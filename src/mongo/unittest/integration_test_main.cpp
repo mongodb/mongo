@@ -35,12 +35,14 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/transport_layer_asio.h"
@@ -59,6 +61,11 @@ using namespace mongo;
 namespace {
 
 ConnectionString fixtureConnectionString{};
+
+MONGO_INITIALIZER(WireSpec)(InitializerContext*) {
+    WireSpec::instance().initialize(WireSpec::Specification{});
+    return Status::OK();
+}
 
 }  // namespace
 

@@ -332,7 +332,7 @@ public:
                     // All incoming connections from mongod/mongos of earlier versions should be
                     // closed if the featureCompatibilityVersion is bumped to 3.6.
                     if (elem.numberInt() >=
-                        WireSpec::instance().incomingInternalClient.maxWireVersion) {
+                        WireSpec::instance().get()->incomingInternalClient.maxWireVersion) {
                         sessionTagsToSet |=
                             transport::Session::kLatestVersionInternalClientKeepOpen;
                     } else {
@@ -422,16 +422,12 @@ public:
         result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
         result.appendNumber("connectionId", opCtx->getClient()->getConnectionId());
 
-        if (internalClientElement) {
-            result.append("minWireVersion",
-                          WireSpec::instance().incomingInternalClient.minWireVersion);
-            result.append("maxWireVersion",
-                          WireSpec::instance().incomingInternalClient.maxWireVersion);
+        if (auto wireSpec = WireSpec::instance().get(); internalClientElement) {
+            result.append("minWireVersion", wireSpec->incomingInternalClient.minWireVersion);
+            result.append("maxWireVersion", wireSpec->incomingInternalClient.maxWireVersion);
         } else {
-            result.append("minWireVersion",
-                          WireSpec::instance().incomingExternalClient.minWireVersion);
-            result.append("maxWireVersion",
-                          WireSpec::instance().incomingExternalClient.maxWireVersion);
+            result.append("minWireVersion", wireSpec->incomingExternalClient.minWireVersion);
+            result.append("maxWireVersion", wireSpec->incomingExternalClient.maxWireVersion);
         }
 
         result.append("readOnly", storageGlobalParams.readOnly);

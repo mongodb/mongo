@@ -587,8 +587,8 @@ void Refresher::scheduleIsMaster(const HostAndPort& host) {
 
     BSONObjBuilder bob;
     bob.append("isMaster", 1);
-    if (WireSpec::instance().isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }
     auto request = executor::RemoteCommandRequest(host, "admin", bob.obj(), nullptr, kCheckTimeout);
     request.sslMode = _set->setUri.getSSLMode();

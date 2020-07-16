@@ -31,9 +31,11 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
@@ -49,6 +51,17 @@
 using mongo::Status;
 
 namespace moe = ::mongo::optionenvironment;
+
+namespace mongo {
+namespace {
+
+MONGO_INITIALIZER(WireSpec)(InitializerContext*) {
+    WireSpec::instance().initialize(WireSpec::Specification{});
+    return Status::OK();
+}
+
+}  // namespace
+}  // namespace mongo
 
 int main(int argc, char** argv) {
     std::vector<std::string> argVec(argv, argv + argc);

@@ -231,19 +231,25 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
 }
 
 void FeatureCompatibilityVersion::updateMinWireVersion() {
-    WireSpec& spec = WireSpec::instance();
+    WireSpec& wireSpec = WireSpec::instance();
 
     switch (serverGlobalParams.featureCompatibility.getVersion()) {
         case ServerGlobalParams::FeatureCompatibility::kLatest:
         case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To451:
-        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingFrom451To44:
-            spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
-            spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
+        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingFrom451To44: {
+            WireSpec::Specification newSpec = *wireSpec.get();
+            newSpec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
+            newSpec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
+            wireSpec.reset(std::move(newSpec));
             return;
-        case ServerGlobalParams::FeatureCompatibility::kLastLTS:
-            spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION - 1;
-            spec.outgoing.minWireVersion = LATEST_WIRE_VERSION - 1;
+        }
+        case ServerGlobalParams::FeatureCompatibility::kLastLTS: {
+            WireSpec::Specification newSpec = *wireSpec.get();
+            newSpec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION - 1;
+            newSpec.outgoing.minWireVersion = LATEST_WIRE_VERSION - 1;
+            wireSpec.reset(std::move(newSpec));
             return;
+        }
         case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault44Behavior:
             // getVersion() does not return this value.
             MONGO_UNREACHABLE;

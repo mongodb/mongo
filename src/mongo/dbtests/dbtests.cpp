@@ -39,6 +39,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/commands.h"
@@ -68,20 +69,24 @@ namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 }  // namespace
 
-void initWireSpec() {
-    WireSpec& spec = WireSpec::instance();
-
-    // Accept from internal clients of the same version, as in upgrade featureCompatibilityVersion.
-    spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
-    spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
+MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(InitializerContext*) {
+    WireSpec::Specification spec;
 
     // Accept from any version external client.
     spec.incomingExternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
     spec.incomingExternalClient.maxWireVersion = LATEST_WIRE_VERSION;
 
+    // Accept from internal clients of the same version, as in upgrade
+    // featureCompatibilityVersion.
+    spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
+    spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
+
     // Connect to servers of the same version, as in upgrade featureCompatibilityVersion.
     spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
     spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
+
+    WireSpec::instance().initialize(std::move(spec));
+    return Status::OK();
 }
 
 Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, bool unique) {
@@ -176,7 +181,6 @@ int dbtestsMain(int argc, char** argv) {
     ::mongo::setTestCommandsEnabled(true);
     ::mongo::TestingProctor::instance().setEnabled(true);
     ::mongo::setupSynchronousSignalHandlers();
-    mongo::dbtests::initWireSpec();
 
     mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.

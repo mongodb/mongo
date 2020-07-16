@@ -57,6 +57,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
@@ -122,6 +123,11 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
 (InitializerContext* context) {
     mongo::serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::kLatest);
+    return Status::OK();
+}
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionSetup"))(InitializerContext*) {
+    WireSpec::instance().initialize(WireSpec::Specification{});
     return Status::OK();
 }
 

@@ -174,8 +174,9 @@ public:
 
         // Mongos tries to keep exactly the same version range of the server for which
         // it is compiled.
-        result.append("maxWireVersion", WireSpec::instance().incomingExternalClient.maxWireVersion);
-        result.append("minWireVersion", WireSpec::instance().incomingExternalClient.minWireVersion);
+        auto wireSpec = WireSpec::instance().get();
+        result.append("maxWireVersion", wireSpec->incomingExternalClient.maxWireVersion);
+        result.append("minWireVersion", wireSpec->incomingExternalClient.minWireVersion);
 
         {
             const auto& serverParams = ServerParameterSet::getGlobal()->getMap();

@@ -89,8 +89,8 @@ BSONObj AsyncDBClient::_buildIsMasterRequest(const std::string& appName,
 
     _compressorManager.clientBegin(&bob);
 
-    if (WireSpec::instance().isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }
 
     if (hook) {
@@ -105,12 +105,12 @@ void AsyncDBClient::_parseIsMasterResponse(BSONObj request,
     uassert(50786,
             "Expected opQuery response to isMaster",
             response->getProtocol() == rpc::Protocol::kOpQuery);
+    auto wireSpec = WireSpec::instance().get();
     auto responseBody = response->getCommandReply();
     uassertStatusOK(getStatusFromCommandResult(responseBody));
 
     auto protocolSet = uassertStatusOK(rpc::parseProtocolSetFromIsMasterReply(responseBody));
-    auto validateStatus =
-        rpc::validateWireVersion(WireSpec::instance().outgoing, protocolSet.version);
+    auto validateStatus = rpc::validateWireVersion(wireSpec->outgoing, protocolSet.version);
     if (!validateStatus.isOK()) {
         LOGV2_WARNING(23741,
                       "Remote host has incompatible wire version: {error}",
@@ -124,12 +124,12 @@ void AsyncDBClient::_parseIsMasterResponse(BSONObj request,
     auto& egressTagManager = executor::EgressTagCloserManager::get(_svcCtx);
     // Tag outgoing connection so it can be kept open on FCV upgrade if it is not to a
     // server with a lower binary version.
-    if (protocolSet.version.maxWireVersion >= WireSpec::instance().outgoing.maxWireVersion) {
+    if (protocolSet.version.maxWireVersion >= wireSpec->outgoing.maxWireVersion) {
         egressTagManager.mutateTags(
             _peer, [](transport::Session::TagMask tags) { return transport::Session::kKeepOpen; });
     }
 
-    auto clientProtocols = rpc::computeProtocolSet(WireSpec::instance().outgoing);
+    auto clientProtocols = rpc::computeProtocolSet(wireSpec->outgoing);
     invariant(clientProtocols != rpc::supports::kNone);
     // Set the operation protocol
     _negotiatedProtocol = uassertStatusOK(rpc::negotiate(protocolSet.protocolSet, clientProtocols));

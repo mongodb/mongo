@@ -68,6 +68,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
 
+        auto wireSpec = WireSpec::instance().get();
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
         if (!seenIsMaster) {
@@ -101,8 +102,8 @@ public:
         result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
         result.appendNumber("connectionId", opCtx->getClient()->getConnectionId());
 
-        result.append("minWireVersion", WireSpec::instance().incomingExternalClient.minWireVersion);
-        result.append("maxWireVersion", WireSpec::instance().incomingExternalClient.maxWireVersion);
+        result.append("minWireVersion", wireSpec->incomingExternalClient.minWireVersion);
+        result.append("maxWireVersion", wireSpec->incomingExternalClient.maxWireVersion);
 
         result.append("readOnly", storageGlobalParams.readOnly);
 

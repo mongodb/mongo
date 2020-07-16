@@ -151,6 +151,12 @@ public:
     constexpr static Milliseconds kNoTimeout = RemoteCommandRequest::kNoTimeout;
     constexpr static Milliseconds kMaxWait = Milliseconds(Minutes(1));
 
+    void resetIsInternalClient(bool isInternalClient) {
+        WireSpec::Specification newSpec = *WireSpec::instance().get();
+        newSpec.isInternalClient = isInternalClient;
+        WireSpec::instance().reset(std::move(newSpec));
+    }
+
     void assertNumOps(uint64_t canceled, uint64_t timedOut, uint64_t failed, uint64_t succeeded) {
         auto counters = net().getCounters();
         ASSERT_EQ(canceled, counters.canceled);
@@ -300,13 +306,13 @@ private:
 class NetworkInterfaceInternalClientTest : public NetworkInterfaceTest {
 public:
     void setUp() override {
-        WireSpec::instance().isInternalClient = true;
+        resetIsInternalClient(true);
         NetworkInterfaceTest::setUp();
     }
 
     void tearDown() override {
         NetworkInterfaceTest::tearDown();
-        WireSpec::instance().isInternalClient = false;
+        resetIsInternalClient(false);
     }
 };
 
@@ -732,14 +738,15 @@ TEST_F(NetworkInterfaceInternalClientTest,
     auto isMasterHandshake = waitForIsMaster();
 
     // Verify that the isMaster reply has the expected internalClient data.
+    auto wireSpec = WireSpec::instance().get();
     auto internalClientElem = isMasterHandshake.request["internalClient"];
     ASSERT_EQ(internalClientElem.type(), BSONType::Object);
     auto minWireVersionElem = internalClientElem.Obj()["minWireVersion"];
     auto maxWireVersionElem = internalClientElem.Obj()["maxWireVersion"];
     ASSERT_EQ(minWireVersionElem.type(), BSONType::NumberInt);
     ASSERT_EQ(maxWireVersionElem.type(), BSONType::NumberInt);
-    ASSERT_EQ(minWireVersionElem.numberInt(), WireSpec::instance().outgoing.minWireVersion);
-    ASSERT_EQ(maxWireVersionElem.numberInt(), WireSpec::instance().outgoing.maxWireVersion);
+    ASSERT_EQ(minWireVersionElem.numberInt(), wireSpec->outgoing.minWireVersion);
+    ASSERT_EQ(maxWireVersionElem.numberInt(), wireSpec->outgoing.maxWireVersion);
 
     // Verify that the ping op is counted as a success.
     auto res = deferred.get();
@@ -748,7 +755,7 @@ TEST_F(NetworkInterfaceInternalClientTest,
 }
 
 TEST_F(NetworkInterfaceTest, IsMasterRequestMissingInternalClientInfoWhenNotInternalClient) {
-    WireSpec::instance().isInternalClient = false;
+    resetIsInternalClient(false);
 
     auto deferred = runCommand(makeCallbackHandle(), makeTestCommand(kNoTimeout, makeEchoCmdObj()));
     auto isMasterHandshake = waitForIsMaster();

@@ -246,8 +246,8 @@ SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
     bob.append("maxAwaitTimeMS", maxAwaitTimeMS);
     bob.append("topologyVersion", _topologyVersion->toBSON());
 
-    if (WireSpec::instance().isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }
 
     const auto timeoutMS = _connectTimeout + kMaxAwaitTime;
@@ -303,8 +303,8 @@ SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
 StatusWith<TaskExecutor::CallbackHandle> SingleServerIsMasterMonitor::_scheduleSingleIsMaster() {
     BSONObjBuilder bob;
     bob.append("isMaster", 1);
-    if (WireSpec::instance().isInternalClient) {
-        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+    if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
+        WireSpec::appendInternalClientWireVersion(wireSpec->outgoing, &bob);
     }
 
     auto request = executor::RemoteCommandRequest(

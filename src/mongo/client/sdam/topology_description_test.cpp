@@ -194,7 +194,7 @@ TEST_F(TopologyDescriptionTestFixture, ShouldNotAllowChangingTheHeartbeatFrequen
 
 TEST_F(TopologyDescriptionTestFixture,
        ShouldSetWireCompatibilityErrorForMinWireVersionWhenMinWireVersionIsGreater) {
-    const auto outgoingMaxWireVersion = WireSpec::instance().outgoing.maxWireVersion;
+    const auto outgoingMaxWireVersion = WireSpec::instance().get()->outgoing.maxWireVersion;
     const auto config = SdamConfiguration(kOneServer, TopologyType::kUnknown);
     const auto topologyDescription = std::make_shared<TopologyDescription>(config);
     const auto serverDescriptionMinVersion = ServerDescriptionBuilder()
@@ -211,7 +211,7 @@ TEST_F(TopologyDescriptionTestFixture,
 
 TEST_F(TopologyDescriptionTestFixture,
        ShouldSetWireCompatibilityErrorForMinWireVersionWhenMaxWireVersionIsLess) {
-    const auto outgoingMinWireVersion = WireSpec::instance().outgoing.minWireVersion;
+    const auto outgoingMinWireVersion = WireSpec::instance().get()->outgoing.minWireVersion;
     const auto config = SdamConfiguration(kOneServer, TopologyType::kUnknown);
     const auto topologyDescription = std::make_shared<TopologyDescription>(config);
     const auto serverDescriptionMaxVersion = ServerDescriptionBuilder()
@@ -227,7 +227,7 @@ TEST_F(TopologyDescriptionTestFixture,
 }
 
 TEST_F(TopologyDescriptionTestFixture, ShouldNotSetWireCompatibilityErrorWhenServerTypeIsUnknown) {
-    const auto outgoingMinWireVersion = WireSpec::instance().outgoing.minWireVersion;
+    const auto outgoingMinWireVersion = WireSpec::instance().get()->outgoing.minWireVersion;
     const auto config = SdamConfiguration(kOneServer, TopologyType::kUnknown);
     const auto topologyDescription = std::make_shared<TopologyDescription>(config);
     const auto serverDescriptionMaxVersion =

@@ -34,6 +34,7 @@
 #include "mongo/embedded/embedded.h"
 
 #include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
@@ -83,19 +84,18 @@ namespace mongo {
 namespace embedded {
 namespace {
 
-void initWireSpec() {
-    WireSpec& spec = WireSpec::instance();
-
+MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(InitializerContext*) {
     // The featureCompatibilityVersion behavior defaults to the downgrade behavior while the
     // in-memory version is unset.
-
+    WireSpec::Specification spec;
     spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
     spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
-
     spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
     spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
-
     spec.isInternalClient = true;
+
+    WireSpec::instance().initialize(std::move(spec));
+    return Status::OK();
 }
 
 // Noop, to fulfill dependencies for other initializers.
@@ -202,8 +202,6 @@ ServiceContext* initialize(const char* yaml_config) {
     Client::initThread("initandlisten");
     // Make sure current thread have no client set in thread_local when we leave this function
     auto clientGuard = makeGuard([] { Client::releaseCurrent(); });
-
-    initWireSpec();
 
     auto serviceContext = getGlobalServiceContext();
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointEmbedded>());

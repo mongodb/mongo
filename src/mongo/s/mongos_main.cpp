@@ -490,15 +490,16 @@ Status initializeSharding(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void initWireSpec() {
-    WireSpec& spec = WireSpec::instance();
-
+MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(InitializerContext*) {
     // Since the upgrade order calls for upgrading mongos last, it only needs to talk the latest
     // wire version. This ensures that users will get errors if they upgrade in the wrong order.
+    WireSpec::Specification spec;
     spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
     spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
-
     spec.isInternalClient = true;
+
+    WireSpec::instance().initialize(std::move(spec));
+    return Status::OK();
 }
 
 class ShardingReplicaSetChangeListener final
@@ -662,8 +663,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ThreadClient tc("mongosMain", serviceContext);
 
     logShardingVersionInfo(nullptr);
-
-    initWireSpec();
 
     // Set up the periodic runner for background job execution
     {

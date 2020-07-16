@@ -27,22 +27,65 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/wire_version.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/static_immortal.h"
+#include "mongo/util/thread_safety_context.h"
+
 namespace mongo {
 
 WireSpec& WireSpec::instance() {
-    static WireSpec instance;
-    return instance;
+    static StaticImmortal<WireSpec> instance;
+    return *instance;
 }
 
 void WireSpec::appendInternalClientWireVersion(WireVersionInfo wireVersionInfo,
                                                BSONObjBuilder* builder) {
     BSONObjBuilder subBuilder(builder->subobjStart("internalClient"));
-    subBuilder.append("minWireVersion", wireVersionInfo.minWireVersion);
-    subBuilder.append("maxWireVersion", wireVersionInfo.maxWireVersion);
+    WireVersionInfo::appendToBSON(wireVersionInfo, &subBuilder);
+}
+
+BSONObj specToBSON(const WireSpec::Specification& spec) {
+    BSONObjBuilder bob;
+    WireSpec::Specification::appendToBSON(spec, &bob);
+    return bob.obj();
+}
+
+void WireSpec::initialize(Specification spec) {
+    invariant(ThreadSafetyContext::getThreadSafetyContext()->isSingleThreaded());
+    fassert(ErrorCodes::AlreadyInitialized, !isInitialized());
+    BSONObj newSpec = specToBSON(spec);
+    _spec = std::make_shared<Specification>(std::move(spec));
+    LOGV2(4915701, "Initialized wire specification", "spec"_attr = newSpec);
+}
+
+void WireSpec::reset(Specification spec) {
+    BSONObj oldSpec, newSpec;
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        internalAssert(
+            ErrorCodes::NotYetInitialized, "WireSpec is not yet initialized", isInitialized());
+
+        oldSpec = specToBSON(*_spec.get());
+        _spec = std::make_shared<Specification>(std::move(spec));
+        newSpec = specToBSON(*_spec.get());
+    }
+
+    LOGV2(
+        4915702, "Updated wire specification", "oldSpec"_attr = oldSpec, "newSpec"_attr = newSpec);
+}
+
+std::shared_ptr<const WireSpec::Specification> WireSpec::get() const {
+    stdx::lock_guard<Latch> lk(_mutex);
+    fassert(ErrorCodes::NotYetInitialized, isInitialized());
+    return _spec;
 }
 
 }  // namespace mongo

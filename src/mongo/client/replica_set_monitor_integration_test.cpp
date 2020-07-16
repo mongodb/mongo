@@ -66,6 +66,12 @@ class ReplicaSetMonitorFixture : public mongo::unittest::Test {
 public:
     constexpr static Milliseconds kTimeout{5000};
 
+    void resetIsInternalClient(bool isInternalClient) {
+        WireSpec::Specification newSpec = *WireSpec::instance().get();
+        newSpec.isInternalClient = isInternalClient;
+        WireSpec::instance().reset(std::move(newSpec));
+    }
+
     void setUp() override {
         net = makeNetworkInterface("ReplicaSetMonintorTest");
 
@@ -78,14 +84,14 @@ public:
         replSetUri = uassertStatusOK(MongoURI::parse(getReplSetConnectionString()));
         numNodes = replSetUri.getServers().size();
 
-        WireSpec::instance().isInternalClient = true;
+        resetIsInternalClient(true);
     };
 
     void tearDown() override {
         executor->shutdown();
         executor.reset();
 
-        WireSpec::instance().isInternalClient = false;
+        resetIsInternalClient(false);
     };
 
 

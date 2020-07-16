@@ -36,6 +36,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
 )
@@ -57,6 +58,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/server_options_base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
     ],
