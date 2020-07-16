@@ -37,6 +37,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/biggie/biggie_kv_engine.h"
 #include "mongo/db/storage/biggie/biggie_record_store.h"
+#include "mongo/db/storage/biggie/store.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -59,7 +60,9 @@ BSONObj BiggieServerStatusSection::generateSection(OperationContext* opCtx,
     }
 
     BSONObjBuilder bob;
-    bob.append("statisitcs", "TODO SERVER-49055");
+    bob.append("totalMemoryUsage", StringStore::totalMemory());
+    bob.append("totalNodes", StringStore::totalNodes());
+    bob.append("averageChildren", StringStore::averageChildren());
 
     return bob.obj();
 }

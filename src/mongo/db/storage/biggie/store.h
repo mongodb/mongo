@@ -52,6 +52,20 @@ class merge_conflict_exception : std::exception {
     }
 };
 
+struct Metrics {
+    AtomicWord<int64_t> totalMemory{0};
+    AtomicWord<int32_t> totalNodes{0};
+    AtomicWord<int32_t> totalChildren{0};
+
+    void addMemory(size_t size) {
+        totalMemory.fetchAndAdd(size);
+    }
+
+    void subtractMemory(size_t size) {
+        totalMemory.fetchAndSubtract(size);
+    }
+};
+
 /**
  * RadixStore is a Trie data structure with the ability to share nodes among copies of trees to
  * minimize data duplication. Each node has a notion of ownership and if modifications are made to
@@ -519,6 +533,20 @@ public:
         return _root->_nextVersion ? true : false;
     }
 
+    // Metrics
+    static int64_t totalMemory() {
+        return _metrics.totalMemory.load();
+    }
+
+    static int32_t totalNodes() {
+        return _metrics.totalNodes.load();
+    }
+
+    static uint16_t averageChildren() {
+        auto totalNodes = _metrics.totalNodes.load();
+        return totalNodes ? _metrics.totalChildren.load() / totalNodes : 0;
+    }
+
     // Modifiers
     void clear() noexcept {
         _root = make_intrusive_node<Head>();
@@ -797,31 +825,44 @@ private:
         friend class RadixStoreTest;
 
     public:
-        Node() = default;
+        Node() {
+            addNodeMemory();
+        }
+
         Node(std::vector<uint8_t> key) {
             _trieKey = key;
+            addNodeMemory();
         }
 
         Node(const Node& other) {
             _trieKey = other._trieKey;
             _depth = other._depth;
-            if (other._data)
-                _data.emplace(other._data->first, other._data->second);
+            if (other._data) {
+                addData(other._data);
+            }
             _children = other._children;
             _numChildren = other._numChildren;
             // _refCount is initialized to 0 and not copied from other.
+
+            addNodeMemory();
         }
 
         Node(Node&& other) {
-            _depth = std::move(other._depth);
+            _depth = other._depth;
             _trieKey = std::move(other._trieKey);
             _data = std::move(other._data);
             _children = std::move(other._children);
-            _numChildren = std::move(other._numChildren);
+            _numChildren = other._numChildren;
             // _refCount is initialized to 0 and not copied from other.
+
+            // The move constructor transfers the dynamic memory so only the static memory of Node
+            // should be added.
+            addNodeMemory(-_trieKey.capacity() * sizeof(uint8_t));
         }
 
-        virtual ~Node() = default;
+        virtual ~Node() {
+            subtractNodeMemory();
+        }
 
         bool isLeaf() const {
             return !_numChildren;
@@ -843,6 +884,30 @@ private:
             if (ptr->_refCount.fetchAndSubtract(1) == 1) {
                 delete ptr;
             }
+        }
+
+        void addNodeMemory(difference_type offset = 0) {
+            _metrics.totalMemory.fetchAndAdd(sizeof(Node) + _trieKey.capacity() * sizeof(uint8_t) +
+                                             offset);
+            _metrics.totalNodes.fetchAndAdd(1);
+            _metrics.totalChildren.fetchAndAdd(_children.size());
+        }
+
+        void subtractNodeMemory() {
+            // Todo SERVER-36709: Vector capacity changes are ignored for now. This might be
+            // handled when nodes are made adaptive.
+            size_t memUsage = sizeof(Node) + _trieKey.capacity() * sizeof(uint8_t);
+            if (_data) {
+                memUsage += _data->first.capacity() + _data->second.capacity();
+            }
+            _metrics.totalMemory.fetchAndSubtract(memUsage);
+            _metrics.totalNodes.fetchAndSubtract(1);
+            _metrics.totalChildren.fetchAndSubtract(_children.size());
+        }
+
+        void addData(boost::optional<value_type> value) {
+            _data.emplace(value->first, value->second);
+            _metrics.addMemory(value->first.capacity() + value->second.capacity());
         }
 
     protected:
@@ -870,17 +935,31 @@ private:
         friend class RadixStore;
 
     public:
-        Head() = default;
-        Head(std::vector<uint8_t> key) : Node(key) {}
-        Head(const Node& other) : Node(other) {}
-        Head(const Head& other) : Node(other), _count(other._count), _dataSize(other._dataSize) {}
+        Head() {
+            _metrics.addMemory(sizeof(Head) - sizeof(Node));
+        }
+
+        Head(std::vector<uint8_t> key) : Node(key) {
+            _metrics.addMemory(sizeof(Head) - sizeof(Node));
+        }
+
+        Head(const Node& other) : Node(other) {
+            _metrics.addMemory(sizeof(Head) - sizeof(Node));
+        }
+
+        Head(const Head& other) : Node(other), _count(other._count), _dataSize(other._dataSize) {
+            _metrics.addMemory(sizeof(Head) - sizeof(Node));
+        }
 
         ~Head() {
             if (_nextVersion)
                 _nextVersion->_hasPreviousVersion = false;
+            _metrics.subtractMemory(sizeof(Head) - sizeof(Node));
         }
 
-        Head(Head&& other) : Node(std::move(other)) {}
+        Head(Head&& other) : Node(std::move(other)) {
+            // TODO SERVER-49100: Move other fields in Head class.
+        }
 
         bool hasPreviousVersion() const {
             return _hasPreviousVersion;
@@ -1056,7 +1135,7 @@ private:
                 } else {
                     // The new key is a prefix of an existing key, and has its own node, so we don't
                     // need to add any new nodes.
-                    newNode->_data.emplace(value->first, value->second);
+                    newNode->addData(value);
                 }
                 _root->_count++;
                 _root->_dataSize += value->second.size();
@@ -1066,26 +1145,30 @@ private:
                 newNode->_children[newKey.front()] = node;
                 ++newNode->_numChildren;
 
+                // Handle key size change to the new key.
+                _metrics.subtractMemory(sizeof(uint8_t) *
+                                        (node->_trieKey.capacity() - newKey.capacity()));
                 node->_trieKey = newKey;
                 node->_depth = newNode->_depth + newNode->_trieKey.size();
 
                 return std::pair<const_iterator, bool>(it, true);
             } else if (mismatchIdx == key.size() - depth) {
+                auto& data = node->_data;
                 // The key already exists. If there's an element as well, account for its removal.
-                if (node->_data) {
+                if (data) {
                     _root->_count--;
-                    _root->_dataSize -= node->_data->second.size();
+                    _root->_dataSize -= data->second.size();
+                    _metrics.subtractMemory(data->first.capacity() + data->second.capacity());
                 }
-
 
                 // Update an internal node.
                 if (!value) {
-                    node->_data = boost::none;
+                    data = boost::none;
                     _compressOnlyChild(node.get());
                 } else {
                     _root->_count++;
                     _root->_dataSize += value->second.size();
-                    node->_data.emplace(value->first, value->second);
+                    node->addData(value);
                 }
                 const_iterator it(_root, node.get());
 
@@ -1142,7 +1225,7 @@ private:
         boost::intrusive_ptr<Node> newNode = make_intrusive_node<Node>(key);
         newNode->_depth = node->_depth + node->_trieKey.size();
         if (value) {
-            newNode->_data.emplace(value->first, value->second);
+            newNode->addData(value);
         }
         auto& child = node->_children[key.front()];
         if (!child) {
@@ -1222,7 +1305,7 @@ private:
         }
 
         if (onlyChild->_data) {
-            node->_data.emplace(onlyChild->_data->first, onlyChild->_data->second);
+            node->addData(onlyChild->_data);
         }
         node->_children = onlyChild->_children;
         node->_numChildren = onlyChild->_numChildren;
@@ -1565,7 +1648,11 @@ private:
     }
 
     boost::intrusive_ptr<Head> _root = nullptr;
+    static Metrics _metrics;
 };
+
+template <class Key, class T>
+Metrics RadixStore<Key, T>::_metrics;
 
 using StringStore = RadixStore<std::string, std::string>;
 }  // namespace biggie
