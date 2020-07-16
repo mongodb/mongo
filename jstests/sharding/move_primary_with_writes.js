@@ -13,6 +13,7 @@ let st = new ShardingTest({
 });
 
 const dbName = "testdb";
+const otherDbName = "otherdb";
 
 function verifyDocuments(db, count) {
     assert.eq(count, db.unshardedFoo.count());
@@ -21,19 +22,27 @@ function verifyDocuments(db, count) {
 function createCollections() {
     assert.commandWorked(st.getDB(dbName).runCommand({dropDatabase: 1}));
     let db = st.getDB(dbName);
+    let otherDb = st.getDB(otherDbName);
 
-    const unshardedFooIndexes = [{key: {a: 1}, name: 'fooIndex_a'}];
-    const shardedBarIndexes = [{key: {a: 1}, name: 'barIndex_a'}];
+    const unshardedFooIndexes = [
+        {key: {a: 1}, name: 'fooIndex_a'},
+        {key: {c: 1}, name: 'fooTTL_c', expireAfterSeconds: 1800}
+    ];
+    const shardedBarIndexes = [
+        {key: {a: 1}, name: 'barIndex_a'},
+        {key: {c: 1}, name: 'barTTL_c', expireAfterSeconds: 1800}
+    ];
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
 
     assert.commandWorked(db.createCollection('unshardedFoo'));
     assert.commandWorked(db.createCollection('shardedBar'));
+    assert.commandWorked(otherDb.createCollection('unshardedOtherFoo'));
 
     for (let i = 0; i < 3; i++) {
-        assert.commandWorked(db.unshardedFoo.insert({_id: i, a: i, b: i}));
-        assert.commandWorked(db.shardedBar.insert({_id: i, a: i, b: i}));
+        assert.commandWorked(db.unshardedFoo.insert({_id: i, a: i, b: i, c: i}));
+        assert.commandWorked(db.shardedBar.insert({_id: i, a: i, b: i, c: i}));
     }
 
     assert.commandWorked(
@@ -54,18 +63,18 @@ function reduceFunc(key, values) {
     return Array.sum(values);
 }
 
-function buildCommands(collName) {
+function buildCommands(collName, shouldFail) {
     const commands = [
-        {command: {insert: collName, documents: [{a: 10}]}, alwaysFail: false},
+        {command: {insert: collName, documents: [{a: 10}]}, shouldFail: shouldFail},
         {
             command: {update: collName, updates: [{q: {a: 1}, u: {$set: {a: 11}}}]},
-            alwaysFail: false
+            shouldFail: shouldFail
         },
         {
             command: {findAndModify: collName, query: {_id: 2}, update: {$set: {a: 11}}},
-            alwaysFail: false
+            shouldFail: shouldFail
         },
-        {command: {delete: collName, deletes: [{q: {_id: 0}, limit: 1}]}, alwaysFail: false},
+        {command: {delete: collName, deletes: [{q: {_id: 0}, limit: 1}]}, shouldFail: shouldFail},
         {
             command: {
                 aggregate: collName,
@@ -74,7 +83,7 @@ function buildCommands(collName) {
                     {$match: {_id: 0}},
                     {
                         $merge: {
-                            into: "testMergeColl",
+                            into: {db: dbName, coll: "testMergeColl"},
                             on: "_id",
                             whenMatched: "replace",
                             whenNotMatched: "insert"
@@ -82,12 +91,30 @@ function buildCommands(collName) {
                     }
                 ]
             },
-            alwaysFail: true
+            shouldFail: true
+        },
+        {
+            command: {
+                aggregate: collName,
+                cursor: {},
+                pipeline: [
+                    {$match: {_id: 0}},
+                    {
+                        $merge: {
+                            into: {db: otherDbName, coll: "testMergeColl"},
+                            on: "_id",
+                            whenMatched: "replace",
+                            whenNotMatched: "insert"
+                        }
+                    }
+                ]
+            },
+            shouldFail: false
         },
         {
             command:
                 {aggregate: collName, cursor: {}, pipeline: [{$match: {}}, {$out: "testOutColl"}]},
-            alwaysFail: true
+            shouldFail: true
         },
         {
             command: {
@@ -96,13 +123,27 @@ function buildCommands(collName) {
                 reduce: reduceFunc,
                 out: {merge: "testOutMR", db: dbName}
             },
-            alwaysFail: true
+            shouldFail: true
         },
-        {command: {create: "testCollection"}, alwaysFail: true},
+        {
+            command: {
+                mapReduce: collName,
+                map: mapFunc,
+                reduce: reduceFunc,
+                out: {merge: "testOutMR", db: otherDbName}
+            },
+            shouldFail: false
+        },
+        {command: {create: "testCollection"}, shouldFail: true},
         {
             command: {createIndexes: collName, indexes: [{key: {b: 1}, name: collName + "Idx_b"}]},
-            alwaysFail: false
+            shouldFail: shouldFail
         },
+        {
+            command: {collMod: collName, index: {keyPattern: {c: 1}, expireAfterSeconds: 3600}},
+            shouldFail: shouldFail
+        },
+        {command: {convertToCapped: "unshardedFoo", size: 1000000}, shouldFail: true}
     ];
     return commands;
 }
@@ -130,19 +171,20 @@ function testMovePrimary(failpoint, fromShard, toShard, db, shouldFail, sharded)
     // Test DML
 
     let collName;
+    let cmdShouldFail = !sharded;
     if (sharded) {
         collName = "shardedBar";
     } else {
         collName = "unshardedFoo";
     }
 
-    buildCommands(collName).forEach(commandObj => {
-        if (shouldFail) {
+    buildCommands(collName, cmdShouldFail).forEach(commandObj => {
+        if (shouldFail && commandObj.shouldFail) {
             jsTestLog("running command: " + tojson(commandObj.command) +
                       ",\nshoudFail: " + shouldFail);
             assert.commandFailedWithCode(db.runCommand(commandObj.command),
                                          ErrorCodes.MovePrimaryInProgress);
-        } else if (!commandObj.alwaysFail) {
+        } else if (!shouldFail && !commandObj.shouldFail) {
             jsTestLog("running command: " + tojson(commandObj.command) +
                       ",\nshoudFail: " + shouldFail);
             assert.commandWorked(db.runCommand(commandObj.command));
