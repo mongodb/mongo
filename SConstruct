@@ -3881,13 +3881,13 @@ if get_option('ninja') != 'disabled':
     else:
         ninja_builder = Tool("ninja_next")
         ninja_builder.generate(env)
-        
+
         ninjaConf = Configure(env, help=False, custom_tests = {
             'CheckNinjaCompdbExpand': env.CheckNinjaCompdbExpand,
         })
         env['NINJA_COMPDB_EXPAND'] = ninjaConf.CheckNinjaCompdbExpand()
         ninjaConf.Finish()
-        
+
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
@@ -3931,7 +3931,7 @@ if get_option('ninja') != 'disabled':
 
     def ninja_test_list_builder(env, node):
         test_files = [test_file.path for test_file in env["MONGO_TEST_REGISTRY"][node.path]]
-        files = "\\n".join(test_files)
+        files = ' '.join(test_files)
         return {
             "outputs": [node.get_path()],
             "rule": "TEST_LIST",
@@ -3941,13 +3941,15 @@ if get_option('ninja') != 'disabled':
             }
         }
 
+    if env["PLATFORM"] == "win32":
+        cmd = 'cmd.exe /c del "$out" && for %a in ($files) do (echo %a >> "$out")'
+    else:
+        cmd = 'rm -f "$out"; for i in $files; do echo "$$i" >> "$out"; done;'
+
     env.NinjaRule(
         rule="TEST_LIST",
         description="Compiling test list: $out",
-        command="{prefix}echo {flags} '$files' > '$out'".format(
-            prefix="cmd.exe /c " if env["PLATFORM"] == "win32" else "",
-            flags="-n" if env["PLATFORM"] != "win32" else "",
-        ),
+        command=cmd,
     )
     env.NinjaRegisterFunctionHandler("test_list_builder_action", ninja_test_list_builder)
 
