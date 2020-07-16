@@ -442,7 +442,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildText(const QuerySolu
 
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildReturnKey(
     const QuerySolutionNode* root) {
-    // TODO SERVER-48721: If the projection includes {$meta: "sortKey"}, the result of this stage
+    // TODO SERVER-49509: If the projection includes {$meta: "sortKey"}, the result of this stage
     // should also include the sort key. Everything else in the projection is ignored.
     auto returnKeyNode = static_cast<const ReturnKeyNode*>(root);
 
