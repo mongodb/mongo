@@ -122,7 +122,7 @@ static const char *const __stats_dsrc_desc[] = {
   "reconciliation: records written including a stop durable timestamp",
   "reconciliation: records written including a stop timestamp",
   "reconciliation: records written including a stop transaction ID", "session: object compaction",
-  "transaction: update conflicts",
+  "transaction: race to read prepared update retry", "transaction: update conflicts",
 };
 
 int
@@ -343,6 +343,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->rec_time_window_stop_ts = 0;
     stats->rec_time_window_stop_txn = 0;
     stats->session_compact = 0;
+    stats->txn_read_race_prepare_update = 0;
     stats->txn_update_conflict = 0;
 }
 
@@ -551,6 +552,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->rec_time_window_stop_ts += from->rec_time_window_stop_ts;
     to->rec_time_window_stop_txn += from->rec_time_window_stop_txn;
     to->session_compact += from->session_compact;
+    to->txn_read_race_prepare_update += from->txn_read_race_prepare_update;
     to->txn_update_conflict += from->txn_update_conflict;
 }
 
@@ -760,6 +762,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->rec_time_window_stop_ts += WT_STAT_READ(from, rec_time_window_stop_ts);
     to->rec_time_window_stop_txn += WT_STAT_READ(from, rec_time_window_stop_txn);
     to->session_compact += WT_STAT_READ(from, session_compact);
+    to->txn_read_race_prepare_update += WT_STAT_READ(from, txn_read_race_prepare_update);
     to->txn_update_conflict += WT_STAT_READ(from, txn_update_conflict);
 }
 
@@ -1067,6 +1070,7 @@ static const char *const __stats_connection_desc[] = {
   "transaction: prepared transactions committed",
   "transaction: prepared transactions currently active",
   "transaction: prepared transactions rolled back", "transaction: query timestamp calls",
+  "transaction: race to read prepared update retry",
   "transaction: read timestamp queue entries walked",
   "transaction: read timestamp queue insert to empty",
   "transaction: read timestamp queue inserts to head",
@@ -1573,6 +1577,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->txn_prepare_active = 0;
     stats->txn_prepare_rollback = 0;
     stats->txn_query_ts = 0;
+    stats->txn_read_race_prepare_update = 0;
     stats->txn_read_queue_walked = 0;
     stats->txn_read_queue_empty = 0;
     stats->txn_read_queue_head = 0;
@@ -2091,6 +2096,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_prepare_active += WT_STAT_READ(from, txn_prepare_active);
     to->txn_prepare_rollback += WT_STAT_READ(from, txn_prepare_rollback);
     to->txn_query_ts += WT_STAT_READ(from, txn_query_ts);
+    to->txn_read_race_prepare_update += WT_STAT_READ(from, txn_read_race_prepare_update);
     to->txn_read_queue_walked += WT_STAT_READ(from, txn_read_queue_walked);
     to->txn_read_queue_empty += WT_STAT_READ(from, txn_read_queue_empty);
     to->txn_read_queue_head += WT_STAT_READ(from, txn_read_queue_head);

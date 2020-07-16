@@ -654,6 +654,7 @@ connection_stats = [
     TxnStat('txn_prepare_rollback', 'prepared transactions rolled back'),
     TxnStat('txn_prepared_updates_count', 'Number of prepared updates'),
     TxnStat('txn_query_ts', 'query timestamp calls'),
+    TxnStat('txn_read_race_prepare_update', 'race to read prepared update retry'),
     TxnStat('txn_read_queue_empty', 'read timestamp queue insert to empty'),
     TxnStat('txn_read_queue_head', 'read timestamp queue inserts to head'),
     TxnStat('txn_read_queue_inserts', 'read timestamp queue inserts total'),
@@ -930,6 +931,7 @@ dsrc_stats = [
     ##########################################
     # Transaction statistics
     ##########################################
+    TxnStat('txn_read_race_prepare_update', 'race to read prepared update retry'),
     TxnStat('txn_update_conflict', 'update conflicts'),
 ]
 

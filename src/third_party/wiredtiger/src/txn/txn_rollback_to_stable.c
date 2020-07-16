@@ -433,7 +433,7 @@ __rollback_abort_row_ondisk_kv(
         } else
             return (0);
     } else if (vpack->tw.durable_start_ts > rollback_timestamp ||
-      (vpack->tw.durable_stop_ts == WT_TS_NONE && prepared)) {
+      (!WT_TIME_WINDOW_HAS_STOP(&vpack->tw) && prepared)) {
         __wt_verbose(session, WT_VERB_RTS,
           "on-disk update aborted with start durable timestamp: %s, commit timestamp: %s, "
           "prepared: %s and stable timestamp: %s",
@@ -450,23 +450,19 @@ __rollback_abort_row_ondisk_kv(
             WT_RET(__wt_upd_alloc_tombstone(session, &upd, NULL));
             WT_STAT_CONN_INCR(session, txn_rts_keys_removed);
         }
-    } else if (vpack->tw.durable_stop_ts != WT_TS_NONE &&
+    } else if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw) &&
       (vpack->tw.durable_stop_ts > rollback_timestamp || prepared)) {
         /*
          * Clear the remove operation from the key by inserting the original on-disk value as a
          * standard update.
-         *
-         * Take the value from the original page cell. If a value is simple(no compression), and is
-         * globally visible at the time of reading a page into cache, we encode its location into
-         * the WT_ROW. Otherwise, read it from the page.
          */
-        if (!__wt_row_leaf_value(page, rip, &buf))
-            WT_RET(__wt_page_cell_data_ref(session, page, vpack, &buf));
+        WT_RET(__wt_page_cell_data_ref(session, page, vpack, &buf));
 
         WT_ERR(__wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, &upd, NULL));
         upd->txnid = vpack->tw.start_txn;
         upd->durable_ts = vpack->tw.durable_start_ts;
         upd->start_ts = vpack->tw.start_ts;
+        F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
         WT_STAT_CONN_INCR(session, txn_rts_keys_restored);
         __wt_verbose(session, WT_VERB_RTS,
           "key restored with commit timestamp: %s, durable timestamp: %s txnid: %" PRIu64

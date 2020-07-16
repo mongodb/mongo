@@ -49,7 +49,9 @@ __rec_update_save(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, voi
 
 /*
  * __rec_append_orig_value --
- *     Append the key's original value to its update list.
+ *     Append the key's original value to its update list. It assumes that we have an onpage value,
+ *     and we don't overwrite transaction id to WT_TXN_NONE and timestamps to WT_TS_NONE in time
+ *     window for in-memory databases.
  */
 static int
 __rec_append_orig_value(
@@ -69,8 +71,8 @@ __rec_append_orig_value(
 
     /* Review the current update list, checking conditions that mean no work is needed. */
     for (;; upd = upd->next) {
-        /* Done if the update was restored from the history store. */
-        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_HS))
+        /* Done if the update was restored from the data store or the history store. */
+        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS))
             return (0);
 
         /*
@@ -83,10 +85,13 @@ __rec_append_orig_value(
         /*
          * Done if the on page value already appears on the update list. We can't do the same check
          * for stop time point because we may still need to append the onpage value if only the
-         * tombstone is on the update chain.
+         * tombstone is on the update chain. We only need to check it in the in memory case as in
+         * other cases, the update must have been restored from the data store and we may overwrite
+         * its transaction id to WT_TXN_NONE and its timestamps to WT_TS_NONE when we write the
+         * update to the time window.
          */
-        if (unpack->tw.start_ts == upd->start_ts && unpack->tw.start_txn == upd->txnid &&
-          upd->type != WT_UPDATE_TOMBSTONE)
+        if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && unpack->tw.start_ts == upd->start_ts &&
+          unpack->tw.start_txn == upd->txnid && upd->type != WT_UPDATE_TOMBSTONE)
             return (0);
 
         /*
@@ -155,9 +160,15 @@ __rec_append_orig_value(
              * Once the prepared update is resolved, the in-memory update and on-disk written copy
              * doesn't have same timestamp due to replacing of prepare timestamp with commit and
              * durable timestamps. Don't compare them when the on-disk version is a prepare.
+             *
+             * We may have overwritten its transaction id to WT_TXN_NONE and its timestamps to
+             * WT_TS_NONE in the time window.
              */
-            WT_ASSERT(session, unpack->tw.prepare || (unpack->tw.stop_ts == oldest_upd->start_ts &&
-                                                       unpack->tw.stop_txn == oldest_upd->txnid));
+            WT_ASSERT(session, unpack->tw.prepare ||
+                ((unpack->tw.stop_ts == oldest_upd->start_ts || unpack->tw.stop_ts == WT_TS_NONE) &&
+                                 (unpack->tw.stop_txn == oldest_upd->txnid ||
+                                   unpack->tw.stop_txn == WT_TXN_NONE)));
+
             if (tombstone_globally_visible)
                 return (0);
         }
