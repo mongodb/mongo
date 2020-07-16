@@ -108,7 +108,7 @@ TEST(ComparisonMatchExpression, EqImplicitArrayTraversalNestedDocument) {
 }
 
 TEST(ComparisonMatchExpression, EqImplicitArrayTraversalNestedArrays) {
-    BSONObj query = BSON("a.b" << BSON("$eq" << 2));
+    BSONObj query = BSON("a.b" << BSON("$eq" << 0));
     BSONObj document =
         BSON("a" << BSON_ARRAY(BSON("b" << BSON_ARRAY(1 << 2)) << BSON("b" << BSON_ARRAY(3 << 4))));
     BSONObj expectedError = BSON("operatorName"
@@ -357,9 +357,8 @@ TEST(ComparisonMatchExpression, NinNestedDocumentsAndArrays) {
 
 // Verify that Comparison operators which accept a regex ($in and $nin) work as expected.
 TEST(ComparisonMatchExpression, InAcceptsRegex) {
-    BSONObj query = BSON("a" << BSON("$in" << BSON_ARRAY("/^v/"
-                                                         << "/^b/"
-                                                         << "/^c/")));
+    BSONObj query = BSON(
+        "a" << BSON("$in" << BSON_ARRAY(BSONRegEx("^v") << BSONRegEx("^b") << BSONRegEx("^c"))));
     BSONObj document = BSON("a"
                             << "Validation");
     BSONObj expectedError = BSON("operatorName"
@@ -372,9 +371,8 @@ TEST(ComparisonMatchExpression, InAcceptsRegex) {
 }
 
 TEST(ComparisonMatchExpression, NinAcceptsRegex) {
-    BSONObj query = BSON("a" << BSON("$nin" << BSON_ARRAY("/^v/"
-                                                          << "/^b/"
-                                                          << "/^c/")));
+    BSONObj query = BSON(
+        "a" << BSON("$nin" << BSON_ARRAY(BSONRegEx("^v") << BSONRegEx("^b") << BSONRegEx("^c"))));
     BSONObj document = BSON("a"
                             << "berry");
     BSONObj expectedError = BSON("operatorName"
@@ -383,6 +381,316 @@ TEST(ComparisonMatchExpression, NinAcceptsRegex) {
                                  << "matching value found in array"
                                  << "consideredValue"
                                  << "berry");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+// Logical operators
+// $and
+TEST(LogicalMatchExpression, BasicAnd) {
+    BSONObj failingClause = BSON("a" << BSON("$lt" << 10));
+    BSONObj query = BSON("$and" << BSON_ARRAY(BSON("b" << BSON("$gt" << 0)) << failingClause));
+    BSONObj document = BSON("a" << 11 << "b" << 2);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$and"
+                                 << "clausesNotSatisfied"
+                                 << BSON_ARRAY(BSON("index" << 1 << "details"
+                                                            << BSON("operatorName"
+                                                                    << "$lt"
+                                                                    << "specifiedAs"
+                                                                    << failingClause << "reason"
+                                                                    << "comparison failed"
+                                                                    << "consideredValue" << 11))));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(LogicalMatchExpression, ImplicitAnd) {
+    BSONObj failingClause = BSON("a" << BSON("$lt" << 10));
+    BSONObj query = BSON("a" << BSON("$gt" << 0 << "$lt" << 10));
+    BSONObj document = BSON("a" << 11);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$and"
+                                 << "clausesNotSatisfied"
+                                 << BSON_ARRAY(BSON("index" << 1 << "details"
+                                                            << BSON("operatorName"
+                                                                    << "$lt"
+                                                                    << "specifiedAs"
+                                                                    << failingClause << "reason"
+                                                                    << "comparison failed"
+                                                                    << "consideredValue" << 11))));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(LogicalMatchExpression, AndMultipleFailingClauses) {
+    BSONObj firstFailingClause = BSON("a" << BSON("$lt" << 10));
+    BSONObj secondFailingClause = BSON("a" << BSON("$gt" << 20));
+    BSONObj query = BSON("$and" << BSON_ARRAY(firstFailingClause << secondFailingClause));
+    BSONObj document = BSON("a" << 15);
+    BSONObj expectedError = BSON(
+        "operatorName"
+        << "$and"
+        << "clausesNotSatisfied"
+        << BSON_ARRAY(BSON("index" << 0 << "details"
+                                   << BSON("operatorName"
+                                           << "$lt"
+                                           << "specifiedAs" << firstFailingClause << "reason"
+                                           << "comparison failed"
+                                           << "consideredValue" << 15))
+                      << BSON("index" << 1 << "details"
+                                      << BSON("operatorName"
+                                              << "$gt"
+                                              << "specifiedAs" << secondFailingClause << "reason"
+                                              << "comparison failed"
+                                              << "consideredValue" << 15))));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+// $or
+TEST(LogicalMatchExpression, BasicOr) {
+    BSONObj failingClause = BSON("a" << BSON("$lt" << 10));
+    BSONObj query = BSON("$or" << BSON_ARRAY(failingClause));
+    BSONObj document = BSON("a" << 11);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$or"
+                                 << "clausesNotSatisfied"
+                                 << BSON_ARRAY(BSON("index" << 0 << "details"
+                                                            << BSON("operatorName"
+                                                                    << "$lt"
+                                                                    << "specifiedAs"
+                                                                    << failingClause << "reason"
+                                                                    << "comparison failed"
+                                                                    << "consideredValue" << 11))));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(LogicalMatchExpression, OrMultipleFailingClauses) {
+    BSONObj firstFailingClause = BSON("a" << BSON("$lt" << 10));
+    BSONObj secondFailingClause = BSON("a" << BSON("$gt" << 20));
+    BSONObj query = BSON("$or" << BSON_ARRAY(firstFailingClause << secondFailingClause));
+    BSONObj document = BSON("a" << 15);
+    BSONObj expectedError = BSON(
+        "operatorName"
+        << "$or"
+        << "clausesNotSatisfied"
+        << BSON_ARRAY(BSON("index" << 0 << "details"
+                                   << BSON("operatorName"
+                                           << "$lt"
+                                           << "specifiedAs" << firstFailingClause << "reason"
+                                           << "comparison failed"
+                                           << "consideredValue" << 15))
+                      << BSON("index" << 1 << "details"
+                                      << BSON("operatorName"
+                                              << "$gt"
+                                              << "specifiedAs" << secondFailingClause << "reason"
+                                              << "comparison failed"
+                                              << "consideredValue" << 15))));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+// $nor
+TEST(LogicalMatchExpression, BasicNor) {
+    BSONObj firstClause = BSON("a" << BSON("$gt" << 10));
+    BSONObj secondFailingClause = BSON("b" << BSON("$lt" << 10));
+    BSONObj query = BSON("$nor" << BSON_ARRAY(firstClause << secondFailingClause));
+    BSONObj document = BSON("a" << 9 << "b" << 9);
+    BSONObj expectedError =
+        BSON("operatorName"
+             << "$nor"
+             << "clausesNotSatisfied"
+             << BSON_ARRAY(BSON("index" << 1 << "details"
+                                        << BSON("operatorName"
+                                                << "$lt"
+                                                << "specifiedAs" << secondFailingClause << "reason"
+                                                << "comparison succeeded"
+                                                << "consideredValue" << 9))));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(LogicalMatchExpression, NorAllSuccessfulClauses) {
+    BSONObj firstFailingClause = BSON("a" << BSON("$lt" << 20));
+    BSONObj secondFailingClause = BSON("a" << BSON("$gt" << 10));
+    BSONObj query = BSON("$nor" << BSON_ARRAY(firstFailingClause << secondFailingClause));
+    BSONObj document = BSON("a" << 15);
+    BSONObj expectedError = BSON(
+        "operatorName"
+        << "$nor"
+        << "clausesNotSatisfied"
+        << BSON_ARRAY(BSON("index" << 0 << "details"
+                                   << BSON("operatorName"
+                                           << "$lt"
+                                           << "specifiedAs" << firstFailingClause << "reason"
+                                           << "comparison succeeded"
+                                           << "consideredValue" << 15))
+                      << BSON("index" << 1 << "details"
+                                      << BSON("operatorName"
+                                              << "$gt"
+                                              << "specifiedAs" << secondFailingClause << "reason"
+                                              << "comparison succeeded"
+                                              << "consideredValue" << 15))));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+// $not
+TEST(LogicalMatchExpression, BasicNot) {
+    BSONObj failingClause = BSON("$lt" << 10);
+    BSONObj failingQuery = BSON("a" << failingClause);
+    BSONObj query = BSON("a" << BSON("$not" << failingClause));
+    BSONObj document = BSON("a" << 9);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$not"
+                                 << "details"
+                                 << BSON("operatorName"
+                                         << "$lt"
+                                         << "specifiedAs" << failingQuery << "reason"
+                                         << "comparison succeeded"
+                                         << "consideredValue" << 9));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(LogicalMatchExpression, NotOverImplicitAnd) {
+    BSONObj failingQuery = BSON("$lt" << 20 << "$gt" << 5);
+    BSONObj query = BSON("a" << BSON("$not" << failingQuery));
+    BSONObj document = BSON("a" << 10);
+    BSONObj expectedError =
+        BSON("operatorName"
+             << "$not"
+             << "details"
+             << BSON("operatorName"
+                     << "$and"
+                     << "clausesNotSatisfied"
+                     << BSON_ARRAY(
+                            BSON("index" << 0 << "details"
+                                         << BSON("operatorName"
+                                                 << "$lt"
+                                                 << "specifiedAs" << BSON("a" << BSON("$lt" << 20))
+                                                 << "reason"
+                                                 << "comparison succeeded"
+                                                 << "consideredValue" << 10))
+                            << BSON("index" << 1 << "details"
+                                            << BSON("operatorName"
+                                                    << "$gt"
+                                                    << "specifiedAs"
+                                                    << BSON("a" << BSON("$gt" << 5)) << "reason"
+                                                    << "comparison succeeded"
+                                                    << "consideredValue" << 10)))));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(LogicalMatchExpression, NestedNot) {
+    BSONObj failingClause = BSON("$lt" << 10);
+    BSONObj failingQuery = BSON("a" << failingClause);
+    BSONObj query = BSON("a" << BSON("$not" << BSON("$not" << failingClause)));
+    BSONObj document = BSON("a" << 11);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$not"
+                                 << "details"
+                                 << BSON("operatorName"
+                                         << "$not"
+                                         << "details"
+                                         << BSON("operatorName"
+                                                 << "$lt"
+                                                 << "specifiedAs" << failingQuery << "reason"
+                                                 << "comparison failed"
+                                                 << "consideredValue" << 11)));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+// Combine logical operators
+TEST(LogicalMatchExpression, NestedAndOr) {
+    BSONObj query = fromjson(
+        "{'$and':["
+        "   {'$or': "
+        "       [{'price': {'$gt': 50}}, "
+        "       {'price': {'$lt': 20}}]},"
+        "   {'qty': {'$gt': 0}},"
+        "   {'qty': {'$lt': 10}}]}");
+    BSONObj document = fromjson("{'price': 30, 'qty': 30}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$and',"
+        "'clausesNotSatisfied': ["
+        "   {'index': 0, 'details': "
+        "   {'operatorName': '$or',"
+        "   'clausesNotSatisfied': ["
+        "       {'index': 0, 'details': "
+        "           {'operatorName': '$gt',"
+        "           'specifiedAs': {'price': {'$gt': 50}},"
+        "           'reason': 'comparison failed',"
+        "           'consideredValue': 30}},"
+        "       {'index': 1, 'details':"
+        "           {'operatorName': '$lt',"
+        "           'specifiedAs': {'price': {'$lt': 20}},"
+        "           'reason': 'comparison failed',"
+        "           'consideredValue': 30}}]}}, "
+        "   {'index': 2, 'details': "
+        "   {'operatorName': '$lt',"
+        "    'specifiedAs': {'qty': {'$lt': 10}},"
+        "    'reason': 'comparison failed',"
+        "    'consideredValue': 30}}]}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(LogicalMatchExpression, NestedAndOrOneFailingClause) {
+    BSONObj query = fromjson(
+        "{'$and':["
+        "   {'$or':[{'price': {'$lt': 20}}]},"
+        "   {'qty': {'$gt': 0}},"
+        "   {'qty': {'$lt': 10}}]}");
+    BSONObj document = fromjson("{'price': 15, 'qty': 30}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$and',"
+        "'clausesNotSatisfied': ["
+        "   {'index': 2, 'details': "
+        "   {'operatorName': '$lt',"
+        "    'specifiedAs': {'qty': {'$lt': 10}},"
+        "    'reason': 'comparison failed',"
+        "    'consideredValue': 30}}]}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(LogicalMatchExpression, NestedAndOrNorOneSuccessfulClause) {
+    BSONObj query = fromjson(
+        "{'$and':["
+        "   {'$or': ["
+        "       {'price': {'$lt': 20}}]},"
+        "   {'$nor':["
+        "       {'qty': {'$gt': 20}},"
+        "       {'qty': {'$lt': 20}}]}]}");
+    BSONObj document = fromjson("{'price': 10, 'qty': 15}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$and',"
+        "'clausesNotSatisfied': ["
+        "   {'index': 1, 'details': "
+        "   {'operatorName': '$nor',"
+        "   'clausesNotSatisfied': ["
+        "       {'index': 1, 'details':"
+        "           {'operatorName': '$lt',"
+        "           'specifiedAs': {'qty': {'$lt': 20}},"
+        "           'reason': 'comparison succeeded',"
+        "           'consideredValue': 15}}]}}]}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(LogicalMatchExpression, NestedAndOrNorNotOneFailingClause) {
+    BSONObj query = fromjson(
+        "{'$and':["
+        "   {'$or': ["
+        "       {'price': {'$lt': 20}}]},"
+        "   {'$nor':["
+        "       {'qty': {'$gt': 30}},"
+        "       {'qty': {'$not': {'$lt': 20}}}]}]}");
+    BSONObj document = fromjson("{'price': 10, 'qty': 25}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$and',"
+        "'clausesNotSatisfied': ["
+        "   {'index': 1, 'details': "
+        "   {'operatorName': '$nor',"
+        "   'clausesNotSatisfied': ["
+        "       {'index': 1, 'details':"
+        "           {'operatorName': '$not',"
+        "            'details':             "
+        "               {'operatorName': '$lt',"
+        "               'specifiedAs': {'qty': {'$lt': 20}},"
+        "               'reason': 'comparison failed',"
+        "               'consideredValue': 25}}}]}}]}");
     verifyGeneratedError(query, document, expectedError);
 }
 }  // namespace

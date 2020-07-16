@@ -462,6 +462,10 @@ public:
         return _errorAnnotation.get();
     }
 
+    void setErrorAnnotation(clonable_ptr<ErrorAnnotation> annotation) {
+        _errorAnnotation = std::move(annotation);
+    }
+
     //
     // Debug information
     //

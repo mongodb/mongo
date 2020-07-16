@@ -41,7 +41,9 @@ namespace mongo {
 
 class ListOfMatchExpression : public MatchExpression {
 public:
-    explicit ListOfMatchExpression(MatchType type) : MatchExpression(type) {}
+    explicit ListOfMatchExpression(MatchType type,
+                                   clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : MatchExpression(type, std::move(annotation)) {}
     virtual ~ListOfMatchExpression();
 
     /**
@@ -108,7 +110,8 @@ class AndMatchExpression : public ListOfMatchExpression {
 public:
     static constexpr StringData kName = "$and"_sd;
 
-    AndMatchExpression() : ListOfMatchExpression(AND) {}
+    AndMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(AND, std::move(annotation)) {}
     virtual ~AndMatchExpression() {}
 
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const;
@@ -116,7 +119,8 @@ public:
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<AndMatchExpression> self = std::make_unique<AndMatchExpression>();
+        std::unique_ptr<AndMatchExpression> self =
+            std::make_unique<AndMatchExpression>(_errorAnnotation);
         for (size_t i = 0; i < numChildren(); ++i) {
             self->add(getChild(i)->shallowClone().release());
         }
@@ -145,7 +149,8 @@ class OrMatchExpression : public ListOfMatchExpression {
 public:
     static constexpr StringData kName = "$or"_sd;
 
-    OrMatchExpression() : ListOfMatchExpression(OR) {}
+    OrMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(OR, std::move(annotation)) {}
     virtual ~OrMatchExpression() {}
 
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const;
@@ -153,7 +158,8 @@ public:
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<OrMatchExpression> self = std::make_unique<OrMatchExpression>();
+        std::unique_ptr<OrMatchExpression> self =
+            std::make_unique<OrMatchExpression>(_errorAnnotation);
         for (size_t i = 0; i < numChildren(); ++i) {
             self->add(getChild(i)->shallowClone().release());
         }
@@ -182,7 +188,8 @@ class NorMatchExpression : public ListOfMatchExpression {
 public:
     static constexpr StringData kName = "$nor"_sd;
 
-    NorMatchExpression() : ListOfMatchExpression(NOR) {}
+    NorMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(NOR, std::move(annotation)) {}
     virtual ~NorMatchExpression() {}
 
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const;
@@ -190,7 +197,8 @@ public:
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<NorMatchExpression> self = std::make_unique<NorMatchExpression>();
+        std::unique_ptr<NorMatchExpression> self =
+            std::make_unique<NorMatchExpression>(_errorAnnotation);
         for (size_t i = 0; i < numChildren(); ++i) {
             self->add(getChild(i)->shallowClone().release());
         }
