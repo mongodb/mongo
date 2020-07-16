@@ -48,6 +48,7 @@
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
@@ -133,8 +134,6 @@ bool canBeDecomposedIntoSingleIntervals(const std::vector<OrderedIntervalList>& 
  *
  * TODO SERVER-48485: optimize this function to build and return the intervals as KeyString objects,
  * rather than BSON.
- * TODO SERVER-48473: add a query knob which sets the limit on the number of statically generated
- * intervals.
  */
 std::vector<std::pair<BSONObj, BSONObj>> decomposeIntoSingleIntervals(
     const std::vector<OrderedIntervalList>& intervalLists,
@@ -161,6 +160,8 @@ std::vector<std::pair<BSONObj, BSONObj>> decomposeIntoSingleIntervals(
         return std::make_pair(lowKeyBob.obj(), highKeyBob.obj());
     };
 
+    size_t maxStaticIndexScanIntervals =
+        internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals.load();
     std::deque<std::pair<BSONObj, BSONObj>> keysQueue{{}};
 
     // This is an adaptation of the BFS algorithm. The 'keysQueue' is initialized with a pair of
@@ -175,6 +176,12 @@ std::vector<std::pair<BSONObj, BSONObj>> decomposeIntoSingleIntervals(
 
             for (auto&& interval : list.intervals) {
                 keysQueue.push_back(appendInterval(lowKey, highKey, interval));
+
+                // If the limit of maximum number of static intervals is exceeded, return an empty
+                // vector which will cause a fallback to build a generic index scan.
+                if (keysQueue.size() > maxStaticIndexScanIntervals) {
+                    return {};
+                }
             }
         }
     }

@@ -370,3 +370,13 @@ server_parameters:
     cpp_varname: "internalQueryEnableLoggingV2OplogEntries"
     cpp_vartype: AtomicWord<bool>
     default: false
+
+  internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals:
+    description: "Limits the number of statically known intervals that SBE can decompose index bounds into when possible."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals"
+    cpp_vartype: AtomicWord<int>
+    default:
+      expr: 1000
+    validator:
+        gt: 0

@@ -42,6 +42,7 @@ const expectedParamDefaults = {
     internalQueryPlannerGenerateCoveredWholeIndexScans: false,
     internalQueryIgnoreUnknownJSONSchemaKeywords: false,
     internalQueryProhibitBlockingMergeOnMongoS: false,
+    internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: 1000,
 };
 
 function assertDefaultParameterValues() {
@@ -169,6 +170,10 @@ assertSetParameterFails("internalDocumentSourceCursorBatchSizeBytes", -1);
 assertSetParameterSucceeds("internalDocumentSourceLookupCacheSizeBytes", 11);
 assertSetParameterSucceeds("internalDocumentSourceLookupCacheSizeBytes", 0);
 assertSetParameterFails("internalDocumentSourceLookupCacheSizeBytes", -1);
+
+assertSetParameterSucceeds("internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals", 1001);
+assertSetParameterFails("internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals", 0);
+assertSetParameterFails("internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals", -1);
 
 MongoRunner.stopMongod(conn);
 })();
