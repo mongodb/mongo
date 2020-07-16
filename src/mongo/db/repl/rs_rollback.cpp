@@ -2014,8 +2014,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     // have rolled back to an optime that fell in the middle of an oplog application batch. We make
     // the database consistent again after rollback by applying ops forward until we reach
     // 'minValid'.
-    replCoord->resetLastOpTimesFromOplog(opCtx,
-                                         ReplicationCoordinator::DataConsistency::Inconsistent);
+    replCoord->resetLastOpTimesFromOplog(opCtx);
 }
 
 Status syncRollback(OperationContext* opCtx,

@@ -122,8 +122,7 @@ public:
 
     void setMyLastAppliedOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) final;
-    void setMyLastAppliedOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime,
-                                                  DataConsistency consistency) final;
+    void setMyLastAppliedOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) final;
     void setMyLastDurableOpTimeAndWallTimeForward(const OpTimeAndWallTime& opTimeAndWallTime) final;
 
     void resetMyLastOpTimes() final;
@@ -212,7 +211,7 @@ public:
 
     void blacklistSyncSource(const HostAndPort&, Date_t) final;
 
-    void resetLastOpTimesFromOplog(OperationContext*, DataConsistency) final;
+    void resetLastOpTimesFromOplog(OperationContext*) final;
 
     ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort&,
                                                   const rpc::ReplSetMetadata&,

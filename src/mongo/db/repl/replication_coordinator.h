@@ -364,20 +364,9 @@ public:
     virtual void setMyLastDurableOpTimeAndWallTime(const OpTimeAndWallTime& opTimeAndWallTime) = 0;
 
     /**
-     * This type is used to represent the "consistency" of a current database state. In
-     * replication, there may be times when our database data is not represented by a single optime,
-     * because we have fetched remote data from different points in time. For example, when we are
-     * in RECOVERING following a refetch based rollback. We never allow external clients to read
-     * from the database if it is not consistent.
-     */
-    enum class DataConsistency { Consistent, Inconsistent };
-
-    /**
      * Updates our internal tracking of the last OpTime applied to this node, but only
      * if the supplied optime is later than the current last OpTime known to the replication
-     * coordinator. The 'consistency' argument must tell whether or not the optime argument
-     * represents a consistent database state. Also updates the wall clock time corresponding to
-     * that operation.
+     * coordinator.
      *
      * This function is used by logOp() on a primary, since the ops in the oplog do not
      * necessarily commit in sequential order. It is also used when we finish oplog batch
@@ -385,7 +374,7 @@ public:
      * applied optime from more than one thread.
      */
     virtual void setMyLastAppliedOpTimeAndWallTimeForward(
-        const OpTimeAndWallTime& opTimeAndWallTime, DataConsistency consistency) = 0;
+        const OpTimeAndWallTime& opTimeAndWallTime) = 0;
 
     /**
      * Updates our internal tracking of the last OpTime durable to this node, but only
@@ -789,11 +778,9 @@ public:
 
     /**
      * Loads the optime from the last op in the oplog into the coordinator's lastAppliedOpTime and
-     * lastDurableOpTime values. The 'consistency' argument must tell whether or not the optime of
-     * the op in the oplog represents a consistent database state.
+     * lastDurableOpTime values.
      */
-    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx,
-                                           DataConsistency consistency) = 0;
+    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx) = 0;
 
     /**
      * Returns the OpTime of the latest replica set-committed op known to this server.

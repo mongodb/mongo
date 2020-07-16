@@ -214,7 +214,7 @@ void ReplicationCoordinatorEmbedded::setMyHeartbeatMessage(const std::string&) {
 }
 
 void ReplicationCoordinatorEmbedded::setMyLastAppliedOpTimeAndWallTimeForward(
-    const OpTimeAndWallTime&, DataConsistency) {
+    const OpTimeAndWallTime&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
@@ -418,7 +418,7 @@ void ReplicationCoordinatorEmbedded::blacklistSyncSource(const HostAndPort&, Dat
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::resetLastOpTimesFromOplog(OperationContext*, DataConsistency) {
+void ReplicationCoordinatorEmbedded::resetLastOpTimesFromOplog(OperationContext*) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

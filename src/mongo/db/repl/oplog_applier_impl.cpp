@@ -303,17 +303,15 @@ public:
     ApplyBatchFinalizer(ReplicationCoordinator* replCoord) : _replCoord(replCoord) {}
     virtual ~ApplyBatchFinalizer(){};
 
-    virtual void record(const OpTimeAndWallTime& newOpTimeAndWallTime,
-                        ReplicationCoordinator::DataConsistency consistency) {
-        _recordApplied(newOpTimeAndWallTime, consistency);
+    virtual void record(const OpTimeAndWallTime& newOpTimeAndWallTime) {
+        _recordApplied(newOpTimeAndWallTime);
     };
 
 protected:
-    void _recordApplied(const OpTimeAndWallTime& newOpTimeAndWallTime,
-                        ReplicationCoordinator::DataConsistency consistency) {
+    void _recordApplied(const OpTimeAndWallTime& newOpTimeAndWallTime) {
         // We have to use setMyLastAppliedOpTimeAndWallTimeForward since this thread races with
         // ReplicationExternalStateImpl::onTransitionToPrimary.
-        _replCoord->setMyLastAppliedOpTimeAndWallTimeForward(newOpTimeAndWallTime, consistency);
+        _replCoord->setMyLastAppliedOpTimeAndWallTimeForward(newOpTimeAndWallTime);
     }
 
     void _recordDurable(const OpTimeAndWallTime& newOpTimeAndWallTime) {
@@ -334,8 +332,7 @@ public:
           _waiterThread{&ApplyBatchFinalizerForJournal::_run, this} {};
     ~ApplyBatchFinalizerForJournal();
 
-    void record(const OpTimeAndWallTime& newOpTimeAndWallTime,
-                ReplicationCoordinator::DataConsistency consistency) override;
+    void record(const OpTimeAndWallTime& newOpTimeAndWallTime) override;
 
 private:
     /**
@@ -366,9 +363,8 @@ ApplyBatchFinalizerForJournal::~ApplyBatchFinalizerForJournal() {
     _waiterThread.join();
 }
 
-void ApplyBatchFinalizerForJournal::record(const OpTimeAndWallTime& newOpTimeAndWallTime,
-                                           ReplicationCoordinator::DataConsistency consistency) {
-    _recordApplied(newOpTimeAndWallTime, consistency);
+void ApplyBatchFinalizerForJournal::record(const OpTimeAndWallTime& newOpTimeAndWallTime) {
+    _recordApplied(newOpTimeAndWallTime);
 
     stdx::unique_lock<Latch> lock(_mutex);
     _latestOpTimeAndWallTime = newOpTimeAndWallTime;
@@ -531,16 +527,8 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         _storageInterface->oplogDiskLocRegister(
             &opCtx, lastOpTimeInBatch.getTimestamp(), orderedCommit);
 
-        // 4. Finalize this batch. We are at a consistent optime if our current optime is >= the
-        // current 'minValid' optime. Note that recording the lastOpTime in the finalizer includes
-        // advancing the global timestamp to at least its timestamp.
-        const auto minValid = _consistencyMarkers->getMinValid(&opCtx);
-        auto consistency = (lastOpTimeInBatch >= minValid)
-            ? ReplicationCoordinator::DataConsistency::Consistent
-            : ReplicationCoordinator::DataConsistency::Inconsistent;
-
-        // The finalizer advances the global timestamp to lastOpTimeInBatch.
-        finalizer->record({lastOpTimeInBatch, lastWallTimeInBatch}, consistency);
+        // 4. Finalize this batch. The finalizer advances the global timestamp to lastOpTimeInBatch.
+        finalizer->record({lastOpTimeInBatch, lastWallTimeInBatch});
     }
 }
 

@@ -127,8 +127,8 @@ public:
         const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
     void setMyLastDurableOpTimeAndWallTime(
         const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
-    void setMyLastAppliedOpTimeAndWallTimeForward(const repl::OpTimeAndWallTime& opTimeAndWallTime,
-                                                  DataConsistency consistency) override;
+    void setMyLastAppliedOpTimeAndWallTimeForward(
+        const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
     void setMyLastDurableOpTimeAndWallTimeForward(
         const repl::OpTimeAndWallTime& opTimeAndWallTime) override;
 
@@ -218,7 +218,7 @@ public:
 
     void blacklistSyncSource(const HostAndPort&, Date_t) override;
 
-    void resetLastOpTimesFromOplog(OperationContext*, DataConsistency) override;
+    void resetLastOpTimesFromOplog(OperationContext*) override;
 
     repl::ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort&,
                                                         const rpc::ReplSetMetadata&,

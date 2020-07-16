@@ -81,8 +81,7 @@ struct InitialSyncerOptions {
     using GetMyLastOptimeFn = std::function<OpTime()>;
 
     /** Function to update optime of last operation applied on this node */
-    using SetMyLastOptimeFn = std::function<void(
-        const OpTimeAndWallTime&, ReplicationCoordinator::DataConsistency consistency)>;
+    using SetMyLastOptimeFn = std::function<void(const OpTimeAndWallTime&)>;
 
     /** Function to reset all optimes on this node (e.g. applied & durable). */
     using ResetOptimesFn = std::function<void()>;

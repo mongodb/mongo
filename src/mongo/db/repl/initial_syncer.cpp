@@ -560,8 +560,7 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
     _storage->setInitialDataTimestamp(opCtx->getServiceContext(), initialDataTimestamp);
     auto currentLastAppliedOpTime = _opts.getMyLastOptime();
     if (currentLastAppliedOpTime.isNull()) {
-        _opts.setMyLastOptime(lastApplied.getValue(),
-                              ReplicationCoordinator::DataConsistency::Consistent);
+        _opts.setMyLastOptime(lastApplied.getValue());
     } else {
         invariant(currentLastAppliedOpTime == lastAppliedOpTime);
     }
@@ -1568,7 +1567,7 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
     _initialSyncState->appliedOps += numApplied;
     _lastApplied = lastApplied;
     const auto lastAppliedOpTime = _lastApplied.opTime;
-    _opts.setMyLastOptime(_lastApplied, ReplicationCoordinator::DataConsistency::Inconsistent);
+    _opts.setMyLastOptime(_lastApplied);
 
     // Update oplog visibility after applying a batch so that while applying transaction oplog
     // entries, the TransactionHistoryIterator can get earlier oplog entries associated with the
