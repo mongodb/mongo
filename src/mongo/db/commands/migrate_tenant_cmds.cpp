@@ -39,23 +39,24 @@ namespace mongo {
 namespace {
 
 
-class DonorStartMigrationCmd : public MigrationDonorCmdBase<DonorStartMigrationCmd> {
+class DonorStartMigrationCmd : public TenantMigrationDonorCmdBase<DonorStartMigrationCmd> {
 public:
     using Request = DonorStartMigration;
-    using ParentInvocation = MigrationDonorCmdBase<DonorStartMigrationCmd>::Invocation;
+    using ParentInvocation = TenantMigrationDonorCmdBase<DonorStartMigrationCmd>::Invocation;
     class Invocation : public ParentInvocation {
         using ParentInvocation::ParentInvocation;
 
     public:
         void typedRun(OperationContext* opCtx) {
             const auto requestBody = request();
-            auto donorDocument = getDonorDocumentFromRequest(requestBody);
+            auto donorStateDocument = getDonorStateDocumentFromRequest(requestBody);
 
-            migrating_tenant_donor_util::persistDonorStateDocument(opCtx, donorDocument);
-            migrating_tenant_donor_util::dataSync(opCtx, donorDocument);
+            migrating_tenant_donor_util::persistDonorStateDocument(opCtx, donorStateDocument);
+            migrating_tenant_donor_util::dataSync(opCtx, donorStateDocument);
         }
 
-        TenantMigrationDonorDocument getDonorDocumentFromRequest(const RequestType& requestBody) {
+        TenantMigrationDonorDocument getDonorStateDocumentFromRequest(
+            const RequestType& requestBody) {
             mongo::UUID migrationId = requestBody.getMigrationId();
 
             std::string recipientURI = requestBody.getRecipientConnectionString().toString();
@@ -63,10 +64,10 @@ public:
 
             auto donorStartState = TenantMigrationDonorStateEnum::kDataSync;
             bool garbageCollect = false;
-            const TenantMigrationDonorDocument donorDocument(
-                OID::gen(), migrationId, recipientURI, dbPrefix, donorStartState, garbageCollect);
+            const TenantMigrationDonorDocument donorStateDocument(
+                migrationId, recipientURI, dbPrefix, donorStartState, garbageCollect);
 
-            return donorDocument;
+            return donorStateDocument;
         }
 
     private:
@@ -81,10 +82,11 @@ public:
 } donorStartMigrationCmd;
 
 class DonorWaitForMigrationToCommitCmd
-    : public MigrationDonorCmdBase<DonorWaitForMigrationToCommitCmd> {
+    : public TenantMigrationDonorCmdBase<DonorWaitForMigrationToCommitCmd> {
 public:
     using Request = DonorWaitForMigrationToCommit;
-    using ParentInvocation = MigrationDonorCmdBase<DonorWaitForMigrationToCommitCmd>::Invocation;
+    using ParentInvocation =
+        TenantMigrationDonorCmdBase<DonorWaitForMigrationToCommitCmd>::Invocation;
     class Invocation : public ParentInvocation {
         using ParentInvocation::ParentInvocation;
 
@@ -101,10 +103,10 @@ public:
 
 } donorWaitForMigrationToCommit;
 
-class DonorForgetMigrationCmd : public MigrationDonorCmdBase<DonorForgetMigrationCmd> {
+class DonorForgetMigrationCmd : public TenantMigrationDonorCmdBase<DonorForgetMigrationCmd> {
 public:
     using Request = DonorForgetMigration;
-    using ParentInvocation = MigrationDonorCmdBase<DonorForgetMigrationCmd>::Invocation;
+    using ParentInvocation = TenantMigrationDonorCmdBase<DonorForgetMigrationCmd>::Invocation;
     class Invocation : public ParentInvocation {
         using ParentInvocation::ParentInvocation;
 

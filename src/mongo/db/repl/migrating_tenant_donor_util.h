@@ -41,7 +41,8 @@ namespace migrating_tenant_donor_util {
  * Sends recipientSyncData to the recipient until success and starts blocking writes and causal
  * reads.
  */
-void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& donorDoc);
+void dataSync(OperationContext* opCtx,
+              const TenantMigrationDonorDocument& originalDonorStateDocument);
 
 /**
  * Creates a task executor to be used for tenant migration.
@@ -55,7 +56,7 @@ std::shared_ptr<executor::TaskExecutor> getTenantMigrationExecutor(ServiceContex
 void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONObj& doc);
 
 void persistDonorStateDocument(OperationContext* opCtx,
-                               const TenantMigrationDonorDocument& donorDoc);
+                               const TenantMigrationDonorDocument& donorStateDocument);
 }  // namespace migrating_tenant_donor_util
 
 }  // namespace mongo

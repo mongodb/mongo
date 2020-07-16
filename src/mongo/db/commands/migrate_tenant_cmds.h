@@ -33,7 +33,7 @@
 namespace mongo {
 
 template <typename DerivedT>
-class MigrationDonorCmdBase : public TypedCommand<DerivedT> {
+class TenantMigrationDonorCmdBase : public TypedCommand<DerivedT> {
 public:
     using TC = TypedCommand<DerivedT>;
 
