@@ -297,7 +297,7 @@ void MetadataManager::append(BSONObjBuilder* builder) const {
     invariant(!_metadata.empty());
 
     BSONArrayBuilder amrArr(builder->subarrayStart("activeMetadataRanges"));
-    for (const auto& entry : _metadata.back()->metadata->getChunks()) {
+    for (const auto& entry : _metadata.back()->metadata->getOwnedChunks()) {
         BSONObjBuilder obj;
         ChunkRange r = ChunkRange(entry.first, entry.second);
         r.append(&obj);

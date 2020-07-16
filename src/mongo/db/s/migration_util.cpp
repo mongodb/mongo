@@ -430,7 +430,7 @@ void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Cal
 
     const auto css = CollectionShardingRuntime::get(opCtx, nss);
     const auto collDesc = css->getCollectionDescription();
-    const auto emptyChunkMap =
+    const auto emptyReceivingChunks =
         RangeMap{SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()};
 
     if (!collDesc.isSharded()) {
@@ -441,18 +441,32 @@ void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Cal
     }
 
     auto startingKey = collDesc.getMinKey();
+    const auto ownedChunks = collDesc->getOwnedChunks();
+
+    auto numOrphanedRangesSoFar = 0;
 
     while (true) {
-        auto range = collDesc->getNextOrphanRange(emptyChunkMap, startingKey);
+        auto range = collDesc->getNextOrphanRange(ownedChunks, emptyReceivingChunks, startingKey);
+        ++numOrphanedRangesSoFar;
+
         if (!range) {
             LOGV2_DEBUG(22030,
                         2,
-                        "Upgrade: Completed orphanged range enumeration; no orphaned ranges "
+                        "Upgrade: Completed orphaned range enumeration; no orphaned ranges "
                         "remain",
                         "namespace"_attr = nss.toString(),
                         "startingKey"_attr = redact(startingKey));
 
             return;
+        }
+
+        // Log progress every 1000 ranges.
+        if (numOrphanedRangesSoFar % 1000 == 0) {
+            LOGV2(4968000,
+                  "Upgrade: Enumerating orphaned ranges",
+                  "namespace"_attr = nss.toString(),
+                  "startingKey"_attr = redact(startingKey),
+                  "numOrphanedRangesSoFar"_attr = numOrphanedRangesSoFar);
         }
 
         handler(*range);

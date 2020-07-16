@@ -86,7 +86,7 @@ std::string CollectionMetadata::toStringBasic() const {
     }
 }
 
-RangeMap CollectionMetadata::getChunks() const {
+RangeMap CollectionMetadata::getOwnedChunks() const {
     invariant(isSharded());
 
     RangeMap chunksMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>());
@@ -136,15 +136,14 @@ Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) const {
 
     return Status::OK();
 }
-
 boost::optional<ChunkRange> CollectionMetadata::getNextOrphanRange(
-    const RangeMap& receivingChunks, const BSONObj& origLookupKey) const {
+    const RangeMap& chunksMap,
+    const RangeMap& receivingChunks,
+    const BSONObj& origLookupKey) const {
     invariant(isSharded());
 
     const BSONObj maxKey = getMaxKey();
     BSONObj lookupKey = origLookupKey;
-
-    auto chunksMap = getChunks();
 
     while (lookupKey.woCompare(maxKey) < 0) {
         using Its = std::pair<RangeMap::const_iterator, RangeMap::const_iterator>;
@@ -204,6 +203,12 @@ boost::optional<ChunkRange> CollectionMetadata::getNextOrphanRange(
     }
 
     return boost::none;
+}
+
+boost::optional<ChunkRange> CollectionMetadata::getNextOrphanRange(
+    const RangeMap& receivingChunks, const BSONObj& origLookupKey) const {
+    invariant(isSharded());
+    return getNextOrphanRange(getOwnedChunks(), receivingChunks, origLookupKey);
 }
 
 void CollectionMetadata::toBSONChunks(BSONArrayBuilder* builder) const {

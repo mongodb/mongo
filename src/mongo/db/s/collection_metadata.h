@@ -214,10 +214,21 @@ public:
     boost::optional<ChunkRange> getNextOrphanRange(const RangeMap& receiveMap,
                                                    const BSONObj& lookupKey) const;
 
+    /*
+     * Variant of getNextOrphanRange that expects the caller to pass in the map
+     * of chunks owned by this shard as the first parameter. This map can be
+     * obtained by calling getOwnedChunks(). This avoids having to recompute this
+     * map internally each time.
+     */
+    boost::optional<ChunkRange> getNextOrphanRange(const RangeMap& chunksMap,
+                                                   const RangeMap& receiveMap,
+                                                   const BSONObj& lookupKey) const;
+
+
     /**
      * Returns all the chunks which are contained on this shard.
      */
-    RangeMap getChunks() const;
+    RangeMap getOwnedChunks() const;
 
     /**
      * BSON output of the chunks metadata into a BSONArray

@@ -150,6 +150,45 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
     }
 }
 
+template <typename ShardSelectorFn>
+auto BM_GetNextOrphanedRange(benchmark::State& state, ShardSelectorFn selectShard) {
+    const int nShards = state.range(0);
+    const uint32_t nChunks = state.range(1);
+
+    const auto collEpoch = OID::gen();
+    const auto collName = NamespaceString("test.foo");
+    const auto shardKeyPattern = KeyPattern(BSON("_id" << 1));
+
+    std::vector<ChunkType> chunks;
+    chunks.reserve(nChunks);
+    for (uint32_t i = 0; i < nChunks; ++i) {
+        chunks.emplace_back(collName,
+                            getRangeForChunk(i, nChunks),
+                            ChunkVersion{i + 1, 0, collEpoch},
+                            selectShard(i, nShards, nChunks));
+    }
+    auto routingTableHistory = RoutingTableHistory::makeNew(
+        collName, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, chunks);
+    auto chunkManager = std::make_shared<ChunkManager>(routingTableHistory, boost::none);
+    CollectionMetadata metadata(std::move(chunkManager), ShardId("shard0"));
+    const auto emptyReceivingChunks =
+        RangeMap{SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()};
+
+    for (auto keepRunning : state) {
+        auto startingKey = metadata.getMinKey();
+        auto chunkMap = metadata.getOwnedChunks();
+        while (true) {
+            auto range = metadata.getNextOrphanRange(chunkMap, emptyReceivingChunks, startingKey);
+            if (!range) {
+                break;
+            }
+
+            startingKey = range->getMax();
+            benchmark::DoNotOptimize(range);
+        }
+    }
+}
+
 std::vector<BSONObj> makeKeys(int nChunks) {
     constexpr int nFinds = 200000;
     static_assert(nFinds % 2 == 0, "");
@@ -343,6 +382,8 @@ MONGO_INITIALIZER(RegisterBenchmarks)(InitializerContext* context) {
     std::initializer_list<benchmark::internal::Benchmark*> bmCases{
         REGISTER_BENCHMARK_CAPTURE(BM_FullBuildOfChunkManager, Pessimal, pessimalShardSelector),
         REGISTER_BENCHMARK_CAPTURE(BM_FullBuildOfChunkManager, Optimal, optimalShardSelector),
+        REGISTER_BENCHMARK_CAPTURE(BM_GetNextOrphanedRange, Pessimal, pessimalShardSelector),
+        REGISTER_BENCHMARK_CAPTURE(BM_GetNextOrphanedRange, Optimal, optimalShardSelector),
         REGISTER_BENCHMARK_CAPTURE(
             BM_FindIntersectingChunk, Pessimal, makeChunkManagerWithPessimalBalancedDistribution),
         REGISTER_BENCHMARK_CAPTURE(

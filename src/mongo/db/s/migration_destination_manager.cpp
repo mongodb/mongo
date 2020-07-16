@@ -645,7 +645,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         if (optMetadata) {
             const auto& metadata = optMetadata->get();
             if (metadata.isSharded()) {
-                auto chunks = metadata.getChunks();
+                auto chunks = metadata.getOwnedChunks();
                 if (chunks.empty()) {
                     return true;
                 }
