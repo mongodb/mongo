@@ -13,6 +13,7 @@ var waitForState;
 var reInitiateWithoutThrowingOnAbortedMember;
 var awaitRSClientHosts;
 var getLastOpTime;
+var getFirstOplogEntry;
 var setLogVerbosity;
 var stopReplicationAndEnforceNewPrimaryToCatchUp;
 var setFailPoint;
@@ -635,6 +636,29 @@ getLastOpTime = function(conn) {
     var replSetStatus = assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
     var connStatus = replSetStatus.members.filter(m => m.self)[0];
     return connStatus.optime;
+};
+
+/**
+ * Returns the oldest oplog entry.
+ */
+getFirstOplogEntry = function(conn) {
+    let firstEntry;
+    // The query plan may yield between the cursor establishment and iterating to retrieve the first
+    // result. During this yield it's possible for the oplog to "roll over" or shrink. This is rare,
+    // but if these both happen the cursor will be unable to resume after yielding and return a
+    // "CappedPositionLost" error. This can be safely retried.
+    assert.soon(() => {
+        try {
+            firstEntry = conn.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1)[0];
+            return true;
+        } catch (e) {
+            if (e.code == ErrorCodes.CappedPositionLost) {
+                return false;
+            }
+            throw e;
+        }
+    });
+    return firstEntry;
 };
 
 /**
