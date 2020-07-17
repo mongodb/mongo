@@ -1797,12 +1797,12 @@ transaction. For a prepared transaction, we have the following guarantee: `prepa
 
 **`currentCommittedSnapshot`**: An optime maintained in `ReplicationCoordinator` that is used to
 serve majority reads and is always guaranteed to be <= `lastCommittedOpTime`. When `eMRC=true`, this
-is currently set to the stable optime, which is guaranteed to be in a node’s oplog. Since it is
-reset every time we recalculate the stable optime, it will also be up to date.
+is currently [set to the stable optime](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4945). 
+Since it is reset every time we recalculate the stable optime, it will also be up to date.
 
-When `eMRC=false`, this is set to the `lastCommittedOpTime`, so it may not be in the node’s oplog.
-The `stable_timestamp` is not allowed to advance past the `all_durable`. So, this value shouldn’t
-be ahead of `all_durable` unless `eMRC=false`.
+When `eMRC=false`, this [is set](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4952-L4961) 
+to the minimum of the stable optime and the `lastCommittedOpTime`, even though it is not used to 
+serve majority reads in that case.
 
 **`initialDataTimestamp`**: A timestamp used to indicate the timestamp at which history “begins”.
 When a node comes out of initial sync, we inform the storage engine that the `initialDataTimestamp`
@@ -1861,3 +1861,7 @@ which is why we must use the Rollback via Refetch rollback algorithm.
 
 This timestamp is also required to increase monotonically except when `eMRC=false`, where in a
 special case during rollback it is possible for the `stableTimestamp` to move backwards.
+
+The calculation of this value in the replication layer occurs [here](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4824-L4881).
+The replication layer will [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4907-L4921) if it is earlier than the
+`initialDataTimestamp`, since data earlier than that timestamp may be inconsistent.
