@@ -4821,13 +4821,13 @@ void ReplicationCoordinatorImpl::attemptToAdvanceStableTimestamp() {
     _setStableTimestampForStorage(lk);
 }
 
-boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_recalculateStableOpTime(
-    WithLock lk) {
-    auto commitPoint = _topCoord->getLastCommittedOpTimeAndWallTime();
+OpTime ReplicationCoordinatorImpl::_recalculateStableOpTime(WithLock lk) {
+    auto commitPoint = _topCoord->getLastCommittedOpTime();
+    auto lastApplied = _topCoord->getMyLastAppliedOpTime();
     if (_currentCommittedSnapshot) {
         auto snapshotOpTime = _currentCommittedSnapshot->opTime;
-        invariant(snapshotOpTime.getTimestamp() <= commitPoint.opTime.getTimestamp());
-        invariant(snapshotOpTime <= commitPoint.opTime);
+        invariant(snapshotOpTime.getTimestamp() <= commitPoint.getTimestamp());
+        invariant(snapshotOpTime <= commitPoint);
     }
 
     //
@@ -4858,28 +4858,24 @@ boost::optional<OpTimeAndWallTime> ReplicationCoordinatorImpl::_recalculateStabl
     // order. Because of this, the stable timestamp must not fall in the middle of a batch while it
     // is being applied. To prevent this we ensure the no-overlap point does not surpass the
     // lastApplied, which is only advanced at the end of secondary batch application.
-    OpTime noOverlap = std::min(_topCoord->getMyLastAppliedOpTime(), allDurableOpTime);
+    OpTime noOverlap = std::min(lastApplied, allDurableOpTime);
 
     // The stable optime must always be less than or equal to the no overlap point. When majority
     // reads are enabled, the stable optime must also not surpass the majority commit point. When
     // majority reads are disabled, the stable optime is not required to be majority committed.
-    boost::optional<OpTimeAndWallTime> stableOpTime;
-    auto maximumStableOpTime = serverGlobalParams.enableMajorityReadConcern
-        ? commitPoint
-        : _topCoord->getMyLastAppliedOpTimeAndWallTime();
+    OpTime stableOpTime;
+    auto maximumStableOpTime =
+        serverGlobalParams.enableMajorityReadConcern ? commitPoint : lastApplied;
 
     // Make sure the stable optime does not surpass its maximum.
-    stableOpTime = OpTimeAndWallTime(std::min(noOverlap, maximumStableOpTime.opTime), Date_t());
+    stableOpTime = std::min(noOverlap, maximumStableOpTime);
 
-    if (stableOpTime) {
-        // Check that the selected stable optime does not exceed our maximum and that it does not
-        // surpass the no-overlap point.
-        invariant(stableOpTime.get().opTime.getTimestamp() <=
-                  maximumStableOpTime.opTime.getTimestamp());
-        invariant(stableOpTime.get().opTime <= maximumStableOpTime.opTime);
-        invariant(stableOpTime.get().opTime.getTimestamp() <= noOverlap.getTimestamp());
-        invariant(stableOpTime.get().opTime <= noOverlap);
-    }
+    // Check that the selected stable optime does not exceed our maximum and that it does not
+    // surpass the no-overlap point.
+    invariant(stableOpTime.getTimestamp() <= maximumStableOpTime.getTimestamp());
+    invariant(stableOpTime <= maximumStableOpTime);
+    invariant(stableOpTime.getTimestamp() <= noOverlap.getTimestamp());
+    invariant(stableOpTime <= noOverlap);
 
     return stableOpTime;
 }
@@ -4906,7 +4902,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     }
 
     // Get the current stable optime.
-    auto stableOpTime = _recalculateStableOpTime(lk);
+    OpTime stableOpTime = _recalculateStableOpTime(lk);
 
     // Don't update the stable timestamp if it is earlier than the initial data timestamp.
     // Timestamps before the initialDataTimestamp are not consistent and so are not safe to use for
@@ -4915,61 +4911,60 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     // after leaving initial sync, since the initialDataTimestamp and oldest timestamp will be equal
     // after initial sync oplog application has completed.
     auto initialDataTimestamp = _service->getStorageEngine()->getInitialDataTimestamp();
-    if (stableOpTime && stableOpTime->opTime.getTimestamp() < initialDataTimestamp) {
+    if (stableOpTime.getTimestamp() < initialDataTimestamp) {
         LOGV2_DEBUG(2139504,
                     2,
                     "Not updating stable timestamp since it is less than the initialDataTimestamp",
-                    "stableTimestamp"_attr = stableOpTime->opTime.getTimestamp(),
+                    "stableTimestamp"_attr = stableOpTime.getTimestamp(),
                     "initialDataTimestamp"_attr = initialDataTimestamp);
         return;
     }
 
-    if (stableOpTime && stableOpTime->opTime.getTimestamp().isNull()) {
+    if (stableOpTime.getTimestamp().isNull()) {
         LOGV2_DEBUG(2139502, 2, "Not updating stable timestamp to a null timestamp");
         return;
     }
 
-    // If there is a valid stable optime, set it for the storage engine, and then remove any
-    // old, unneeded stable optime candidates.
-    if (stableOpTime) {
-        LOGV2_DEBUG(21396,
-                    2,
-                    "Setting replication's stable optime to {stableOpTime}",
-                    "Setting replication's stable optime",
-                    "stableOpTime"_attr = stableOpTime.value());
+    if (gTestingSnapshotBehaviorInIsolation) {
+        return;
+    }
 
-        if (!gTestingSnapshotBehaviorInIsolation) {
-            // Update committed snapshot and wake up any threads waiting on read concern or
-            // write concern.
-            if (serverGlobalParams.enableMajorityReadConcern) {
-                // When majority read concern is enabled, the committed snapshot is set to the new
-                // stable optime.
-                if (_updateCommittedSnapshot(lk, stableOpTime.value())) {
-                    // Update the stable timestamp for the storage engine.
-                    _storage->setStableTimestamp(getServiceContext(),
-                                                 stableOpTime->opTime.getTimestamp());
-                }
-            } else {
-                const auto lastCommittedOpTime = _topCoord->getLastCommittedOpTimeAndWallTime();
-                if (!lastCommittedOpTime.opTime.isNull()) {
-                    // When majority read concern is disabled, we set the stable timestamp to
-                    // be less than or equal to the all committed timestamp. This makes sure that
-                    // the committed snapshot is not past the all committed timestamp to guarantee
-                    // we can always read our own majority committed writes. This problem is
-                    // specific to the case where we have a single node replica set and the
-                    // lastCommittedOpTime is set to be the lastApplied which can be ahead of the
-                    // allCommitted.
-                    auto newCommittedSnapshot = std::min(lastCommittedOpTime, *stableOpTime);
-                    _updateCommittedSnapshot(lk, newCommittedSnapshot);
-                }
-                // Set the stable timestamp regardless of whether the majority commit point moved
-                // forward. If we are in rollback state, however, do not alter the stable timestamp,
-                // since it may be moved backwards explicitly by the rollback-via-refetch process.
-                if (!MONGO_unlikely(disableSnapshotting.shouldFail()) && !_memberState.rollback()) {
-                    _storage->setStableTimestamp(getServiceContext(),
-                                                 stableOpTime->opTime.getTimestamp());
-                }
-            }
+    // Set the stable timestamp and update the committed snapshot.
+    LOGV2_DEBUG(21396,
+                2,
+                "Setting replication's stable optime to {stableOpTime}",
+                "Setting replication's stable optime",
+                "stableOpTime"_attr = stableOpTime);
+
+    // Update committed snapshot and wake up any threads waiting on read concern or
+    // write concern.
+    if (serverGlobalParams.enableMajorityReadConcern) {
+        // When majority read concern is enabled, the committed snapshot is set to the new
+        // stable optime. The wall time of the committed snapshot is not used for anything so we can
+        // create a fake one.
+        if (_updateCommittedSnapshot(lk, OpTimeAndWallTime(stableOpTime, Date_t()))) {
+            // Update the stable timestamp for the storage engine.
+            _storage->setStableTimestamp(getServiceContext(), stableOpTime.getTimestamp());
+        }
+    } else {
+        const auto lastCommittedOpTime = _topCoord->getLastCommittedOpTime();
+        if (!lastCommittedOpTime.isNull()) {
+            // When majority read concern is disabled, we set the stable timestamp to be less than
+            // or equal to the all-durable timestamp. This makes sure that the committed snapshot is
+            // not past the all-durable timestamp to guarantee we can always read our own majority
+            // committed writes. This problem is specific to the case where we have a single node
+            // replica set and the lastCommittedOpTime is set to be the lastApplied which can be
+            // ahead of the all-durable.
+            OpTime newCommittedSnapshot = std::min(lastCommittedOpTime, stableOpTime);
+            // The wall clock time of the committed snapshot is not used for anything so we can
+            // create a fake one.
+            _updateCommittedSnapshot(lk, OpTimeAndWallTime(newCommittedSnapshot, Date_t()));
+        }
+        // Set the stable timestamp regardless of whether the majority commit point moved
+        // forward. If we are in rollback state, however, do not alter the stable timestamp,
+        // since it may be moved backwards explicitly by the rollback-via-refetch process.
+        if (!MONGO_unlikely(disableSnapshotting.shouldFail()) && !_memberState.rollback()) {
+            _storage->setStableTimestamp(getServiceContext(), stableOpTime.getTimestamp());
         }
     }
 }

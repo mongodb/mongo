@@ -1338,10 +1338,9 @@ private:
     bool _updateCommittedSnapshot(WithLock lk, const OpTimeAndWallTime& newCommittedSnapshot);
 
     /**
-     * A helper method that returns the current stable optime based on the current commit point and
-     * set of stable optime candidates.
+     * A helper method that returns the current stable optime based on the current commit point.
      */
-    boost::optional<OpTimeAndWallTime> _recalculateStableOpTime(WithLock lk);
+    OpTime _recalculateStableOpTime(WithLock lk);
 
     /**
      * Calculates and sets the value of the 'stable' replication optime for the storage engine.
