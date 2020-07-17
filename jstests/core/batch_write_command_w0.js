@@ -34,7 +34,7 @@ assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with wri
 
 //
 // Single document insert, w:0 write concern specified, missing ordered
-coll.remove({});
+coll.drop();
 request = {
     insert: coll.getName(),
     documents: [{a: 1}],
@@ -46,7 +46,7 @@ countEventually(coll, 1);
 
 //
 // Single document upsert, write concern 0 specified, ordered = true
-coll.remove({});
+coll.drop();
 request = {
     update: coll.getName(),
     updates: [{q: {a: 1}, u: {$set: {a: 1}}, upsert: true}],
@@ -59,7 +59,7 @@ countEventually(coll, 1);
 
 //
 // Two document upsert, write concern 0 specified, ordered = true
-coll.remove({});
+coll.drop();
 request = {
     update: coll.getName(),
     updates: [
@@ -75,7 +75,7 @@ countEventually(coll, 2);
 
 //
 // Upsert fail due to duplicate key index, w:0, ordered:true
-coll.remove({});
+coll.drop();
 coll.ensureIndex({a: 1}, {unique: true});
 request = {
     update: coll.getName(),
@@ -90,12 +90,9 @@ result = coll.runCommand(request);
 assert.eq({ok: 1}, result);
 countEventually(coll, 1);
 
-// Remove unique index
-coll.drop();
-
 //
 // Single document delete, w:0 write concern specified
-coll.remove({});
+coll.drop();
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),
@@ -108,7 +105,7 @@ countEventually(coll, 0);
 
 //
 // Cause remove error using ordered:false and w:0
-coll.remove({});
+coll.drop();
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),
@@ -122,7 +119,7 @@ countEventually(coll, 0);
 
 //
 // Cause remove error using ordered:true and w:0 - $set isn't a valid delete filter
-coll.remove({});
+coll.drop();
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),
@@ -136,7 +133,7 @@ assert.eq(coll.count(), 1);
 
 //
 // When limit is not 0 and 1
-coll.remove({});
+coll.drop();
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),

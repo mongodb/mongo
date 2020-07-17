@@ -47,7 +47,7 @@ function countEventually(collection, n) {
 
 //
 // NO DOCS, illegal command
-coll.remove({});
+coll.drop();
 coll.insert({a: 1});
 request = {
     delete: coll.getName()
@@ -58,7 +58,7 @@ assert.eq(1, coll.count());
 
 //
 // Single document remove, default write concern specified
-coll.remove({});
+coll.drop();
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),
@@ -71,7 +71,7 @@ assert.eq(0, coll.count());
 
 //
 // Single document remove, w:1 write concern specified, ordered:true
-coll.remove({});
+coll.drop();
 coll.insert([{a: 1}, {a: 1}]);
 request = {
     delete: coll.getName(),
@@ -86,7 +86,7 @@ assert.eq(1, coll.count());
 
 //
 // Multiple document remove, w:1 write concern specified, ordered:true, default top
-coll.remove({});
+coll.drop();
 coll.insert([{a: 1}, {a: 1}]);
 request = {
     delete: coll.getName(),
@@ -101,7 +101,7 @@ assert.eq(0, coll.count());
 
 //
 // Multiple document remove, w:1 write concern specified, ordered:true, top:0
-coll.remove({});
+coll.drop();
 coll.insert([{a: 1}, {a: 1}]);
 request = {
     delete: coll.getName(),
@@ -116,7 +116,7 @@ assert.eq(0, coll.count());
 
 //
 // Large batch under the size threshold should delete successfully
-coll.remove({});
+coll.drop();
 batch = [];
 var insertBatch = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < maxWriteBatchSize; ++i) {
@@ -137,7 +137,7 @@ assert.eq(0, coll.count());
 
 //
 // Large batch above the size threshold should fail to delete
-coll.remove({});
+coll.drop();
 batch = [];
 var insertBatch = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < maxWriteBatchSize + 1; ++i) {
@@ -157,7 +157,7 @@ assert.eq(batch.length, coll.count());
 
 //
 // Cause remove error using ordered:true
-coll.remove({});
+coll.drop();
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),
@@ -178,7 +178,7 @@ assert.eq(0, coll.count());
 
 //
 // Cause remove error using ordered:false
-coll.remove({});
+coll.drop();
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),
