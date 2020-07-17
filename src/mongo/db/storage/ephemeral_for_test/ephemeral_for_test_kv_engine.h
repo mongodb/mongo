@@ -146,9 +146,9 @@ public:
     // Ephemeral for test Specific
 
     /**
-     * Returns a pair of the current version and copy of tree of the master.
+     * Returns a pair of the current version and a shared_ptr of tree of the master.
      */
-    std::pair<uint64_t, StringStore> getMasterInfo() {
+    std::pair<uint64_t, std::shared_ptr<StringStore>> getMasterInfo() {
         stdx::lock_guard<Latch> lock(_masterLock);
         return std::make_pair(_masterVersion, _master);
     }
@@ -163,6 +163,22 @@ public:
         return _visibilityManager.get();
     }
 
+    /**
+     * History in the map that is older than the oldest timestamp can be removed. Additionally, if
+     * the tree at the oldest timestamp is no longer in use by any active transactions it can be
+     * cleaned up, up until the point where there's an active transaction in the map. That point
+     * also becomes the new oldest timestamp.
+     */
+    void cleanHistory();
+
+    Timestamp getOldestTimestamp() const override;
+
+    void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) override;
+
+    std::map<Timestamp, std::shared_ptr<StringStore>> getHistory_forTest();
+
+    static bool instanceExists();
+
 private:
     std::shared_ptr<void> _catalogInfo;
     int _cachePressureForTest = 0;
@@ -171,8 +187,14 @@ private:
     std::unique_ptr<VisibilityManager> _visibilityManager;
 
     mutable Mutex _masterLock = MONGO_MAKE_LATCH("KVEngine::_masterLock");
-    StringStore _master;
+    std::shared_ptr<StringStore> _master;
     uint64_t _masterVersion = 0;
+
+    void _cleanHistory(WithLock);
+
+    // This map contains the different versions of the StringStore's referenced by their commit
+    // timestamps.
+    std::map<Timestamp, std::shared_ptr<StringStore>> _availableHistory;
 };
 }  // namespace ephemeral_for_test
 }  // namespace mongo

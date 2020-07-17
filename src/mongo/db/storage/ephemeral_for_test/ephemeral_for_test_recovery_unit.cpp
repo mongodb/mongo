@@ -59,9 +59,10 @@ void RecoveryUnit::doCommitUnitOfWork() {
     if (_dirty) {
         invariant(_forked);
         while (true) {
-            std::pair<uint64_t, StringStore> masterInfo = _KVEngine->getMasterInfo();
+            auto masterInfo = _KVEngine->getMasterInfo();
             try {
-                _workingCopy.merge3(_mergeBase, masterInfo.second);
+                invariant(_mergeBase);
+                _workingCopy.merge3(*_mergeBase, *masterInfo.second);
             } catch (const merge_conflict_exception&) {
                 throw WriteConflictException();
             }
@@ -78,7 +79,7 @@ void RecoveryUnit::doCommitUnitOfWork() {
         _dirty = false;
     } else if (_forked) {
         if (kDebugBuild)
-            invariant(_mergeBase == _workingCopy);
+            invariant(*_mergeBase == _workingCopy);
     }
 
     _setState(State::kCommitting);
@@ -109,6 +110,7 @@ void RecoveryUnit::doAbandonSnapshot() {
     invariant(!_inUnitOfWork(), toString(_getState()));
     _forked = false;
     _dirty = false;
+    _setMergeNull();
 }
 
 bool RecoveryUnit::forkIfNeeded() {
@@ -116,13 +118,13 @@ bool RecoveryUnit::forkIfNeeded() {
         return false;
 
     // Update the copies of the trees when not in a WUOW so cursors can retrieve the latest data.
+    auto masterInfo = _KVEngine->getMasterInfo();
+    _mergeBase = masterInfo.second;
+    _workingCopy = *masterInfo.second;
+    invariant(_mergeBase);
 
-    std::pair<uint64_t, StringStore> masterInfo = _KVEngine->getMasterInfo();
-    StringStore master = masterInfo.second;
-
-    _mergeBase = master;
-    _workingCopy = master;
-
+    // Call cleanHistory in case _mergeBase was holding a shared_ptr to an older tree.
+    _KVEngine->cleanHistory();
     _forked = true;
     return true;
 }
@@ -140,9 +142,17 @@ void RecoveryUnit::setOrderedCommit(bool orderedCommit) {}
 void RecoveryUnit::_abort() {
     _forked = false;
     _dirty = false;
+    _setMergeNull();
     _setState(State::kAborting);
     abortRegisteredChanges();
     _setState(State::kInactive);
+}
+
+void RecoveryUnit::_setMergeNull() {
+    _mergeBase = nullptr;
+    if (!KVEngine::instanceExists()) {
+        _KVEngine->cleanHistory();
+    }
 }
 
 RecoveryUnit* RecoveryUnit::get(OperationContext* opCtx) {

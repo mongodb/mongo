@@ -108,10 +108,15 @@ private:
 
     void _abort();
 
+    void _setMergeNull();
+
     std::function<void()> _waitUntilDurableCallback;
     // Official master is kept by KVEngine
     KVEngine* _KVEngine;
-    StringStore _mergeBase;
+    // We need _mergeBase to be a shared_ptr to hold references in KVEngine::_availableHistory.
+    // _mergeBase will be initialized in forkIfNeeded().
+    std::shared_ptr<StringStore> _mergeBase;
+    // We need _workingCopy to be a unique copy, not a shared_ptr.
     StringStore _workingCopy;
 
     bool _forked = false;
