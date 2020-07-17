@@ -11,6 +11,7 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/replsets/rslib.js");
 
 var name = 'initial_sync_oplog_rollover';
 var replSet = new ReplSetTest({
@@ -32,10 +33,6 @@ var primary = replSet.getPrimary();
 
 var coll = primary.getDB('test').foo;
 assert.commandWorked(coll.insert({a: 1}));
-
-function getFirstOplogEntry(conn) {
-    return conn.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1)[0];
-}
 
 var firstOplogEntry = getFirstOplogEntry(primary);
 
