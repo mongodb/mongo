@@ -21,8 +21,9 @@ const ns = dbName + "." + collName;
 TestData.transactionLifetimeLimitSeconds = 10;
 
 const rsOpts = {
-    nodes: 3,
-    settings: {chainingAllowed: false}
+    // Make secondaries unelectable.
+    nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+    settings: {chainingAllowed: false, electionTimeoutMillis: ReplSetTest.kForeverMillis}
 };
 let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts, rs2: rsOpts}});
 
