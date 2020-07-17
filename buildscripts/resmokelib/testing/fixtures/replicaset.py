@@ -208,7 +208,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         # contains more than 1 node), so the primary is elected more quickly.
         repl_config["members"] = [members[0]]
         self.logger.info("Issuing replSetInitiate command: %s", repl_config)
-        self._configure_repl_set(client, {"replSetInitiate": repl_config})
+        self._initiate_repl_set(client, repl_config)
         self._await_primary()
 
         if self.mixed_bin_versions is not None:
@@ -237,40 +237,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             # Add in the members one at a time, since non force reconfigs can only add/remove a
             # single voting member at a time.
             for ind in range(2, len(members) + 1):
-                self.logger.info("Adding in node %d: %s", ind, members[ind - 1])
-                while True:
-                    try:
-                        # 'newlyAdded' removal reconfigs could bump the version.
-                        # Get the current version to be safe.
-                        curr_version = client.admin.command(
-                            {"replSetGetConfig": 1})['config']['version']
-                        repl_config["version"] = curr_version + 1
-                        repl_config["members"] = members[:ind]
-                        self.logger.info("Issuing replSetReconfig command: %s", repl_config)
-                        self._configure_repl_set(
-                            client, {
-                                "replSetReconfig": repl_config,
-                                "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
-                            })
-                        break
-                    except pymongo.errors.OperationFailure as err:
-                        # These error codes may be transient, and so we retry the reconfig with a
-                        # (potentially) higher config version. We should not receive these codes
-                        # indefinitely.
-                        if (err.code !=
-                                ReplicaSetFixture._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE
-                                and err.code != ReplicaSetFixture._CURRENT_CONFIG_NOT_COMMITTED_YET
-                                and err.code != ReplicaSetFixture._CONFIGURATION_IN_PROGRESS
-                                and err.code != ReplicaSetFixture._NODE_NOT_FOUND and err.code !=
-                                ReplicaSetFixture._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE):
-                            msg = ("Operation failure while setting up the "
-                                   "replica set fixture: {}").format(err)
-                            self.logger.error(msg)
-                            raise errors.ServerFailure(msg)
-
-                        msg = ("Retrying failed attempt to add new node to fixture: {}").format(err)
-                        self.logger.error(msg)
-                        time.sleep(0.1)  # Wait a little bit before trying again.
+                self._add_node_to_repl_set(client, repl_config, ind, members)
 
         self._await_secondaries()
         self._await_newly_added_removals()
@@ -284,14 +251,47 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             self.logger.debug('No members running when gathering replicaset fixture pids.')
         return pids
 
-    def _configure_repl_set(self, client, cmd_obj):
-        # replSetInitiate and replSetReconfig commands can fail with a NodeNotFound error
+    def _add_node_to_repl_set(self, client, repl_config, member_index, members):
+        self.logger.info("Adding in node %d: %s", member_index, members[member_index - 1])
+        while True:
+            try:
+                # 'newlyAdded' removal reconfigs could bump the version.
+                # Get the current version to be safe.
+                curr_version = client.admin.command({"replSetGetConfig": 1})['config']['version']
+                repl_config["version"] = curr_version + 1
+                repl_config["members"] = members[:member_index]
+                self.logger.info("Issuing replSetReconfig command: %s", repl_config)
+                client.admin.command({
+                    "replSetReconfig": repl_config,
+                    "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
+                })
+                break
+            except pymongo.errors.OperationFailure as err:
+                # These error codes may be transient, and so we retry the reconfig with a
+                # (potentially) higher config version. We should not receive these codes
+                # indefinitely.
+                if (err.code != ReplicaSetFixture._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE
+                        and err.code != ReplicaSetFixture._CURRENT_CONFIG_NOT_COMMITTED_YET
+                        and err.code != ReplicaSetFixture._CONFIGURATION_IN_PROGRESS
+                        and err.code != ReplicaSetFixture._NODE_NOT_FOUND
+                        and err.code != ReplicaSetFixture._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE):
+                    msg = ("Operation failure while setting up the "
+                           "replica set fixture: {}").format(err)
+                    self.logger.error(msg)
+                    raise errors.ServerFailure(msg)
+
+                msg = ("Retrying failed attempt to add new node to fixture: {}").format(err)
+                self.logger.error(msg)
+                time.sleep(0.1)  # Wait a little bit before trying again.
+
+    def _initiate_repl_set(self, client, repl_config):
+        # replSetInitiate (and replSetReconfig) commands can fail with a NodeNotFound error
         # if a heartbeat times out during the quorum check. We retry three times to reduce
         # the chance of failing this way.
         num_initiate_attempts = 3
         for attempt in range(1, num_initiate_attempts + 1):
             try:
-                client.admin.command(cmd_obj)
+                client.admin.command({"replSetInitiate": repl_config})
                 break
             except pymongo.errors.OperationFailure as err:
                 # Retry on NodeNotFound errors from the "replSetInitiate" command.
