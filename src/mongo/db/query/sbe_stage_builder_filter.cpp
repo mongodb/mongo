@@ -213,7 +213,7 @@ std::unique_ptr<sbe::PlanStage> generateTraverseHelper(MatchExpressionVisitorCon
                                      sbe::makeE<sbe::EVariable>(traversePredicateVar),
                                      sbe::makeE<sbe::EVariable>(elemPredicateVar)),
         sbe::makeE<sbe::EVariable>(traversePredicateVar),
-        2);
+        1);
 }
 
 /**
