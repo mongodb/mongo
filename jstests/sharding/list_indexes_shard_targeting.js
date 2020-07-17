@@ -13,7 +13,10 @@ load("jstests/libs/fail_point_util.js");
 // This test makes shards have inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
-const st = new ShardingTest({shards: 3});
+const st = new ShardingTest({
+    shards: 3,
+    other: {mongosOptions: {setParameter: {enableFinerGrainedCatalogCacheRefresh: true}}}
+});
 const dbName = "test";
 const collName = "user";
 const ns = dbName + "." + collName;

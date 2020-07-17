@@ -10,7 +10,11 @@
 load("jstests/sharding/libs/shard_versioning_util.js");
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
-let st = new ShardingTest({mongos: 1, shards: 3});
+let st = new ShardingTest({
+    mongos: 1,
+    shards: 3,
+    other: {mongosOptions: {setParameter: {enableFinerGrainedCatalogCacheRefresh: true}}}
+});
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;

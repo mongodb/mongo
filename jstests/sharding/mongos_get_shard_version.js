@@ -16,7 +16,14 @@ if (isStepdownSuite && isCodeCoverageEnabled) {
     return;
 }
 
-const st = new ShardingTest({shards: 2, mongos: 1});
+let shardingTestOpt = {shards: 2};
+if (jsTestOptions().mongosBinVersion != "last-stable") {
+    shardingTestOpt.other = {
+        mongosOptions: {setParameter: {enableFinerGrainedCatalogCacheRefresh: true}}
+    };
+}
+
+const st = new ShardingTest(shardingTestOpt);
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
