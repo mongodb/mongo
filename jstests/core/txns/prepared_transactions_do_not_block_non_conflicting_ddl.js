@@ -40,7 +40,8 @@ testSuccess(otherDBName, createCmd);
 jsTest.log("Test 'createIndexes'.");
 const createIndexesCmd = {
     createIndexes: collName,
-    indexes: [{key: {x: 1}, name: "x_1"}]
+    indexes: [{key: {x: 1}, name: "x_1"}],
+    writeConcern: {w: 'majority'},
 };
 testSuccess(otherDBName, createIndexesCmd);
 
@@ -51,7 +52,11 @@ const dropIndexesCmd = {
 };
 testSuccess(otherDBName, dropIndexesCmd);
 
-sessionColl.createIndex({multiKeyField: 1});
+assert.commandWorked(sessionDB.runCommand({
+    createIndexes: collName,
+    indexes: [{name: 'multiKeyField_1', key: {multiKeyField: 1}}],
+    writeConcern: {w: 'majority'},
+}));
 jsTest.log("Test 'insert' that enables multi-key index on the same collection.");
 const insertAndSetMultiKeyCmd = {
     insert: collName,
