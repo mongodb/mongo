@@ -3809,10 +3809,9 @@ def doConfigure(myenv):
 env = doConfigure( env )
 env["NINJA_SYNTAX"] = "#site_scons/third_party/ninja_syntax.py"
 
-
 # Now that we are done with configure checks, enable ccache and
-# icecream if requested. If *both* icecream and ccache are requested,
-# ccache must be loaded first.
+# icecream, if available. Per the rules declared in the icecream tool,
+# load the ccache tool first.
 env.Tool('ccache')
 
 if env.ToolchainIs("clang"):
@@ -3821,7 +3820,6 @@ elif env.ToolchainIs("gcc"):
     env["ICECC_COMPILER_TYPE"] = "gcc"
 
 env.Tool('icecream')
-
 
 # Defaults for SCons provided flags. SetOption only sets the option to our value
 # if the user did not provide it. So for any flag here if it's explicitly passed

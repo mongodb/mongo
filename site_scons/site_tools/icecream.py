@@ -29,7 +29,7 @@ import subprocess
 from pkg_resources import parse_version
 
 _icecream_version_min = parse_version("1.1rc2")
-_icecream_version_gcc_remote_cpp = parse_version("1.2")
+_ccache_nocpp2_version = parse_version("3.4.1")
 
 
 # I'd prefer to use value here, but amazingly, its __str__ returns the
@@ -54,8 +54,31 @@ def icecc_create_env(env, target, source, for_signature):
 
     # Create the env, use awk to get just the tarball name and we store it in
     # the shell variable $ICECC_VERSION_TMP so the subsequent mv command and
-    # store it in a known location.
-    create_env = "ICECC_VERSION_TMP=$$($ICECC_CREATE_ENV --$ICECC_COMPILER_TYPE $CC $CXX | awk '/^creating .*\\.tar\\.gz/ { print $$2 }')"
+    # store it in a known location. Add any files requested from the user environment.
+    create_env = "ICECC_VERSION_TMP=$$($ICECC_CREATE_ENV --$ICECC_COMPILER_TYPE $CC $CXX"
+    for addfile in env.get('ICECC_CREATE_ENV_ADDFILES', []):
+        if (type(addfile) == tuple
+            and len(addfile) == 2):
+            if env['ICECREAM_VERSION'] > parse_version('1.1'):
+                raise Exception("This version of icecream does not support addfile remapping.")
+            create_env += " --addfile {}={}".format(
+                env.File(addfile[0]).srcnode().abspath,
+                env.File(addfile[1]).srcnode().abspath)
+            env.Depends('$ICECC_VERSION', addfile[1])
+        elif type(addfile) == str:
+            create_env += " --addfile {}".format(env.File(addfile).srcnode().abspath)
+            env.Depends('$ICECC_VERSION', addfile)
+        else:
+            # NOTE: abspath is required by icecream because of
+            # this line in icecc-create-env:
+            # https://github.com/icecc/icecream/blob/10b9468f5bd30a0fdb058901e91e7a29f1bfbd42/client/icecc-create-env.in#L534
+            # which cuts out the two files based off the equals sign and
+            # starting slash of the second file
+            raise Exception("Found incorrect icecream addfile format: {}" +
+                "\nicecream addfiles must be a single path or tuple path format: " +
+                "('chroot dest path', 'source file path')".format(
+                str(addfile)))
+    create_env += " | awk '/^creating .*\\.tar\\.gz/ { print $$2 }')"
 
     # Simply move our tarball to the expected locale.
     mv = "mv $$ICECC_VERSION_TMP $TARGET"
@@ -69,6 +92,14 @@ def generate(env):
 
     if not exists(env):
         return
+
+    # icecc lower then 1.1 supports addfile remapping accidentally
+    # and above it adds an empty cpuinfo so handle cpuinfo issues for icecream
+    # below version 1.1
+    if (env['ICECREAM_VERSION'] <= parse_version('1.1')
+        and env.ToolchainIs("clang")
+        and os.path.exists('/proc/cpuinfo')):
+        env.AppendUnique(ICECC_CREATE_ENV_ADDFILES=[('/proc/cpuinfo', '/dev/null')])
 
     env["ICECCENVCOMSTR"] = env.get("ICECCENVCOMSTR", "Generating environment: $TARGET")
     env["ICECC_COMPILER_TYPE"] = env.get(
@@ -207,37 +238,14 @@ def generate(env):
 
     if env.ToolchainIs("clang"):
         env["ENV"]["ICECC_CLANG_REMOTE_CPP"] = 1
-    elif env.ToolchainIs("gcc"):
-        if env["ICECREAM_VERSION"] >= _icecream_version_gcc_remote_cpp:
-            if ccache_enabled:
-                # Newer versions of Icecream will drop -fdirectives-only from
-                # preprocessor and compiler flags if it does not find a remote
-                # build host to build on. ccache, on the other hand, will not
-                # pass the flag to the compiler if CCACHE_NOCPP2=1, but it will
-                # pass it to the preprocessor. The combination of setting
-                # CCACHE_NOCPP2=1 and passing the flag can lead to build
-                # failures.
 
-                # See: https://jira.mongodb.org/browse/SERVER-48443
-
-                # We have an open issue with Icecream and ccache to resolve the
-                # cause of these build failures. Once the bug is resolved and
-                # the fix is deployed, we can remove this entire conditional
-                # branch and make it like the one for clang.
-                # TODO: https://github.com/icecc/icecream/issues/550
-                env["ENV"].pop("CCACHE_NOCPP2", None)
-                env["ENV"]["CCACHE_CPP2"] = 1
-                try:
-                    env["CCFLAGS"].remove("-fdirectives-only")
-                except ValueError:
-                    pass
-            else:
-                # If we can, we should make Icecream do its own preprocessing
-                # to reduce concurrency on the local host. We should not do
-                # this when ccache is in use because ccache will execute
-                # Icecream to do its own preprocessing and then execute
-                # Icecream as the compiler on the preprocessed source.
-                env["ENV"]["ICECC_REMOTE_CPP"] = 1
+        if ccache_enabled and env["CCACHE_VERSION"] >= _ccache_nocpp2_version:
+            env.AppendUnique(CCFLAGS=["-frewrite-includes"])
+            env["ENV"]["CCACHE_NOCPP2"] = 1
+    else:
+        env.AppendUnique(CCFLAGS=["-fdirectives-only"])
+        if ccache_enabled:
+            env["ENV"]["CCACHE_NOCPP2"] = 1
 
     if "ICECC_SCHEDULER" in env:
         env["ENV"]["USE_SCHEDULER"] = env["ICECC_SCHEDULER"]
@@ -310,9 +318,6 @@ def generate(env):
 
 
 def exists(env):
-    # Assume the tool has run if we already know the version.
-    if "ICECREAM_VERSION" in env:
-        return True
 
     icecc = env.get("ICECC", False)
     if not icecc:
