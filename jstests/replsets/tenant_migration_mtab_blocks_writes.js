@@ -1,5 +1,6 @@
 /**
- *
+ * Tests that after donorStartCommand is run, that reads and writes should be blocked for the
+ * migrating tenant.
  * @tags: [requires_fcv_46]
  */
 
@@ -41,6 +42,9 @@ jsTest.log('Running the serverStatus command.');
 const migratingTenantServerStatus =
     donorPrimary.adminCommand({serverStatus: 1}).migratingTenantAccessBlocker;
 
+// Due to the way that the state machine works, if both reads and writes are blocked, we know that
+// at some point only writes were blocked Thus both kBlockWrites and kBlockWritesAndReads are states
+// that are used.
 assert.eq(migratingTenantServerStatus.access, kBlockReadsAndWrites);
 assert(migratingTenantServerStatus.blockTimestamp);
 
