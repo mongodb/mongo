@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.6.3.
+// A Bison parser, made by GNU Bison 3.6.
 
 // Locations for Bison parsers in C++
 
@@ -31,12 +31,12 @@
 // version 2.2 of Bison.
 
 /**
- ** \file location_gen.h
+ ** \file src/mongo/db/cst/location_gen.h
  ** Define the mongo::location class.
  */
 
-#ifndef YY_YY_LOCATION_GEN_H_INCLUDED
-#define YY_YY_LOCATION_GEN_H_INCLUDED
+#ifndef YY_YY_SRC_MONGO_DB_CST_LOCATION_GEN_H_INCLUDED
+#define YY_YY_SRC_MONGO_DB_CST_LOCATION_GEN_H_INCLUDED
 
 #include <iostream>
 #include <string>
@@ -53,9 +53,9 @@
 #endif
 #endif
 
-#line 52 "pipeline_grammar.yy"
+#line 52 "src/mongo/db/cst/pipeline_grammar.yy"
 namespace mongo {
-#line 59 "location_gen.h"
+#line 59 "src/mongo/db/cst/location_gen.h"
 
 /// A point in a source file.
 class position {
@@ -260,8 +260,8 @@ std::basic_ostream<YYChar>& operator<<(std::basic_ostream<YYChar>& ostr, const l
     return ostr;
 }
 
-#line 52 "pipeline_grammar.yy"
+#line 52 "src/mongo/db/cst/pipeline_grammar.yy"
 }  // namespace mongo
-#line 333 "location_gen.h"
+#line 333 "src/mongo/db/cst/location_gen.h"
 
-#endif  // !YY_YY_LOCATION_GEN_H_INCLUDED
+#endif  // !YY_YY_SRC_MONGO_DB_CST_LOCATION_GEN_H_INCLUDED

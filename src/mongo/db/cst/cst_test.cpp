@@ -146,5 +146,57 @@ TEST(CstGrammarTest, ParsesUnionWith) {
     }
 }
 
+TEST(CstGrammarTest, ParseSkipInt) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$skip: 5}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::skip == stages[0].firstKeyFieldname());
+    ASSERT_BSONOBJ_EQ(fromjson("{skip : \"<UserInt 5>\" }"), stages[0].toBson());
+}
+
+TEST(CstGrammarTest, ParseSkipDouble) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$skip: 1.5}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::skip == stages[0].firstKeyFieldname());
+    ASSERT_BSONOBJ_EQ(fromjson("{skip : \"<UserDouble 1.500000>\" }"), stages[0].toBson());
+}
+
+TEST(CstGrammarTest, ParseSkipLong) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$skip: 8223372036854775807}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::skip == stages[0].firstKeyFieldname());
+    ASSERT_BSONOBJ_EQ(fromjson("{skip : \"<UserLong 8223372036854775807>\" }"), stages[0].toBson());
+}
+
+TEST(CstGrammarTest, InvalidParseSkipObject) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$skip: {}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+}
+
+TEST(CstGrammarTest, InvalidParseSkipString) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$skip: '5'}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+}
+
 }  // namespace
 }  // namespace mongo

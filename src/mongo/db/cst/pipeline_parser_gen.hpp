@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.6.3.
+// A Bison parser, made by GNU Bison 3.6.
 
 // Skeleton interface for Bison LALR(1) parsers in C++
 
@@ -32,7 +32,7 @@
 
 
 /**
- ** \file pipeline_parser_gen.hpp
+ ** \file src/mongo/db/cst/pipeline_parser_gen.hpp
  ** Define the mongo::parser class.
  */
 
@@ -42,10 +42,10 @@
 // especially those whose name start with YY_ or yy_.  They are
 // private implementation details that can be changed or removed.
 
-#ifndef YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
-#define YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#ifndef YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#define YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
 // "%code requires" blocks.
-#line 60 "pipeline_grammar.yy"
+#line 60 "src/mongo/db/cst/pipeline_grammar.yy"
 
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/key_fieldname.h"
@@ -61,7 +61,7 @@ class BSONLexer;
 #pragma warning(disable : 4065)
 #endif
 
-#line 65 "pipeline_parser_gen.hpp"
+#line 65 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 #include <cassert>
 #include <cstdlib>  // std::abort
@@ -190,9 +190,9 @@ class BSONLexer;
 #define YYDEBUG 0
 #endif
 
-#line 52 "pipeline_grammar.yy"
+#line 52 "src/mongo/db/cst/pipeline_grammar.yy"
 namespace mongo {
-#line 200 "pipeline_parser_gen.hpp"
+#line 200 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 
 /// A Bison parser.
@@ -371,6 +371,8 @@ public:
             // stage
             // inhibitOptimization
             // unionWith
+            // num
+            // skip
             char dummy1[sizeof(CNode)];
 
             // BOOL
@@ -435,13 +437,14 @@ public:
             END_ARRAY = 6,                   // END_ARRAY
             STAGE_INHIBIT_OPTIMIZATION = 7,  // STAGE_INHIBIT_OPTIMIZATION
             STAGE_UNION_WITH = 8,            // STAGE_UNION_WITH
-            COLL_ARG = 9,                    // COLL_ARG
-            PIPELINE_ARG = 10,               // PIPELINE_ARG
-            STRING = 11,                     // STRING
-            NUMBER_INT = 12,                 // NUMBER_INT
-            NUMBER_LONG = 13,                // NUMBER_LONG
-            NUMBER_DOUBLE = 14,              // NUMBER_DOUBLE
-            BOOL = 15                        // BOOL
+            STAGE_SKIP = 9,                  // STAGE_SKIP
+            COLL_ARG = 10,                   // COLL_ARG
+            PIPELINE_ARG = 11,               // PIPELINE_ARG
+            STRING = 12,                     // STRING
+            NUMBER_INT = 13,                 // NUMBER_INT
+            NUMBER_LONG = 14,                // NUMBER_LONG
+            NUMBER_DOUBLE = 15,              // NUMBER_DOUBLE
+            BOOL = 16                        // BOOL
         };
         /// Backward compatibility alias (Bison 3.6).
         typedef token_kind_type yytokentype;
@@ -456,7 +459,7 @@ public:
     /// Symbol kinds.
     struct symbol_kind {
         enum symbol_kind_type {
-            YYNTOKENS = 16,  ///< Number of tokens.
+            YYNTOKENS = 17,  ///< Number of tokens.
             S_YYEMPTY = -2,
             S_YYEOF = 0,                       // "EOF"
             S_YYerror = 1,                     // error
@@ -467,21 +470,24 @@ public:
             S_END_ARRAY = 6,                   // END_ARRAY
             S_STAGE_INHIBIT_OPTIMIZATION = 7,  // STAGE_INHIBIT_OPTIMIZATION
             S_STAGE_UNION_WITH = 8,            // STAGE_UNION_WITH
-            S_COLL_ARG = 9,                    // COLL_ARG
-            S_PIPELINE_ARG = 10,               // PIPELINE_ARG
-            S_STRING = 11,                     // STRING
-            S_NUMBER_INT = 12,                 // NUMBER_INT
-            S_NUMBER_LONG = 13,                // NUMBER_LONG
-            S_NUMBER_DOUBLE = 14,              // NUMBER_DOUBLE
-            S_BOOL = 15,                       // BOOL
-            S_YYACCEPT = 16,                   // $accept
-            S_stageList = 17,                  // stageList
-            S_stage = 18,                      // stage
-            S_inhibitOptimization = 19,        // inhibitOptimization
-            S_unionWith = 20,                  // unionWith
-            S_pipeline = 21,                   // pipeline
-            S_START_ORDERED_OBJECT = 22,       // START_ORDERED_OBJECT
-            S_23_1 = 23                        // $@1
+            S_STAGE_SKIP = 9,                  // STAGE_SKIP
+            S_COLL_ARG = 10,                   // COLL_ARG
+            S_PIPELINE_ARG = 11,               // PIPELINE_ARG
+            S_STRING = 12,                     // STRING
+            S_NUMBER_INT = 13,                 // NUMBER_INT
+            S_NUMBER_LONG = 14,                // NUMBER_LONG
+            S_NUMBER_DOUBLE = 15,              // NUMBER_DOUBLE
+            S_BOOL = 16,                       // BOOL
+            S_YYACCEPT = 17,                   // $accept
+            S_stageList = 18,                  // stageList
+            S_stage = 19,                      // stage
+            S_inhibitOptimization = 20,        // inhibitOptimization
+            S_unionWith = 21,                  // unionWith
+            S_num = 22,                        // num
+            S_skip = 23,                       // skip
+            S_pipeline = 24,                   // pipeline
+            S_START_ORDERED_OBJECT = 25,       // START_ORDERED_OBJECT
+            S_26_1 = 26                        // $@1
         };
     };
 
@@ -510,30 +516,32 @@ public:
         basic_symbol(basic_symbol&& that)
             : Base(std::move(that)), value(), location(std::move(that.location)) {
             switch (this->kind()) {
-                case 17:  // stageList
-                case 18:  // stage
-                case 19:  // inhibitOptimization
-                case 20:  // unionWith
+                case 18:  // stageList
+                case 19:  // stage
+                case 20:  // inhibitOptimization
+                case 21:  // unionWith
+                case 22:  // num
+                case 23:  // skip
                     value.move<CNode>(std::move(that.value));
                     break;
 
-                case 15:  // BOOL
+                case 16:  // BOOL
                     value.move<bool>(std::move(that.value));
                     break;
 
-                case 14:  // NUMBER_DOUBLE
+                case 15:  // NUMBER_DOUBLE
                     value.move<double>(std::move(that.value));
                     break;
 
-                case 12:  // NUMBER_INT
+                case 13:  // NUMBER_INT
                     value.move<int>(std::move(that.value));
                     break;
 
-                case 13:  // NUMBER_LONG
+                case 14:  // NUMBER_LONG
                     value.move<long long>(std::move(that.value));
                     break;
 
-                case 11:  // STRING
+                case 12:  // STRING
                     value.move<std::string>(std::move(that.value));
                     break;
 
@@ -614,30 +622,32 @@ public:
 
             // Value type destructor.
             switch (yykind) {
-                case 17:  // stageList
-                case 18:  // stage
-                case 19:  // inhibitOptimization
-                case 20:  // unionWith
+                case 18:  // stageList
+                case 19:  // stage
+                case 20:  // inhibitOptimization
+                case 21:  // unionWith
+                case 22:  // num
+                case 23:  // skip
                     value.template destroy<CNode>();
                     break;
 
-                case 15:  // BOOL
+                case 16:  // BOOL
                     value.template destroy<bool>();
                     break;
 
-                case 14:  // NUMBER_DOUBLE
+                case 15:  // NUMBER_DOUBLE
                     value.template destroy<double>();
                     break;
 
-                case 12:  // NUMBER_INT
+                case 13:  // NUMBER_INT
                     value.template destroy<int>();
                     break;
 
-                case 13:  // NUMBER_LONG
+                case 14:  // NUMBER_LONG
                     value.template destroy<long long>();
                     break;
 
-                case 11:  // STRING
+                case 12:  // STRING
                     value.template destroy<std::string>();
                     break;
 
@@ -647,14 +657,6 @@ public:
 
             Base::clear();
         }
-
-#if YYDEBUG || 0
-        /// The user-facing name of this symbol.
-        const char* name() const YY_NOEXCEPT {
-            return PipelineParserGen::symbol_name(this->kind());
-        }
-#endif  // #if YYDEBUG || 0
-
 
         /// Backward compatibility (Bison 3.6).
         symbol_kind_type type_get() const YY_NOEXCEPT;
@@ -733,7 +735,8 @@ public:
                       tok == token::START_OBJECT || tok == token::END_OBJECT ||
                       tok == token::START_ARRAY || tok == token::END_ARRAY ||
                       tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_UNION_WITH ||
-                      tok == token::COLL_ARG || tok == token::PIPELINE_ARG);
+                      tok == token::STAGE_SKIP || tok == token::COLL_ARG ||
+                      tok == token::PIPELINE_ARG);
         }
 #else
         symbol_type(int tok, const location_type& l) : super_type(token_type(tok), l) {
@@ -741,7 +744,8 @@ public:
                       tok == token::START_OBJECT || tok == token::END_OBJECT ||
                       tok == token::START_ARRAY || tok == token::END_ARRAY ||
                       tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_UNION_WITH ||
-                      tok == token::COLL_ARG || tok == token::PIPELINE_ARG);
+                      tok == token::STAGE_SKIP || tok == token::COLL_ARG ||
+                      tok == token::PIPELINE_ARG);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -842,13 +846,6 @@ public:
     /// Report a syntax error.
     void error(const syntax_error& err);
 
-#if YYDEBUG || 0
-    /// The user-facing name of the symbol whose (internal) number is
-    /// YYSYMBOL.  No bounds checking.
-    static const char* symbol_name(symbol_kind_type yysymbol);
-#endif  // #if YYDEBUG || 0
-
-
     // Implementation of make_symbol for each symbol type.
 #if 201103L <= YY_CPLUSPLUS
     static symbol_type make_END_OF_FILE(location_type l) {
@@ -929,6 +926,15 @@ public:
 #else
     static symbol_type make_STAGE_UNION_WITH(const location_type& l) {
         return symbol_type(token::STAGE_UNION_WITH, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_STAGE_SKIP(location_type l) {
+        return symbol_type(token::STAGE_SKIP, std::move(l));
+    }
+#else
+    static symbol_type make_STAGE_SKIP(const location_type& l) {
+        return symbol_type(token::STAGE_SKIP, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1030,6 +1036,10 @@ private:
     static symbol_kind_type yytranslate_(int t);
 
 #if YYDEBUG || 0
+    /// The user-facing name of the symbol whose (internal) number is
+    /// YYSYMBOL.  No bounds checking.
+    static const char* symbol_name(symbol_kind_type yysymbol);
+
     /// For a symbol, its name in clear.
     static const char* const yytname_[];
 #endif  // #if YYDEBUG || 0
@@ -1270,8 +1280,8 @@ private:
 
     /// Constants.
     enum {
-        yylast_ = 25,  ///< Last index in yytable_.
-        yynnts_ = 8,   ///< Number of nonterminal symbols.
+        yylast_ = 21,  ///< Last index in yytable_.
+        yynnts_ = 10,  ///< Number of nonterminal symbols.
         yyfinal_ = 5   ///< Termination state number.
     };
 
@@ -1290,30 +1300,32 @@ template <typename Base>
 PipelineParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
     : Base(that), value(), location(that.location) {
     switch (this->kind()) {
-        case 17:  // stageList
-        case 18:  // stage
-        case 19:  // inhibitOptimization
-        case 20:  // unionWith
+        case 18:  // stageList
+        case 19:  // stage
+        case 20:  // inhibitOptimization
+        case 21:  // unionWith
+        case 22:  // num
+        case 23:  // skip
             value.copy<CNode>(YY_MOVE(that.value));
             break;
 
-        case 15:  // BOOL
+        case 16:  // BOOL
             value.copy<bool>(YY_MOVE(that.value));
             break;
 
-        case 14:  // NUMBER_DOUBLE
+        case 15:  // NUMBER_DOUBLE
             value.copy<double>(YY_MOVE(that.value));
             break;
 
-        case 12:  // NUMBER_INT
+        case 13:  // NUMBER_INT
             value.copy<int>(YY_MOVE(that.value));
             break;
 
-        case 13:  // NUMBER_LONG
+        case 14:  // NUMBER_LONG
             value.copy<long long>(YY_MOVE(that.value));
             break;
 
-        case 11:  // STRING
+        case 12:  // STRING
             value.copy<std::string>(YY_MOVE(that.value));
             break;
 
@@ -1338,30 +1350,32 @@ template <typename Base>
 void PipelineParserGen::basic_symbol<Base>::move(basic_symbol& s) {
     super_type::move(s);
     switch (this->kind()) {
-        case 17:  // stageList
-        case 18:  // stage
-        case 19:  // inhibitOptimization
-        case 20:  // unionWith
+        case 18:  // stageList
+        case 19:  // stage
+        case 20:  // inhibitOptimization
+        case 21:  // unionWith
+        case 22:  // num
+        case 23:  // skip
             value.move<CNode>(YY_MOVE(s.value));
             break;
 
-        case 15:  // BOOL
+        case 16:  // BOOL
             value.move<bool>(YY_MOVE(s.value));
             break;
 
-        case 14:  // NUMBER_DOUBLE
+        case 15:  // NUMBER_DOUBLE
             value.move<double>(YY_MOVE(s.value));
             break;
 
-        case 12:  // NUMBER_INT
+        case 13:  // NUMBER_INT
             value.move<int>(YY_MOVE(s.value));
             break;
 
-        case 13:  // NUMBER_LONG
+        case 14:  // NUMBER_LONG
             value.move<long long>(YY_MOVE(s.value));
             break;
 
-        case 11:  // STRING
+        case 12:  // STRING
             value.move<std::string>(YY_MOVE(s.value));
             break;
 
@@ -1403,9 +1417,9 @@ inline PipelineParserGen::symbol_kind_type PipelineParserGen::by_kind::type_get(
     return this->kind();
 }
 
-#line 52 "pipeline_grammar.yy"
+#line 52 "src/mongo/db/cst/pipeline_grammar.yy"
 }  // namespace mongo
-#line 1689 "pipeline_parser_gen.hpp"
+#line 1705 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 
-#endif  // !YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#endif  // !YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED

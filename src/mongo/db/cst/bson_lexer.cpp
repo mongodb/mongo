@@ -44,6 +44,7 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"$unionWith", PipelineParserGen::token::STAGE_UNION_WITH},
     {"coll", PipelineParserGen::token::COLL_ARG},
     {"pipeline", PipelineParserGen::token::PIPELINE_ARG},
+    {"$skip", PipelineParserGen::token::STAGE_SKIP},
 };
 bool isCompound(PipelineParserGen::symbol_type token) {
     return token.type_get() == static_cast<int>(PipelineParserGen::token::START_OBJECT) ||

@@ -39,6 +39,7 @@
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
@@ -81,12 +82,40 @@ auto translateProject(const CNode& cst, const boost::intrusive_ptr<ExpressionCon
 }
 
 /**
+ * Cast a CNode payload to a UserLong.
+ */
+auto translateNumToLong(const CNode& cst) {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [](const UserDouble& userDouble) {
+                return (BSON("" << userDouble).firstElement()).safeNumberLong();
+            },
+            [](const UserInt& userInt) {
+                return (BSON("" << userInt).firstElement()).safeNumberLong();
+            },
+            [](const UserLong& userLong) { return userLong; },
+            [](auto &&) -> UserLong { MONGO_UNREACHABLE }},
+        cst.payload);
+}
+
+/**
+ * Walk a skip stage object CNode and produce a DocumentSourceSkip.
+ */
+auto translateSkip(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    UserLong nToSkip = translateNumToLong(cst);
+    return DocumentSourceSkip::create(expCtx, nToSkip);
+}
+
+/**
  * Walk an aggregation pipeline stage object CNode and produce a DocumentSource.
  */
-auto translateSource(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+boost::intrusive_ptr<DocumentSource> translateSource(
+    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     switch (cst.firstKeyFieldname()) {
         case KeyFieldname::project:
             return translateProject(cst.objectChildren()[0].second, expCtx);
+        case KeyFieldname::skip:
+            return translateSkip(cst.objectChildren()[0].second, expCtx);
         default:
             MONGO_UNREACHABLE;
     }

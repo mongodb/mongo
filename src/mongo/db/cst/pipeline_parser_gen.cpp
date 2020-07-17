@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.6.3.
+// A Bison parser, made by GNU Bison 3.6.
 
 // Skeleton implementation for Bison LALR(1) parsers in C++
 
@@ -39,7 +39,7 @@
 
 
 // Unqualified %code blocks.
-#line 77 "pipeline_grammar.yy"
+#line 77 "src/mongo/db/cst/pipeline_grammar.yy"
 
 #include "mongo/db/cst/bson_lexer.h"
 
@@ -53,7 +53,7 @@ void PipelineParserGen::error(const PipelineParserGen::location_type& loc, const
 }
 }  // namespace mongo
 
-#line 62 "pipeline_parser_gen.cpp"
+#line 62 "src/mongo/db/cst/pipeline_parser_gen.cpp"
 
 
 #ifndef YY_
@@ -144,9 +144,16 @@ void PipelineParserGen::error(const PipelineParserGen::location_type& loc, const
 #define YYERROR goto yyerrorlab
 #define YYRECOVERING() (!!yyerrstatus_)
 
-#line 52 "pipeline_grammar.yy"
+#line 52 "src/mongo/db/cst/pipeline_grammar.yy"
 namespace mongo {
-#line 155 "pipeline_parser_gen.cpp"
+#line 155 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+
+#if YYDEBUG || 0
+const char* PipelineParserGen::symbol_name(symbol_kind_type yysymbol) {
+    return yytname_[yysymbol];
+}
+#endif  // #if YYDEBUG || 0
+
 
 /// Build a parser object.
 PipelineParserGen::PipelineParserGen(BSONLexer& lexer_yyarg, CNode* cst_yyarg)
@@ -197,30 +204,32 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type() {}
 PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_type) that)
     : super_type(YY_MOVE(that.state), YY_MOVE(that.location)) {
     switch (that.kind()) {
-        case 17:  // stageList
-        case 18:  // stage
-        case 19:  // inhibitOptimization
-        case 20:  // unionWith
+        case 18:  // stageList
+        case 19:  // stage
+        case 20:  // inhibitOptimization
+        case 21:  // unionWith
+        case 22:  // num
+        case 23:  // skip
             value.YY_MOVE_OR_COPY<CNode>(YY_MOVE(that.value));
             break;
 
-        case 15:  // BOOL
+        case 16:  // BOOL
             value.YY_MOVE_OR_COPY<bool>(YY_MOVE(that.value));
             break;
 
-        case 14:  // NUMBER_DOUBLE
+        case 15:  // NUMBER_DOUBLE
             value.YY_MOVE_OR_COPY<double>(YY_MOVE(that.value));
             break;
 
-        case 12:  // NUMBER_INT
+        case 13:  // NUMBER_INT
             value.YY_MOVE_OR_COPY<int>(YY_MOVE(that.value));
             break;
 
-        case 13:  // NUMBER_LONG
+        case 14:  // NUMBER_LONG
             value.YY_MOVE_OR_COPY<long long>(YY_MOVE(that.value));
             break;
 
-        case 11:  // STRING
+        case 12:  // STRING
             value.YY_MOVE_OR_COPY<std::string>(YY_MOVE(that.value));
             break;
 
@@ -237,30 +246,32 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_ty
 PipelineParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_REF(symbol_type) that)
     : super_type(s, YY_MOVE(that.location)) {
     switch (that.kind()) {
-        case 17:  // stageList
-        case 18:  // stage
-        case 19:  // inhibitOptimization
-        case 20:  // unionWith
+        case 18:  // stageList
+        case 19:  // stage
+        case 20:  // inhibitOptimization
+        case 21:  // unionWith
+        case 22:  // num
+        case 23:  // skip
             value.move<CNode>(YY_MOVE(that.value));
             break;
 
-        case 15:  // BOOL
+        case 16:  // BOOL
             value.move<bool>(YY_MOVE(that.value));
             break;
 
-        case 14:  // NUMBER_DOUBLE
+        case 15:  // NUMBER_DOUBLE
             value.move<double>(YY_MOVE(that.value));
             break;
 
-        case 12:  // NUMBER_INT
+        case 13:  // NUMBER_INT
             value.move<int>(YY_MOVE(that.value));
             break;
 
-        case 13:  // NUMBER_LONG
+        case 14:  // NUMBER_LONG
             value.move<long long>(YY_MOVE(that.value));
             break;
 
-        case 11:  // STRING
+        case 12:  // STRING
             value.move<std::string>(YY_MOVE(that.value));
             break;
 
@@ -277,30 +288,32 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
     const stack_symbol_type& that) {
     state = that.state;
     switch (that.kind()) {
-        case 17:  // stageList
-        case 18:  // stage
-        case 19:  // inhibitOptimization
-        case 20:  // unionWith
+        case 18:  // stageList
+        case 19:  // stage
+        case 20:  // inhibitOptimization
+        case 21:  // unionWith
+        case 22:  // num
+        case 23:  // skip
             value.copy<CNode>(that.value);
             break;
 
-        case 15:  // BOOL
+        case 16:  // BOOL
             value.copy<bool>(that.value);
             break;
 
-        case 14:  // NUMBER_DOUBLE
+        case 15:  // NUMBER_DOUBLE
             value.copy<double>(that.value);
             break;
 
-        case 12:  // NUMBER_INT
+        case 13:  // NUMBER_INT
             value.copy<int>(that.value);
             break;
 
-        case 13:  // NUMBER_LONG
+        case 14:  // NUMBER_LONG
             value.copy<long long>(that.value);
             break;
 
-        case 11:  // STRING
+        case 12:  // STRING
             value.copy<std::string>(that.value);
             break;
 
@@ -316,30 +329,32 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
     stack_symbol_type& that) {
     state = that.state;
     switch (that.kind()) {
-        case 17:  // stageList
-        case 18:  // stage
-        case 19:  // inhibitOptimization
-        case 20:  // unionWith
+        case 18:  // stageList
+        case 19:  // stage
+        case 20:  // inhibitOptimization
+        case 21:  // unionWith
+        case 22:  // num
+        case 23:  // skip
             value.move<CNode>(that.value);
             break;
 
-        case 15:  // BOOL
+        case 16:  // BOOL
             value.move<bool>(that.value);
             break;
 
-        case 14:  // NUMBER_DOUBLE
+        case 15:  // NUMBER_DOUBLE
             value.move<double>(that.value);
             break;
 
-        case 12:  // NUMBER_INT
+        case 13:  // NUMBER_INT
             value.move<int>(that.value);
             break;
 
-        case 13:  // NUMBER_LONG
+        case 14:  // NUMBER_LONG
             value.move<long long>(that.value);
             break;
 
-        case 11:  // STRING
+        case 12:  // STRING
             value.move<std::string>(that.value);
             break;
 
@@ -369,7 +384,7 @@ void PipelineParserGen::yy_print_(std::ostream& yyo, const basic_symbol<Base>& y
         yyo << "empty symbol";
     else {
         symbol_kind_type yykind = yysym.kind();
-        yyo << (yykind < YYNTOKENS ? "token" : "nterm") << ' ' << yysym.name() << " ("
+        yyo << (yykind < YYNTOKENS ? "token" : "nterm") << ' ' << symbol_name(yykind) << " ("
             << yysym.location << ": ";
         YYUSE(yykind);
         yyo << ')';
@@ -566,30 +581,32 @@ int PipelineParserGen::parse() {
                correct type. The default '$$ = $1' action is NOT applied
                when using variants.  */
             switch (yyr1_[yyn]) {
-                case 17:  // stageList
-                case 18:  // stage
-                case 19:  // inhibitOptimization
-                case 20:  // unionWith
+                case 18:  // stageList
+                case 19:  // stage
+                case 20:  // inhibitOptimization
+                case 21:  // unionWith
+                case 22:  // num
+                case 23:  // skip
                     yylhs.value.emplace<CNode>();
                     break;
 
-                case 15:  // BOOL
+                case 16:  // BOOL
                     yylhs.value.emplace<bool>();
                     break;
 
-                case 14:  // NUMBER_DOUBLE
+                case 15:  // NUMBER_DOUBLE
                     yylhs.value.emplace<double>();
                     break;
 
-                case 12:  // NUMBER_INT
+                case 13:  // NUMBER_INT
                     yylhs.value.emplace<int>();
                     break;
 
-                case 13:  // NUMBER_LONG
+                case 14:  // NUMBER_LONG
                     yylhs.value.emplace<long long>();
                     break;
 
-                case 11:  // STRING
+                case 12:  // STRING
                     yylhs.value.emplace<std::string>();
                     break;
 
@@ -613,64 +630,72 @@ int PipelineParserGen::parse() {
             {
                 switch (yyn) {
                     case 2:
-#line 136 "pipeline_grammar.yy"
+#line 137 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         *cst = std::move(yystack_[1].value.as<CNode>());
                     }
-#line 687 "pipeline_parser_gen.cpp"
+#line 706 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 3:
-#line 141 "pipeline_grammar.yy"
+#line 142 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                     }
-#line 693 "pipeline_parser_gen.cpp"
+#line 712 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 4:
-#line 142 "pipeline_grammar.yy"
+#line 143 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ArrayChildren{yystack_[2].value.as<CNode>()}};
                     }
-#line 701 "pipeline_parser_gen.cpp"
+#line 720 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 5:
-#line 150 "pipeline_grammar.yy"
+#line 151 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         lexer.sortObjTokens();
                     }
-#line 707 "pipeline_parser_gen.cpp"
+#line 726 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 7:
-#line 153 "pipeline_grammar.yy"
+#line 154 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = yystack_[0].value.as<CNode>();
                     }
-#line 713 "pipeline_parser_gen.cpp"
+#line 732 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 8:
-#line 153 "pipeline_grammar.yy"
+#line 154 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = yystack_[0].value.as<CNode>();
                     }
-#line 719 "pipeline_parser_gen.cpp"
+#line 738 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 9:
-#line 157 "pipeline_grammar.yy"
+#line 154 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = yystack_[0].value.as<CNode>();
+                    }
+#line 744 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 10:
+#line 158 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()}}};
                     }
-#line 728 "pipeline_parser_gen.cpp"
+#line 753 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 10:
-#line 163 "pipeline_grammar.yy"
+                    case 11:
+#line 164 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         auto coll = CNode{UserString(yystack_[3].value.as<std::string>())};
                         auto pipeline = CNode{UserDouble(yystack_[1].value.as<double>())};
@@ -680,11 +705,45 @@ int PipelineParserGen::parse() {
                                           {KeyFieldname::collArg, std::move(coll)},
                                           {KeyFieldname::pipelineArg, std::move(pipeline)}}}}}};
                     }
-#line 742 "pipeline_parser_gen.cpp"
+#line 767 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 12:
+#line 175 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserInt(yystack_[0].value.as<int>())};
+                    }
+#line 775 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 13:
+#line 178 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{UserLong(yystack_[0].value.as<long long>())};
+                    }
+#line 783 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 14:
+#line 181 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserDouble(yystack_[0].value.as<double>())};
+                    }
+#line 791 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 15:
+#line 187 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
+                            std::pair{KeyFieldname::skip, yystack_[0].value.as<CNode>()}}};
+                    }
+#line 799 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
 
-#line 746 "pipeline_parser_gen.cpp"
+#line 803 "src/mongo/db/cst/pipeline_parser_gen.cpp"
 
                     default:
                         break;
@@ -848,39 +907,36 @@ void PipelineParserGen::error(const syntax_error& yyexc) {
     error(yyexc.location, yyexc.what());
 }
 
-#if YYDEBUG || 0
-const char* PipelineParserGen::symbol_name(symbol_kind_type yysymbol) {
-    return yytname_[yysymbol];
-}
-#endif  // #if YYDEBUG || 0
 
-
-const signed char PipelineParserGen::yypact_ninf_ = -8;
+const signed char PipelineParserGen::yypact_ninf_ = -11;
 
 const signed char PipelineParserGen::yytable_ninf_ = -1;
 
-const signed char PipelineParserGen::yypact_[] = {-3, 0,  4, -7, -1, -8, 3,  -8, 5, -8, -8, -8,
-                                                  6,  -2, 8, 0,  -8, 1,  -8, -8, 7, -6, 9,  -8};
+const signed char PipelineParserGen::yypact_[] = {1,   4,   8,   -7,  3,   -11, 7,  -11, -10, 9,
+                                                  -11, -11, -11, -11, 10,  2,   12, -11, -11, -11,
+                                                  -11, 4,   -11, -1,  -11, -11, 5,  6,   13,  -11};
 
-const signed char PipelineParserGen::yydefact_[] = {0, 3, 0, 0, 0, 1, 0, 5, 0, 7, 8, 2,
-                                                    0, 0, 0, 3, 9, 0, 6, 4, 0, 0, 0, 10};
+const signed char PipelineParserGen::yydefact_[] = {
+    0, 3, 0, 0, 0, 1, 0, 5, 0, 0, 7, 8, 9, 2, 0, 0, 0, 12, 13, 14, 15, 3, 10, 0, 6, 4, 0, 0, 0, 11};
 
-const signed char PipelineParserGen::yypgoto_[] = {-8, 10, -8, -8, -8, -8, -8, -8};
+const signed char PipelineParserGen::yypgoto_[] = {-11, -3, -11, -11, -11, -11, -11, -11, -11, -11};
 
-const signed char PipelineParserGen::yydefgoto_[] = {-1, 4, 8, 9, 10, 2, 13, 14};
+const signed char PipelineParserGen::yydefgoto_[] = {-1, 4, 9, 10, 11, 20, 12, 2, 15, 16};
 
-const signed char PipelineParserGen::yytable_[] = {6,  7, 1, 3, 5,  11, 12, 17, 22, 15, 16, 18, 20,
-                                                   23, 0, 0, 0, 21, 0,  0,  0,  0,  0,  0,  0,  19};
+const signed char PipelineParserGen::yytable_[] = {6,  7,  8,  17, 18, 19, 1,  3,  5, 13, 14,
+                                                   26, 23, 21, 22, 24, 27, 29, 25, 0, 0,  28};
 
-const signed char PipelineParserGen::yycheck_[] = {
-    7, 8, 5, 3, 0, 6, 3, 9, 14, 4, 4, 3, 11, 4, -1, -1, -1, 10, -1, -1, -1, -1, -1, -1, -1, 15};
+const signed char PipelineParserGen::yycheck_[] = {7,  8,  9, 13, 14, 15, 5, 3,  0,  6,  3,
+                                                   12, 10, 4, 4,  3,  11, 4, 21, -1, -1, 15};
 
-const signed char PipelineParserGen::yystos_[] = {0, 5,  21, 3, 17, 0, 7, 8,  18, 19, 20, 6,
-                                                  3, 22, 23, 4, 4,  9, 3, 17, 11, 10, 14, 4};
+const signed char PipelineParserGen::yystos_[] = {0,  5,  24, 3,  18, 0,  7,  8,  9,  19,
+                                                  20, 21, 23, 6,  3,  25, 26, 13, 14, 15,
+                                                  22, 4,  4,  10, 3,  18, 12, 11, 15, 4};
 
-const signed char PipelineParserGen::yyr1_[] = {0, 16, 21, 17, 17, 23, 22, 18, 18, 19, 20};
+const signed char PipelineParserGen::yyr1_[] = {
+    0, 17, 24, 18, 18, 26, 25, 19, 19, 19, 20, 21, 22, 22, 22, 23};
 
-const signed char PipelineParserGen::yyr2_[] = {0, 2, 3, 0, 4, 0, 2, 1, 1, 3, 7};
+const signed char PipelineParserGen::yyr2_[] = {0, 2, 3, 0, 4, 0, 2, 1, 1, 1, 3, 7, 1, 1, 1, 2};
 
 
 #if YYDEBUG
@@ -895,6 +951,7 @@ const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    "END_ARRAY",
                                                    "STAGE_INHIBIT_OPTIMIZATION",
                                                    "STAGE_UNION_WITH",
+                                                   "STAGE_SKIP",
                                                    "COLL_ARG",
                                                    "PIPELINE_ARG",
                                                    "STRING",
@@ -907,6 +964,8 @@ const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    "stage",
                                                    "inhibitOptimization",
                                                    "unionWith",
+                                                   "num",
+                                                   "skip",
                                                    "pipeline",
                                                    "START_ORDERED_OBJECT",
                                                    "$@1",
@@ -916,7 +975,7 @@ const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
 
 #if YYDEBUG
 const unsigned char PipelineParserGen::yyrline_[] = {
-    0, 136, 136, 141, 142, 150, 150, 153, 153, 157, 163};
+    0, 137, 137, 142, 143, 151, 151, 154, 154, 154, 158, 164, 175, 178, 181, 187};
 
 void PipelineParserGen::yy_stack_print_() const {
     *yycdebug_ << "Stack now";
@@ -937,8 +996,8 @@ void PipelineParserGen::yy_reduce_print_(int yyrule) const {
 #endif  // YYDEBUG
 
 
-#line 52 "pipeline_grammar.yy"
+#line 52 "src/mongo/db/cst/pipeline_grammar.yy"
 }  // namespace mongo
-#line 1060 "pipeline_parser_gen.cpp"
+#line 1106 "src/mongo/db/cst/pipeline_parser_gen.cpp"
 
-#line 173 "pipeline_grammar.yy"
+#line 191 "src/mongo/db/cst/pipeline_grammar.yy"

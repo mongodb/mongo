@@ -42,6 +42,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -164,6 +165,45 @@ TEST(CstTest, TranslatesMultipleInclusionProjectionStages) {
             BSON("_id" << true << "c" << true) ==
             singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
     }
+}
+
+TEST(CstTest, TranslatesSkipWithInt) {
+    auto nss = NamespaceString{"db", "coll"};
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserInt{5}}}}}}};
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    ASSERT(typeid(DocumentSourceSkip) == typeid(**iter));
+    ASSERT_EQ((dynamic_cast<DocumentSourceSkip&>(**iter).getSkip()), 5ll);
+}
+
+TEST(CstTest, TranslatesSkipWithDouble) {
+    auto nss = NamespaceString{"db", "coll"};
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserDouble{5.5}}}}}}};
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    ASSERT(typeid(DocumentSourceSkip) == typeid(**iter));
+    ASSERT_EQ((dynamic_cast<DocumentSourceSkip&>(**iter).getSkip()), 5ll);
+}
+
+TEST(CstTest, TranslatesSkipWithLong) {
+    auto nss = NamespaceString{"db", "coll"};
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserLong{8223372036854775807}}}}}}};
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    ASSERT(typeid(DocumentSourceSkip) == typeid(**iter));
+    ASSERT_EQ((dynamic_cast<DocumentSourceSkip&>(**iter).getSkip()), 8223372036854775807);
 }
 
 }  // namespace

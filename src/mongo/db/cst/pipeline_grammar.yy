@@ -108,6 +108,7 @@
     // Reserve pipeline stage names.
     STAGE_INHIBIT_OPTIMIZATION
     STAGE_UNION_WITH
+    STAGE_SKIP
 
     // $unionWith arguments.
     COLL_ARG
@@ -125,7 +126,7 @@
 //
 // Semantic values (aka the C++ types produced by the actions).
 //
-%nterm <CNode> stageList stage inhibitOptimization unionWith
+%nterm <CNode> stageList stage inhibitOptimization unionWith num skip
 
 //
 // Grammar rules
@@ -150,7 +151,7 @@ stageList[result]:
 START_ORDERED_OBJECT: { lexer.sortObjTokens(); } START_OBJECT;
 
 stage:
-    inhibitOptimization | unionWith
+    inhibitOptimization | unionWith | skip
 ;
 
 inhibitOptimization:
@@ -168,6 +169,23 @@ unionWith:
             {KeyFieldname::collArg, std::move(coll)},
             {KeyFieldname::pipelineArg, std::move(pipeline)}
      }}}}};
+};
+
+num:
+    NUMBER_INT { 
+        $num = CNode{UserInt($NUMBER_INT)}; 
+    }
+    | NUMBER_LONG { 
+        $num = CNode{UserLong($NUMBER_LONG)}; 
+    }
+    | NUMBER_DOUBLE { 
+        $num = CNode{UserDouble($NUMBER_DOUBLE)}; 
+    }
+;
+
+skip:
+    STAGE_SKIP num {
+        $skip = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::skip, $num}}};
 };
 
 %%
