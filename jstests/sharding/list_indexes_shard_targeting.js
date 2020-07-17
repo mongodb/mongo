@@ -18,7 +18,13 @@ const nodeOptions = {
     setParameter: {enableShardedIndexConsistencyCheck: false}
 };
 
-const st = new ShardingTest({shards: 3, other: {configOptions: nodeOptions}});
+const st = new ShardingTest({
+    shards: 3,
+    other: {
+        configOptions: nodeOptions,
+        mongosOptions: {setParameter: {enableFinerGrainedCatalogCacheRefresh: true}}
+    }
+});
 const dbName = "test";
 const collName = "user";
 const ns = dbName + "." + collName;
