@@ -138,15 +138,6 @@ def generate(env):
         env.get("ICECC_CREATE_ENV", "icecc-create-env")
     )
 
-    # We can't handle sanitizer blacklist files, so disable icecc then, and just flow through
-    # icerun to prevent slamming the local system with a huge -j value.
-    if any(
-        f.startswith("-fsanitize-blacklist=")
-        for fs in ["CCFLAGS", "CFLAGS", "CXXFLAGS"]
-        for f in env[fs]
-    ):
-        env["ICECC"] = "$ICERUN"
-
     # Make CC and CXX absolute paths too. It is better for icecc.
     env["CC"] = env.WhereIs("$CC")
     env["CXX"] = env.WhereIs("$CXX")
