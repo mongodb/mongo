@@ -1234,8 +1234,10 @@ DB.prototype.fsyncUnlock = function() {
 };
 
 DB.autocomplete = function(obj) {
-    // Time out if a transaction or other op holds locks we need. Caller suppresses exceptions.
-    var colls = obj._getCollectionNamesInternal({maxTimeMS: 1000});
+    // In interactive mode, time out if a transaction or other op holds locks we need. Caller
+    // suppresses exceptions. In non-interactive mode, don't specify a timeout, because in an
+    // automated test we prefer consistent results over quick feedback.
+    var colls = obj._getCollectionNamesInternal(isInteractive() ? {maxTimeMS: 1000} : {});
     var ret = [];
     for (var i = 0; i < colls.length; i++) {
         if (colls[i].match(/^[a-zA-Z0-9_.\$]+$/))
