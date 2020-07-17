@@ -78,9 +78,7 @@ protected:
         }());
     }
 
-    // TODO SERVER-34061 Remove this call once loading an unsharded database doesn't require
-    // attempting to load sharded collections.
-    void expectGetNoCollectionsFromDatabase() {
+    void expectGetCollectionUnsharded() {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() { return std::vector<BSONObj>{}; }());
     }
 
@@ -112,7 +110,7 @@ TEST_F(BuildVersionedRequestsForTargetedShardsTest, ReturnPrimaryShardForUnshard
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
 
     expectGetDatabaseUnsharded();
-    expectGetNoCollectionsFromDatabase();
+    expectGetCollectionUnsharded();
 
     auto routingInfo = future.default_timed_get();
 
@@ -125,7 +123,7 @@ TEST_F(BuildVersionedRequestsForTargetedShardsTest,
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
 
     expectGetDatabaseUnsharded();
-    expectGetNoCollectionsFromDatabase();
+    expectGetCollectionUnsharded();
 
     auto routingInfo = future.default_timed_get();
 
