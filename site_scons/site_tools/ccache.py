@@ -103,6 +103,17 @@ def generate(env):
     # but it doesn't work or is out of date.
     env["CCACHE_VERSION"] = _ccache_version_found
 
+    # Set up a performant ccache configuration. Here, we don't use a second preprocessor and
+    # pass preprocessor arguments that deterministically expand source files so a stable
+    # hash can be calculated on them. This both reduces the amount of work ccache needs to
+    # do and increases the likelihood of a cache hit.
+    env["ENV"]["CCACHE_NOCPP2"] = 1
+    if env.ToolchainIs("clang"):
+        env.AppendUnique(CCFLAGS=["-frewrite-includes"])
+    elif env.ToolchainIs("gcc"):
+        env.AppendUnique(CCFLAGS=["-fdirectives-only"])
+
+
     # Make a generator to expand to CCACHE in the case where we are
     # not a conftest. We don't want to use ccache for configure tests
     # because we don't want to use icecream for configure tests, but

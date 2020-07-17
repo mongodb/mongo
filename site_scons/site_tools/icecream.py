@@ -21,7 +21,7 @@ import subprocess
 from pkg_resources import parse_version
 
 _icecream_version_min = parse_version("1.1rc2")
-_ccache_nocpp2_version = parse_version("3.4.1")
+_icecream_version_gcc_remote_cpp = parse_version("1.2")
 
 
 # I'd prefer to use value here, but amazingly, its __str__ returns the
@@ -230,14 +230,37 @@ def generate(env):
 
     if env.ToolchainIs("clang"):
         env["ENV"]["ICECC_CLANG_REMOTE_CPP"] = 1
+    elif env.ToolchainIs("gcc"):
+        if env["ICECREAM_VERSION"] >= _icecream_version_gcc_remote_cpp:
+            if ccache_enabled:
+                # Newer versions of Icecream will drop -fdirectives-only from
+                # preprocessor and compiler flags if it does not find a remote
+                # build host to build on. ccache, on the other hand, will not
+                # pass the flag to the compiler if CCACHE_NOCPP2=1, but it will
+                # pass it to the preprocessor. The combination of setting
+                # CCACHE_NOCPP2=1 and passing the flag can lead to build
+                # failures.
 
-        if ccache_enabled and env["CCACHE_VERSION"] >= _ccache_nocpp2_version:
-            env.AppendUnique(CCFLAGS=["-frewrite-includes"])
-            env["ENV"]["CCACHE_NOCPP2"] = 1
-    else:
-        env.AppendUnique(CCFLAGS=["-fdirectives-only"])
-        if ccache_enabled:
-            env["ENV"]["CCACHE_NOCPP2"] = 1
+                # See: https://jira.mongodb.org/browse/SERVER-48443
+
+                # We have an open issue with Icecream and ccache to resolve the
+                # cause of these build failures. Once the bug is resolved and
+                # the fix is deployed, we can remove this entire conditional
+                # branch and make it like the one for clang.
+                # TODO: https://github.com/icecc/icecream/issues/550
+                env["ENV"].pop("CCACHE_NOCPP2", None)
+                env["ENV"]["CCACHE_CPP2"] = 1
+                try:
+                    env["CCFLAGS"].remove("-fdirectives-only")
+                except ValueError:
+                    pass
+            else:
+                # If we can, we should make Icecream do its own preprocessing
+                # to reduce concurrency on the local host. We should not do
+                # this when ccache is in use because ccache will execute
+                # Icecream to do its own preprocessing and then execute
+                # Icecream as the compiler on the preprocessed source.
+                env["ENV"]["ICECC_REMOTE_CPP"] = 1
 
     if "ICECC_SCHEDULER" in env:
         env["ENV"]["USE_SCHEDULER"] = env["ICECC_SCHEDULER"]
@@ -310,6 +333,9 @@ def generate(env):
 
 
 def exists(env):
+    # Assume the tool has run if we already know the version.
+    if "ICECREAM_VERSION" in env:
+        return True
 
     icecc = env.get("ICECC", False)
     if not icecc:
