@@ -24,7 +24,8 @@ if (isMongos) {
 
 const createIndexesCommand = {
     createIndexes: collName,
-    indexes: [{key: {a: 1}, name: "a_1"}]
+    indexes: [{key: {a: 1}, name: "a_1"}],
+    writeConcern: {w: 'majority'},
 };
 assert.commandWorked(sessionDB.runCommand(createIndexesCommand));
 
