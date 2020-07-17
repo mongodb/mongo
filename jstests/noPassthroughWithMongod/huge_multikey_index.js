@@ -1,6 +1,8 @@
 // https://jira.mongodb.org/browse/SERVER-4534
-// Building an index in the forground on a field with a large array and few documents in
+// Building an index in the foreground on a field with a large array and few documents in
 // the collection used to open too many files and crash the server.
+// SERVER-49547: Disabled for ephemeralForTest due to excessive memory usage
+// @tags: [incompatible_with_eft]
 t = db.huge_multikey_index;
 t.drop();
 
