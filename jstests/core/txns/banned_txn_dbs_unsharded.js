@@ -1,4 +1,4 @@
-// Tests that reads and writes to the config, admin, and local databases are forbidden within
+// Tests that reads and writes to the config and local databases are forbidden within
 // transactions on non-sharded clusters. Behavior on sharded clusters is tested separately.
 // @tags: [assumes_against_mongod_not_mongos, assumes_unsharded_collection, uses_transactions]
 (function() {
@@ -30,7 +30,6 @@ function runTest(sessionDB) {
 }
 
 runTest(session.getDatabase("config"));
-runTest(session.getDatabase("admin"));
 runTest(session.getDatabase("local"));
 
 session.endSession();
