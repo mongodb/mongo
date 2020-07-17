@@ -31,8 +31,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
-#include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/executor/task_executor_pool.h"

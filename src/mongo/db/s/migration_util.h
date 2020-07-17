@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
-#include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/util/concurrency/thread_pool.h"

@@ -29,10 +29,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/persistent_task_store.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
 
 namespace mongo {
 namespace {
@@ -69,14 +69,13 @@ struct TestTask {
     }
 };
 
-class PersistentTaskStoreTest : public ShardServerTestFixture {
+class PersistentTaskStoreTest : public CatalogTestFixture {
     void setUp() override {
-        ShardServerTestFixture::setUp();
+        CatalogTestFixture::setUp();
+        auto opCtx = operationContext();
 
-        AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);
-        Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
-        CollectionShardingRuntime::get(operationContext(), kNss)
-            ->setFilteringMetadata(operationContext(), CollectionMetadata());
+        AutoGetDb autoDb(opCtx, kNss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, kNss, MODE_IX);
     }
 };
 
@@ -324,7 +323,6 @@ TEST_F(PersistentTaskStoreTest, TestCountWithQuery) {
               2);
 
     // Remove multipe overlapping ranges.
-    auto range = ChunkRange{BSON("_id" << 5), BSON("_id" << 10)};
     store.remove(opCtx, QUERY("min" << 10));
 
     ASSERT_EQ(store.count(opCtx,

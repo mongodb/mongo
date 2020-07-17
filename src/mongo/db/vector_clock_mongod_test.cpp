@@ -32,7 +32,7 @@
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_time_validator.h"
-#include "mongo/db/s/persistent_task_store.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
