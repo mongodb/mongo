@@ -16,7 +16,11 @@ const sessionColl = sessionDb.getCollection(collName);
 assert.commandWorked(sessionDb.runCommand({create: collName}));
 
 assert.commandWorked(sessionColl.insert({a: 1}));
-assert.commandWorked(sessionColl.createIndex({a: 1}));
+assert.commandWorked(sessionDb.runCommand({
+    createIndexes: collName,
+    indexes: [{name: 'a_1', key: {a: 1}}],
+    writeConcern: {w: 'majority'},
+}));
 
 session.startTransaction();
 assert.commandWorked(sessionColl.update({}, {$set: {a: [1, 2, 3]}}));
