@@ -2926,7 +2926,15 @@ def doConfigure(myenv):
         # generator to return at command line expansion time so that
         # we can change the signature if the file contents change.
         if blackfiles:
-            blacklist_options=["-fsanitize-blacklist=%s" % blackfile for blackfile in blackfiles]
+            # Unconditionally using the full path can affect SCons cached builds, so we only do
+            # this in cases where we know it's going to matter.
+            blackfile_paths = [
+                blackfile.get_abspath() if ('ICECC' in env and env['ICECC']) else blackfile.path
+                for blackfile in blackfiles
+            ]
+            # Make these files available to remote icecream builds if requested
+            blacklist_options=[f"-fsanitize-blacklist={file_path}" for file_path in blackfile_paths]
+            env.AppendUnique(ICECC_CREATE_ENV_ADDFILES=blackfile_paths)
             def SanitizerBlacklistGenerator(source, target, env, for_signature):
                 if for_signature:
                     return [f.get_csig() for f in blackfiles]
