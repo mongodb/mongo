@@ -239,7 +239,7 @@ TEST(SharedFuture, ThenChaining_Async_DoubleShare) {
                         });
 }
 
-TEST(SharedFuture, AddChild_Get) {
+TEST(SharedFuture, AddChild_ThenRunOn_Get) {
     FUTURE_SUCCESS_TEST([] {},
                         [](/*Future<void>*/ auto&& fut) {
                             const auto exec = InlineCountingExecutor::make();
@@ -247,6 +247,16 @@ TEST(SharedFuture, AddChild_Get) {
                             auto fut2 = shared.thenRunOn(exec).then([] {});
                             shared.get();
                             fut2.get();
+                        });
+}
+
+TEST(SharedFuture, AddChild_Split_Get) {
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](/*Future<void>*/ auto&& fut) {
+                            auto shared = std::move(fut).share();
+                            auto shared2 = shared.split();
+                            ASSERT_EQ(shared.get(), 1);
+                            ASSERT_EQ(shared2.get(), 1);
                         });
 }
 

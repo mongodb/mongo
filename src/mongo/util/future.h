@@ -952,6 +952,13 @@ public:
         return ExecutorFuture<T>(std::move(exec), toFutureImpl());
     }
 
+    /**
+     * Makes a copy of this SharedSemiFuture that resolves at the same time as the original.
+     */
+    SharedSemiFuture split() const noexcept {
+        return toFutureImpl().share();
+    }
+
     SemiFuture<T> semi() && noexcept {
         return SemiFuture<T>(toFutureImpl());
     }
