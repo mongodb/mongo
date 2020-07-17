@@ -33,10 +33,6 @@
 
 load('jstests/replsets/rslib.js');
 
-function getFirstOplogEntry(conn) {
-    return conn.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1)[0];
-}
-
 /**
  * Overflows the oplog of a given node.
  *

@@ -10,6 +10,8 @@
 (function() {
 "use strict";
 
+load("jstests/replsets/rslib.js");
+
 var name = 'initial_sync_oplog_rollover';
 var replSet = new ReplSetTest({
     name: name,
@@ -30,10 +32,6 @@ var primary = replSet.getPrimary();
 
 var coll = primary.getDB('test').foo;
 assert.writeOK(coll.insert({a: 1}));
-
-function getFirstOplogEntry(conn) {
-    return conn.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1)[0];
-}
 
 var firstOplogEntry = getFirstOplogEntry(primary);
 
