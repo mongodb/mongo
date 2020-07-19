@@ -64,6 +64,8 @@
 #include "mongo/db/query/find.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/repl/migrating_tenant_access_blocker_by_prefix.h"
+#include "mongo/db/repl/migrating_tenant_donor_util.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -514,6 +516,14 @@ void _abortUnpreparedOrStashPreparedTransaction(
 }
 }  // namespace
 
+void invokeWithNoSession(OperationContext* opCtx,
+                         const OpMsgRequest& request,
+                         CommandInvocation* invocation,
+                         rpc::ReplyBuilderInterface* replyBuilder) {
+    migrating_tenant_donor_util::checkIfCanReadOrBlock(opCtx, request.getDatabase());
+    CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
+}
+
 void invokeWithSessionCheckedOut(OperationContext* opCtx,
                                  const OpMsgRequest& request,
                                  CommandInvocation* invocation,
@@ -614,6 +624,8 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
             }
         }
     }
+
+    migrating_tenant_donor_util::checkIfCanReadOrBlock(opCtx, request.getDatabase());
 
     try {
         CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
@@ -802,7 +814,7 @@ bool runCommandImpl(OperationContext* opCtx,
                 invokeWithSessionCheckedOut(
                     opCtx, request, invocation, sessionOptions, replyBuilder);
             } else {
-                CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
+                invokeWithNoSession(opCtx, request, invocation, replyBuilder);
             }
         } catch (const DBException& ex) {
             // Do no-op write before returning NoSuchTransaction if command has writeConcern.
@@ -833,7 +845,7 @@ bool runCommandImpl(OperationContext* opCtx,
         if (shouldCheckOutSession) {
             invokeWithSessionCheckedOut(opCtx, request, invocation, sessionOptions, replyBuilder);
         } else {
-            CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
+            invokeWithNoSession(opCtx, request, invocation, replyBuilder);
         }
     }
 
@@ -857,6 +869,8 @@ bool runCommandImpl(OperationContext* opCtx,
     });
 
     behaviors.waitForLinearizableReadConcern(opCtx);
+    migrating_tenant_donor_util::checkIfLinearizableReadWasAllowedOrThrow(opCtx,
+                                                                          request.getDatabase());
 
     // Wait for data to satisfy the read concern level, if necessary.
     behaviors.waitForSpeculativeMajorityReadConcern(opCtx);

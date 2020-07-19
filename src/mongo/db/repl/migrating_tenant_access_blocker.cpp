@@ -69,8 +69,8 @@ void MigratingTenantAccessBlocker::checkIfCanWriteOrBlock(OperationContext* opCt
             _access == Access::kAllow);
 }
 
-void MigratingTenantAccessBlocker::checkIfCanReadOrBlock(OperationContext* opCtx,
-                                                         const Timestamp& readTimestamp) {
+void MigratingTenantAccessBlocker::checkIfCanDoClusterTimeReadOrBlock(
+    OperationContext* opCtx, const Timestamp& readTimestamp) {
     stdx::unique_lock<Latch> ul(_mutex);
 
     auto canRead = [&]() {
@@ -84,6 +84,14 @@ void MigratingTenantAccessBlocker::checkIfCanReadOrBlock(OperationContext* opCtx
     uassert(ErrorCodes::TenantMigrationCommitted,
             "Read must be re-routed to the new owner of this database",
             canRead());
+}
+
+void MigratingTenantAccessBlocker::checkIfLinearizableReadWasAllowedOrThrow(
+    OperationContext* opCtx) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    uassert(ErrorCodes::TenantMigrationCommitted,
+            "Read must be re-routed to the new owner of this database",
+            _access != Access::kReject);
 }
 
 void MigratingTenantAccessBlocker::startBlockingWrites() {

@@ -121,7 +121,10 @@ public:
 
     void checkIfCanWriteOrThrow();
     void checkIfCanWriteOrBlock(OperationContext* opCtx);
-    void checkIfCanReadOrBlock(OperationContext* opCtx, const Timestamp& readTimestamp);
+
+    void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx);
+    void checkIfCanDoClusterTimeReadOrBlock(OperationContext* opCtx,
+                                            const Timestamp& readTimestamp);
 
     //
     // Called while donating this database.

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/migrate_tenant_cmds_gen.h"
 #include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
@@ -35,7 +34,6 @@
 
 namespace mongo {
 namespace {
-
 
 class DonorStartMigrationCmd : public TypedCommand<DonorStartMigrationCmd> {
 public:
