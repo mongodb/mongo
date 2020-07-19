@@ -55,6 +55,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/op_observer',
+        '$BUILD_DIR/mongo/db/repl/tenant_migration_donor',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
         '$BUILD_DIR/mongo/db/transaction',
@@ -1216,7 +1217,7 @@ env.Library(
 )
 
 env.Library(
-    target='migrating_tenant',
+    target='tenant_migration_donor',
     source=[
         'tenant_migration_access_blocker.cpp',
         'tenant_migration_access_blocker_by_prefix.cpp',
@@ -1272,7 +1273,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         'bgsync',
         'drop_pending_collection_reaper',
-        'migrating_tenant',
         'oplog_application',
         'oplog_buffer_collection',
         'oplog_interface_remote',
@@ -1286,6 +1286,7 @@ env.Library(
         'replication_recovery',
         'reporter',
         'rollback_source_impl',
+        'tenant_migration_donor',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',

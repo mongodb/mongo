@@ -271,6 +271,15 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
     }
 }
 
+void onWriteToDatabase(OperationContext* opCtx, StringData dbName) {
+    auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
+    auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(dbName);
+
+    if (mtab) {
+        mtab->checkIfCanWriteOrThrow();
+    }
+}
+
 }  // namespace tenant_migration
 
 }  // namespace mongo
