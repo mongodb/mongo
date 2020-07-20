@@ -133,9 +133,8 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                 // Because constraint enforcement is set, this will throw if there are any indexing
                 // errors, instead of writing back to the skipped records table, which would
                 // normally happen if constraints were relaxed.
-                InsertResult result;
                 auto status = _indexCatalogEntry->accessMethod()->insert(
-                    opCtx, collection, skippedDoc, skippedRecordId, options, &result);
+                    opCtx, collection, skippedDoc, skippedRecordId, options, nullptr, nullptr);
                 if (!status.isOK()) {
                     return status;
                 }

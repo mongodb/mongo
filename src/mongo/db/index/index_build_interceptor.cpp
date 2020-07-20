@@ -97,10 +97,10 @@ void IndexBuildInterceptor::finalizeTemporaryTables(
     _skippedRecordTracker.finalizeTemporaryTable(opCtx, action);
 }
 
-Status IndexBuildInterceptor::recordDuplicateKeys(OperationContext* opCtx,
-                                                  const std::vector<BSONObj>& keys) {
+Status IndexBuildInterceptor::recordDuplicateKey(OperationContext* opCtx,
+                                                 const KeyString::Value& key) {
     invariant(_indexCatalogEntry->descriptor()->unique());
-    return _duplicateKeyTracker->recordKeys(opCtx, keys);
+    return _duplicateKeyTracker->recordKey(opCtx, key);
 }
 
 Status IndexBuildInterceptor::checkDuplicateKeyConstraints(OperationContext* opCtx) const {
@@ -299,7 +299,7 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
 
     auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {
-        InsertResult result;
+        int64_t numInserted;
         auto status = accessMethod->insertKeys(opCtx,
                                                coll,
                                                {keySet.begin(), keySet.end()},
@@ -307,19 +307,16 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
                                                MultikeyPaths{},
                                                opRecordId,
                                                options,
-                                               &result);
+                                               [=](const KeyString::Value& duplicateKey) {
+                                                   return trackDups == TrackDuplicates::kTrack
+                                                       ? recordDuplicateKey(opCtx, duplicateKey)
+                                                       : Status::OK();
+                                               },
+                                               &numInserted);
         if (!status.isOK()) {
             return status;
         }
 
-        if (result.dupsInserted.size() && TrackDuplicates::kTrack == trackDups) {
-            status = recordDuplicateKeys(opCtx, result.dupsInserted);
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-
-        int64_t numInserted = result.numInserted;
         *keysInserted += numInserted;
         opCtx->recoveryUnit()->onRollback(
             [keysInserted, numInserted] { *keysInserted -= numInserted; });

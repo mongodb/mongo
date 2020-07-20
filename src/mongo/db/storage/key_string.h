@@ -376,6 +376,13 @@ public:
         buf.appendBuf(_buffer.get(), _buffer.size());  // Serialize Keystring + Typebits
     }
 
+    /**
+     * Serializes this Value, excluing the RecordId, into a storable format with TypeBits
+     * information. The serialized format takes the following form:
+     *   [keystring size][keystring encoding][typebits encoding]
+     */
+    void serializeWithoutRecordId(BufBuilder& buf) const;
+
     // Deserialize the Value from a serialized format.
     static Value deserialize(BufReader& buf, KeyString::Version version) {
         const int32_t sizeOfKeystring = buf.read<LittleEndian<int32_t>>();
