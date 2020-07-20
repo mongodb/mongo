@@ -1182,21 +1182,6 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     _externalState->startNoopWriter(_getMyLastAppliedOpTime_inlock());
 }
 
-Status ReplicationCoordinatorImpl::waitForDrainFinish(Milliseconds timeout) {
-    if (timeout < Milliseconds(0)) {
-        return Status(ErrorCodes::BadValue, "Timeout duration cannot be negative");
-    }
-
-    stdx::unique_lock<Latch> lk(_mutex);
-    auto pred = [this]() { return _applierState != ApplierState::Draining; };
-    if (!_drainFinishedCond.wait_for(lk, timeout.toSystemDuration(), pred)) {
-        return Status(ErrorCodes::ExceededTimeLimit,
-                      "Timed out waiting to finish draining applier buffer");
-    }
-
-    return Status::OK();
-}
-
 void ReplicationCoordinatorImpl::signalUpstreamUpdater() {
     _externalState->forwardSlaveProgress();
 }

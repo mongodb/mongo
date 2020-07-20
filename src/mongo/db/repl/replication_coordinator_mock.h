@@ -174,8 +174,6 @@ public:
 
     virtual void signalDrainComplete(OperationContext*, long long);
 
-    virtual Status waitForDrainFinish(Milliseconds timeout) override;
-
     virtual void signalUpstreamUpdater();
 
     virtual Status resyncData(OperationContext* opCtx, bool waitUntilCompleted) override;

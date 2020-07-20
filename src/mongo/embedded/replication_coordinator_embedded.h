@@ -161,8 +161,6 @@ public:
 
     void signalDrainComplete(OperationContext*, long long) override;
 
-    Status waitForDrainFinish(Milliseconds) override;
-
     void signalUpstreamUpdater() override;
 
     Status resyncData(OperationContext*, bool) override;

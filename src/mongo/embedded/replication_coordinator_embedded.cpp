@@ -194,10 +194,6 @@ void ReplicationCoordinatorEmbedded::signalDrainComplete(OperationContext*, long
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::waitForDrainFinish(Milliseconds) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 void ReplicationCoordinatorEmbedded::signalUpstreamUpdater() {
     UASSERT_NOT_IMPLEMENTED;
 }
