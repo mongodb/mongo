@@ -1067,12 +1067,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
         OpTime firstOpTime = _externalState->onTransitionToPrimary(opCtx);
         lk.lock();
 
-        auto status = _topCoord->completeTransitionToPrimary(firstOpTime);
-        if (status.code() == ErrorCodes::PrimarySteppedDown) {
-            log() << "Transition to primary failed" << causedBy(status);
-            return;
-        }
-        invariant(status);
+        _topCoord->completeTransitionToPrimary(firstOpTime);
     }
 
     // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
