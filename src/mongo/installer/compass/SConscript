@@ -1,0 +1,41 @@
+# -*- mode: python; -*-
+
+Import([
+    "env"
+])
+
+env = env.Clone()
+
+# Set the download url to the right place
+compass_type = 'compass-community'
+if 'enterprise' in env['MONGO_MODULES']:
+    compass_type = 'compass'
+
+compass_script = "install_compass.in"
+if env.TargetOSIs('windows'):
+    compass_script = "Install-Compass.ps1.in"
+
+compass_python_interpreter = '/usr/bin/env python2'
+if env.TargetOSIs('darwin'):
+    compass_python_interpreter = '/usr/bin/env python'
+
+compass_installer = env.Substfile(
+  target=compass_script[:-3],
+  source=compass_script,
+  SUBST_DICT=[
+    ('@compass_type@', compass_type),
+    ('@python_interpreter@', compass_python_interpreter),
+  ],
+)
+
+if env.TargetOSIs('posix'):
+    env.AddPostAction(compass_installer, Chmod('$TARGET', 0o755))
+
+env.AutoInstall(
+    target='$PREFIX_BINDIR',
+    source=[
+        compass_installer,
+    ],
+    AIB_COMPONENT='dist',
+    AIB_ROLE='runtime',
+)

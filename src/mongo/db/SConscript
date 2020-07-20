@@ -1,8 +1,13 @@
 # -*- mode: python -*-
 
-Import("env")
-Import("has_option")
-Import("get_option")
+Import([
+    "env",
+    "get_option",
+    "has_option",
+    "version_extra",
+    "version_parts",
+    "wiredtiger",
+])
 
 env = env.Clone()
 
@@ -1834,6 +1839,284 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/rpc/protocol',
         "$BUILD_DIR/mongo/rpc/rpc",
+    ],
+)
+
+env.Program(
+    target="mongotrafficreader",
+    source=[
+        "traffic_reader_main.cpp"
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/util/signal_handlers',
+        'traffic_reader',
+    ],
+)
+
+env.Library(
+    target="mongod_options_init",
+    source=[
+        "mongod_options_init.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        'mongod_options',
+        '$BUILD_DIR/mongo/util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
+    ]
+)
+
+env.Library(
+    target="mongod_initializers",
+    source=[
+        # NOTE: If you add an additional source file here, please delete
+        # the file db/mongod_initializers.cpp.
+        "mongod_initializers.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        # NOTE: If you need to add a static or mongo initializer to mongod startup,
+        # please add that library here, as a private library dependency.
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/rpc/rpc',
+        '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
+        '$BUILD_DIR/mongo/s/sessions_collection_sharded',
+        '$BUILD_DIR/mongo/scripting/scripting_server',
+        '$BUILD_DIR/mongo/transport/message_compressor_options_server',
+        '$BUILD_DIR/mongo/transport/service_entry_point',
+        '$BUILD_DIR/mongo/transport/transport_layer_manager',
+        '$BUILD_DIR/mongo/util/clock_sources',
+        '$BUILD_DIR/mongo/util/elapsed_tracker',
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/ntservice',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+        '$BUILD_DIR/mongo/util/periodic_runner_factory',
+        '$BUILD_DIR/mongo/util/testing_options',
+        '$BUILD_DIR/mongo/util/version_impl',
+        '$BUILD_DIR/mongo/watchdog/watchdog_mongod',
+        '$BUILD_DIR/third_party/shim_snappy',
+        'auth/auth_op_observer',
+        'auth/authmongod',
+        'bson/dotted_path_support',
+        'catalog/catalog_impl',
+        'catalog/collection_options',
+        'catalog/document_validation',
+        'catalog/health_log',
+        'catalog/index_key_validate',
+        'client_metadata_propagation_egress_hook',
+        'collection_index_usage_tracker',
+        'commands/mongod',
+        'commands/mongod_fcv',
+        'commands/server_status_servers',
+        'common',
+        'concurrency/flow_control_ticketholder',
+        'concurrency/lock_manager',
+        'concurrency/write_conflict_exception',
+        'curop',
+        'curop_metrics',
+        'db_raii',
+        'dbdirectclient',
+        'dbhelpers',
+        'exec/working_set',
+        'free_mon/free_mon_mongod',
+        'ftdc/ftdc_mongod',
+        'fts/ftsmongod',
+        'index/index_access_method',
+        'index/index_access_methods',
+        'index/index_descriptor',
+        'index_builds_coordinator_mongod',
+        'initialize_server_security_state',
+        'initialize_snmp',
+        'introspect',
+        'keys_collection_client_direct',
+        'kill_sessions_local',
+        'logical_session_cache_impl',
+        'logical_time_metadata_hook',
+        'matcher/expressions_mongod_only',
+        'mirror_maestro',
+        'mongod_options',
+        'mongod_options_init',
+        'ops/write_ops_parsers',
+        'periodic_runner_job_abort_expired_transactions',
+        'pipeline/aggregation',
+        'pipeline/process_interface/mongod_process_interface_factory',
+        'query_exec',
+        'read_concern_d_impl',
+        'read_write_concern_defaults',
+        'repl/bgsync',
+        'repl/oplog_application',
+        'repl/oplog_buffer_blocking_queue',
+        'repl/oplog_buffer_collection',
+        'repl/oplog_buffer_proxy',
+        'repl/repl_coordinator_impl',
+        'repl/repl_set_commands',
+        'repl/repl_settings',
+        'repl/replica_set_aware_service',
+        'repl/rs_rollback',
+        'repl/serveronly_repl',
+        'repl/storage_interface_impl',
+        'repl/topology_coordinator',
+        'rw_concern_d',
+        's/balancer',
+        's/sessions_collection_config_server',
+        's/sharding_commands_d',
+        's/sharding_runtime_d',
+        'service_context_d',
+        'service_liaison_mongod',
+        'sessions_collection_rs',
+        'sessions_collection_standalone',
+        'startup_recovery',
+        'startup_warnings_mongod',
+        'stats/counters',
+        'stats/serveronly_stats',
+        'stats/top',
+        'storage/backup_cursor_hooks',
+        'storage/devnull/storage_devnull',
+        'storage/ephemeral_for_test/storage_ephemeral_for_test',
+        'storage/flow_control',
+        'storage/flow_control_parameters',
+        'storage/storage_control',
+        'storage/storage_engine_lock_file',
+        'storage/storage_engine_metadata',
+        'storage/storage_init_d',
+        'storage/storage_options',
+        'storage/wiredtiger/storage_wiredtiger' if wiredtiger else [],
+        'system_index',
+        'traffic_recorder',
+        'ttl_collection_cache',
+        'ttl_d',
+        'update/update_driver',
+        'update_index_data',
+        'views/views_mongod',
+        'windows_options' if env.TargetOSIs('windows') else [],
+    ],
+    LIBDEPS=[
+        # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
+    ],
+)
+
+env.Library(
+    target="mongod_main",
+    source=[
+        'mongod_main.cpp',
+        'logical_session_cache_factory_mongod.cpp',
+        'read_write_concern_defaults_cache_lookup_mongod.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        # NOTE: Do not add new libdeps (public or private) here unless
+        # required by the linker to satisfy symbol dependencies from
+        # the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongod,
+        # please add that library as a private libdep of
+        # mongod_initializers.
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
+        '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/mongo/s/sessions_collection_sharded',
+        '$BUILD_DIR/mongo/s/sessions_collection_sharded',
+        '$BUILD_DIR/mongo/scripting/scripting',
+        '$BUILD_DIR/mongo/transport/service_entry_point',
+        '$BUILD_DIR/mongo/transport/transport_layer_manager',
+        '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
+        '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/mongo/util/signal_handlers',
+        '$BUILD_DIR/mongo/watchdog/watchdog_mongod',
+        'auth/auth_op_observer',
+        'catalog/catalog_impl',
+        'catalog/collection',
+        'catalog/health_log',
+        'commands/mongod',
+        'concurrency/flow_control_ticketholder',
+        'concurrency/lock_manager',
+        'free_mon/free_mon_mongod',
+        'ftdc/ftdc_mongod',
+        'index/index_access_method_factory',
+        'index/index_access_methods',
+        'index_builds_coordinator_mongod',
+        'initialize_server_security_state',
+        'initialize_snmp',
+        'keys_collection_client_direct',
+        'kill_sessions',
+        'kill_sessions_local',
+        'log_process_details',
+        'mirror_maestro',
+        'mongod_initializers',
+        'mongod_options',
+        'op_observer',
+        'periodic_runner_job_abort_expired_transactions',
+        'pipeline/process_interface/mongod_process_interface_factory',
+        'repl/drop_pending_collection_reaper',
+        'repl/repl_coordinator_impl',
+        'repl/replication_recovery',
+        'repl/serveronly_repl',
+        'repl/storage_interface_impl',
+        'repl/topology_coordinator',
+        'repl/wait_for_majority_service',
+        's/sessions_collection_config_server',
+        's/sharding_runtime_d',
+        'serverinit',
+        'service_context_d',
+        'service_liaison_mongod',
+        'sessions_collection_rs',
+        'sessions_collection_standalone',
+        'startup_recovery',
+        'startup_warnings_mongod',
+        'storage/backup_cursor_hooks',
+        'storage/flow_control',
+        'storage/flow_control_parameters',
+        'storage/storage_control',
+        'storage/storage_engine_common',
+        'system_index',
+        'ttl_d',
+        'vector_clock',
+    ],
+    LIBDEPS=[
+        # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
+    ],
+)
+
+if env.TargetOSIs('windows'):
+    generatedDbManifest = env.Substfile(
+        'mongod.manifest.in',
+        SUBST_DICT=[
+            ('@mongo_version_major@', version_parts[0]),
+            ('@mongo_version_minor@', version_parts[1]),
+            ('@mongo_version_patch@', version_parts[2]),
+            ('@mongo_version_extra@', version_parts[3]),
+            ('@mongo_version_extra_str@', version_extra),
+        ])
+
+    env.Alias('generated-sources', generatedDbManifest)
+    env.Depends("mongod.res", generatedDbManifest)
+
+env.Program(
+    target="mongod",
+    source=[
+        'mongod.cpp'
+    ] + env.WindowsResourceFile("mongod.rc"),
+    LIBDEPS=[
+        # NOTE: Do not add new libdeps (public or private) here unless
+        # required by the linker to satisfy symbol dependencies from
+        # the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongod,
+        # please add that library as a private libdep of
+        # mongod_initializers.
+        '$BUILD_DIR/mongo/base',
+        'mongod_main',
+    ],
+    AIB_COMPONENT="mongod",
+    AIB_COMPONENTS_EXTRA=[
+        "core",
+        "default",
+        "dist",
+        "dist-test",
+        "servers",
+        "integration-tests",
     ],
 )
 

@@ -1,24 +1,46 @@
 # -*- mode: python; -*-
 
-# This SConscript describes build rules for the "mongo" project.
-
-import itertools
-import os
 import re
-import sys
-from buildscripts import utils
 
-Import("env")
-Import("has_option")
-Import("get_option")
-Import("usemozjs")
-Import("use_system_version_of_library")
-Import("use_libunwind")
-Import("wiredtiger")
+Import([
+    "env",
+    "has_option",
+    "get_option",
+    "use_libunwind",
+])
 
 env = env.Clone()
 
 env.InjectMongoIncludePaths()
+
+# This generates a numeric representation of the version string so that
+# you can easily compare versions of MongoDB without having to parse
+# the version string.
+#
+# The rules for this are
+# {major}{minor}{release}{pre/rc/final}
+# If the version is pre-release and not an rc, the final number is 0
+# If the version is an RC, the final number of 1 + rc number
+# If the version is pre-release between RC's, the final number is 1 + rc number
+# If the version is a final release, the final number is 99
+#
+# Examples:
+# 3.1.1-123     = 3010100
+# 3.1.1-rc2     = 3010103
+# 3.1.1-rc2-123 = 3010103
+# 3.1.1         = 3010199
+#
+version_parts = [ x for x in re.match(r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?',
+    env['MONGO_VERSION']).groups() ]
+version_extra = version_parts[3] if version_parts[3] else ""
+if version_parts[4] == 'rc':
+    version_parts[3] = int(version_parts[5]) + -50
+elif version_parts[3]:
+    version_parts[2] = int(version_parts[2]) + 1
+    version_parts[3] = -100
+else:
+    version_parts[3] = 0
+version_parts = [ int(x) for x in version_parts[:4]]
 
 env.SConscript(
     dirs=[
@@ -48,8 +70,50 @@ env.SConscript(
     ],
     exports=[
         'env',
+        'version_extra',
+        'version_parts',
     ],
 )
+
+config_header_substs = (
+    ('@mongo_config_altivec_vec_vbpermq_output_index@', 'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
+    ('@mongo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
+    ('@mongo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
+    ('@mongo_config_have_explicit_bzero@', 'MONGO_CONFIG_HAVE_EXPLICIT_BZERO'),
+    ('@mongo_config_have_fips_mode_set@', 'MONGO_CONFIG_HAVE_FIPS_MODE_SET'),
+    ('@mongo_config_have_header_unistd_h@', 'MONGO_CONFIG_HAVE_HEADER_UNISTD_H'),
+    ('@mongo_config_have_memset_s@', 'MONGO_CONFIG_HAVE_MEMSET_S'),
+    ('@mongo_config_have_posix_monotonic_clock@', 'MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
+    ('@mongo_config_have_pthread_setname_np@', 'MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
+    ('@mongo_config_have_ssl_ec_key_new@', 'MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW'),
+    ('@mongo_config_have_ssl_set_ecdh_auto@', 'MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO'),
+    ('@mongo_config_have_std_enable_if_t@', 'MONGO_CONFIG_HAVE_STD_ENABLE_IF_T'),
+    ('@mongo_config_have_strnlen@', 'MONGO_CONFIG_HAVE_STRNLEN'),
+    ('@mongo_config_max_extended_alignment@', 'MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT'),
+    ('@mongo_config_optimized_build@', 'MONGO_CONFIG_OPTIMIZED_BUILD'),
+    ('@mongo_config_ssl_has_asn1_any_definitions@', 'MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
+    ('@mongo_config_ssl_provider@', 'MONGO_CONFIG_SSL_PROVIDER'),
+    ('@mongo_config_ssl@', 'MONGO_CONFIG_SSL'),
+    ('@mongo_config_usdt_enabled@', 'MONGO_CONFIG_USDT_ENABLED'),
+    ('@mongo_config_usdt_provider@', 'MONGO_CONFIG_USDT_PROVIDER'),
+    ('@mongo_config_use_libunwind@', 'MONGO_CONFIG_USE_LIBUNWIND'),
+    ('@mongo_config_use_raw_latches@', 'MONGO_CONFIG_USE_RAW_LATCHES'),
+    ('@mongo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
+)
+
+def makeConfigHeaderDefine(self, key):
+    val = "// #undef {0}".format(key)
+    if key in self['CONFIG_HEADER_DEFINES']:
+        val = "#define {0} {1}".format(key, self['CONFIG_HEADER_DEFINES'][key])
+    return val
+env.AddMethod(makeConfigHeaderDefine)
+
+generateConfigHeaderFile = env.Substfile(
+    'config.h.in',
+    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs]
+)
+env.Alias('generated-sources', generateConfigHeaderFile)
+
 
 # NOTE: The 'base' library does not really belong here. Its presence
 # here is temporary. Do not add to this library, do not remove from
@@ -205,709 +269,15 @@ baseEnv.Library(
         '$BUILD_DIR/third_party/shim_intel_decimal128',
         '$BUILD_DIR/third_party/shim_pcrecpp',
         '$BUILD_DIR/third_party/shim_unwind' if use_libunwind else [],
-        'boost_assert_shim',
+        'util/boost_assert_shim',
         'stdx/stdx',
     ],
     AIB_COMPONENT='platform',
 )
 
-# Shim library for boost to depend on
-env.Library(
-    target='boost_assert_shim',
-    source=[
-        'util/boost_assert_shim.cpp'
-    ],
-    # NOTE: This library *must not* depend on any mongodb code
-    LIBDEPS=[],
-)
-
-js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else "none"
-
-# On windows, we need to escape the backslashes in the command-line
-# so that windows paths look okay.
-cmd_line = " ".join(sys.argv).encode('unicode_escape')
-if env.TargetOSIs('windows'):
-    cmd_line = cmd_line.replace(b'\\', b'\\')
-
-module_list = ',\n'.join(['"{0}"_sd'.format(x) for x in env['MONGO_MODULES']])
-
-# This generates a numeric representation of the version string so that
-# you can easily compare versions of MongoDB without having to parse
-# the version string.
-#
-# The rules for this are
-# {major}{minor}{release}{pre/rc/final}
-# If the version is pre-release and not an rc, the final number is 0
-# If the version is an RC, the final number of 1 + rc number
-# If the version is pre-release between RC's, the final number is 1 + rc number
-# If the version is a final release, the final number is 99
-#
-# Examples:
-# 3.1.1-123     = 3010100
-# 3.1.1-rc2     = 3010103
-# 3.1.1-rc2-123 = 3010103
-# 3.1.1         = 3010199
-#
-version_parts = [ x for x in re.match(r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?',
-    env['MONGO_VERSION']).groups() ]
-version_extra = version_parts[3] if version_parts[3] else ""
-if version_parts[4] == 'rc':
-    version_parts[3] = int(version_parts[5]) + -50
-elif version_parts[3]:
-    version_parts[2] = int(version_parts[2]) + 1
-    version_parts[3] = -100
-else:
-    version_parts[3] = 0
-version_parts = [ int(x) for x in version_parts[:4]]
-
-# Render the MONGO_BUILDINFO_ENVIRONMENT_DATA dict into an initializer for a
-# `std::vector<VersionInfoInterface::BuildInfoField>`.
-def fmtBuildInfo(data):
-    def fmtBool(val):
-        return "true" if val else "false"
-    def fmtStr(val):
-        return 'R"({0})"_sd'.format(val.replace("\\", r"\\"))
-    def fmtObj(obj):
-        return '{{{}, {}, {}, {}}}'.format(fmtStr(obj['key']),
-                                           fmtStr(env.subst(obj['value'])),
-                                           fmtBool(obj['inBuildInfo']),
-                                           fmtBool(obj['inVersion']))
-    return ',\n'.join([fmtObj(obj) for _,obj in data.items()])
-
-buildInfoInitializer = fmtBuildInfo(env['MONGO_BUILDINFO_ENVIRONMENT_DATA'])
-
-generatedVersionFile = env.Substfile(
-    'util/version_constants.h.in',
-    SUBST_DICT=[
-        ('@mongo_version@', env['MONGO_VERSION']),
-        ('@mongo_version_major@', version_parts[0]),
-        ('@mongo_version_minor@', version_parts[1]),
-        ('@mongo_version_patch@', version_parts[2]),
-        ('@mongo_version_extra@', version_parts[3]),
-        ('@mongo_version_extra_str@', version_extra),
-        ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
-        ('@buildinfo_js_engine@', js_engine_ver),
-        ('@buildinfo_allocator@', env['MONGO_ALLOCATOR']),
-        ('@buildinfo_modules@', module_list),
-        ('@buildinfo_environment_data@', buildInfoInitializer),
-    ])
-env.Alias('generated-sources', generatedVersionFile)
-
-if env.TargetOSIs('windows'):
-    enterpriseEnv = env.Clone().InjectModule("enterprise")
-    generatedResourceConstantFile = enterpriseEnv.Substfile(
-        'util/resource_constants.h.in',
-        SUBST_DICT=[
-            ('@mongo_version@', env['MONGO_VERSION']),
-            ('@mongo_version_major@', version_parts[0]),
-            ('@mongo_version_minor@', version_parts[1]),
-            ('@mongo_version_patch@', version_parts[2]),
-            ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
-        ])
-    env.Alias('generated-sources', generatedResourceConstantFile)
-
-config_header_substs = (
-    ('@mongo_config_altivec_vec_vbpermq_output_index@', 'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
-    ('@mongo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
-    ('@mongo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
-    ('@mongo_config_have_explicit_bzero@', 'MONGO_CONFIG_HAVE_EXPLICIT_BZERO'),
-    ('@mongo_config_have_fips_mode_set@', 'MONGO_CONFIG_HAVE_FIPS_MODE_SET'),
-    ('@mongo_config_have_header_unistd_h@', 'MONGO_CONFIG_HAVE_HEADER_UNISTD_H'),
-    ('@mongo_config_have_memset_s@', 'MONGO_CONFIG_HAVE_MEMSET_S'),
-    ('@mongo_config_have_posix_monotonic_clock@', 'MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
-    ('@mongo_config_have_pthread_setname_np@', 'MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
-    ('@mongo_config_have_ssl_ec_key_new@', 'MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW'),
-    ('@mongo_config_have_ssl_set_ecdh_auto@', 'MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO'),
-    ('@mongo_config_have_std_enable_if_t@', 'MONGO_CONFIG_HAVE_STD_ENABLE_IF_T'),
-    ('@mongo_config_have_strnlen@', 'MONGO_CONFIG_HAVE_STRNLEN'),
-    ('@mongo_config_max_extended_alignment@', 'MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT'),
-    ('@mongo_config_optimized_build@', 'MONGO_CONFIG_OPTIMIZED_BUILD'),
-    ('@mongo_config_ssl_has_asn1_any_definitions@', 'MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
-    ('@mongo_config_ssl_provider@', 'MONGO_CONFIG_SSL_PROVIDER'),
-    ('@mongo_config_ssl@', 'MONGO_CONFIG_SSL'),
-    ('@mongo_config_usdt_enabled@', 'MONGO_CONFIG_USDT_ENABLED'),
-    ('@mongo_config_usdt_provider@', 'MONGO_CONFIG_USDT_PROVIDER'),
-    ('@mongo_config_use_libunwind@', 'MONGO_CONFIG_USE_LIBUNWIND'),
-    ('@mongo_config_use_raw_latches@', 'MONGO_CONFIG_USE_RAW_LATCHES'),
-    ('@mongo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
-)
-
-def makeConfigHeaderDefine(self, key):
-    val = "// #undef {0}".format(key)
-    if key in self['CONFIG_HEADER_DEFINES']:
-        val = "#define {0} {1}".format(key, self['CONFIG_HEADER_DEFINES'][key])
-    return val
-env.AddMethod(makeConfigHeaderDefine)
-
-generateConfigHeaderFile = env.Substfile(
-    'config.h.in',
-    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs]
-)
-env.Alias('generated-sources', generateConfigHeaderFile)
-
-env.Library(
-    target="mongod_options_init",
-    source=[
-        "db/mongod_options_init.cpp",
-    ],
-    LIBDEPS=[
-        'base',
-    ],
-    LIBDEPS_PRIVATE=[
-        'db/mongod_options',
-        '$BUILD_DIR/mongo/util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
-    ]
-)
-
-if env.TargetOSIs('windows'):
-    generatedDbManifest = env.Substfile(
-        'db/mongod.manifest.in',
-        SUBST_DICT=[
-            ('@mongo_version_major@', version_parts[0]),
-            ('@mongo_version_minor@', version_parts[1]),
-            ('@mongo_version_patch@', version_parts[2]),
-            ('@mongo_version_extra@', version_parts[3]),
-            ('@mongo_version_extra_str@', version_extra),
-        ])
-
-    env.Alias('generated-sources', generatedDbManifest)
-    env.Depends("db/mongod.res", generatedDbManifest)
-
-mongod = env.Program(
-    target="mongod",
-    source=[
-        'db/mongod.cpp'
-    ] + env.WindowsResourceFile("db/mongod.rc"),
-    LIBDEPS=[
-        # NOTE: Do not add new libdeps (public or private) here unless
-        # required by the linker to satisfy symbol dependencies from
-        # the files listed above in `sources`. If you need to add a
-        # library to inject a static or mongo initializer to mongod,
-        # please add that library as a private libdep of
-        # mongod_initializers.
-        'base',
-        'mongod_main',
-    ],
-    AIB_COMPONENT="mongod",
-    AIB_COMPONENTS_EXTRA=[
-        "core",
-        "default",
-        "dist",
-        "dist-test",
-        "servers",
-        "integration-tests",
-    ],
-)
-
-env.Library(
-    target="mongod_initializers",
-    source=[
-        # NOTE: If you add an additional source file here, please delete
-        # the file db/mongod_initializers.cpp.
-        "db/mongod_initializers.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        # NOTE: If you need to add a static or mongo initializer to mongod startup,
-        # please add that library here, as a private library dependency.
-        '$BUILD_DIR/third_party/shim_snappy',
-        'base',
-        'db/auth/auth_op_observer',
-        'db/auth/authmongod',
-        'db/bson/dotted_path_support',
-        'db/catalog/catalog_impl',
-        'db/catalog/collection_options',
-        'db/catalog/document_validation',
-        'db/catalog/health_log',
-        'db/catalog/index_key_validate',
-        'db/client_metadata_propagation_egress_hook',
-        'db/collection_index_usage_tracker',
-        'db/commands/mongod_fcv',
-        'db/commands/mongod',
-        'db/commands/server_status_servers',
-        'db/common',
-        'db/concurrency/flow_control_ticketholder',
-        'db/concurrency/lock_manager',
-        'db/concurrency/write_conflict_exception',
-        'db/curop_metrics',
-        'db/curop',
-        'db/db_raii',
-        'db/dbdirectclient',
-        'db/dbhelpers',
-        'db/exec/working_set',
-        'db/free_mon/free_mon_mongod',
-        'db/ftdc/ftdc_mongod',
-        'db/fts/ftsmongod',
-        'db/index_builds_coordinator_mongod',
-        'db/index/index_access_method',
-        'db/index/index_access_methods',
-        'db/index/index_descriptor',
-        'db/initialize_server_security_state',
-        'db/initialize_snmp',
-        'db/introspect',
-        'db/keys_collection_client_direct',
-        'db/kill_sessions_local',
-        'db/logical_session_cache_impl',
-        'db/logical_time_metadata_hook',
-        'db/matcher/expressions_mongod_only',
-        'db/mirror_maestro',
-        'db/mongod_options',
-        'db/ops/write_ops_parsers',
-        'db/periodic_runner_job_abort_expired_transactions',
-        'db/pipeline/aggregation',
-        'db/pipeline/process_interface/mongod_process_interface_factory',
-        'db/query_exec',
-        'db/read_concern_d_impl',
-        'db/read_write_concern_defaults',
-        'db/repl/bgsync',
-        'db/repl/oplog_application',
-        'db/repl/oplog_buffer_blocking_queue',
-        'db/repl/oplog_buffer_collection',
-        'db/repl/oplog_buffer_proxy',
-        'db/repl/repl_coordinator_impl',
-        'db/repl/repl_set_commands',
-        'db/repl/repl_settings',
-        'db/repl/replica_set_aware_service',
-        'db/repl/rs_rollback',
-        'db/repl/serveronly_repl',
-        'db/repl/storage_interface_impl',
-        'db/repl/topology_coordinator',
-        'db/rw_concern_d',
-        'db/s/balancer',
-        'db/s/sessions_collection_config_server',
-        'db/s/sharding_commands_d',
-        'db/s/sharding_runtime_d',
-        'db/service_context_d',
-        'db/service_liaison_mongod',
-        'db/sessions_collection_rs',
-        'db/sessions_collection_standalone',
-        'db/startup_recovery',
-        'db/startup_warnings_mongod',
-        'db/stats/counters',
-        'db/stats/serveronly_stats',
-        'db/stats/top',
-        'db/storage/backup_cursor_hooks',
-        'db/storage/ephemeral_for_test/storage_ephemeral_for_test',
-        'db/storage/devnull/storage_devnull',
-        'db/storage/flow_control_parameters',
-        'db/storage/flow_control',
-        'db/storage/storage_control',
-        'db/storage/storage_engine_lock_file',
-        'db/storage/storage_engine_metadata',
-        'db/storage/storage_init_d',
-        'db/storage/storage_options',
-        'db/storage/wiredtiger/storage_wiredtiger' if wiredtiger else [],
-        'db/system_index',
-        'db/traffic_recorder',
-        'db/ttl_collection_cache',
-        'db/ttl_d',
-        'db/update_index_data',
-        'db/update/update_driver',
-        'db/views/views_mongod',
-        'db/windows_options' if env.TargetOSIs('windows') else [],
-        'executor/network_interface_factory',
-        'mongod_options_init',
-        'rpc/rpc',
-        's/commands/shared_cluster_commands',
-        's/sessions_collection_sharded',
-        'scripting/scripting_server',
-        'transport/message_compressor_options_server',
-        'transport/service_entry_point',
-        'transport/transport_layer_manager',
-        'util/clock_sources',
-        'util/elapsed_tracker',
-        'util/fail_point',
-        'util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
-        'util/net/network',
-        'util/ntservice',
-        'util/options_parser/options_parser_init',
-        'util/periodic_runner_factory',
-        'util/testing_options',
-        'util/version_impl',
-        'watchdog/watchdog_mongod',
-    ],
-    LIBDEPS=[
-        # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
-    ],
-)
-
-env.Library(
-    target="mongod_main",
-    source=[
-        'db/mongod_main.cpp',
-        'db/logical_session_cache_factory_mongod.cpp',
-        'db/read_write_concern_defaults_cache_lookup_mongod.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        # NOTE: Do not add new libdeps (public or private) here unless
-        # required by the linker to satisfy symbol dependencies from
-        # the files listed above in `sources`. If you need to add a
-        # library to inject a static or mongo initializer to mongod,
-        # please add that library as a private libdep of
-        # mongod_initializers.
-        'base',
-        'client/clientdriver_minimal',
-        'db/auth/auth_op_observer',
-        'db/catalog/catalog_impl',
-        'db/catalog/collection',
-        'db/catalog/health_log',
-        'db/commands/mongod',
-        'db/concurrency/flow_control_ticketholder',
-        'db/concurrency/lock_manager',
-        'db/free_mon/free_mon_mongod',
-        'db/ftdc/ftdc_mongod',
-        'db/index/index_access_method_factory',
-        'db/index/index_access_methods',
-        'db/index_builds_coordinator_mongod',
-        'db/initialize_server_security_state',
-        'db/initialize_snmp',
-        'db/keys_collection_client_direct',
-        'db/kill_sessions',
-        'db/kill_sessions_local',
-        'db/log_process_details',
-        'db/mirror_maestro',
-        'db/mongod_options',
-        'db/op_observer',
-        'db/periodic_runner_job_abort_expired_transactions',
-        'db/pipeline/process_interface/mongod_process_interface_factory',
-        'db/repl/drop_pending_collection_reaper',
-        'db/repl/repl_coordinator_impl',
-        'db/repl/replication_recovery',
-        'db/repl/serveronly_repl',
-        'db/repl/storage_interface_impl',
-        'db/repl/topology_coordinator',
-        'db/repl/wait_for_majority_service',
-        'db/s/sessions_collection_config_server',
-        'db/s/sharding_runtime_d',
-        'db/serverinit',
-        'db/service_context_d',
-        'db/service_liaison_mongod',
-        'db/sessions_collection_rs',
-        'db/sessions_collection_standalone',
-        'db/startup_recovery',
-        'db/startup_warnings_mongod',
-        'db/storage/backup_cursor_hooks',
-        'db/storage/flow_control',
-        'db/storage/flow_control_parameters',
-        'db/storage/storage_control',
-        'db/storage/storage_engine_common',
-        'db/system_index',
-        'db/ttl_d',
-        'db/vector_clock',
-        'mongod_initializers',
-        's/grid',
-        's/sessions_collection_sharded',
-        's/sessions_collection_sharded',
-        'scripting/scripting',
-        'transport/service_entry_point',
-        'transport/transport_layer_manager',
-        'util/cmdline_utils/cmdline_utils',
-        'util/concurrency/thread_pool',
-        'util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
-        'util/net/ssl_manager',
-        'util/signal_handlers',
-        'watchdog/watchdog_mongod',
-    ],
-    LIBDEPS=[
-        # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
-    ],
-)
-
-if env.TargetOSIs('windows'):
-    generatedServerManifest = env.Substfile(
-        's/mongos.manifest.in',
-        SUBST_DICT=[
-            ('@mongo_version_major@', version_parts[0]),
-            ('@mongo_version_minor@', version_parts[1]),
-            ('@mongo_version_patch@', version_parts[2]),
-            ('@mongo_version_extra@', version_parts[3]),
-            ('@mongo_version_extra_str@', version_extra),
-        ])
-
-    env.Alias('generated-sources', generatedServerManifest)
-    env.Depends("s/mongos.res", generatedServerManifest)
-
-
-mongotrafficreader = env.Program(
-    target="mongotrafficreader",
-    source=[
-        "db/traffic_reader_main.cpp"
-    ],
-    LIBDEPS=[
-        'base',
-        'db/traffic_reader',
-        'rpc/protocol',
-        'util/signal_handlers'
-    ],
-)
-
-# mongos
-mongos = env.Program(
-    target='mongos',
-    source=[
-        's/mongos.cpp',
-    ] + env.WindowsResourceFile("s/mongos.rc"),
-    LIBDEPS=[
-        # NOTE: Do not add new libdeps (public or private) here unless
-        # required by the linker to satisfy symbol dependencies from
-        # the files listed above in `sources`. If you need to add a
-        # library to inject a static or mongo initializer to mongos,
-        # please add that library as a private libdep of
-        # mongos_initializers.
-        'base',
-        'mongos_main',
-    ],
-    AIB_COMPONENT="mongos",
-    AIB_COMPONENTS_EXTRA=[
-        "core",
-        "dist",
-        "dist-test",
-        "servers",
-        "integration-tests",
-    ],
-)
-
-env.Library(
-    target='mongos_initializers',
-    source=[
-        's/cluster_cursor_stats.cpp',
-        's/router_transactions_server_status.cpp',
-        's/s_sharding_server_status.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        # NOTE: If you need to add a static or mongo initializer to mongos startup,
-        # please add that library here, as a private library dependency.
-        'db/audit',
-        'db/auth/authmongos',
-        'db/commands/server_status',
-        'db/commands/server_status_core',
-        'db/commands/server_status_servers',
-        'db/curop',
-        'db/dbdirectclient',
-        'db/ftdc/ftdc_mongos',
-        'db/initialize_server_security_state',
-        'db/logical_session_cache',
-        'db/logical_session_cache_impl',
-        'db/logical_time_metadata_hook',
-        'db/pipeline/process_interface/mongos_process_interface_factory',
-        'db/read_write_concern_defaults',
-        'db/server_options',
-        'db/server_options_base',
-        'db/service_liaison_mongos',
-        'db/session_catalog',
-        'db/startup_warnings_common',
-        'db/stats/counters',
-        'db/windows_options' if env.TargetOSIs('windows') else [],
-        's/commands/cluster_commands',
-        's/commands/shared_cluster_commands',
-        's/committed_optime_metadata_hook',
-        's/coreshard',
-        's/is_mongos',
-        's/mongos_topology_coordinator',
-        's/mongos_server_parameters',
-        's/query/cluster_cursor_cleanup_job',
-        's/sessions_collection_sharded',
-        's/sharding_egress_metadata_hook_for_mongos',
-        's/sharding_initialization',
-        's/sharding_router_api',
-        'transport/message_compressor_options_server',
-        'transport/service_entry_point',
-        'transport/transport_layer_manager',
-        'util/clock_sources',
-        'util/fail_point',
-        'util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
-        'util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
-        'util/ntservice',
-        'util/options_parser/options_parser',
-        'util/options_parser/options_parser_init',
-        'util/testing_options',
-        'util/version_impl',
-    ],
-    LIBDEPS=[
-        # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
-    ],
-)
-
-env.Library(
-    target='mongos_main',
-    source=[
-        'db/read_write_concern_defaults_cache_lookup_mongos.cpp',
-        's/mongos_main.cpp',
-        's/mongos_options.cpp',
-        's/mongos_options_init.cpp',
-        env.Idlc('s/mongos_options.idl')[0],
-        's/service_entry_point_mongos.cpp',
-        's/sharding_uptime_reporter.cpp',
-        's/version_mongos.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        # NOTE: Do not add new libdeps (public or private) here unless
-        # required by the linker to satisfy symbol dependencies from
-        # the files listed above in `sources`. If you need to add a
-        # library to inject a static or mongo initializer to mongos,
-        # please add that library as a private libdep of
-        # mongos_initializers.
-        'db/audit',
-        'db/auth/authmongos',
-        'db/ftdc/ftdc_mongos',
-        'db/initialize_server_security_state',
-        'db/log_process_details',
-        'db/read_write_concern_defaults',
-        'db/serverinit',
-        'db/service_liaison_mongos',
-        'db/session_catalog',
-        'db/startup_warnings_common',
-        'mongos_initializers',
-        's/client/sharding_client',
-        's/cluster_last_error_info',
-        's/commands/cluster_commands',
-        's/committed_optime_metadata_hook',
-        's/common_s',
-        's/mongos_topology_coordinator',
-        's/query/cluster_cursor_cleanup_job',
-        's/sessions_collection_sharded',
-        's/sharding_egress_metadata_hook_for_mongos',
-        's/sharding_initialization',
-        's/sharding_router_api',
-        'transport/service_entry_point',
-        'transport/transport_layer_manager',
-        'util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
-        'util/net/ssl_manager',
-        'util/periodic_runner_factory',
-        'util/signal_handlers',
-    ],
-    LIBDEPS=[
-        # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
-    ],
-)
-
-
-# --- shell ---
-
-if not has_option('noshell') and usemozjs:
-    shellEnv = env.Clone()
-    if env.TargetOSIs('windows'):
-        shellEnv.Append(LIBS=["winmm.lib"])
-
-        generatedMongoManifest = shellEnv.Substfile(
-                'shell/mongo.manifest.in',
-                SUBST_DICT=[
-                    ('@mongo_version_major@', version_parts[0]),
-                    ('@mongo_version_minor@', version_parts[1]),
-                    ('@mongo_version_patch@', version_parts[2]),
-                    ('@mongo_version_extra@', version_parts[3]),
-                    ('@mongo_version_extra_str@', version_extra),
-                ])
-        shellEnv.Alias('generated-sources', generatedMongoManifest)
-        shellEnv.Depends("shell/mongo.res", generatedMongoManifest)
-
-    mongo_shell = shellEnv.Program(
-        target="mongo",
-        source=[
-            "shell/mongo.cpp",
-        ] + env.WindowsResourceFile("shell/mongo.rc"),
-        LIBDEPS=[
-            # NOTE: Do not add new libdeps (public or private) here unless
-            # required by the linker to satisfy symbol dependencies from
-            # the files listed above in `sources`. If you need to add a
-            # library to inject a static or mongo initializer to mongo,
-            # please add that library as a private libdep of
-            # mongo_initializers.
-            'base',
-            'mongo_main',
-        ],
-        AIB_COMPONENT="mongo",
-        AIB_COMPONENTS_EXTRA=[
-            "core",
-            "dist",
-            "dist-test",
-            "shell",
-            "integration-tests",
-        ],
-    )
-
-    env.Library(
-        target="mongo_initializers",
-        source=[
-            "shell/mongodbcr.cpp",
-            "shell/shell_options_init.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            # NOTE: If you need to add a static or mongo initializer to mongo startup,
-            # please add that library here, as a private library dependency.
-            "$BUILD_DIR/third_party/shim_pcrecpp",
-            "client/clientdriver_network",
-            "client/connection_string",
-            "db/catalog/index_key_validate",
-            "db/logical_session_id_helpers",
-            "db/mongohasher",
-            "db/query/command_request_response",
-            "db/query/query_request",
-            "db/server_options_core",
-            "db/storage/duplicate_key_error_info",
-            "db/traffic_reader",
-            "db/views/resolved_view",
-            "executor/network_interface_factory",
-            "executor/network_interface_thread_pool",
-            "executor/thread_pool_task_executor",
-            "rpc/protocol",
-            "scripting/scripting",
-            "shell/benchrun",
-            "shell/encrypted_dbclient" if get_option('ssl') == 'on' else '',
-            "shell/kms_shell" if get_option('ssl') == 'on' else '',
-            "shell/mongojs",
-            "shell/shell_options_register",
-            "shell/shell_utils",
-            "transport/message_compressor",
-            "transport/message_compressor_options_client",
-            "transport/transport_layer_manager",
-            "util/net/network",
-            "util/net/ssl_options_client" if get_option('ssl') == 'on' else '',
-            "util/options_parser/options_parser_init",
-            "util/password",
-            "util/processinfo",
-            "util/signal_handlers",
-            "util/version_impl",
-        ],
-        LIBDEPS=[
-            # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
-        ],
-
-    )
-
-    env.Library(
-        target="mongo_main",
-        source=[
-            "shell/mongo_main.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            # NOTE: Do not add new libdeps (public or private) here unless
-            # required by the linker to satisfy symbol dependencies from
-            # the files listed above in `sources`. If you need to add a
-            # library to inject a static or mongo initializer to mongo,
-            # please add that library as a private libdep of
-            # mongo_initializers.
-            "$BUILD_DIR/third_party/shim_pcrecpp",
-            "mongo_initializers",
-            "shell/linenoise",
-            "shell/shell_utils",
-            "transport/transport_layer",
-            "util/net/ssl_manager",
-            "util/signal_handlers",
-        ],
-        LIBDEPS=[
-            # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
-        ],
-    )
-
-else:
-    shellEnv = None
-
-#  ----  INSTALL -------
-
 # Stage the top-level mongodb banners
+
 distsrc = env.Dir('#distsrc')
-
-
 env.AutoInstall(
     target='$PREFIX',
     source=[
@@ -940,38 +310,4 @@ env.AutoInstall(
     AIB_COMPONENT='common',
     AIB_COMPONENTS_EXTRA=['dist', 'dist-test'],
     AIB_ROLE='base',
-)
-
-# Set the download url to the right place
-compass_type = 'compass-community'
-if 'enterprise' in env['MONGO_MODULES']:
-    compass_type = 'compass'
-
-compass_script = "install_compass.in"
-if env.TargetOSIs('windows'):
-    compass_script = "Install-Compass.ps1.in"
-
-compass_python_interpreter = '/usr/bin/env python2'
-if env.TargetOSIs('darwin'):
-    compass_python_interpreter = '/usr/bin/env python'
-
-compass_installer = env.Substfile(
-  target="$BUILD_DIR/mongo/installer/compass/" + compass_script[:-3],
-  source='installer/compass/' + compass_script,
-  SUBST_DICT=[
-    ('@compass_type@', compass_type),
-    ('@python_interpreter@', compass_python_interpreter),
-  ],
-)
-
-if env.TargetOSIs('posix'):
-    env.AddPostAction(compass_installer, Chmod('$TARGET', 0o755))
-
-env.AutoInstall(
-    target='$PREFIX_BINDIR',
-    source=[
-        compass_installer,
-    ],
-    AIB_COMPONENT='dist',
-    AIB_ROLE='runtime',
 )

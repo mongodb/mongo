@@ -1,15 +1,79 @@
 # -*- mode: python -*-
 
-Import("endian")
-Import("env")
-Import("get_option")
-Import("has_option")
-Import("use_libunwind")
-Import("use_system_version_of_library")
+Import([
+    "endian",
+    "env",
+    "get_option",
+    "has_option",
+    "use_libunwind",
+    "use_system_version_of_library",
+    "version_extra",
+    "version_parts",
+])
 
 env = env.Clone()
 
 env.InjectThirdParty('asio')
+
+js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else "none"
+
+module_list = ',\n'.join(['"{0}"_sd'.format(x) for x in env['MONGO_MODULES']])
+
+# Render the MONGO_BUILDINFO_ENVIRONMENT_DATA dict into an initializer for a
+# `std::vector<VersionInfoInterface::BuildInfoField>`.
+def fmtBuildInfo(data):
+    def fmtBool(val):
+        return "true" if val else "false"
+    def fmtStr(val):
+        return 'R"({0})"_sd'.format(val.replace("\\", r"\\"))
+    def fmtObj(obj):
+        return '{{{}, {}, {}, {}}}'.format(fmtStr(obj['key']),
+                                           fmtStr(env.subst(obj['value'])),
+                                           fmtBool(obj['inBuildInfo']),
+                                           fmtBool(obj['inVersion']))
+    return ',\n'.join([fmtObj(obj) for _,obj in data.items()])
+
+buildInfoInitializer = fmtBuildInfo(env['MONGO_BUILDINFO_ENVIRONMENT_DATA'])
+
+generatedVersionFile = env.Substfile(
+    'version_constants.h.in',
+    SUBST_DICT=[
+        ('@mongo_version@', env['MONGO_VERSION']),
+        ('@mongo_version_major@', version_parts[0]),
+        ('@mongo_version_minor@', version_parts[1]),
+        ('@mongo_version_patch@', version_parts[2]),
+        ('@mongo_version_extra@', version_parts[3]),
+        ('@mongo_version_extra_str@', version_extra),
+        ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
+        ('@buildinfo_js_engine@', js_engine_ver),
+        ('@buildinfo_allocator@', env['MONGO_ALLOCATOR']),
+        ('@buildinfo_modules@', module_list),
+        ('@buildinfo_environment_data@', buildInfoInitializer),
+    ])
+env.Alias('generated-sources', generatedVersionFile)
+
+if env.TargetOSIs('windows'):
+    enterpriseEnv = env.Clone().InjectModule("enterprise")
+    generatedResourceConstantFile = enterpriseEnv.Substfile(
+        'resource_constants.h.in',
+        SUBST_DICT=[
+            ('@mongo_version@', env['MONGO_VERSION']),
+            ('@mongo_version_major@', version_parts[0]),
+            ('@mongo_version_minor@', version_parts[1]),
+            ('@mongo_version_patch@', version_parts[2]),
+            ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
+        ])
+    env.Alias('generated-sources', generatedResourceConstantFile)
+
+# Shim library for boost to depend on
+env.Library(
+    target='boost_assert_shim',
+    source=[
+        'boost_assert_shim.cpp'
+    ],
+    # NOTE: This library *must not* depend on any mongodb code
+    LIBDEPS=[],
+)
 
 env.SConscript(
     dirs=[

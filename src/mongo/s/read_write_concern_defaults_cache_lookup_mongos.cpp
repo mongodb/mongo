@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/read_write_concern_defaults_cache_lookup_mongos.h"
+#include "mongo/s/read_write_concern_defaults_cache_lookup_mongos.h"
 
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
 #include "mongo/s/grid.h"

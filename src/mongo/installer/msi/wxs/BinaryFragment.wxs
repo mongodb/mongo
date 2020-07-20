@@ -6,15 +6,15 @@
         <File Id="InstallCompassScript" Name="InstallCompass.ps1" Source="$(var.CompassDir)\Install-Compass.ps1" />
       </Component>
       <Component Id="c_mongo" Guid="395C3DA5-A905-409C-AD96-29BFFF5E12D6">
-        <File Id="f_mongo" Name="mongo.exe" Source="$(var.BinarySource)\mongo.exe"
+        <File Id="f_mongo" Name="mongo.exe" Source="$(var.BinarySource)\shell\mongo.exe"
               DiskId ="1" KeyPath="yes"/>
       </Component>
       <Component Id="c_mongod" Guid="7EDFB4A2-5A45-4C41-8F6D-976558B3A9D6">
-        <File Id="f_mongod" Name="mongod.exe" Source="$(var.BinarySource)\mongod.exe"
+        <File Id="f_mongod" Name="mongod.exe" Source="$(var.BinarySource)\db\mongod.exe"
               DiskId ="1" KeyPath="yes"/>
       </Component>
       <Component Id="c_mongodWithService" Guid="1E7C89DA-4B96-41E2-8106-DDBA64631249">
-        <File Id="f_mongodWithService" Name="mongod.exe" Source="$(var.BinarySource)\mongod.exe"
+        <File Id="f_mongodWithService" Name="mongod.exe" Source="$(var.BinarySource)\db\mongod.exe"
               DiskId ="1" KeyPath="yes"/>
         <ServiceInstall Id='MyServiceInstall'
               Description="MongoDB Database Server ([MONGO_SERVICE_NAME])"
@@ -40,7 +40,7 @@
         </util:User>
       </Component>
       <Component Id="c_mongodPdb" Guid="8B41A2E2-911C-4399-8E9F-D3C1AD3B9EDD">
-        <File Id="f_mongodPdb" Name="mongod.pdb" Source="$(var.BinarySource)\mongod.pdb"
+        <File Id="f_mongodPdb" Name="mongod.pdb" Source="$(var.BinarySource)\db\mongod.pdb"
               DiskId ="1" KeyPath="yes"/>
       </Component>
       <Component Id="c_mongodCfg" Guid="EA715A4C-7C63-4C5C-8F73-A82E84668AEE">
@@ -48,11 +48,11 @@
               DiskId ="1" KeyPath="yes"/>
       </Component>
       <Component Id="c_mongos" Guid="3CA63864-9FA0-4DAE-A664-2BE9A157FB60">
-        <File Id="f_mongos" Name="mongos.exe" Source="$(var.BinarySource)\mongos.exe"
+        <File Id="f_mongos" Name="mongos.exe" Source="$(var.BinarySource)\s\mongos.exe"
               DiskId ="1" KeyPath="yes"/>
       </Component>
       <Component Id="c_mongosPdb" Guid="F1694AB8-4B0D-4096-AD67-948063FF2A6C">
-        <File Id="f_mongosPdb" Name="mongos.pdb" Source="$(var.BinarySource)\mongos.pdb"
+        <File Id="f_mongosPdb" Name="mongos.pdb" Source="$(var.BinarySource)\s\mongos.pdb"
               DiskId ="1" KeyPath="yes"/>
       </Component>
       <?if $(var.Edition) = Enterprise ?>

@@ -3,12 +3,11 @@
 Import("env")
 Import("get_option")
 
-hygienic = get_option('install-mode') == 'hygienic'
-
 env = env.Clone()
 
 env.SConscript(
     dirs=[
+        'compass',
         'msi',
     ],
     exports=[
@@ -16,7 +15,7 @@ env.SConscript(
     ],
 )
 
-if hygienic and env.TargetOSIs('windows'):
+if env.TargetOSIs('windows'):
     # This ensures that the VC++ redistributable is always included in the
     # community server ZIP.
 
@@ -32,4 +31,3 @@ if hygienic and env.TargetOSIs('windows'):
         AIB_COMPONENT="dist",
         AIB_ROLE="runtime",
     )
-

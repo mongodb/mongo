@@ -1,6 +1,11 @@
 # -*- mode: python -*-
 
-Import("env")
+Import([
+    "env",
+    "get_option",
+    "version_extra",
+    "version_parts",
+])
 
 env = env.Clone()
 
@@ -396,6 +401,159 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/vector_clock',
+    ],
+)
+
+env.Library(
+    target='mongos_initializers',
+    source=[
+        'cluster_cursor_stats.cpp',
+        'router_transactions_server_status.cpp',
+        's_sharding_server_status.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        # NOTE: If you need to add a static or mongo initializer to mongos startup,
+        # please add that library here, as a private library dependency.
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/auth/authmongos',
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/commands/server_status_servers',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/ftdc/ftdc_mongos',
+        '$BUILD_DIR/mongo/db/initialize_server_security_state',
+        '$BUILD_DIR/mongo/db/logical_session_cache',
+        '$BUILD_DIR/mongo/db/logical_session_cache_impl',
+        '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
+        '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory',
+        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
+        '$BUILD_DIR/mongo/db/server_options',
+        '$BUILD_DIR/mongo/db/server_options_base',
+        '$BUILD_DIR/mongo/db/service_liaison_mongos',
+        '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/mongo/db/startup_warnings_common',
+        '$BUILD_DIR/mongo/db/stats/counters',
+        '$BUILD_DIR/mongo/db/windows_options' if env.TargetOSIs('windows') else [],
+        '$BUILD_DIR/mongo/transport/message_compressor_options_server',
+        '$BUILD_DIR/mongo/transport/service_entry_point',
+        '$BUILD_DIR/mongo/transport/transport_layer_manager',
+        '$BUILD_DIR/mongo/util/clock_sources',
+        '$BUILD_DIR/mongo/util/fail_point',
+        '$BUILD_DIR/mongo/util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
+        '$BUILD_DIR/mongo/util/net/ssl_options_server' if get_option('ssl') == 'on' else '',
+        '$BUILD_DIR/mongo/util/ntservice',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+        '$BUILD_DIR/mongo/util/testing_options',
+        '$BUILD_DIR/mongo/util/version_impl',
+        'commands/cluster_commands',
+        'commands/shared_cluster_commands',
+        'committed_optime_metadata_hook',
+        'coreshard',
+        'is_mongos',
+        'mongos_server_parameters',
+        'mongos_topology_coordinator',
+        'query/cluster_cursor_cleanup_job',
+        'sessions_collection_sharded',
+        'sharding_egress_metadata_hook_for_mongos',
+        'sharding_initialization',
+        'sharding_router_api',
+    ],
+    LIBDEPS=[
+        # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
+    ],
+)
+
+env.Library(
+    target='mongos_main',
+    source=[
+        'read_write_concern_defaults_cache_lookup_mongos.cpp',
+        'mongos_main.cpp',
+        'mongos_options.cpp',
+        'mongos_options_init.cpp',
+        env.Idlc('mongos_options.idl')[0],
+        'service_entry_point_mongos.cpp',
+        'sharding_uptime_reporter.cpp',
+        'version_mongos.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        # NOTE: Do not add new libdeps (public or private) here unless
+        # required by the linker to satisfy symbol dependencies from
+        # the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongos,
+        # please add that library as a private libdep of
+        # mongos_initializers.
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/auth/authmongos',
+        '$BUILD_DIR/mongo/db/ftdc/ftdc_mongos',
+        '$BUILD_DIR/mongo/db/initialize_server_security_state',
+        '$BUILD_DIR/mongo/db/log_process_details',
+        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
+        '$BUILD_DIR/mongo/db/serverinit',
+        '$BUILD_DIR/mongo/db/service_liaison_mongos',
+        '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/mongo/db/startup_warnings_common',
+        '$BUILD_DIR/mongo/transport/service_entry_point',
+        '$BUILD_DIR/mongo/transport/transport_layer_manager',
+        '$BUILD_DIR/mongo/util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
+        '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/mongo/util/periodic_runner_factory',
+        '$BUILD_DIR/mongo/util/signal_handlers',
+        'client/sharding_client',
+        'cluster_last_error_info',
+        'commands/cluster_commands',
+        'committed_optime_metadata_hook',
+        'common_s',
+        'mongos_initializers',
+        'mongos_topology_coordinator',
+        'query/cluster_cursor_cleanup_job',
+        'sessions_collection_sharded',
+        'sharding_egress_metadata_hook_for_mongos',
+        'sharding_initialization',
+        'sharding_router_api',
+    ],
+    LIBDEPS=[
+        # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
+    ],
+)
+
+if env.TargetOSIs('windows'):
+    generatedServerManifest = env.Substfile(
+        'mongos.manifest.in',
+        SUBST_DICT=[
+            ('@mongo_version_major@', version_parts[0]),
+            ('@mongo_version_minor@', version_parts[1]),
+            ('@mongo_version_patch@', version_parts[2]),
+            ('@mongo_version_extra@', version_parts[3]),
+            ('@mongo_version_extra_str@', version_extra),
+        ])
+
+    env.Alias('generated-sources', generatedServerManifest)
+    env.Depends("mongos.res", generatedServerManifest)
+
+env.Program(
+    target='mongos',
+    source=[
+        'mongos.cpp',
+    ] + env.WindowsResourceFile("mongos.rc"),
+    LIBDEPS=[
+        # NOTE: Do not add new libdeps (public or private) here unless
+        # required by the linker to satisfy symbol dependencies from
+        # the files listed above in `sources`. If you need to add a
+        # library to inject a static or mongo initializer to mongos,
+        # please add that library as a private libdep of
+        # mongos_initializers.
+        '$BUILD_DIR/mongo/base',
+        'mongos_main',
+    ],
+    AIB_COMPONENT="mongos",
+    AIB_COMPONENTS_EXTRA=[
+        "core",
+        "dist",
+        "dist-test",
+        "servers",
+        "integration-tests",
     ],
 )
 

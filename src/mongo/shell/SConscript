@@ -2,7 +2,11 @@
 
 Import([
     'env',
-    'get_option'
+    'get_option',
+    'has_option',
+    'usemozjs',
+    'version_parts',
+    'version_extra',
 ])
 
 env = env.Clone()
@@ -213,6 +217,124 @@ env.Library(
         "linenoise_utf8",
     ],
 )
+
+if not has_option('noshell') and usemozjs:
+
+    env.Library(
+        target="mongo_initializers",
+        source=[
+            "mongodbcr.cpp",
+            "shell_options_init.cpp",
+        ],
+        LIBDEPS_PRIVATE=[
+            # NOTE: If you need to add a static or mongo initializer to mongo startup,
+            # please add that library here, as a private library dependency.
+            "$BUILD_DIR/mongo/client/clientdriver_network",
+            "$BUILD_DIR/mongo/client/connection_string",
+            "$BUILD_DIR/mongo/db/catalog/index_key_validate",
+            "$BUILD_DIR/mongo/db/logical_session_id_helpers",
+            "$BUILD_DIR/mongo/db/mongohasher",
+            "$BUILD_DIR/mongo/db/query/command_request_response",
+            "$BUILD_DIR/mongo/db/query/query_request",
+            "$BUILD_DIR/mongo/db/server_options_core",
+            "$BUILD_DIR/mongo/db/storage/duplicate_key_error_info",
+            "$BUILD_DIR/mongo/db/traffic_reader",
+            "$BUILD_DIR/mongo/db/views/resolved_view",
+            "$BUILD_DIR/mongo/executor/network_interface_factory",
+            "$BUILD_DIR/mongo/executor/network_interface_thread_pool",
+            "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
+            "$BUILD_DIR/mongo/rpc/protocol",
+            "$BUILD_DIR/mongo/scripting/scripting",
+            "$BUILD_DIR/mongo/transport/message_compressor",
+            "$BUILD_DIR/mongo/transport/message_compressor_options_client",
+            "$BUILD_DIR/mongo/transport/transport_layer_manager",
+            "$BUILD_DIR/mongo/util/net/network",
+            "$BUILD_DIR/mongo/util/net/ssl_options_client" if get_option('ssl') == 'on' else '',
+            "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
+            "$BUILD_DIR/mongo/util/password",
+            "$BUILD_DIR/mongo/util/processinfo",
+            "$BUILD_DIR/mongo/util/signal_handlers",
+            "$BUILD_DIR/mongo/util/version_impl",
+            "$BUILD_DIR/third_party/shim_pcrecpp",
+            "benchrun",
+            "encrypted_dbclient" if get_option('ssl') == 'on' else '',
+            "kms_shell" if get_option('ssl') == 'on' else '',
+            "mongojs",
+            "shell_options_register",
+            "shell_utils",
+        ],
+        LIBDEPS=[
+            # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
+        ],
+
+    )
+
+    env.Library(
+        target="mongo_main",
+        source=[
+            "mongo_main.cpp",
+        ],
+        LIBDEPS_PRIVATE=[
+            # NOTE: Do not add new libdeps (public or private) here unless
+            # required by the linker to satisfy symbol dependencies from
+            # the files listed above in `sources`. If you need to add a
+            # library to inject a static or mongo initializer to mongo,
+            # please add that library as a private libdep of
+            # mongo_initializers.
+            "$BUILD_DIR/mongo/transport/transport_layer",
+            "$BUILD_DIR/mongo/util/net/ssl_manager",
+            "$BUILD_DIR/mongo/util/signal_handlers",
+            "$BUILD_DIR/third_party/shim_pcrecpp",
+            "linenoise",
+            "mongo_initializers",
+            "shell_utils",
+        ],
+        LIBDEPS=[
+            # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
+        ],
+    )
+
+    shellEnv = env.Clone()
+    if env.TargetOSIs('windows'):
+        shellEnv.Append(LIBS=["winmm.lib"])
+
+        generatedMongoManifest = shellEnv.Substfile(
+                'mongo.manifest.in',
+                SUBST_DICT=[
+                    ('@mongo_version_major@', version_parts[0]),
+                    ('@mongo_version_minor@', version_parts[1]),
+                    ('@mongo_version_patch@', version_parts[2]),
+                    ('@mongo_version_extra@', version_parts[3]),
+                    ('@mongo_version_extra_str@', version_extra),
+                ])
+        shellEnv.Alias('generated-sources', generatedMongoManifest)
+        shellEnv.Depends("mongo.res", generatedMongoManifest)
+
+    mongo_shell = shellEnv.Program(
+        target="mongo",
+        source=[
+            "mongo.cpp",
+        ] + env.WindowsResourceFile("mongo.rc"),
+        LIBDEPS=[
+            # NOTE: Do not add new libdeps (public or private) here unless
+            # required by the linker to satisfy symbol dependencies from
+            # the files listed above in `sources`. If you need to add a
+            # library to inject a static or mongo initializer to mongo,
+            # please add that library as a private libdep of
+            # mongo_initializers.
+            '$BUILD_DIR/mongo/base',
+            'mongo_main',
+        ],
+        AIB_COMPONENT="mongo",
+        AIB_COMPONENTS_EXTRA=[
+            "core",
+            "dist",
+            "dist-test",
+            "shell",
+            "integration-tests",
+        ],
+    )
+
 
 env.CppUnitTest(
     target='shell_test',
