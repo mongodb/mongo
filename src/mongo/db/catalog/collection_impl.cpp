@@ -383,17 +383,18 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
     if (validatorMatchExpr->matchesBSON(document))
         return Status::OK();
 
+    BSONObj generatedError = doc_validation_error::generateError(*validatorMatchExpr, document);
+
     if (_validationAction == ValidationAction::WARN) {
         LOGV2_WARNING(20294,
-                      "Document would fail validation collection: {ns} doc: {document}",
                       "Document would fail validation",
                       "namespace"_attr = ns(),
-                      "document"_attr = redact(document));
+                      "document"_attr = redact(document),
+                      "errInfo"_attr = generatedError);
         return Status::OK();
     }
 
-    return {doc_validation_error::DocumentValidationFailureInfo(
-                doc_validation_error::generateError(*validatorMatchExpr, document)),
+    return {doc_validation_error::DocumentValidationFailureInfo(generatedError),
             "Document failed validation"};
 }
 
