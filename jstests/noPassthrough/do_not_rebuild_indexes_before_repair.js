@@ -60,7 +60,8 @@ rst.awaitReplication();
 
 let primaryDbpath = rst.getPrimary().dbpath;
 let primaryPort = rst.getPrimary().port;
-rst.stopSet(9, true, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+rst.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
+rst.stopSet(undefined, true);
 
 // This should succeed in rebuilding the indexes, but only after the databases have been
 // repaired.

@@ -81,8 +81,19 @@ assert.commandWorked(initialSyncNodeDb.adminCommand(
 assert.commandWorked(initialSyncSource.getDB("admin").adminCommand(
     {configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 
+// We want to ensure the initialSyncNode encounters the InitialSyncFailure error and shuts down.
+assert.soon(() => {
+    try {
+        initialSyncNodeDb.runCommand({ping: 1});
+    } catch (e) {
+        return true;
+    }
+    return false;
+}, "Node did not shutdown due to initial sync failure", ReplSetTest.kDefaultTimeoutMS);
+
 // We skip validation and dbhashes because the initial sync failed so the initial sync node is
 // invalid and unreachable.
 TestData.skipCheckDBHashes = true;
+rst.stop(initialSyncNode, null, {skipValidation: true, allowedExitCode: MongoRunner.EXIT_ABRUPT});
 rst.stopSet(null, null, {skipValidation: true});
 })();

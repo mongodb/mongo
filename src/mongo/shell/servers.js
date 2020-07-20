@@ -1024,10 +1024,9 @@ var stopMongoProgram = function(conn, signal, opts, waitpid) {
         TestData.skipEnforceFastCountOnValidate = true;
     }
 
-    var allowedExitCode = MongoRunner.EXIT_CLEAN;
-
-    if (opts.allowedExitCode) {
-        allowedExitCode = opts.allowedExitCode;
+    const allowedExitCode = opts.allowedExitCode ? opts.allowedExitCode : MongoRunner.EXIT_CLEAN;
+    if (!waitpid && allowedExitCode !== MongoRunner.EXIT_CLEAN) {
+        throw new Error('Must wait for process to exit if it is expected to exit uncleanly');
     }
 
     var port = parseInt(conn.port);

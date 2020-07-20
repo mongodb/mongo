@@ -3108,7 +3108,8 @@ var ReplSetTest = function(opts) {
     };
 
     /**
-     * Stops a particular node or nodes, specified by conn or id
+     * Stops a particular node or nodes, specified by conn or id. If we expect the node to exit with
+     * a nonzero exit code, call this function and pass in allowedExitCode as a field of opts.
      *
      * If _useBridge=true, then the mongobridge process(es) corresponding to the node(s) are also
      * terminated unless forRestart=true. The mongobridge process(es) are left running across
@@ -3176,7 +3177,9 @@ var ReplSetTest = function(opts) {
     };
 
     /**
-     * Kill all members of this replica set.
+     * Kill all members of this replica set. When calling this function, we expect all live nodes to
+     * exit cleanly. If we expect a node to exit with a nonzero exit code, use the stop function to
+     * terminate that node before calling stopSet.
      *
      * @param {number} signal The signal number to use for killing the members
      * @param {boolean} forRestart will not cleanup data directory
@@ -3269,6 +3272,11 @@ var ReplSetTest = function(opts) {
             let port = parseInt(conn.port);
             print("ReplSetTest stopSet waiting for mongo program on port " + port + " to stop.");
             let exitCode = waitMongoProgram(port);
+            if (exitCode !== MongoRunner.EXIT_CLEAN) {
+                throw new Error("ReplSetTest stopSet mongo program on port " + port +
+                                " shut down unexpectedly with code " + exitCode + " when code " +
+                                MongoRunner.EXIT_CLEAN + " was expected.");
+            }
             print("ReplSetTest stopSet mongo program on port " + port + " shut down with code " +
                   exitCode);
         }

@@ -51,7 +51,8 @@ nodes.forEach(node => assert.commandWorked(node.adminCommand(
 coll = rst.getPrimary().getDB("indexRebuild")["coll"];
 assert.commandWorked(coll.dropIndexes());
 rst.awaitReplication();
-rst.stopSet(9, true, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
+rst.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
+rst.stop(1, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
 
 // Restarting the replica set should rebuild both indexes on both nodes. Just to be dropped
 // again by replication recovery. Starting up successfully is a passing test run.
