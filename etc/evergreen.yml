@@ -11822,20 +11822,6 @@ buildvariants:
 # storage engine buildvariants #
 ################################
 
-- name: rhel-62-64-bit-biggie
-  display_name: RHEL 6.2 (Biggie)
-  run_on:
-  - rhel62-small
-  expansions:
-    test_flags: --storageEngine=biggie --excludeWithAnyTags=SERVER-38379,requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
-    compile_flags: MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    scons_cache_scope: shared
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel62-large
-  - name: jsCore
-
 - name: enterprise-rhel-62-benchmarks
   display_name: Enterprise RHEL 6.2 (Benchmarks)
   modules:
