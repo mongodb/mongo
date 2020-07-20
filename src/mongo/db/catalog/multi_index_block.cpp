@@ -420,7 +420,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 
             // The external sorter is not part of the storage engine and therefore does not need a
             // WriteUnitOfWork to write keys.
-            Status ret = insert(opCtx, objToIndex, loc);
+            Status ret = insertSingleDocumentForInitialSyncOrRecovery(opCtx, objToIndex, loc);
             if (!ret.isOK()) {
                 return ret;
             }
@@ -480,7 +480,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status MultiIndexBlock::insert(OperationContext* opCtx, const BSONObj& doc, const RecordId& loc) {
+Status MultiIndexBlock::insertSingleDocumentForInitialSyncOrRecovery(OperationContext* opCtx,
+                                                                     const BSONObj& doc,
+                                                                     const RecordId& loc) {
     invariant(!_buildIsCleanedUp);
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].filterExpression && !_indexes[i].filterExpression->matchesBSON(doc)) {
@@ -515,7 +517,8 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
 
-    // Initial sync adds documents to the sorter using insert() instead of delegating to
+    // Initial sync adds documents to the sorter using
+    // insertSingleDocumentForInitialSyncOrRecovery() instead of delegating to
     // insertDocumentsInCollection() to scan and insert the contents of the collection.
     // Therefore, it is possible for the phase of this MultiIndexBlock to be kInitialized
     // rather than kCollection when this function is called.

@@ -365,14 +365,16 @@ Status CollectionBulkLoaderImpl::_runTaskReleaseResourcesOnFailure(const F& task
 Status CollectionBulkLoaderImpl::_addDocumentToIndexBlocks(const BSONObj& doc,
                                                            const RecordId& loc) {
     if (_idIndexBlock) {
-        auto status = _idIndexBlock->insert(_opCtx.get(), doc, loc);
+        auto status =
+            _idIndexBlock->insertSingleDocumentForInitialSyncOrRecovery(_opCtx.get(), doc, loc);
         if (!status.isOK()) {
             return status.withContext("failed to add document to _id index");
         }
     }
 
     if (_secondaryIndexesBlock) {
-        auto status = _secondaryIndexesBlock->insert(_opCtx.get(), doc, loc);
+        auto status = _secondaryIndexesBlock->insertSingleDocumentForInitialSyncOrRecovery(
+            _opCtx.get(), doc, loc);
         if (!status.isOK()) {
             return status.withContext("failed to add document to secondary indexes");
         }

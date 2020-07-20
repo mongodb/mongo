@@ -61,8 +61,8 @@ class OperationContext;
 /**
  * Builds one or more indexes.
  *
- * If any method other than insert() returns a not-ok Status, this MultiIndexBlock should be
- * considered failed and must be destroyed.
+ * If any method other than insertSingleDocumentForInitialSyncOrRecovery() returns a not-ok Status,
+ * this MultiIndexBlock should be considered failed and must be destroyed.
  *
  * If a MultiIndexBlock is destroyed before commit() or if commit() is rolled back, it will
  * clean up all traces of the indexes being constructed. MultiIndexBlocks should not be
@@ -133,8 +133,8 @@ public:
     /**
      * Inserts all documents in the Collection into the indexes and logs with timing info.
      *
-     * This is a simplified replacement for insert and doneInserting. Do not call this if you
-     * are calling either of them.
+     * This is a replacement for calling both insertSingleDocumentForInitialSyncOrRecovery and
+     * dumpInsertsFromBulk. Do not call this if you are calling either of them.
      *
      * Will fail if violators of uniqueness constraints exist.
      *
@@ -151,11 +151,13 @@ public:
      *
      * Should be called inside of a WriteUnitOfWork.
      */
-    Status insert(OperationContext* opCtx, const BSONObj& wholeDocument, const RecordId& loc);
+    Status insertSingleDocumentForInitialSyncOrRecovery(OperationContext* opCtx,
+                                                        const BSONObj& wholeDocument,
+                                                        const RecordId& loc);
 
     /**
-     * Call this after the last insert(). This gives the index builder a chance to do any
-     * long-running operations in separate units of work from commit().
+     * Call this after the last insertSingleDocumentForInitialSyncOrRecovery(). This gives the index
+     * builder a chance to do any long-running operations in separate units of work from commit().
      *
      * Do not call if you called insertAllDocumentsInCollection();
      *
@@ -209,7 +211,7 @@ public:
 
     /**
      * Marks the index ready for use. Should only be called as the last method after
-     * doneInserting() or insertAllDocumentsInCollection() return success.
+     * dumpInsertsFromBulk() or insertAllDocumentsInCollection() return success.
      *
      * Should be called inside of a WriteUnitOfWork. If the index building is to be logOp'd,
      * logOp() should be called from the same unit of work as commit().

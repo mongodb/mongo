@@ -120,7 +120,7 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
         operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
 
-    ASSERT_OK(indexer->insert(operationContext(), {}, {}));
+    ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(), {}, {}));
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext()));
     ASSERT_OK(indexer->checkConstraints(operationContext()));
 
@@ -146,7 +146,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
     auto specs = unittest::assertGet(indexer->init(
         operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
-    ASSERT_OK(indexer->insert(operationContext(), {}, {}));
+    ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(), {}, {}));
     indexer->abortWithoutCleanupForRollback(operationContext());
 }
 

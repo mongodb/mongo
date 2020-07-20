@@ -184,7 +184,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                 } else {
                     numRecords++;
                     dataSize += data.size();
-                    auto insertStatus = builder->insert(opCtx, data.releaseToBson(), id);
+                    auto insertStatus = builder->insertSingleDocumentForInitialSyncOrRecovery(
+                        opCtx, data.releaseToBson(), id);
                     if (!insertStatus.isOK()) {
                         return insertStatus;
                     }
