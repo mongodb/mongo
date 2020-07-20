@@ -224,6 +224,7 @@ if (typeof _threadInject != "undefined") {
                 "merge_sort_collation.js",
                 "update_pipeline_shell_helpers.js",
                 "update_with_pipeline.js",
+                "verify_update_mods.js",
                 "views/views_aggregation.js",
                 "views/views_change.js",
                 "views/views_drop.js",
