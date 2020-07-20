@@ -295,12 +295,13 @@ TEST_F(ServiceExecutorFixedFixture, ShutdownTimeLimit) {
 
 TEST_F(ServiceExecutorFixedFixture, Stats) {
     auto executor = startAndGetServiceExecutor();
-    auto barrier = std::make_shared<unittest::Barrier>(kNumExecutorThreads + 1);
-    stdx::condition_variable cond;
+    auto rendezvousBarrier = std::make_shared<unittest::Barrier>(kNumExecutorThreads + 1);
+    auto returnBarrier = std::make_shared<unittest::Barrier>(kNumExecutorThreads + 1);
 
-    auto task = [barrier, &cond]() mutable {
-        cond.notify_one();
-        barrier->countDownAndWait();
+    auto task = [rendezvousBarrier, returnBarrier]() mutable {
+        rendezvousBarrier->countDownAndWait();
+        // Executor threads wait here for the main thread to test "executor->appendStats()".
+        returnBarrier->countDownAndWait();
     };
 
     for (auto i = 0; i < kNumExecutorThreads; i++) {
@@ -308,22 +309,18 @@ TEST_F(ServiceExecutorFixedFixture, Stats) {
     }
 
     // The main thread waits for the executor threads to bump up "threadsRunning" while picking up a
-    // task to execute. Once all executor threads are running, the main thread will unblock them
-    // through the barrier.
-    auto mutex = MONGO_MAKE_LATCH();
-    stdx::unique_lock<Latch> lk(mutex);
-    cond.wait(lk, [&executor]() {
-        BSONObjBuilder bob;
-        executor->appendStats(&bob);
-        auto obj = bob.obj();
-        ASSERT(obj.hasField("threadsRunning"));
-        auto threadsRunning = obj.getIntField("threadsRunning");
-        LOGV2_DEBUG(
-            4910503, 1, "Checked number of executor threads", "threads"_attr = threadsRunning);
-        return threadsRunning == static_cast<int>(ServiceExecutorFixedFixture::kNumExecutorThreads);
-    });
+    // task to execute. Once all executor threads are running (rendezvous) and the main thread is
+    // done testing the stats, the main thread will unblock them through "returnBarrier".
+    rendezvousBarrier->countDownAndWait();
 
-    barrier->countDownAndWait();
+    BSONObjBuilder bob;
+    executor->appendStats(&bob);
+    auto obj = bob.obj();
+    ASSERT(obj.hasField("threadsRunning"));
+    auto threadsRunning = obj.getIntField("threadsRunning");
+    ASSERT_EQ(threadsRunning, static_cast<int>(ServiceExecutorFixedFixture::kNumExecutorThreads));
+
+    returnBarrier->countDownAndWait();
 }
 
 TEST_F(ServiceExecutorFixedFixture, ScheduleFailsAfterShutdown) {
