@@ -71,8 +71,11 @@ var $config = (function() {
     var transitions = {init: {insert: 1}, insert: {find: 1}, find: {insert: 1}};
 
     function setup(db, collName, cluster) {
-        var res = db[collName].ensureIndex(this.getIndexSpec());
-        assertAlways.commandWorked(res);
+        const spec = {name: this.getIndexName(), key: this.getIndexSpec()};
+        assertAlways.commandWorked(db.runCommand({
+            createIndexes: collName,
+            indexes: [spec],
+        }));
         this.indexExists = true;
     }
 
@@ -82,6 +85,9 @@ var $config = (function() {
         states: states,
         transitions: transitions,
         data: {
+            getIndexName: function getIndexName() {
+                return this.indexedField + '_1';
+            },
             getIndexSpec: function getIndexSpec() {
                 var ixSpec = {};
                 ixSpec[this.indexedField] = 1;

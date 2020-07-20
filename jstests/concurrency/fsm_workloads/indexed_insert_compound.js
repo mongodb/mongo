@@ -23,6 +23,12 @@ var $config = extendWorkload($config, function($config, $super) {
         };
     };
 
+    $config.data.getIndexName = function getIndexName() {
+        return 'indexed_insert_compound_x_1_' +
+            'indexed_insert_compound_y_1_' +
+            'indexed_insert_compound_z_1';
+    };
+
     $config.data.getIndexSpec = function getIndexSpec() {
         return {
             indexed_insert_compound_x: 1,
