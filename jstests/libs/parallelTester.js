@@ -238,6 +238,7 @@ if (typeof _threadInject != "undefined") {
         if (db.getMongo().readMode() === "legacy") {
             var requires_find_command = [
                 "merge_sort_collation.js",
+                "verify_update_mods.js",
                 "views/views_aggregation.js",
                 "views/views_change.js",
                 "views/views_drop.js",
