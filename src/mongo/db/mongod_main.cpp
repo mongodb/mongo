@@ -191,7 +191,6 @@
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/ramlog.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/signal_handlers.h"

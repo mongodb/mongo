@@ -49,15 +49,6 @@
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
-#include "mongo/logger/console_appender.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/message_event.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
-#include "mongo/logger/ramlog.h"
-#include "mongo/logger/rotatable_file_appender.h"
-#include "mongo/logger/rotatable_file_manager.h"
-#include "mongo/logger/rotatable_file_writer.h"
-#include "mongo/logger/syslog_appender.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/platform/process_id.h"
@@ -296,21 +287,12 @@ void forkServerOrDie() {
 }
 
 MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
-                          ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer"),
+                          ("EndStartupOptionHandling", "ForkServer"),
                           ("default"))
 (InitializerContext*) {
-    using logger::LogManager;
-    using logger::MessageEventDetailsEncoder;
-    using logger::MessageEventEphemeral;
-    using logger::MessageEventWithContextEncoder;
-    using logger::MessageLogDomain;
-    using logger::RotatableFileAppender;
-    using logger::StatusWithRotatableFileWriter;
-
     // Hook up this global into our logging encoder
     auto& lv2Manager = logv2::LogManager::global();
     logv2::LogDomainGlobal::ConfigurationOptions lv2Config;
-    MessageEventDetailsEncoder::setMaxLogSizeKBSource(gMaxLogAttributeSizeKB);
     lv2Config.maxAttributeSizeKB = &gMaxLogAttributeSizeKB;
     bool writeServerRestartedAfterLogConfig = false;
 

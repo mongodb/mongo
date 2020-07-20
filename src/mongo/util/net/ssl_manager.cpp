@@ -626,7 +626,7 @@ TLSVersionCounts& TLSVersionCounts::get(ServiceContext* serviceContext) {
     return getTLSVersionCounts(serviceContext);
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLogManager"))
+MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         const auto& config = SSLManagerCoordinator::get()->getSSLManager()->getSSLConfiguration();

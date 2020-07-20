@@ -36,7 +36,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/logger/logger.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/unittest/log_test.h"

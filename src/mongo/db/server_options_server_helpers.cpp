@@ -48,7 +48,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/transport/message_compressor_registry.h"

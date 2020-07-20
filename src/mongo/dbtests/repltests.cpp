@@ -46,7 +46,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/logger/logger.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/transport_layer_asio.h"
 

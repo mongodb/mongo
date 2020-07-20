@@ -29,7 +29,16 @@
 
 #pragma once
 
+#include <functional>
+
+#include <mongo/base/status.h>
+#include <mongo/base/string_data.h>
+
 namespace mongo::logv2 {
+
+using LogRotateCallback = std::function<Status(bool, StringData)>;
+void addLogRotator(LogRotateCallback cb);
+
 /**
  * Rotates the log files.  Returns true if all logs rotate successfully.
  *

@@ -40,7 +40,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/logger/logger.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/router_transactions_metrics.h"

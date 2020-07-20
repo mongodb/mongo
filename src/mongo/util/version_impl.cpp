@@ -101,7 +101,7 @@ const InterpolatedVersionInfo interpolatedVersionInfo;
 
 MONGO_INITIALIZER_GENERAL(EnableVersionInfo,
                           MONGO_NO_PREREQUISITES,
-                          ("BeginStartupOptionRegistration", "GlobalLogManager"))
+                          ("BeginStartupOptionRegistration"))
 (InitializerContext*) {
     VersionInfoInterface::enable(&interpolatedVersionInfo);
     return Status::OK();

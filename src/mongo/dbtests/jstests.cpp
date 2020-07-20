@@ -40,7 +40,6 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/logger/logger.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
@@ -162,104 +161,6 @@ public:
         s->invoke("function( z ){ return 5 + z; }", &obj, nullptr);
         ASSERT_EQUALS(16, s->getNumber("__returnValue"));
     }
-};
-
-/** Installs a tee for auditing log messages in the same thread. */
-class LogRecordingScope {
-public:
-    LogRecordingScope()
-        : _handle(mongo::logger::globalLogDomain()->attachAppender(std::make_unique<Tee>(this))) {}
-    ~LogRecordingScope() {
-        mongo::logger::globalLogDomain()->detachAppender(_handle);
-    }
-    /** @return most recent log entry. */
-    bool logged() const {
-        return _logged;
-    }
-
-private:
-    class Tee : public mongo::logger::Appender<mongo::logger::MessageEventEphemeral> {
-    public:
-        Tee(LogRecordingScope* scope) : _scope(scope) {}
-        Status append(const logger::MessageEventEphemeral& event) override {
-            // Don't want to consider logging by background threads.
-            if (mongo::getThreadName() == _scope->_threadName) {
-                _scope->_logged = true;
-            }
-            return Status::OK();
-        }
-
-    private:
-        LogRecordingScope* _scope;
-    };
-
-    bool _logged = false;
-    const string _threadName = mongo::getThreadName().toString();
-    mongo::logger::MessageLogDomain::AppenderHandle _handle;
-};
-
-/** Error logging in Scope::exec(). */
-template <ScopeFactory scopeFactory>
-class ExecLogError {
-public:
-    void run() {
-        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
-
-        // No error is logged when reportError == false.
-        ASSERT(!scope->exec("notAFunction()", "foo", false, false, false));
-        ASSERT(!_logger.logged());
-
-        // No error is logged for a valid statement.
-        ASSERT(scope->exec("validStatement = true", "foo", false, true, false));
-        ASSERT(!_logger.logged());
-
-        // An error is logged for an invalid statement when reportError == true.
-        ASSERT(!scope->exec("notAFunction()", "foo", false, true, false));
-
-        // Don't check if we're using SpiderMonkey. Our threading model breaks
-        // this test
-        // TODO: figure out a way to check for SpiderMonkey
-        auto ivs = getGlobalScriptEngine()->getInterpreterVersionString();
-        std::string prefix("MozJS");
-        if (ivs.compare(0, prefix.length(), prefix) != 0) {
-            ASSERT(_logger.logged());
-        }
-    }
-
-private:
-    LogRecordingScope _logger;
-};
-
-/** Error logging in Scope::invoke(). */
-template <ScopeFactory scopeFactory>
-class InvokeLogError {
-public:
-    void run() {
-        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
-
-        // No error is logged for a valid statement.
-        ASSERT_EQUALS(0, scope->invoke("validStatement = true", nullptr, nullptr));
-        ASSERT(!_logger.logged());
-
-        // An error is logged for an invalid statement.
-        try {
-            scope->invoke("notAFunction()", nullptr, nullptr);
-        } catch (const DBException&) {
-            // ignore the exception; just test that we logged something
-        }
-
-        // Don't check if we're using SpiderMonkey. Our threading model breaks
-        // this test
-        // TODO: figure out a way to check for SpiderMonkey
-        auto ivs = getGlobalScriptEngine()->getInterpreterVersionString();
-        std::string prefix("MozJS");
-        if (ivs.compare(0, prefix.length(), prefix) != 0) {
-            ASSERT(_logger.logged());
-        }
-    }
-
-private:
-    LogRecordingScope _logger;
 };
 
 template <ScopeFactory scopeFactory>
@@ -1520,8 +1421,6 @@ public:
         add<ResetScope<scopeFactory>>();
         add<FalseTests<scopeFactory>>();
         add<SimpleFunctions<scopeFactory>>();
-        add<ExecLogError<scopeFactory>>();
-        add<InvokeLogError<scopeFactory>>();
         add<ExecTimeout<scopeFactory>>();
         add<ExecNoTimeout<scopeFactory>>();
         add<InvokeTimeout<scopeFactory>>();

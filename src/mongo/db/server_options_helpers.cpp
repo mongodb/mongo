@@ -47,7 +47,6 @@
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/server_parameter.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
@@ -308,14 +307,11 @@ Status storeBaseOptions(const moe::Environment& params) {
     }
 
     if (params.count("systemLog.timeStampFormat")) {
-        using logger::MessageEventDetailsEncoder;
         std::string formatterName = params["systemLog.timeStampFormat"].as<string>();
         if (formatterName == "iso8601-utc") {
-            MessageEventDetailsEncoder::setDateFormatter(outputDateAsISOStringUTC);
             serverGlobalParams.logTimestampFormat = logv2::LogTimestampFormat::kISO8601UTC;
             setDateFormatIsLocalTimezone(false);
         } else if (formatterName == "iso8601-local") {
-            MessageEventDetailsEncoder::setDateFormatter(outputDateAsISOStringLocal);
             serverGlobalParams.logTimestampFormat = logv2::LogTimestampFormat::kISO8601Local;
             setDateFormatIsLocalTimezone(true);
         } else {

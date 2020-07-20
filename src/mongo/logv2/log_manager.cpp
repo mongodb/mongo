@@ -35,9 +35,11 @@
 
 #include <boost/log/core.hpp>
 
+#include "mongo/base/init.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_util.h"
 
 namespace mongo::logv2 {
 
@@ -96,6 +98,13 @@ LogDomainGlobal& LogManager::getGlobalDomainInternal() {
 
 LogComponentSettings& LogManager::getGlobalSettings() {
     return getGlobalDomainInternal().settings();
+}
+
+MONGO_INITIALIZER(GlobalLogRotator)(InitializerContext*) {
+    addLogRotator([](bool renameFiles, StringData suffix) {
+        return LogManager::global().getGlobalDomainInternal().rotate(renameFiles, suffix);
+    });
+    return Status::OK();
 }
 
 }  // namespace mongo::logv2

@@ -31,38 +31,41 @@
 
 #include "mongo/logv2/log_util.h"
 
-#include "mongo/logger/logger.h"
-#include "mongo/logger/rotatable_file_manager.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_domain_global.h"
-#include "mongo/logv2/log_manager.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/time_support.h"
 
 #include <string>
+#include <vector>
 
 namespace mongo::logv2 {
 namespace {
 AtomicWord<bool> redactionEnabled{false};
+std::vector<LogRotateCallback> logRotateCallbacks;
+}  // namespace
+
+void addLogRotator(LogRotateCallback cb) {
+    logRotateCallbacks.push_back(std::move(cb));
 }
+
 bool rotateLogs(bool renameFiles) {
     // Rotate on both logv1 and logv2 so all files that need rotation gets rotated
-    LOGV2(23166, "Log rotation initiated");
     std::string suffix = "." + terseCurrentTime(false);
-    Status resultv2 =
-        logv2::LogManager::global().getGlobalDomainInternal().rotate(renameFiles, suffix);
-    if (!resultv2.isOK())
-        LOGV2_WARNING(23168, "Log rotation failed", "reason"_attr = resultv2);
+    LOGV2(23166, "Log rotation initiated", "suffix"_attr = suffix);
+    bool success = true;
 
-    using logger::RotatableFileManager;
-    RotatableFileManager* manager = logger::globalRotatableFileManager();
-    RotatableFileManager::FileNameStatusPairVector result(manager->rotateAll(renameFiles, suffix));
-    for (RotatableFileManager::FileNameStatusPairVector::iterator it = result.begin();
-         it != result.end();
-         it++) {
-        LOGV2_WARNING(
-            23169, "Rotating log file failed", "file"_attr = it->first, "reason"_attr = it->second);
+    // Call each callback in turn.
+    // If they fail, they must log why.
+    // We only return true if all succeed.
+    for (const auto& cb : logRotateCallbacks) {
+        auto status = cb(renameFiles, suffix);
+        if (!status.isOK()) {
+            LOGV2_WARNING(23168, "Log rotation failed", "reason"_attr = status);
+            success = false;
+        }
     }
-    return resultv2.isOK() && result.empty();
+
+    return success;
 }
 
 bool shouldRedactLogs() {

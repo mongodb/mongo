@@ -51,7 +51,6 @@
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
-#include "mongo/logger/logger.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"

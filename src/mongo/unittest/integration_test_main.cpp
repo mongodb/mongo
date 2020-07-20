@@ -43,7 +43,6 @@
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/logger/logger.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/unittest/unittest.h"

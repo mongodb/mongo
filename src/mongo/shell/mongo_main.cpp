@@ -58,9 +58,6 @@
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/logger/console_appender.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/console.h"
@@ -134,20 +131,21 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionSetup"))(Initia
 const auto kAuthParam = "authSource"s;
 
 /**
- * This throws away all log output while inside of a LoggingDisabledScope.
+ * Basic Logv2 console backend. Provides scoped logging disable.
  */
-class ShellConsoleAppender final : public logger::ConsoleAppender<logger::MessageEventEphemeral> {
-    using Base = logger::ConsoleAppender<logger::MessageEventEphemeral>;
-    friend class ShellBackend;
-
+class ShellBackend final : public boost::log::sinks::text_ostream_backend {
 public:
-    using Base::Base;
+    void consume(boost::log::record_view const& rec, string_type const& formatted_message) {
+        using boost::log::extract;
 
-    Status append(const Event& event) override {
         auto lk = stdx::lock_guard(mx);
-        if (!loggingEnabled)
-            return Status::OK();
-        return Base::append(event);
+        if (!loggingEnabled &&
+            !extract<logv2::LogTag>(logv2::attributes::tags(), rec)
+                 .get()
+                 .has(logv2::LogTag::kAllowDuringPromptingShell)) {
+            return;
+        }
+        boost::log::sinks::text_ostream_backend::consume(rec, formatted_message);
     }
 
     struct LoggingDisabledScope {
@@ -175,26 +173,8 @@ private:
 
     // This needs to use a mutex rather than an atomic bool because we need to ensure that no more
     // logging will happen once we return from disable().
-    static inline Mutex mx = MONGO_MAKE_LATCH("ShellConsoleAppender::mx");
+    static inline Mutex mx = MONGO_MAKE_LATCH("ShellBackend::mx");
     static inline bool loggingEnabled = true;
-};
-
-/**
- * Logv2 equivalent of ShellConsoleAppender above. Sharing the lock and LoggingDisabledScope.
- */
-class ShellBackend final : public boost::log::sinks::text_ostream_backend {
-public:
-    void consume(boost::log::record_view const& rec, string_type const& formatted_message) {
-        using boost::log::extract;
-
-        auto lk = stdx::lock_guard(ShellConsoleAppender::mx);
-        if (!ShellConsoleAppender::loggingEnabled &&
-            !extract<logv2::LogTag>(logv2::attributes::tags(), rec)
-                 .get()
-                 .has(logv2::LogTag::kAllowDuringPromptingShell))
-            return;
-        boost::log::sinks::text_ostream_backend::consume(rec, formatted_message);
-    }
 };
 
 /**
@@ -330,7 +310,7 @@ void quitNicely(int sig) {
 
 // the returned string is allocated with strdup() or malloc() and must be freed by calling free()
 char* shellReadline(const char* prompt, int handlesigint = 0) {
-    auto lds = ShellConsoleAppender::LoggingDisabledScope();
+    auto lds = ShellBackend::LoggingDisabledScope();
     atPrompt.store(true);
 
     char* ret = linenoise(prompt);
@@ -641,7 +621,7 @@ static void edit(const std::string& whatToEdit) {
     StringBuilder sb;
     sb << editor << " " << filename;
     int ret = [&] {
-        auto lds = ShellConsoleAppender::LoggingDisabledScope();
+        auto lds = ShellBackend::LoggingDisabledScope();
         return ::system(sb.str().c_str());
     }();
     if (ret) {

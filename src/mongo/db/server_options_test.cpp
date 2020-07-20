@@ -53,7 +53,6 @@
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
-#include "mongo/logger/logger.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/errno_util.h"

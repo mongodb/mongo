@@ -79,7 +79,7 @@ void StaticInit() {
                                   {"StartupOptionStorage"},
                                   {"PostStartupOptionStorage"},
                               }};
-    std::stack<StackEntry> stack{{{&stages, {"GlobalLogManager", "ValidateLocale"}, {"default"}}}};
+    std::stack<StackEntry> stack{{{&stages, {"ValidateLocale"}, {"default"}}}};
     while (!stack.empty()) {
         auto top = stack.top();
         stack.pop();

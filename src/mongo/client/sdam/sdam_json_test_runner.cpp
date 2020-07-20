@@ -43,7 +43,6 @@
 #include "mongo/client/sdam/json_test_arg_parser.h"
 #include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
 #include "mongo/client/sdam/topology_manager.h"
-#include "mongo/logger/logger.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source_mock.h"
@@ -650,8 +649,9 @@ private:
 int main(int argc, char* argv[]) {
     ArgParser args(argc, argv);
 
-    ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-        ::mongo::logv2::LogSeverity::Debug(args.Verbose()));
+    ::mongo::logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+        MONGO_LOGV2_DEFAULT_COMPONENT, ::mongo::logv2::LogSeverity::Debug(args.Verbose()));
+
     args.LogParams();
 
     SdamJsonTestRunner testRunner(args.SourceDirectory(), args.TestFilters());

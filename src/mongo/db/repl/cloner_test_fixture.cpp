@@ -37,7 +37,6 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/logger/logger.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 

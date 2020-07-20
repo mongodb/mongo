@@ -30,7 +30,6 @@
 
 #include "mongo/client/sdam/json_test_arg_parser.h"
 
-#include "mongo/logger/logger.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"

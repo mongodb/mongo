@@ -28,7 +28,6 @@
 global:
     cpp_namespace: mongo
     cpp_includes:
-      - mongo/logger/message_event_utf8_encoder.h
       - mongo/logv2/constants.h
 
 server_parameters:
