@@ -510,7 +510,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
     // 3) Check if we can create the index without handing control to the IndexBuildsCoordinator.
     OptionalCollectionUUID collectionUUID;
     {
-        Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
+        Lock::DBLock dbLock(opCtx, ns.db(), MODE_IS);
         checkDatabaseShardingState(opCtx, ns);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
             uasserted(ErrorCodes::NotMaster,
@@ -518,12 +518,14 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         }
 
         bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns.ns(), [&] {
-            AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+            AutoGetCollection autoColl(opCtx, ns, MODE_IS);
             auto collection = autoColl.getCollection();
 
             // Before potentially taking an exclusive collection lock, check if all indexes already
             // exist while holding an intent lock.
             if (collection && indexesAlreadyExist(opCtx, collection, specs, &result)) {
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
                 return true;
             }
 
