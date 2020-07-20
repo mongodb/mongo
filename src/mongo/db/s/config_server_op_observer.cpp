@@ -139,10 +139,15 @@ void ConfigServerOpObserver::onApplyOps(OperationContext* opCtx,
         return;
     }
 
+    if (applyOpCmd.firstElementFieldNameStringData() != "applyOps") {
+        return;
+    }
+
     const auto& updatesElem = applyOpCmd["applyOps"];
     if (updatesElem.type() != Array) {
         return;
     }
+
     auto updates = updatesElem.Array();
     if (updates.size() != 2) {
         return;
