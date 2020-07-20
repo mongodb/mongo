@@ -113,16 +113,13 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
         invariant(!engine->isEphemeral() || getTestCommandsEnabled());
         LOGV2_WARNING(
             23788,
-            "Attempted to increase the time window of available snapshots for "
-            "point-in-time operations (readConcern level 'snapshot' or transactions), but "
-            "the storage engine cache pressure, per the cachePressureThreshold setting of "
-            "'{snapshotWindowParams_cachePressureThreshold_load}', is too high to allow it to "
-            "increase. If this happens frequently, consider "
-            "either increasing the cache pressure threshold or increasing the memory "
-            "available to the storage engine cache, in order to improve the success rate "
-            "or speed of point-in-time requests.",
-            "snapshotWindowParams_cachePressureThreshold_load"_attr =
-                snapshotWindowParams.cachePressureThreshold.load());
+            "Attempted to increase the time window of available snapshots for point-in-time "
+            "operations (readConcern level 'snapshot' or transactions), but the storage engine "
+            "cache pressure is too high to allow more history to be saved. If this happens "
+            "frequently, consider either increasing the cache pressure threshold or increasing the "
+            "memory available to the storage engine cache, in order to improve the success rate or "
+            "speed of point-in-time requests",
+            "cachePressureThreshold"_attr = snapshotWindowParams.cachePressureThreshold.load());
         _decreaseTargetSnapshotWindowSize(lock, opCtx);
         return;
     }
@@ -135,9 +132,8 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
             "point-in-time operations (readConcern level 'snapshot' or transactions), but "
             "maxTargetSnapshotHistoryWindowInSeconds has already been reached. If this "
             "happens frequently, consider increasing the "
-            "maxTargetSnapshotHistoryWindowInSeconds setting value, which is currently "
-            "set to '{snapshotWindowParams_maxTargetSnapshotHistoryWindowInSeconds_load}'.",
-            "snapshotWindowParams_maxTargetSnapshotHistoryWindowInSeconds_load"_attr =
+            "maxTargetSnapshotHistoryWindowInSeconds setting value",
+            "maxTargetSnapshotHistoryWindowInSeconds"_attr =
                 snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.load());
         return;
     }
