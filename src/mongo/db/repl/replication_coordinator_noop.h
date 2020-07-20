@@ -160,8 +160,6 @@ public:
 
     void signalDrainComplete(OperationContext*, long long) final;
 
-    Status waitForDrainFinish(Milliseconds) final;
-
     void signalUpstreamUpdater() final;
 
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const final;

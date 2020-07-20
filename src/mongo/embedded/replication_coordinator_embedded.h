@@ -167,8 +167,6 @@ public:
 
     void signalDrainComplete(OperationContext*, long long) override;
 
-    Status waitForDrainFinish(Milliseconds) override;
-
     void signalUpstreamUpdater() override;
 
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const override;

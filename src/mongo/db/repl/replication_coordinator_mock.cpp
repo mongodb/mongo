@@ -352,11 +352,6 @@ ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState
 
 void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*, long long) {}
 
-Status ReplicationCoordinatorMock::waitForDrainFinish(Milliseconds timeout) {
-    MONGO_UNREACHABLE;
-    return Status::OK();
-}
-
 void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 
 StatusWith<BSONObj> ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand() const {

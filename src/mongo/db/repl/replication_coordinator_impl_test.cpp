@@ -1690,8 +1690,8 @@ TEST_F(ReplCoordTest, DrainCompletionMidStepDown) {
     // Now wait for stepdown to complete
     getReplExec()->waitForEvent(updateTermEvh);
 
-    // By now drain mode should be cancelled.
-    ASSERT_OK(getReplCoord()->waitForDrainFinish(Milliseconds(0)));
+    // By now, the node should have left drain mode.
+    ASSERT(ReplicationCoordinator::ApplierState::Draining != getReplCoord()->getApplierState());
 
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
     // ASSERT_EQUALS(2, getReplCoord()->getTerm()); // SERVER-28290
@@ -7277,43 +7277,6 @@ TEST_F(ReplCoordTest, WaitForMemberState) {
     ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, Milliseconds(0)));
     ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
                   replCoord->waitForMemberState(MemberState::RS_ARBITER, Milliseconds(0)));
-}
-
-TEST_F(ReplCoordTest, WaitForDrainFinish) {
-    init("mySet");
-
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                     << "test1:1234"))),
-                       HostAndPort("test1", 1234));
-    auto replCoord = getReplCoord();
-    auto initialTerm = replCoord->getTerm();
-    replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(1, 1), 0), Date_t() + Seconds(100));
-    replCoordSetMyLastDurableOpTime(OpTime(Timestamp(1, 1), 0), Date_t() + Seconds(100));
-    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
-
-    // Single node cluster - this node should start election on setFollowerMode() completion.
-    replCoord->waitForElectionFinish_forTest();
-
-    // Successful dry run election increases term.
-    ASSERT_EQUALS(initialTerm + 1, replCoord->getTerm());
-
-    auto timeout = Milliseconds(1);
-    ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, timeout));
-
-    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
-    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, replCoord->waitForDrainFinish(timeout));
-
-    ASSERT_EQUALS(ErrorCodes::BadValue, replCoord->waitForDrainFinish(Milliseconds(-1)));
-
-    const auto opCtx = makeOperationContext();
-    signalDrainComplete(opCtx.get());
-    ASSERT_OK(replCoord->waitForDrainFinish(timeout));
-
-    // Zero timeout is fine.
-    ASSERT_OK(replCoord->waitForDrainFinish(Milliseconds(0)));
 }
 
 TEST_F(

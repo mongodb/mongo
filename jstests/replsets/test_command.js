@@ -1,6 +1,5 @@
 // Tests 'replSetTest' command:
 //    waitForMemberState - waits for node's state to become 'expectedState'.
-//    waitForDrainFinish - waits for primary to finish draining its applier queue.
 
 (function() {
 'use strict';
@@ -111,32 +110,5 @@ assert.commandWorked(
     }),
     'replSetTest waitForMemberState(SECONDARY) failed on node 1 ' + secondary.host);
 
-// waitForDrainFinish tests.
-
-assert.commandFailedWithCode(primary.adminCommand({
-    replSetTest: 1,
-    waitForDrainFinish: 'what state',
-}),
-                             ErrorCodes.TypeMismatch,
-                             'replSetTest waitForDrainFinish should fail on non-numerical timeout');
-
-assert.commandFailedWithCode(primary.adminCommand({
-    replSetTest: 1,
-    waitForDrainFinish: -1000,
-}),
-                             ErrorCodes.BadValue,
-                             'replSetTest waitForDrainFinish should fail on negative timeout');
-
-assert.commandWorked(primary.adminCommand({
-    replSetTest: 1,
-    waitForDrainFinish: 1000,
-}),
-                     'node 0' + primary.host + ' failed to wait for drain to finish');
-
-assert.commandWorked(secondary.adminCommand({
-    replSetTest: 1,
-    waitForDrainFinish: 0,
-}),
-                     'node 1' + primary.host + ' failed to wait for drain to finish');
 replSet.stopSet();
 })();

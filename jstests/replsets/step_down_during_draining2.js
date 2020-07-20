@@ -88,14 +88,6 @@ replSet.stepUp(secondary, {awaitReplicationBeforeStepUp: false, awaitWritablePri
 var res = secondary.getDB("admin").runCommand({"isMaster": 1});
 assert(!res.ismaster);
 
-assert.commandFailedWithCode(
-    secondary.adminCommand({
-        replSetTest: 1,
-        waitForDrainFinish: 5000,
-    }),
-    ErrorCodes.ExceededTimeLimit,
-    'replSetTest waitForDrainFinish should time out when draining is not allowed to complete');
-
 // Prevent the current primary from stepping down
 jsTest.log("disallowing heartbeat stepdown " + secondary.host);
 var blockHeartbeatStepdownFailPoint = configureFailPoint(secondary, "blockHeartbeatStepdown");

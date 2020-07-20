@@ -134,20 +134,6 @@ public:
 
             uassertStatusOK(status);
             return true;
-        } else if (cmdObj.hasElement("waitForDrainFinish")) {
-            long long timeoutMillis;
-            auto status = bsonExtractIntegerField(cmdObj, "waitForDrainFinish", &timeoutMillis);
-            uassertStatusOK(status);
-            Milliseconds timeout(timeoutMillis);
-            LOGV2(21575,
-                  "replSetTest: waiting {timeout} for applier buffer to finish draining",
-                  "replSetTest: waiting for applier buffer to finish draining",
-                  "timeout"_attr = timeout);
-
-            status = replCoord->waitForDrainFinish(timeout);
-
-            uassertStatusOK(status);
-            return true;
         } else if (cmdObj.hasElement("getLastStableRecoveryTimestamp")) {
             boost::optional<Timestamp> ts =
                 StorageInterface::get(getGlobalServiceContext())
