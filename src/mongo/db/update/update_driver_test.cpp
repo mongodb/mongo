@@ -121,11 +121,8 @@ TEST(Parse, EmptyMod) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_THROWS_CODE_AND_WHAT(
-        driver.parse(fromjson("{$set:{}}"), arrayFilters),
-        AssertionException,
-        ErrorCodes::FailedToParse,
-        "'$set' is empty. You must specify a field like so: {$set: {<field>: ...}}");
+    // Verifies that {$set: {}} is accepted.
+    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$set: {}}"), arrayFilters));
 }
 
 TEST(Parse, WrongMod) {
