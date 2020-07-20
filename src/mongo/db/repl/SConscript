@@ -1481,9 +1481,10 @@ env.CppUnitTest(
     source=[
         'all_database_cloner_test.cpp',
         'cloner_test_fixture.cpp',
-        'database_cloner_test.cpp',
         'collection_cloner_test.cpp',
-        'initial_sync_shared_data_test.cpp'
+        'database_cloner_test.cpp',
+        'initial_sync_shared_data_test.cpp',
+        'tenant_database_cloner_test.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',  # Required for service context test fixture
@@ -1493,7 +1494,8 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'replmocks',
         'initial_sync_cloners',
-        'initial_sync_shared_data'
+        'initial_sync_shared_data',
+        'tenant_migration_cloners'
     ],
 )
 

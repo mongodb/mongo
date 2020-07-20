@@ -753,6 +753,13 @@ public:
     virtual rpc::UniqueReply parseCommandReplyMessage(const std::string& host,
                                                       const Message& replyMsg);
 
+    /**
+     * Returns the latest operationTime tracked on this client.
+     */
+    Timestamp getOperationTime();
+
+    void setOperationTime(Timestamp operationTime);
+
     // This is only for DBClientCursor.
     static void (*withConnection_do_not_use)(std::string host, std::function<void(DBClientBase*)>);
 
@@ -825,6 +832,10 @@ private:
 
     enum QueryOptions _cachedAvailableOptions;
     bool _haveCachedAvailableOptions;
+
+    // The operationTime associated with the last command handles by the client.
+    // TODO(SERVER-49791): Implement proper tracking of operationTime.
+    Timestamp _lastOperationTime;
 };  // DBClientBase
 
 BSONElement getErrField(const BSONObj& result);

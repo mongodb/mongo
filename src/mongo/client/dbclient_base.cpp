@@ -1121,5 +1121,12 @@ string nsGetCollection(const string& ns) {
     return ns.substr(pos + 1);
 }
 
+Timestamp DBClientBase::getOperationTime() {
+    return _lastOperationTime;
+}
+
+void DBClientBase::setOperationTime(Timestamp operationTime) {
+    _lastOperationTime = operationTime;
+}
 
 }  // namespace mongo

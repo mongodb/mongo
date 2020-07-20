@@ -34,13 +34,19 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/repl/database_cloner_gen.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/tenant_collection_cloner.h"
 #include "mongo/db/repl/tenant_database_cloner.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace repl {
+
+// Failpoint which the tenant database cloner to hang after it has successully run listCollections
+// and recorded the results and the operationTime.
+MONGO_FAIL_POINT_DEFINE(tenantDatabaseClonerHangAfterGettingOperationTime);
 
 TenantDatabaseCloner::TenantDatabaseCloner(const std::string& dbName,
                                            InitialSyncSharedData* sharedData,
@@ -64,8 +70,90 @@ void TenantDatabaseCloner::preStage() {
     _stats.start = getSharedData()->getClock()->now();
 }
 
+/* static */
+BSONObj TenantDatabaseCloner::buildMajorityWaitRequest(Timestamp operationTime) {
+    BSONObjBuilder bob;
+    bob.append("find", NamespaceString::kSystemReplSetNamespace.toString());
+    bob.append("filter", BSONObj());
+    ReadConcernArgs readConcern(LogicalTime(operationTime), ReadConcernLevel::kMajorityReadConcern);
+    readConcern.appendInfo(&bob);
+    return bob.obj();
+}
+
 BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
-    // TODO(SERVER-48816): Implement this stage.
+    // This will be set after a successful listCollections command.
+    _operationTime = Timestamp(0, 0);
+
+    BSONObj res;
+    auto collectionInfos =
+        getClient()->getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+
+    // Do a speculative majority read on the sync source to make sure the collections listed
+    // exist on a majority of nodes in the set. We do not check the rollbackId - rollback
+    // would lead to the sync source closing connections so the stage would fail.
+    _operationTime = getClient()->getOperationTime();
+
+    tenantDatabaseClonerHangAfterGettingOperationTime.executeIf(
+        [&](const BSONObj&) {
+            while (MONGO_unlikely(tenantDatabaseClonerHangAfterGettingOperationTime.shouldFail()) &&
+                   !mustExit()) {
+                LOGV2(4881605,
+                      "tenantDatabaseClonerHangAfterGettingOperationTime fail point "
+                      "enabled. Blocking until fail point is disabled",
+                      "dbName"_attr = _dbName);
+                mongo::sleepsecs(1);
+            }
+        },
+        [&](const BSONObj& data) {
+            // Only hang when cloning the specified collection, or if no collection was specified.
+            auto dbName = data["dbName"].str();
+            return dbName.empty() || dbName == _dbName;
+        });
+
+    BSONObj readResult;
+    BSONObj cmd = TenantDatabaseCloner::buildMajorityWaitRequest(_operationTime);
+    getClient()->runCommand("admin", cmd, readResult, QueryOption_SlaveOk);
+    uassertStatusOKWithContext(
+        getStatusFromCommandResult(readResult),
+        "TenantDatabaseCloner failed to get listCollections result majority-committed");
+
+    // Process and verify the listCollections results.
+    stdx::unordered_set<std::string> seen;
+    for (auto&& info : collectionInfos) {
+        ListCollectionResult result;
+        try {
+            result = ListCollectionResult::parse(
+                IDLParserErrorContext("DatabaseCloner::listCollectionsStage"), info);
+        } catch (const DBException& e) {
+            uasserted(
+                ErrorCodes::FailedToParse,
+                e.toStatus()
+                    .withContext(str::stream() << "Collection info could not be parsed : " << info)
+                    .reason());
+        }
+        NamespaceString collectionNamespace(_dbName, result.getName());
+        if (collectionNamespace.isSystem() && !collectionNamespace.isLegalClientSystemNS()) {
+            LOGV2_DEBUG(4881602,
+                        1,
+                        "Database cloner skipping 'system' collection",
+                        "namespace"_attr = collectionNamespace.ns());
+            continue;
+        }
+        LOGV2_DEBUG(4881603, 2, "Allowing cloning of collectionInfo", "info"_attr = info);
+
+        bool isDuplicate = seen.insert(result.getName().toString()).second;
+        uassert(4881604,
+                str::stream() << "collection info contains duplicate collection name "
+                              << "'" << result.getName() << "': " << info,
+                isDuplicate);
+
+        // While UUID is a member of CollectionOptions, listCollections does not return the
+        // collectionUUID there as part of the options, but instead places it in the 'info'
+        // field.
+        // We need to move it back to CollectionOptions to create the collection properly.
+        result.getOptions().uuid = result.getInfo().getUuid();
+        _collections.emplace_back(collectionNamespace, result.getOptions());
+    }
     return kContinueNormally;
 }
 
@@ -165,6 +253,10 @@ void TenantDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
         collection.append(&collectionBuilder);
         collectionBuilder.doneFast();
     }
+}
+
+Timestamp TenantDatabaseCloner::getOperationTime_forTest() {
+    return _operationTime;
 }
 
 }  // namespace repl
