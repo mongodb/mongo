@@ -224,6 +224,7 @@ if (typeof _threadInject != "undefined") {
                 "explode_for_sort_fetch.js",
                 "update_pipeline_shell_helpers.js",
                 "update_with_pipeline.js",
+                "verify_update_mods.js",
                 "views/dbref_projection.js",
                 "views/views_aggregation.js",
                 "views/views_change.js",
