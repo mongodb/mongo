@@ -1,13 +1,12 @@
 /**
- * Tracks Biggie's memory usage metrics on a consistent workload.
+ * Tracks ephemeralForTest's memory usage metrics on a consistent workload.
  * TODO SERVER-36709: Making the nodes adaptive should improve the memory usage retrieved here.
  */
 (function() {
 "use strict";
 
 const storageEngine = jsTest.options().storageEngine;
-if (storageEngine != "biggie") {
-    // TODO SERVER-38987: Replace this with "ephemeralForTest".
+if (storageEngine != "ephemeralForTest") {
     return;
 }
 
@@ -52,7 +51,7 @@ s1();
 s2();
 s3();
 
-const serverStatus = db.serverStatus().biggie;
+const serverStatus = db.serverStatus().ephemeralForTest;
 print("Total Memory Usage: " + serverStatus.totalMemoryUsage + " Bytes.");
 print("Total Number of Nodes: " + serverStatus.totalNodes + ".");
 })();
