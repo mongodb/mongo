@@ -2886,24 +2886,22 @@ bool TopologyCoordinator::canCompleteTransitionToPrimary(long long termWhenDrain
     }
     // Allow completing the transition to primary even when in the middle of a stepdown attempt,
     // in case the stepdown attempt fails.
-    if (_leaderMode != LeaderMode::kLeaderElect && _leaderMode != LeaderMode::kAttemptingStepDown) {
+    if (_leaderMode != LeaderMode::kLeaderElect && _leaderMode != LeaderMode::kAttemptingStepDown &&
+        _leaderMode != LeaderMode::kSteppingDown) {
         return false;
     }
 
     return true;
 }
 
-Status TopologyCoordinator::completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm) {
-    if (!canCompleteTransitionToPrimary(firstOpTimeOfTerm.getTerm())) {
-        return Status(ErrorCodes::PrimarySteppedDown,
-                      "By the time this node was ready to complete its transition to PRIMARY it "
-                      "was no longer eligible to do so");
-    }
+void TopologyCoordinator::completeTransitionToPrimary(const OpTime& firstOpTimeOfTerm) {
+    invariant(canCompleteTransitionToPrimary(firstOpTimeOfTerm.getTerm()));
+
     if (_leaderMode == LeaderMode::kLeaderElect) {
         _setLeaderMode(LeaderMode::kMaster);
     }
+
     _firstOpTimeOfMyTerm = firstOpTimeOfTerm;
-    return Status::OK();
 }
 
 void TopologyCoordinator::adjustMaintenanceCountBy(int inc) {

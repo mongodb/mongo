@@ -1223,15 +1223,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
                                                                        firstOpTime.getTerm());
         lk.lock();
 
-        auto status = _topCoord->completeTransitionToPrimary(firstOpTime);
-        if (status.code() == ErrorCodes::PrimarySteppedDown) {
-            LOGV2(21330,
-                  "Transition to primary failed {error}",
-                  "Transition to primary failed",
-                  "error"_attr = causedBy(status));
-            return;
-        }
-        invariant(status);
+        _topCoord->completeTransitionToPrimary(firstOpTime);
         invariant(firstOpTime.getTerm() == _topCoord->getTerm());
         invariant(termWhenBufferIsEmpty == _topCoord->getTerm());
     }
