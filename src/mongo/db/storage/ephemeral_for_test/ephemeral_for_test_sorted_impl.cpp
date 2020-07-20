@@ -305,9 +305,10 @@ std::string createRadixKeyWithoutLocFromObj(const BSONObj& key,
 std::string createRadixKeyWithoutLocFromKS(const KeyString::Value& keyString,
                                            const std::string& prefixToUse) {
     KeyString::Builder ks(KeyString::Version::kLatestVersion);
-    ks.resetFromBuffer(
-        keyString.getBuffer(),
-        KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+    auto ksBuffer = keyString.getBuffer();
+    if (ksBuffer)
+        ks.resetFromBuffer(ksBuffer,
+                           KeyString::sizeWithoutRecordIdAtEnd(ksBuffer, keyString.getSize()));
     prefixKeyStringWithoutLoc(&ks, prefixToUse);
     return std::string(ks.getBuffer(), ks.getSize());
 }
@@ -315,7 +316,9 @@ std::string createRadixKeyWithoutLocFromKS(const KeyString::Value& keyString,
 std::string createRadixKeyWithoutLocFromKSWithoutRecordId(const KeyString::Value& keyString,
                                                           const std::string& prefixToUse) {
     KeyString::Builder ks(KeyString::Version::kLatestVersion);
-    ks.resetFromBuffer(keyString.getBuffer(), keyString.getSize());
+    auto ksBuffer = keyString.getBuffer();
+    if (ksBuffer)
+        ks.resetFromBuffer(ksBuffer, keyString.getSize());
     prefixKeyStringWithoutLoc(&ks, prefixToUse);
     return std::string(ks.getBuffer(), ks.getSize());
 }
@@ -335,9 +338,10 @@ std::string createRadixKeyWithLocFromKS(const KeyString::Value& keyString,
                                         RecordId loc,
                                         const std::string& prefixToUse) {
     KeyString::Builder ks(KeyString::Version::kLatestVersion);
-    ks.resetFromBuffer(
-        keyString.getBuffer(),
-        KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()));
+    auto ksBuffer = keyString.getBuffer();
+    if (ksBuffer)
+        ks.resetFromBuffer(ksBuffer,
+                           KeyString::sizeWithoutRecordIdAtEnd(ksBuffer, keyString.getSize()));
     prefixKeyStringWithLoc(&ks, loc, prefixToUse);
     return std::string(ks.getBuffer(), ks.getSize());
 }
@@ -346,7 +350,9 @@ std::string createRadixKeyWithLocFromKSWithoutRecordId(const KeyString::Value& k
                                                        RecordId loc,
                                                        const std::string& prefixToUse) {
     KeyString::Builder ks(KeyString::Version::kLatestVersion);
-    ks.resetFromBuffer(keyString.getBuffer(), keyString.getSize());
+    auto ksBuffer = keyString.getBuffer();
+    if (ksBuffer)
+        ks.resetFromBuffer(ksBuffer, keyString.getSize());
     prefixKeyStringWithLoc(&ks, loc, prefixToUse);
     return std::string(ks.getBuffer(), ks.getSize());
 }
