@@ -333,15 +333,14 @@ StatusWith<SSLX509Name::Entry> extractSingleOIDEntry(::CFDictionaryRef entry) {
         std::move(swLabelStr.getValue()), 19, std::move(swValueStr.getValue()));
 }
 
-// Translate a raw DER subject sequence into a structured subject name.
-StatusWith<SSLX509Name> extractSubjectName(::CFDictionaryRef dict) {
-    auto swSubject = extractDictionaryValue<::CFDictionaryRef>(dict, ::kSecOIDX509V1SubjectName);
-    if (!swSubject.isOK()) {
-        return swSubject.getStatus();
+// Extract a name value from the dictionary for the given property key.
+StatusWith<SSLX509Name> extractPropertyName(::CFDictionaryRef dict, CFStringRef property) {
+    auto swProp = extractDictionaryValue<::CFDictionaryRef>(dict, property);
+    if (!swProp.isOK()) {
+        return swProp.getStatus();
     }
 
-    auto swElems =
-        extractDictionaryValue<::CFArrayRef>(swSubject.getValue(), ::kSecPropertyKeyValue);
+    auto swElems = extractDictionaryValue<::CFArrayRef>(swProp.getValue(), ::kSecPropertyKeyValue);
     if (!swElems.isOK()) {
         return swElems.getStatus();
     }
@@ -354,7 +353,7 @@ StatusWith<SSLX509Name> extractSubjectName(::CFDictionaryRef dict) {
         invariant(elem);
         if (::CFGetTypeID(elem) != ::CFDictionaryGetTypeID()) {
             return {ErrorCodes::InvalidSSLConfiguration,
-                    "Subject name element is not a dictionary"};
+                    str::stream() << toString(property) << " element is not a dictionary"};
         }
 
         auto swType = extractDictionaryValue<::CFStringRef>(elem, ::kSecPropertyKeyType);
@@ -376,7 +375,8 @@ StatusWith<SSLX509Name> extractSubjectName(::CFDictionaryRef dict) {
                 invariant(rdnElem);
                 if (::CFGetTypeID(rdnElem) != ::CFDictionaryGetTypeID()) {
                     return {ErrorCodes::InvalidSSLConfiguration,
-                            "Subject name sub-element is not a dictionary"};
+                            str::stream()
+                                << toString(property) << " sub-element is not a dictionary"};
                 }
                 auto swEntry = extractSingleOIDEntry(rdnElem);
                 if (!swEntry.isOK()) {
@@ -396,12 +396,17 @@ StatusWith<SSLX509Name> extractSubjectName(::CFDictionaryRef dict) {
         }
     }
 
-    SSLX509Name subjectName = SSLX509Name(std::move(ret));
-    Status normalize = subjectName.normalizeStrings();
+    SSLX509Name propertyName = SSLX509Name(std::move(ret));
+    Status normalize = propertyName.normalizeStrings();
     if (!normalize.isOK()) {
         return normalize;
     }
-    return subjectName;
+    return propertyName;
+}
+
+// Translate a raw DER subject sequence into a structured subject name.
+StatusWith<SSLX509Name> extractSubjectName(::CFDictionaryRef dict) {
+    return extractPropertyName(dict, ::kSecOIDX509V1SubjectName);
 }
 
 StatusWith<mongo::Date_t> extractValidityDate(::CFDictionaryRef dict,
@@ -819,11 +824,13 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
     return std::move(cfcerts);
 }
 
-StatusWith<SSLX509Name> certificateGetSubject(::SecCertificateRef cert, Date_t* expire = nullptr) {
-    // Fetch expiry range and full subject name.
+StatusWith<SSLX509Name> certificateGetPropertyName(::SecCertificateRef cert,
+                                                   CFStringRef property,
+                                                   Date_t* expire = nullptr) {
+    // Fetch expiry range and property name.
     CFUniquePtr<::CFMutableArrayRef> oids(
         ::CFArrayCreateMutable(nullptr, expire ? 3 : 1, &::kCFTypeArrayCallBacks));
-    ::CFArrayAppendValue(oids.get(), ::kSecOIDX509V1SubjectName);
+    ::CFArrayAppendValue(oids.get(), property);
     if (expire) {
         ::CFArrayAppendValue(oids.get(), ::kSecOIDX509V1ValidityNotBefore);
         ::CFArrayAppendValue(oids.get(), ::kSecOIDX509V1ValidityNotAfter);
@@ -837,14 +844,14 @@ StatusWith<SSLX509Name> certificateGetSubject(::SecCertificateRef cert, Date_t* 
                 str::stream() << "Unable to determine certificate validity: " << cferror};
     }
 
-    auto swSubjectName = extractSubjectName(cfdict.get());
-    if (!swSubjectName.isOK()) {
-        return swSubjectName.getStatus();
+    auto swPropertyName = extractPropertyName(cfdict.get(), property);
+    if (!swPropertyName.isOK()) {
+        return swPropertyName.getStatus();
     }
-    auto subject = swSubjectName.getValue();
+    auto propertyName = swPropertyName.getValue();
 
     if (!expire) {
-        return subject;
+        return propertyName;
     }
 
     // Marshal expiration.
@@ -863,10 +870,11 @@ StatusWith<SSLX509Name> certificateGetSubject(::SecCertificateRef cert, Date_t* 
                 "The provided SSL certificate is expired or not yet valid"};
     }
 
-    return subject;
+    return propertyName;
 }
 
-StatusWith<SSLX509Name> certificateGetSubject(::CFArrayRef certs, Date_t* expire = nullptr) {
+// Get the root certificate from an array of certs.
+StatusWith<::SecCertificateRef> getCertificate(::CFArrayRef certs) {
     if (::CFArrayGetCount(certs) <= 0) {
         return {ErrorCodes::InvalidSSLConfiguration, "No certificates in certificate list"};
     }
@@ -883,8 +891,26 @@ StatusWith<SSLX509Name> certificateGetSubject(::CFArrayRef certs, Date_t* expire
                 str::stream() << "Unable to get certificate from identity: "
                               << stringFromOSStatus(status)};
     }
-    CFUniquePtr<::SecCertificateRef> cert(idcert);
-    return certificateGetSubject(cert.get(), expire);
+    return idcert;
+}
+
+StatusWith<SSLX509Name> certificateGetPropertyName(::CFArrayRef certs,
+                                                   CFStringRef property,
+                                                   Date_t* expire = nullptr) {
+    auto swCert = getCertificate(certs);
+    if (!swCert.isOK()) {
+        return swCert.getStatus();
+    }
+    CFUniquePtr<::SecCertificateRef> cert(swCert.getValue());
+    return certificateGetPropertyName(cert.get(), property, expire);
+}
+
+StatusWith<SSLX509Name> certificateGetSubject(::SecCertificateRef cert, Date_t* expire = nullptr) {
+    return certificateGetPropertyName(cert, ::kSecOIDX509V1SubjectName, expire);
+}
+
+StatusWith<SSLX509Name> certificateGetSubject(::CFArrayRef certs, Date_t* expire = nullptr) {
+    return certificateGetPropertyName(certs, ::kSecOIDX509V1SubjectName, expire);
 }
 
 StatusWith<CFUniquePtr<::CFArrayRef>> copyMatchingCertificate(
@@ -1727,8 +1753,51 @@ int SSLManagerApple::SSL_shutdown(SSLConnectionInterface* conn) {
     return 1;
 }
 
+void getCertInfo(CertInformationToLog* info, const ::CFArrayRef cert) {
+    info->subject = uassertStatusOK(certificateGetSubject(cert));
+    info->issuer = uassertStatusOK(certificateGetPropertyName(cert, ::kSecOIDX509V1IssuerName));
+
+    // Get validity dates via SecCertificateCopyValues
+    CFUniquePtr<::CFMutableArrayRef> oids(
+        ::CFArrayCreateMutable(nullptr, 2, &::kCFTypeArrayCallBacks));
+    ::CFArrayAppendValue(oids.get(), ::kSecOIDX509V1ValidityNotBefore);
+    ::CFArrayAppendValue(oids.get(), ::kSecOIDX509V1ValidityNotAfter);
+
+    CFUniquePtr<::SecCertificateRef> rootCert(uassertStatusOK(getCertificate(cert)));
+    ::CFErrorRef cferror = nullptr;
+    CFUniquePtr<::CFDictionaryRef> cfdict(
+        ::SecCertificateCopyValues(rootCert.get(), oids.get(), &cferror));
+    if (cferror) {
+        CFUniquePtr<::CFErrorRef> deleter(cferror);
+        uasserted(ErrorCodes::InvalidSSLConfiguration,
+                  str::stream() << "Failed to get thumbprint: " << cferror);
+    }
+
+    info->validityNotBefore = uassertStatusOK(
+        extractValidityDate(cfdict.get(), ::kSecOIDX509V1ValidityNotBefore, "valid-from"));
+    info->validityNotAfter = uassertStatusOK(
+        extractValidityDate(cfdict.get(), ::kSecOIDX509V1ValidityNotAfter, "valid-until"));
+
+    // Compute certificate thumbprint
+    CFUniquePtr<::CFDataRef> cfCertData(::SecCertificateCopyData(rootCert.get()));
+    ConstDataRange certData(reinterpret_cast<const char*>(::CFDataGetBytePtr(cfCertData.get())),
+                            ::CFDataGetLength(cfCertData.get()));
+
+    // Comupte hash from bytes of certificate
+    const auto certSha1 = SHA1Block::computeHash({certData});
+    info->thumbprint =
+        std::vector<char>((char*)certSha1.data(), (char*)certSha1.data() + certSha1.kHashLength);
+}
+
 SSLInformationToLog SSLManagerApple::getSSLInformationToLog() const {
     SSLInformationToLog info;
+    // server CA should definitely exist, client CA is optional
+    getCertInfo(&info.server, _serverCtx.certs.get());
+    if (_clientCA != nullptr) {
+        CertInformationToLog clientInfo;
+        getCertInfo(&clientInfo, _clientCtx.certs.get());
+        info.cluster = clientInfo;
+    }
     return info;
 }
 
