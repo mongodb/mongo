@@ -3254,8 +3254,8 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnStepDown) {
         // A topology change should increment the TopologyVersion counter.
         auto expectedCounter = currentTopologyVersion.getCounter() + 1;
 
-        const auto responseAfterDisablingWrites = getReplCoord()->awaitIsMasterResponse(
-            opCtx.get(), {}, currentTopologyVersion, deadline);
+        const auto responseAfterDisablingWrites =
+            awaitIsMasterWithNewOpCtx(getReplCoord(), currentTopologyVersion, {}, deadline);
         const auto topologyVersionAfterDisablingWrites =
             responseAfterDisablingWrites->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionAfterDisablingWrites->getCounter(), expectedCounter);
@@ -3273,8 +3273,8 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnStepDown) {
         // TopologyVersion is now stale.
         expectedCounter = topologyVersionAfterDisablingWrites->getCounter() + 1;
         deadline = getNet()->now() + maxAwaitTime;
-        const auto responseStepdownComplete = getReplCoord()->awaitIsMasterResponse(
-            opCtx.get(), {}, topologyVersionAfterDisablingWrites, deadline);
+        const auto responseStepdownComplete = awaitIsMasterWithNewOpCtx(
+            getReplCoord(), topologyVersionAfterDisablingWrites.get(), {}, deadline);
         const auto topologyVersionStepDownComplete = responseStepdownComplete->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionStepDownComplete->getCounter(), expectedCounter);
         ASSERT_EQUALS(topologyVersionStepDownComplete->getProcessId(), expectedProcessId);
@@ -4575,8 +4575,8 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionWin) {
 
         // The server TopologyVersion will increment again once we exit drain mode.
         expectedCounter = topologyVersionAfterElection->getCounter() + 1;
-        const auto responseAfterDrainComplete = getReplCoord()->awaitIsMasterResponse(
-            opCtx.get(), {}, topologyVersionAfterElection, deadline);
+        const auto responseAfterDrainComplete = awaitIsMasterWithNewOpCtx(
+            getReplCoord(), topologyVersionAfterElection.get(), {}, deadline);
         const auto topologyVersionAfterDrainComplete =
             responseAfterDrainComplete->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionAfterDrainComplete->getCounter(), expectedCounter);
@@ -4669,8 +4669,8 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionWinWithReconfig) {
 
         // The server TopologyVersion will increment once we finish reconfig.
         expectedCounter = topologyVersionAfterElection->getCounter() + 1;
-        const auto responseAfterReconfig = getReplCoord()->awaitIsMasterResponse(
-            opCtx.get(), {}, topologyVersionAfterElection, deadline);
+        const auto responseAfterReconfig = awaitIsMasterWithNewOpCtx(
+            getReplCoord(), topologyVersionAfterElection.get(), {}, deadline);
         const auto topologyVersionAfterReconfig = responseAfterReconfig->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionAfterReconfig->getCounter(), expectedCounter);
         ASSERT_EQUALS(topologyVersionAfterReconfig->getProcessId(), expectedProcessId);
@@ -4684,8 +4684,8 @@ TEST_F(ReplCoordTest, AwaitIsMasterResponseReturnsOnElectionWinWithReconfig) {
         hangAfterReconfigFailPoint->setMode(FailPoint::off);
         // The server TopologyVersion will increment again once we exit drain mode.
         expectedCounter = topologyVersionAfterReconfig->getCounter() + 1;
-        const auto responseAfterDrainComplete = getReplCoord()->awaitIsMasterResponse(
-            opCtx.get(), {}, topologyVersionAfterReconfig, deadline);
+        const auto responseAfterDrainComplete = awaitIsMasterWithNewOpCtx(
+            getReplCoord(), topologyVersionAfterReconfig.get(), {}, deadline);
         const auto topologyVersionAfterDrainComplete =
             responseAfterDrainComplete->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionAfterDrainComplete->getCounter(), expectedCounter);
