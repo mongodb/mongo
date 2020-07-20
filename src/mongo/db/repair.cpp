@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -34,7 +34,7 @@
 #include <algorithm>
 #include <fmt/format.h>
 
-#include "mongo/db/repair_database.h"
+#include "mongo/db/repair.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -118,87 +118,16 @@ Status repairCollections(OperationContext* opCtx,
     auto colls = CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName);
 
     for (const auto& nss : colls) {
-        opCtx->checkForInterrupt();
-
-        LOGV2(21027, "Repairing collection", "namespace"_attr = nss);
-
-        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-        Status status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
-
-        // Need to lookup from catalog again because the old collection object was invalidated by
-        // repairRecordStore.
-        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-
-        // If data was modified during repairRecordStore, we know to rebuild indexes without needing
-        // to run an expensive collection validation.
-        if (status.code() == ErrorCodes::DataModifiedByRepair) {
-            invariant(StorageRepairObserver::get(opCtx->getServiceContext())->isDataInvalidated(),
-                      "Collection '{}' ({})"_format(collection->ns().toString(),
-                                                    collection->uuid().toString()));
-
-            // If we are a replica set member in standalone mode and we have unfinished indexes,
-            // drop them before rebuilding any completed indexes. Since we have already made
-            // invalidating modifications to our data, it is safe to just drop the indexes entirely
-            // to avoid the risk of the index rebuild failing.
-            if (getReplSetMemberInStandaloneMode(opCtx->getServiceContext())) {
-                if (auto status = dropUnfinishedIndexes(opCtx, collection); !status.isOK()) {
-                    return status;
-                }
-            }
-
-            Status status = rebuildIndexesForNamespace(opCtx, nss, engine);
-            if (!status.isOK()) {
-                return status;
-            }
-            continue;
-        } else if (!status.isOK()) {
-            return status;
-        }
-
-        // Run collection validation to avoid unecessarily rebuilding indexes on valid collections
-        // with consistent indexes. Initialize the collection prior to validation.
-        collection->init(opCtx);
-
-        ValidateResults validateResults;
-        BSONObjBuilder output;
-
-        // Exclude full record store validation because we have already validated the underlying
-        // record store in the call to repairRecordStore above.
-        status = CollectionValidation::validate(
-            opCtx,
-            nss,
-            CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
-            CollectionValidation::RepairMode::kRepair,
-            &validateResults,
-            &output);
+        auto status = repair::repairCollection(opCtx, engine, nss);
         if (!status.isOK()) {
             return status;
-        }
-
-        LOGV2(21028, "Collection validation", "results"_attr = output.done());
-
-        if (validateResults.repaired) {
-            if (validateResults.valid) {
-                LOGV2(4934000, "Validate successfully repaired all data", "collection"_attr = nss);
-            } else {
-                LOGV2(4934001, "Validate was unable to repair all data", "collection"_attr = nss);
-            }
-        } else {
-            LOGV2(4934002, "Validate did not make any repairs", "collection"_attr = nss);
-        }
-
-        // If not valid, whether repair ran or not, indexes will need to be rebuilt.
-        if (!validateResults.valid) {
-            status = rebuildIndexesForNamespace(opCtx, nss, engine);
-            if (!status.isOK()) {
-                return status;
-            }
         }
     }
     return Status::OK();
 }
 }  // namespace
 
+namespace repair {
 Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std::string& dbName) {
     DisableDocumentValidation validationDisabler(opCtx);
 
@@ -257,5 +186,81 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
 
     return status;
 }
+
+Status repairCollection(OperationContext* opCtx,
+                        StorageEngine* engine,
+                        const NamespaceString& nss) {
+    opCtx->checkForInterrupt();
+
+    LOGV2(21027, "Repairing collection", "namespace"_attr = nss);
+
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    Status status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
+
+    // Need to lookup from catalog again because the old collection object was invalidated by
+    // repairRecordStore.
+    collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+
+    // If data was modified during repairRecordStore, we know to rebuild indexes without needing
+    // to run an expensive collection validation.
+    if (status.code() == ErrorCodes::DataModifiedByRepair) {
+        invariant(StorageRepairObserver::get(opCtx->getServiceContext())->isDataInvalidated(),
+                  "Collection '{}' ({})"_format(collection->ns().toString(),
+                                                collection->uuid().toString()));
+
+        // If we are a replica set member in standalone mode and we have unfinished indexes,
+        // drop them before rebuilding any completed indexes. Since we have already made
+        // invalidating modifications to our data, it is safe to just drop the indexes entirely
+        // to avoid the risk of the index rebuild failing.
+        if (getReplSetMemberInStandaloneMode(opCtx->getServiceContext())) {
+            if (auto status = dropUnfinishedIndexes(opCtx, collection); !status.isOK()) {
+                return status;
+            }
+        }
+
+        return rebuildIndexesForNamespace(opCtx, nss, engine);
+    } else if (!status.isOK()) {
+        return status;
+    }
+
+    // Run collection validation to avoid unecessarily rebuilding indexes on valid collections
+    // with consistent indexes. Initialize the collection prior to validation.
+    collection->init(opCtx);
+
+    ValidateResults validateResults;
+    BSONObjBuilder output;
+
+    // Exclude full record store validation because we have already validated the underlying
+    // record store in the call to repairRecordStore above.
+    status =
+        CollectionValidation::validate(opCtx,
+                                       nss,
+                                       CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
+                                       CollectionValidation::RepairMode::kRepair,
+                                       &validateResults,
+                                       &output);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    LOGV2(21028, "Collection validation", "results"_attr = output.done());
+
+    if (validateResults.repaired) {
+        if (validateResults.valid) {
+            LOGV2(4934000, "Validate successfully repaired all data", "collection"_attr = nss);
+        } else {
+            LOGV2(4934001, "Validate was unable to repair all data", "collection"_attr = nss);
+        }
+    } else {
+        LOGV2(4934002, "Validate did not make any repairs", "collection"_attr = nss);
+    }
+
+    // If not valid, whether repair ran or not, indexes will need to be rebuilt.
+    if (!validateResults.valid) {
+        return rebuildIndexesForNamespace(opCtx, nss, engine);
+    }
+    return Status::OK();
+}
+}  // namespace repair
 
 }  // namespace mongo

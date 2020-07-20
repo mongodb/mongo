@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,16 +29,35 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
+#include <functional>
+#include <string>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo {
+class StorageEngine;
+class NamespaceString;
 class OperationContext;
+class Status;
+
+namespace repair {
 
 /**
- * Return whether there are non-local databases. If there was an error becauses the wrong mongod
- * version was used for these datafiles, a DBException with status ErrorCodes::MustDowngrade is
- * thrown.
+ * Repairs a database using a storage engine-specific, best-effort process. Some data may be lost or
+ * modified in the process but the result will be readable collections consistent with their indexes
+ * on a successful return.
+ *
+ * It is expected that the local database will be repaired first when running in repair mode.
  */
-bool repairDatabasesAndCheckVersion(OperationContext* opCtx);
+Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std::string& dbName);
 
+/**
+ * Repairs a collection using a storage engine-specific, best-effort process.
+ * Some data may be lost or modified in the process but the result will be a readable collection
+ * consistent with its indexes on a successful return.
+ */
+Status repairCollection(OperationContext* opCtx, StorageEngine* engine, const NamespaceString& nss);
+
+}  // namespace repair
 }  // namespace mongo

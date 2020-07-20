@@ -1012,9 +1012,9 @@ env.Library(
 )
 
 env.Library(
-    target="repair_database",
+    target="repair",
     source=[
-        "repair_database.cpp",
+        "repair.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection',
@@ -1191,9 +1191,9 @@ env.Library(
 )
 
 env.Library(
-    target="repair_database_and_check_version",
+    target="startup_recovery",
     source=[
-        "repair_database_and_check_version.cpp",
+        "startup_recovery.cpp",
     ],
     LIBDEPS_PRIVATE=[
         'rebuild_indexes',
@@ -1202,7 +1202,7 @@ env.Library(
         'commands/mongod_fcv',
         'dbdirectclient',
         'dbhelpers',
-        'repair_database',
+        'repair',
         'repl/repl_settings',
         'storage/storage_repair_observer',
     ],

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,27 +29,16 @@
 
 #pragma once
 
-#include <functional>
-#include <string>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/record_id.h"
-
 namespace mongo {
-class Collection;
-class StorageEngine;
-class NamespaceString;
 class OperationContext;
-class Status;
-class StringData;
+
+namespace startup_recovery {
 
 /**
- * Repairs a database using a storage engine-specific, best-effort process.
- * Some data may be lost or modified in the process but the output will
- * be structurally valid on successful return.
- *
- * It is expected that the local database will be repaired first when running in repair mode.
+ * Recovers or repairs all databases from a previous shutdown. May throw a MustDowngrade error
+ * if data files are incompatible with the current binary version.
  */
-Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std::string& dbName);
+void repairAndRecoverDatabases(OperationContext* opCtx);
+}  // namespace startup_recovery
 
 }  // namespace mongo

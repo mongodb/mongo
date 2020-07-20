@@ -52,11 +52,11 @@
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
-#include "mongo/db/repair_database_and_check_version.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_liaison_mongod.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/sessions_collection_standalone.h"
+#include "mongo/db/startup_recovery.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -291,7 +291,7 @@ ServiceContext* initialize(const char* yaml_config) {
     }
 
     try {
-        repairDatabasesAndCheckVersion(startupOpCtx.get());
+        startup_recovery::repairAndRecoverDatabases(startupOpCtx.get());
     } catch (const ExceptionFor<ErrorCodes::MustDowngrade>& error) {
         LOGV2_FATAL_OPTIONS(22555,
                             logv2::LogOptions(LogComponent::kControl, logv2::FatalMode::kContinue),
@@ -300,14 +300,9 @@ ServiceContext* initialize(const char* yaml_config) {
         quickExit(EXIT_NEED_DOWNGRADE);
     }
 
-    // Assert that the in-memory featureCompatibilityVersion parameter has been explicitly set.
-    // If we are part of a replica set and are started up with no data files, we do not set the
-    // featureCompatibilityVersion until a primary is chosen. For this case, we expect the
-    // in-memory featureCompatibilityVersion parameter to still be uninitialized until after
-    // startup.
-    if (canCallFCVSetIfCleanStartup) {
-        invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
-    }
+    // Ensure FCV document exists and is initialized in-memory. Fatally asserts if there is an
+    // error.
+    FeatureCompatibilityVersion::fassertInitializedAfterStartup(startupOpCtx.get());
 
     if (storageGlobalParams.upgrade) {
         LOGV2(22553, "finished checking dbs");

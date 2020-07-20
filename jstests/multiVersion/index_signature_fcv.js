@@ -13,8 +13,9 @@
 (function() {
 "use strict";
 
-load("jstests/libs/analyze_plan.js");           // For isIxscan and hasRejectedPlans.
-load("jstests/multiVersion/libs/multi_rs.js");  // For upgradeSet.
+load("jstests/libs/analyze_plan.js");               // For isIxscan and hasRejectedPlans.
+load("jstests/multiVersion/libs/multi_rs.js");      // For upgradeSet.
+load('jstests/noPassthrough/libs/index_build.js');  // For IndexBuildTest
 
 const rst = new ReplSetTest({
     nodes: 2,
@@ -23,13 +24,14 @@ const rst = new ReplSetTest({
 rst.startSet();
 rst.initiate();
 
-let testDB = rst.getPrimary().getDB(jsTestName());
+let primary = rst.getPrimary();
+let testDB = primary.getDB(jsTestName());
 let coll = testDB.test;
+coll.insert({a: 100});
 
 // Verifies that the given query is indexed, and that 'numAlternativePlans' were generated.
 function assertIndexedQuery(query, numAlternativePlans) {
     const explainOut = coll.explain().find(query).finish();
-    const results = coll.find(query).toArray();
     assert(isIxscan(testDB, explainOut), explainOut);
     assert.eq(getRejectedPlans(explainOut).length, numAlternativePlans, explainOut);
 }
@@ -47,6 +49,31 @@ assert.commandWorked(
 assertIndexedQuery({a: 1}, 0);
 assertIndexedQuery({a: 11}, 1);
 assertIndexedQuery({a: 101}, 2);
+
+// Test that an index build restarted during startup recovery in FCV 4.6 does not revert to FCV 4.4
+// behavior.
+jsTestLog("Starting index build on primary and pausing before completion");
+IndexBuildTest.pauseIndexBuilds(primary);
+IndexBuildTest.startIndexBuild(
+    primary, coll.getFullName(), {a: 1}, {name: "index4", partialFilterExpression: {a: {$lt: 0}}});
+
+jsTestLog("Waiting for secondary to start the index build");
+let secondary = rst.getSecondary();
+let secondaryDB = secondary.getDB(jsTestName());
+IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
+rst.restart(secondary.nodeId);
+
+jsTestLog("Waiting for all nodes to finish building the index");
+IndexBuildTest.resumeIndexBuilds(primary);
+IndexBuildTest.waitForIndexBuildToStop(testDB, coll.getName(), "index4");
+rst.awaitReplication();
+
+// Reset connection in case leadership has changed.
+primary = rst.getPrimary();
+testDB = primary.getDB(jsTestName());
+coll = testDB.test;
+
+assertIndexedQuery({a: -1}, 0);
 
 // Test that these indexes are retained and can be used by the planner when we downgrade to FCV 4.4.
 testDB.adminCommand({setFeatureCompatibilityVersion: lastStableFCV});

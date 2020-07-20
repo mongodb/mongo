@@ -52,6 +52,21 @@ public:
     static Lock::ResourceMutex fcvLock;
 
     /**
+     * Reads the featureCompatibilityVersion (FCV) document in admin.system.version and initializes
+     * the FCV global state. Returns an error if the FCV document exists and is invalid. Does not
+     * return an error if it is missing. This should be checked after startup with
+     * fassertInitializedAfterStartup.
+     *
+     * Throws a MustDowngrade error if an existing FCV document contains an invalid version.
+     */
+    static void initializeForStartup(OperationContext* opCtx);
+
+    /**
+     * Fatally asserts if the featureCompatibilityVersion is not properly initialized after startup.
+     */
+    static void fassertInitializedAfterStartup(OperationContext* opCtx);
+
+    /**
      * Records intent to perform a currentVersion -> kLatest upgrade by updating the on-disk
      * feature compatibility version document to have 'version'=currentVersion,
      * 'targetVersion'=kLatest. Should be called before schemas are modified.

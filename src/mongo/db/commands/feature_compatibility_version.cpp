@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -66,6 +67,25 @@ using repl::UnreplicatedWritesBlock;
 Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVersionLock");
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingRunningTransactionsOnFCVDowngrade);
+
+namespace {
+bool isWriteableStorageEngine() {
+    return !storageGlobalParams.readOnly && (storageGlobalParams.engine != "devnull");
+}
+
+// Returns the featureCompatibilityVersion document if it exists.
+boost::optional<BSONObj> findFcvDocument(OperationContext* opCtx) {
+    // Ensure database is opened and exists.
+    AutoGetOrCreateDb autoDb(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_IX);
+
+    const auto query = BSON("_id" << FeatureCompatibilityVersionParser::kParameterName);
+    const auto swFcv = repl::StorageInterface::get(opCtx)->findById(
+        opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
+    if (!swFcv.isOK()) {
+        return boost::none;
+    }
+    return swFcv.getValue();
+}
 
 /**
  * Build update command for featureCompatibilityVersion document updates.
@@ -103,7 +123,7 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
     client.runCommand(nss.db().toString(), updateCmd.obj(), updateResult);
     uassertStatusOK(getStatusFromWriteCommandReply(updateResult));
 }
-
+}  // namespace
 
 void FeatureCompatibilityVersion::setTargetUpgradeFrom(
     OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version fromVersion) {
@@ -227,6 +247,102 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
         case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault44Behavior:
             // getVersion() does not return this value.
             MONGO_UNREACHABLE;
+    }
+}
+
+void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) {
+    // Global write lock must be held.
+    invariant(opCtx->lockState()->isW());
+    auto featureCompatibilityVersion = findFcvDocument(opCtx);
+    if (!featureCompatibilityVersion) {
+        return;
+    }
+
+    // If the server configuration collection already contains a valid featureCompatibilityVersion
+    // document, cache it in-memory as a server parameter.
+    auto swVersion = FeatureCompatibilityVersionParser::parse(*featureCompatibilityVersion);
+
+    // Note this error path captures all cases of an FCV document existing, but with any
+    // unacceptable value. This includes unexpected cases with no path forward such as the FCV value
+    // not being a string.
+    if (!swVersion.isOK()) {
+        uassertStatusOK({ErrorCodes::MustDowngrade,
+                         str::stream()
+                             << "UPGRADE PROBLEM: Found an invalid featureCompatibilityVersion "
+                                "document (ERROR: "
+                             << swVersion.getStatus()
+                             << "). If the current featureCompatibilityVersion is below 4.4, see "
+                                "the documentation on upgrading at "
+                             << feature_compatibility_version_documentation::kUpgradeLink << "."});
+    }
+
+    auto version = swVersion.getValue();
+    serverGlobalParams.featureCompatibility.setVersion(version);
+    FeatureCompatibilityVersion::updateMinWireVersion();
+
+    // On startup, if the version is in an upgrading or downgrading state, print a warning.
+    if (version == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To451) {
+        LOGV2_WARNING_OPTIONS(
+            21011,
+            {logv2::LogTag::kStartupWarnings},
+            "A featureCompatibilityVersion upgrade did not complete. The current "
+            "featureCompatibilityVersion is {currentfeatureCompatibilityVersion}. To fix this, "
+            "use the setFeatureCompatibilityVersion command to resume upgrade to 4.5.1",
+            "A featureCompatibilityVersion upgrade did not complete. To fix this, use the "
+            "setFeatureCompatibilityVersion command to resume upgrade to 4.5.1",
+            "currentfeatureCompatibilityVersion"_attr =
+                FeatureCompatibilityVersionParser::toString(version));
+    } else if (version ==
+               ServerGlobalParams::FeatureCompatibility::Version::kDowngradingFrom451To44) {
+        LOGV2_WARNING_OPTIONS(
+            21014,
+            {logv2::LogTag::kStartupWarnings},
+            "A featureCompatibilityVersion downgrade did not complete. The current "
+            "featureCompatibilityVersion is {currentfeatureCompatibilityVersion}. To fix this, "
+            "use the setFeatureCompatibilityVersion command to resume downgrade to 4.4.",
+            "A featureCompatibilityVersion downgrade did not complete. To fix this, use the "
+            "setFeatureCompatibilityVersion command to resume downgrade to 4.5.1",
+            "currentfeatureCompatibilityVersion"_attr =
+                FeatureCompatibilityVersionParser::toString(version));
+    }
+}
+
+// Fatally asserts if the featureCompatibilityVersion document is not initialized, when required.
+void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContext* opCtx) {
+    Lock::GlobalWrite lk(opCtx);
+    const auto replProcess = repl::ReplicationProcess::get(opCtx);
+    const auto& replSettings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
+
+    // The node did not complete the last initial sync. If the initial sync flag is set and we are
+    // part of a replica set, we expect the version to be initialized as part of initial sync after
+    // startup.
+    bool needInitialSync = replSettings.usingReplSets() && replProcess &&
+        replProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx);
+    if (needInitialSync) {
+        return;
+    }
+
+    auto fcvDocument = findFcvDocument(opCtx);
+
+    auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto dbNames = storageEngine->listDatabases();
+    bool nonLocalDatabases = std::any_of(dbNames.begin(), dbNames.end(), [](auto name) {
+        return name != NamespaceString::kLocalDb;
+    });
+
+    // Fail to start up if there is no featureCompatibilityVersion document and there are non-local
+    // databases present.
+    if (!fcvDocument && nonLocalDatabases) {
+        LOGV2_FATAL_NOTRACE(40652,
+                            "Unable to start up mongod due to missing featureCompatibilityVersion "
+                            "document. Please run with --repair to restore the document.");
+    }
+
+    // If we are part of a replica set and are started up with no data files, we do not set the
+    // featureCompatibilityVersion until a primary is chosen. For this case, we expect the in-memory
+    // featureCompatibilityVersion parameter to still be uninitialized until after startup.
+    if (isWriteableStorageEngine() && (!replSettings.usingReplSets() || nonLocalDatabases)) {
+        invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
     }
 }
 
