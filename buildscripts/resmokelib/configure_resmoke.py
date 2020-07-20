@@ -36,6 +36,12 @@ def _validate_options(parser, args):
                      " test(s) under those suite configuration(s)".format(
                          args.executor_file, " ".join(args.test_files)))
 
+    # The "test_files" positional argument logically overlaps with `--replayFile`. Disallow using both.
+    if args.test_files and args.replay_file:
+        parser.error(
+            "Cannot use --replayFile with additional test files listed on the command line invocation."
+        )
+
 
 def _validate_config(parser):
     """Do validation on the config settings."""
@@ -163,7 +169,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     if _config.SUITE_FILES is not None:
         _config.SUITE_FILES = _config.SUITE_FILES.split(",")
     _config.TAG_FILE = config.pop("tag_file")
-    _config.TEST_FILES = config.pop("test_files")
     _config.TRANSPORT_LAYER = config.pop("transport_layer")
 
     # Internal testing options.
@@ -209,6 +214,25 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     # Populate the named suites by scanning config_dir/suites
     named_suites = {}
 
+    def configure_tests(test_files, replay_file):
+        # `_validate_options` has asserted that at most one of `test_files` and `replay_file` contains input.
+
+        to_replay = None
+        # Treat `resmoke run @to_replay` as `resmoke run --replayFile to_replay`
+        if len(test_files) == 1 and test_files[0].startswith("@"):
+            to_replay = test_files[0][1:]
+        elif replay_file:
+            to_replay = replay_file
+
+        if to_replay:
+            # The replay file is expected to be one file per line, but cope with extra whitespace.
+            with open(to_replay) as fd:
+                _config.TEST_FILES = fd.read().split()
+        else:
+            _config.TEST_FILES = test_files
+
+    configure_tests(config.pop("test_files"), config.pop("replay_file"))
+
     suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
     root = os.path.abspath(suites_dir)
     files = os.listdir(root)
@@ -248,7 +272,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.LOGGER_FILE = config.pop("logger_file")
 
     if config:
-        raise ValueError(f"Unkown option(s): {list(config.keys())}s")
+        raise ValueError(f"Unknown option(s): {list(config.keys())}s")
 
 
 def _set_logging_config():

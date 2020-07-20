@@ -1,6 +1,7 @@
 """Test resmoke's handling of test/task timeouts."""
 
 import logging
+import json
 import os
 import os.path
 import sys
@@ -16,19 +17,25 @@ from buildscripts.resmokelib.utils import rmtree
 class _ResmokeSelftest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Print logs from spawned resmoke process to stdout
-        cls.logger = logging.getLogger("resmoke_timeouts_unittest")
-        cls.logger.setLevel(logging.DEBUG)
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter(fmt="%(message)s"))
-        cls.logger.addHandler(handler)
-
         cls.test_dir = os.path.normpath("/data/db/selftest")
         cls.resmoke_const_args = ["run", "--dbpathPrefix={}".format(cls.test_dir)]
 
     def setUp(self):
+        #self.test_dir = os.path.normpath("/data/db/selftest")
+        self.end2end_root = "buildscripts/tests/resmoke_end2end"
+        self.suites_root = f"{self.end2end_root}/suites"
+        self.testfiles_root = f"{self.end2end_root}/testfiles"
+        self.report_file = os.path.join(self.test_dir, "reports.json")
+
+        self.logger = logging.getLogger(self._testMethodName)
+        self.logger.setLevel(logging.DEBUG)
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter(fmt="%(message)s"))
+        self.logger.addHandler(handler)
+
         self.logger.info("Cleaning temp directory %s", self.test_dir)
         rmtree(self.test_dir, ignore_errors=True)
+        os.makedirs(self.test_dir, mode=0o755, exist_ok=True)
 
     def execute_resmoke(self, resmoke_args):
         resmoke_process = core.programs.make_process(
@@ -166,3 +173,84 @@ class TestTimeout(_ResmokeSelftest):
 
         # analysis_files_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
         # self.assert_dir_file_count(self.analysis_file, analysis_files_to_expect)
+
+
+class TestTestSelection(_ResmokeSelftest):
+    def parse_reports_json(self):
+        with open(self.report_file) as fd:
+            return json.load(fd)
+
+    def execute_resmoke(self, resmoke_args):
+        resmoke_process = core.programs.make_process(
+            self.logger, [sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args)
+        resmoke_process.start()
+
+        return resmoke_process
+
+    def create_file_in_test_dir(self, filename, contents):
+        with open(os.path.normpath(f"{self.test_dir}/{filename}"), "w") as fd:
+            fd.write(contents)
+
+    def get_tests_run(self):
+        tests_run = []
+        for res in self.parse_reports_json()["results"]:
+            if "fixture" not in res["test_file"]:
+                tests_run.append(res["test_file"])
+
+        return tests_run
+
+    def test_positional_arguments(self):
+        self.assertEqual(
+            0,
+            self.execute_resmoke([
+                f"--reportFile={self.report_file}", "--repeatTests=2",
+                f"--suites={self.suites_root}/resmoke_no_mongod.yml",
+                f"{self.testfiles_root}/one.js", f"{self.testfiles_root}/one.js",
+                f"{self.testfiles_root}/one.js"
+            ]).wait())
+
+        self.assertEqual(6 * [f"{self.testfiles_root}/one.js"], self.get_tests_run())
+
+    def test_replay_file(self):
+        self.create_file_in_test_dir("replay", f"{self.testfiles_root}/two.js\n" * 3)
+
+        self.assertEqual(
+            0,
+            self.execute_resmoke([
+                f"--reportFile={self.report_file}", "--repeatTests=2",
+                f"--suites={self.suites_root}/resmoke_no_mongod.yml",
+                f"--replay={self.test_dir}/replay"
+            ]).wait())
+
+        self.assertEqual(6 * [f"{self.testfiles_root}/two.js"], self.get_tests_run())
+
+    def test_suite_file(self):
+        self.assertEqual(
+            0,
+            self.execute_resmoke([
+                f"--reportFile={self.report_file}", "--repeatTests=2",
+                f"--suites={self.suites_root}/resmoke_no_mongod.yml"
+            ]).wait())
+
+        self.assertEqual(2 * [f"{self.testfiles_root}/one.js", f"{self.testfiles_root}/two.js"],
+                         self.get_tests_run())
+
+    def test_at_sign_as_replay_file(self):
+        self.create_file_in_test_dir("replay", f"{self.testfiles_root}/two.js\n" * 3)
+
+        self.assertEqual(
+            0,
+            self.execute_resmoke([
+                f"--reportFile={self.report_file}", "--repeatTests=2",
+                f"--suites={self.suites_root}/resmoke_no_mongod.yml", f"@{self.test_dir}/replay"
+            ]).wait())
+
+        self.assertEqual(6 * [f"{self.testfiles_root}/two.js"], self.get_tests_run())
+
+    def test_disallow_mixing_replay_and_positional(self):
+        # Additionally can assert on the error message.
+        self.assertEqual(1, self.execute_resmoke(["--replay=foo", "jstests/filename.js"]).wait())
+        self.assertEqual(1, self.execute_resmoke(["@foo", "jstests/filename.js"]).wait())
+
+        # Technically errors on file `@foo` not existing. Only the first positional argument can be interpreted as a `@replay_file`. This is a limitation not a feature, this test just serves as documentation.
+        self.assertEqual(1, self.execute_resmoke([f"{self.testfiles_root}/one.js", "@foo"]).wait())

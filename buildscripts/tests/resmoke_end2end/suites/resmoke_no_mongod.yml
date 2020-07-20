@@ -1,0 +1,10 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - buildscripts/tests/resmoke_end2end/testfiles/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''

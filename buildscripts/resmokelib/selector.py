@@ -242,7 +242,8 @@ class _TestList(object):
         excluded = []
         for test in self._roots:
             if test in self._filtered:
-                if test not in tests:
+                if config.TEST_FILES or test not in tests:
+                    # Allow duplicate tests if the tests were explicitly duplicated on the CLI invocation or replay file.
                     tests.append(test)
             elif test not in excluded:
                 excluded.append(test)

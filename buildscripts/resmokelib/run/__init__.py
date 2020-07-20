@@ -818,6 +818,11 @@ class RunPlugin(PluginInterface):
             "Every time a mongod restarts on existing data files, the data files will be backed up underneath the input directory."
         )
 
+        parser.add_argument(
+            "--replayFile", action="store", type=str, dest="replay_file", metavar="FILE", help=
+            "Run the tests listed in the input file. This is an alternative to passing test files as positional arguments on the command line. Each line in the file must be a path to a test file relative to the current working directory. A short-hand for `resmoke run --replay_file foo` is `resmoke run @foo`."
+        )
+
         internal_options = parser.add_argument_group(
             title=_INTERNAL_OPTIONS_TITLE,
             description=("Internal options for advanced users and resmoke developers."

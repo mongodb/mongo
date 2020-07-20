@@ -76,6 +76,7 @@ DEFAULTS = {
     "repeat_tests_max": None,
     "repeat_tests_min": None,
     "repeat_tests_secs": None,
+    "replay_file": None,
     "report_failure_status": "fail",
     "report_file": None,
     "seed": int(time.time() * 256),  # Taken from random.py code in Python 2.7.
@@ -92,7 +93,7 @@ DEFAULTS = {
     "storage_engine_cache_size_gb": None,
     "suite_files": "with_server",
     "tag_file": None,
-    "test_files": None,
+    "test_files": [],
     "transport_layer": None,
     "mixed_bin_versions": None,
     "linear_chain": None,
