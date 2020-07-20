@@ -125,7 +125,7 @@ protected:
         getTopoCoord().setCurrentPrimary_forTest(_selfIndex, electionTimestamp);
         OpTime dummyOpTime(Timestamp(1, 1), getTopoCoord().getTerm());
         setMyOpTime(dummyOpTime);
-        ASSERT_OK(getTopoCoord().completeTransitionToPrimary(dummyOpTime));
+        getTopoCoord().completeTransitionToPrimary(dummyOpTime);
     }
 
     void setMyOpTime(const OpTime& opTime, Date_t wallTime = Date_t()) {
@@ -6823,7 +6823,7 @@ TEST_F(HeartbeatResponseTestV1, NodeDoesNotStepDownSelfWhenRemoteNodeWasElectedL
     ASSERT_NO_ACTION(nextAction.getAction());
 }
 
-TEST_F(HeartbeatResponseTestV1, NodeWillNotTransitionToPrimaryAfterHearingAboutNewerTerm) {
+TEST_F(HeartbeatResponseTestV1, NodeWillCompleteTransitionToPrimaryAfterHearingAboutNewerTerm) {
     auto initialTerm = getTopoCoord().getTerm();
     OpTime firstOpTimeOfTerm(Timestamp(1, 1), initialTerm);
 
@@ -6832,17 +6832,14 @@ TEST_F(HeartbeatResponseTestV1, NodeWillNotTransitionToPrimaryAfterHearingAboutN
                                              firstOpTimeOfTerm.getTimestamp());
     getTopoCoord().setCurrentPrimary_forTest(getSelfIndex());
 
-    // At first transition to primary is OK
-    ASSERT(getTopoCoord().canCompleteTransitionToPrimary(initialTerm));
+    // Verify that transition to primary is OK.
+    ASSERT_TRUE(getTopoCoord().canCompleteTransitionToPrimary(initialTerm));
 
     // Now mark ourselves as mid-stepdown, as if we had heard about a new term.
     getTopoCoord().prepareForUnconditionalStepDown();
 
-    ASSERT_FALSE(getTopoCoord().canCompleteTransitionToPrimary(initialTerm));
-
-    // Check that transitioning to primary fails now that the term has been updated.
-    ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown,
-                  getTopoCoord().completeTransitionToPrimary(firstOpTimeOfTerm));
+    // Verify that the transition to primary can still complete.
+    ASSERT_TRUE(getTopoCoord().canCompleteTransitionToPrimary(initialTerm));
 }
 
 TEST_F(HeartbeatResponseTestV1,

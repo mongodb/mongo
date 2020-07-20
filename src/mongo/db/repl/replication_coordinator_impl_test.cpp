@@ -1665,6 +1665,9 @@ TEST_F(ReplCoordTest, DrainCompletionMidStepDown) {
     ASSERT(updateTermEvh.isValid());
     ASSERT(termUpdated == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
 
+    // Set 'firstOpTimeOfMyTerm' to have term 1, so that the node will see that the noop entry has
+    // the correct term at the end of signalDrainComplete.
+    getExternalState()->setFirstOpTimeOfMyTerm(OpTime(Timestamp(100, 1), 1));
     // Now signal that replication applier is finished draining its buffer.
     getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
 
