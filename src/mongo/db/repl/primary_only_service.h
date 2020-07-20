@@ -175,9 +175,15 @@ public:
      * Called on stepDown. Releases all running Instances of this service from management by this
      * PrimaryOnlyService object. The Instances will have their OperationContexts interrupted
      * independently. Instance objects may continue to exist in memory in a detached state until the
-     * next stepUp.
+     * next stepUp. Also shuts down _executor, forcing all outstanding jobs to complete.
      */
     void onStepDown();
+
+    /**
+     * Releases all running Instances, then shuts down and joins _executor, ensuring that there are
+     * no remaining tasks running.
+     */
+    void shutdown();
 
     /**
      * Writes the given 'initialState' object to the service's state document collection and then
@@ -224,6 +230,7 @@ private:
     enum class State {
         kRunning,
         kPaused,
+        kShutdown,
     };
 
     State _state = State::kRunning;
@@ -261,6 +268,11 @@ public:
      * no concern about the returned pointer becoming invalid.
      */
     PrimaryOnlyService* lookupService(StringData serviceName);
+
+    /**
+     * Shuts down all registered services.
+     */
+    void shutdown();
 
     void onStepUpBegin(OperationContext*, long long term) final {}
     void onBecomeArbiter() final{};

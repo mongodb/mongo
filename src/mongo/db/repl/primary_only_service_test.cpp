@@ -140,51 +140,33 @@ public:
                 dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
             opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
         }
+
+        _registry = std::make_unique<PrimaryOnlyServiceRegistry>();
+        {
+            std::unique_ptr<TestService> service =
+                std::make_unique<TestService>(getServiceContext());
+
+            _registry->registerService(std::move(service));
+            _registry->onStepUpComplete(nullptr, 1);
+        }
+
+        _service = _registry->lookupService("TestService");
+        ASSERT(_service);
     }
     void tearDown() override {
+        _registry->shutdown();
+        _registry.reset();
+        _service = nullptr;
+
         WaitForMajorityService::get(getServiceContext()).shutDown();
 
         ServiceContextMongoDTest::tearDown();
     }
+
+protected:
+    std::unique_ptr<PrimaryOnlyServiceRegistry> _registry;
+    PrimaryOnlyService* _service;
 };
-
-TEST_F(PrimaryOnlyServiceTest, BasicStartNewInstance) {
-    PrimaryOnlyServiceRegistry registry;
-
-    {
-        std::unique_ptr<TestService> service = std::make_unique<TestService>(getServiceContext());
-
-        registry.registerService(std::move(service));
-        registry.onStepUpComplete(nullptr, 1);
-    }
-
-    auto service = registry.lookupService("TestService");
-    ASSERT(service);
-
-    BSONObj state = BSON("_id" << 0 << "state"
-                               << "foo");
-
-    // Check that state document collection is empty
-    auto opCtx = makeOperationContext();
-    DBDirectClient client(opCtx.get());
-    auto obj = client.findOne(service->getStateDocumentsNS().toString(), Query());
-    ASSERT(obj.isEmpty());
-
-    // Successfully start a new instance
-    auto fut = service->startNewInstance(opCtx.get(), state);
-    auto instanceID = fut.get();
-    ASSERT_EQ(0, instanceID["_id"].Int());
-
-    // Check that the state document for the instance was created properly.
-    obj = client.findOne(service->getStateDocumentsNS().toString(), Query());
-    ASSERT_EQ(0, obj["_id"].Int());
-    ASSERT_EQ("foo", obj["state"].String());
-
-    // Check that we can look up the Instance by ID.
-    auto instance = TestService::Instance::lookup(service, BSON("_id" << 0));
-    ASSERT_EQ(0, instance.get()->getState()["_id"].Int());
-    ASSERT_EQ("foo", instance.get()->getState()["state"].String());
-}
 
 DEATH_TEST_F(PrimaryOnlyServiceTest,
              DoubleRegisterService,
@@ -198,17 +180,33 @@ DEATH_TEST_F(PrimaryOnlyServiceTest,
     registry.registerService(std::move(service2));
 }
 
+TEST_F(PrimaryOnlyServiceTest, BasicStartNewInstance) {
+    BSONObj state = BSON("_id" << 0 << "state"
+                               << "foo");
+
+    // Check that state document collection is empty
+    auto opCtx = makeOperationContext();
+    DBDirectClient client(opCtx.get());
+    auto obj = client.findOne(_service->getStateDocumentsNS().toString(), Query());
+    ASSERT(obj.isEmpty());
+
+    // Successfully start a new instance
+    auto fut = _service->startNewInstance(opCtx.get(), state);
+    auto instanceID = fut.get();
+    ASSERT_EQ(0, instanceID["_id"].Int());
+
+    // Check that the state document for the instance was created properly.
+    obj = client.findOne(_service->getStateDocumentsNS().toString(), Query());
+    ASSERT_EQ(0, obj["_id"].Int());
+    ASSERT_EQ("foo", obj["state"].String());
+
+    // Check that we can look up the Instance by ID.
+    auto instance = TestService::Instance::lookup(_service, BSON("_id" << 0));
+    ASSERT_EQ(0, instance.get()->getState()["_id"].Int());
+    ASSERT_EQ("foo", instance.get()->getState()["state"].String());
+}
+
 TEST_F(PrimaryOnlyServiceTest, DoubleRegisterInstance) {
-    PrimaryOnlyServiceRegistry registry;
-    {
-        std::unique_ptr<TestService> service = std::make_unique<TestService>(getServiceContext());
-
-        registry.registerService(std::move(service));
-        registry.onStepUpComplete(nullptr, 1);
-    }
-
-    auto service = registry.lookupService("TestService");
-
     BSONObj state1 = BSON("_id" << 0 << "state"
                                 << "foo");
     BSONObj state2 = BSON("_id" << 0 << "state"
@@ -217,10 +215,10 @@ TEST_F(PrimaryOnlyServiceTest, DoubleRegisterInstance) {
     auto opCtx = makeOperationContext();
 
     // Register instance with _id 0
-    auto fut = service->startNewInstance(opCtx.get(), std::move(state1));
+    auto fut = _service->startNewInstance(opCtx.get(), std::move(state1));
 
     // Assert that registering a second instance with the same _id throws DuplicateKey
-    ASSERT_THROWS_CODE(service->startNewInstance(opCtx.get(), std::move(state2)),
+    ASSERT_THROWS_CODE(_service->startNewInstance(opCtx.get(), std::move(state2)),
                        DBException,
                        ErrorCodes::DuplicateKey);
 
@@ -229,24 +227,12 @@ TEST_F(PrimaryOnlyServiceTest, DoubleRegisterInstance) {
     ASSERT_EQ(0, instanceID["_id"].Int());
 
     // Check that we can look up the Instance by ID.
-    auto instance = TestService::Instance::lookup(service, BSON("_id" << 0));
+    auto instance = TestService::Instance::lookup(_service, BSON("_id" << 0));
     ASSERT_EQ(0, instance.get()->getState()["_id"].Int());
     ASSERT_EQ("foo", instance.get()->getState()["state"].String());
 }
 
 TEST_F(PrimaryOnlyServiceTest, StepDownDuringRegisterInstance) {
-    PrimaryOnlyServiceRegistry registry;
-
-    {
-        std::unique_ptr<TestService> service = std::make_unique<TestService>(getServiceContext());
-
-        registry.registerService(std::move(service));
-        registry.onStepUpComplete(nullptr, 1);
-    }
-
-    auto service = registry.lookupService("TestService");
-    ASSERT(service);
-
     BSONObj state = BSON("_id" << 0 << "state"
                                << "foo");
 
@@ -254,11 +240,11 @@ TEST_F(PrimaryOnlyServiceTest, StepDownDuringRegisterInstance) {
     auto& fp = PrimaryOnlyServiceHangBeforeCreatingInstance;
     fp.setMode(FailPoint::alwaysOn);
     auto opCtx = makeOperationContext();
-    auto fut = service->startNewInstance(opCtx.get(), state);
+    auto fut = _service->startNewInstance(opCtx.get(), state);
     fp.waitForTimesEntered(1);
 
     // Now step down
-    registry.onStepDown();
+    _registry->onStepDown();
     auto replCoord = ReplicationCoordinator::get(opCtx.get());
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -268,12 +254,12 @@ TEST_F(PrimaryOnlyServiceTest, StepDownDuringRegisterInstance) {
     ASSERT_EQ(0, instanceID["_id"].Int());
 
     // Check that the Instance was not created since we were are no longer primary.
-    auto instance = TestService::Instance::lookup(service, BSON("_id" << 0));
+    auto instance = TestService::Instance::lookup(_service, BSON("_id" << 0));
     ASSERT_FALSE(instance.is_initialized());
 
     // Check that the state document for the instance was created properly.
     DBDirectClient client(opCtx.get());
-    BSONObj obj = client.findOne(service->getStateDocumentsNS().toString(), Query());
+    BSONObj obj = client.findOne(_service->getStateDocumentsNS().toString(), Query());
     ASSERT_EQ(0, obj["_id"].Int());
     ASSERT_EQ("foo", obj["state"].String());
 }

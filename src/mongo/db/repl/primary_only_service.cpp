@@ -101,9 +101,16 @@ void PrimaryOnlyServiceRegistry::onStepUpComplete(OperationContext*, long long t
         service.second->onStepUp(term);
     }
 }
+
 void PrimaryOnlyServiceRegistry::onStepDown() {
     for (auto& service : _services) {
         service.second->onStepDown();
+    }
+}
+
+void PrimaryOnlyServiceRegistry::shutdown() {
+    for (auto& service : _services) {
+        service.second->shutdown();
     }
 }
 
@@ -139,6 +146,23 @@ void PrimaryOnlyService::onStepDown() {
     }
     _state = State::kPaused;
     _instances.clear();
+}
+
+void PrimaryOnlyService::shutdown() {
+    std::unique_ptr<executor::ScopedTaskExecutor> savedExecutor;
+
+    {
+        stdx::lock_guard lk(_mutex);
+
+        _executor.swap(savedExecutor);
+        _state = State::kShutdown;
+        _instances.clear();
+    }
+
+    if (savedExecutor) {
+        (*savedExecutor)->shutdown();
+        (*savedExecutor)->join();
+    }
 }
 
 SemiFuture<PrimaryOnlyService::InstanceID> PrimaryOnlyService::startNewInstance(
