@@ -201,6 +201,7 @@ public:
         }
 
         result.appendBool("valid", validateResults.valid);
+        result.appendBool("repaired", validateResults.repaired);
         if (validateResults.readTimestamp) {
             result.append("readTimestamp", validateResults.readTimestamp.get());
         }
@@ -215,6 +216,11 @@ public:
             builder.append(corruptRecord.repr());
         }
         result.append("corruptRecords", builder.done());
+
+        if (validateResults.repaired) {
+            result.appendNumber("numRemovedCorruptRecords",
+                                validateResults.numRemovedCorruptRecords);
+        }
 
         if (!validateResults.valid) {
             result.append("advice",

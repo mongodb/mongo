@@ -131,6 +131,7 @@ void printValidateResults(const ValidateResults& results) {
     std::stringstream ss;
 
     ss << "ValidateResults:\nValid: " << results.valid << "\n"
+       << "Repaired: " << results.repaired << "\n"
        << "Errors:\n";
 
     for (const std::string& error : results.errors) {
@@ -156,6 +157,7 @@ void printValidateResults(const ValidateResults& results) {
     for (const RecordId id : results.corruptRecords) {
         ss << "\t" << id << "\n";
     }
+    ss << "Number of corrupt records removed: " << results.numRemovedCorruptRecords << "\n";
 
     LOGV2(51812, "{results_string}", "results_string"_attr = ss.str());
 }

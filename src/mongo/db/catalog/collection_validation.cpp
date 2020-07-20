@@ -429,10 +429,6 @@ Status validate(OperationContext* opCtx,
                 bool turnOnExtraLoggingForTest) {
     invariant(!opCtx->lockState()->isLocked() || storageGlobalParams.repair);
 
-    if (repairMode == RepairMode::kRepair) {
-        invariant(storageGlobalParams.repair);
-    }
-
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.
     ValidateState validateState(opCtx, nss, mode, repairMode, turnOnExtraLoggingForTest);

@@ -577,5 +577,6 @@ struct ValidateResults {
     std::vector<BSONObj> extraIndexEntries;
     std::vector<BSONObj> missingIndexEntries;
     std::vector<RecordId> corruptRecords;
+    long long numRemovedCorruptRecords = 0;
 };
 }  // namespace mongo

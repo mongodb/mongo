@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -314,6 +315,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     // of records when we begin traversing, even if this number may deviate from the final number.
     const char* curopMessage = "Validate: scanning documents";
     const auto totalRecords = _validateState->getCollection()->getRecordStore()->numRecords(opCtx);
+    const auto rs = _validateState->getCollection()->getRecordStore();
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         _progress.set(CurOp::get(opCtx)->setProgress_inlock(curopMessage, totalRecords));
@@ -342,15 +344,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         // validatedSize = dataSize is not a general requirement as some storage engines may use
         // padding, but we still require that they return the unpadded record data.
         if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
-            if (!status.isOK() && validatedSize != static_cast<size_t>(dataSize)) {
-                LOGV2(4835000,
-                      "Document corruption details - Multiple causes for document validation "
-                      "failure; error status and size mismatch",
-                      "recordId"_attr = record->id,
-                      "validatedBytes"_attr = validatedSize,
-                      "recordBytes"_attr = dataSize,
-                      "error"_attr = status);
-            } else if (!status.isOK()) {
+            // If status is not okay, dataSize is not reliable.
+            if (!status.isOK()) {
                 LOGV2(4835001,
                       "Document corruption details - Document validation failed with error",
                       "recordId"_attr = record->id,
@@ -363,21 +358,33 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                       "recordBytes"_attr = dataSize);
             }
 
-            // Only log once
-            if (results->valid) {
-                results->errors.push_back("Detected one or more invalid documents. See logs.");
-                results->valid = false;
-            }
+            if (_validateState->shouldRunRepair()) {
+                writeConflictRetry(
+                    opCtx, "corrupt record removal", _validateState->nss().ns(), [&] {
+                        WriteUnitOfWork wunit(opCtx);
+                        rs->deleteRecord(opCtx, record->id);
+                        wunit.commit();
+                    });
+                results->repaired = true;
+                results->numRemovedCorruptRecords++;
+                _numRecords--;
+            } else {
+                if (results->valid) {
+                    results->errors.push_back("Detected one or more invalid documents. See logs.");
+                    results->valid = false;
+                }
 
-            numCorruptRecordsSizeBytes += sizeof(record->id);
-            if (numCorruptRecordsSizeBytes <= kMaxErrorSizeBytes) {
-                results->corruptRecords.push_back(record->id);
-            } else if (!corruptRecordsSizeLimitWarning) {
-                results->errors.push_back(
-                    "Not all corrupted records are listed due to size limitations.");
-                corruptRecordsSizeLimitWarning = true;
+                numCorruptRecordsSizeBytes += sizeof(record->id);
+                if (numCorruptRecordsSizeBytes <= kMaxErrorSizeBytes) {
+                    results->corruptRecords.push_back(record->id);
+                } else if (!corruptRecordsSizeLimitWarning) {
+                    results->warnings.push_back(
+                        "Not all corrupted records are listed due to size limitations.");
+                    corruptRecordsSizeLimitWarning = true;
+                }
+
+                nInvalid++;
             }
-            nInvalid++;
         }
 
         prevRecordId = record->id;
@@ -392,6 +399,11 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 interruptIntervalNumBytes = 0;
             }
         }
+    }
+
+    if (results->numRemovedCorruptRecords > 0) {
+        results->warnings.push_back(str::stream() << "Removed " << results->numRemovedCorruptRecords
+                                                  << " invalid documents.");
     }
 
     const auto fastCount = _validateState->getCollection()->numRecords(opCtx);
