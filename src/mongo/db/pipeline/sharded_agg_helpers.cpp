@@ -1146,13 +1146,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* owne
     return shardVersionRetry(
         expCtx->opCtx, catalogCache, expCtx->ns, "targeting pipeline to attach cursors"_sd, [&]() {
             auto pipelineToTarget = pipeline->clone();
-            if (!allowTargetingShards || expCtx->ns.db() == "local") {
-                // If the db is local, this may be a change stream examining the oplog. We know the
-                // oplog (and any other local collections) will not be sharded.
-                return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
-                    pipelineToTarget.release());
+            if (allowTargetingShards && !expCtx->ns.isConfigDotCacheDotChunks() &&
+                expCtx->ns.db() != "local") {
+                return targetShardsAndAddMergeCursors(expCtx, pipelineToTarget.release());
             }
-            return targetShardsAndAddMergeCursors(expCtx, pipelineToTarget.release());
+            return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
+                pipelineToTarget.release());
         });
 }
 

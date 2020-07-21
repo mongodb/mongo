@@ -105,10 +105,7 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        // {shardsStage, mergingStage, sortPattern}
-        return DistributedPlanLogic{nullptr, this, boost::none};
-    }
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
     void addInvolvedCollections(stdx::unordered_set<NamespaceString>* collectionNames) const final;
 

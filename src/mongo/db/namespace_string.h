@@ -280,6 +280,11 @@ public:
     bool isNamespaceAlwaysUnsharded() const;
 
     /**
+     * Returns whether the specified namespace is config.cache.chunks.<>.
+     */
+    bool isConfigDotCacheDotChunks() const;
+
+    /**
      * Returns whether a namespace is replicated, based only on its string value. One notable
      * omission is that map reduce `tmp.mr` collections may or may not be replicated. Callers must
      * decide how to handle that case separately.

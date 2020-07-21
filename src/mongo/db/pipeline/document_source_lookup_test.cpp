@@ -30,12 +30,14 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional/optional_io.hpp>
 #include <deque>
 #include <vector>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -428,6 +430,180 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {
 
     ASSERT_EQ(newSerialization.size(), 1UL);
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
+// Tests that $lookup with special 'from' syntax from: {db: config, coll: cache.chunks.*} can
+// be round tripped.
+TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithFromDBAndColl) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("config", "cache.chunks.test.foo");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    auto originalBSON = BSON("$lookup" << BSON("from" << BSON("db"
+                                                              << "config"
+                                                              << "coll"
+                                                              << "cache.chunks.test.foo")
+                                                      << "localField"
+                                                      << "x"
+                                                      << "foreignField"
+                                                      << "id"
+                                                      << "as"
+                                                      << "results"));
+    auto lookupStage = DocumentSourceLookUp::createFromBson(originalBSON.firstElement(), expCtx);
+
+    //
+    // Serialize the $lookup stage and confirm contents.
+    //
+    vector<Value> serialization;
+    static const UnorderedFieldsBSONObjComparator kComparator;
+    lookupStage->serializeToArray(serialization);
+    auto serializedBSON = serialization[0].getDocument().toBson();
+    ASSERT_EQ(kComparator.compare(serializedBSON, originalBSON), 0);
+
+    auto roundTripped = DocumentSourceLookUp::createFromBson(serializedBSON.firstElement(), expCtx);
+
+    vector<Value> newSerialization;
+    roundTripped->serializeToArray(newSerialization);
+
+    ASSERT_EQ(newSerialization.size(), 1UL);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
+// Tests that $lookup with 'let' and special 'from' syntax from: {db: config, coll: cache.chunks.*}
+// can be round tripped.
+TEST_F(DocumentSourceLookUpTest, LookupWithLetReParseSerializedStageWithFromDBAndColl) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("config", "cache.chunks.test.foo");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    auto originalBSON =
+        BSON("$lookup" << BSON("from" << BSON("db"
+                                              << "config"
+                                              << "coll"
+                                              << "cache.chunks.test.foo")
+                                      << "let"
+                                      << BSON("local_x"
+                                              << "$x")
+                                      << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                      << "as"
+                                      << "as"));
+    auto lookupStage = DocumentSourceLookUp::createFromBson(originalBSON.firstElement(), expCtx);
+
+    //
+    // Serialize the $lookup stage and confirm contents.
+    //
+    vector<Value> serialization;
+    static const UnorderedFieldsBSONObjComparator kComparator;
+    lookupStage->serializeToArray(serialization);
+    auto serializedBSON = serialization[0].getDocument().toBson();
+    ASSERT_EQ(kComparator.compare(serializedBSON, originalBSON), 0);
+
+    auto roundTripped = DocumentSourceLookUp::createFromBson(serializedBSON.firstElement(), expCtx);
+
+    vector<Value> newSerialization;
+    roundTripped->serializeToArray(newSerialization);
+
+    ASSERT_EQ(newSerialization.size(), 1UL);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace that isn't
+// config.cache.chunks*.
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadDBAndColl) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            fromjson("{$lookup: {from: {db: 'test', coll: 'coll'}, as: 'as', pipeline: []}}")
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::FailedToParse);
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace when "coll" is
+// "cache.chunks.*" but "db" is not "config".
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadColl) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("config", "coll");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    ASSERT_THROWS_CODE(
+        DocumentSourceLookUp::createFromBson(
+            fromjson("{$lookup: {from: {db: 'config', coll: 'coll'}, as: 'as', pipeline: []}}")
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        ErrorCodes::FailedToParse);
+}
+
+// $lookup : {from : {db: <>, coll: <>}} syntax fails when "db" is config but "coll" is
+// not "cache.chunks.*".
+TEST_F(DocumentSourceLookUpTest, RejectsPipelineFromDBAndCollWithBadDB) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "cache.chunks.test.foo");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    ASSERT_THROWS_CODE(DocumentSourceLookUp::createFromBson(
+                           fromjson("{$lookup: {from: {db: 'test', coll: 'cache.chunks.test.foo'}, "
+                                    "as: 'as', pipeline: []}}")
+                               .firstElement(),
+                           expCtx),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+// Tests that $lookup distributedPlanLogic() is boost::none, allowing for the stage to run on each
+// shard, when it reads from config.cache.chunks.* namespaces using from: {db: <> , coll: <> }
+// syntax.
+TEST_F(DocumentSourceLookUpTest, FromDBAndCollDistributedPlanLogic) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("config", "cache.chunks.test.foo");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from" << BSON("db"
+                                              << "config"
+                                              << "coll"
+                                              << "cache.chunks.test.foo")
+                                      << "let"
+                                      << BSON("local_x"
+                                              << "$x")
+                                      << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                      << "as"
+                                      << "as"))
+            .firstElement(),
+        expCtx);
+
+    ASSERT(!lookupStage->distributedPlanLogic());
+}
+
+// Tests $lookup distributedPlanLogic() is prohibited from executing on the shardsStage for standard
+// $lookup with from: <string> syntax.
+TEST_F(DocumentSourceLookUpTest, LookupDistributedPlanLogic) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "coll");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+
+    auto lookupStage = DocumentSourceLookUp::createFromBson(
+        BSON("$lookup" << BSON("from"
+                               << "coll"
+                               << "pipeline" << BSON_ARRAY(BSON("$match" << BSON("x" << 1))) << "as"
+                               << "as"))
+            .firstElement(),
+        expCtx);
+    ASSERT(lookupStage->distributedPlanLogic());
+    ASSERT(lookupStage->distributedPlanLogic()->shardsStage == nullptr);
+    ASSERT(lookupStage->distributedPlanLogic()->mergingStage != nullptr);
 }
 
 TEST(MakeMatchStageFromInput, NonArrayValueUsesEqQuery) {

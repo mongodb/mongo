@@ -2321,6 +2321,11 @@ public:
     virtual string shardPipeJson() = 0;
     virtual string mergePipeJson() = 0;
 
+    // Allows tests to override the default resolvedNamespaces.
+    virtual NamespaceString getLookupCollNs() {
+        return NamespaceString("a", "lookupColl");
+    }
+
     BSONObj pipelineFromJsonArray(const string& array) {
         return fromjson("{pipeline: " + array + "}");
     }
@@ -2342,7 +2347,7 @@ public:
 
         // For $graphLookup and $lookup, we have to populate the resolvedNamespaces so that the
         // operations will be able to have a resolved view definition.
-        NamespaceString lookupCollNs("a", "lookupColl");
+        auto lookupCollNs = getLookupCollNs();
         ctx->setResolvedNamespace(lookupCollNs, {lookupCollNs, std::vector<BSONObj>{}});
 
         // Test that we can both split the pipeline and reassemble it into its original form.
@@ -2389,6 +2394,47 @@ class Empty : public Base {
         return "[]";
     }
 };
+
+// Since each shard has an identical copy of config.cache.chunks.* namespaces, $lookup from
+// config.cache.chunks.* should run on each shard in parallel.
+namespace lookupFromShardsInParallel {
+class LookupWithDBAndColl : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: {db: 'config', coll: 'cache.chunks.test.foo'}, as: 'results', "
+               "localField: 'x', foreignField: '_id'}}]";
+    }
+    string shardPipeJson() {
+        return inputPipeJson();
+    }
+
+    string mergePipeJson() {
+        return "[]";
+    }
+
+    NamespaceString getLookupCollNs() override {
+        return {"config", "cache.chunks.test.foo"};
+    }
+};
+
+class LookupWithLetWithDBAndColl : public Base {
+    string inputPipeJson() {
+        return "[{$lookup: {from: {db: 'config', coll: 'cache.chunks.test.foo'}, as: 'results', "
+               "let: {x_field: '$x'}, pipeline: []}}]";
+    }
+    string shardPipeJson() {
+        return inputPipeJson();
+    }
+
+    string mergePipeJson() {
+        return "[]";
+    }
+
+    NamespaceString getLookupCollNs() override {
+        return {"config", "cache.chunks.test.foo"};
+    }
+};
+
+}  // namespace lookupFromShardsInParallel
 
 namespace moveFinalUnwindFromShardsToMerger {
 
@@ -4030,6 +4076,8 @@ public:
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
                 ShardedMatchSortProjLimBecomesMatchTopKSortProj>();
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
+        add<Optimizations::Sharded::lookupFromShardsInParallel::LookupWithDBAndColl>();
+        add<Optimizations::Sharded::lookupFromShardsInParallel::LookupWithLetWithDBAndColl>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::Out>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::MergeWithUnshardedCollection>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::MergeWithShardedCollection>();

@@ -231,10 +231,14 @@ bool NamespaceString::isNamespaceAlwaysUnsharded() const {
         return true;
 
     if (ns() == "config.cache.databases" || ns() == "config.cache.collections" ||
-        (db() == "config" && coll().startsWith("cache.chunks")))
+        isConfigDotCacheDotChunks())
         return true;
 
     return false;
+}
+
+bool NamespaceString::isConfigDotCacheDotChunks() const {
+    return db() == "config" && coll().startsWith("cache.chunks.");
 }
 
 bool NamespaceString::isReplicated() const {
