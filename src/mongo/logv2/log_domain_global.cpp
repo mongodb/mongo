@@ -157,14 +157,6 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
     }
 #endif
 
-    if (options.consoleEnabled && _consoleSink.use_count() == 1) {
-        boost::log::core::get()->add_sink(_consoleSink);
-    }
-
-    if (!options.consoleEnabled && _consoleSink.use_count() > 1) {
-        boost::log::core::get()->remove_sink(_consoleSink);
-    }
-
     if (options.fileEnabled) {
         auto backend = boost::make_shared<RotatableFileBackend>(
             boost::make_shared<FileRotateSink>(options.timestampFormat),
@@ -212,6 +204,16 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
     }
 
     _config = options;
+
+    if (options.consoleEnabled) {
+        if (_consoleSink.use_count() == 1) {
+            boost::log::core::get()->add_sink(_consoleSink);
+        }
+    } else {
+        if (_consoleSink.use_count() > 1) {
+            boost::log::core::get()->remove_sink(_consoleSink);
+        }
+    }
 
     return Status::OK();
 }
