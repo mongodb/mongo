@@ -73,6 +73,43 @@ void getLeafNodes(QuerySolutionNode* root, vector<QuerySolutionNode*>* leafNodes
 }
 
 /**
+ * Determines if the query solution node 'node' is a FETCH node with an IXSCAN child node.
+ */
+bool isFetchNodeWithIndexScanChild(const QuerySolutionNode* node) {
+    return (STAGE_FETCH == node->getType() && node->children.size() == 1 &&
+            STAGE_IXSCAN == node->children[0]->getType());
+}
+
+/**
+ * Walks the tree 'root' and outputs all nodes that can be considered for explosion for sort.
+ * Outputs FETCH nodes with an IXSCAN node as a child as well as singular IXSCAN leaves without a
+ * FETCH as a parent into 'explodableNodes'.
+ */
+void getExplodableNodes(QuerySolutionNode* root, vector<QuerySolutionNode*>* explodableNodes) {
+    if (STAGE_IXSCAN == root->getType() || isFetchNodeWithIndexScanChild(root)) {
+        explodableNodes->push_back(root);
+    } else {
+        for (auto&& childNode : root->children) {
+            getExplodableNodes(childNode, explodableNodes);
+        }
+    }
+}
+
+/**
+ * Returns the IXSCAN node from the tree 'node' that can be either a IXSCAN node or a FETCH node
+ * with an IXSCAN node as a child.
+ */
+const IndexScanNode* getIndexScanNode(const QuerySolutionNode* node) {
+    if (STAGE_IXSCAN == node->getType()) {
+        return static_cast<const IndexScanNode*>(node);
+    } else if (isFetchNodeWithIndexScanChild(node)) {
+        return static_cast<const IndexScanNode*>(node->children[0]);
+    }
+    MONGO_UNREACHABLE;
+    return nullptr;
+}
+
+/**
  * Returns true if every interval in 'oil' is a point, false otherwise.
  */
 bool isUnionOfPoints(const OrderedIntervalList& oil) {
@@ -115,16 +152,16 @@ bool structureOKForExplode(QuerySolutionNode* solnRoot, QuerySolutionNode** toRe
         return true;
     }
 
-    if (STAGE_FETCH == solnRoot->getType()) {
-        if (STAGE_IXSCAN == solnRoot->children[0]->getType()) {
-            *toReplace = solnRoot->children[0];
-            return true;
-        }
+    if (isFetchNodeWithIndexScanChild(solnRoot)) {
+        *toReplace = solnRoot->children[0];
+        return true;
     }
 
+    // If we have a STAGE_OR, we can explode only when all children are either IXSCANs or FETCHes
+    // that have an IXSCAN as a child.
     if (STAGE_OR == solnRoot->getType()) {
-        for (size_t i = 0; i < solnRoot->children.size(); ++i) {
-            if (STAGE_IXSCAN != solnRoot->children[i]->getType()) {
+        for (auto&& child : solnRoot->children) {
+            if (STAGE_IXSCAN != child->getType() && !isFetchNodeWithIndexScanChild(child)) {
                 return false;
             }
         }
@@ -184,9 +221,9 @@ void makeCartesianProduct(const IndexBounds& bounds,
 }
 
 /**
- * Take the provided index scan node 'isn'. Returns a list of index scans which are
- * logically equivalent to 'isn' if joined by a MergeSort through the out-parameter
- * 'explosionResult'. These index scan instances are owned by the caller.
+ * Takes the provided 'node', either an IndexScanNode or FetchNode with a direct child that is an
+ * IndexScanNode. Returns a list of nodes which are logically equivalent to 'node' if joined by a
+ * MergeSort through the out-parameter 'explosionResult'. These nodes are owned by the caller.
  *
  * fieldsToExplode is a count of how many fields in the scan's bounds are the union of point
  * intervals.  This is computed beforehand and provided as a small optimization.
@@ -194,18 +231,21 @@ void makeCartesianProduct(const IndexBounds& bounds,
  * Example:
  *
  * For the query find({a: {$in: [1,2]}}).sort({b: 1}) using the index {a:1, b:1}:
- * 'isn' will be scan with bounds a:[[1,1],[2,2]] & b: [MinKey, MaxKey]
+ * 'node' will be a scan with multi-interval bounds a: [[1, 1], [2, 2]], b: [MinKey, MaxKey]
  * 'sort' will be {b: 1}
  * 'fieldsToExplode' will be 1 (as only one field isUnionOfPoints).
  *
  * On return, 'explosionResult' will contain the following two scans:
- * a:[[1,1]], b:[MinKey, MaxKey]
- * a:[[2,2]], b:[MinKey, MaxKey]
+ * a: [[1, 1]], b: [MinKey, MaxKey]
+ * a: [[2, 2]], b: [MinKey, MaxKey]
  */
-void explodeScan(const IndexScanNode* isn,
+void explodeNode(const QuerySolutionNode* node,
                  const BSONObj& sort,
                  size_t fieldsToExplode,
                  vector<QuerySolutionNode*>* explosionResult) {
+    // Get the 'isn' from either the FetchNode or IndexScanNode.
+    const IndexScanNode* isn = getIndexScanNode(node);
+
     // Turn the compact bounds in 'isn' into a bunch of points...
     vector<PointPrefix> prefixForScans;
     makeCartesianProduct(isn->bounds, fieldsToExplode, &prefixForScans);
@@ -234,7 +274,23 @@ void explodeScan(const IndexScanNode* isn,
         for (size_t j = fieldsToExplode; j < isn->bounds.fields.size(); ++j) {
             child->bounds.fields[j] = isn->bounds.fields[j];
         }
-        explosionResult->push_back(child);
+
+        // If the explosion is on a FetchNode, make a copy and add the 'isn' as a child.
+        if (STAGE_FETCH == node->getType()) {
+            auto origFetchNode = static_cast<const FetchNode*>(node);
+            auto newFetchNode = std::make_unique<FetchNode>();
+
+            // Copy the FETCH's filter, if it exists.
+            if (origFetchNode->filter.get()) {
+                newFetchNode->filter = origFetchNode->filter->shallowClone();
+            }
+
+            // Add the 'child' IXSCAN under the FETCH stage, and the FETCH stage to the result set.
+            newFetchNode->children.push_back(child);
+            explosionResult->push_back(newFetchNode.release());
+        } else {
+            explosionResult->push_back(child);
+        }
     }
 }
 
@@ -530,31 +586,31 @@ BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
 bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
                                           const QueryPlannerParams& params,
                                           QuerySolutionNode** solnRoot) {
-    vector<QuerySolutionNode*> leafNodes;
+    vector<QuerySolutionNode*> explodableNodes;
 
     QuerySolutionNode* toReplace;
     if (!structureOKForExplode(*solnRoot, &toReplace)) {
         return false;
     }
 
-    getLeafNodes(*solnRoot, &leafNodes);
+    // Find explodable nodes in the subtree rooted at 'toReplace'.
+    getExplodableNodes(toReplace, &explodableNodes);
 
     const BSONObj& desiredSort = query.getQueryRequest().getSort();
 
     // How many scan leaves will result from our expansion?
     size_t totalNumScans = 0;
 
-    // The value of entry i is how many scans we want to blow up for leafNodes[i].
-    // We calculate this in the loop below and might as well reuse it if we blow up
-    // that scan.
+    // The value of entry i is how many scans we want to blow up for explodableNodes[i]. We
+    // calculate this in the loop below and might as well reuse it if we blow up that scan.
     vector<size_t> fieldsToExplode;
 
     // The sort order we're looking for has to possibly be provided by each of the index scans
     // upon explosion.
-    for (size_t i = 0; i < leafNodes.size(); ++i) {
+    for (auto&& explodableNode : explodableNodes) {
         // We can do this because structureOKForExplode is only true if the leaves are index
         // scans.
-        IndexScanNode* isn = static_cast<IndexScanNode*>(leafNodes[i]);
+        IndexScanNode* isn = const_cast<IndexScanNode*>(getIndexScanNode(explodableNode));
         const IndexBounds& bounds = isn->bounds;
 
         // Not a point interval prefix, can't try to rewrite.
@@ -662,9 +718,8 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
     // get our sort order via ixscan blow-up.
     MergeSortNode* merge = new MergeSortNode();
     merge->sort = desiredSort;
-    for (size_t i = 0; i < leafNodes.size(); ++i) {
-        IndexScanNode* isn = static_cast<IndexScanNode*>(leafNodes[i]);
-        explodeScan(isn, desiredSort, fieldsToExplode[i], &merge->children);
+    for (size_t i = 0; i < explodableNodes.size(); ++i) {
+        explodeNode(explodableNodes[i], desiredSort, fieldsToExplode[i], &merge->children);
     }
 
     merge->computeProperties();

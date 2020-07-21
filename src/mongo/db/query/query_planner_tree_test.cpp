@@ -929,7 +929,7 @@ TEST_F(QueryPlannerTest, ExplodeOrForSort2) {
 }
 
 // SERVER-13754: an $or that can't be exploded, because one clause of the
-// $or does provide the sort, even after explosion.
+// $or doesn't provide the sort, even after explosion.
 TEST_F(QueryPlannerTest, CantExplodeOrForSort) {
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
     addIndex(BSON("d" << 1 << "c" << 1));
@@ -947,45 +947,39 @@ TEST_F(QueryPlannerTest, CantExplodeOrForSort) {
         "{ixscan: {pattern: {d: 1, c: 1}}}]}}}}}}");
 }
 
-// SERVER-13754: too many scans in an $or explosion.
+// Verifies that the $or is not exploded due to too many ixscans in the explosion.
 TEST_F(QueryPlannerTest, TooManyToExplodeOr) {
-    addIndex(BSON("a" << 1 << "e" << 1));
-    addIndex(BSON("b" << 1 << "e" << 1));
-    addIndex(BSON("c" << 1 << "e" << 1));
-    addIndex(BSON("d" << 1 << "e" << 1));
-    runQuerySortProj(fromjson("{$or: [{a: {$in: [1,2,3,4,5,6]},"
-                              "b: {$in: [1,2,3,4,5,6]}},"
-                              "{c: {$in: [1,2,3,4,5,6]},"
-                              "d: {$in: [1,2,3,4,5,6]}}]}"),
+    addIndex(BSON("a" << 1 << "b" << 1 << "e" << 1));
+    addIndex(BSON("b" << 1 << "c" << 1 << "e" << 1));
+    // Both branches of the $or have 2 indexed predicates with an 11-element $in, which will
+    // generate a total of 2*(11^2)=242 scans when exploded. This exceeds the permitted limit of
+    // 200.
+    runQuerySortProj(fromjson("{$or: [{a: {$in: [1,2,3,4,5,6,7,8,9,10,11]},"
+                              "b: {$in: [1,2,3,4,5,6,7,8,9,10,11]},"
+                              "d: {$in: [1, 2]}},"
+                              "{c: {$in: [1,2,3,4,5,6,7,8,9,10,11]},"
+                              "b: {$in: [1,2,3,4,5,6,7,8,9,10,11]}}]}"),
                      BSON("e" << 1),
                      BSONObj());
 
     // We cap the # of ixscans we're willing to create, so we don't get explosion. Instead
-    // we get 5 different solutions which all use a blocking sort.
-    assertNumSolutions(5U);
+    // we get 3 different solutions which all use a blocking sort.
+    assertNumSolutions(3U);
     assertSolutionExists(
         "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
         "{cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
+        "{fetch: {node: "
+        "{sort: {pattern: {e: 1}, limit: 0, type: 'default', node: "
         "{or: {nodes: ["
-        "{fetch: {node: {ixscan: {pattern: {a: 1, e: 1}}}}},"
-        "{fetch: {node: {ixscan: {pattern: {c: 1, e: 1}}}}}]}}}}");
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1, e: 1}}}}},"
+        "{ixscan: {pattern: {b: 1, c: 1, e: 1}}}]}}}}}}");
     assertSolutionExists(
-        "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
+        "{fetch: {node: "
+        "{sort: {pattern: {e: 1}, limit: 0, type: 'default', node: "
         "{or: {nodes: ["
-        "{fetch: {node: {ixscan: {pattern: {b: 1, e: 1}}}}},"
-        "{fetch: {node: {ixscan: {pattern: {c: 1, e: 1}}}}}]}}}}");
-    assertSolutionExists(
-        "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
-        "{or: {nodes: ["
-        "{fetch: {node: {ixscan: {pattern: {a: 1, e: 1}}}}},"
-        "{fetch: {node: {ixscan: {pattern: {d: 1, e: 1}}}}}]}}}}");
-    assertSolutionExists(
-        "{sort: {pattern: {e: 1}, limit: 0, type: 'simple', node: "
-        "{or: {nodes: ["
-        "{fetch: {node: {ixscan: {pattern: {b: 1, e: 1}}}}},"
-        "{fetch: {node: {ixscan: {pattern: {d: 1, e: 1}}}}}]}}}}");
+        "{ixscan: {pattern: {b: 1, c: 1, e: 1}}},"
+        "{fetch: {node: {ixscan: {pattern: {b: 1, c: 1, e: 1}}}}}]}}}}}}");
 }
 
 // SERVER-15696: Make sure explodeForSort copies filters on IXSCAN stages to all of the
@@ -1009,6 +1003,66 @@ TEST_F(QueryPlannerTest, ExplodeIxscanWithFilter) {
         "filter: {b: {$regex: 'foo', $options: 'i'}}}},"
         "{ixscan: {pattern: {a:1, b:1},"
         "filter: {b: {$regex: 'foo', $options: 'i'}}}}]}}}}");
+}
+
+// Verifies that a OR > FETCH > IXSCAN plan is exploded for sort.
+TEST_F(QueryPlannerTest, ExplodeForSortIxscanFetchOr) {
+    addIndex(BSON("a" << 1 << "x" << 1));
+    addIndex(BSON("b" << 1 << "x" << 1));
+
+    // Field 'c' is not covered by an index and forces an introduction of a FETCH stage to form
+    // OR > FETCH > IXSCAN tree.
+    runQuerySortProj(fromjson("{$or: [{a: {$in: [1,2]}, c: 1}, {b: {$in: [3,4]}, c: 2}]}"),
+                     BSON("x" << 1),
+                     BSONObj());
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {x: 1}, limit: 0, type: 'simple', node:"
+        "{cscan: {dir: 1}}}}}");
+    assertSolutionExists(
+        "{mergeSort: {nodes:"
+        "[{fetch: {filter: {c: 1}, node:"
+        "{ixscan: {bounds: {a: [[1,1,true,true]], x: [['MinKey','MaxKey',true,true]]},"
+        "pattern: {a:1, x:1}}}}},"
+        "{fetch: {filter: {c: 1}, node:"
+        "{ixscan: {bounds: {a: [[2,2,true,true]], x: [['MinKey','MaxKey',true,true]]},"
+        "pattern: {a:1, x:1}}}}},"
+        "{fetch: {filter: {c: 2}, node:"
+        "{ixscan: {bounds: {b: [[3,3,true,true]], x: [['MinKey','MaxKey',true,true]]},"
+        "pattern: {b:1, x:1}}}}},"
+        "{fetch: {filter: {c: 2}, node:"
+        "{ixscan: {bounds: {b: [[4,4,true,true]], x: [['MinKey','MaxKey',true,true]]},"
+        "pattern: {b:1, x:1}}}}}]}}");
+}
+
+// Verifies that a mix of OR > IXSCAN and OR > FETCH > IXSCAN plan structures is exploded for sort.
+TEST_F(QueryPlannerTest, ExplodeForSortIxscanFetchOrAndIxscanOr) {
+    addIndex(BSON("a" << 1 << "x" << 1));
+    addIndex(BSON("b" << 1 << "x" << 1));
+
+    // Field 'c' is not covered by an index and forces an introduction of a FETCH stage to form
+    // OR > FETCH > IXSCAN tree.
+    runQuerySortProj(
+        fromjson("{$or: [{a: {$in: [1,2]}, c: 1}, {b: {$in: [3,4]}}]}"), BSON("x" << 1), BSONObj());
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {pattern: {x: 1}, limit: 0, type: 'simple', node:"
+        "{cscan: {dir: 1}}}}}");
+    assertSolutionExists(
+        "{fetch: {node:"
+        "{mergeSort: {nodes:"
+        "[{fetch: {filter: {c: 1}, node:"
+        "{ixscan: {bounds: {a: [[1,1,true,true]], x: [['MinKey','MaxKey',true,true]]},"
+        "pattern: {a:1, x:1}}}}},"
+        "{fetch: {filter: {c: 1}, node:"
+        "{ixscan: {bounds: {a: [[2,2,true,true]], x: [['MinKey','MaxKey',true,true]]},"
+        "pattern: {a:1, x:1}}}}},"
+        "{ixscan: {bounds: {b: [[3,3,true,true]], x: [['MinKey','MaxKey',true,true]]},"
+        "pattern: {b:1, x:1}}},"
+        "{ixscan: {bounds: {b: [[4,4,true,true]], x: [['MinKey','MaxKey',true,true]]},"
+        "pattern: {b:1, x:1}}}]}}}}");
 }
 
 TEST_F(QueryPlannerTest, InWithSortAndLimitTrailingField) {

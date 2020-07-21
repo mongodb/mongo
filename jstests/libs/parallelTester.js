@@ -221,6 +221,7 @@ if (typeof _threadInject != "undefined") {
             var requires_find_command = [
                 "apply_ops_system_dot_views.js",
                 "explode_for_sort_collation.js",
+                "explode_for_sort_fetch.js",
                 "update_pipeline_shell_helpers.js",
                 "update_with_pipeline.js",
                 "views/dbref_projection.js",
