@@ -165,6 +165,18 @@ public:
     virtual NamespaceString getStateDocumentsNS() const = 0;
 
     /**
+     * Virtual shutdown method where derived services can put their specific shutdown logic.
+     */
+    virtual void shutdownImpl() = 0;
+
+    /**
+     * Releases all running Instances, then shuts down and joins _executor, ensuring that there are
+     * no remaining tasks running.
+     * Ends by calling shutdownImpl so that derived services can clean up their local state.
+     */
+    void shutdown();
+
+    /**
      * Called on transition to primary. Resumes any running Instances of this service
      * based on their persisted state documents. Also joins() any outstanding jobs from the previous
      * term, thereby ensuring that two Instance objects with the same InstanceID cannot coexist.
@@ -178,12 +190,6 @@ public:
      * next stepUp. Also shuts down _executor, forcing all outstanding jobs to complete.
      */
     void onStepDown();
-
-    /**
-     * Releases all running Instances, then shuts down and joins _executor, ensuring that there are
-     * no remaining tasks running.
-     */
-    void shutdown();
 
     /**
      * Writes the given 'initialState' object to the service's state document collection and then

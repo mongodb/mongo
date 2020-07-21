@@ -95,6 +95,12 @@ public:
         return std::make_unique<executor::ScopedTaskExecutor>(_executor);
     }
 
+    void shutdownImpl() override {
+        _executor->shutdown();
+        _executor->join();
+        _executor.reset();
+    }
+
     class Instance final : public PrimaryOnlyService::TypedInstance<Instance> {
     public:
         Instance(const BSONObj& state)
@@ -153,6 +159,7 @@ public:
         _service = _registry->lookupService("TestService");
         ASSERT(_service);
     }
+
     void tearDown() override {
         _registry->shutdown();
         _registry.reset();

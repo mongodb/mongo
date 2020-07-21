@@ -149,20 +149,24 @@ void PrimaryOnlyService::onStepDown() {
 }
 
 void PrimaryOnlyService::shutdown() {
-    std::unique_ptr<executor::ScopedTaskExecutor> savedExecutor;
-
     {
-        stdx::lock_guard lk(_mutex);
+        std::unique_ptr<executor::ScopedTaskExecutor> savedExecutor;
 
-        _executor.swap(savedExecutor);
-        _state = State::kShutdown;
-        _instances.clear();
+        {
+            stdx::lock_guard lk(_mutex);
+
+            _executor.swap(savedExecutor);
+            _state = State::kShutdown;
+            _instances.clear();
+        }
+
+        if (savedExecutor) {
+            (*savedExecutor)->shutdown();
+            (*savedExecutor)->join();
+        }
     }
 
-    if (savedExecutor) {
-        (*savedExecutor)->shutdown();
-        (*savedExecutor)->join();
-    }
+    shutdownImpl();
 }
 
 SemiFuture<PrimaryOnlyService::InstanceID> PrimaryOnlyService::startNewInstance(
