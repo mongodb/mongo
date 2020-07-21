@@ -367,6 +367,10 @@ Status _collModInternal(OperationContext* opCtx,
         }
     }
 
+    if (view) {
+        Lock::CollectionLock collLock(opCtx, view->viewOn(), MODE_IS);
+        assertMovePrimaryInProgress(opCtx, view->viewOn());
+    }
     // This can kill all cursors so don't allow running it while a background operation is in
     // progress.
     if (coll) {
