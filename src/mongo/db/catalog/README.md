@@ -842,19 +842,168 @@ that checkpoint's timestamp is known as the
 ## Table Ident Resolution
 
 # File-System Backups
+Backups represent a full copy of the data files at a point-in-time. These copies of the data files
+can be used to recover data from a consistent state at an earlier time. This technique is commonly
+used after a disaster ensued in the database.
+
+The data storage requirements for backups can be large as they correlate to the size of the
+database. This can be alleviated by using a technique called incremental backups. Incremental
+backups only back up the data that has changed since the last backup.
+
+MongoDB instances used in production should have a strategy in place for capturing and restoring
+backups in the case of data loss events.
+
+[Documentation for further reading.](https://docs.mongodb.com/manual/core/backups/)
 
 ## How To Take a Backup
 
-## How To Use Backed Up Datafiles
-describe the different ways backed up datafiles can be used
+### Open a Backup Cursor
+To open a backup cursor, the aggregate command with the `$backupCursor` pipeline must be used.
 
-explain how datafiles persist a machine’s identity which must be manipulated for some kinds of restores
+`let cursor = db.runCommand({aggregate: 1, pipeline: [{$backupCursor: {}}], cursor: {}})`
 
-## Replica Set Backup
+The cursor will implicitly be created as a tailable cursor. A tailable cursor remains open after the
+client exhausts the results in the cursor.
 
-## Sharding Backup
+For a sharded cluster, a backup cursor will need to be open on one member of each shard and one
+member of the config server replica set.
 
-## Queryable Backup (Read-Only)
+### Consume the Results
+When iterating through the contents of the backup cursor, there are a couple of things to be aware
+of.
+
+* The metadata document
+  * This is always the first document in the response. It has one key, `metadata` and its value is a
+    sub-document.
+    * `backupId` is the UUID of the backup, this is unused for replica sets.
+    * `dbpath` is the directory mongod is running against. This is always reported as an absolute
+      path.
+    * `oplogStart` and `oplogEnd` are both guaranteed to be in the oplog on the copied data files.
+      There exist documents earlier than the `oplogStart` and documents later than the `oplogEnd`,
+      the values are conservative in that respect.
+    * `checkpointTimestamp` is the state of the data if brought up in standalone mode. The data can
+      be "played forward" to any time later than the `checkpointTimestamp`. Opening backup cursors
+      against a standalone and replica set nodes in initial sync should not report a
+      `checkpointTimestamp`.
+    * The value used for the `disableIncrementalBackup` option, which turns off the storage of
+      incremental history.
+    * The value used for the `incrementalBackup` option, which is used to determine whether to take
+      an incremental backup.
+    * The value used for the `blockSize` option, which allows the granularity to be specified when
+      tracking a range of files to be included in a backup. 
+    * The value used for the `thisBackupName` option, which tags the backup being taken with that
+      name.
+    * The value used for the `srcBackupName` option, which is the backup name that is used as the
+      base for the incremental backup being taken.
+
+* The file document
+  * The other variety of documents represent the files to be copied as part of the backup.
+  * For non-incremental backups, the documents returned have the following format.
+    * `filename`: The absolute path of the filename.
+    * `fileSize`: The size of the file at `filename`.
+  * For incremental backups, the documents returned can have one of two formats returned.
+    * If a file remained unchanged in the incremental backup, then it will return the document in
+      the same format as non-incremental backups.
+    * Otherwise, if an incremental backup of a file is taken, the following format is returned.
+      * `filename`: The absolute path of the filename.
+      * `fileSize`: The size of the file at `filename`.
+      * `offset`: The offset at `filename` where the bytes should start being copied from.
+      * `length`: The number of bytes to copy starting at `offset` in `filename`. The client is
+        responsible for coping with EOF (end of file) errors. They are expected and benign.
+
+### Copy Files While Sending Heartbeats
+To prevent MongoDB from releasing the backup cursor's resources while copying files and start
+overwriting data that was previously reserved for the backup, a `getMore` request must be sent at
+least once every 10 minutes. Sending a `getMore` request is how this algorithm does heartbeats. 
+While copying files, WiredTiger still accepts writes and persists data while a backup cursor is 
+open. This means the files being copied can be getting changed while the copy is happening. Thus,
+the first important property of backup cursors is that WiredTiger will never change the bytes in a
+file that is important to the backup. The second property is the number of bytes to copy can be
+determined right after the backup cursor is opened.
+
+A valid heartbeat will respond with `{ok: 1}`.
+A heartbeat after storage has released resources responds with `{ok: 0}` and a
+`CursorNotFound` error.
+
+### Determine the Backup/Restore Point in Time (Sharded Cluster Only)
+Once all backup cursors have been opened, set the `backupPointInTime` to be the max of all
+`checkpointTimestamps`.
+
+`backupPointInTime = restorePointInTime = max(checkpointTimestamp0, ..., checkpointTimestampN)`
+
+### Extending the Backup Cursor on Each Node (Sharded Cluster Only)
+To extend the backup cursor, the aggregate command with the `$backupCursorExtend` pipeline must be
+used.
+
+`let cursor = db.runCommand({aggregate: 1, pipeline:  [{$backupCursorExtend: {backupId:<backupId>, timestamp: <backupPointInTime>}}], cursor: {}})`
+
+The backupId was returned in the `metadata` document from the `$backupCursor` command. The cursor
+will be created as a non-tailable cursor. The command may not return immediately because it may wait
+for the node to have the full oplog history up to the backup point in time.
+
+### Consume and Copy the Results in the Extended Backup Cursor (Sharded Cluster Only)
+All the documents represent the additional journal files to be copied as part of the backup. The
+`filename` is always reported as an absolute path. Additionally, the `fileSize` of the `filename` is
+provided too.
+
+### Close the Backup Cursor
+After all files have been copied, the backup process must send the `killCursors` command and
+receive a successful response. A successful response will include the `cursorId` that was sent as
+part of the request in the response's `cursorsKilled` array. If the `cursorId` is found in any
+other field, the `killCursors` request was not successful.
+
+## How To Use Backed Up Data Files
+
+### Replica Set Backup
+There are two approaches that can be taken when restoring the data files for a replica set node.
+
+* Initial Sync via Restore
+
+  When using backed-up data to seed an initial sync (whether for a new node, or an existing node),
+  there should not be a need to throw away any writes. The most recent version of the data is
+  suitable.
+
+  It's sufficient to copy the backed up files into place and start a mongod instance on them.
+
+  If the node is already part of a replica set, no further commands are necessary. Otherwise, all
+  that's left is to add the node to the replica set config.
+
+* Cloning Data into a New Replica Set
+
+  When using backed-up data to startup a new replica set, there's more flexibility in choosing the
+  restore point as there are still writes that need to be replayed from the oplog. The oplog can be
+  truncated after a certain point by setting the `db.replset.oplogTruncateAfterPoint` document to
+  the desired point in time.
+
+  The nodes will first need to be started up in standalone mode to perform their recoveries. Any
+  previous replica set configuration should be replaced with the new one. Afterwards, all the nodes
+  will need to be restarted with the `--replSet` option.
+
+### Sharding Backup
+
+Larger data sets that use sharding to distribute the data across multiple machines require a more
+complex backup and restore technique. The technique for backing up a sharded cluster was described
+[above](#open-a-backup-cursor).
+
+With the backed-up data from a sharded cluster backup, we can obtain a completely consistent point
+in time across the entire cluster.
+
+Standalone mongod instances will be needed on the data files of each node. The previous replica set
+configuration and other non-oplog replication related collections will need to be removed. The
+previous shards configuration will need to be replaced with the new shards configuration document on
+the config server's data files. Additionally the `shardIdentity` document needs to be updated and
+the cache collections in the config databases must be dropped.
+
+[Additional documentation on sharded cluster backup and restore.](https://docs.mongodb.com/manual/administration/backup-sharded-clusters/)
+
+### Queryable Backup (Read-Only)
+This is a feature provided by Ops Manager in which Ops Manager quickly and securely makes a given
+snapshot accessible over a MongoDB connection string.
+
+Queryable backups start-up quickly regardless of the snapshot's total data size. They are uniquely
+useful for restoring a small subset of data, such as a document that was accidentally deleted or
+reading out a single collection. Queryable backups allow access to the snapshot for read-only
+operations.
 
 # Checkpoints
 
