@@ -343,7 +343,7 @@ __wt_meta_block_metadata(WT_SESSION_IMPL *session, const char *config, WT_CKPT *
         __wt_encrypt_size(session, kencryptor, a->size, &encrypt_size);
         WT_ERR(__wt_buf_grow(session, b, encrypt_size));
         WT_ERR(__wt_encrypt(session, kencryptor, 0, a, b));
-        WT_ERR(__wt_buf_grow(session, a, b->size * 2));
+        WT_ERR(__wt_buf_grow(session, a, b->size * 2 + 1));
         __wt_fill_hex(b->mem, b->size, a->mem, a->memsize, &a->size);
 
         metadata = a->data;
@@ -409,8 +409,7 @@ __ckpt_valid_blk_mods(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
          * - Our entry's id string matches the current global information. We just want to add our
          *   information to the existing list.
          * - Our entry's id string does not match the current one. It is outdated. Free old
-         * resources
-         *   and then set up our entry.
+         * resources and then set up our entry.
          */
 
         /* Check if the global entry is valid at our index.  */
