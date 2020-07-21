@@ -305,7 +305,7 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
 
 PlanExecutor::ExecState PlanExecutorImpl::getNext(BSONObj* objOut, RecordId* dlOut) {
     const auto state = getNextDocument(&_docOutput, dlOut);
-    if (objOut) {
+    if (objOut && state == ExecState::ADVANCED) {
         const bool includeMetadata = _expCtx && _expCtx->needsMerge;
         *objOut = includeMetadata ? _docOutput.toBsonWithMetaData() : _docOutput.toBson();
     }
