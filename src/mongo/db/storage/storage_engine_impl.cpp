@@ -78,7 +78,7 @@ StorageEngineImpl::StorageEngineImpl(std::unique_ptr<KVEngine> engine, StorageEn
       _supportsCappedCollections(_engine->supportsCappedCollections()) {
     uassert(28601,
             "Storage engine does not support --directoryperdb",
-            !(options.directoryPerDB && !_engine->supportsDirectoryPerDB()));
+            !(_options.directoryPerDB && !_engine->supportsDirectoryPerDB()));
 
     OperationContextNoop opCtx(_engine->newRecoveryUnit());
     loadCatalog(&opCtx);
