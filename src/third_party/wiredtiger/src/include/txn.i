@@ -1268,10 +1268,10 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE 
     if (!rollback && upd == NULL && cbt != NULL && CUR2BT(cbt)->type != BTREE_COL_FIX &&
       cbt->ins == NULL) {
         __wt_read_cell_time_window(cbt, cbt->ref, &tw);
-        if (tw.stop_txn != WT_TXN_MAX && tw.stop_ts != WT_TS_MAX)
-            rollback = !__wt_txn_visible(session, tw.stop_txn, tw.stop_ts);
+        if (WT_TIME_WINDOW_HAS_STOP(&tw))
+            rollback = !__wt_txn_tw_stop_visible(session, &tw);
         else
-            rollback = !__wt_txn_visible(session, tw.start_txn, tw.start_ts);
+            rollback = !__wt_txn_tw_start_visible(session, &tw);
     }
 
     if (rollback) {
