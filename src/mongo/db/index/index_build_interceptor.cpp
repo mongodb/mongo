@@ -94,10 +94,9 @@ void IndexBuildInterceptor::deleteTemporaryTables(OperationContext* opCtx) {
     }
 }
 
-Status IndexBuildInterceptor::recordDuplicateKeys(OperationContext* opCtx,
-                                                  const std::vector<BSONObj>& keys) {
+Status IndexBuildInterceptor::recordDuplicateKey(OperationContext* opCtx, const BSONObj& key) {
     invariant(_indexCatalogEntry->descriptor()->unique());
-    return _duplicateKeyTracker->recordKeys(opCtx, keys);
+    return _duplicateKeyTracker->recordKey(opCtx, key);
 }
 
 Status IndexBuildInterceptor::checkDuplicateKeyConstraints(OperationContext* opCtx) const {
@@ -276,27 +275,24 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
 
     auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {
-        InsertResult result;
-        auto status = accessMethod->insertKeys(opCtx,
-                                               {keySet.begin(), keySet.end()},
-                                               {},
-                                               MultikeyPaths{},
-                                               opRecordId,
-                                               options,
-                                               &result);
+        int64_t numInserted;
+        auto status = accessMethod->insertKeys(
+            opCtx,
+            {keySet.begin(), keySet.end()},
+            {},
+            MultikeyPaths{},
+            opRecordId,
+            options,
+            [=](const BSONObj& duplicateKey) {
+                return options.getKeysMode == IndexAccessMethod::GetKeysMode::kEnforceConstraints
+                    ? recordDuplicateKey(opCtx, duplicateKey)
+                    : Status::OK();
+            },
+            &numInserted);
         if (!status.isOK()) {
             return status;
         }
 
-        if (result.dupsInserted.size() &&
-            options.getKeysMode == IndexAccessMethod::GetKeysMode::kEnforceConstraints) {
-            status = recordDuplicateKeys(opCtx, result.dupsInserted);
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-
-        int64_t numInserted = result.numInserted;
         *keysInserted += numInserted;
         opCtx->recoveryUnit()->onRollback(
             [keysInserted, numInserted] { *keysInserted -= numInserted; });

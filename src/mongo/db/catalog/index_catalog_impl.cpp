@@ -1312,7 +1312,7 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
             *keysInsertedOut += inserted;
         }
     } else {
-        InsertResult result;
+        int64_t numInserted;
         status = index->accessMethod()->insertKeys(
             opCtx,
             keys,
@@ -1320,9 +1320,10 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
             multikeyPaths,
             loc,
             options,
-            &result);
+            nullptr,
+            &numInserted);
         if (keysInsertedOut) {
-            *keysInsertedOut += result.numInserted;
+            *keysInsertedOut += numInserted;
         }
     }
 

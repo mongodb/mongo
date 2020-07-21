@@ -58,39 +58,25 @@ void DuplicateKeyTracker::deleteTemporaryTable(OperationContext* opCtx) {
     _keyConstraintsTable->deleteTemporaryTable(opCtx);
 }
 
-Status DuplicateKeyTracker::recordKeys(OperationContext* opCtx, const std::vector<BSONObj>& keys) {
-    if (keys.size() == 0)
-        return Status::OK();
+Status DuplicateKeyTracker::recordKey(OperationContext* opCtx, const BSONObj& key) {
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    std::vector<BSONObj> toInsert;
-    toInsert.reserve(keys.size());
-    for (auto&& key : keys) {
-        BSONObjBuilder builder;
-        builder.append(kKeyField, key);
-
-        BSONObj obj = builder.obj();
-
-        toInsert.emplace_back(std::move(obj));
-    }
-
-    std::vector<Record> records;
-    records.reserve(keys.size());
-    for (auto&& obj : toInsert) {
-        records.emplace_back(Record{RecordId(), RecordData(obj.objdata(), obj.objsize())});
-    }
-
-    LOG(1) << "recording " << records.size() << " duplicate key conflicts on unique index: "
+    LOG(1) << "Index build: recording duplicate key conflict on unique index: "
            << _indexCatalogEntry->descriptor()->indexName();
 
-    WriteUnitOfWork wuow(opCtx);
-    std::vector<Timestamp> timestamps(records.size());
-    Status s = _keyConstraintsTable->rs()->insertRecords(opCtx, &records, timestamps);
-    if (!s.isOK())
-        return s;
+    auto status =
+        _keyConstraintsTable->rs()->insertRecord(opCtx, key.objdata(), key.objsize(), Timestamp());
+    if (!status.isOK())
+        return status.getStatus();
 
-    wuow.commit();
+    auto numDuplicates = _duplicateCounter.addAndFetch(1);
+    opCtx->recoveryUnit()->onRollback([this]() { _duplicateCounter.fetchAndAdd(-1); });
 
-    _duplicateCounter.fetchAndAdd(records.size());
+    if (numDuplicates % 1000 == 0) {
+        log() << "Index build: high number (" << numDuplicates
+              << ") of duplicate keys on unique index: "
+              << _indexCatalogEntry->descriptor()->indexName();
+    }
 
     return Status::OK();
 }
@@ -111,14 +97,12 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
             CurOp::get(opCtx)->setProgress_inlock(curopMessage, _duplicateCounter.load(), 1));
     }
 
-
     int resolved = 0;
     while (record) {
         resolved++;
-        BSONObj conflict = record->data.toBson();
-        BSONObj keyObj = conflict[kKeyField].Obj();
+        auto key = record->data.toBson();
 
-        auto status = index->dupKeyCheck(opCtx, keyObj);
+        auto status = index->dupKeyCheck(opCtx, key);
         if (!status.isOK())
             return status;
 

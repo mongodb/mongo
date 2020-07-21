@@ -184,7 +184,8 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
                                          const BSONObj& obj,
                                          const RecordId& loc,
                                          const InsertDeleteOptions& options,
-                                         InsertResult* result) {
+                                         KeyHandlerFn&& onDuplicateKey,
+                                         int64_t* numInserted) {
     invariant(options.fromIndexBuilder || !_btreeState->isHybridBuilding());
 
     BSONObjSet multikeyMetadataKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
@@ -205,7 +206,8 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
                       multikeyPaths,
                       loc,
                       options,
-                      result);
+                      std::move(onDuplicateKey),
+                      numInserted);
 }
 
 Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
@@ -214,7 +216,8 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
                                              const MultikeyPaths& multikeyPaths,
                                              const RecordId& loc,
                                              const InsertDeleteOptions& options,
-                                             InsertResult* result) {
+                                             KeyHandlerFn&& onDuplicateKey,
+                                             int64_t* numInserted) {
     bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
 
     // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
@@ -230,20 +233,15 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
                     _newInterface->insert(opCtx, key, recordId, !unique /* dupsAllowed */);
                 status = ret.getStatus();
 
-                // When duplicates are encountered and allowed, retry with dupsAllowed. Add the
-                // key to the output vector so callers know which duplicate keys were inserted.
+                // When duplicates are encountered and allowed, retry with dupsAllowed. Call
+                // onDuplicateKey() with the inserted duplicate key.
                 if (ErrorCodes::DuplicateKey == status.code() && options.dupsAllowed) {
                     invariant(unique);
                     ret = _newInterface->insert(opCtx, key, recordId, true /* dupsAllowed */);
                     status = ret.getStatus();
 
-                    // This is speculative in that the 'dupsInserted' vector is not used by any code
-                    // today. It is currently in place to test detecting duplicate key errors during
-                    // hybrid index builds. Duplicate detection in the future will likely not take
-                    // place in this insert() method.
-                    if (status.isOK() && result) {
-                        result->dupsInserted.push_back(key);
-                    }
+                    if (status.isOK() && onDuplicateKey)
+                        status = onDuplicateKey(key);
                 }
 
                 if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)
@@ -256,8 +254,8 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
         }
     }
 
-    if (result) {
-        result->numInserted += keys.size() + multikeyMetadataKeys.size();
+    if (numInserted) {
+        *numInserted = keys.size() + multikeyMetadataKeys.size();
     }
 
     if (shouldMarkIndexAsMultikey(keys, multikeyMetadataKeys, multikeyPaths)) {
@@ -650,12 +648,8 @@ int64_t AbstractIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
 Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
                                              BulkBuilder* bulk,
                                              bool dupsAllowed,
-                                             set<RecordId>* dupRecords,
-                                             std::vector<BSONObj>* dupKeysInserted) {
-    // Cannot simultaneously report uninserted duplicates 'dupRecords' and inserted duplicates
-    // 'dupKeysInserted'.
-    invariant(!(dupRecords && dupKeysInserted));
-
+                                             KeyHandlerFn&& onDuplicateKey,
+                                             set<RecordId>* dupRecords) {
     Timer timer;
 
     std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->done());
@@ -726,8 +720,10 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
         previousKey = data.first.getOwned();
 
-        if (isDup && dupsAllowed && dupKeysInserted) {
-            dupKeysInserted->push_back(data.first.getOwned());
+        if (isDup) {
+            status = onDuplicateKey(data.first);
+            if (!status.isOK())
+                return status;
         }
 
         // If we're here either it's a dup and we're cool with it or the addKey went just fine.

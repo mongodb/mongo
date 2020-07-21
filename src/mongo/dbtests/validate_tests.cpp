@@ -37,6 +37,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
@@ -822,7 +823,7 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             int64_t numDeleted;
-            InsertResult insertResult;
+            int64_t numInserted;
             const BSONObj actualKey = BSON("a" << 1);
             const BSONObj badKey = BSON("a" << -1);
             InsertDeleteOptions options;
@@ -838,10 +839,10 @@ public:
                          nullptr);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
-            auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, &insertResult);
+            auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, nullptr, &numInserted);
 
             ASSERT_EQUALS(numDeleted, 1);
-            ASSERT_EQUALS(insertResult.numInserted, 1);
+            ASSERT_EQUALS(numInserted, 1);
             ASSERT_OK(removeStatus);
             ASSERT_OK(insertStatus);
             wunit.commit();
@@ -1570,10 +1571,11 @@ public:
 
             IndexCatalog* indexCatalog = coll->getIndexCatalog();
 
-            WriteUnitOfWork wunit(&_opCtx);
             InsertDeleteOptions options;
             options.logIfError = true;
             options.dupsAllowed = true;
+
+            WriteUnitOfWork wunit(&_opCtx);
 
             // Insert a record and its keys separately. We do this to bypass duplicate constraint
             // checking. Inserting a record and all of its keys ensures that validation fails
@@ -1583,11 +1585,17 @@ public:
                 &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
             ASSERT_OK(swRecordId);
 
+            wunit.commit();
+
             // Insert the key on _id.
             {
+                WriteUnitOfWork wunit(&_opCtx);
+
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
-                auto iam = const_cast<IndexAccessMethod*>(
-                    indexCatalog->getEntry(descriptor)->accessMethod());
+                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto iam = entry->accessMethod();
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
+
                 BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
                 iam->getKeys(dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
@@ -1597,28 +1605,39 @@ public:
                              nullptr);
                 ASSERT_EQ(1ul, keys.size());
 
-                InsertResult result;
-                auto insertStatus = iam->insertKeys(&_opCtx,
-                                                    {keys.begin(), keys.end()},
-                                                    {},
-                                                    MultikeyPaths{},
-                                                    swRecordId.getValue(),
-                                                    options,
-                                                    &result);
+                int64_t numInserted;
+                auto insertStatus = iam->insertKeys(
+                    &_opCtx,
+                    {keys.begin(), keys.end()},
+                    {},
+                    MultikeyPaths{},
+                    swRecordId.getValue(),
+                    options,
+                    [this, &interceptor](const BSONObj& duplicateKey) {
+                        return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                    },
+                    &numInserted);
 
-                ASSERT_EQUALS(result.dupsInserted.size(), 0ul);
-                ASSERT_EQUALS(result.numInserted, 1);
+                wunit.commit();
+
+                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
+                ASSERT_EQUALS(numInserted, 1);
                 ASSERT_OK(insertStatus);
+
+                interceptor->deleteTemporaryTables(&_opCtx);
             }
 
             // Insert the key on "a".
             {
+                WriteUnitOfWork wunit(&_opCtx);
+
                 auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
-                auto iam = const_cast<IndexAccessMethod*>(
-                    indexCatalog->getEntry(descriptor)->accessMethod());
+                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto iam = entry->accessMethod();
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-                InsertResult result;
+                int64_t numInserted;
                 iam->getKeys(dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
                              IndexAccessMethod::GetKeysContext::kReadOrAddKeys,
@@ -1626,19 +1645,26 @@ public:
                              nullptr,
                              nullptr);
                 ASSERT_EQ(1ul, keys.size());
-                auto insertStatus = iam->insertKeys(&_opCtx,
-                                                    {keys.begin(), keys.end()},
-                                                    {},
-                                                    MultikeyPaths{},
-                                                    swRecordId.getValue(),
-                                                    options,
-                                                    &result);
+                auto insertStatus = iam->insertKeys(
+                    &_opCtx,
+                    {keys.begin(), keys.end()},
+                    {},
+                    MultikeyPaths{},
+                    swRecordId.getValue(),
+                    options,
+                    [this, &interceptor](const BSONObj& duplicateKey) {
+                        return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                    },
+                    &numInserted);
 
-                ASSERT_EQUALS(result.dupsInserted.size(), 1ul);
-                ASSERT_EQUALS(result.numInserted, 1);
+                wunit.commit();
+
+                ASSERT_NOT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
+                ASSERT_EQUALS(numInserted, 1);
                 ASSERT_OK(insertStatus);
+
+                interceptor->deleteTemporaryTables(&_opCtx);
             }
-            wunit.commit();
 
             releaseDb();
         }

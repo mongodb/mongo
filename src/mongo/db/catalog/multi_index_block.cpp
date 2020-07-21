@@ -648,7 +648,6 @@ Status MultiIndexBlock::insert(OperationContext* opCtx, const BSONObj& doc, cons
             continue;
         }
 
-        InsertResult result;
         Status idxStatus(ErrorCodes::InternalError, "");
         if (_indexes[i].bulk) {
             // When calling insert, BulkBuilderImpl's Sorter performs file I/O that may result in an
@@ -659,7 +658,8 @@ Status MultiIndexBlock::insert(OperationContext* opCtx, const BSONObj& doc, cons
                 return exceptionToStatus();
             }
         } else {
-            idxStatus = _indexes[i].real->insert(opCtx, doc, loc, _indexes[i].options, &result);
+            idxStatus =
+                _indexes[i].real->insert(opCtx, doc, loc, _indexes[i].options, nullptr, nullptr);
         }
 
         if (!idxStatus.isOK())
@@ -684,11 +684,6 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
         if (_indexes[i].bulk == NULL)
             continue;
 
-        // If 'dupRecords' is provided, it will be used to store all records that would result in
-        // duplicate key errors. Only pass 'dupKeysInserted', which stores inserted duplicate keys,
-        // when 'dupRecords' is not used because these two vectors are mutually incompatible.
-        std::vector<BSONObj> dupKeysInserted;
-
         // When dupRecords is passed, 'dupsAllowed' should be passed to reflect whether or not the
         // index is unique.
         bool dupsAllowed = (dupRecords) ? !_indexes[i].block->getEntry()->descriptor()->unique()
@@ -701,29 +696,22 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
         // SERVER-41918 This call to commitBulk() results in file I/O that may result in an
         // exception.
         try {
-            Status status = _indexes[i].real->commitBulk(opCtx,
-                                                         _indexes[i].bulk.get(),
-                                                         dupsAllowed,
-                                                         dupRecords,
-                                                         (dupRecords) ? nullptr : &dupKeysInserted);
+            Status status = _indexes[i].real->commitBulk(
+                opCtx,
+                _indexes[i].bulk.get(),
+                dupsAllowed,
+                [=](const BSONObj& duplicateKey) {
+                    // Do not record duplicates when explicitly ignored. This may be the case on
+                    // secondaries.
+                    return dupsAllowed && !dupRecords && !_ignoreUnique &&
+                            entry->indexBuildInterceptor()
+                        ? entry->indexBuildInterceptor()->recordDuplicateKey(opCtx, duplicateKey)
+                        : Status::OK();
+                },
+                dupRecords);
 
             if (!status.isOK()) {
                 return status;
-            }
-
-            // Do not record duplicates when explicitly ignored. This may be the case on
-            // secondaries.
-            auto interceptor = entry->indexBuildInterceptor();
-            if (!interceptor || _ignoreUnique) {
-                continue;
-            }
-
-            // Record duplicate key insertions for later verification.
-            if (dupKeysInserted.size()) {
-                status = interceptor->recordDuplicateKeys(opCtx, dupKeysInserted);
-                if (!status.isOK()) {
-                    return status;
-                }
             }
         } catch (...) {
             return exceptionToStatus();

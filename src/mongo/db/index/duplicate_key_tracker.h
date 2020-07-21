@@ -63,9 +63,9 @@ public:
     void deleteTemporaryTable(OperationContext* opCtx);
 
     /**
-     * Given a set of duplicate keys, insert them into the key constraint table.
+     * Given a duplicate key, insert it into the key constraint table.
      */
-    Status recordKeys(OperationContext* opCtx, const std::vector<BSONObj>& keys);
+    Status recordKey(OperationContext* opCtx, const BSONObj& key);
 
     /**
      * Returns Status::OK if all previously recorded duplicate key constraint violations have been
