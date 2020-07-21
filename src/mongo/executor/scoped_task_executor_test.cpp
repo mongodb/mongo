@@ -112,6 +112,10 @@ public:
         return *_executor;
     }
 
+    std::shared_ptr<ThreadPoolTaskExecutor>& getUnderlying() {
+        return _tpte;
+    }
+
     NetworkInterfaceMock* getNet() {
         return _net;
     }
@@ -315,6 +319,29 @@ TEST_F(ScopedTaskExecutorTest, DestructionShutsDown) {
     }
 
     ASSERT_EQUALS(pf.future.getNoThrow(), ErrorCodes::ShutdownInProgress);
+}
+
+TEST_F(ScopedTaskExecutorTest, SetShutdownCode) {
+    // Make an executor with the default shutdown behavior, shut it down, check the code returned
+    // when you try to use it.
+    {
+        ScopedTaskExecutor executor(getUnderlying());
+        executor->shutdown();
+
+        auto event = executor->makeEvent();
+        ASSERT_EQUALS(event.getStatus(), ErrorCodes::ShutdownInProgress);
+    }
+
+    // Now make an executor with a provided non-default shutdown code and check that we get that
+    // code instead of the default one.
+    {
+        Status stepDownStatus(ErrorCodes::InterruptedDueToReplStateChange, "node stepped down");
+        ScopedTaskExecutor executor(getUnderlying(), stepDownStatus);
+        executor->shutdown();
+
+        auto event = executor->makeEvent();
+        ASSERT_EQUALS(event.getStatus(), ErrorCodes::InterruptedDueToReplStateChange);
+    }
 }
 
 TEST_F(ScopedTaskExecutorTest, joinAllBecomesReadyOnShutdown) {

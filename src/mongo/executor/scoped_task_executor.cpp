@@ -38,6 +38,11 @@ MONGO_FAIL_POINT_DEFINE(ScopedTaskExecutorHangBeforeSchedule);
 MONGO_FAIL_POINT_DEFINE(ScopedTaskExecutorHangExitBeforeSchedule);
 MONGO_FAIL_POINT_DEFINE(ScopedTaskExecutorHangAfterSchedule);
 
+namespace {
+static const inline auto kDefaultShutdownStatus =
+    Status(ErrorCodes::ShutdownInProgress, "Shutting down ScopedTaskExecutor");
+}
+
 /**
  * Implements the wrapping indirection needed to satisfy the ScopedTaskExecutor contract.  Note
  * that at least shutdown() must be called on this type before destruction.
@@ -45,11 +50,9 @@ MONGO_FAIL_POINT_DEFINE(ScopedTaskExecutorHangAfterSchedule);
 class ScopedTaskExecutor::Impl : public std::enable_shared_from_this<ScopedTaskExecutor::Impl>,
                                  public TaskExecutor {
 
-    static const inline auto kShutdownStatus =
-        Status(ErrorCodes::ShutdownInProgress, "Shutting down ScopedTaskExecutor::Impl");
-
 public:
-    explicit Impl(std::shared_ptr<TaskExecutor> executor) : _executor(std::move(executor)) {}
+    Impl(std::shared_ptr<TaskExecutor> executor, Status shutdownStatus)
+        : _executor(std::move(executor)), _shutdownStatus(std::move(shutdownStatus)) {}
 
     ~Impl() {
         // The ScopedTaskExecutor dtor calls shutdown, so this is guaranteed.
@@ -104,7 +107,7 @@ public:
 
     StatusWith<EventHandle> makeEvent() override {
         if (stdx::lock_guard lk(_mutex); _inShutdown) {
-            return kShutdownStatus;
+            return _shutdownStatus;
         }
 
         return _executor->makeEvent();
@@ -230,7 +233,7 @@ private:
 
             // No clean up needed because we never ran or recorded anything
             if (_inShutdown) {
-                return kShutdownStatus;
+                return _shutdownStatus;
             }
 
             id = _id++;
@@ -272,12 +275,12 @@ private:
                 auto args = cargs;
 
                 if constexpr (std::is_same_v<ArgsT, CallbackArgs>) {
-                    args.status = kShutdownStatus;
+                    args.status = self->_shutdownStatus;
                 } else {
                     static_assert(std::is_same_v<ArgsT, RemoteCommandOnAnyCallbackArgs>,
                                   "_wrapCallback only supports CallbackArgs and "
                                   "RemoteCommandOnAnyCallbackArgs");
-                    args.response.status = kShutdownStatus;
+                    args.response.status = self->_shutdownStatus;
                 }
 
                 doWorkAndNotify(args);
@@ -331,6 +334,7 @@ private:
     Mutex _mutex = MONGO_MAKE_LATCH("ScopedTaskExecutor::_mutex");
     bool _inShutdown = false;
     std::shared_ptr<TaskExecutor> _executor;
+    Status _shutdownStatus;
     size_t _id = 0;
     stdx::unordered_map<size_t, CallbackHandle> _cbHandles;
 
@@ -340,7 +344,11 @@ private:
 };
 
 ScopedTaskExecutor::ScopedTaskExecutor(std::shared_ptr<TaskExecutor> executor)
-    : _executor(std::make_shared<Impl>(std::move(executor))) {}
+    : _executor(std::make_shared<Impl>(std::move(executor), kDefaultShutdownStatus)) {}
+
+ScopedTaskExecutor::ScopedTaskExecutor(std::shared_ptr<TaskExecutor> executor,
+                                       Status shutdownStatus)
+    : _executor(std::make_shared<Impl>(std::move(executor), std::move(shutdownStatus))) {}
 
 ScopedTaskExecutor::~ScopedTaskExecutor() {
     _executor->shutdown();
