@@ -12164,7 +12164,7 @@ buildvariants:
   - name: server_selection_json_test_TG
 
 - name: ubuntu1804-debug-aubsan-lite
-  display_name: "! {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
+  display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
   batchtime: 240 # 4 hours
   modules:
   - enterprise
@@ -12177,13 +12177,15 @@ buildvariants:
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
     lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
+    scons_cache_mode: all
     max_sub_suites: 100
+    num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_all_run_unittests_parallel_TG
   - name: jsCore
   - name: jsCore_txns
   # Note: {A,UB}SAN has a runtime component that is not fed into Jepsen.
