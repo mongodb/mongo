@@ -67,6 +67,7 @@ namespace {
 // server is found to be inconsistent.
 const int kMaxInconsistentRoutingInfoRefreshAttempts = 3;
 
+const int kDatabaseCacheSize = 10000;
 /**
  * Returns whether two shard versions have a matching epoch.
  */
@@ -139,15 +140,19 @@ std::shared_ptr<ThreadPool> CatalogCache::makeDefaultThreadPool() {
     ThreadPool::Options options;
     options.poolName = "CatalogCache";
     options.minThreads = 0;
-    options.maxThreads = 6;
+    options.maxThreads = ThreadPool::Options::kUnlimited;
 
     auto executor = std::make_shared<ThreadPool>(std::move(options));
     executor->startup();
     return executor;
 }
 
-CatalogCache::CatalogCache(CatalogCacheLoader& cacheLoader, std::shared_ptr<ThreadPool> executor)
-    : _cacheLoader(cacheLoader), _executor(executor){};
+CatalogCache::CatalogCache(ServiceContext* const service,
+                           CatalogCacheLoader& cacheLoader,
+                           std::shared_ptr<ThreadPool> executor)
+    : _cacheLoader(cacheLoader),
+      _executor(executor),
+      _databaseCache(service, *_executor, _cacheLoader) {}
 
 CatalogCache::~CatalogCache() = default;
 
@@ -158,35 +163,33 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
               "hold the lock during a network call, and can lead to a deadlock as described in "
               "SERVER-37398.");
     try {
-        while (true) {
-            stdx::unique_lock<Latch> ul(_mutex);
-
-            auto& dbEntry = _databases[dbName];
-            if (!dbEntry) {
-                dbEntry = std::make_shared<DatabaseInfoEntry>();
-            }
-
-            if (dbEntry->needsRefresh) {
-                auto refreshNotification = dbEntry->refreshCompletionNotification;
-                if (!refreshNotification) {
-                    refreshNotification = (dbEntry->refreshCompletionNotification =
-                                               std::make_shared<Notification<Status>>());
-                    _scheduleDatabaseRefresh(ul, dbName, dbEntry);
-                }
-
-                // Wait on the notification outside of the mutex.
-                ul.unlock();
-                uassertStatusOK(refreshNotification->get(opCtx));
-
-                // Once the refresh is complete, loop around to get the refreshed cache entry.
-                continue;
-            }
-
-            auto primaryShard = uassertStatusOKWithContext(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt->getPrimary()),
-                str::stream() << "could not find the primary shard for database " << dbName);
-            return {CachedDatabaseInfo(*dbEntry->dbt, std::move(primaryShard))};
+        // TODO SERVER-49724: Make ReadThroughCache support StringData keys
+        auto dbEntry = _databaseCache.acquire(opCtx, dbName.toString());
+        if (!dbEntry) {
+            return {ErrorCodes::NamespaceNotFound,
+                    str::stream() << "database " << dbName << " not found"};
         }
+        const auto primaryShardExists =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->getPrimary()).isOK();
+
+        if (!primaryShardExists) {
+            LOGV2_FOR_CATALOG_REFRESH(
+                4947103,
+                2,
+                "Invalidating cached database entry because its primary shard hasn't been found",
+                "db"_attr = dbName);
+            _databaseCache.invalidate(dbName.toString());
+            dbEntry = _databaseCache.acquire(opCtx, dbName.toString());
+            if (!dbEntry) {
+                return {ErrorCodes::NamespaceNotFound,
+                        str::stream() << "database " << dbName << " not found"};
+            }
+        }
+
+        const auto primaryShard = uassertStatusOKWithContext(
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->getPrimary()),
+            str::stream() << "could not find the primary shard for database " << dbName);
+        return {CachedDatabaseInfo(*dbEntry, std::move(primaryShard))};
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -229,6 +232,14 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
     while (true) {
         const auto swDbInfo = getDatabase(opCtx, nss.db());
         if (!swDbInfo.isOK()) {
+            if (swDbInfo == ErrorCodes::NamespaceNotFound) {
+                LOGV2_FOR_CATALOG_REFRESH(
+                    4947102,
+                    2,
+                    "Invalidating cached collection entry because its database has been dropped",
+                    "namespace"_attr = nss);
+                purgeCollection(nss);
+            }
             return {swDbInfo.getStatus(), refreshActionTaken};
         }
 
@@ -292,7 +303,8 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationContext* opCtx,
                                                                     StringData dbName) {
-    invalidateDatabaseEntry(dbName);
+    // TODO SERVER-49724: Make ReadThroughCache support StringData keys
+    _databaseCache.invalidate(dbName.toString());
     return getDatabase(opCtx, dbName);
 }
 
@@ -324,24 +336,9 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutin
 
 void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
                                           const DatabaseVersion& databaseVersion) {
-    stdx::lock_guard<Latch> lg(_mutex);
-
-    const auto itDbEntry = _databases.find(dbName);
-    if (itDbEntry == _databases.end()) {
-        // The database was dropped.
-        return;
-    } else if (itDbEntry->second->needsRefresh) {
-        // Refresh has been scheduled for the database already
-        return;
-    } else if (!itDbEntry->second->dbt ||
-               databaseVersion::equal(itDbEntry->second->dbt->getVersion(), databaseVersion)) {
-        // If the versions match, the cached database info is stale, so mark it as needs refresh.
-        LOGV2(22642,
-              "Marking cached database entry for {db} as stale",
-              "Marking cached database entry as stale",
-              "db"_attr = dbName);
-        itDbEntry->second->needsRefresh = true;
-    }
+    // TODO SERVER-49856: Use a comparable DatabaseVersion to advance the time of the cached entry
+    // istead of invalidating it.
+    _databaseCache.invalidate(dbName.toString());
 }
 
 void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInvalidate,
@@ -440,16 +437,6 @@ void CatalogCache::checkEpochOrThrow(const NamespaceString& nss,
             foundVersion.epoch() == targetCollectionVersion.epoch());
 }
 
-void CatalogCache::invalidateDatabaseEntry(const StringData dbName) {
-    stdx::lock_guard<Latch> lg(_mutex);
-    auto itDbEntry = _databases.find(dbName);
-    if (itDbEntry == _databases.end()) {
-        // The database was dropped.
-        return;
-    }
-    itDbEntry->second->needsRefresh = true;
-}
-
 void CatalogCache::invalidateShardForShardedCollection(const NamespaceString& nss,
                                                        const ShardId& staleShardId) {
     _createOrGetCollectionEntryAndMarkShardStale(nss, staleShardId);
@@ -459,29 +446,9 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     LOGV2(22643,
-          "Starting to invalidate databases and collections with data on shard {shardId}",
-          "Starting to invalidate databases and collections referencing a specific shard",
+          "Starting to invalidate collections with data on shard {shardId}",
+          "Starting to invalidate collections referencing a specific shard",
           "shardId"_attr = shardId);
-
-    // Invalidate databases with this shard as their primary.
-    for (const auto& [dbNs, dbInfoEntry] : _databases) {
-        LOGV2_DEBUG(22644,
-                    3,
-                    "Checking if database {db} has primary shard: {primaryShardId}",
-                    "Checking if database matches primary shard",
-                    "db"_attr = dbNs,
-                    "primaryShardId"_attr = shardId);
-        if (!dbInfoEntry->needsRefresh && dbInfoEntry->dbt->getPrimary() == shardId) {
-            LOGV2_DEBUG(22645,
-                        3,
-                        "Invalidating cache entry for database {db} that has primary shard "
-                        "{primaryShardId}",
-                        "Invalidating database cache entry",
-                        "db"_attr = dbNs,
-                        "primaryShardId"_attr = shardId);
-            dbInfoEntry->needsRefresh = true;
-        }
-    }
 
     // Invalidate collections which contain data on this shard.
     for (const auto& [db, collInfoMap] : _collectionsByDb) {
@@ -534,14 +501,14 @@ void CatalogCache::purgeCollection(const NamespaceString& nss) {
 }
 
 void CatalogCache::purgeDatabase(StringData dbName) {
+    _databaseCache.invalidate(dbName.toString());
     stdx::lock_guard<Latch> lg(_mutex);
-    _databases.erase(dbName);
     _collectionsByDb.erase(dbName);
 }
 
 void CatalogCache::purgeAllDatabases() {
+    _databaseCache.invalidateAll();
     stdx::lock_guard<Latch> lg(_mutex);
-    _databases.clear();
     _collectionsByDb.clear();
 }
 
@@ -551,8 +518,8 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
     size_t numDatabaseEntries;
     size_t numCollectionEntries{0};
     {
+        numDatabaseEntries = _databaseCache.getCacheInfo().size();
         stdx::lock_guard<Latch> ul(_mutex);
-        numDatabaseEntries = _databases.size();
         for (const auto& entry : _collectionsByDb) {
             numCollectionEntries += entry.second.size();
         }
@@ -593,78 +560,6 @@ void CatalogCache::checkAndRecordOperationBlockedByRefresh(OperationContext* opC
         default:
             MONGO_UNREACHABLE;
     }
-}
-
-void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
-                                            StringData dbName,
-                                            std::shared_ptr<DatabaseInfoEntry> dbEntry) {
-
-    // TODO (SERVER-34164): Track and increment stats for database refreshes
-
-    LOGV2_FOR_CATALOG_REFRESH(24102,
-                              1,
-                              "Refreshing cached database entry for {db}; current cached database "
-                              "info is {currentDbInfo}",
-                              "Refreshing cached database entry",
-                              "db"_attr = dbName,
-                              "currentDbInfo"_attr =
-                                  (dbEntry->dbt ? dbEntry->dbt->toBSON() : BSONObj()));
-
-    Timer t{};
-
-    _cacheLoader.getDatabase(dbName)
-        .thenRunOn(_executor)
-        .then([ =, dbName = dbName.toString() ](const DatabaseType& dbt) noexcept {
-            const auto dbVersionAfterRefresh = dbt.getVersion();
-            const auto dbVersionHasChanged =
-                (!dbEntry->dbt ||
-                 (dbEntry->dbt &&
-                  !databaseVersion::equal(dbVersionAfterRefresh, dbEntry->dbt->getVersion())));
-
-            stdx::lock_guard<Latch> lg(_mutex);
-
-            LOGV2_FOR_CATALOG_REFRESH(
-                24101,
-                dbVersionHasChanged ? 0 : 1,
-                "Refreshed cached database entry for {db} to version {newDbVersion}"
-                "from version {oldDbVersion}. Took {duration}",
-                "Refreshed cached database entry",
-                "db"_attr = dbName,
-                "newDbVersion"_attr = dbVersionAfterRefresh,
-                "oldDbVersion"_attr =
-                    (dbEntry->dbt ? dbEntry->dbt->getVersion().toBSON() : BSONObj()),
-                "duration"_attr = Milliseconds(t.millis()));
-
-            dbEntry->needsRefresh = false;
-            dbEntry->refreshCompletionNotification->set(Status::OK());
-            dbEntry->refreshCompletionNotification = nullptr;
-
-            dbEntry->dbt = std::move(dbt);
-        })
-        .onError([ =, dbName = dbName.toString() ](Status errStatus) noexcept {
-            stdx::lock_guard<Latch> lg(_mutex);
-
-            LOGV2_OPTIONS(24100,
-                          {logv2::LogComponent::kShardingCatalogRefresh},
-                          "Error refreshing cached database entry for {db}. Took {duration} and "
-                          "failed due to {error}",
-                          "Error refreshing cached database entry",
-                          "db"_attr = dbName,
-                          "duration"_attr = Milliseconds(t.millis()),
-                          "error"_attr = redact(errStatus));
-
-            // Clear the notification so the next 'getDatabase' kicks off a new refresh attempt.
-            dbEntry->refreshCompletionNotification->set(errStatus);
-            dbEntry->refreshCompletionNotification = nullptr;
-
-            if (errStatus == ErrorCodes::NamespaceNotFound) {
-                // The refresh found that the database was dropped, so remove its entry
-                // from the cache.
-                _databases.erase(dbName);
-                _collectionsByDb.erase(dbName);
-            }
-        })
-        .getAsync([](auto) {});
 }
 
 void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
@@ -880,6 +775,50 @@ void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
                                                  operationsBlockedByRefresh.countCommands.load());
 
         operationsBlockedByRefreshBuilder.done();
+    }
+}
+
+CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
+                                           ThreadPoolInterface& threadPool,
+                                           CatalogCacheLoader& catalogCacheLoader)
+    : ReadThroughCache(_mutex,
+                       service,
+                       threadPool,
+                       [this](OperationContext* opCtx,
+                              const std::string& dbName,
+                              const ValueHandle& db) { return _lookupDatabase(opCtx, dbName); },
+                       kDatabaseCacheSize),
+      _catalogCacheLoader(catalogCacheLoader){};
+
+CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDatabase(
+    OperationContext* opCtx, const std::string& dbName) {
+
+    // TODO (SERVER-34164): Track and increment stats for database refreshes
+
+    LOGV2_FOR_CATALOG_REFRESH(24102, 1, "Refreshing cached database entry", "db"_attr = dbName);
+
+    Timer t{};
+    try {
+        auto newDb = _catalogCacheLoader.getDatabase(dbName).get();
+        auto const newDbVersion = newDb.getVersion();
+        LOGV2_FOR_CATALOG_REFRESH(24101,
+                                  2,
+                                  "Refreshed cached database entry",
+                                  "db"_attr = dbName,
+                                  "newDbVersion"_attr = newDbVersion,
+                                  "duration"_attr = Milliseconds(t.millis()));
+        return CatalogCache::DatabaseCache::LookupResult(boost::make_optional(std::move(newDb)));
+    } catch (const DBException& ex) {
+        LOGV2_FOR_CATALOG_REFRESH(24100,
+                                  1,
+                                  "Error refreshing cached database entry",
+                                  "db"_attr = dbName,
+                                  "duration"_attr = Milliseconds(t.millis()),
+                                  "error"_attr = redact(ex));
+        if (ex.code() == ErrorCodes::NamespaceNotFound) {
+            return CatalogCache::DatabaseCache::LookupResult(boost::none);
+        }
+        throw;
     }
 }
 

@@ -559,8 +559,8 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
 
     globalConnPool.addHook(new ShardingConnectionHook(makeEgressHooksList(service)));
 
-    auto catalogCache =
-        std::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx), catalogCacheExecutor);
+    auto catalogCache = std::make_unique<CatalogCache>(
+        service, CatalogCacheLoader::get(opCtx), catalogCacheExecutor);
 
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.

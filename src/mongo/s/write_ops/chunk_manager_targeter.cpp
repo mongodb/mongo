@@ -824,8 +824,7 @@ void ChunkManagerTargeter::_refreshShardVersionNow(OperationContext* opCtx) {
 }
 
 void ChunkManagerTargeter::_refreshDbVersionNow(OperationContext* opCtx) {
-    Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(
-        _nss.db(), std::move(_routingInfo->db().databaseVersion()));
+    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, _nss.db()));
 
     _init(opCtx);
 }
