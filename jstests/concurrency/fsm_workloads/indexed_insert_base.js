@@ -75,6 +75,7 @@ var $config = (function() {
         assertAlways.commandWorked(db.runCommand({
             createIndexes: collName,
             indexes: [spec],
+            writeConcern: {w: 'majority'},
         }));
         this.indexExists = true;
     }
