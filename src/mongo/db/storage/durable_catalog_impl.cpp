@@ -900,15 +900,6 @@ Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, RecordId cata
     }
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(entry.nss, MODE_X));
-    invariant(getTotalIndexCount(opCtx, catalogId) == getCompletedIndexCount(opCtx, catalogId));
-    {
-        std::vector<std::string> indexNames;
-        getAllIndexes(opCtx, catalogId, &indexNames);
-        for (size_t i = 0; i < indexNames.size(); i++) {
-            Status status = removeIndex(opCtx, catalogId, indexNames[i]);
-        }
-    }
-
     invariant(getTotalIndexCount(opCtx, catalogId) == 0);
 
     // Remove metadata from mdb_catalog

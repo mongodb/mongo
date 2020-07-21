@@ -134,6 +134,10 @@ public:
                                     const NamespaceString& toNss,
                                     bool stayTemp) = 0;
 
+    /**
+     * Expects (invariants) that all of the index catalog entries have been removed already via
+     * removeIndex.
+     */
     virtual Status dropCollection(OperationContext* opCtx, RecordId catalogId) = 0;
 
     /**

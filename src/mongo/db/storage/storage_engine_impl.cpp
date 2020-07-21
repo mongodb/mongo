@@ -658,10 +658,24 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     Status firstError = Status::OK();
     WriteUnitOfWork untimestampedDropWuow(opCtx);
     for (auto& nss : toDrop) {
-        invariant(getCatalog());
+        auto durableCatalog = getCatalog();
+        invariant(durableCatalog);
         auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-        Status result = getCatalog()->dropCollection(opCtx, coll->getCatalogId());
 
+        // No need to remove the indexes from the IndexCatalog because eliminating the Collection
+        // will have the same effect.
+        auto ii =
+            coll->getIndexCatalog()->getIndexIterator(opCtx, true /* includeUnfinishedIndexes */);
+        while (ii->more()) {
+            const IndexCatalogEntry* ice = ii->next();
+            Status status = durableCatalog->removeIndex(
+                opCtx, coll->getCatalogId(), ice->descriptor()->indexName());
+            if (!status.isOK() && firstError.isOK()) {
+                firstError = status;
+            }
+        }
+
+        Status result = durableCatalog->dropCollection(opCtx, coll->getCatalogId());
         if (!result.isOK() && firstError.isOK()) {
             firstError = result;
         }
