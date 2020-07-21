@@ -57,21 +57,25 @@ public:
         auto oldestRequiredTimestampForCrashRecovery = engine->getOplogNeededForCrashRecovery();
         auto backupCursorHooks = BackupCursorHooks::get(svcCtx);
 
-        return BSON("name" << storageGlobalParams.engine << "supportsCommittedReads"
-                           << engine->supportsReadConcernMajority()
-                           << "oldestRequiredTimestampForCrashRecovery"
-                           << (oldestRequiredTimestampForCrashRecovery
-                                   ? *oldestRequiredTimestampForCrashRecovery
-                                   : Timestamp())
-                           << "supportsPendingDrops" << engine->supportsPendingDrops()
-                           << "dropPendingIdents"
-                           << static_cast<long long>(engine->getDropPendingIdents().size())
-                           << "supportsSnapshotReadConcern" << engine->supportsReadConcernSnapshot()
-                           << "readOnly" << storageGlobalParams.readOnly << "persistent"
-                           << !engine->isEphemeral() << "backupCursorOpen"
-                           << backupCursorHooks->isBackupCursorOpen()
-                           << "supportsResumableIndexBuilds"
-                           << engine->supportsResumableIndexBuilds());
+        BSONObjBuilder bob;
+        bob.append("name", storageGlobalParams.engine);
+        bob.append("supportsCommittedReads", engine->supportsReadConcernMajority());
+        bob.append("oldestRequiredTimestampForCrashRecovery",
+                   oldestRequiredTimestampForCrashRecovery
+                       ? *oldestRequiredTimestampForCrashRecovery
+                       : Timestamp());
+        bob.append("supportsPendingDrops", engine->supportsPendingDrops());
+        bob.append("dropPendingIdents",
+                   static_cast<long long>(engine->getDropPendingIdents().size()));
+        bob.append("supportsSnapshotReadConcern", engine->supportsReadConcernSnapshot());
+        bob.append("readOnly", storageGlobalParams.readOnly);
+        bob.append("persistent", !engine->isEphemeral());
+        bob.append("backupCursorOpen", backupCursorHooks->isBackupCursorOpen());
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+            bob.append("supportsResumableIndexBuilds", engine->supportsResumableIndexBuilds());
+        }
+
+        return bob.obj();
     }
 
 } storageSSS;
