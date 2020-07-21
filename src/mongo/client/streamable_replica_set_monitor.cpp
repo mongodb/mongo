@@ -110,11 +110,11 @@ std::string hostListToString(boost::optional<std::vector<HostAndPort>> x) {
     return s.str();
 }
 
-int32_t pingTimeMillis(const ServerDescriptionPtr& serverDescription) {
-    static const Milliseconds maxLatency = Milliseconds::max();
+double pingTimeMillis(const ServerDescriptionPtr& serverDescription) {
     const auto& serverRtt = serverDescription->getRtt();
-    auto latencyMillis = (serverRtt) ? duration_cast<Milliseconds>(*serverRtt) : maxLatency;
-    return std::min(latencyMillis, maxLatency).count();
+    const auto latencyNanos =
+        serverRtt ? duration_cast<Nanoseconds>(*serverRtt) : Nanoseconds::max();
+    return latencyNanos.count() / 1000000.0;
 }
 
 constexpr auto kZeroMs = Milliseconds(0);
