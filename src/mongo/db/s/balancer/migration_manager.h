@@ -176,6 +176,9 @@ private:
 
     using CollectionMigrationsStateMap = stdx::unordered_map<NamespaceString, MigrationsList>;
 
+    using ScopedMigrationRequestsMap =
+        std::map<MigrationIdentifier, StatusWith<ScopedMigrationRequest>>;
+
     /**
      * Optionally takes the collection distributed lock and schedules a chunk migration with the
      * specified parameters. May block for distributed lock acquisition. If dist lock acquisition is
@@ -187,7 +190,8 @@ private:
         const MigrateInfo& migrateInfo,
         uint64_t maxChunkSizeBytes,
         const MigrationSecondaryThrottleOptions& secondaryThrottle,
-        bool waitForDelete);
+        bool waitForDelete,
+        ScopedMigrationRequestsMap* scopedMigrationRequests);
 
     /**
      * Acquires the collection distributed lock for the specified namespace and if it succeeds,
@@ -195,11 +199,18 @@ private:
      *
      * The distributed lock is acquired before scheduling the first migration for the collection and
      * is only released when all active migrations on the collection have finished.
+     *
+     * Assumes that the migration document has already been written if no ScopedMigrationRequestsMap
+     * pointer is passed. Otherwise, writes the migration document under the collection distributed
+     * lock and adds it to the map.
      */
     void _schedule(WithLock,
                    OperationContext* opCtx,
                    const HostAndPort& targetHost,
-                   Migration migration);
+                   Migration migration,
+                   const MigrateInfo& migrateInfo,
+                   bool waitForDelete,
+                   ScopedMigrationRequestsMap* scopedMigrationRequests);
 
     /**
      * Used internally for migrations scheduled with the distributed lock acquired by the config
