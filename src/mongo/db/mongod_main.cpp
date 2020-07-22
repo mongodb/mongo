@@ -736,16 +736,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // operation context anymore
     startupOpCtx.reset();
 
-    auto start = serviceContext->getServiceExecutor()->start();
-    if (!start.isOK()) {
-        LOGV2_ERROR(20570,
-                    "Error starting service executor: {error}",
-                    "Error starting service executor",
-                    "error"_attr = start);
-        return EXIT_NET_ERROR;
-    }
-
-    start = serviceContext->getServiceEntryPoint()->start();
+    auto start = serviceContext->getServiceEntryPoint()->start();
     if (!start.isOK()) {
         LOGV2_ERROR(20571,
                     "Error starting service entry point: {error}",
@@ -1295,11 +1286,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         CatalogCacheLoader::get(serviceContext).shutDown();
     }
 
-#if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
-    // When running under address sanitizer, we get false positive leaks due to disorder around
-    // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
-    // harder to dry up the server from active connections before going on to really shut down.
-
     // Shutdown the Service Entry Point and its sessions and give it a grace period to complete.
     if (auto sep = serviceContext->getServiceEntryPoint()) {
         LOGV2_OPTIONS(4784923, {LogComponent::kCommand}, "Shutting down the ServiceEntryPoint");
@@ -1309,19 +1295,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                           "Service entry point did not shutdown within the time limit");
         }
     }
-
-    // Shutdown and wait for the service executor to exit
-    if (auto svcExec = serviceContext->getServiceExecutor()) {
-        LOGV2_OPTIONS(4784924, {LogComponent::kExecutor}, "Shutting down the service executor");
-        Status status = svcExec->shutdown(Seconds(10));
-        if (!status.isOK()) {
-            LOGV2_OPTIONS(20564,
-                          {LogComponent::kNetwork},
-                          "Service executor did not shutdown within the time limit",
-                          "error"_attr = status);
-        }
-    }
-#endif
 
     LOGV2(4784925, "Shutting down free monitoring");
     stopFreeMonitoring();

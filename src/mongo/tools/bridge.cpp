@@ -485,10 +485,9 @@ int bridgeMain(int argc, char** argv) {
     setGlobalServiceContext(ServiceContext::make());
     auto serviceContext = getGlobalServiceContext();
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointBridge>(serviceContext));
-    serviceContext->setServiceExecutor(
-        std::make_unique<transport::ServiceExecutorSynchronous>(serviceContext));
-
-    fassert(50766, serviceContext->getServiceExecutor()->start());
+    if (auto status = serviceContext->getServiceEntryPoint()->start(); !status.isOK()) {
+        LOGV2(4907203, "Error starting service entry point", "error"_attr = status);
+    }
 
     transport::TransportLayerASIO::Options opts;
     opts.ipList.emplace_back("0.0.0.0");
@@ -497,13 +496,13 @@ int bridgeMain(int argc, char** argv) {
     serviceContext->setTransportLayer(std::make_unique<mongo::transport::TransportLayerASIO>(
         opts, serviceContext->getServiceEntryPoint()));
     auto tl = serviceContext->getTransportLayer();
-    if (!tl->setup().isOK()) {
-        LOGV2(22922, "Error setting up transport layer");
+    if (auto status = tl->setup(); !status.isOK()) {
+        LOGV2(22922, "Error setting up transport layer", "error"_attr = status);
         return EXIT_NET_ERROR;
     }
 
-    if (!tl->start().isOK()) {
-        LOGV2(22923, "Error starting transport layer");
+    if (auto status = tl->start(); !status.isOK()) {
+        LOGV2(22923, "Error starting transport layer", "error"_attr = status);
         return EXIT_NET_ERROR;
     }
 
