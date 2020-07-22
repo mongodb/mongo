@@ -90,8 +90,11 @@ def BSONObjPrinter(valobj, *_args):  # pylint: disable=invalid-name
     size = struct.unpack("<I", valobj.GetProcess().ReadMemory(ptr, 4, lldb.SBError()))[0]
     if size < 5 or size > 17 * 1024 * 1024:
         return None
-    buf = bson.BSON(bytes(valobj.GetProcess().ReadMemory(ptr, size, lldb.SBError())))
-    buf_str = buf.decode()
+    mem = bytes(memoryview(valobj.GetProcess().ReadMemory(ptr, size, lldb.SBError())))
+    if not bson.is_valid(mem):
+        return None
+
+    buf_str = bson.decode(mem)
     obj = json_util.dumps(buf_str, indent=4)
     # If the object is huge then just dump it as one line
     if obj.count("\n") > 1000:
