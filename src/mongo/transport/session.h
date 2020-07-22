@@ -116,6 +116,11 @@ public:
     virtual Future<Message> asyncSourceMessage(const BatonHandle& handle = nullptr) = 0;
 
     /**
+     * Asynchronously waits for the availability of incoming data.
+     */
+    virtual Future<void> waitForData() = 0;
+
+    /**
      * Sink (send) a Message to the remote host for this Session.
      *
      * Async version will keep the buffer alive until the operation completes.

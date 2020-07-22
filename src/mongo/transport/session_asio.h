@@ -167,6 +167,14 @@ public:
         return sourceMessageImpl(baton);
     }
 
+    Future<void> waitForData() override {
+#ifdef MONGO_CONFIG_SSL
+        if (_sslSocket)
+            return asio::async_read(*_sslSocket, asio::null_buffers(), UseFuture{}).ignoreValue();
+#endif
+        return asio::async_read(_socket, asio::null_buffers(), UseFuture{}).ignoreValue();
+    }
+
     Status sinkMessage(Message message) override {
         ensureSync();
 

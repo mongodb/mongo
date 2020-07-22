@@ -37,10 +37,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -341,6 +343,28 @@ TEST_F(ServiceExecutorFixedFixture, ScheduleFailsAfterShutdown) {
     }
 
     schedulerThread->join();
+}
+
+TEST_F(ServiceExecutorFixedFixture, RunTaskAfterWaitingForData) {
+    auto tl = std::make_unique<TransportLayerMock>();
+    auto session = tl->createSession();
+
+    auto executor = startAndGetServiceExecutor();
+
+    const auto mainThreadId = stdx::this_thread::get_id();
+    AtomicWord<bool> ranOnDataAvailable{false};
+    auto barrier = std::make_shared<unittest::Barrier>(2);
+    executor->runOnDataAvailable(
+        session.get(), [&ranOnDataAvailable, mainThreadId, barrier](Status) mutable -> void {
+            ranOnDataAvailable.store(true);
+            ASSERT(stdx::this_thread::get_id() != mainThreadId);
+            barrier->countDownAndWait();
+        });
+
+    ASSERT(!ranOnDataAvailable.load());
+    reinterpret_cast<MockSession*>(session.get())->signalAvailableData();
+    barrier->countDownAndWait();
+    ASSERT(ranOnDataAvailable.load());
 }
 
 }  // namespace
