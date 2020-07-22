@@ -56,14 +56,13 @@ public:
     VectorClockMongoD();
     virtual ~VectorClockMongoD();
 
-    LogicalTime tick(Component component, uint64_t nTicks) override;
-    void tickTo(Component component, LogicalTime newTime) override;
-
     SharedSemiFuture<void> persist(OperationContext* opCtx) override;
     void waitForInMemoryVectorClockToBePersisted(OperationContext* opCtx) override;
 
     SharedSemiFuture<void> recover(OperationContext* opCtx) override;
     void waitForVectorClockToBeRecovered(OperationContext* opCtx) override;
+
+    void _tickTo(Component component, LogicalTime newTime) override;
 
 protected:
     bool _gossipOutInternal(OperationContext* opCtx,
@@ -79,6 +78,8 @@ protected:
                                        const BSONObj& in,
                                        bool couldBeUnauthenticated) override;
     bool _permitRefreshDuringGossipOut() const override;
+
+    LogicalTime _tick(Component component, uint64_t nTicks) override;
 
 private:
     void onStepUpBegin(OperationContext* opCtx, long long term) override {}
@@ -369,7 +370,7 @@ bool VectorClockMongoD::_permitRefreshDuringGossipOut() const {
     return false;
 }
 
-LogicalTime VectorClockMongoD::tick(Component component, uint64_t nTicks) {
+LogicalTime VectorClockMongoD::_tick(Component component, uint64_t nTicks) {
     if (component == Component::ClusterTime) {
         // Although conceptually ClusterTime can only be ticked when a mongod is able to take writes
         // (ie. primary, or standalone), this is handled at a higher layer.
@@ -389,7 +390,7 @@ LogicalTime VectorClockMongoD::tick(Component component, uint64_t nTicks) {
     MONGO_UNREACHABLE;
 }
 
-void VectorClockMongoD::tickTo(Component component, LogicalTime newTime) {
+void VectorClockMongoD::_tickTo(Component component, LogicalTime newTime) {
     if (component == Component::ClusterTime) {
         // The ClusterTime is allowed to tickTo in certain very limited and trusted cases (eg.
         // initializing based on oplog timestamps), so we have to allow it here.

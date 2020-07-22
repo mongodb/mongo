@@ -1596,8 +1596,7 @@ public:
 
         auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
         LogicalClock::set(getServiceContext(), std::move(logicalClock));
-        VectorClock::get(getServiceContext())
-            ->advanceTime_forTest(VectorClock::Component::ClusterTime, kInMemoryLogicalTime);
+        VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
 
         _scopedSession.emplace(operationContext());
 

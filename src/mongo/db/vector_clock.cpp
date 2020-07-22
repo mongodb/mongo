@@ -400,7 +400,7 @@ void VectorClock::resetVectorClock_forTest() {
     _isEnabled = true;
 }
 
-void VectorClock::advanceTime_forTest(Component component, LogicalTime newTime) {
+void VectorClock::_advanceTime_forTest(Component component, LogicalTime newTime) {
     LogicalTimeArray newTimeArray;
     newTimeArray[component] = newTime;
     _advanceTime(std::move(newTimeArray));

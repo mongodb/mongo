@@ -79,8 +79,7 @@ VectorClockMutable* LogicalClockTestFixture::resetClock() {
 }
 
 void LogicalClockTestFixture::advanceClusterTime(LogicalTime newTime) {
-    VectorClock::get(getServiceContext())
-        ->advanceTime_forTest(VectorClock::Component::ClusterTime, newTime);
+    VectorClock::get(getServiceContext())->advanceClusterTime_forTest(newTime);
 }
 
 LogicalClock* LogicalClockTestFixture::getClock() const {

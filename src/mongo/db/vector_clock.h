@@ -48,7 +48,7 @@ class VectorClockMutable;
  * clusterTime), that are used to provide causal-consistency to various other services.
  */
 class VectorClock {
-public:
+protected:
     enum class Component : uint8_t {
         ClusterTime = 0,
         ConfigTime = 1,
@@ -56,7 +56,6 @@ public:
         _kNumComponents = 3,
     };
 
-protected:
     template <typename T>
     class ComponentArray
         : public std::array<T, static_cast<unsigned long>(Component::_kNumComponents)> {
@@ -83,6 +82,22 @@ protected:
 public:
     class VectorTime {
     public:
+        LogicalTime clusterTime() const& {
+            return _time[Component::ClusterTime];
+        }
+
+        LogicalTime configTime() const& {
+            return _time[Component::ConfigTime];
+        }
+
+        LogicalTime topologyTime() const& {
+            return _time[Component::TopologyTime];
+        }
+
+        LogicalTime clusterTime() const&& = delete;
+        LogicalTime configTime() const&& = delete;
+        LogicalTime topologyTime() const&& = delete;
+
         LogicalTime operator[](Component component) const {
             return _time[component];
         }
@@ -149,7 +164,18 @@ public:
     virtual void waitForVectorClockToBeRecovered(OperationContext* opCtx) {}
 
     void resetVectorClock_forTest();
-    void advanceTime_forTest(Component component, LogicalTime newTime);
+
+    void advanceClusterTime_forTest(LogicalTime newTime) {
+        _advanceTime_forTest(Component::ClusterTime, newTime);
+    }
+
+    void advanceConfigTime_forTest(LogicalTime newTime) {
+        _advanceTime_forTest(Component::ConfigTime, newTime);
+    }
+
+    void advanceTopologyTime_forTest(LogicalTime newTime) {
+        _advanceTime_forTest(Component::TopologyTime, newTime);
+    }
 
     // Query to use when reading/writing the vector clock state document.
     static const Query& stateQuery();
@@ -182,6 +208,8 @@ protected:
 
     VectorClock();
     virtual ~VectorClock();
+
+    void _advanceTime_forTest(Component component, LogicalTime newTime);
 
     /**
      * The maximum permissible value for each part of a LogicalTime's Timestamp (ie. "secs" and

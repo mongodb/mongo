@@ -210,8 +210,7 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
                                     "commitTimestamp"_attr = *_decision->getCommitTimestamp());
 
                         VectorClockMutable::get(_serviceContext)
-                            ->tickTo(VectorClock::Component::ClusterTime,
-                                     LogicalTime(*_decision->getCommitTimestamp()));
+                            ->tickClusterTimeTo(LogicalTime(*_decision->getCommitTimestamp()));
                     }
                 });
         })

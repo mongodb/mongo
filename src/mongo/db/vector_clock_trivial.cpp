@@ -45,10 +45,11 @@ public:
     VectorClockTrivial();
     virtual ~VectorClockTrivial();
 
-    LogicalTime tick(Component component, uint64_t nTicks) override;
-    void tickTo(Component component, LogicalTime newTime) override;
+    void _tickTo(Component component, LogicalTime newTime) override;
 
 protected:
+    LogicalTime _tick(Component component, uint64_t nTicks) override;
+
     bool _gossipOutInternal(OperationContext* opCtx,
                             BSONObjBuilder* out,
                             const LogicalTimeArray& time) const override;
@@ -111,11 +112,11 @@ bool VectorClockTrivial::_permitRefreshDuringGossipOut() const {
     return false;
 }
 
-LogicalTime VectorClockTrivial::tick(Component component, uint64_t nTicks) {
+LogicalTime VectorClockTrivial::_tick(Component component, uint64_t nTicks) {
     return _advanceComponentTimeByTicks(component, nTicks);
 }
 
-void VectorClockTrivial::tickTo(Component component, LogicalTime newTime) {
+void VectorClockTrivial::_tickTo(Component component, LogicalTime newTime) {
     _advanceComponentTimeTo(component, std::move(newTime));
 }
 

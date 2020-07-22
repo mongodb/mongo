@@ -75,7 +75,8 @@ void LogicalClock::set(ServiceContext* service, std::unique_ptr<LogicalClock> cl
 LogicalClock::LogicalClock(ServiceContext* service) : _service(service) {}
 
 LogicalTime LogicalClock::getClusterTime() {
-    return VectorClock::get(_service)->getTime()[VectorClock::Component::ClusterTime];
+    auto time = VectorClock::get(_service)->getTime();
+    return time.clusterTime();
 }
 
 }  // namespace mongo

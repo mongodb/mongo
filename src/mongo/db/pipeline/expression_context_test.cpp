@@ -58,11 +58,9 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
     auto opCtx = makeOperationContext();
     auto logicalClock = std::make_unique<LogicalClock>(opCtx->getServiceContext());
     LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
-    auto t1 = VectorClockMutable::get(opCtx->getServiceContext())
-                  ->tick(VectorClock::Component::ClusterTime, 1);
+    auto t1 = VectorClockMutable::get(opCtx->getServiceContext())->tickClusterTime(1);
     t1.addTicks(100);
-    VectorClockMutable::get(opCtx->getServiceContext())
-        ->tickTo(VectorClock::Component::ClusterTime, t1);
+    VectorClockMutable::get(opCtx->getServiceContext())->tickClusterTimeTo(t1);
     {
         const auto expCtx = ExpressionContext{opCtx.get(),
                                               {},     // explain

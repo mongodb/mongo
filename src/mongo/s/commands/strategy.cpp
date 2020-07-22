@@ -123,7 +123,8 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
     // The appended operationTime must always be <= the appended $clusterTime, so in case we need to
     // use $clusterTime as the operationTime below, take a $clusterTime value which is guaranteed to
     // be <= the value output by gossipOut().
-    auto clusterTime = VectorClock::get(opCtx)->getTime()[VectorClock::Component::ClusterTime];
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    const auto clusterTime = currentTime.clusterTime();
 
     bool clusterTimeWasOutput = VectorClock::get(opCtx)->gossipOut(opCtx, responseBuilder);
 

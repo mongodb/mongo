@@ -4172,9 +4172,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
 void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) {
     invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
     _electionId = OID::fromTerm(_topCoord->getTerm());
-    auto ts = VectorClockMutable::get(getServiceContext())
-                  ->tick(VectorClock::Component::ClusterTime, 1)
-                  .asTimestamp();
+    auto ts = VectorClockMutable::get(getServiceContext())->tickClusterTime(1).asTimestamp();
     _topCoord->processWinElection(_electionId, ts);
     const PostMemberStateUpdateAction nextAction = _updateMemberStateFromTopologyCoordinator(lk);
 

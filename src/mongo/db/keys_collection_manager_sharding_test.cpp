@@ -261,8 +261,7 @@ TEST_F(KeysManagerShardedTest, ShouldCreateKeysIfKeyGeneratorEnabled) {
     keyManager()->startMonitoring(getServiceContext());
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
-    VectorClockMutable::get(operationContext())
-        ->tickTo(VectorClock::Component::ClusterTime, currentTime);
+    VectorClockMutable::get(operationContext())->tickClusterTimeTo(currentTime);
 
     keyManager()->enableKeyGenerator(operationContext(), true);
     keyManager()->refreshNow(operationContext());
@@ -278,8 +277,7 @@ TEST_F(KeysManagerShardedTest, EnableModeFlipFlopStressTest) {
     keyManager()->startMonitoring(getServiceContext());
 
     const LogicalTime currentTime(LogicalTime(Timestamp(100, 0)));
-    VectorClockMutable::get(operationContext())
-        ->tickTo(VectorClock::Component::ClusterTime, currentTime);
+    VectorClockMutable::get(operationContext())->tickClusterTimeTo(currentTime);
 
     bool doEnable = true;
 
@@ -305,8 +303,7 @@ TEST_F(KeysManagerShardedTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateK
 
     // Set the time to be very ahead so the updater will be forced to create new keys.
     const LogicalTime fakeTime(Timestamp(20000, 0));
-    VectorClockMutable::get(operationContext())
-        ->tickTo(VectorClock::Component::ClusterTime, fakeTime);
+    VectorClockMutable::get(operationContext())->tickClusterTimeTo(fakeTime);
 
     FailPointEnableBlock failWriteBlock("failCollectionInserts");
 
@@ -328,8 +325,7 @@ TEST_F(KeysManagerShardedTest, ShouldStillBeAbleToUpdateCacheEvenIfItCantCreateK
 
 TEST_F(KeysManagerShardedTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPoint) {
     const LogicalTime currentTime(Timestamp(100, 0));
-    VectorClockMutable::get(operationContext())
-        ->tickTo(VectorClock::Component::ClusterTime, currentTime);
+    VectorClockMutable::get(operationContext())->tickClusterTimeTo(currentTime);
 
     {
         FailPointEnableBlock failKeyGenerationBlock("disableKeyGeneration");
@@ -350,8 +346,7 @@ TEST_F(KeysManagerShardedTest, ShouldNotCreateKeysWithDisableKeyGenerationFailPo
 
 TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
     const LogicalTime currentTime(Timestamp(100, 0));
-    VectorClockMutable::get(operationContext())
-        ->tickTo(VectorClock::Component::ClusterTime, currentTime);
+    VectorClockMutable::get(operationContext())->tickClusterTimeTo(currentTime);
 
     ASSERT_EQ(false, keyManager()->hasSeenKeys());
 

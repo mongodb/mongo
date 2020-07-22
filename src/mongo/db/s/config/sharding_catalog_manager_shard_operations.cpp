@@ -679,8 +679,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         }
 
         // Tick clusterTime to get a new topologyTime for this mutation of the topology.
-        auto newTopologyTime =
-            VectorClockMutable::get(opCtx)->tick(VectorClock::Component::ClusterTime, 1);
+        auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
 
         shardType.setTopologyTime(newTopologyTime.asTimestamp());
 
@@ -920,8 +919,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     std::string controlShardName = controlShardStatus.getValue().getName();
 
     // Tick clusterTime to get a new topologyTime for this mutation of the topology.
-    auto newTopologyTime =
-        VectorClockMutable::get(opCtx)->tick(VectorClock::Component::ClusterTime, 1);
+    auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
 
     // Use applyOps to both remove the shard's document and update topologyTime on another document.
     auto command =

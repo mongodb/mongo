@@ -64,8 +64,7 @@ protected:
             Grid::get(operationContext())->catalogClient());
 
         const LogicalTime currentTime(LogicalTime(Timestamp(1, 0)));
-        VectorClockMutable::get(operationContext())
-            ->tickTo(VectorClock::Component::ClusterTime, currentTime);
+        VectorClockMutable::get(operationContext())->tickClusterTimeTo(currentTime);
 
         _keyManager = std::make_shared<KeysCollectionManager>(
             "dummy", std::move(catalogClient), Seconds(1000));

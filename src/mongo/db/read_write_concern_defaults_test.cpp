@@ -273,7 +273,7 @@ protected:
         _lookupMock.setLookupCallReturnValue(std::move(defaults));
         auto oldDefaults = _rwcd.getDefault(operationContext());
 
-        VectorClockMutable::get(getServiceContext())->tick(VectorClock::Component::ClusterTime, 1);
+        VectorClockMutable::get(getServiceContext())->tickClusterTime(1);
         getMockClockSource()->advance(Milliseconds(1));
 
         return oldDefaults;
@@ -472,7 +472,7 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestRefreshDefaultsWithDelet
     ASSERT_EQ(Timestamp(10, 20), *origCachedDefaults.getUpdateOpTime());
     ASSERT_EQ(Date_t::fromMillisSinceEpoch(1234), *origCachedDefaults.getUpdateWallClockTime());
 
-    VectorClockMutable::get(getServiceContext())->tick(VectorClock::Component::ClusterTime, 1);
+    VectorClockMutable::get(getServiceContext())->tickClusterTime(1);
     getMockClockSource()->advance(Milliseconds(1));
 
     _lookupMock.setLookupCallReturnValue(RWConcernDefault());

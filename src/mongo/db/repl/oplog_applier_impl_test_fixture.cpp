@@ -132,8 +132,7 @@ void OplogApplierImplTest::setUp() {
 
     // This is necessary to generate ghost timestamps for index builds that are not 0, since 0 is an
     // invalid timestamp.
-    VectorClockMutable::get(_opCtx.get())
-        ->tickTo(VectorClock::Component::ClusterTime, LogicalTime(Timestamp(1, 0)));
+    VectorClockMutable::get(_opCtx.get())->tickClusterTimeTo(LogicalTime(Timestamp(1, 0)));
 }
 
 void OplogApplierImplTest::tearDown() {

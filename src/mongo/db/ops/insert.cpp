@@ -162,8 +162,7 @@ StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj&
         if (hadId && e.fieldNameStringData() == "_id") {
             // no-op
         } else if (e.type() == bsonTimestamp && e.timestampValue() == 0) {
-            auto nextTime =
-                VectorClockMutable::get(service)->tick(VectorClock::Component::ClusterTime, 1);
+            auto nextTime = VectorClockMutable::get(service)->tickClusterTime(1);
             b.append(e.fieldName(), nextTime.asTimestamp());
         } else {
             b.append(e);

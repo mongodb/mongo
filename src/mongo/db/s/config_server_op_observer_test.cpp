@@ -106,11 +106,11 @@ TEST_F(ConfigServerOpObserverTest, ConfigOpTimeAdvancedWhenMajorityCommitPointAd
 
     opObserver.onMajorityCommitPointUpdate(getServiceContext(), a);
     const auto aTime = VectorClock::get(getServiceContext())->getTime();
-    ASSERT_EQ(a.getTimestamp(), aTime[VectorClock::Component::ConfigTime].asTimestamp());
+    ASSERT_EQ(a.getTimestamp(), aTime.configTime().asTimestamp());
 
     opObserver.onMajorityCommitPointUpdate(getServiceContext(), b);
     const auto bTime = VectorClock::get(getServiceContext())->getTime();
-    ASSERT_EQ(b.getTimestamp(), bTime[VectorClock::Component::ConfigTime].asTimestamp());
+    ASSERT_EQ(b.getTimestamp(), bTime.configTime().asTimestamp());
 }
 
 }  // namespace

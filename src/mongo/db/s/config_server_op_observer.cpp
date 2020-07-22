@@ -236,8 +236,7 @@ void ConfigServerOpObserver::_tickTopologyTimeIfNecessary(ServiceContext* servic
 
     // If any tick points were passed, tick TopologyTime to the largest one.
     if (maxPassedTime) {
-        VectorClockMutable::get(service)->tickTo(VectorClock::Component::TopologyTime,
-                                                 LogicalTime(*maxPassedTime));
+        VectorClockMutable::get(service)->tickTopologyTimeTo(LogicalTime(*maxPassedTime));
     }
 }
 
@@ -247,8 +246,7 @@ void ConfigServerOpObserver::onMajorityCommitPointUpdate(ServiceContext* service
 
     // TopologyTime must always be <= ConfigTime, so ticking them separately is fine as long as
     // ConfigTime is done first.
-    VectorClockMutable::get(service)->tickTo(VectorClock::Component::ConfigTime,
-                                             LogicalTime(newCommitPointTime));
+    VectorClockMutable::get(service)->tickConfigTimeTo(LogicalTime(newCommitPointTime));
 
     _tickTopologyTimeIfNecessary(service, newCommitPointTime);
 }
