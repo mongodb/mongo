@@ -957,9 +957,8 @@ private:
             _metrics.subtractMemory(sizeof(Head) - sizeof(Node));
         }
 
-        Head(Head&& other) : Node(std::move(other)) {
-            // TODO SERVER-49100: Move other fields in Head class.
-        }
+        Head(Head&& other)
+            : Node(std::move(other)), _count(other._count), _dataSize(other._dataSize) {}
 
         bool hasPreviousVersion() const {
             return _hasPreviousVersion;
