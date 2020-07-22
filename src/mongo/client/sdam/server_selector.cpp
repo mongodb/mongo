@@ -169,7 +169,7 @@ boost::optional<std::vector<ServerDescriptionPtr>> SdamServerSelector::selectSer
 
         // latency window should always leave at least one result
         invariant(results.size());
-
+        std::shuffle(std::begin(results), std::end(results), _random.urbg());
         return results;
     }
 
