@@ -65,6 +65,7 @@ struct Metrics {
         totalMemory.fetchAndSubtract(size);
     }
 };
+enum class NodeType : uint8_t { LEAF, NODE4, NODE16, NODE48, NODE256 };
 
 /**
  * RadixStore is a Trie data structure with the ability to share nodes among copies of trees to
@@ -88,6 +89,10 @@ public:
     using size_type = std::size_t;
     using difference_type = std::ptrdiff_t;
     using uint8_t = std::uint8_t;
+    using node_ptr = boost::intrusive_ptr<Node>;
+    using head_ptr = boost::intrusive_ptr<Head>;
+
+    static constexpr uint8_t maxByte = 255;
 
     template <class pointer_type, class reference_type>
     class radix_iterator {
@@ -164,10 +169,9 @@ public:
         }
 
     private:
-        radix_iterator(const boost::intrusive_ptr<Head>& root) : _root(root), _current(nullptr) {}
+        radix_iterator(const head_ptr& root) : _root(root), _current(nullptr) {}
 
-        radix_iterator(const boost::intrusive_ptr<Head>& root, Node* current)
-            : _root(root), _current(current) {}
+        radix_iterator(const head_ptr& root, Node* current) : _root(root), _current(current) {}
 
         /**
          * This function traverses the tree to find the next left-most node with data. Modifies
@@ -208,25 +212,20 @@ public:
 
                 // Check the children right of the node that the iterator was at already. This way,
                 // there will be no backtracking in the traversal.
-                for (auto iter = oldKey + 1 + node->_children.begin();
-                     iter != node->_children.end();
-                     ++iter) {
-
-                    // If the node has a child, then the sub-tree must have a node with data that
-                    // has not yet been visited.
-                    if (*iter != nullptr) {
-
-                        // If the current node has data, return it and exit. If not, continue
-                        // following the nodes to find the next one with data. It is necessary to go
-                        // to the left-most node in this sub-tree.
-                        if ((*iter)->_data) {
-                            _current = iter->get();
-                            return;
-                        }
-                        _current = iter->get();
-                        _traverseLeftSubtree();
-                        return;
+                bool res = _forEachChild(node, oldKey + 1, false, [this](node_ptr child) {
+                    // If the current node has data, return it and exit. If not, find the
+                    // left-most node with data in this sub-tree.
+                    if (child->_data) {
+                        _current = child.get();
+                        return false;
                     }
+
+                    _current = child.get();
+                    _traverseLeftSubtree();
+                    return false;
+                });
+                if (!res) {
+                    return;
                 }
             }
             return;
@@ -237,12 +236,10 @@ public:
             // '_current' is root. However, it cannot return the root, and hence at least 1
             // iteration of the while loop is required.
             do {
-                for (auto child : _current->_children) {
-                    if (child != nullptr) {
-                        _current = child.get();
-                        break;
-                    }
-                }
+                _forEachChild(_current, 0, false, [this](node_ptr child) {
+                    _current = child.get();
+                    return false;
+                });
             } while (!_current->_data);
         }
 
@@ -259,7 +256,7 @@ public:
         }
 
         // "_root" is a pointer to the root of the tree over which this is iterating.
-        boost::intrusive_ptr<Head> _root;
+        head_ptr _root;
 
         // "_current" is the node that the iterator is currently on. _current->_data will never be
         // boost::none (unless it is within the process of tree traversal), and _current will be
@@ -384,10 +381,9 @@ public:
         }
 
     private:
-        reverse_radix_iterator(const boost::intrusive_ptr<Head>& root)
-            : _root(root), _current(nullptr) {}
+        reverse_radix_iterator(const head_ptr& root) : _root(root), _current(nullptr) {}
 
-        reverse_radix_iterator(const boost::intrusive_ptr<Head>& root, Node* current)
+        reverse_radix_iterator(const head_ptr& root, Node* current)
             : _root(root), _current(current) {}
 
         void _findNextReverse() {
@@ -416,14 +412,15 @@ public:
 
                 // After moving up in the tree, continue searching for neighboring nodes to see if
                 // they have data, moving from right to left.
-                for (int i = oldKey - 1; i >= 0; i--) {
-                    if (node->_children[i] != nullptr) {
-                        // If there is a sub-tree found, it must have data, therefore it's necessary
-                        // to traverse to the right most node.
-                        _current = node->_children[i].get();
-                        _traverseRightSubtree();
-                        return;
-                    }
+                bool res = _forEachChild(node, oldKey - 1, true, [this](node_ptr child) {
+                    // If there is a sub-tree found, it must have data, therefore it's necessary
+                    // to traverse to the right most node.
+                    _current = child.get();
+                    _traverseRightSubtree();
+                    return false;
+                });
+                if (!res) {
+                    return;
                 }
 
                 // If there were no sub-trees that contained data, and the 'current' node has data,
@@ -439,13 +436,10 @@ public:
             // This function traverses the given tree to the right most leaf of the subtree where
             // 'current' is the root.
             do {
-                for (auto iter = _current->_children.rbegin(); iter != _current->_children.rend();
-                     ++iter) {
-                    if (*iter != nullptr) {
-                        _current = iter->get();
-                        break;
-                    }
-                }
+                _forEachChild(_current, maxByte, true, [this](node_ptr child) {
+                    _current = child.get();
+                    return false;
+                });
             } while (!_current->isLeaf());
         }
 
@@ -462,7 +456,7 @@ public:
         }
 
         // "_root" is a pointer to the root of the tree over which this is iterating.
-        boost::intrusive_ptr<Head> _root;
+        head_ptr _root;
 
         // "_current" is a the node that the iterator is currently on. _current->_data will never be
         // boost::none, and _current will be become a nullptr once there are no more nodes left to
@@ -542,9 +536,9 @@ public:
         return _metrics.totalNodes.load();
     }
 
-    static uint16_t averageChildren() {
+    static float averageChildren() {
         auto totalNodes = _metrics.totalNodes.load();
-        return totalNodes ? _metrics.totalChildren.load() / totalNodes : 0;
+        return totalNodes ? _metrics.totalChildren.load() / static_cast<float>(totalNodes) : 0;
     }
 
     // Modifiers
@@ -593,8 +587,8 @@ public:
         const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
         size_t depth = prev->_depth + prev->_trieKey.size();
         while (depth < key.size()) {
-            uint8_t c = charKey[depth];
-            node = prev->_children[c].get();
+            auto nodePtr = _findChild(prev, charKey[depth]);
+            node = nodePtr.get();
             if (node == nullptr) {
                 return false;
             }
@@ -605,7 +599,7 @@ public:
                 return false;
             }
 
-            isUniquelyOwned = isUniquelyOwned && prev->_children[c]->refCount() == 1;
+            isUniquelyOwned = isUniquelyOwned && nodePtr->refCount() - 1 == 1;
             context.push_back(std::make_pair(node, isUniquelyOwned));
             depth = node->_depth + node->_trieKey.size();
             prev = node;
@@ -643,27 +637,35 @@ public:
         size_t sizeOfRemovedData = node->_data->second.size();
         _root->_dataSize -= sizeOfRemovedData;
         _root->_count--;
-
+        Node* prevParent = nullptr;
         for (size_t depth = 1; depth < context.size(); depth++) {
             Node* child = context.at(depth).first;
             isUniquelyOwned = context.at(depth).second;
 
             uint8_t childFirstChar = child->_trieKey.front();
             if (!isUniquelyOwned) {
-                parent->_children[childFirstChar] = make_intrusive_node<Node>(*child);
-                child = parent->_children[childFirstChar].get();
+                auto childCopy = _copyNode(child);
+                _setChildPtr(parent, childFirstChar, childCopy);
+                child = childCopy.get();
             }
 
+            prevParent = parent;
             parent = child;
         }
 
         // Handle the deleted node, as it is a leaf.
-        parent->_children[deleted->_trieKey.front()] = nullptr;
-        --parent->_numChildren;
+        _setChildPtr(parent, deleted->_trieKey.front(), nullptr);
 
         // 'parent' may only have one child, in which case we need to evaluate whether or not
         // this node is redundant.
-        _compressOnlyChild(parent);
+        if (auto newParent = _compressOnlyChild(prevParent, parent)) {
+            parent = newParent;
+        }
+
+        // Don't shrink the root node.
+        if (prevParent && parent->needShrink()) {
+            parent = _shrink(prevParent, parent).get();
+        }
 
         return true;
     }
@@ -729,10 +731,11 @@ public:
             if (idx != UINT8_MAX)
                 context.push_back(std::make_pair(node, idx + 1));
 
-            if (!node->_children[idx])
+            auto nodePtr = _findChild(node, idx);
+            if (!nodePtr)
                 break;
 
-            node = node->_children[idx].get();
+            node = nodePtr.get();
             size_t mismatchIdx =
                 _comparePrefix(node->_trieKey, charKey + depth, key.size() - depth);
 
@@ -775,18 +778,17 @@ public:
             std::tie(node, idx) = context.back();
             context.pop_back();
 
-            for (auto iter = idx + node->_children.begin(); iter != node->_children.end(); ++iter) {
-                if (!(*iter))
-                    continue;
-
+            bool exhausted = _forEachChild(node, idx, false, [&node, &context](node_ptr child) {
+                node = child.get();
+                if (!node->_data) {
+                    // Need to search this node's children for the next largest node.
+                    context.push_back(std::make_pair(node, 0));
+                }
+                return false;
+            });
+            if (!exhausted && node->_data) {
                 // There exists a node with a key larger than the one given.
-                node = iter->get();
-                if (node->_data)
-                    return const_iterator(_root, node);
-
-                // Need to search this node's children for the next largest node.
-                context.push_back(std::make_pair(node, 0));
-                break;
+                return const_iterator(_root, node);
             }
 
             if (node->_trieKey.empty() && context.empty()) {
@@ -824,6 +826,9 @@ public:
     }
 
 private:
+    /*
+     * The base class of all other node types.
+     */
     class Node {
         friend class RadixStore;
         friend class RadixStoreTest;
@@ -833,35 +838,36 @@ private:
             addNodeMemory();
         }
 
-        Node(std::vector<uint8_t> key) {
+        Node(NodeType type, std::vector<uint8_t> key) {
+            _nodeType = type;
             _trieKey = key;
             addNodeMemory();
         }
 
         Node(const Node& other) {
-            _trieKey = other._trieKey;
-            _depth = other._depth;
-            if (other._data) {
-                addData(other._data);
-            }
-            _children = other._children;
+            _nodeType = other._nodeType;
             _numChildren = other._numChildren;
+            _depth = other._depth;
+            _trieKey = other._trieKey;
+            if (other._data) {
+                addData(other._data.value());
+            }
             // _refCount is initialized to 0 and not copied from other.
 
             addNodeMemory();
         }
 
-        Node(Node&& other) {
-            _depth = other._depth;
-            _trieKey = std::move(other._trieKey);
-            _data = std::move(other._data);
-            _children = std::move(other._children);
-            _numChildren = other._numChildren;
+        Node(Node&& other)
+            : _nodeType(other._nodeType),
+              _numChildren(other._numChildren),
+              _depth(other._depth),
+              _trieKey(std::move(other._trieKey)),
+              _data(std::move(other._data)) {
             // _refCount is initialized to 0 and not copied from other.
-
             // The move constructor transfers the dynamic memory so only the static memory of Node
             // should be added.
-            addNodeMemory(-_trieKey.capacity() * sizeof(uint8_t));
+            addNodeMemory(-static_cast<int64_t>(_trieKey.capacity()) *
+                          static_cast<int64_t>(sizeof(uint8_t)));
         }
 
         virtual ~Node() {
@@ -890,38 +896,354 @@ private:
             }
         }
 
+    protected:
+        NodeType _nodeType;
+        uint16_t _numChildren = 0;
+        unsigned int _depth = 0;
+        std::vector<uint8_t> _trieKey;
+        boost::optional<value_type> _data;
+        AtomicWord<uint32_t> _refCount{0};
+
+    private:
+        bool needGrow() const {
+            switch (_nodeType) {
+                case NodeType::LEAF:
+                    return true;
+                case NodeType::NODE4:
+                    return numChildren() == 4;
+                case NodeType::NODE16:
+                    return numChildren() == 16;
+                case NodeType::NODE48:
+                    return numChildren() == 48;
+                case NodeType::NODE256:
+                    return false;
+            }
+            MONGO_UNREACHABLE;
+        }
+
+        bool needShrink() const {
+            switch (_nodeType) {
+                case NodeType::LEAF:
+                    return false;
+                case NodeType::NODE4:
+                    return numChildren() < 1;
+                case NodeType::NODE16:
+                    return numChildren() < 5;
+                case NodeType::NODE48:
+                    return numChildren() < 17;
+                case NodeType::NODE256:
+                    return numChildren() < 49;
+            }
+            MONGO_UNREACHABLE;
+        }
+
+        /*
+         * Only adds non-empty value and handle the increment on memory metrics.
+         */
+        void addData(value_type value) {
+            _data.emplace(value.first, value.second);
+            _metrics.addMemory(value.first.capacity() + value.second.capacity());
+        }
+
         void addNodeMemory(difference_type offset = 0) {
             _metrics.totalMemory.fetchAndAdd(sizeof(Node) + _trieKey.capacity() * sizeof(uint8_t) +
                                              offset);
             _metrics.totalNodes.fetchAndAdd(1);
-            _metrics.totalChildren.fetchAndAdd(_children.size());
         }
 
         void subtractNodeMemory() {
-            // Todo SERVER-36709: Vector capacity changes are ignored for now. This might be
-            // handled when nodes are made adaptive.
             size_t memUsage = sizeof(Node) + _trieKey.capacity() * sizeof(uint8_t);
             if (_data) {
                 memUsage += _data->first.capacity() + _data->second.capacity();
             }
             _metrics.totalMemory.fetchAndSubtract(memUsage);
             _metrics.totalNodes.fetchAndSubtract(1);
+        }
+    };
+
+    class Node4;
+    class Node16;
+    class Node48;
+    class Node256;
+
+    class NodeLeaf : public Node {
+        friend class RadixStore;
+
+    public:
+        NodeLeaf(std::vector<uint8_t> key) : Node(NodeType::LEAF, key) {}
+        NodeLeaf(const NodeLeaf& other) : Node(other) {}
+
+        NodeLeaf(Node4&& other) : Node(std::move(other)) {
+            this->_nodeType = NodeType::LEAF;
+        }
+    };
+
+    /*
+     * Node4 is used when the number of children is in the range of [1, 4].
+     */
+    class Node4 : public Node {
+        friend class RadixStore;
+
+    public:
+        Node4(std::vector<uint8_t> key) : Node(NodeType::NODE4, key) {
+            std::fill(_childKey.begin(), _childKey.end(), 0);
+            addNodeMemory();
+        }
+
+        Node4(const Node4& other)
+            : Node(other), _childKey(other._childKey), _children(other._children) {
+            addNodeMemory();
+        }
+
+        /*
+         * This move constructor should only be used when growing NodeLeaf to Node4.
+         */
+        Node4(NodeLeaf&& other) : Node(std::move(other)) {
+            this->_nodeType = NodeType::NODE4;
+            std::fill(_childKey.begin(), _childKey.end(), 0);
+            addNodeMemory();
+        }
+
+        /*
+         * This move constructor should only be used when shrinking Node16 to Node4.
+         */
+        Node4(Node16&& other) : Node(std::move(other)) {
+            invariant(other.needShrink());
+            this->_nodeType = NodeType::NODE4;
+            std::fill(_childKey.begin(), _childKey.end(), 0);
+            for (size_t i = 0; i < other.numChildren(); ++i) {
+                _childKey[i] = other._childKey[i];
+                _children[i] = std::move(other._children[i]);
+            }
+            addNodeMemory();
+        }
+
+        ~Node4() {
+            _metrics.subtractMemory(sizeof(Node4) - sizeof(Node));
             _metrics.totalChildren.fetchAndSubtract(_children.size());
         }
 
-        void addData(boost::optional<value_type> value) {
-            _data.emplace(value->first, value->second);
-            _metrics.addMemory(value->first.capacity() + value->second.capacity());
+    private:
+        void addNodeMemory() {
+            _metrics.totalMemory.fetchAndAdd(sizeof(Node4) - sizeof(Node));
+            _metrics.totalChildren.fetchAndAdd(_children.size());
         }
 
-    protected:
-        unsigned int _depth = 0;
-        std::vector<uint8_t> _trieKey;
-        boost::optional<value_type> _data;
-        std::array<boost::intrusive_ptr<Node>, 256> _children;
-        // TODO SERVER-36709: Updating to uint8_t after using adaptive nodes.
-        uint16_t _numChildren = 0;
-        AtomicWord<uint32_t> _refCount{0};
+        // The first bytes of each child's key is stored in a sorted order.
+        std::array<uint8_t, 4> _childKey;
+        std::array<node_ptr, 4> _children;
+    };
+
+    /*
+     * Node16 is used when the number of children is in the range of [5, 16].
+     */
+    class Node16 : public Node {
+        friend class RadixStore;
+
+    public:
+        Node16(std::vector<uint8_t> key) : Node(NodeType::NODE16, key) {
+            std::fill(_childKey.begin(), _childKey.end(), 0);
+            addNodeMemory();
+        }
+
+        Node16(const Node16& other)
+            : Node(other), _childKey(other._childKey), _children(other._children) {
+            addNodeMemory();
+        }
+
+        /*
+         * This move constructor should only be used when growing Node4 to Node16.
+         */
+        Node16(Node4&& other) : Node(std::move(other)) {
+            invariant(other.needGrow());
+            this->_nodeType = NodeType::NODE16;
+            auto n = other._childKey.size();
+            for (size_t i = 0; i < n; ++i) {
+                _childKey[i] = other._childKey[i];
+                _children[i] = std::move(other._children[i]);
+            }
+            std::fill(_childKey.begin() + n, _childKey.end(), 0);
+            addNodeMemory();
+        }
+
+        /*
+         * This move constructor should only be used when shrinking Node48 to Node16.
+         */
+        Node16(Node48&& other) : Node(std::move(other)) {
+            invariant(other.needShrink());
+            this->_nodeType = NodeType::NODE16;
+            std::fill(_childKey.begin(), _childKey.end(), 0);
+            size_t cur = 0;
+            for (size_t i = 0; i < other._childIndex.size(); ++i) {
+                auto index = other._childIndex[i];
+                if (index != maxByte) {
+                    _childKey[cur] = i;
+                    _children[cur++] = std::move(other._children[index]);
+                }
+            }
+            addNodeMemory();
+        }
+
+        ~Node16() {
+            _metrics.subtractMemory(sizeof(Node16) - sizeof(Node));
+            _metrics.totalChildren.fetchAndSubtract(_children.size());
+        }
+
+    private:
+        void addNodeMemory() {
+            _metrics.totalMemory.fetchAndAdd(sizeof(Node16) - sizeof(Node));
+            _metrics.totalChildren.fetchAndAdd(_children.size());
+        }
+
+        // _childKey is sorted ascendingly.
+        std::array<uint8_t, 16> _childKey;
+        std::array<node_ptr, 16> _children;
+    };
+
+    /*
+     * Node48 is used when the number of children is in the range of [17, 48].
+     */
+    class Node48 : public Node {
+        friend class RadixStore;
+
+    public:
+        Node48(std::vector<uint8_t> key) : Node(NodeType::NODE48, key) {
+            std::fill(_childIndex.begin(), _childIndex.end(), maxByte);
+            addNodeMemory();
+        }
+
+        Node48(const Node48& other)
+            : Node(other), _childIndex(other._childIndex), _children(other._children) {
+            addNodeMemory();
+        }
+
+        /*
+         * This move constructor should only be used when growing Node16 to Node48.
+         */
+        Node48(Node16&& other) : Node(std::move(other)) {
+            invariant(other.needGrow());
+            this->_nodeType = NodeType::NODE48;
+            std::fill(_childIndex.begin(), _childIndex.end(), maxByte);
+            for (uint8_t i = 0; i < other._children.size(); ++i) {
+                _childIndex[other._childKey[i]] = i;
+                _children[i] = std::move(other._children[i]);
+            }
+            addNodeMemory();
+        }
+
+        /*
+         * This move constructor should only be used when shrinking Node256 to Node48.
+         */
+        Node48(Node256&& other) : Node(std::move(other)) {
+            invariant(other.needShrink());
+            this->_nodeType = NodeType::NODE48;
+            std::fill(_childIndex.begin(), _childIndex.end(), maxByte);
+            size_t cur = 0;
+            for (size_t i = 0; i < other._children.size(); ++i) {
+                auto child = other._children[i];
+                if (child) {
+                    _childIndex[i] = cur;
+                    _children[cur++] = child;
+                }
+            }
+            addNodeMemory();
+        }
+
+        ~Node48() {
+            _metrics.subtractMemory(sizeof(Node48) - sizeof(Node));
+            _metrics.totalChildren.fetchAndSubtract(_children.size());
+        }
+
+    private:
+        void addNodeMemory() {
+            _metrics.totalMemory.fetchAndAdd(sizeof(Node48) - sizeof(Node));
+            _metrics.totalChildren.fetchAndAdd(_children.size());
+        }
+
+        // A lookup table for child pointers. It has values from 0 to 48, where 0
+        // represents empty, and all other index i maps to index i - 1 in _children.
+        std::array<uint8_t, 256> _childIndex;
+        std::array<node_ptr, 48> _children;
+    };
+
+    /*
+     * Node256 is used when the number of children is in the range of [49, 256].
+     */
+    class Node256 : public Node {
+        friend class RadixStore;
+
+    public:
+        Node256() {
+            this->_nodeType = NodeType::NODE256;
+            addNodeMemory();
+        }
+
+        Node256(std::vector<uint8_t> key) : Node(NodeType::NODE256, key) {
+            addNodeMemory();
+        }
+
+        Node256(const NodeLeaf& other) : Node(other) {
+            addNodeMemory();
+        }
+
+        Node256(const Node4& other) : Node(other) {
+            this->_nodeType = NodeType::NODE256;
+            for (size_t i = 0; i < other.numChildren(); ++i) {
+                this->_children[other._childKey[i]] = other._children[i];
+            }
+            addNodeMemory();
+        }
+
+        Node256(const Node16& other) : Node(other) {
+            this->_nodeType = NodeType::NODE256;
+            for (size_t i = 0; i < other.numChildren(); ++i) {
+                this->_children[other._childKey[i]] = other._children[i];
+            }
+            addNodeMemory();
+        }
+
+        Node256(const Node48& other) : Node(other) {
+            this->_nodeType = NodeType::NODE256;
+            for (size_t i = 0; i < other._childIndex.size(); ++i) {
+                auto index = other._childIndex[i];
+                if (index != maxByte) {
+                    this->_children[i] = other._children[index];
+                }
+            }
+            addNodeMemory();
+        }
+
+        Node256(const Node256& other) : Node(other), _children(other._children) {
+            addNodeMemory();
+        }
+
+        /*
+         * This move constructor should only be used when growing Node48 to Node256.
+         */
+        Node256(Node48&& other) : Node(std::move(other)) {
+            invariant(other.needGrow());
+            this->_nodeType = NodeType::NODE256;
+            for (size_t i = 0; i < other._childIndex.size(); ++i) {
+                auto index = other._childIndex[i];
+                if (index != maxByte) {
+                    _children[i] = std::move(other._children[index]);
+                }
+            }
+            addNodeMemory();
+        }
+
+        ~Node256() {
+            _metrics.subtractMemory(sizeof(Node256) - sizeof(Node));
+            _metrics.totalChildren.fetchAndSubtract(_children.size());
+        }
+
+    private:
+        void addNodeMemory() {
+            _metrics.totalMemory.fetchAndAdd(sizeof(Node256) - sizeof(Node));
+            _metrics.totalChildren.fetchAndAdd(_children.size());
+        }
+
+        std::array<node_ptr, 256> _children;
     };
 
     template <typename Node, typename... Args>
@@ -935,34 +1257,38 @@ private:
      * be able to see when the tree is modified and to respond to these changes by ensuring they are
      * not iterating over stale trees.
      */
-    class Head : public Node {
+    class Head : public Node256 {
         friend class RadixStore;
 
     public:
         Head() {
-            _metrics.addMemory(sizeof(Head) - sizeof(Node));
+            addNodeMemory();
         }
 
-        Head(std::vector<uint8_t> key) : Node(key) {
-            _metrics.addMemory(sizeof(Head) - sizeof(Node));
+        Head(std::vector<uint8_t> key) : Node256(key) {
+            addNodeMemory();
         }
 
-        Head(const Node& other) : Node(other) {
-            _metrics.addMemory(sizeof(Head) - sizeof(Node));
+        Head(const Head& other) : Node256(other), _count(other._count), _dataSize(other._dataSize) {
+            addNodeMemory();
         }
 
-        Head(const Head& other) : Node(other), _count(other._count), _dataSize(other._dataSize) {
-            _metrics.addMemory(sizeof(Head) - sizeof(Node));
+        // Copy constructor template for the five node types.
+        template <typename NodeT>
+        Head(const NodeT& other) : Node256(other) {
+            addNodeMemory();
         }
 
         ~Head() {
             if (_nextVersion)
                 _nextVersion->_hasPreviousVersion = false;
-            _metrics.subtractMemory(sizeof(Head) - sizeof(Node));
+            _metrics.subtractMemory(sizeof(Head) - sizeof(Node256));
         }
 
         Head(Head&& other)
-            : Node(std::move(other)), _count(other._count), _dataSize(other._dataSize) {}
+            : Node256(std::move(other)), _count(other._count), _dataSize(other._dataSize) {
+            addNodeMemory();
+        }
 
         bool hasPreviousVersion() const {
             return _hasPreviousVersion;
@@ -971,7 +1297,7 @@ private:
     protected:
         // Forms a singly linked list of versions that is needed to reposition cursors after
         // modifications have been made.
-        boost::intrusive_ptr<Head> _nextVersion;
+        head_ptr _nextVersion;
 
         // While we have cursors that haven't been repositioned to the latest tree, this will be
         // true to help us understand when to copy on modifications due to the extra shared pointer
@@ -979,6 +1305,10 @@ private:
         bool _hasPreviousVersion = false;
 
     private:
+        void addNodeMemory() {
+            _metrics.totalMemory.fetchAndAdd(sizeof(Head) - sizeof(Node256));
+        }
+
         size_type _count = 0;
         size_type _dataSize = 0;
     };
@@ -1008,12 +1338,160 @@ private:
         }
         ret.push_back('\n');
 
-        for (auto child : node->_children) {
-            if (child != nullptr) {
-                ret.append(_walkTree(child.get(), depth + 1));
+        _forEachChild(node, 0, false, [this, &ret, depth](node_ptr child) {
+            ret.append(_walkTree(child.get(), depth + 1));
+            return true;
+        });
+        return ret;
+    }
+
+    /*
+     * Helper function to iterate through _children array for different node types and execute the
+     * given function on each child. The given function returns false when it intends to break the
+     * iteration.
+     * Returns false when the given function returns false on an element. Returns true
+     * when the end of the array is reached.
+     */
+    static bool _forEachChild(Node* node,
+                              uint16_t startKey,
+                              bool reverse,
+                              const std::function<bool(node_ptr)>& func) {
+        if (startKey > maxByte || !node->_numChildren) {
+            return true;
+        }
+        // Sets the step depending on the direction of iteration.
+        int16_t step = reverse ? -1 : 1;
+        switch (node->_nodeType) {
+            case NodeType::LEAF:
+                return true;
+            case NodeType::NODE4: {
+                Node4* node4 = static_cast<Node4*>(node);
+                // Locates the actual starting position first.
+                auto first = node4->_childKey.begin();
+                auto numChildren = node4->numChildren();
+                auto pos = std::find_if(first, first + numChildren, [&startKey](uint8_t keyByte) {
+                    return keyByte >= startKey;
+                });
+                if (reverse) {
+                    if (pos == first && *pos != startKey) {
+                        return true;
+                    }
+                    if (pos == first + numChildren || *pos != startKey) {
+                        --pos;
+                    }
+                }
+
+                // No qualified elements.
+                if (pos == first + numChildren) {
+                    return true;
+                }
+
+                auto end = reverse ? -1 : numChildren;
+                for (auto cur = pos - first; cur != end; cur += step) {
+                    // All children within the range will not be null since they are stored
+                    // consecutively.
+                    if (!func(node4->_children[cur])) {
+                        // Breaks the loop if the given function decides to.
+                        return false;
+                    }
+                }
+                return true;
+            }
+            case NodeType::NODE16: {
+                Node16* node16 = static_cast<Node16*>(node);
+                // Locates the actual starting position first.
+                auto first = node16->_childKey.begin();
+                auto numChildren = node16->numChildren();
+                auto pos = std::find_if(first, first + numChildren, [&startKey](uint8_t keyByte) {
+                    return keyByte >= startKey;
+                });
+                if (reverse) {
+                    if (pos == first && *pos != startKey) {
+                        return true;
+                    }
+                    if (pos == first + numChildren || *pos != startKey) {
+                        --pos;
+                    }
+                }
+
+                // No qualified elements.
+                if (pos == first + numChildren) {
+                    return true;
+                }
+
+                int16_t end = reverse ? -1 : numChildren;
+                for (auto cur = pos - first; cur != end; cur += step) {
+                    // All children within the range will not be null since they are stored
+                    // consecutively.
+                    if (!func(node16->_children[cur])) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            case NodeType::NODE48: {
+                Node48* node48 = static_cast<Node48*>(node);
+                size_t end = reverse ? -1 : node48->_childIndex.size();
+                for (size_t cur = startKey; cur != end; cur += step) {
+                    auto index = node48->_childIndex[cur];
+                    if (index != maxByte && !func(node48->_children[index])) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            case NodeType::NODE256: {
+                Node256* node256 = static_cast<Node256*>(node);
+                size_t end = reverse ? -1 : node256->_children.size();
+                for (size_t cur = startKey; cur != end; cur += step) {
+                    auto child = node256->_children[cur];
+                    if (child && !func(child)) {
+                        return false;
+                    }
+                }
+                return true;
             }
         }
-        return ret;
+        MONGO_UNREACHABLE;
+    }
+
+    /*
+     * Gets the child mapped by the key for different node types. Node4 just does a simple linear
+     * search. Node16 uses binary search. Node48 does one extra lookup with the index table. Node256
+     * has direct mapping.
+     */
+    static node_ptr _findChild(const Node* node, uint8_t key) {
+        switch (node->_nodeType) {
+            case NodeType::LEAF:
+                return node_ptr(nullptr);
+            case NodeType::NODE4: {
+                const Node4* node4 = static_cast<const Node4*>(node);
+                auto start = node4->_childKey.begin();
+                auto end = start + node4->numChildren();
+                auto pos = std::find(start, end, key);
+                return pos != end ? node4->_children[pos - start] : node_ptr(nullptr);
+            }
+            case NodeType::NODE16: {
+                const Node16* node16 = static_cast<const Node16*>(node);
+                auto start = node16->_childKey.begin();
+                auto end = start + node16->numChildren();
+                auto pos = std::find(start, end, key);
+                return pos != end ? node16->_children[pos - start] : node_ptr(nullptr);
+            }
+            case NodeType::NODE48: {
+                const Node48* node48 = static_cast<const Node48*>(node);
+                auto index = node48->_childIndex[key];
+                if (index != maxByte) {
+                    return node48->_children[index];
+                }
+                return node_ptr(nullptr);
+            }
+            case NodeType::NODE256: {
+                const Node256* node256 = static_cast<const Node256*>(node);
+                return node256->_children[key];
+            }
+        }
+        MONGO_UNREACHABLE;
     }
 
     Node* _findNode(const Key& key) const {
@@ -1038,7 +1516,7 @@ private:
 
         depth = _root->_depth + _root->_trieKey.size();
         uint8_t childFirstChar = charKey[depth];
-        auto node = _root->_children[childFirstChar];
+        auto node = _findChild(_root.get(), childFirstChar);
 
         while (node != nullptr) {
 
@@ -1055,7 +1533,7 @@ private:
             depth = node->_depth + node->_trieKey.size();
 
             childFirstChar = charKey[depth];
-            node = node->_children[childFirstChar];
+            node = _findChild(node.get(), childFirstChar);
         }
 
         return nullptr;
@@ -1086,6 +1564,78 @@ private:
         _root->_hasPreviousVersion = true;
     }
 
+    /*
+     * Moves a smaller node's contents to a larger one. The method should only be called when the
+     * node is full.
+     */
+    node_ptr _grow(Node* parent, Node* node) {
+        invariant(node->_nodeType != NodeType::NODE256);
+        auto key = node->_trieKey.front();
+        switch (node->_nodeType) {
+            case NodeType::NODE256:
+                return nullptr;
+            case NodeType::LEAF: {
+                NodeLeaf* leaf = static_cast<NodeLeaf*>(node);
+                auto newNode = make_intrusive_node<Node4>(std::move(*leaf));
+                _setChildPtr(parent, key, newNode);
+                return newNode;
+            }
+            case NodeType::NODE4: {
+                Node4* node4 = static_cast<Node4*>(node);
+                auto newNode = make_intrusive_node<Node16>(std::move(*node4));
+                _setChildPtr(parent, key, newNode);
+                return newNode;
+            }
+            case NodeType::NODE16: {
+                Node16* node16 = static_cast<Node16*>(node);
+                auto newNode = make_intrusive_node<Node48>(std::move(*node16));
+                _setChildPtr(parent, key, newNode);
+                return newNode;
+            }
+            case NodeType::NODE48: {
+                Node48* node48 = static_cast<Node48*>(node);
+                auto newNode = make_intrusive_node<Node256>(std::move(*node48));
+                _setChildPtr(parent, key, newNode);
+                return newNode;
+            }
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    node_ptr _shrink(Node* parent, Node* node) {
+        invariant(node->_nodeType != NodeType::LEAF);
+        auto key = node->_trieKey.front();
+        switch (node->_nodeType) {
+            case NodeType::LEAF:
+                return nullptr;
+            case NodeType::NODE4: {
+                Node4* node4 = static_cast<Node4*>(node);
+                auto newNode = make_intrusive_node<NodeLeaf>(std::move(*node4));
+                _setChildPtr(parent, key, newNode);
+                return newNode;
+            }
+            case NodeType::NODE16: {
+                Node16* node16 = static_cast<Node16*>(node);
+                auto newNode = make_intrusive_node<Node4>(std::move(*node16));
+                _setChildPtr(parent, key, newNode);
+                return newNode;
+            }
+            case NodeType::NODE48: {
+                Node48* node48 = static_cast<Node48*>(node);
+                auto newNode = make_intrusive_node<Node16>(std::move(*node48));
+                _setChildPtr(parent, key, newNode);
+                return newNode;
+            }
+            case NodeType::NODE256: {
+                Node256* node256 = static_cast<Node256*>(node);
+                auto newNode = make_intrusive_node<Node48>(std::move(*node256));
+                _setChildPtr(parent, key, newNode);
+                return newNode;
+            }
+        }
+        MONGO_UNREACHABLE;
+    }
+
     /**
      * _upsertWithCopyOnSharedNodes is a helper function to help manage copy on modification for the
      * tree. This function follows the path for the to-be modified node using the keystring. If at
@@ -1106,13 +1656,14 @@ private:
 
         _makeRootUnique();
 
+        Node* prevParent = nullptr;
         Node* prev = _root.get();
-        boost::intrusive_ptr<Node> node = prev->_children[childFirstChar];
+        node_ptr node = _findChild(prev, childFirstChar);
         while (node != nullptr) {
             if (node->refCount() - 1 > 1) {
                 // Copy node on a modifying operation when it isn't owned uniquely.
-                node = make_intrusive_node<Node>(*node);
-                prev->_children[childFirstChar] = node;
+                node = _copyNode(node.get());
+                _setChildPtr(prev, childFirstChar, node);
             }
 
             // 'node' is uniquely owned at this point, so we are free to modify it.
@@ -1126,8 +1677,7 @@ private:
                 // Make a new node with whatever prefix is shared between node->_trieKey
                 // and the new key. This will replace the current node in the tree.
                 std::vector<uint8_t> newKey = _makeKey(node->_trieKey, 0, mismatchIdx);
-                Node* newNode = _addChild(prev, newKey, boost::none);
-
+                Node* newNode = _addChild(prev, newKey, boost::none, NodeType::NODE4);
                 depth += mismatchIdx;
                 const_iterator it(_root, newNode);
                 if (key.size() - depth != 0) {
@@ -1138,15 +1688,14 @@ private:
                 } else {
                     // The new key is a prefix of an existing key, and has its own node, so we don't
                     // need to add any new nodes.
-                    newNode->addData(value);
+                    newNode->addData(value.value());
                 }
                 _root->_count++;
                 _root->_dataSize += value->second.size();
 
                 // Change the current node's trieKey and make a child of the new node.
                 newKey = _makeKey(node->_trieKey, mismatchIdx, node->_trieKey.size() - mismatchIdx);
-                newNode->_children[newKey.front()] = node;
-                ++newNode->_numChildren;
+                _setChildPtr(newNode, newKey.front(), node);
 
                 // Handle key size change to the new key.
                 _metrics.subtractMemory(sizeof(uint8_t) *
@@ -1167,11 +1716,14 @@ private:
                 // Update an internal node.
                 if (!value) {
                     data = boost::none;
-                    _compressOnlyChild(node.get());
+                    auto keyByte = node->_trieKey.front();
+                    if (_compressOnlyChild(prev, node.get())) {
+                        node = _findChild(prev, keyByte);
+                    }
                 } else {
                     _root->_count++;
                     _root->_dataSize += value->second.size();
-                    node->addData(value);
+                    node->addData(value.value());
                 }
                 const_iterator it(_root, node.get());
 
@@ -1181,13 +1733,17 @@ private:
             depth = node->_depth + node->_trieKey.size();
             childFirstChar = charKey[depth];
 
+            prevParent = prev;
             prev = node.get();
-            node = node->_children[childFirstChar];
+            node = _findChild(node.get(), childFirstChar);
         }
 
         // Add a completely new child to a node. The new key at this depth does not
         // share a prefix with any existing keys.
         std::vector<uint8_t> newKey = _makeKey(charKey + depth, key.size() - depth);
+        if (prev->needGrow()) {
+            prev = _grow(prevParent, prev).get();
+        }
         Node* newNode = _addChild(prev, newKey, value);
         _root->_count++;
         _root->_dataSize += value->second.size();
@@ -1220,23 +1776,193 @@ private:
         return key;
     }
 
-    /**
-     * Add a child with trieKey 'key' and value 'value' to 'node'.
+    /*
+     * Wraps around the copy constructor for different node types.
      */
-    Node* _addChild(Node* node, std::vector<uint8_t> key, boost::optional<value_type> value) {
+    node_ptr _copyNode(Node* node) {
+        switch (node->_nodeType) {
+            case NodeType::LEAF: {
+                NodeLeaf* leaf = static_cast<NodeLeaf*>(node);
+                return make_intrusive_node<NodeLeaf>(*leaf);
+            }
+            case NodeType::NODE4: {
+                Node4* node4 = static_cast<Node4*>(node);
+                return make_intrusive_node<Node4>(*node4);
+            }
+            case NodeType::NODE16: {
+                Node16* node16 = static_cast<Node16*>(node);
+                return make_intrusive_node<Node16>(*node16);
+            }
+            case NodeType::NODE48: {
+                Node48* node48 = static_cast<Node48*>(node);
+                return make_intrusive_node<Node48>(*node48);
+            }
+            case NodeType::NODE256: {
+                Node256* node256 = static_cast<Node256*>(node);
+                return make_intrusive_node<Node256>(*node256);
+            }
+        }
+        MONGO_UNREACHABLE;
+    }
 
-        boost::intrusive_ptr<Node> newNode = make_intrusive_node<Node>(key);
+    head_ptr _makeHead(Node* node) {
+        switch (node->_nodeType) {
+            case NodeType::LEAF: {
+                NodeLeaf* leaf = static_cast<NodeLeaf*>(node);
+                return make_intrusive_node<Head>(*leaf);
+            }
+            case NodeType::NODE4: {
+                Node4* node4 = static_cast<Node4*>(node);
+                return make_intrusive_node<Head>(*node4);
+            }
+            case NodeType::NODE16: {
+                Node16* node16 = static_cast<Node16*>(node);
+                return make_intrusive_node<Head>(*node16);
+            }
+            case NodeType::NODE48: {
+                Node48* node48 = static_cast<Node48*>(node);
+                return make_intrusive_node<Head>(*node48);
+            }
+            case NodeType::NODE256: {
+                Node256* node256 = static_cast<Node256*>(node);
+                return make_intrusive_node<Head>(*node256);
+            }
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    /**
+     * Add a child with trieKey 'key' and value 'value' to 'node'. The new child node created should
+     * only be the type NodeLeaf or Node4.
+     */
+    Node* _addChild(Node* node,
+                    std::vector<uint8_t> key,
+                    boost::optional<value_type> value,
+                    NodeType childType = NodeType::LEAF) {
+        invariant(childType == NodeType::LEAF || childType == NodeType::NODE4);
+        node_ptr newNode;
+        if (childType == NodeType::LEAF) {
+            newNode = make_intrusive_node<NodeLeaf>(key);
+        } else if (childType == NodeType::NODE4) {
+            newNode = make_intrusive_node<Node4>(key);
+        }
         newNode->_depth = node->_depth + node->_trieKey.size();
         if (value) {
-            newNode->addData(value);
+            newNode->addData(value.value());
         }
-        auto& child = node->_children[key.front()];
-        if (!child) {
-            // Only increment the number of children if the node didn't have one at the position.
+        auto newNodeRaw = newNode.get();
+        _setChildPtr(node, key.front(), std::move(newNode));
+        return newNodeRaw;
+    }
+
+    /*
+     * Inserts, updates, or deletes a child node at index and then maintains the key and children
+     * array for Node4 and Node16 in _setChildPtr().
+     */
+    template <class Node4Or16>
+    bool _setChildAtIndex(Node4Or16* node, node_ptr child, uint8_t key, size_t index) {
+        // Adds to the end of the array.
+        if (!node->_childKey[index] && !node->_children[index]) {
+            node->_childKey[index] = key;
+            node->_children[index] = child;
             ++node->_numChildren;
+            return true;
         }
-        child = newNode;
-        return newNode.get();
+        if (node->_childKey[index] == key) {
+            if (!child) {
+                // Deletes a child and shifts
+                auto n = node->numChildren();
+                for (int j = index; j < n - 1; ++j) {
+                    node->_childKey[j] = node->_childKey[j + 1];
+                    node->_children[j] = node->_children[j + 1];
+                }
+                node->_childKey[n - 1] = 0;
+                node->_children[n - 1] = nullptr;
+                --node->_numChildren;
+                return true;
+            }
+            node->_children[index] = child;
+            return true;
+        }
+        if (node->_childKey[index] > key) {
+            // _children is guaranteed not to be full.
+            // Inserts to 'index' and shift larger keys to the right.
+            for (size_t j = node->numChildren(); j > index; --j) {
+                node->_childKey[j] = node->_childKey[j - 1];
+                node->_children[j] = node->_children[j - 1];
+            }
+            node->_childKey[index] = key;
+            node->_children[index] = child;
+            ++node->_numChildren;
+            return true;
+        }
+        return false;
+    }
+
+    /*
+     * Sets the child pointer of 'key' to the 'newNode' in 'node'.
+     */
+    void _setChildPtr(Node* node, uint8_t key, node_ptr newNode) {
+        switch (node->_nodeType) {
+            case NodeType::LEAF:
+                return;
+            case NodeType::NODE4: {
+                Node4* node4 = static_cast<Node4*>(node);
+                auto start = node4->_childKey.begin();
+                // Find the position of the first larger or equal key to insert.
+                auto pos = std::find_if(start,
+                                        start + node4->numChildren(),
+                                        [&key](uint8_t keyByte) { return keyByte >= key; });
+                _setChildAtIndex(node4, newNode, key, pos - start);
+                return;
+            }
+            case NodeType::NODE16: {
+                Node16* node16 = static_cast<Node16*>(node);
+                auto start = node16->_childKey.begin();
+                auto pos = std::find_if(start,
+                                        start + node16->numChildren(),
+                                        [&key](uint8_t keyByte) { return keyByte >= key; });
+                _setChildAtIndex(node16, newNode, key, pos - start);
+                return;
+            }
+            case NodeType::NODE48: {
+                Node48* node48 = static_cast<Node48*>(node);
+                auto index = node48->_childIndex[key];
+                if (index != maxByte) {
+                    // Pointer already exists. Delete or update it.
+                    if (!newNode) {
+                        node48->_childIndex[key] = maxByte;
+                        --node48->_numChildren;
+                    }
+                    node48->_children[index] = newNode;
+                    return;
+                } else {
+                    // Finds the first empty slot to insert the newNode.
+                    for (size_t i = 0; i < node48->_children.size(); ++i) {
+                        auto& child = node48->_children[i];
+                        if (!child) {
+                            child = newNode;
+                            node48->_childIndex[key] = i;
+                            ++node48->_numChildren;
+                            return;
+                        }
+                    }
+                }
+                return;
+            }
+            case NodeType::NODE256: {
+                Node256* node256 = static_cast<Node256*>(node);
+                auto& child = node256->_children[key];
+                if (!child) {
+                    ++node256->_numChildren;
+                } else if (!newNode) {
+                    --node256->_numChildren;
+                }
+                child = newNode;
+                return;
+            }
+        }
+        MONGO_UNREACHABLE;
     }
 
     /**
@@ -1255,8 +1981,7 @@ private:
         size_t depth = node->_depth + node->_trieKey.size();
 
         while (depth < key.size()) {
-            uint8_t c = charKey[depth];
-            node = node->_children[c].get();
+            node = _findChild(node, charKey[depth]).get();
             context.push_back(node);
             depth = node->_depth + node->_trieKey.size();
         }
@@ -1285,34 +2010,41 @@ private:
      * in a node with no value and only one child.
      * Returns true if compression occurred and false otherwise.
      */
-    bool _compressOnlyChild(Node* node) {
-        // Don't compress if this node has an actual value associated with it or is the root
+    Node* _compressOnlyChild(Node* parent, Node* node) {
+        // Don't compress if this node is not of type Node4, has an actual value associated with it,
         // or doesn't have only one child.
-        if (node->_data || node->_trieKey.empty() || node->numChildren() != 1) {
-            return false;
+        if (node->_nodeType != NodeType::NODE4 || node->_data || node->_trieKey.empty() ||
+            node->numChildren() != 1) {
+            return nullptr;
         }
 
-        // Determine if this node has only one child.
-        boost::intrusive_ptr<Node> onlyChild = nullptr;
+        Node4* node4 = static_cast<Node4*>(node);
+        node_ptr onlyChild = std::move(node4->_children[0]);
+        node4->_childKey[0] = 0;
+        node4->_numChildren = 0;
+        auto oldCapacity = node4->_trieKey.capacity();
 
-        for (size_t i = 0; i < node->_children.size(); ++i) {
-            if (node->_children[i] != nullptr) {
-                onlyChild = node->_children[i];
-                break;
-            }
-        }
-
-        // Append the child's key onto the parent.
         for (char item : onlyChild->_trieKey) {
-            node->_trieKey.push_back(item);
+            node4->_trieKey.push_back(item);
+        }
+        _metrics.addMemory(sizeof(uint8_t) * (node4->_trieKey.capacity() - oldCapacity));
+        if (onlyChild->_data) {
+            node4->addData(onlyChild->_data.value());
+        }
+        _forEachChild(onlyChild.get(), 0, false, [this, &parent, &node](node_ptr child) {
+            if (node->needGrow()) {
+                node = _grow(parent, node).get();
+            }
+            auto keyByte = child->_trieKey.front();
+            _setChildPtr(node, keyByte, std::move(child));
+            return true;
+        });
+
+        if (node->needShrink()) {
+            node = _shrink(parent, node).get();
         }
 
-        if (onlyChild->_data) {
-            node->addData(onlyChild->_data);
-        }
-        node->_children = onlyChild->_children;
-        node->_numChildren = onlyChild->_numChildren;
-        return true;
+        return node;
     }
 
     /**
@@ -1325,7 +2057,7 @@ private:
         context[0] = replaceNode;
 
         for (size_t node = 1; node < context.size(); node++) {
-            replaceNode = replaceNode->_children[trieKeyIndex[node - 1]].get();
+            replaceNode = _findChild(replaceNode, trieKeyIndex[node - 1]).get();
             context[node] = replaceNode;
         }
     }
@@ -1350,13 +2082,14 @@ private:
         for (size_t idx = 1; idx < context.size(); idx++) {
             node = context[idx];
 
-            if (prev->_children[node->_trieKey.front()]->refCount() > 1) {
-                boost::intrusive_ptr<Node> nodeCopy = make_intrusive_node<Node>(*node);
-                prev->_children[nodeCopy->_trieKey.front()] = nodeCopy;
+            auto next = _findChild(prev, node->_trieKey.front());
+            if (next->refCount() - 1 > 1) {
+                node_ptr nodeCopy = _copyNode(node);
+                _setChildPtr(prev, nodeCopy->_trieKey.front(), nodeCopy);
                 context[idx] = nodeCopy.get();
                 prev = nodeCopy.get();
             } else {
-                prev = prev->_children[node->_trieKey.front()].get();
+                prev = next.get();
             }
         }
 
@@ -1367,14 +2100,14 @@ private:
      * Resolves conflicts within subtrees due to the complicated structure of path-compressed radix
      * tries.
      */
-    void _mergeResolveConflict(const Node* current, const Node* baseNode, const Node* otherNode) {
+    void _mergeResolveConflict(Node* current, Node* baseNode, Node* otherNode) {
 
         // Merges all differences between this and other, using base to determine whether operations
         // are allowed or should throw a merge conflict.
         RadixStore base, other, node;
-        node._root = make_intrusive_node<Head>(*current);
-        base._root = make_intrusive_node<Head>(*baseNode);
-        other._root = make_intrusive_node<Head>(*otherNode);
+        node._root = _makeHead(current);
+        base._root = _makeHead(baseNode);
+        other._root = _makeHead(otherNode);
 
         // Merges insertions and updates from the master tree into the working tree, if possible.
         for (const value_type otherVal : other) {
@@ -1437,11 +2170,11 @@ private:
      * Merges elements from the master tree into the working copy if they have no presence in the
      * working copy, otherwise we throw a merge conflict.
      */
-    void _mergeTwoBranches(const Node* current, const Node* otherNode) {
+    void _mergeTwoBranches(Node* current, Node* otherNode) {
 
         RadixStore other, node;
-        node._root = make_intrusive_node<Head>(*current);
-        other._root = make_intrusive_node<Head>(*otherNode);
+        node._root = _makeHead(current);
+        other._root = _makeHead(otherNode);
 
         for (const value_type otherVal : other) {
             RadixStore::const_iterator thisIter = node.find(otherVal.first);
@@ -1489,22 +2222,21 @@ private:
             auto key = current->_trieKey.front();
             auto newTrieKeyBegin = current->_trieKey.begin();
             auto newTrieKeyEnd = current->_trieKey.begin() + mismatchIdx;
-            auto shared_current = std::move(parent->_children[key]);
-            --parent->_numChildren;
+            auto shared_current = std::move(_findChild(parent, key));
             auto newTrieKey = std::vector<uint8_t>(newTrieKeyBegin, newTrieKeyEnd);
 
             // Replace current with a new node with no data
-            auto newNode = _addChild(parent, newTrieKey, boost::none);
+            auto newNode = _addChild(parent, newTrieKey, boost::none, NodeType::NODE4);
 
             // Remove the part of the trieKey that is used by the new node.
             current->_trieKey.erase(current->_trieKey.begin(),
                                     current->_trieKey.begin() + mismatchIdx);
+            _metrics.subtractMemory(sizeof(uint8_t) * mismatchIdx);
             current->_depth += mismatchIdx;
 
             // Add what was the current node as a child to the new internal node
             key = current->_trieKey.front();
-            newNode->_children[key] = std::move(shared_current);
-            newNode->_numChildren = 1;
+            _setChildPtr(newNode, key, std::move(shared_current));
 
             // Update current pointer and context
             child = current;
@@ -1518,9 +2250,9 @@ private:
             // Since _makeBranchUnique may make changes to the pointer addresses in recursive calls.
             current = context.back();
 
-            Node* node = current->_children[key].get();
-            Node* baseNode = base->_children[key].get();
-            Node* otherNode = other->_children[key].get();
+            Node* node = _findChild(current, key).get();
+            Node* baseNode = _findChild(base, key).get();
+            Node* otherNode = _findChild(other, key).get();
 
             if (!node && !baseNode && !otherNode)
                 continue;
@@ -1535,12 +2267,14 @@ private:
                     // merge in the other's branch.
                     current = _makeBranchUnique(context);
 
+                    if (current->needGrow()) {
+                        current = _grow(context.at(context.size() - 2), current).get();
+                    }
+
                     // Need to rebuild our context to have updated pointers due to the
                     // modifications that go on in _makeBranchUnique.
                     _rebuildContext(context, trieKeyIndex);
-
-                    current->_children[key] = other->_children[key];
-                    ++current->_numChildren;
+                    _setChildPtr(current, key, _findChild(other, key));
                 } else if (!otherNode || (baseNode && baseNode != otherNode)) {
                     // Either the master tree and working tree remove the same branch, or the master
                     // tree updated the branch while the working tree removed the branch, resulting
@@ -1552,18 +2286,23 @@ private:
                     node = splitCurrentBeforeWriteIfNeeded(node);
 
                     // Other has a deleted branch that must also be removed from current tree.
-
                     current = _makeBranchUnique(context);
+                    int prevIdx = context.size() - 2;
+                    _setChildPtr(current, key, nullptr);
+                    if (prevIdx >= 0 && current->needShrink()) {
+                        current = _shrink(context.at(prevIdx), current).get();
+                    }
                     _rebuildContext(context, trieKeyIndex);
-                    current->_children[key] = nullptr;
-                    --current->_numChildren;
                 } else if (baseNode && otherNode && baseNode == node) {
                     node = splitCurrentBeforeWriteIfNeeded(node);
 
                     // If base and current point to the same node, then master changed.
                     current = _makeBranchUnique(context);
+                    if (current->needGrow()) {
+                        current = _grow(context.at(context.size() - 2), current).get();
+                    }
                     _rebuildContext(context, trieKeyIndex);
-                    current->_children[key] = other->_children[key];
+                    _setChildPtr(current, key, _findChild(other, key));
                 }
             } else if (baseNode && otherNode && baseNode != otherNode) {
                 // If all three are unique and leaf nodes with different data, then it is a merge
@@ -1579,7 +2318,7 @@ private:
                         // Only other changed the data. Take that node
                         current = _makeBranchUnique(context);
                         _rebuildContext(context, trieKeyIndex);
-                        current->_children[key] = other->_children[key];
+                        _setChildPtr(current, key, _findChild(other, key));
                     }
                     continue;
                 }
@@ -1605,15 +2344,27 @@ private:
                         // Drop if leaf node without data, that is not valid. Otherwise we might
                         // need to compress if we have only one child.
                         if (node->isLeaf()) {
-                            current->_children[key] = nullptr;
-                            --current->_numChildren;
+                            _setChildPtr(current, key, nullptr);
+                            int prevIdx = context.size() - 2;
+                            // Don't shrink the root node.
+                            if (prevIdx >= 0 && current->needShrink()) {
+                                current = _shrink(context.at(prevIdx), current).get();
+                            }
+                            _rebuildContext(context, trieKeyIndex);
                         } else {
-                            _compressOnlyChild(node);
+                            if (auto compressedNode = _compressOnlyChild(current, node)) {
+                                node = compressedNode;
+                            }
                         }
                     }
                 }
                 if (resolveConflict) {
-                    Node* nodeToResolve = _compressOnlyChild(current) ? current : node;
+                    auto curParent = context.size() > 1 ? context.at(context.size() - 2) : nullptr;
+                    Node* nodeToResolve = node;
+                    if (auto compressed = _compressOnlyChild(curParent, current)) {
+                        current = compressed;
+                        nodeToResolve = current;
+                    }
                     _mergeResolveConflict(nodeToResolve, baseNode, otherNode);
                     _rebuildContext(context, trieKeyIndex);
                     // If we compressed above, resolving the conflict can result in erasing current.
@@ -1650,17 +2401,15 @@ private:
     Node* _begin(Node* root) const noexcept {
         Node* node = root;
         while (!node->_data) {
-            for (auto child : node->_children) {
-                if (child != nullptr) {
-                    node = child.get();
-                    break;
-                }
-            }
+            _forEachChild(node, 0, false, [&node](node_ptr child) {
+                node = child.get();
+                return false;
+            });
         }
         return node;
     }
 
-    boost::intrusive_ptr<Head> _root = nullptr;
+    head_ptr _root = nullptr;
     static Metrics _metrics;
 };
 
