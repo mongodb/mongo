@@ -81,18 +81,17 @@ public:
     /**
      * Returns all nodes in "store" with level order traversal.
      */
-    std::vector<boost::intrusive_ptr<node_type>> allNodes(StringStore& store) const {
-        std::deque<boost::intrusive_ptr<node_type>> level(1, store._root);
-        std::vector<boost::intrusive_ptr<node_type>> result(1, store._root);
+    std::vector<node_type*> allNodes(StringStore& store) const {
+        std::deque<node_type*> level(1, store._root.get());
+        std::vector<node_type*> result(1, store._root.get());
         while (!level.empty()) {
-            auto node = level.front().get();
-            for (int i = 0; i < 256; ++i) {
-                auto child = node->_children[i];
-                if (child.get()) {
-                    level.push_back(child);
-                    result.push_back(child);
-                }
-            }
+            auto node = level.front();
+            StringStore::_forEachChild(
+                node, 0, false, [&level, &result](boost::intrusive_ptr<node_type> child) {
+                    level.push_back(child.get());
+                    result.push_back(child.get());
+                    return true;
+                });
             level.pop_front();
         }
         return result;
@@ -105,14 +104,19 @@ public:
         auto nodes = allNodes(store);
         for (const auto& node : nodes) {
             uint16_t numChildren = 0;
-            auto children = node.get()->_children;
-            for (uint16_t i = 0; i < children.size(); ++i) {
-                if (children[i]) {
+            StringStore::_forEachChild(
+                node, 0, false, [&numChildren](boost::intrusive_ptr<node_type> child) {
                     ++numChildren;
-                }
-            }
-            ASSERT_EQ(numChildren, node.get()->numChildren());
+                    return true;
+                });
+            ASSERT_EQ(numChildren, node->numChildren());
         }
+    }
+
+    void debug(StringStore& store) const {
+        std::cout << "Memory: " << store._metrics.totalMemory.load() << std::endl
+                  << "Nodes: " << store._metrics.totalNodes.load() << std::endl
+                  << "Children: " << store._metrics.totalChildren.load() << std::endl;
     }
 
 protected:
@@ -2107,20 +2111,139 @@ TEST_F(RadixStoreTest, BasicInsertFindDeleteNullCharacter) {
     ASSERT_EQ(iter->first, value2.first);
 }
 
+TEST_F(RadixStoreTest, IteratorTest) {
+    uint8_t keyArr[] = {97, 0, 0};
+    int v = 0;
+    int cur = v;
+
+    // Node4
+    for (size_t i = 0; i < 4; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, std::to_string(++v));
+
+        thisStore.insert(value_type(value));
+    }
+
+    cur = 0;
+    for (auto iter = thisStore.begin(); iter != thisStore.end(); ++iter) {
+        ++cur;
+        ASSERT_EQ(iter->second, std::to_string(cur));
+    }
+    ASSERT_EQ(cur, v);
+
+    // Node16
+    for (size_t i = 0; i < 12; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, std::to_string(++v));
+
+        thisStore.insert(value_type(value));
+    }
+
+    cur = 0;
+    for (auto iter = thisStore.begin(); iter != thisStore.end(); ++iter) {
+        ++cur;
+        ASSERT_EQ(iter->second, std::to_string(cur));
+    }
+    ASSERT_EQ(cur, v);
+
+    // Node48
+    for (size_t i = 0; i < 32; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, std::to_string(++v));
+
+        thisStore.insert(value_type(value));
+    }
+
+    cur = 0;
+    for (auto iter = thisStore.begin(); iter != thisStore.end(); ++iter) {
+        ++cur;
+        ASSERT_EQ(iter->second, std::to_string(cur));
+    }
+    ASSERT_EQ(cur, v);
+
+    // Node256
+    for (size_t i = 0; i < 207; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, std::to_string(++v));
+
+        thisStore.insert(value_type(value));
+    }
+
+    cur = 0;
+    for (auto iter = thisStore.begin(); iter != thisStore.end(); ++iter) {
+        ++cur;
+        ASSERT_EQ(iter->second, std::to_string(cur));
+    }
+    ASSERT_EQ(cur, v);
+}
+
 TEST_F(RadixStoreTest, ReverseIteratorTest) {
-    value_type value1 = std::make_pair("foo", "3");
-    value_type value2 = std::make_pair("bar", "1");
-    value_type value3 = std::make_pair("baz", "2");
-    value_type value4 = std::make_pair("fools", "5");
-    value_type value5 = std::make_pair("foods", "4");
+    uint8_t keyArr[] = {97, 0, 0};
+    int v = 0;
+    int cur = v;
 
-    thisStore.insert(value_type(value4));
-    thisStore.insert(value_type(value5));
-    thisStore.insert(value_type(value1));
-    thisStore.insert(value_type(value3));
-    thisStore.insert(value_type(value2));
+    // Node4
+    for (size_t i = 0; i < 4; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, std::to_string(++v));
 
-    int cur = 5;
+        thisStore.insert(value_type(value));
+    }
+
+    cur = v;
+    for (auto iter = thisStore.rbegin(); iter != thisStore.rend(); ++iter) {
+        ASSERT_EQ(iter->second, std::to_string(cur));
+        --cur;
+    }
+    ASSERT_EQ(cur, 0);
+
+    // Node16
+    for (size_t i = 0; i < 12; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, std::to_string(++v));
+
+        thisStore.insert(value_type(value));
+    }
+
+    cur = v;
+    for (auto iter = thisStore.rbegin(); iter != thisStore.rend(); ++iter) {
+        ASSERT_EQ(iter->second, std::to_string(cur));
+        --cur;
+    }
+    ASSERT_EQ(cur, 0);
+
+    // Node48
+    for (size_t i = 0; i < 32; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, std::to_string(++v));
+
+        thisStore.insert(value_type(value));
+    }
+
+    cur = v;
+    for (auto iter = thisStore.rbegin(); iter != thisStore.rend(); ++iter) {
+        ASSERT_EQ(iter->second, std::to_string(cur));
+        --cur;
+    }
+    ASSERT_EQ(cur, 0);
+
+    // Node256
+    for (size_t i = 0; i < 207; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, std::to_string(++v));
+
+        thisStore.insert(value_type(value));
+    }
+
+    cur = v;
     for (auto iter = thisStore.rbegin(); iter != thisStore.rend(); ++iter) {
         ASSERT_EQ(iter->second, std::to_string(cur));
         --cur;
@@ -2791,6 +2914,152 @@ TEST_F(RadixStoreTest, LowerBoundEndpoint) {
 
     it = thisStore.lower_bound("\xff\xff\xff\xff");
     ASSERT_TRUE(it == thisStore.end());
+}
+
+TEST_F(RadixStoreTest, SimpleGrowTest) {
+    std::pair<StringStore::const_iterator, bool> res;
+    uint8_t keyArr[] = {97, 0, 0};
+
+    for (size_t i = 0; i < 255; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, "1");
+
+        res = thisStore.insert(value_type(value));
+        ASSERT_TRUE(res.second);
+        ASSERT_TRUE(*res.first == value);
+    }
+
+    ASSERT_EQ(thisStore.size(), 255);
+}
+
+TEST_F(RadixStoreTest, SimpleShrinkTest) {
+    uint8_t keyArr[] = {97, 0, 0};
+
+    for (size_t i = 0; i < 255; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, "1");
+
+        thisStore.insert(value_type(value));
+    }
+
+    for (size_t i = 0; i < 255; ++i) {
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        thisStore.erase(keyStr);
+        --keyArr[1];
+    }
+
+    ASSERT_EQ(thisStore.size(), 0);
+}
+
+TEST_F(RadixStoreTest, UpdateGrowTest) {
+    std::pair<StringStore::const_iterator, bool> res;
+    uint8_t keyArr[] = {97, 0, 0};
+
+    for (size_t i = 0; i < 255; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, "1");
+
+        thisStore.insert(value_type(value));
+
+        value_type update = std::make_pair(keyStr, "2");
+        res = thisStore.update(value_type(update));
+        ASSERT_TRUE(res.second);
+        ASSERT_TRUE(*res.first == update);
+    }
+}
+
+TEST_F(RadixStoreTest, MergeGrowOneTest) {
+    // !baseNode && otherNode
+    thisStore = baseStore;
+
+    uint8_t keyArr[] = {97, 0, 0};
+    for (size_t i = 0; i < 16; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, "1");
+        thisStore.insert((value_type(value)));
+    }
+
+    otherStore = baseStore;
+    auto keyArrOther = keyArr;
+    ++keyArrOther[1];
+    std::string keyStr1(reinterpret_cast<char*>(keyArrOther));
+    value_type value1 = std::make_pair(keyStr1, "1");
+    otherStore.insert((value_type(value1)));
+
+    thisStore.merge3(baseStore, otherStore);
+
+    ASSERT_EQ(baseStore.size(), 0);
+    ASSERT_EQ(otherStore.size(), 1);
+    ASSERT_EQ(thisStore.size(), 17);
+    ASSERT_EQ(thisStore.dataSize(), 17);
+
+    for (size_t i = 0; i < 31; ++i) {
+        ++keyArr[1];
+        std::string keyStr(reinterpret_cast<char*>(keyArr));
+        value_type value = std::make_pair(keyStr, "1");
+        thisStore.insert((value_type(value)));
+    }
+
+    otherStore = baseStore;
+    keyArrOther = keyArr;
+    ++keyArrOther[1];
+    std::string keyStr2(reinterpret_cast<char*>(keyArrOther));
+    value_type value2 = std::make_pair(keyStr2, "1");
+    otherStore.insert((value_type(value2)));
+
+    thisStore.merge3(baseStore, otherStore);
+
+    ASSERT_EQ(baseStore.size(), 0);
+    ASSERT_EQ(otherStore.size(), 1);
+    ASSERT_EQ(thisStore.size(), 49);
+    ASSERT_EQ(thisStore.dataSize(), 49);
+}
+
+TEST_F(RadixStoreTest, MergeGrowTwoTest) {
+    // !node && !baseNode && otherNode
+    value_type value1 = std::make_pair("a", "1");
+    value_type value2 = std::make_pair("aa", "2");
+
+    baseStore.insert(value_type(value1));
+
+    thisStore = baseStore;
+    otherStore = baseStore;
+
+    otherStore.insert(value_type(value2));
+
+    thisStore.merge3(baseStore, otherStore);
+
+    ASSERT_EQ(baseStore.size(), 1);
+    ASSERT_EQ(otherStore.size(), 2);
+    ASSERT_EQ(thisStore.size(), 2);
+}
+
+TEST_F(RadixStoreTest, MergeCompressTest) {
+    value_type value1 = std::make_pair("a", "1");
+    value_type value2 = std::make_pair("aaa", "2");
+    value_type value3 = std::make_pair("aab", "3");
+    value_type value4 = std::make_pair("aac", "4");
+
+    baseStore.insert(value_type(value1));
+    baseStore.insert(value_type(value2));
+    baseStore.insert(value_type(value3));
+    baseStore.insert(value_type(value4));
+
+    thisStore = baseStore;
+    otherStore = baseStore;
+
+    thisStore.erase("aac");
+    otherStore.erase("aab");
+
+    thisStore.merge3(baseStore, otherStore);
+
+    ASSERT_EQ(baseStore.size(), 4);
+    ASSERT_EQ(otherStore.size(), 3);
+    ASSERT_EQ(thisStore.size(), 2);
 }
 
 }  // namespace ephemeral_for_test

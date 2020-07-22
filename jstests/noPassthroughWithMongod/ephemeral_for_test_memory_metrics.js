@@ -1,6 +1,5 @@
 /**
  * Tracks ephemeralForTest's memory usage metrics on a consistent workload.
- * TODO SERVER-36709: Making the nodes adaptive should improve the memory usage retrieved here.
  */
 (function() {
 "use strict";
@@ -40,10 +39,7 @@ const s2 = startParallelShell(function() {
 const s3 = startParallelShell(function() {
     testColl3 = db.jstests_ephemeralForTest_metrics3;
     for (let i = 0; i < 50000; ++i) {
-        assert.writeOK(testColl3.save({
-            x: Math.floor(Math.random() * 1024 * 1024),
-            y: Math.floor(Math.random() * 1024 * 1024)
-        }));
+        assert.writeOK(testColl3.save({x: i, y: Math.floor(Math.random() * 1024 * 1024)}));
     }
 });
 
@@ -51,7 +47,18 @@ s1();
 s2();
 s3();
 
-const serverStatus = db.serverStatus().ephemeralForTest;
+let serverStatus = db.serverStatus().ephemeralForTest;
 print("Total Memory Usage: " + serverStatus.totalMemoryUsage + " Bytes.");
 print("Total Number of Nodes: " + serverStatus.totalNodes + ".");
+print("Average Number of Children: " + serverStatus.averageChildren + ".");
+
+for (let i = 0; i < 50000; ++i) {
+    assert.commandWorked(testColl3.deleteOne({x: i}));
+}
+
+serverStatus = db.serverStatus().ephemeralForTest;
+print("After Deletion:");
+print("Total Memory Usage: " + serverStatus.totalMemoryUsage + " Bytes.");
+print("Total Number of Nodes: " + serverStatus.totalNodes + ".");
+print("Average Number of Children: " + serverStatus.averageChildren + ".");
 })();
