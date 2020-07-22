@@ -1774,7 +1774,7 @@ __hs_delete_key_from_pos(
         upd->start_ts = upd->durable_ts = WT_TS_NONE;
         WT_ERR(__wt_hs_modify(hs_cbt, upd));
         upd = NULL;
-        WT_STAT_CONN_INCR(session, cache_hs_remove_key_truncate);
+        WT_STAT_CONN_INCR(session, cache_hs_key_truncate);
     }
     if (ret == WT_NOTFOUND)
         return (0);
