@@ -62,7 +62,6 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -580,6 +579,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
             str::stream() << "Cannot create collection " << nss
                           << " - database is in the process of being dropped.",
             !_dropPending.load());
+    assertMovePrimaryInProgress(opCtx, nss);
 }
 
 Status DatabaseImpl::createView(OperationContext* opCtx,
@@ -593,22 +593,6 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
 
     NamespaceString viewOnNss(viewName.db(), options.viewOn);
     _checkCanCreateCollection(opCtx, viewName, options);
-
-    try {
-        Lock::CollectionLock collLock(opCtx, viewOnNss, MODE_IS);
-        const auto collDesc =
-            CollectionShardingState::get(opCtx, viewOnNss)->getCollectionDescription(opCtx);
-        if (!collDesc.isSharded()) {
-            assertMovePrimaryInProgress(opCtx, viewOnNss);
-        }
-    } catch (const DBException& ex) {
-        if (ex.toStatus() == ErrorCodes::MovePrimaryInProgress) {
-            throw;
-        } else {
-            LOGV2(4909101, "Error when getting colleciton description", "what"_attr = ex.what());
-        }
-    }
-
     audit::logCreateCollection(&cc(), viewName.toString());
 
     if (viewName.isOplog())
@@ -675,7 +659,6 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     }
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
-    assertMovePrimaryInProgress(opCtx, nss);
     audit::logCreateCollection(&cc(), nss.ns());
 
     LOGV2(20320,

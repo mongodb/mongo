@@ -25,11 +25,11 @@ function createCollections() {
     let otherDb = st.getDB(otherDbName);
 
     const unshardedFooIndexes = [
-        {key: {a: 1}, name: 'unshardedFooIndex'},
+        {key: {a: 1}, name: 'fooIndex_a'},
         {key: {c: 1}, name: 'fooTTL_c', expireAfterSeconds: 1800}
     ];
     const shardedBarIndexes = [
-        {key: {a: 1}, name: 'shardedBarIndex'},
+        {key: {a: 1}, name: 'barIndex_a'},
         {key: {c: 1}, name: 'barTTL_c', expireAfterSeconds: 1800}
     ];
 
@@ -136,10 +136,6 @@ function buildCommands(collName, shouldFail) {
         },
         {command: {create: "testCollection"}, shouldFail: true},
         {
-            command: {create: "testView", viewOn: collName, pipeline: [{$match: {}}]},
-            shouldFail: shouldFail
-        },
-        {
             command: {createIndexes: collName, indexes: [{key: {b: 1}, name: collName + "Idx_b"}]},
             shouldFail: shouldFail
         },
@@ -147,22 +143,7 @@ function buildCommands(collName, shouldFail) {
             command: {collMod: collName, index: {keyPattern: {c: 1}, expireAfterSeconds: 3600}},
             shouldFail: shouldFail
         },
-        {
-            command: {collMod: collName + "View", viewOn: collName, pipeline: [{$match: {_id: 1}}]},
-            shouldFail: shouldFail
-        },
-        {command: {convertToCapped: "unshardedFoo", size: 1000000}, shouldFail: true},
-        {command: {dropIndexes: collName, index: collName + "Index"}, shouldFail: shouldFail},
-        {
-            command: {drop: collName},
-            shouldFail: true,
-            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.InterruptedDueToReplStateChange]
-        },
-        {
-            command: {dropDatabase: 1},
-            shouldFail: true,
-            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.InterruptedDueToReplStateChange]
-        },
+        {command: {convertToCapped: "unshardedFoo", size: 1000000}, shouldFail: true}
     ];
     return commands;
 }
@@ -201,13 +182,8 @@ function testMovePrimary(failpoint, fromShard, toShard, db, shouldFail, sharded)
         if (shouldFail && commandObj.shouldFail) {
             jsTestLog("running command: " + tojson(commandObj.command) +
                       ",\nshoudFail: " + shouldFail);
-            if (commandObj.hasOwnProperty("errorCodes")) {
-                assert.commandFailedWithCode(db.runCommand(commandObj.command),
-                                             commandObj.errorCodes);
-            } else {
-                assert.commandFailedWithCode(db.runCommand(commandObj.command),
-                                             ErrorCodes.MovePrimaryInProgress);
-            }
+            assert.commandFailedWithCode(db.runCommand(commandObj.command),
+                                         ErrorCodes.MovePrimaryInProgress);
         } else if (!shouldFail && !commandObj.shouldFail) {
             jsTestLog("running command: " + tojson(commandObj.command) +
                       ",\nshoudFail: " + shouldFail);
