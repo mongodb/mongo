@@ -777,6 +777,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: move_chunk_large_chunk_map_workloads
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "move_chunk_large_chunk_map"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: refine_shard_key_transaction_stress
   priority: 5
   commands:
@@ -1427,6 +1437,7 @@ buildvariants:
     - name: mixed_workloads
     - name: mongos_workloads
     - name: mongos_large_catalog_workloads
+    - name: move_chunk_large_chunk_map_workloads
     - name: move_chunk_workloads
     - name: move_chunk_waiting_workloads
     - name: retryable_writes_workloads
