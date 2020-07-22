@@ -78,6 +78,17 @@ Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
                  "passthrough executor couldn't shutdown all worker threads within time limit.");
 }
 
+const auto getServiceExecutorSynchronous =
+    ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorSynchronous>>();
+
+ServiceExecutorSynchronous* ServiceExecutorSynchronous::get(ServiceContext* ctx) {
+    auto& ref = getServiceExecutorSynchronous(ctx);
+    if (!ref) {
+        ref = std::make_unique<ServiceExecutorSynchronous>();
+    }
+    return ref.get();
+}
+
 Status ServiceExecutorSynchronous::schedule(Task task, ScheduleFlags flags) {
     if (!_stillRunning.load()) {
         return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};

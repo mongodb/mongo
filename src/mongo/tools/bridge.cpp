@@ -478,10 +478,6 @@ int bridgeMain(int argc, char** argv) {
     setGlobalServiceContext(ServiceContext::make());
     auto serviceContext = getGlobalServiceContext();
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointBridge>(serviceContext));
-    serviceContext->setServiceExecutor(
-        std::make_unique<transport::ServiceExecutorSynchronous>(serviceContext));
-
-    fassert(50766, serviceContext->getServiceExecutor()->start());
 
     transport::TransportLayerASIO::Options opts;
     opts.ipList.emplace_back("0.0.0.0");

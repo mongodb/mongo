@@ -80,6 +80,18 @@ Status ServiceExecutorFixed::start() {
     return Status::OK();
 }
 
+const auto getServiceExecutorFixed =
+    ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorFixed>>();
+
+ServiceExecutorFixed* ServiceExecutorFixed::get(ServiceContext* ctx) {
+    auto& ref = getServiceExecutorFixed(ctx);
+    if (!ref) {
+        ThreadPool::Options options{};
+        ref = std::make_unique<ServiceExecutorFixed>(options);
+    }
+    return ref.get();
+}
+
 Status ServiceExecutorFixed::shutdown(Milliseconds timeout) {
     auto waitForShutdown = [&]() mutable -> Status {
         stdx::unique_lock<Latch> lk(_mutex);

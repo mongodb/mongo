@@ -371,16 +371,6 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             }
         }
 
-        // Shutdown and wait for the service executor to exit
-        if (auto svcExec = serviceContext->getServiceExecutor()) {
-            Status status = svcExec->shutdown(Seconds(5));
-            if (!status.isOK()) {
-                LOGV2_OPTIONS(22845,
-                              {LogComponent::kNetwork},
-                              "Service executor did not shutdown within the time limit",
-                              "error"_attr = status);
-            }
-        }
 #endif
 
         // Shutdown Full-Time Data Capture
@@ -787,15 +777,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         std::make_unique<LogicalSessionCacheImpl>(std::make_unique<ServiceLiaisonMongos>(),
                                                   std::make_unique<SessionsCollectionSharded>(),
                                                   RouterSessionCatalog::reapSessionsOlderThan));
-
-    status = serviceContext->getServiceExecutor()->start();
-    if (!status.isOK()) {
-        LOGV2_ERROR(22859,
-                    "Error starting service executor: {error}",
-                    "Error starting service executor",
-                    "error"_attr = redact(status));
-        return EXIT_NET_ERROR;
-    }
 
     status = serviceContext->getServiceEntryPoint()->start();
     if (!status.isOK()) {

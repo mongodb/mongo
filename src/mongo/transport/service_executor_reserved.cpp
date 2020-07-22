@@ -33,6 +33,7 @@
 
 #include "mongo/transport/service_executor_reserved.h"
 
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point_utils.h"
@@ -147,6 +148,20 @@ Status ServiceExecutorReserved::_startWorker() {
     });
 }
 
+const auto getServiceExecutorReserved =
+    ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorReserved>>();
+
+ServiceExecutorReserved* ServiceExecutorReserved::get(ServiceContext* ctx) {
+    auto& ref = getServiceExecutorReserved(ctx);
+    if (!ref) {
+        if (serverGlobalParams.reservedAdminThreads) {
+            ref = std::make_unique<transport::ServiceExecutorReserved>(
+                ctx, "admin/internal connections", serverGlobalParams.reservedAdminThreads);
+        } else
+            return nullptr;
+    }
+    return ref.get();
+}
 
 Status ServiceExecutorReserved::shutdown(Milliseconds timeout) {
     LOGV2_DEBUG(22980, 3, "Shutting down reserved executor");
@@ -173,8 +188,8 @@ Status ServiceExecutorReserved::schedule(Task task, ScheduleFlags flags) {
     if (!_localWorkQueue.empty()) {
         // Execute task directly (recurse) if allowed by the caller as it produced better
         // performance in testing. Try to limit the amount of recursion so we don't blow up the
-        // stack, even though this shouldn't happen with this executor that uses blocking network
-        // I/O.
+        // stack, even though this shouldn't happen with this executor that uses blocking
+        // network I/O.
         if ((flags & ScheduleFlags::kMayRecurse) &&
             (_localRecursionDepth < reservedServiceExecutorRecursionLimit.loadRelaxed())) {
             ++_localRecursionDepth;

@@ -230,12 +230,12 @@ private:
     transport::Mode _transportMode;
 
     ServiceContext* const _serviceContext;
-    transport::ServiceExecutor* _serviceExecutor;
 
     transport::SessionHandle _sessionHandle;
     const std::string _threadName;
     ServiceContext::UniqueClient _dbClient;
     const Client* _dbClientPtr;
+    transport::ServiceExecutor* _serviceExecutor;
     std::function<void()> _cleanupHook;
 
     bool _inExhaust = false;

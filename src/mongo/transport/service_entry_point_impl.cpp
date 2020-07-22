@@ -122,12 +122,26 @@ ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx) : _svcCtx(s
 }
 
 Status ServiceEntryPointImpl::start() {
-    if (_adminInternalPool)
-        return _adminInternalPool->start();
-    else
-        return Status::OK();
+    if (auto status = transport::ServiceExecutorSynchronous::get(_svcCtx)->start();
+        !status.isOK()) {
+        return status;
+    }
+
+    if (auto exec = transport::ServiceExecutorReserved::get(_svcCtx); exec) {
+        if (auto status = exec->start(); !status.isOK()) {
+            return status;
+        }
+    }
+
+    // TODO: Reintroduce SEF once it is attached as initial SE in SERVER-49109
+    // if (auto status = transport::ServiceExecutorFixed::get(_svcCtx)->start(); !status.isOK()) {
+    //     return status;
+    // }
+
+    return Status::OK();
 }
 
+// TODO: explicitly start on the fixed executor
 void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     // Setup the restriction environment on the Session, if the Session has local/remote Sockaddrs
     const auto& remoteAddr = session->remoteAddr();
@@ -140,7 +154,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
 
     const bool quiet = serverGlobalParams.quiet.load();
     size_t connectionCount;
-    auto transportMode = _svcCtx->getServiceExecutor()->transportMode();
+    auto transportMode = transport::ServiceExecutorSynchronous::get(_svcCtx)->transportMode();
 
     auto ssm = ServiceStateMachine::create(_svcCtx, session, transportMode);
     auto usingMaxConnOverride = false;
@@ -168,8 +182,9 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
                   "connectionCount"_attr = connectionCount);
         }
         return;
-    } else if (usingMaxConnOverride && _adminInternalPool) {
-        ssm->setServiceExecutor(_adminInternalPool.get());
+    } else if (auto exec = transport::ServiceExecutorReserved::get(_svcCtx);
+               usingMaxConnOverride && exec) {
+        ssm->setServiceExecutor(exec);
     }
 
     if (!quiet) {
@@ -256,6 +271,27 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
             "shutdown: exhausted grace period active workers to drain; continuing with shutdown...",
             "workers"_attr = numOpenSessions());
     }
+
+    lk.unlock();
+    // TODO: Reintroduce SEF once it is attached as initial SE in SERVER-49109
+    // if (auto status = transport::ServiceExecutorFixed::get(_svcCtx)->shutdown(timeout -
+    // timeSpent);
+    //     !status.isOK()) {
+    //     LOGV2(4907202, "Failed to shutdown ServiceExecutorFixed", "error"_attr = status);
+    // }
+
+    if (auto exec = transport::ServiceExecutorReserved::get(_svcCtx)) {
+        if (auto status = exec->shutdown(timeout - timeSpent); !status.isOK()) {
+            LOGV2(4907201, "Failed to shutdown ServiceExecutorReserved", "error"_attr = status);
+        }
+    }
+
+    if (auto status =
+            transport::ServiceExecutorSynchronous::get(_svcCtx)->shutdown(timeout - timeSpent);
+        !status.isOK()) {
+        LOGV2(4907200, "Failed to shutdown ServiceExecutorSynchronous", "error"_attr = status);
+    }
+
     return result;
 }
 

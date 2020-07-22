@@ -96,6 +96,7 @@ tlEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/idl/server_parameter",
+        "$BUILD_DIR/mongo/db/server_options_core",
         "$BUILD_DIR/mongo/util/concurrency/thread_pool",
         "$BUILD_DIR/mongo/util/processinfo",
         '$BUILD_DIR/third_party/shim_asio',
@@ -178,7 +179,7 @@ tlEnv.CppUnitTest(
         'transport_layer_asio_test.cpp',
         'service_executor_test.cpp',
         'max_conns_override_test.cpp',
-        'service_state_machine_test.cpp',
+        # 'service_state_machine_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
