@@ -611,8 +611,6 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     const ChunkVersion& catalogCacheSinceVersion,
     long long termScheduled) {
 
-    // TODO (SERVER-49755): breake up this function into smaller private or anonymous functions.
-
     // Get the max version the loader has.
     const ChunkVersion maxLoaderVersion = [&] {
         {
