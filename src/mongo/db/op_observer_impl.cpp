@@ -356,6 +356,10 @@ void OpObserverImpl::onStartIndexBuildSinglePhase(OperationContext* opCtx,
         {},
         boost::none,
         BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << nss)),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none,
         boost::none);
 }
 
@@ -646,17 +650,28 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     }
 }
 
-void OpObserverImpl::onInternalOpMessage(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const boost::optional<UUID> uuid,
-                                         const BSONObj& msgObj,
-                                         const boost::optional<BSONObj> o2MsgObj) {
+void OpObserverImpl::onInternalOpMessage(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const boost::optional<UUID> uuid,
+    const BSONObj& msgObj,
+    const boost::optional<BSONObj> o2MsgObj,
+    const boost::optional<repl::OpTime> preImageOpTime,
+    const boost::optional<repl::OpTime> postImageOpTime,
+    const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+    const boost::optional<OplogSlot> slot) {
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setNss(nss);
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(msgObj);
     oplogEntry.setObject2(o2MsgObj);
+    oplogEntry.setPreImageOpTime(preImageOpTime);
+    oplogEntry.setPostImageOpTime(postImageOpTime);
+    oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
+    if (slot) {
+        oplogEntry.setOpTime(*slot);
+    }
     logOperation(opCtx, &oplogEntry);
 }
 

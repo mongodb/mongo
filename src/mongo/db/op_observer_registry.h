@@ -153,10 +153,22 @@ public:
                              const NamespaceString& nss,
                              const boost::optional<UUID> uuid,
                              const BSONObj& msgObj,
-                             const boost::optional<BSONObj> o2MsgObj) override {
+                             const boost::optional<BSONObj> o2MsgObj,
+                             const boost::optional<repl::OpTime> preImageOpTime,
+                             const boost::optional<repl::OpTime> postImageOpTime,
+                             const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+                             const boost::optional<OplogSlot> slot) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onInternalOpMessage(opCtx, nss, uuid, msgObj, o2MsgObj);
+            o->onInternalOpMessage(opCtx,
+                                   nss,
+                                   uuid,
+                                   msgObj,
+                                   o2MsgObj,
+                                   preImageOpTime,
+                                   postImageOpTime,
+                                   prevWriteOpTimeInTransaction,
+                                   slot);
     }
 
     void onCreateCollection(OperationContext* const opCtx,

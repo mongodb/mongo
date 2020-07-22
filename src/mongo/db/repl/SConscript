@@ -35,6 +35,7 @@ env.Library(
         'apply_ops.cpp',
         'oplog.cpp',
         'oplog_entry_or_grouped_inserts.cpp',
+        'tenant_migration_decoration.cpp',
         'transaction_oplog_application.cpp',
         env.Idlc('apply_ops.idl')[0],
     ],
@@ -1381,6 +1382,7 @@ env.CppUnitTest(
         'sync_source_resolver_test.cpp',
         'task_runner_test.cpp',
         'task_runner_test_fixture.cpp',
+        'tenant_oplog_applier_test.cpp',
         'tenant_oplog_batcher_test.cpp',
         'vote_requester_test.cpp',
         'wait_for_majority_service_test.cpp',
@@ -1642,10 +1644,12 @@ env.Library(
 env.Library(
     target='tenant_oplog_processing',
     source=[
-        'tenant_oplog_batcher.cpp'
+        'tenant_oplog_batcher.cpp',
+        'tenant_oplog_applier.cpp'
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         'abstract_async_component',
         'oplog',
         'oplog_application_interface',

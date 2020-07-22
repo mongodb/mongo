@@ -119,6 +119,11 @@ structs:
                 type: bool
                 optional: true
                 description: "An operation caused by a chunk migration"
+            fromTenantMigration:
+                type: uuid
+                optional: true
+                description: "Contains the UUID of a tenant migration for an operation caused by
+                              one."
             _id:
                 type: objectid
                 optional: true

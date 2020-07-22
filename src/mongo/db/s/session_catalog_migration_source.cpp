@@ -163,7 +163,15 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
 
                 WriteUnitOfWork wuow(opCtx);
                 opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
-                    opCtx, _ns, {}, {}, message);
+                    opCtx,
+                    _ns,
+                    {},
+                    {},
+                    message,
+                    boost::none,
+                    boost::none,
+                    boost::none,
+                    boost::none);
                 wuow.commit();
             });
     }

@@ -206,6 +206,7 @@ public:
     using MutableOplogEntry::kDestinedRecipientFieldName;
     using MutableOplogEntry::kDurableReplOperationFieldName;
     using MutableOplogEntry::kFromMigrateFieldName;
+    using MutableOplogEntry::kFromTenantMigrationFieldName;
     using MutableOplogEntry::kHashFieldName;
     using MutableOplogEntry::kNssFieldName;
     using MutableOplogEntry::kObject2FieldName;
@@ -231,6 +232,7 @@ public:
     using MutableOplogEntry::getDestinedRecipient;
     using MutableOplogEntry::getDurableReplOperation;
     using MutableOplogEntry::getFromMigrate;
+    using MutableOplogEntry::getFromTenantMigration;
     using MutableOplogEntry::getHash;
     using MutableOplogEntry::getNss;
     using MutableOplogEntry::getObject;

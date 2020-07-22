@@ -79,6 +79,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
@@ -284,6 +285,12 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
                 !oplogEntry->getStatementId());
         return {};
     }
+    // If this oplog entry is from a tenant migration, include the tenant migration
+    // UUID.
+    const auto& recipientInfo = tenantMigrationRecipientInfo(opCtx);
+    if (recipientInfo) {
+        oplogEntry->setFromTenantMigration(recipientInfo->uuid);
+    }
 
     // Use OplogAccessMode::kLogOp to avoid recursive locking.
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kLogOp);
@@ -329,6 +336,12 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                  std::vector<InsertStatement>::const_iterator end) {
     invariant(begin != end);
     oplogEntryTemplate->setOpType(repl::OpTypeEnum::kInsert);
+    // If this oplog entry is from a tenant migration, include the tenant migration
+    // UUID.
+    const auto& recipientInfo = tenantMigrationRecipientInfo(opCtx);
+    if (recipientInfo) {
+        oplogEntryTemplate->setFromTenantMigration(recipientInfo->uuid);
+    }
 
     auto nss = oplogEntryTemplate->getNss();
     auto replCoord = ReplicationCoordinator::get(opCtx);

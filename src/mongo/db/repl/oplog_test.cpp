@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
+#include <boost/optional/optional_io.hpp>
 #include <functional>
 #include <map>
 #include <utility>
@@ -44,6 +45,7 @@
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/unittest/barrier.h"
@@ -354,6 +356,45 @@ TEST_F(OplogTest, ConcurrentLogOpRevertLastOplogEntry) {
         1U);
 
     _checkOplogEntry(oplogEntries[0], *(opTimeNssMap.cbegin()));
+}
+
+TEST_F(OplogTest, MigrationIdAddedToOplog) {
+    auto opCtx = cc().makeOperationContext();
+    auto migrationUuid = UUID::gen();
+    tenantMigrationRecipientInfo(opCtx.get()) =
+        boost::make_optional<TenantMigrationRecipientInfo>(migrationUuid);
+
+    const NamespaceString nss("test.coll");
+    auto msgObj = BSON("msg"
+                       << "hello, world!");
+
+    // Write to the oplog.
+    OpTime opTime;
+    {
+        MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+        oplogEntry.setNss(nss);
+        oplogEntry.setObject(msgObj);
+        oplogEntry.setWallClockTime(Date_t::now());
+        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opTime = logOp(opCtx.get(), &oplogEntry);
+        ASSERT_FALSE(opTime.isNull());
+        wunit.commit();
+    }
+
+    OplogEntry oplogEntry = _getSingleOplogEntry(opCtx.get());
+
+    // Ensure that msg fields were properly added to the oplog entry.
+    ASSERT_EQUALS(opTime, oplogEntry.getOpTime())
+        << "OpTime returned from logOp() did not match that in the oplog entry written to the "
+           "oplog: "
+        << oplogEntry.toBSON();
+    ASSERT(OpTypeEnum::kNoop == oplogEntry.getOpType())
+        << "Expected 'n' op type but found '" << OpType_serializer(oplogEntry.getOpType())
+        << "' instead: " << oplogEntry.toBSON();
+    ASSERT_BSONOBJ_EQ(msgObj, oplogEntry.getObject());
+    ASSERT_EQ(migrationUuid, oplogEntry.getFromTenantMigration());
 }
 
 }  // namespace

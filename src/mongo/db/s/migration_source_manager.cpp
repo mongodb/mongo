@@ -640,8 +640,15 @@ void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
     writeConflictRetry(
         _opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
             WriteUnitOfWork uow(_opCtx);
-            serviceContext->getOpObserver()->onInternalOpMessage(
-                _opCtx, getNss(), *_collectionUUID, BSON("msg" << dbgMessage), o2Message);
+            serviceContext->getOpObserver()->onInternalOpMessage(_opCtx,
+                                                                 getNss(),
+                                                                 *_collectionUUID,
+                                                                 BSON("msg" << dbgMessage),
+                                                                 o2Message,
+                                                                 boost::none,
+                                                                 boost::none,
+                                                                 boost::none,
+                                                                 boost::none);
             uow.commit();
         });
 }
