@@ -67,6 +67,7 @@ class UUID {
     friend class ConfigsvrShardCollectionResponse;
     friend class ShardsvrShardCollectionResponse;
     friend class ShardsvrRenameCollection;
+    friend class CommonReshardingMetadata;
     friend class DatabaseVersion;
     friend class DbCheckOplogCollection;
     friend class EncryptionPlaceholder;

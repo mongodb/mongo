@@ -1,0 +1,122 @@
+# Copyright (C) 2020-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# This file defines types used among various resharding-related IDL structs.
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/s/sharding_types.idl"
+
+enums:
+    CoordinatorState:
+        description: "The current state of a resharding operation on the coordinator."
+        type: string
+        values:
+            kUnused: "unused"
+            kInitializing: "initializing"
+            kInitialized: "initialized"
+            kPreparingToDonate: "preparing-to-donate"
+            kCloning: "cloning"
+            kMirroring: "mirroring"
+            kCommitted: "committed"
+            kDropping: "dropping"
+            kRenaming: "renaming"
+            kDone: "done"
+            kError: "error"
+
+    DonorState:
+        description: "The current state of a donor shard for a resharding operation."
+        type: string
+        values:
+            kInitializing: "initialized"
+            kDonatingInitialData: "donating-initial-data"
+            kDonatingOplogEntries: "donating-oplog-entries"
+            kMirroring: "mirroring"
+            kDropping: "dropping"
+            kError: "error"
+
+    RecipientState:
+        description: "The current state of a recipient shard for a resharding operation."
+        type: string
+        values:
+            kCloning: "cloning"
+            kApplying: "applying"
+            kSteadyState: "steady-state"
+            kStrictConsistency: "strict-consistency"
+            kRenaming: "renaming"
+            kError: "error"
+
+structs:
+    CommonReshardingMetadata:
+        description: "Metadata shared across all node types for a resharding operation."
+        generate_comparison_operators: false
+        strict: true
+        fields:
+            _id:
+                type: uuid
+                description: "A unique identifier for the resharding operation."
+            nss:
+                type: namespacestring
+                description: "The namespace of the collection being resharded."
+            reshardingKey:
+                type: object
+                description: "The index specification document to use as the new shard key."
+
+    MinFetchTimestamp:
+        description: "Not meant to be used directly. Only use internal fields."
+        strict: true
+        fields:
+            minFetchTimestamp:
+                type: timestamp
+                description: "Timestamp after which a donor shard has guaranteed that oplog
+                              entries contain recipient shard information."
+                optional: true
+
+    FetchTimestamp:
+        description: "Not meant to be used directly. Only use internal fields."
+        strict: true
+        fields:
+            fetchTimestamp:
+                type: timestamp
+                description: "Timestamp after which it is acceptable for recipient shards to
+                              retrieve documents from donor shards."
+                optional: true
+
+    StrictConsistencyTimestamp:
+        description: "Not meant to be used directly. Only use internal fields."
+        strict: true
+        fields:
+            strictConsistencyTimestamp:
+                type: timestamp
+                description: "Timestamp after which all writes to a particular recipient shard for
+                              the original resharding collection will be executed as distributed
+                              transactions."
+                optional: true
