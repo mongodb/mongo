@@ -10249,6 +10249,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel62-large
   tasks:
+  - name: burn_in_tests_gen
   - name: compile_TG
     distros:
     - rhel62-large
