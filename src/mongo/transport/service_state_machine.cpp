@@ -45,6 +45,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
@@ -301,11 +302,11 @@ ServiceStateMachine::ServiceStateMachine(ServiceContext* svcContext,
       _sep{svcContext->getServiceEntryPoint()},
       _transportMode(transportMode),
       _serviceContext(svcContext),
-      _serviceExecutor(_serviceContext->getServiceExecutor()),
       _sessionHandle(session),
       _threadName{str::stream() << "conn" << _session()->id()},
       _dbClient{svcContext->makeClient(_threadName, std::move(session))},
-      _dbClientPtr{_dbClient.get()} {}
+      _dbClientPtr{_dbClient.get()},
+      _serviceExecutor(transport::ServiceExecutorSynchronous::get(_serviceContext)) {}
 
 const transport::SessionHandle& ServiceStateMachine::_session() const {
     return _sessionHandle;
