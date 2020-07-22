@@ -112,7 +112,7 @@ public:
      * filtering metadata will interrupt all in-progress orphan cleanups in which case orphaned data
      * will remain behind on disk.
      */
-    void clearFilteringMetadata();
+    void clearFilteringMetadata(OperationContext* opCtx);
 
     /**
      * Methods to control the collection's critical section. Methods listed below must be called

@@ -83,7 +83,8 @@ public:
 
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
-        CollectionShardingRuntime::get(_opCtx, _nss)->clearFilteringMetadata();
+        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+        CollectionShardingRuntime::get(_opCtx, _nss)->clearFilteringMetadata(_opCtx);
     }
 
     void rollback() override {}
@@ -328,7 +329,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
                 // Force subsequent uses of the namespace to refresh the filtering metadata so they
                 // can synchronize with any work happening on the primary (e.g., migration critical
                 // section).
-                CollectionShardingRuntime::get(opCtx, updatedNss)->clearFilteringMetadata();
+                CollectionShardingRuntime::get(opCtx, updatedNss)->clearFilteringMetadata(opCtx);
             }
         }
     }

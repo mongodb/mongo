@@ -128,7 +128,7 @@ TEST_F(CollectionShardingRuntimeTest,
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     OperationContext* opCtx = operationContext();
     csr.setFilteringMetadata(opCtx, makeShardedMetadata(opCtx));
-    csr.clearFilteringMetadata();
+    csr.clearFilteringMetadata(opCtx);
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
 }
 

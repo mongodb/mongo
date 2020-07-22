@@ -202,7 +202,8 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
     }
 }
 
-void CollectionShardingRuntime::clearFilteringMetadata() {
+void CollectionShardingRuntime::clearFilteringMetadata(OperationContext* opCtx) {
+    const auto csrLock = CSRLock::lockExclusive(opCtx, this);
     stdx::lock_guard lk(_metadataManagerLock);
     if (!isNamespaceAlwaysUnsharded(_nss)) {
         LOGV2_DEBUG(4798530,

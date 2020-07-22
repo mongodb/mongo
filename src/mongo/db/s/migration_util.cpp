@@ -806,8 +806,8 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
 
                       const auto nss = doc.getNss();
                       {
-                          AutoGetCollection autoColl(opCtx, nss, MODE_X);
-                          CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata();
+                          AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                          CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
                       }
 
                       const auto serviceContext = opCtx->getServiceContext();

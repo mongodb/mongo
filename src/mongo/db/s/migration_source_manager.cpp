@@ -451,10 +451,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         {
             UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
             AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
-            auto* const csr = CollectionShardingRuntime::get(_opCtx, getNss());
-            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-
-            CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata();
+            CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata(_opCtx);
         }
         scopedGuard.dismiss();
         _cleanup(false);
@@ -489,10 +486,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         {
             UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
             AutoGetCollection autoColl(_opCtx, getNss(), MODE_IX);
-            auto* const csr = CollectionShardingRuntime::get(_opCtx, getNss());
-            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-
-            CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata();
+            CollectionShardingRuntime::get(_opCtx, getNss())->clearFilteringMetadata(_opCtx);
         }
         scopedGuard.dismiss();
         _cleanup(false);
