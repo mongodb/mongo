@@ -41,18 +41,14 @@ namespace migrating_tenant_donor_util {
  * Sends recipientSyncData to the recipient until success and starts blocking writes and causal
  * reads.
  */
-void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& donorDoc);
-
-/**
- * Creates a task executor to be used for tenant migration.
- */
-std::shared_ptr<executor::TaskExecutor> getTenantMigrationExecutor(ServiceContext* serviceContext);
+void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& originalDonorStateDoc);
 
 /**
  * Updates the MigratingTenantAccessBlocker for the tenant migration represented by the given
  * config.migrationDonors document.
  */
 void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONObj& doc);
+
 
 }  // namespace migrating_tenant_donor_util
 

@@ -100,7 +100,9 @@ void MigratingTenantAccessBlockerByPrefix::appendInfoForServerStatus(BSONObjBuil
     auto appendBlockerStatus =
         [builder](
             const std::pair<std::string, std::shared_ptr<MigratingTenantAccessBlocker>>& blocker) {
-            blocker.second->appendInfoForServerStatus(builder);
+            BSONObjBuilder tenantBuilder;
+            blocker.second->appendInfoForServerStatus(&tenantBuilder);
+            builder->append(blocker.first, tenantBuilder.obj());
         };
 
     std::for_each(_migratingTenantAccessBlockers.begin(),

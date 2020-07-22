@@ -28,12 +28,14 @@
  */
 
 #include "mongo/platform/basic.h"
+#include "mongo/util/str.h"
 
 #include "mongo/db/repl/migrating_tenant_donor_util.h"
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
 #include "mongo/db/repl/migrating_tenant_access_blocker_by_prefix.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -49,6 +51,24 @@ namespace {
 const char kThreadNamePrefix[] = "TenantMigrationWorker-";
 const char kPoolName[] = "TenantMigrationWorkerThreadPool";
 const char kNetName[] = "TenantMigrationWorkerNetwork";
+
+
+/**
+ * Creates a task executor to be used for tenant migration.
+ */
+std::shared_ptr<executor::TaskExecutor> getTenantMigrationExecutor(ServiceContext* serviceContext) {
+    ThreadPool::Options tpOptions;
+    tpOptions.threadNamePrefix = kThreadNamePrefix;
+    tpOptions.poolName = kPoolName;
+    tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
+    tpOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+
+    return std::make_unique<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(tpOptions),
+        executor::makeNetworkInterface(kNetName, nullptr, nullptr));
+}
 
 /**
  * Updates the MigratingTenantAccessBlocker when the tenant migration transitions to the blocking
@@ -83,15 +103,30 @@ void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocumen
     mtab->startBlockingReadsAfter(donorDoc.getBlockTimestamp().get());
 }
 
-}  // namespace
+/**
+ * Creates a MigratingTenantAccessBlocker, and makes it start blocking writes. Then adds it to
+ * the MigratingTenantAccessBlockerByPrefix.
+ */
+void startBlockingWritesForTenant(OperationContext* opCtx,
+                                  const TenantMigrationDonorDocument& donorStateDoc) {
+    invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
+    auto serviceContext = opCtx->getServiceContext();
 
-void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& originalDoc) {
-    // Send recipientSyncData.
+    executor::TaskExecutor* mtabExecutor = getTenantMigrationExecutor(serviceContext).get();
+    auto mtab = std::make_shared<MigratingTenantAccessBlocker>(serviceContext, mtabExecutor);
 
-    // Call startBlockingWrites.
+    mtab->startBlockingWrites();
 
-    // Update the on-disk state of the migration to "blocking" state.
-    invariant(originalDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
+    auto& mtabByPrefix = MigratingTenantAccessBlockerByPrefix::get(serviceContext);
+    mtabByPrefix.add(donorStateDoc.getDatabasePrefix(), mtab);
+}
+
+/**
+ * Updates the donor document to have state "blocking" and a blockingTimestamp.
+ * Does the write by reserving an oplog slot beforehand and uses it as the blockingTimestamp.
+ */
+void updateDonorStateDocumentToBlocking(OperationContext* opCtx,
+                                        const TenantMigrationDonorDocument& originalDonorStateDoc) {
 
     uassertStatusOK(writeConflictRetry(
         opCtx,
@@ -107,64 +142,90 @@ void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& origi
                               str::stream() << NamespaceString::kMigrationDonorsNamespace.ns()
                                             << " does not exist");
             }
-
             WriteUnitOfWork wuow(opCtx);
 
-            const auto originalRecordId =
-                Helpers::findOne(opCtx, collection, originalDoc.toBSON(), false /* requireIndex */);
+            const auto originalRecordId = Helpers::findOne(
+                opCtx, collection, originalDonorStateDoc.toBSON(), false /* requireIndex */);
+            const auto originalSnapshot = Snapshotted<BSONObj>(
+                opCtx->recoveryUnit()->getSnapshotId(), originalDonorStateDoc.toBSON());
             invariant(!originalRecordId.isNull());
 
             // Reserve an opTime for the write and use it as the blockTimestamp for the migration.
             auto oplogSlot = repl::LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
 
-            TenantMigrationDonorDocument updatedDoc;
-            updatedDoc.setId(originalDoc.getId());
-            updatedDoc.setDatabasePrefix(originalDoc.getDatabasePrefix());
-            updatedDoc.setState(TenantMigrationDonorStateEnum::kBlocking);
-            updatedDoc.setBlockTimestamp(oplogSlot.getTimestamp());
+
+            // Creates the new donor state document with the updated state and block time.
+            // Then uses the updated document as the criteria (so its available in the oplog) when
+            // creating the update arguments.
+            const BSONObj updatedDonorStateDoc([&]() {
+                TenantMigrationDonorDocument updatedDoc = originalDonorStateDoc;
+                updatedDoc.setState(TenantMigrationDonorStateEnum::kBlocking);
+                updatedDoc.setBlockTimestamp(oplogSlot.getTimestamp());
+                return updatedDoc.toBSON();
+            }());
 
             CollectionUpdateArgs args;
-            args.update = updatedDoc.toBSON();
-            args.criteria = BSON("_id" << originalDoc.getId());
+            args.criteria = BSON("_id" << originalDonorStateDoc.getId());
             args.oplogSlot = oplogSlot;
+            args.update = updatedDonorStateDoc;
 
-            collection->updateDocument(
-                opCtx,
-                originalRecordId,
-                Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(), originalDoc.toBSON()),
-                updatedDoc.toBSON(),
-                false,
-                nullptr /* OpDebug* */,
-                &args);
 
+            collection->updateDocument(opCtx,
+                                       originalRecordId,
+                                       originalSnapshot,
+                                       updatedDonorStateDoc,
+                                       false,
+                                       nullptr /* OpDebug* */,
+                                       &args);
             wuow.commit();
-
             return Status::OK();
         }));
 }
 
-std::shared_ptr<executor::TaskExecutor> getTenantMigrationExecutor(ServiceContext* serviceContext) {
-    ThreadPool::Options tpOptions;
-    tpOptions.threadNamePrefix = kThreadNamePrefix;
-    tpOptions.poolName = kPoolName;
-    tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
-    tpOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
+/**
+ * Writes the provided donor's state document to config.tenantMigrationDonors and waits for majority
+ * write concern.
+ */
+void persistDonorStateDocument(OperationContext* opCtx,
+                               const TenantMigrationDonorDocument& donorStateDoc) {
+    PersistentTaskStore<TenantMigrationDonorDocument> store(
+        NamespaceString::kMigrationDonorsNamespace);
+    try {
+        store.add(opCtx, donorStateDoc);
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+        uasserted(
+            4917300,
+            str::stream()
+                << "While attempting to persist the donor's state machine for tenant migration"
+                << ", found another document with the same migration id. Attempted migration: "
+                << donorStateDoc.toBSON());
+    }
+}
+}  // namespace
 
-    return std::make_unique<executor::ThreadPoolTaskExecutor>(
-        std::make_unique<ThreadPool>(tpOptions),
-        executor::makeNetworkInterface(kNetName, nullptr, nullptr));
+
+void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& originalDonorStateDoc) {
+    invariant(originalDonorStateDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
+    persistDonorStateDocument(opCtx, originalDonorStateDoc);
+
+    // Send recipientSyncData.
+
+    startBlockingWritesForTenant(opCtx, originalDonorStateDoc);
+
+    // Update the on-disk state of the migration to "blocking" state.
+    updateDonorStateDocumentToBlocking(opCtx, originalDonorStateDoc);
 }
 
-void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONObj& doc) {
-    auto donorDoc = TenantMigrationDonorDocument::parse(IDLParserErrorContext("donorDoc"), doc);
 
-    switch (donorDoc.getState()) {
+void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONObj& donorStateDoc) {
+    auto parsedDonorStateDoc =
+        TenantMigrationDonorDocument::parse(IDLParserErrorContext("donorDoc"), donorStateDoc);
+
+    switch (parsedDonorStateDoc.getState()) {
         case TenantMigrationDonorStateEnum::kDataSync:
             break;
         case TenantMigrationDonorStateEnum::kBlocking:
-            onTransitionToBlocking(opCtx, donorDoc);
+            onTransitionToBlocking(opCtx, parsedDonorStateDoc);
             break;
         case TenantMigrationDonorStateEnum::kCommitted:
             break;
@@ -174,6 +235,7 @@ void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONOb
             MONGO_UNREACHABLE;
     }
 }
+
 
 }  // namespace migrating_tenant_donor_util
 

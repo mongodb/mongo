@@ -30,89 +30,125 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/migrate_tenant_cmds_gen.h"
+#include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
+#include "mongo/db/repl/migrating_tenant_donor_util.h"
 
 namespace mongo {
 namespace {
 
-template <typename RequestT>
-class MigrationDonorCmdBase : public TypedCommand<MigrationDonorCmdBase<RequestT>> {
+
+class DonorStartMigrationCmd : public TypedCommand<DonorStartMigrationCmd> {
 public:
-    using Request = RequestT;
-    using TC = TypedCommand<MigrationDonorCmdBase<RequestT>>;
+    using Request = DonorStartMigration;
 
-    class Invocation : public TC::InvocationBase {
+    class Invocation : public InvocationBase {
+
     public:
-        using TC::InvocationBase::InvocationBase;
-        using TC::InvocationBase::request;
+        using InvocationBase::InvocationBase;
+        void typedRun(OperationContext* opCtx) {
+            const RequestType& requestBody = request();
 
-        void typedRun(OperationContext* opCtx) {}
+            const TenantMigrationDonorDocument donorStateDoc(
+                requestBody.getMigrationId(),
+                requestBody.getRecipientConnectionString().toString(),
+                requestBody.getDatabasePrefix().toString(),
+                TenantMigrationDonorStateEnum::kDataSync);
+
+            migrating_tenant_donor_util::dataSync(opCtx, donorStateDoc);
+        }
+
+
+        void doCheckAuthorization(OperationContext* opCtx) const {}
 
     private:
         bool supportsWriteConcern() const override {
             return false;
         }
-        NamespaceString ns() const override {
+        NamespaceString ns() const {
             return NamespaceString(request().getDbName(), "");
         }
-
-        void doCheckAuthorization(OperationContext* opCtx) const override {}
     };
 
+    std::string help() const {
+        return "Start migrating databases whose names match the specified prefix to the specified "
+               "replica set.";
+    }
     bool adminOnly() const override {
         return true;
     }
 
-    std::string help() const override {
-        return "Multi-tenant migration command on the donor.";
-    }
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
-    }
-};
-
-class DonorStartMigrationCmd : public MigrationDonorCmdBase<DonorStartMigration> {
-public:
-    using ParentInvocation = MigrationDonorCmdBase<DonorStartMigration>::Invocation;
-    class Invocation final : public ParentInvocation {
-    public:
-        void typedRun(OperationContext* opCtx) {}
-
-    private:
-        void doCheckAuthorization(OperationContext* opCtx) const override {}
-    };
-
-    std::string help() const override {
-        return "Start migrating databases whose names match the specified prefix to the specified "
-               "replica set.";
     }
 
 } donorStartMigrationCmd;
 
-class DonorWaitForMigrationToCommitCmd
-    : public MigrationDonorCmdBase<DonorWaitForMigrationToCommit> {
+class DonorWaitForMigrationToCommitCmd : public TypedCommand<DonorWaitForMigrationToCommitCmd> {
 public:
-    using ParentInvocation = MigrationDonorCmdBase<DonorWaitForMigrationToCommit>::Invocation;
-    class Invocation final : public ParentInvocation {
+    using Request = DonorWaitForMigrationToCommit;
+
+
+    class Invocation : public InvocationBase {
+
     public:
+        using InvocationBase::InvocationBase;
+
         void typedRun(OperationContext* opCtx) {}
+
+    private:
+        void doCheckAuthorization(OperationContext* opCtx) const {}
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+        NamespaceString ns() const {
+            return NamespaceString(request().getDbName(), "");
+        }
     };
 
     std::string help() const override {
         return "Wait for migration to be commited.";
     }
+    bool adminOnly() const override {
+        return true;
+    }
+
+    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return BasicCommand::AllowedOnSecondary::kNever;
+    }
 
 } donorWaitForMigrationToCommit;
 
-class DonorForgetMigrationCmd : public MigrationDonorCmdBase<DonorForgetMigration> {
+class DonorForgetMigrationCmd : public TypedCommand<DonorForgetMigrationCmd> {
 public:
-    using ParentInvocation = MigrationDonorCmdBase<DonorWaitForMigrationToCommit>::Invocation;
-    class Invocation final : public ParentInvocation {
+    using Request = DonorForgetMigration;
+
+    class Invocation : public InvocationBase {
+
     public:
+        using InvocationBase::InvocationBase;
+
         void typedRun(OperationContext* opCtx) {}
+
+    private:
+        void doCheckAuthorization(OperationContext* opCtx) const {}
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+        NamespaceString ns() const {
+            return NamespaceString(request().getDbName(), "");
+        }
     };
 
     std::string help() const override {
         return "Forget a migration";
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return BasicCommand::AllowedOnSecondary::kNever;
     }
 } donorForgetMigration;
 

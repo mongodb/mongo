@@ -52,12 +52,9 @@ structs:
         strict: true
         fields:
             _id:
-                type: objectid
-                description: "A unique identifier for the document."
-                cpp_name: id
-            migrationId:
                 type: uuid
                 description: "Unique identifier for the tenant migration."
+                cpp_name: id
             recipientConnectionString:
                 type: string
                 description: "The URI string that the donor will utilize to create a connection with the recipient."
@@ -76,18 +73,16 @@ structs:
             garbageCollect:
                 type: bool
                 description: "A boolean that determines whether the state machine should be deleted after a delay via the TTL monitor."
+                default: false
 
     tenantMigrationRecipientDocument:
         description: "Represents an in-progress tenant migration on the migration recipient."
         strict: true
         fields:
             _id:
-                type: objectid
-                description: "A unique identifier for the document."
-                cpp_name: id
-            migrationId:
                 type: uuid
                 description: "Unique identifier for the tenant migration."
+                cpp_name: id
             donorConnectionString:
                 type: string
                 description: "The URI string that the donor will utilize to create a connection with the recipient."
@@ -102,6 +97,7 @@ structs:
             garbageCollect:
                 type: bool
                 description: "A boolean that determines whether the state machine should be deleted after a delay via the TTL monitor."
+                default: false
             startApplyingOpTime:
                 description: "Populated during data sync; the donor's operation time when the data cloning starts."
                 type: optime
