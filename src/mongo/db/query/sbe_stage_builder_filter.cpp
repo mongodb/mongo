@@ -112,6 +112,13 @@ struct MatchExpressionVisitorContext {
     sbe::value::SlotId inputVar;
 };
 
+std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
+    using namespace std::literals;
+    return sbe::makeE<sbe::EFunction>(
+        "fillEmpty"sv,
+        sbe::makeEs(std::move(e), sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, 0)));
+}
+
 /**
  * A helper function to generate a path traversal plan stage at the given nested 'level' of the
  * traversal path. For example, for a dotted path expression {'a.b': 2}, the traversal sub-tree will
@@ -201,7 +208,7 @@ std::unique_ptr<sbe::PlanStage> generateTraverseHelper(MatchExpressionVisitorCon
             sbe::makeE<sbe::EVariable>(traversePredicateVar));
     }
 
-    // The final traverse stage for the current nested level.
+    // The traverse stage for the current nested level.
     return sbe::makeS<sbe::TraverseStage>(
         std::move(inputStage),
         std::move(innerBranch),
@@ -262,8 +269,8 @@ void generateTraverseForComparisonPredicate(MatchExpressionVisitorContext* conte
         // SBE EConstant assumes ownership of the value so we have to make a copy here.
         auto [tag, val] = sbe::value::copyValue(tagView, valView);
 
-        return sbe::makeE<sbe::EPrimBinary>(
-            binaryOp, sbe::makeE<sbe::EVariable>(inputSlot), sbe::makeE<sbe::EConstant>(tag, val));
+        return makeFillEmptyFalse(sbe::makeE<sbe::EPrimBinary>(
+            binaryOp, sbe::makeE<sbe::EVariable>(inputSlot), sbe::makeE<sbe::EConstant>(tag, val)));
     };
     generateTraverse(context, expr, std::move(makeEExprFn));
 }
@@ -580,15 +587,11 @@ public:
             // TODO: In the future, this needs to account for the fact that the regex match
             // expression matches strings, but also matches stored regexes. For example,
             // {$match: {a: /foo/}} matches the document {a: /foo/} in addition to {a: "foobar"}.
-            return sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::logicAnd,
-                sbe::makeE<sbe::EFunction>("isString",
-                                           sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot))),
-                sbe::makeE<sbe::EFunction>(
-                    "regexMatch",
-                    sbe::makeEs(
-                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::pcreRegex, ownedRegexVal),
-                        sbe::makeE<sbe::EVariable>(inputSlot))));
+            return makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
+                "regexMatch",
+                sbe::makeEs(
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::pcreRegex, ownedRegexVal),
+                    sbe::makeE<sbe::EVariable>(inputSlot))));
         };
 
         generateTraverse(_context, expr, std::move(makeEExprFn));
