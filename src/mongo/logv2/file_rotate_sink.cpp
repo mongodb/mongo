@@ -84,7 +84,7 @@ Status FileRotateSink::addFile(const std::string& filename, bool append) {
         _impl->files[filename] = statusWithFile.getValue();
     }
 
-    return statusWithFile.getStatus();
+    return statusWithFile.getStatus().withContext("Can't initialize rotatable log file");
 }
 void FileRotateSink::removeFile(const std::string& filename) {
     auto it = _impl->files.find(filename);

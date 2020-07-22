@@ -203,8 +203,6 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
             break;
     }
 
-    _config = options;
-
     if (options.consoleEnabled) {
         if (_consoleSink.use_count() == 1) {
             boost::log::core::get()->add_sink(_consoleSink);
@@ -214,6 +212,8 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
             boost::log::core::get()->remove_sink(_consoleSink);
         }
     }
+
+    _config = options;
 
     return Status::OK();
 }
