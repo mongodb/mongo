@@ -219,6 +219,7 @@ selector:
 
   # SERVER-48537 addShard is not idempotent for retries
   - jstests/sharding/conversion_of_replica_set_to_sharded_cluster.js
+  - jstests/sharding/move_primary_with_writes.js
 
 executor:
   config:
