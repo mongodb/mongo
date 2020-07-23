@@ -831,10 +831,7 @@ for full_dir, archive_dir in list(env["ARCHIVE_ADDITION_DIR_MAP"].items()):
 for target in env["DIST_BINARIES"]:
     installBinary(env, "db/modules/" + target)
 
-# Set the download url to the right place
-compass_type = 'compass-community'
-if 'enterprise' in env['MONGO_MODULES']:
-    compass_type = 'compass'
+compass_type = 'compass'
 
 compass_script = "install_compass.in"
 if env.TargetOSIs('windows'):
