@@ -490,18 +490,6 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
     try {
 
         onShardVersionMismatch(opCtx, nss, boost::none);
-        {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-            auto csr = CollectionShardingRuntime::get(opCtx, nss);
-            auto metadata = csr->getCurrentMetadataIfKnown();
-            if (!metadata || !metadata->isSharded()) {
-                return;
-            }
-            // We clear the list of receiving chunks to ensure that a RangeDeletionTask submitted by
-            // this setFCV command cannot be blocked behind a chunk received as a part of a
-            // migration that completed on the recipient (this node) but failed to commit.
-            csr->clearReceivingChunks();
-        }
 
         LOGV2_DEBUG(22031,
                     2,

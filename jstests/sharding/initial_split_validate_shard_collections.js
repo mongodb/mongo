@@ -27,7 +27,6 @@ function checkMetadata(metadata) {
     jsTestLog(tojson(metadata));
 
     assert.eq(1, metadata.chunks.length);
-    assert.eq(0, metadata.pending.length);
 
     // Check that the single chunk on the shard's metadata is a valid chunk (getShardVersion
     // represents chunks as an array of [min, max])

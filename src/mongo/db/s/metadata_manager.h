@@ -104,38 +104,10 @@ public:
 
     void setFilteringMetadata(CollectionMetadata newMetadata);
 
-    void toBSONPending(BSONArrayBuilder& bb) const;
-
-    /**
-     * Returns the number of items in the _receivingChunks list. Useful for unit tests.
-     */
-    size_t numberOfReceivingChunks() {
-        return _receivingChunks.size();
-    }
-
-    /**
-     * Clears the items in the _receivingChunks list.
-     */
-    void clearReceivingChunks();
-
     /**
      * Appends information on all the chunk ranges in rangesToClean to builder.
      */
     void append(BSONObjBuilder* builder) const;
-
-    /**
-     * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
-     * on them, and adds the range to the list of ranges currently being received.
-     *
-     * Returns a future that will be resolved when the deletion either completes or fail.
-     */
-    SharedSemiFuture<void> beginReceive(ChunkRange const& range);
-
-    /**
-     * Removes `range` from the list of ranges currently being received, and schedules any documents
-     * in the range for immediate cleanup.
-     */
-    void forgetReceive(const ChunkRange& range);
 
     /**
      * Schedules documents in `range` for cleanup after any running queries that may depend on them
@@ -279,9 +251,6 @@ private:
     // the most recent metadata and is what is returned to new queries. The rest are previously
     // active collection metadata instances still in use by active server operations or cursors.
     std::list<std::shared_ptr<CollectionMetadataTracker>> _metadata;
-
-    // Chunk ranges being migrated into to the shard. Indexed by the min key of the range.
-    RangeMap _receivingChunks;
 
     // Ranges being deleted, or scheduled to be deleted, by a background task.
     std::list<std::pair<ChunkRange, SharedSemiFuture<void>>> _rangesScheduledForDeletion;

@@ -19,9 +19,6 @@ selector:
   - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
 
   # TODO: SERVER-48192
-  - jstests/multiVersion/pending_chunk.js
-
-  # TODO: SERVER-48192
   - jstests/multiVersion/migrations_with_mixed_fcv.js
 
 # Multiversion tests start their own mongod's.

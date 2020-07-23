@@ -216,18 +216,6 @@ void CollectionShardingRuntime::clearFilteringMetadata(OperationContext* opCtx) 
     }
 }
 
-SharedSemiFuture<void> CollectionShardingRuntime::beginReceive(ChunkRange const& range) {
-    stdx::lock_guard lk(_metadataManagerLock);
-    invariant(_metadataType == MetadataType::kSharded);
-    return _metadataManager->beginReceive(range);
-}
-
-void CollectionShardingRuntime::forgetReceive(const ChunkRange& range) {
-    stdx::lock_guard lk(_metadataManagerLock);
-    invariant(_metadataType == MetadataType::kSharded);
-    _metadataManager->forgetReceive(range);
-}
-
 SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const& range,
                                                                boost::optional<UUID> migrationId,
                                                                CleanWhen when) {
@@ -289,12 +277,6 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
     }
 
     MONGO_UNREACHABLE;
-}
-
-boost::optional<ChunkRange> CollectionShardingRuntime::getNextOrphanRange(BSONObj const& from) {
-    stdx::lock_guard lk(_metadataManagerLock);
-    invariant(_metadataType == MetadataType::kSharded);
-    return _metadataManager->getNextOrphanRange(from);
 }
 
 std::shared_ptr<ScopedCollectionDescription::Impl>
@@ -391,16 +373,6 @@ void CollectionShardingRuntime::appendShardVersion(BSONObjBuilder* builder) {
     if (optCollDescr) {
         builder->appendTimestamp(_nss.ns(), optCollDescr->getShardVersion().toLong());
     }
-}
-
-void CollectionShardingRuntime::appendPendingReceiveChunks(BSONArrayBuilder* builder) {
-    _metadataManager->toBSONPending(*builder);
-}
-
-void CollectionShardingRuntime::clearReceivingChunks() {
-    stdx::lock_guard lk(_metadataManagerLock);
-    invariant(_metadataType == MetadataType::kSharded);
-    _metadataManager->clearReceivingChunks();
 }
 
 size_t CollectionShardingRuntime::numberOfRangesScheduledForDeletion() const {
