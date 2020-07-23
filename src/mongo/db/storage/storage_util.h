@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,18 +29,41 @@
 
 #pragma once
 
+#include "mongo/db/record_id.h"
+#include "mongo/util/uuid.h"
+
 namespace mongo {
 
-class KVEngine;
-class DurableCatalog;
-class StorageEngine;
+class OperationContext;
+class NamespaceString;
 
-class StorageEngineInterface {
-public:
-    StorageEngineInterface() = default;
-    virtual ~StorageEngineInterface() = default;
-    virtual StorageEngine* getStorageEngine() = 0;
-    virtual KVEngine* getEngine() = 0;
-    virtual DurableCatalog* getCatalog() = 0;
-};
+namespace catalog {
+
+/**
+ * Performs two-phase index drop.
+ *
+ * Passthrough to DurableCatalog::removeIndex to execute the first phase of drop by removing the
+ * index catalog entry, then registers an onCommit hook to schedule the second phase of drop to
+ * delete the index data.
+ */
+void removeIndex(OperationContext* opCtx,
+                 StringData indexName,
+                 RecordId collectionCatalogId,
+                 UUID collectionUUID,
+                 const NamespaceString& nss);
+
+/**
+ * Performs two-phase collection drop.
+ *
+ * Passthrough to DurableCatalog::dropCollection to execute the first phase of drop by removing the
+ * collection entry, then registers and onCommit hook to schedule the second phase of drop to delete
+ * the collection data.
+ */
+Status dropCollection(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      RecordId collectionCatalogId,
+                      StringData ident);
+
+
+}  // namespace catalog
 }  // namespace mongo

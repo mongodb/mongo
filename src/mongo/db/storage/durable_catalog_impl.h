@@ -148,7 +148,7 @@ public:
                          StringData validationLevel,
                          StringData validationAction);
 
-    Status removeIndex(OperationContext* opCtx, RecordId catalogId, StringData indexName);
+    void removeIndex(OperationContext* opCtx, RecordId catalogId, StringData indexName);
 
     Status prepareForIndexBuild(OperationContext* opCtx,
                                 RecordId catalogId,
@@ -206,7 +206,6 @@ private:
     class AddIdentChange;
     class RemoveIdentChange;
     class AddIndexChange;
-    class RemoveIndexChange;
 
     friend class StorageEngineImpl;
     friend class DurableCatalogImplTest;

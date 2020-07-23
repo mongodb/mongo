@@ -143,6 +143,8 @@ public:
                                     bool stayTemp) = 0;
 
     /**
+     * Deletes the collection catalog entry identified by 'catalogId'.
+     *
      * Expects (invariants) that all of the index catalog entries have been removed already via
      * removeIndex.
      */
@@ -200,9 +202,11 @@ public:
                                  StringData validationLevel,
                                  StringData validationAction) = 0;
 
-    virtual Status removeIndex(OperationContext* opCtx,
-                               RecordId catalogId,
-                               StringData indexName) = 0;
+    /**
+     * Removes the 'indexName' index catalog entry from the collection catalog entry identified by
+     * 'catalogId'.
+     */
+    virtual void removeIndex(OperationContext* opCtx, RecordId catalogId, StringData indexName) = 0;
 
     /**
      * Updates the persisted catalog entry for 'ns' with the new index and creates the index on

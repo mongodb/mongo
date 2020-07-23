@@ -46,6 +46,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
@@ -732,14 +733,15 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
             coll->getIndexCatalog()->getIndexIterator(opCtx, true /* includeUnfinishedIndexes */);
         while (ii->more()) {
             const IndexCatalogEntry* ice = ii->next();
-            Status status = durableCatalog->removeIndex(
-                opCtx, coll->getCatalogId(), ice->descriptor()->indexName());
-            if (!status.isOK() && firstError.isOK()) {
-                firstError = status;
-            }
+            catalog::removeIndex(opCtx,
+                                 ice->descriptor()->indexName(),
+                                 coll->getCatalogId(),
+                                 coll->uuid(),
+                                 coll->ns());
         }
 
-        Status result = durableCatalog->dropCollection(opCtx, coll->getCatalogId());
+        Status result = catalog::dropCollection(
+            opCtx, coll->ns(), coll->getCatalogId(), coll->getRecordStore()->getIdent());
         if (!result.isOK() && firstError.isOK()) {
             firstError = result;
         }

@@ -72,6 +72,7 @@
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/db/storage/storage_util.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -1083,21 +1084,8 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx, IndexCatalogEnt
 
 void IndexCatalogImpl::deleteIndexFromDisk(OperationContext* opCtx, const string& indexName) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
-
-    Status status =
-        DurableCatalog::get(opCtx)->removeIndex(opCtx, _collection->getCatalogId(), indexName);
-    if (status.code() == ErrorCodes::NamespaceNotFound) {
-        /*
-         * This is ok, as we may be partially through index creation.
-         */
-    } else if (!status.isOK()) {
-        LOGV2_WARNING(20364,
-                      "couldn't drop index {index} on collection: {namespace} because of {error}",
-                      "Couldn't drop index",
-                      "index"_attr = indexName,
-                      "namespace"_attr = _collection->ns(),
-                      "error"_attr = redact(status));
-    }
+    catalog::removeIndex(
+        opCtx, indexName, _collection->getCatalogId(), _collection->uuid(), _collection->ns());
 }
 
 void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,

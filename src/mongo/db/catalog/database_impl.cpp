@@ -73,6 +73,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_util.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
@@ -492,7 +493,10 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
           "namespace"_attr = nss,
           "uuid"_attr = uuid);
 
-    auto status = DurableCatalog::get(opCtx)->dropCollection(opCtx, collection->getCatalogId());
+    auto status = catalog::dropCollection(opCtx,
+                                          collection->ns(),
+                                          collection->getCatalogId(),
+                                          collection->getRecordStore()->getIdent());
     if (!status.isOK())
         return status;
 

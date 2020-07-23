@@ -58,6 +58,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/storage_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
@@ -501,11 +502,11 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                     return s;
                 }
             } else {
-                Status status = DurableCatalog::get(opCtx)->removeIndex(
-                    opCtx, collection->getCatalogId(), indexNames[i]);
-                if (!status.isOK()) {
-                    return status;
-                }
+                catalog::removeIndex(opCtx,
+                                     indexNames[i],
+                                     collection->getCatalogId(),
+                                     collection->uuid(),
+                                     collection->ns());
             }
         }
 

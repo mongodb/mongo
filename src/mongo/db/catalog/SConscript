@@ -355,6 +355,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/db/storage/storage_debug_util',
+        '$BUILD_DIR/mongo/db/storage/storage_util',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/vector_clock',
         'index_build_block',

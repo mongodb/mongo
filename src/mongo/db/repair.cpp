@@ -60,6 +60,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/storage/storage_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -98,10 +99,8 @@ Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
                   "Dropping unfinished index after collection was modified by repair",
                   "index"_attr = indexName);
             WriteUnitOfWork wuow(opCtx);
-            auto status = durableCatalog->removeIndex(opCtx, collection->getCatalogId(), indexName);
-            if (!status.isOK()) {
-                return status;
-            }
+            catalog::removeIndex(
+                opCtx, indexName, collection->getCatalogId(), collection->uuid(), collection->ns());
             wuow.commit();
             StorageRepairObserver::get(opCtx->getServiceContext())
                 ->invalidatingModification(str::stream()

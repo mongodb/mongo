@@ -239,53 +239,6 @@ public:
     const std::string _ident;
 };
 
-class DurableCatalogImpl::RemoveIndexChange : public RecoveryUnit::Change {
-public:
-    RemoveIndexChange(OperationContext* opCtx,
-                      StorageEngineInterface* engine,
-                      OptionalCollectionUUID uuid,
-                      const NamespaceString& indexNss,
-                      StringData indexName,
-                      StringData ident)
-        : _opCtx(opCtx),
-          _recoveryUnit(opCtx->recoveryUnit()),
-          _engine(engine),
-          _uuid(uuid),
-          _indexNss(indexNss),
-          _indexName(indexName),
-          _ident(ident.toString()) {}
-
-    virtual void rollback() {}
-    virtual void commit(boost::optional<Timestamp> commitTimestamp) {
-        // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
-        // index, we should never see it again anyway.
-        if (_engine->getStorageEngine()->supportsPendingDrops() && commitTimestamp) {
-            LOGV2(22206,
-                  "Deferring table drop for index '{index}' on collection "
-                  "'{namespace}{uuid}. Ident: '{ident}', commit timestamp: '{commitTimestamp}'",
-                  "Deferring table drop for index",
-                  "index"_attr = _indexName,
-                  logAttrs(_indexNss),
-                  "uuid"_attr = _uuid,
-                  "ident"_attr = _ident,
-                  "commitTimestamp"_attr = commitTimestamp);
-            _engine->addDropPendingIdent(*commitTimestamp, _indexNss, _ident);
-        } else {
-            auto kvEngine = _engine->getEngine();
-            MONGO_COMPILER_VARIABLE_UNUSED auto status =
-                kvEngine->dropIdent(_opCtx, _recoveryUnit, _ident);
-        }
-    }
-
-    OperationContext* const _opCtx;
-    RecoveryUnit* const _recoveryUnit;
-    StorageEngineInterface* _engine;
-    OptionalCollectionUUID _uuid;
-    const NamespaceString _indexNss;
-    const std::string _indexName;
-    const std::string _ident;
-};
-
 bool DurableCatalogImpl::FeatureTracker::isFeatureDocument(BSONObj obj) {
     BSONElement firstElem = obj.firstElement();
     if (firstElem.fieldNameStringData() == kIsFeatureDocumentFieldName) {
@@ -931,29 +884,6 @@ Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, RecordId cata
         return status;
     }
 
-    auto ru = opCtx->recoveryUnit();
-    // This will notify the storageEngine to drop the collection only on WUOW::commit().
-    opCtx->recoveryUnit()->onCommit(
-        [opCtx, ru, catalog = this, entry](boost::optional<Timestamp> commitTimestamp) {
-            StorageEngineInterface* engine = catalog->_engine;
-            auto storageEngine = engine->getStorageEngine();
-            if (storageEngine->supportsPendingDrops() && commitTimestamp) {
-                LOGV2(22214,
-                      "Deferring table drop for collection '{namespace}'. Ident: {ident}, "
-                      "commit timestamp: {commitTimestamp}",
-                      "Deferring table drop for collection",
-                      logAttrs(entry.nss),
-                      "ident"_attr = entry.ident,
-                      "commitTimestamp"_attr = commitTimestamp);
-                engine->addDropPendingIdent(*commitTimestamp, entry.nss, entry.ident);
-            } else {
-                // Intentionally ignoring failure here. Since we've removed the metadata pointing to
-                // the collection, we should never see it again anyway.
-                auto kvEngine = engine->getEngine();
-                kvEngine->dropIdent(opCtx, ru, entry.ident).ignore();
-            }
-        });
-
     return Status::OK();
 }
 
@@ -1022,23 +952,18 @@ void DurableCatalogImpl::updateValidator(OperationContext* opCtx,
     putMetaData(opCtx, catalogId, md);
 }
 
-Status DurableCatalogImpl::removeIndex(OperationContext* opCtx,
-                                       RecordId catalogId,
-                                       StringData indexName) {
+void DurableCatalogImpl::removeIndex(OperationContext* opCtx,
+                                     RecordId catalogId,
+                                     StringData indexName) {
     BSONCollectionCatalogEntry::MetaData md = getMetaData(opCtx, catalogId);
 
     if (md.findIndexOffset(indexName) < 0)
-        return Status::OK();  // never had the index so nothing to do.
+        return;  // never had the index so nothing to do.
 
     const string ident = getIndexIdent(opCtx, catalogId, indexName);
 
     md.eraseIndex(indexName);
     putMetaData(opCtx, catalogId, md);
-
-    // Lazily remove to isolate underlying engine from rollback.
-    opCtx->recoveryUnit()->registerChange(std::make_unique<RemoveIndexChange>(
-        opCtx, _engine, md.options.uuid, NamespaceString(md.ns), indexName, ident));
-    return Status::OK();
 }
 
 Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,

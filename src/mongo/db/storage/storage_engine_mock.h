@@ -162,6 +162,9 @@ public:
     std::set<std::string> getDropPendingIdents() const final {
         return {};
     }
+    void addDropPendingIdent(const Timestamp& dropTimestamp,
+                             const NamespaceString& nss,
+                             StringData ident) final {}
     Status currentFilesCompatible(OperationContext* opCtx) const final {
         return Status::OK();
     }
