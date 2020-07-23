@@ -442,6 +442,26 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: linkbench_stepdowns
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "linkbench_stepdowns"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: linkbench_rolling_restarts
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "linkbench_rolling_restarts"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: linkbench2
   priority: 5
   exec_timeout_secs: 43200 # 12 hours
@@ -505,6 +525,30 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "ycsb-wmajority"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+
+- name: industry_benchmarks_stepdowns
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "ycsb_stepdowns"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+
+- name: industry_benchmarks_rolling_restarts
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "ycsb_rolling_restarts"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -1520,6 +1564,30 @@ buildvariants:
     - name: mixed_workloads
     - name: genny_patch_tasks
     - name: genny_auto_tasks
+
+- name: linux-3-node-replSet-maintenance-events
+  display_name: Linux 3-Node ReplSet (Maintenance Events)
+  batchtime: 2880  # 48 hours
+  modules: *modules
+  expansions:
+    setup: replica-maintenance-events
+    cluster: replica
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-replset"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
+  tasks:
+    - name: industry_benchmarks_stepdowns
+    - name: linkbench_stepdowns
+    - name: industry_benchmarks_rolling_restarts
+    - name: linkbench_rolling_restarts
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
