@@ -3059,9 +3059,9 @@ functions:
   "gather failed unittests": &gather_failed_unittests
     command: shell.exec
     params:
+      shell: bash
       working_dir: "src"
       script: |
-
         set -eou pipefail
 
         # Only run on unit test tasks so we don't target mongod binaries from cores.
