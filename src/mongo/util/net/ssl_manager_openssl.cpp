@@ -379,11 +379,50 @@ UniqueVerifiedChainPolyfill SSLgetVerifiedChain(SSL* s) {
     return UniqueVerifiedChainPolyfill(SSL_get0_verified_chain(s));
 }
 
+SSLX509Name convertX509ToSSLX509Name(X509_NAME* x509Name) {
+    std::vector<std::vector<SSLX509Name::Entry>> entries;
+
+    int count = X509_NAME_entry_count(x509Name);
+    int prevSet = -1;
+    std::vector<SSLX509Name::Entry> rdn;
+    for (int i = count - 1; i >= 0; --i) {
+        auto* entry = X509_NAME_get_entry(x509Name, i);
+
+        const auto currentSet = X509_NAME_ENTRY_set(entry);
+        if (currentSet != prevSet) {
+            if (!rdn.empty()) {
+                entries.push_back(std::move(rdn));
+                rdn = std::vector<SSLX509Name::Entry>();
+            }
+            prevSet = currentSet;
+        }
+
+        char buffer[128];
+        // OBJ_obj2txt can only fail if we pass a nullptr from get_object,
+        // or if OpenSSL's BN library falls over.
+        // In either case, just panic.
+        uassert(ErrorCodes::InvalidSSLConfiguration,
+                "Unable to parse certificate subject name",
+                OBJ_obj2txt(buffer, sizeof(buffer), X509_NAME_ENTRY_get_object(entry), 1) > 0);
+
+        const auto* str = X509_NAME_ENTRY_get_data(entry);
+        rdn.emplace_back(
+            buffer, str->type, std::string(reinterpret_cast<const char*>(str->data), str->length));
+    }
+    if (!rdn.empty()) {
+        entries.push_back(std::move(rdn));
+    }
+
+    SSLX509Name sslX509Name = SSLX509Name(std::move(entries));
+    uassertStatusOK(sslX509Name.normalizeStrings());
+    return sslX509Name;
+}
+
 /*
  * Converts time from OpenSSL return value to Date_t representing the time on
  * the ASN1_TIME object.
  */
-Date_t convertASN1ToMillis(ASN1_TIME* asn1time) {
+Date_t convertASN1ToMillis(const ASN1_TIME* asn1time) {
     static const int DATE_LEN = 128;
 
     BIO* outBIO = BIO_new(BIO_s_mem());
@@ -1188,6 +1227,29 @@ private:
                                       SSLX509Name* subjectName,
                                       Date_t* serverNotAfter);
 
+    /*
+     * Parse and return x509 object from the provided keyfile.
+     * @param keyFile referencing the PEM file to be read.
+     * @param keyPassword password to the PEM file.
+     * @return UniqueX509 object parsed from the keyfile.
+     */
+    UniqueX509 _getX509Object(StringData keyFile, const PasswordFetcher* keyPassword) const;
+
+    /*
+     * Retrieve and store certificate information from the provided UniqueX509 object.
+     * @param x509 referencing the UniqueX509 object to query.
+     * @param info as a pointer to the CertInformationToLog struct to populate
+     * with the information.
+     */
+    void _getX509CertInfo(UniqueX509& x509, CertInformationToLog* info) const;
+
+    /*
+     * Retrieve and store CRL information from the provided CRL filename.
+     * @param crlFile referencing the CRL filename
+     * @param info as a pointer to the CRLInformationToLog struct to populate
+     * with the information.
+     */
+    void _getCRLInfo(StringData crlFile, CRLInformationToLog* info) const;
 
     StatusWith<stdx::unordered_set<RoleName>> _parsePeerRoles(X509* peerCert) const;
 
@@ -1250,43 +1312,8 @@ std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams
 }
 
 SSLX509Name getCertificateSubjectX509Name(X509* cert) {
-    std::vector<std::vector<SSLX509Name::Entry>> entries;
-
     auto name = X509_get_subject_name(cert);
-    int count = X509_NAME_entry_count(name);
-    int prevSet = -1;
-    std::vector<SSLX509Name::Entry> rdn;
-    for (int i = count - 1; i >= 0; --i) {
-        auto* entry = X509_NAME_get_entry(name, i);
-
-        const auto currentSet = X509_NAME_ENTRY_set(entry);
-        if (currentSet != prevSet) {
-            if (!rdn.empty()) {
-                entries.push_back(std::move(rdn));
-                rdn = std::vector<SSLX509Name::Entry>();
-            }
-            prevSet = currentSet;
-        }
-
-        char buffer[128];
-        // OBJ_obj2txt can only fail if we pass a nullptr from get_object,
-        // or if OpenSSL's BN library falls over.
-        // In either case, just panic.
-        uassert(ErrorCodes::InvalidSSLConfiguration,
-                "Unable to parse certiciate subject name",
-                OBJ_obj2txt(buffer, sizeof(buffer), X509_NAME_ENTRY_get_object(entry), 1) > 0);
-
-        const auto* str = X509_NAME_ENTRY_get_data(entry);
-        rdn.emplace_back(
-            buffer, str->type, std::string(reinterpret_cast<const char*>(str->data), str->length));
-    }
-    if (!rdn.empty()) {
-        entries.push_back(std::move(rdn));
-    }
-
-    SSLX509Name subjectName = SSLX509Name(std::move(entries));
-    uassertStatusOK(subjectName.normalizeStrings());
-    return subjectName;
+    return convertX509ToSSLX509Name(name);
 }
 
 int verifyDHParameters(const UniqueDHParams& dhparams) {
@@ -2801,8 +2828,122 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
     throwSocketError(errToThrow, conn->socket->remoteString());
 }
 
+UniqueX509 SSLManagerOpenSSL::_getX509Object(StringData keyFile,
+                                             const PasswordFetcher* keyPassword) const {
+    BIO* inBIO = BIO_new(BIO_s_file());
+    if (inBIO == nullptr) {
+        uasserted(4913000, "failed to allocate BIO object");
+    }
+
+    ON_BLOCK_EXIT([&] { BIO_free(inBIO); });
+    if (BIO_read_filename(inBIO, keyFile.toString().c_str()) <= 0) {
+        uasserted(4913001,
+                  str::stream() << "cannot read key file when setting subject name: " << keyFile
+                                << " " << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
+    }
+
+    UniqueX509 x509(PEM_read_bio_X509(
+        inBIO, nullptr, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword)));
+    if (x509 == nullptr) {
+        uasserted(4913002,
+                  str::stream() << "cannot retrieve certificate from keyfile: " << keyFile << " "
+                                << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
+    }
+    return x509;
+}
+
+constexpr size_t kSHA1HashBytes = 20;
+
+void SSLManagerOpenSSL::_getX509CertInfo(UniqueX509& x509, CertInformationToLog* info) const {
+    info->subject = getCertificateSubjectX509Name(x509.get());
+    info->issuer = convertX509ToSSLX509Name(X509_get_issuer_name(x509.get()));
+
+    info->thumbprint.resize(kSHA1HashBytes);
+    X509_digest(
+        x509.get(), EVP_sha1(), reinterpret_cast<unsigned char*>(info->thumbprint.data()), nullptr);
+
+    auto notBeforeMillis = convertASN1ToMillis(X509_get_notBefore(x509.get()));
+
+    uassert(4913003, "date conversion failed", notBeforeMillis != Date_t());
+
+    info->validityNotBefore = notBeforeMillis;
+
+    auto notAfterMillis = convertASN1ToMillis(X509_get_notAfter(x509.get()));
+
+    info->validityNotAfter = notAfterMillis;
+
+    uassert(4913004, "date conversion failed", notAfterMillis != Date_t());
+}
+
+
+void SSLManagerOpenSSL::_getCRLInfo(StringData crlFile, CRLInformationToLog* info) const {
+    BIO* inBIO = BIO_new(BIO_s_file());
+    if (inBIO == nullptr) {
+        uasserted(4913005, "failed to allocate BIO object");
+    }
+
+    ON_BLOCK_EXIT([&] { BIO_free(inBIO); });
+
+    if (BIO_read_filename(inBIO, crlFile.toString().c_str()) <= 0) {
+        uasserted(4913006,
+                  str::stream() << "cannot read crl file when setting subject name: " << crlFile
+                                << " " << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
+    }
+
+
+    X509_CRL* x509 =
+        PEM_read_bio_X509_CRL(inBIO, nullptr, &SSLManagerOpenSSL::password_cb, nullptr);
+    if (x509 == nullptr) {
+        uasserted(4913007,
+                  str::stream() << "cannot retrieve CRL information from crl file: " << crlFile
+                                << " " << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
+    }
+    ON_BLOCK_EXIT([&] { X509_CRL_free(x509); });
+
+    info->thumbprint.resize(kSHA1HashBytes);
+    X509_CRL_digest(
+        x509, EVP_sha1(), reinterpret_cast<unsigned char*>(info->thumbprint.data()), nullptr);
+
+    auto notBeforeMillis = convertASN1ToMillis(X509_CRL_get_lastUpdate(x509));
+
+    uassert(4913008, "date conversion failed", notBeforeMillis != Date_t());
+
+    info->validityNotBefore = notBeforeMillis;
+
+    auto notAfterMillis = convertASN1ToMillis(X509_CRL_get_nextUpdate(x509));
+
+    uassert(4913009, "date conversion failed", notAfterMillis != Date_t());
+
+    info->validityNotAfter = notAfterMillis;
+}
+
+
 SSLInformationToLog SSLManagerOpenSSL::getSSLInformationToLog() const {
     SSLInformationToLog info;
+    if (!(sslGlobalParams.sslPEMKeyFile.empty())) {
+        UniqueX509 serverX509Cert =
+            _getX509Object(sslGlobalParams.sslPEMKeyFile, &_serverPEMPassword);
+        _getX509CertInfo(serverX509Cert, &info.server);
+    }
+
+    if (!(sslGlobalParams.sslClusterFile.empty())) {
+        CertInformationToLog clusterInfo;
+        UniqueX509 clusterX509Cert =
+            _getX509Object(sslGlobalParams.sslClusterFile, &_clusterPEMPassword);
+        _getX509CertInfo(clusterX509Cert, &clusterInfo);
+        info.cluster = clusterInfo;
+    } else {
+        info.cluster = boost::none;
+    }
+
+    if (!sslGlobalParams.sslCRLFile.empty()) {
+        CRLInformationToLog crlInfo;
+        _getCRLInfo(getSSLGlobalParams().sslCRLFile, &crlInfo);
+        info.crl = crlInfo;
+    } else {
+        info.crl = boost::none;
+    }
+
     return info;
 }
 

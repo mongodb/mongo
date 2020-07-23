@@ -1792,8 +1792,10 @@ void getCertInfo(CertInformationToLog* info, const ::CFArrayRef cert) {
 SSLInformationToLog SSLManagerApple::getSSLInformationToLog() const {
     SSLInformationToLog info;
     // server CA should definitely exist, client CA is optional
-    getCertInfo(&info.server, _serverCtx.certs.get());
-    if (_clientCA != nullptr) {
+    if (_serverCtx.certs.get()) {
+        getCertInfo(&info.server, _serverCtx.certs.get());
+    }
+    if (_clientCtx.certs.get()) {
         CertInformationToLog clientInfo;
         getCertInfo(&clientInfo, _clientCtx.certs.get());
         info.cluster = clientInfo;

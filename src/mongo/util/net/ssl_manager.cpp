@@ -371,8 +371,43 @@ void SSLManagerCoordinator::rotate() {
 #endif
 }
 
+void logCert(const CertInformationToLog& cert, StringData certType, const int logNum) {
+    LOGV2(logNum,
+          "Certificate information",
+          "type"_attr = certType,
+          "subject"_attr = cert.subject.toString(),
+          "issuer"_attr = cert.issuer.toString(),
+          "thumbprint"_attr =
+              toHex(static_cast<const void*>(cert.thumbprint.data()), cert.thumbprint.size()),
+          "notValidBefore"_attr = cert.validityNotBefore.toString(),
+          "notValidAfter"_attr = cert.validityNotAfter.toString());
+}
+
+void logCRL(const CRLInformationToLog& crl, const int logNum) {
+    LOGV2(logNum,
+          "CRL information",
+          "thumbprint"_attr =
+              toHex(static_cast<const void*>(crl.thumbprint.data()), crl.thumbprint.size()),
+          "notValidBefore"_attr = crl.validityNotBefore.toString(),
+          "notValidAfter"_attr = crl.validityNotAfter.toString());
+}
+
+void logSSLInfo(const SSLInformationToLog& info) {
+    if (!(sslGlobalParams.sslPEMKeyFile.empty())) {
+        logCert(info.server, "Server", 4913010);
+    }
+    if (info.cluster.has_value()) {
+        logCert(info.cluster.get(), "Cluster", 4913011);
+    }
+    if (info.crl.has_value()) {
+        logCRL(info.crl.get(), 4913012);
+    }
+}
+
 SSLManagerCoordinator::SSLManagerCoordinator()
-    : _manager(SSLManagerInterface::create(sslGlobalParams, isSSLServer)) {}
+    : _manager(SSLManagerInterface::create(sslGlobalParams, isSSLServer)) {
+    logSSLInfo(_manager->get()->getSSLInformationToLog());
+}
 
 void ClusterMemberDNOverride::append(OperationContext* opCtx,
                                      BSONObjBuilder& b,
