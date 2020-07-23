@@ -490,6 +490,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     if (newChunks.size() == 2) {
         appendShortVersion(&logDetail.subobjStart("left"), newChunks[0]);
         appendShortVersion(&logDetail.subobjStart("right"), newChunks[1]);
+        logDetail.append("owningShard", shardName);
 
         ShardingLogging::get(opCtx)->logChange(
             opCtx, "split", nss.ns(), logDetail.obj(), WriteConcernOptions());
@@ -504,6 +505,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
             chunkDetail.append("number", i + 1);
             chunkDetail.append("of", newChunksSize);
             appendShortVersion(&chunkDetail.subobjStart("chunk"), newChunks[i]);
+            chunkDetail.append("owningShard", shardName);
 
             ShardingLogging::get(opCtx)->logChange(
                 opCtx, "multi-split", nss.ns(), chunkDetail.obj(), WriteConcernOptions());
@@ -626,6 +628,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     }
     collVersion.appendLegacyWithField(&logDetail, "prevShardVersion");
     mergeVersion.appendLegacyWithField(&logDetail, "mergedVersion");
+    logDetail.append("owningShard", shardName);
 
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
