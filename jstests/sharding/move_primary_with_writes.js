@@ -137,7 +137,7 @@ function buildCommands(collName, shouldFail) {
         {command: {create: "testCollection"}, shouldFail: true},
         {
             command: {create: "testView", viewOn: collName, pipeline: [{$match: {}}]},
-            shouldFail: false
+            shouldFail: true
         },
         {
             command: {createIndexes: collName, indexes: [{key: {b: 1}, name: collName + "Idx_b"}]},
@@ -149,7 +149,7 @@ function buildCommands(collName, shouldFail) {
         },
         {
             command: {collMod: collName + "View", viewOn: collName, pipeline: [{$match: {_id: 1}}]},
-            shouldFail: false
+            shouldFail: true
         },
         {command: {convertToCapped: "unshardedFoo", size: 1000000}, shouldFail: true},
         {command: {dropIndexes: collName, index: collName + "Index"}, shouldFail: shouldFail},
