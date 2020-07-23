@@ -309,7 +309,8 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverse(
                                                innerBranchOutputSlot,
                                                sbe::makeSV(),
                                                nullptr,
-                                               nullptr)};
+                                               nullptr,
+                                               1)};
     }
 }
 
