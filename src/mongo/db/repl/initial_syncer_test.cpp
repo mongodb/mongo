@@ -66,6 +66,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
@@ -337,10 +338,8 @@ protected:
         };
 
         auto* service = getGlobalServiceContext();
-        service->setFastClockSource(
-            std::make_unique<executor::NetworkInterfaceMockClockSource>(getNet()));
-        service->setPreciseClockSource(
-            std::make_unique<executor::NetworkInterfaceMockClockSource>(getNet()));
+        service->setFastClockSource(std::make_unique<ClockSourceMock>());
+        service->setPreciseClockSource(std::make_unique<ClockSourceMock>());
         ThreadPool::Options dbThreadPoolOptions;
         dbThreadPoolOptions.poolName = "dbthread";
         dbThreadPoolOptions.minThreads = 1U;
@@ -4449,7 +4448,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 0) << progress;
         ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
-        ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberDouble) << progress;
+        ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberLong) << progress;
         ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 0) << progress;
         ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 0) << progress;
         ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
@@ -4517,7 +4516,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
         ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
-        ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberDouble) << progress;
+        ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberLong) << progress;
         ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 0) << progress;
         ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 0) << progress;
         ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
@@ -4619,7 +4618,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(progress.nFields(), 13) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
-    ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberDouble) << progress;
+    ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberLong) << progress;
     ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 10) << progress;
     ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 10) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;

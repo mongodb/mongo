@@ -31,55 +31,91 @@
 
 #include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/static_immortal.h"
 
 #include <algorithm>
 
 namespace mongo {
+namespace {
+/**
+ * This is a synchronized global mocked ClockSource.
+ *
+ * For ease of use, this is the underlying source behind *every* clock source.
+ **/
+class ClockSourceMockImpl {
+public:
+    using Alarm = std::pair<Date_t, unique_function<void()>>;
+
+    static ClockSourceMockImpl* get() noexcept {
+        static auto clkSource = StaticImmortal<ClockSourceMockImpl>();
+        return &clkSource.value();
+    }
+
+    Date_t now() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _now;
+    }
+
+    void advance(Milliseconds ms) {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        _now += ms;
+        _processAlarms(std::move(lk));
+    }
+    void reset(Date_t newNow) {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        _now = newNow;
+        _processAlarms(std::move(lk));
+    }
+
+    Status setAlarm(Date_t when, unique_function<void()> action) {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        if (when <= _now) {
+            lk.unlock();
+            action();
+            return Status::OK();
+        }
+        _alarms.emplace_back(when, std::move(action));
+        return Status::OK();
+    }
+
+private:
+    void _processAlarms(stdx::unique_lock<stdx::mutex> lk) {
+        invariant(lk.owns_lock());
+        std::vector<Alarm> readyAlarms;
+        auto alarmIsNotExpired = [&](const Alarm& alarm) { return alarm.first > _now; };
+        auto expiredAlarmsBegin = std::partition(_alarms.begin(), _alarms.end(), alarmIsNotExpired);
+        std::move(expiredAlarmsBegin, _alarms.end(), std::back_inserter(readyAlarms));
+        _alarms.erase(expiredAlarmsBegin, _alarms.end());
+        lk.unlock();
+        for (const auto& alarm : readyAlarms) {
+            alarm.second();
+        }
+    }
+
+    stdx::mutex _mutex;  // NOLINT
+    Date_t _now = ClockSourceMock::kInitialNow;
+    std::vector<Alarm> _alarms;
+};
+}  // namespace
 
 Milliseconds ClockSourceMock::getPrecision() {
     return Milliseconds(1);
 }
 
 Date_t ClockSourceMock::now() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _now;
+    return ClockSourceMockImpl::get()->now();
 }
 
 void ClockSourceMock::advance(Milliseconds ms) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _now += ms;
-    _processAlarms(std::move(lk));
+    ClockSourceMockImpl::get()->advance(ms);
 }
 
 void ClockSourceMock::reset(Date_t newNow) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _now = newNow;
-    _processAlarms(std::move(lk));
+    ClockSourceMockImpl::get()->reset(newNow);
 }
 
 Status ClockSourceMock::setAlarm(Date_t when, unique_function<void()> action) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (when <= _now) {
-        lk.unlock();
-        action();
-        return Status::OK();
-    }
-    _alarms.emplace_back(std::make_pair(when, std::move(action)));
-    return Status::OK();
-}
-
-void ClockSourceMock::_processAlarms(stdx::unique_lock<stdx::mutex> lk) {
-    using std::swap;
-    invariant(lk.owns_lock());
-    std::vector<Alarm> readyAlarms;
-    auto alarmIsNotExpired = [&](const Alarm& alarm) { return alarm.first > _now; };
-    auto expiredAlarmsBegin = std::partition(_alarms.begin(), _alarms.end(), alarmIsNotExpired);
-    std::move(expiredAlarmsBegin, _alarms.end(), std::back_inserter(readyAlarms));
-    _alarms.erase(expiredAlarmsBegin, _alarms.end());
-    lk.unlock();
-    for (const auto& alarm : readyAlarms) {
-        alarm.second();
-    }
+    return ClockSourceMockImpl::get()->setAlarm(when, std::move(action));
 }
 
 }  // namespace mongo

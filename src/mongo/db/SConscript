@@ -1663,6 +1663,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'op_observer',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
 

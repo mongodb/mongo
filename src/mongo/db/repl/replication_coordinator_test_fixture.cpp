@@ -155,9 +155,8 @@ void ReplCoordTest::init() {
                                                          replicationProcess,
                                                          _storageInterface,
                                                          seed);
-    service->setFastClockSource(std::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
-    service->setPreciseClockSource(
-        std::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
+    service->setFastClockSource(std::make_unique<ClockSourceMock>());
+    service->setPreciseClockSource(std::make_unique<ClockSourceMock>());
 }
 
 void ReplCoordTest::init(const ReplSettings& settings) {

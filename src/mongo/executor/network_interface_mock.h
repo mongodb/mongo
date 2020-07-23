@@ -42,6 +42,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -317,7 +318,7 @@ private:
      * Returns the current virtualized time.
      */
     Date_t _now_inlock() const {
-        return _now;
+        return _clkSource->now();
     }
 
     /**
@@ -362,6 +363,9 @@ private:
     // in multi-threaded execution, and so unsynchronized, are labeled (R).
     stdx::mutex _mutex;  // NOLINT
 
+    // A mocked clock source.
+    std::unique_ptr<ClockSourceMock> _clkSource;  // (M)
+
     // Condition signaled to indicate that the network processing thread should wake up.
     stdx::condition_variable _shouldWakeNetworkCondition;  // (M)
 
@@ -373,9 +377,6 @@ private:
 
     // Indicator of which thread, if any, is currently running.
     ThreadType _currentlyRunning;  // (M)
-
-    // The current time reported by this instance of NetworkInterfaceMock.
-    Date_t _now;  // (M)
 
     // Set to true by "startUp()"
     bool _hasStarted;  // (M)
@@ -552,26 +553,6 @@ public:
 private:
     NetworkInterfaceMock* _net;
     bool _callExitNetwork = true;
-};
-
-class NetworkInterfaceMockClockSource : public ClockSource {
-public:
-    explicit NetworkInterfaceMockClockSource(NetworkInterfaceMock* net);
-
-    Milliseconds getPrecision() override {
-        return Milliseconds{1};
-    }
-    Date_t now() override {
-        return _net->now();
-    }
-    Status setAlarm(Date_t when, unique_function<void()> action) override {
-        return _net->setAlarm(TaskExecutor::CallbackHandle(),
-                              when,
-                              [action = std::move(action)](Status) { action(); });
-    }
-
-private:
-    NetworkInterfaceMock* _net;
 };
 
 }  // namespace executor

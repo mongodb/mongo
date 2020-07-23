@@ -37,11 +37,18 @@
 #include "mongo/db/client.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/diagnostic_info.h"
 
 namespace mongo {
 
 ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
+    {
+        // Reset the global clock source
+        ClockSourceMock clkSource;
+        clkSource.reset();
+    }
+
     auto serviceContext = [] {
         auto serviceContext = ServiceContext::make();
         auto serviceContextPtr = serviceContext.get();

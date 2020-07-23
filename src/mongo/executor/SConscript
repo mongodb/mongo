@@ -74,6 +74,7 @@ env.Library('network_interface_mock',
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base',
                 '$BUILD_DIR/mongo/rpc/metadata',
+                '$BUILD_DIR/mongo/util/clock_source_mock',
                 '$BUILD_DIR/mongo/util/net/network',
                 'network_interface',
                 'task_executor_interface',
