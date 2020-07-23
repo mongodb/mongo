@@ -7,9 +7,7 @@ Import([
 env = env.Clone()
 
 # Set the download url to the right place
-compass_type = 'compass-community'
-if 'enterprise' in env['MONGO_MODULES']:
-    compass_type = 'compass'
+compass_type = 'compass'
 
 compass_script = "install_compass.in"
 if env.TargetOSIs('windows'):
