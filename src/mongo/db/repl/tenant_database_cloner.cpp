@@ -33,8 +33,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/database_cloner_gen.h"
-#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/tenant_collection_cloner.h"
 #include "mongo/db/repl/tenant_database_cloner.h"
 #include "mongo/logv2/log.h"
@@ -70,16 +70,6 @@ void TenantDatabaseCloner::preStage() {
     _stats.start = getSharedData()->getClock()->now();
 }
 
-/* static */
-BSONObj TenantDatabaseCloner::buildMajorityWaitRequest(Timestamp operationTime) {
-    BSONObjBuilder bob;
-    bob.append("find", NamespaceString::kSystemReplSetNamespace.toString());
-    bob.append("filter", BSONObj());
-    ReadConcernArgs readConcern(LogicalTime(operationTime), ReadConcernLevel::kMajorityReadConcern);
-    readConcern.appendInfo(&bob);
-    return bob.obj();
-}
-
 BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
     // This will be set after a successful listCollections command.
     _operationTime = Timestamp(0, 0);
@@ -111,7 +101,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
         });
 
     BSONObj readResult;
-    BSONObj cmd = TenantDatabaseCloner::buildMajorityWaitRequest(_operationTime);
+    BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(_operationTime);
     getClient()->runCommand("admin", cmd, readResult, QueryOption_SlaveOk);
     uassertStatusOKWithContext(
         getStatusFromCommandResult(readResult),

@@ -32,34 +32,30 @@
 #include <vector>
 
 #include "mongo/db/repl/base_cloner.h"
-#include "mongo/db/repl/tenant_collection_cloner.h"
+#include "mongo/db/repl/tenant_database_cloner.h"
 
 namespace mongo {
 namespace repl {
 
-class TenantDatabaseCloner final : public BaseCloner {
+class TenantAllDatabaseCloner final : public BaseCloner {
 public:
     struct Stats {
-        std::string dbname;
-        Date_t start;
-        Date_t end;
-        size_t collections{0};
-        size_t clonedCollections{0};
-        std::vector<TenantCollectionCloner::Stats> collectionStats;
+        size_t databasesCloned{0};
+        std::vector<TenantDatabaseCloner::Stats> databaseStats;
 
         std::string toString() const;
         BSONObj toBSON() const;
         void append(BSONObjBuilder* builder) const;
     };
 
-    TenantDatabaseCloner(const std::string& dbName,
-                         InitialSyncSharedData* sharedData,
-                         const HostAndPort& source,
-                         DBClientConnection* client,
-                         StorageInterface* storageInterface,
-                         ThreadPool* dbPool);
+    TenantAllDatabaseCloner(InitialSyncSharedData* sharedData,
+                            const HostAndPort& source,
+                            DBClientConnection* client,
+                            StorageInterface* storageInterface,
+                            ThreadPool* dbPool,
+                            StringData databasePrefix);
 
-    virtual ~TenantDatabaseCloner() = default;
+    virtual ~TenantAllDatabaseCloner() = default;
 
     Stats getStats() const;
 
@@ -70,17 +66,15 @@ public:
 protected:
     ClonerStages getStages() final;
 
-    bool isMyFailPoint(const BSONObj& data) const final;
-
 private:
-    friend class TenantDatabaseClonerTest;
+    friend class TenantAllDatabaseClonerTest;
 
-    class TenantDatabaseClonerStage : public ClonerStage<TenantDatabaseCloner> {
+    class TenantAllDatabaseClonerStage : public ClonerStage<TenantAllDatabaseCloner> {
     public:
-        TenantDatabaseClonerStage(std::string name,
-                                  TenantDatabaseCloner* cloner,
-                                  ClonerRunFn stageFunc)
-            : ClonerStage<TenantDatabaseCloner>(name, cloner, stageFunc) {}
+        TenantAllDatabaseClonerStage(std::string name,
+                                     TenantAllDatabaseCloner* cloner,
+                                     ClonerRunFn stageFunc)
+            : ClonerStage<TenantAllDatabaseCloner>(name, cloner, stageFunc) {}
 
         bool isTransientError(const Status& status) override {
             // Always abort on error.
@@ -89,46 +83,43 @@ private:
     };
 
     /**
-     * Stage function that retrieves collection information from the donor.
+     * Stage function that retrieves database information from the sync source.
      */
-    AfterStageBehavior listCollectionsStage();
+    AfterStageBehavior listDatabasesStage();
 
     /**
-     * The preStage sets the start time in _stats.
-     */
-    void preStage() final;
-
-    /**
-     * The postStage creates and runs the individual TenantCollectionCloners on each database found
-     * on the sync source, and sets the end time in _stats when done.
+     *
+     * The postStage creates and runs the individual TenantDatabaseCloners on each database found on
+     * the sync source.
      */
     void postStage() final;
 
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
-        return _dbName + " db: { " + stage->getName() + ": 1 } ";
+        return "admin db: { " + stage->getName() + ": 1 }";
     }
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
     // (R)  Read-only in concurrent operation; no synchronization required.
-    // (S)  Self-synchronizing; access according to class's own rules.
+    // (S)  Self-synchronizing; access according to classes own rules.
     // (M)  Reads and writes guarded by _mutex (defined in base class).
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
     // (MX) Write access with mutex from main flow of control, read access with mutex from other
     //      threads, read access allowed from main flow without mutex.
-    const std::string _dbName;                                                // (R)
-    std::vector<std::pair<NamespaceString, CollectionOptions>> _collections;  // (X)
-    std::unique_ptr<TenantCollectionCloner> _currentCollectionCloner;         // (MX)
+    std::vector<std::string> _databases;                           // (X)
+    std::unique_ptr<TenantDatabaseCloner> _currentDatabaseCloner;  // (MX)
 
-    TenantDatabaseClonerStage _listCollectionsStage;  // (R)
+    // The database name prefix of the tenant associated with this migration.
+    std::string _databasePrefix;  // (R)
 
-    // The operationTime returned with the listCollections result.
+    TenantAllDatabaseClonerStage _listDatabasesStage;  // (R)
+
+    // The operationTime returned with the listDatabases result.
     Timestamp _operationTime;  // (X)
 
     Stats _stats;  // (MX)
 };
-
 
 }  // namespace repl
 }  // namespace mongo

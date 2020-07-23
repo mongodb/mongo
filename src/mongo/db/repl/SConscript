@@ -977,7 +977,7 @@ env.Library(
     ],
     LIBDEPS = [
         'base_cloner',
-        'database_cloner_common',
+        'cloner_utils',
         'initial_sync_shared_data',
         'member_data',
         'replication_consistency_markers_impl',
@@ -1000,12 +1000,13 @@ env.Library(
 env.Library(
     target='tenant_migration_cloners',
     source=[
+        'tenant_all_database_cloner.cpp',
         'tenant_collection_cloner.cpp',
         'tenant_database_cloner.cpp',
     ],
     LIBDEPS = [
         'base_cloner',
-        'database_cloner_common',
+        'cloner_utils',
         'initial_sync_shared_data',
         '$BUILD_DIR/mongo/base',
     ],
@@ -1122,8 +1123,9 @@ env.Library(
 )
 
 env.Library(
-    target='database_cloner_common',
+    target='cloner_utils',
     source=[
+        'cloner_utils.cpp',
         'database_cloner_common.cpp',
         env.Idlc('database_cloner.idl')[0],
     ],
@@ -1132,7 +1134,9 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        'read_concern_args',
     ]
 )
 
@@ -1488,6 +1492,7 @@ env.CppUnitTest(
         'collection_cloner_test.cpp',
         'database_cloner_test.cpp',
         'initial_sync_shared_data_test.cpp',
+        'tenant_all_database_cloner_test.cpp',
         'tenant_database_cloner_test.cpp'
     ],
     LIBDEPS=[
