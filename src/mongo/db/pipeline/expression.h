@@ -796,6 +796,9 @@ public:
     explicit ExpressionAnd(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionAnd>(expCtx) {}
 
+    ExpressionAnd(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionVariadic<ExpressionAnd>(expCtx, std::move(children)) {}
+
     boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1828,6 +1831,9 @@ public:
     explicit ExpressionNot(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionNot, 1>(expCtx) {}
 
+    ExpressionNot(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionNot, 1>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -1896,6 +1902,9 @@ class ExpressionOr final : public ExpressionVariadic<ExpressionOr> {
 public:
     explicit ExpressionOr(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionOr>(expCtx) {}
+
+    ExpressionOr(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionVariadic<ExpressionOr>(expCtx, std::move(children)) {}
 
     boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const final;

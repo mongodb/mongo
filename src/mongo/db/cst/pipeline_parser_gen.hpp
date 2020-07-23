@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.6.3.
+// A Bison parser, made by GNU Bison 3.6.
 
 // Skeleton interface for Bison LALR(1) parsers in C++
 
@@ -32,7 +32,7 @@
 
 
 /**
- ** \file pipeline_parser_gen.hpp
+ ** \file src/mongo/db/cst/pipeline_parser_gen.hpp
  ** Define the mongo::parser class.
  */
 
@@ -42,10 +42,10 @@
 // especially those whose name start with YY_ or yy_.  They are
 // private implementation details that can be changed or removed.
 
-#ifndef YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
-#define YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#ifndef YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#define YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
 // "%code requires" blocks.
-#line 66 "pipeline_grammar.yy"
+#line 66 "src/mongo/db/cst/pipeline_grammar.yy"
 
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/key_fieldname.h"
@@ -61,7 +61,7 @@ class BSONLexer;
 #pragma warning(disable : 4065)
 #endif
 
-#line 65 "pipeline_parser_gen.hpp"
+#line 65 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 #include <cassert>
 #include <cstdlib>  // std::abort
@@ -190,9 +190,9 @@ class BSONLexer;
 #define YYDEBUG 0
 #endif
 
-#line 58 "pipeline_grammar.yy"
+#line 58 "src/mongo/db/cst/pipeline_grammar.yy"
 namespace mongo {
-#line 200 "pipeline_parser_gen.hpp"
+#line 200 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 
 /// A Bison parser.
@@ -388,6 +388,10 @@ public:
             // double
             // bool
             // value
+            // boolExps
+            // and
+            // or
+            // not
             char dummy1[sizeof(CNode)];
 
             // projectionFieldname
@@ -476,12 +480,15 @@ public:
             PIPELINE_ARG = 20,                // PIPELINE_ARG
             ADD = 21,                         // ADD
             ATAN2 = 22,                       // ATAN2
-            FIELDNAME = 23,                   // FIELDNAME
-            STRING = 24,                      // STRING
-            INT_NON_ZERO = 25,                // INT_NON_ZERO
-            LONG_NON_ZERO = 26,               // LONG_NON_ZERO
-            DOUBLE_NON_ZERO = 27,             // DOUBLE_NON_ZERO
-            DECIMAL_NON_ZERO = 28             // DECIMAL_NON_ZERO
+            AND = 23,                         // AND
+            OR = 24,                          // OR
+            NOT = 25,                         // NOT
+            FIELDNAME = 26,                   // FIELDNAME
+            STRING = 27,                      // STRING
+            INT_NON_ZERO = 28,                // INT_NON_ZERO
+            LONG_NON_ZERO = 29,               // LONG_NON_ZERO
+            DOUBLE_NON_ZERO = 30,             // DOUBLE_NON_ZERO
+            DECIMAL_NON_ZERO = 31             // DECIMAL_NON_ZERO
         };
         /// Backward compatibility alias (Bison 3.6).
         typedef token_kind_type yytokentype;
@@ -496,7 +503,7 @@ public:
     /// Symbol kinds.
     struct symbol_kind {
         enum symbol_kind_type {
-            YYNTOKENS = 29,  ///< Number of tokens.
+            YYNTOKENS = 32,  ///< Number of tokens.
             S_YYEMPTY = -2,
             S_YYEOF = 0,                        // "EOF"
             S_YYerror = 1,                      // error
@@ -521,40 +528,47 @@ public:
             S_PIPELINE_ARG = 20,                // PIPELINE_ARG
             S_ADD = 21,                         // ADD
             S_ATAN2 = 22,                       // ATAN2
-            S_FIELDNAME = 23,                   // FIELDNAME
-            S_STRING = 24,                      // STRING
-            S_INT_NON_ZERO = 25,                // INT_NON_ZERO
-            S_LONG_NON_ZERO = 26,               // LONG_NON_ZERO
-            S_DOUBLE_NON_ZERO = 27,             // DOUBLE_NON_ZERO
-            S_DECIMAL_NON_ZERO = 28,            // DECIMAL_NON_ZERO
-            S_YYACCEPT = 29,                    // $accept
-            S_stageList = 30,                   // stageList
-            S_stage = 31,                       // stage
-            S_inhibitOptimization = 32,         // inhibitOptimization
-            S_unionWith = 33,                   // unionWith
-            S_num = 34,                         // num
-            S_skip = 35,                        // skip
-            S_limit = 36,                       // limit
-            S_project = 37,                     // project
-            S_projectFields = 38,               // projectFields
-            S_projection = 39,                  // projection
-            S_compoundExpression = 40,          // compoundExpression
-            S_expression = 41,                  // expression
-            S_maths = 42,                       // maths
-            S_add = 43,                         // add
-            S_atan2 = 44,                       // atan2
-            S_string = 45,                      // string
-            S_int = 46,                         // int
-            S_long = 47,                        // long
-            S_double = 48,                      // double
-            S_bool = 49,                        // bool
-            S_value = 50,                       // value
-            S_projectionFieldname = 51,         // projectionFieldname
-            S_projectField = 52,                // projectField
-            S_expressions = 53,                 // expressions
-            S_pipeline = 54,                    // pipeline
-            S_START_ORDERED_OBJECT = 55,        // START_ORDERED_OBJECT
-            S_56_1 = 56                         // $@1
+            S_AND = 23,                         // AND
+            S_OR = 24,                          // OR
+            S_NOT = 25,                         // NOT
+            S_FIELDNAME = 26,                   // FIELDNAME
+            S_STRING = 27,                      // STRING
+            S_INT_NON_ZERO = 28,                // INT_NON_ZERO
+            S_LONG_NON_ZERO = 29,               // LONG_NON_ZERO
+            S_DOUBLE_NON_ZERO = 30,             // DOUBLE_NON_ZERO
+            S_DECIMAL_NON_ZERO = 31,            // DECIMAL_NON_ZERO
+            S_YYACCEPT = 32,                    // $accept
+            S_stageList = 33,                   // stageList
+            S_stage = 34,                       // stage
+            S_inhibitOptimization = 35,         // inhibitOptimization
+            S_unionWith = 36,                   // unionWith
+            S_num = 37,                         // num
+            S_skip = 38,                        // skip
+            S_limit = 39,                       // limit
+            S_project = 40,                     // project
+            S_projectFields = 41,               // projectFields
+            S_projection = 42,                  // projection
+            S_compoundExpression = 43,          // compoundExpression
+            S_expression = 44,                  // expression
+            S_maths = 45,                       // maths
+            S_add = 46,                         // add
+            S_atan2 = 47,                       // atan2
+            S_string = 48,                      // string
+            S_int = 49,                         // int
+            S_long = 50,                        // long
+            S_double = 51,                      // double
+            S_bool = 52,                        // bool
+            S_value = 53,                       // value
+            S_boolExps = 54,                    // boolExps
+            S_and = 55,                         // and
+            S_or = 56,                          // or
+            S_not = 57,                         // not
+            S_projectionFieldname = 58,         // projectionFieldname
+            S_projectField = 59,                // projectField
+            S_expressions = 60,                 // expressions
+            S_pipeline = 61,                    // pipeline
+            S_START_ORDERED_OBJECT = 62,        // START_ORDERED_OBJECT
+            S_63_1 = 63                         // $@1
         };
     };
 
@@ -583,60 +597,64 @@ public:
         basic_symbol(basic_symbol&& that)
             : Base(std::move(that)), value(), location(std::move(that.location)) {
             switch (this->kind()) {
-                case 30:  // stageList
-                case 31:  // stage
-                case 32:  // inhibitOptimization
-                case 33:  // unionWith
-                case 34:  // num
-                case 35:  // skip
-                case 36:  // limit
-                case 37:  // project
-                case 38:  // projectFields
-                case 39:  // projection
-                case 40:  // compoundExpression
-                case 41:  // expression
-                case 42:  // maths
-                case 43:  // add
-                case 44:  // atan2
-                case 45:  // string
-                case 46:  // int
-                case 47:  // long
-                case 48:  // double
-                case 49:  // bool
-                case 50:  // value
+                case 33:  // stageList
+                case 34:  // stage
+                case 35:  // inhibitOptimization
+                case 36:  // unionWith
+                case 37:  // num
+                case 38:  // skip
+                case 39:  // limit
+                case 40:  // project
+                case 41:  // projectFields
+                case 42:  // projection
+                case 43:  // compoundExpression
+                case 44:  // expression
+                case 45:  // maths
+                case 46:  // add
+                case 47:  // atan2
+                case 48:  // string
+                case 49:  // int
+                case 50:  // long
+                case 51:  // double
+                case 52:  // bool
+                case 53:  // value
+                case 54:  // boolExps
+                case 55:  // and
+                case 56:  // or
+                case 57:  // not
                     value.move<CNode>(std::move(that.value));
                     break;
 
-                case 51:  // projectionFieldname
+                case 58:  // projectionFieldname
                     value.move<CNode::Fieldname>(std::move(that.value));
                     break;
 
-                case 28:  // DECIMAL_NON_ZERO
+                case 31:  // DECIMAL_NON_ZERO
                     value.move<Decimal128>(std::move(that.value));
                     break;
 
-                case 27:  // DOUBLE_NON_ZERO
+                case 30:  // DOUBLE_NON_ZERO
                     value.move<double>(std::move(that.value));
                     break;
 
-                case 25:  // INT_NON_ZERO
+                case 28:  // INT_NON_ZERO
                     value.move<int>(std::move(that.value));
                     break;
 
-                case 26:  // LONG_NON_ZERO
+                case 29:  // LONG_NON_ZERO
                     value.move<long long>(std::move(that.value));
                     break;
 
-                case 52:  // projectField
+                case 59:  // projectField
                     value.move<std::pair<CNode::Fieldname, CNode>>(std::move(that.value));
                     break;
 
-                case 23:  // FIELDNAME
-                case 24:  // STRING
+                case 26:  // FIELDNAME
+                case 27:  // STRING
                     value.move<std::string>(std::move(that.value));
                     break;
 
-                case 53:  // expressions
+                case 60:  // expressions
                     value.move<std::vector<CNode>>(std::move(that.value));
                     break;
 
@@ -744,60 +762,64 @@ public:
 
             // Value type destructor.
             switch (yykind) {
-                case 30:  // stageList
-                case 31:  // stage
-                case 32:  // inhibitOptimization
-                case 33:  // unionWith
-                case 34:  // num
-                case 35:  // skip
-                case 36:  // limit
-                case 37:  // project
-                case 38:  // projectFields
-                case 39:  // projection
-                case 40:  // compoundExpression
-                case 41:  // expression
-                case 42:  // maths
-                case 43:  // add
-                case 44:  // atan2
-                case 45:  // string
-                case 46:  // int
-                case 47:  // long
-                case 48:  // double
-                case 49:  // bool
-                case 50:  // value
+                case 33:  // stageList
+                case 34:  // stage
+                case 35:  // inhibitOptimization
+                case 36:  // unionWith
+                case 37:  // num
+                case 38:  // skip
+                case 39:  // limit
+                case 40:  // project
+                case 41:  // projectFields
+                case 42:  // projection
+                case 43:  // compoundExpression
+                case 44:  // expression
+                case 45:  // maths
+                case 46:  // add
+                case 47:  // atan2
+                case 48:  // string
+                case 49:  // int
+                case 50:  // long
+                case 51:  // double
+                case 52:  // bool
+                case 53:  // value
+                case 54:  // boolExps
+                case 55:  // and
+                case 56:  // or
+                case 57:  // not
                     value.template destroy<CNode>();
                     break;
 
-                case 51:  // projectionFieldname
+                case 58:  // projectionFieldname
                     value.template destroy<CNode::Fieldname>();
                     break;
 
-                case 28:  // DECIMAL_NON_ZERO
+                case 31:  // DECIMAL_NON_ZERO
                     value.template destroy<Decimal128>();
                     break;
 
-                case 27:  // DOUBLE_NON_ZERO
+                case 30:  // DOUBLE_NON_ZERO
                     value.template destroy<double>();
                     break;
 
-                case 25:  // INT_NON_ZERO
+                case 28:  // INT_NON_ZERO
                     value.template destroy<int>();
                     break;
 
-                case 26:  // LONG_NON_ZERO
+                case 29:  // LONG_NON_ZERO
                     value.template destroy<long long>();
                     break;
 
-                case 52:  // projectField
+                case 59:  // projectField
                     value.template destroy<std::pair<CNode::Fieldname, CNode>>();
                     break;
 
-                case 23:  // FIELDNAME
-                case 24:  // STRING
+                case 26:  // FIELDNAME
+                case 27:  // STRING
                     value.template destroy<std::string>();
                     break;
 
-                case 53:  // expressions
+                case 60:  // expressions
                     value.template destroy<std::vector<CNode>>();
                     break;
 
@@ -807,14 +829,6 @@ public:
 
             Base::clear();
         }
-
-#if YYDEBUG || 0
-        /// The user-facing name of this symbol.
-        const char* name() const YY_NOEXCEPT {
-            return PipelineParserGen::symbol_name(this->kind());
-        }
-#endif  // #if YYDEBUG || 0
-
 
         /// Backward compatibility (Bison 3.6).
         symbol_kind_type type_get() const YY_NOEXCEPT;
@@ -898,7 +912,8 @@ public:
                       tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_UNION_WITH ||
                       tok == token::STAGE_SKIP || tok == token::STAGE_LIMIT ||
                       tok == token::STAGE_PROJECT || tok == token::COLL_ARG ||
-                      tok == token::PIPELINE_ARG || tok == token::ADD || tok == token::ATAN2);
+                      tok == token::PIPELINE_ARG || tok == token::ADD || tok == token::ATAN2 ||
+                      tok == token::AND || tok == token::OR || tok == token::NOT);
         }
 #else
         symbol_type(int tok, const location_type& l) : super_type(token_type(tok), l) {
@@ -911,7 +926,8 @@ public:
                       tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_UNION_WITH ||
                       tok == token::STAGE_SKIP || tok == token::STAGE_LIMIT ||
                       tok == token::STAGE_PROJECT || tok == token::COLL_ARG ||
-                      tok == token::PIPELINE_ARG || tok == token::ADD || tok == token::ATAN2);
+                      tok == token::PIPELINE_ARG || tok == token::ADD || tok == token::ATAN2 ||
+                      tok == token::AND || tok == token::OR || tok == token::NOT);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1011,13 +1027,6 @@ public:
 
     /// Report a syntax error.
     void error(const syntax_error& err);
-
-#if YYDEBUG || 0
-    /// The user-facing name of the symbol whose (internal) number is
-    /// YYSYMBOL.  No bounds checking.
-    static const char* symbol_name(symbol_kind_type yysymbol);
-#endif  // #if YYDEBUG || 0
-
 
     // Implementation of make_symbol for each symbol type.
 #if 201103L <= YY_CPLUSPLUS
@@ -1228,6 +1237,33 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_AND(location_type l) {
+        return symbol_type(token::AND, std::move(l));
+    }
+#else
+    static symbol_type make_AND(const location_type& l) {
+        return symbol_type(token::AND, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_OR(location_type l) {
+        return symbol_type(token::OR, std::move(l));
+    }
+#else
+    static symbol_type make_OR(const location_type& l) {
+        return symbol_type(token::OR, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_NOT(location_type l) {
+        return symbol_type(token::NOT, std::move(l));
+    }
+#else
+    static symbol_type make_NOT(const location_type& l) {
+        return symbol_type(token::NOT, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_FIELDNAME(std::string v, location_type l) {
         return symbol_type(token::FIELDNAME, std::move(v), std::move(l));
     }
@@ -1317,6 +1353,10 @@ private:
     static symbol_kind_type yytranslate_(int t);
 
 #if YYDEBUG || 0
+    /// The user-facing name of the symbol whose (internal) number is
+    /// YYSYMBOL.  No bounds checking.
+    static const char* symbol_name(symbol_kind_type yysymbol);
+
     /// For a symbol, its name in clear.
     static const char* const yytname_[];
 #endif  // #if YYDEBUG || 0
@@ -1557,9 +1597,9 @@ private:
 
     /// Constants.
     enum {
-        yylast_ = 89,  ///< Last index in yytable_.
-        yynnts_ = 28,  ///< Number of nonterminal symbols.
-        yyfinal_ = 5   ///< Termination state number.
+        yylast_ = 108,  ///< Last index in yytable_.
+        yynnts_ = 32,   ///< Number of nonterminal symbols.
+        yyfinal_ = 5    ///< Termination state number.
     };
 
 
@@ -1577,60 +1617,64 @@ template <typename Base>
 PipelineParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
     : Base(that), value(), location(that.location) {
     switch (this->kind()) {
-        case 30:  // stageList
-        case 31:  // stage
-        case 32:  // inhibitOptimization
-        case 33:  // unionWith
-        case 34:  // num
-        case 35:  // skip
-        case 36:  // limit
-        case 37:  // project
-        case 38:  // projectFields
-        case 39:  // projection
-        case 40:  // compoundExpression
-        case 41:  // expression
-        case 42:  // maths
-        case 43:  // add
-        case 44:  // atan2
-        case 45:  // string
-        case 46:  // int
-        case 47:  // long
-        case 48:  // double
-        case 49:  // bool
-        case 50:  // value
+        case 33:  // stageList
+        case 34:  // stage
+        case 35:  // inhibitOptimization
+        case 36:  // unionWith
+        case 37:  // num
+        case 38:  // skip
+        case 39:  // limit
+        case 40:  // project
+        case 41:  // projectFields
+        case 42:  // projection
+        case 43:  // compoundExpression
+        case 44:  // expression
+        case 45:  // maths
+        case 46:  // add
+        case 47:  // atan2
+        case 48:  // string
+        case 49:  // int
+        case 50:  // long
+        case 51:  // double
+        case 52:  // bool
+        case 53:  // value
+        case 54:  // boolExps
+        case 55:  // and
+        case 56:  // or
+        case 57:  // not
             value.copy<CNode>(YY_MOVE(that.value));
             break;
 
-        case 51:  // projectionFieldname
+        case 58:  // projectionFieldname
             value.copy<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case 28:  // DECIMAL_NON_ZERO
+        case 31:  // DECIMAL_NON_ZERO
             value.copy<Decimal128>(YY_MOVE(that.value));
             break;
 
-        case 27:  // DOUBLE_NON_ZERO
+        case 30:  // DOUBLE_NON_ZERO
             value.copy<double>(YY_MOVE(that.value));
             break;
 
-        case 25:  // INT_NON_ZERO
+        case 28:  // INT_NON_ZERO
             value.copy<int>(YY_MOVE(that.value));
             break;
 
-        case 26:  // LONG_NON_ZERO
+        case 29:  // LONG_NON_ZERO
             value.copy<long long>(YY_MOVE(that.value));
             break;
 
-        case 52:  // projectField
+        case 59:  // projectField
             value.copy<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
             break;
 
-        case 23:  // FIELDNAME
-        case 24:  // STRING
+        case 26:  // FIELDNAME
+        case 27:  // STRING
             value.copy<std::string>(YY_MOVE(that.value));
             break;
 
-        case 53:  // expressions
+        case 60:  // expressions
             value.copy<std::vector<CNode>>(YY_MOVE(that.value));
             break;
 
@@ -1655,60 +1699,64 @@ template <typename Base>
 void PipelineParserGen::basic_symbol<Base>::move(basic_symbol& s) {
     super_type::move(s);
     switch (this->kind()) {
-        case 30:  // stageList
-        case 31:  // stage
-        case 32:  // inhibitOptimization
-        case 33:  // unionWith
-        case 34:  // num
-        case 35:  // skip
-        case 36:  // limit
-        case 37:  // project
-        case 38:  // projectFields
-        case 39:  // projection
-        case 40:  // compoundExpression
-        case 41:  // expression
-        case 42:  // maths
-        case 43:  // add
-        case 44:  // atan2
-        case 45:  // string
-        case 46:  // int
-        case 47:  // long
-        case 48:  // double
-        case 49:  // bool
-        case 50:  // value
+        case 33:  // stageList
+        case 34:  // stage
+        case 35:  // inhibitOptimization
+        case 36:  // unionWith
+        case 37:  // num
+        case 38:  // skip
+        case 39:  // limit
+        case 40:  // project
+        case 41:  // projectFields
+        case 42:  // projection
+        case 43:  // compoundExpression
+        case 44:  // expression
+        case 45:  // maths
+        case 46:  // add
+        case 47:  // atan2
+        case 48:  // string
+        case 49:  // int
+        case 50:  // long
+        case 51:  // double
+        case 52:  // bool
+        case 53:  // value
+        case 54:  // boolExps
+        case 55:  // and
+        case 56:  // or
+        case 57:  // not
             value.move<CNode>(YY_MOVE(s.value));
             break;
 
-        case 51:  // projectionFieldname
+        case 58:  // projectionFieldname
             value.move<CNode::Fieldname>(YY_MOVE(s.value));
             break;
 
-        case 28:  // DECIMAL_NON_ZERO
+        case 31:  // DECIMAL_NON_ZERO
             value.move<Decimal128>(YY_MOVE(s.value));
             break;
 
-        case 27:  // DOUBLE_NON_ZERO
+        case 30:  // DOUBLE_NON_ZERO
             value.move<double>(YY_MOVE(s.value));
             break;
 
-        case 25:  // INT_NON_ZERO
+        case 28:  // INT_NON_ZERO
             value.move<int>(YY_MOVE(s.value));
             break;
 
-        case 26:  // LONG_NON_ZERO
+        case 29:  // LONG_NON_ZERO
             value.move<long long>(YY_MOVE(s.value));
             break;
 
-        case 52:  // projectField
+        case 59:  // projectField
             value.move<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(s.value));
             break;
 
-        case 23:  // FIELDNAME
-        case 24:  // STRING
+        case 26:  // FIELDNAME
+        case 27:  // STRING
             value.move<std::string>(YY_MOVE(s.value));
             break;
 
-        case 53:  // expressions
+        case 60:  // expressions
             value.move<std::vector<CNode>>(YY_MOVE(s.value));
             break;
 
@@ -1750,9 +1798,9 @@ inline PipelineParserGen::symbol_kind_type PipelineParserGen::by_kind::type_get(
     return this->kind();
 }
 
-#line 58 "pipeline_grammar.yy"
+#line 58 "src/mongo/db/cst/pipeline_grammar.yy"
 }  // namespace mongo
-#line 2116 "pipeline_parser_gen.hpp"
+#line 2178 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 
-#endif  // !YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#endif  // !YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED

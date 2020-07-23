@@ -136,6 +136,9 @@
     // Expressions
     ADD
     ATAN2
+    AND
+    OR
+    NOT
 
     END_OF_FILE 0 "EOF"
 ;
@@ -152,7 +155,8 @@
 //
 %nterm <CNode> stageList stage inhibitOptimization unionWith num skip limit
 %nterm <CNode> project projectFields projection
-%nterm <CNode> compoundExpression expression maths add atan2 string int long double bool value
+%nterm <CNode> compoundExpression expression maths add atan2 string int long double bool value 
+%nterm <CNode> boolExps and or not
 %nterm <CNode::Fieldname> projectionFieldname
 %nterm <std::pair<CNode::Fieldname, CNode>> projectField
 %nterm <std::vector<CNode>> expressions
@@ -302,6 +306,15 @@ projectionFieldname:
     | ATAN2 {
         $$ = UserFieldname{"$atan2"};
     }
+    | AND {
+        $$ = UserFieldname{"$and"};
+    }
+    | OR {
+        $$ = UserFieldname{"$or"};
+    }
+    | NOT {
+        $$ = UserFieldname{"$not"};
+    }
 ;
 
 string:
@@ -370,7 +383,7 @@ expression:
 ;
 
 compoundExpression:
-    maths
+    maths | boolExps
 ;
 
 maths:
@@ -391,6 +404,37 @@ atan2:
     START_OBJECT ATAN2 START_ARRAY expression[expr1] expression[expr2] END_ARRAY END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::atan2,
                                           CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+    }
+;
+
+boolExps:
+    and| or | not
+;
+
+and:
+    START_OBJECT AND START_ARRAY expression[expr1] expression[expr2] expressions END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::andExpr,
+                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+        auto&& others = $expressions;
+        auto&& array = $$.objectChildren()[0].second.arrayChildren();
+        array.insert(array.end(), others.begin(), others.end());
+    }
+;
+
+or:
+    START_OBJECT OR START_ARRAY expression[expr1] expression[expr2] expressions END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::orExpr,
+                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+        auto&& others = $expressions;
+        auto&& array = $$.objectChildren()[0].second.arrayChildren();
+        array.insert(array.end(), others.begin(), others.end());
+    }
+;
+
+not:
+    START_OBJECT NOT START_ARRAY expression END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::notExpr,
+                                          CNode{CNode::ArrayChildren{$expression}}}}};
     }
 ;
 

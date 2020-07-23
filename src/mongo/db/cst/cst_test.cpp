@@ -307,5 +307,152 @@ TEST(CstGrammarTest, ParsesProject) {
     }
 }
 
+TEST(CstTest, BuildsAndPrintsAnd) {
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::andExpr,
+             CNode{CNode::ArrayChildren{CNode{UserDouble{3.0}}, CNode{UserString{"green"}}}}}}};
+        ASSERT_BSONOBJ_EQ(
+            fromjson("{andExpr: [\"<UserDouble 3.000000>\", \"<UserString green>\"]}"),
+            cst.toBson());
+    }
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::andExpr, CNode{CNode::ArrayChildren{}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{andExpr: []}"), cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::andExpr,
+             CNode{CNode::ArrayChildren{
+                 CNode{UserDouble{3.0}}, CNode{UserInt{2}}, CNode{UserDouble{5.0}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{andExpr: [\"<UserDouble 3.000000>\", \"<UserInt 2>\", "
+                                   "\"<UserDouble 5.000000>\"]}"),
+                          cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::andExpr,
+             CNode{CNode::ArrayChildren{CNode{UserDouble{3.0}}, CNode{UserInt{2}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{andExpr: [\"<UserDouble 3.000000>\", \"<UserInt 2>\"]}"),
+                          cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::andExpr,
+             CNode{CNode::ArrayChildren{CNode{UserInt{0}}, CNode{UserBoolean{true}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{andExpr: [\"<UserInt 0>\", \"<UserBoolean 1>\"]}"),
+                          cst.toBson());
+    }
+}
+
+TEST(CstTest, BuildsAndPrintsOr) {
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::orExpr,
+             CNode{CNode::ArrayChildren{CNode{UserDouble{3.0}}, CNode{UserString{"green"}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{orExpr: [\"<UserDouble 3.000000>\", \"<UserString green>\"]}"),
+                          cst.toBson());
+    }
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::orExpr, CNode{CNode::ArrayChildren{}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{orExpr: []}"), cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::orExpr,
+             CNode{CNode::ArrayChildren{
+                 CNode{UserDouble{3.0}}, CNode{UserInt{2}}, CNode{UserDouble{5.0}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{orExpr: [\"<UserDouble 3.000000>\", \"<UserInt 2>\", "
+                                   "\"<UserDouble 5.000000>\"]}"),
+                          cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::orExpr,
+             CNode{CNode::ArrayChildren{CNode{UserDouble{3.0}}, CNode{UserInt{2}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{orExpr: [\"<UserDouble 3.000000>\", \"<UserInt 2>\"]}"),
+                          cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::orExpr,
+             CNode{CNode::ArrayChildren{CNode{UserInt{0}}, CNode{UserBoolean{true}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{orExpr: [\"<UserInt 0>\", \"<UserBoolean 1>\"]}"),
+                          cst.toBson());
+    }
+}
+
+TEST(CstTest, BuildsAndPrintsNot) {
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::notExpr, CNode{CNode::ArrayChildren{CNode{UserDouble{3.0}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{notExpr: [\"<UserDouble 3.000000>\"]}"), cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::notExpr, CNode{CNode::ArrayChildren{CNode{UserBoolean{true}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{notExpr: [\"<UserBoolean 1>\"]}"), cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::notExpr, CNode{CNode::ArrayChildren{CNode{UserBoolean{false}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{notExpr: [\"<UserBoolean 0>\"]}"), cst.toBson());
+    }
+}
+
+TEST(CstGrammarTest, ParsesProjectWithAnd) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: {_id: 9.10, a: {$and: [4, {$and: [7, 8]}]}, b: {$and: [2, "
+        "-3]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ project: { id: \"<NonZeroKey of type double 9.100000>\", a: { andExpr: [ "
+        "\"<UserInt 4>\", { andExpr: [ \"<UserInt 7>\", \"<UserInt 8>\" ] } ] }, b: { andExpr: [ "
+        "\"<UserInt 2>\", \"<UserInt -3>\" ] } } }");
+}
+
+TEST(CstGrammarTest, ParsesProjectWithOr) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: {_id: 9.10, a: {$or: [4, {$or: [7, 8]}]}, b: {$or: [2, -3]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ project: { id: \"<NonZeroKey of type double 9.100000>\", a: { orExpr: [ "
+        "\"<UserInt 4>\", { orExpr: [ \"<UserInt 7>\", \"<UserInt 8>\" ] } ] }, b: { orExpr: [ "
+        "\"<UserInt 2>\", \"<UserInt -3>\" ] } } }");
+}
+
+TEST(CstGrammarTest, ParsesProjectWithNot) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: {_id: 9.10, a: {$not: [4]}, b: {$and: [1.0, {$not: "
+        "[true]}]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { id: \"<NonZeroKey of type double 9.100000>\", a: { notExpr: [ "
+              "\"<UserInt 4>\" ] }, b: { andExpr: [ \"<UserDouble 1.000000>\", { notExpr: [ "
+              "\"<UserBoolean 1>\" ] } ] } } }");
+}
+
 }  // namespace
 }  // namespace mongo

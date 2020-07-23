@@ -101,6 +101,12 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
             return make_intrusive<ExpressionAdd>(expCtx.get(), std::move(expressions));
         case KeyFieldname::atan2:
             return make_intrusive<ExpressionArcTangent2>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::andExpr:
+            return make_intrusive<ExpressionAnd>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::orExpr:
+            return make_intrusive<ExpressionOr>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::notExpr:
+            return make_intrusive<ExpressionNot>(expCtx.get(), std::move(expressions));
         default:
             MONGO_UNREACHABLE;
     }

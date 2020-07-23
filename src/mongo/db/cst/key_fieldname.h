@@ -37,6 +37,9 @@
     ENUMIFY(add)                 \
     ENUMIFY(atan2)               \
     ENUMIFY(id)                  \
+    ENUMIFY(andExpr)             \
+    ENUMIFY(orExpr)              \
+    ENUMIFY(notExpr)             \
     ENUMIFY(project)             \
     ENUMIFY(inhibitOptimization) \
     ENUMIFY(unionWith)           \

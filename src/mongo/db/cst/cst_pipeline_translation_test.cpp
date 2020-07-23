@@ -290,6 +290,129 @@ TEST(CstTest, TranslatesMultipleProjectionStages) {
     }
 }
 
+TEST(CstTest, TranslatesMultipleProjectionStagesWithAndOrNot) {
+    // [
+    //     { $project: { a: { $not: [
+    //         { $const: 0 } },
+    //     { $project: { c: { $and: [
+    //         { $const: 2.2 },
+    //         { $or: [ { $const: 1 }, { $const: 0 } ] },
+    //         { $const: 3 } ] } } }
+    // ]
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{
+            {KeyFieldname::project,
+             CNode{CNode::ObjectChildren{
+                 {UserFieldname{"a"},
+                  CNode{CNode::ObjectChildren{
+                      {KeyFieldname::notExpr,
+                       CNode{CNode::ArrayChildren{CNode{UserInt{0}}}}}}}}}}}}},
+        CNode{
+            CNode::ObjectChildren{{KeyFieldname::project,
+                                   CNode{CNode::ObjectChildren{
+                                       {UserFieldname{"c"},
+                                        CNode{CNode::ObjectChildren{
+                                            {KeyFieldname::andExpr,
+                                             CNode{CNode::ArrayChildren{
+                                                 CNode{UserDouble{2.2}},
+                                                 CNode{CNode::ObjectChildren{
+                                                     {KeyFieldname::orExpr,
+                                                      CNode{CNode::ArrayChildren{
+                                                          CNode{UserInt{1}}, CNode{UserInt{0}}}}}}},
+                                                 CNode{UserLong{3ll}}}}}}}}}}}}},
+    }};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(2u, sources.size());
+    auto iter = sources.begin();
+    {
+        auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter++);
+        // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be
+        // insensitive.
+        ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+            BSON("_id" << true << "a" << BSON("$not" << BSON_ARRAY(BSON("$const" << 0)))) ==
+            singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+    }
+    {
+        auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+        // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be
+        // insensitive.
+        ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+            BSON("_id" << true << "c"
+                       << BSON("$and"
+                               << BSON_ARRAY(BSON("$const" << 2.2)
+                                             << BSON("$or" << BSON_ARRAY(BSON("$const" << 1)
+                                                                         << BSON("$const" << 0)))
+                                             << BSON("$const" << 3ll)))) ==
+            singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+    }
+}
+
+TEST(CstTest, TranslatesComputedProjectionWithAndOr) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::project,
+         CNode{CNode::ObjectChildren{
+             {UserFieldname{"a"},
+              CNode{CNode::ObjectChildren{
+                  {KeyFieldname::andExpr,
+                   CNode{CNode::ArrayChildren{
+                       CNode{UserInt{1}},
+                       CNode{CNode::ObjectChildren{
+                           {KeyFieldname::add,
+                            CNode{CNode::ArrayChildren{CNode{UserInt{1}},
+                                                       CNode{UserInt{0}}}}}}}}}}}}},
+             {UserFieldname{"b"},
+              CNode{
+                  CNode::ObjectChildren{{KeyFieldname::orExpr,
+                                         CNode{CNode::ArrayChildren{CNode{UserInt{1}},
+                                                                    CNode{UserInt{2}},
+                                                                    CNode{UserInt{3}},
+                                                                    CNode{UserInt{4}}}}}}}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("_id" << true << "a"
+                   << BSON("$and" << BSON_ARRAY(BSON("$const" << 1) << BSON(
+                                                    "$add" << BSON_ARRAY(BSON("$const" << 1)
+                                                                         << BSON("$const" << 0)))))
+                   << "b"
+                   << BSON("$or" << BSON_ARRAY(BSON("$const" << 1)
+                                               << BSON("$const" << 2) << BSON("$const" << 3)
+                                               << BSON("$const" << 4)))) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
+TEST(CstTest, TranslatesComputedProjectionWithExpressionOnId) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::project,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::id,
+              CNode{CNode::ObjectChildren{
+                  {KeyFieldname::add,
+                   CNode{CNode::ArrayChildren{
+                       CNode{UserInt{0}},
+                       CNode{CNode::ObjectChildren{
+                           {KeyFieldname::andExpr,
+                            CNode{CNode::ArrayChildren{CNode{UserInt{1}},
+                                                       CNode{UserInt{0}}}}}}}}}}}}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("_id" << BSON(
+                 "$add" << BSON_ARRAY(
+                     BSON("$const" << 0)
+                     << BSON("$and" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 0)))))) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
 TEST(CstTest, TranslatesSkipWithInt) {
     auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{

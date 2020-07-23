@@ -50,6 +50,9 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"pipeline", PipelineParserGen::token::PIPELINE_ARG},
     {"$add", PipelineParserGen::token::ADD},
     {"$atan2", PipelineParserGen::token::ATAN2},
+    {"$and", PipelineParserGen::token::AND},
+    {"$or", PipelineParserGen::token::OR},
+    {"$not", PipelineParserGen::token::NOT},
 };
 bool isCompound(PipelineParserGen::symbol_type token) {
     return token.type_get() == static_cast<int>(PipelineParserGen::token::START_OBJECT) ||
