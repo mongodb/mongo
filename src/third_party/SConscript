@@ -229,15 +229,17 @@ for builder_name in ('Program', 'SharedLibrary', 'LoadableModule', 'StaticLibrar
         # OverrideEnvironment, since if you didn't pass any kw args
         # into your builder call, you just reuse the env you were
         # called with. That could mean that we see the same
-        # envirnoment here multiple times. But that is really OK,
+        # environment here multiple times. But that is really OK,
         # since the operation we are performing would be performed on
         # all of them anyway. The flag serves as a way to disable the
         # auto-injection for the handful of libraries where we must do
         # so to avoid forming a cycle.
         if not env.get('DISABLE_ALLOCATOR_SHIM_INJECTION', False):
             lds = env.get('LIBDEPS', [])
-            lds.append('$BUILD_DIR/third_party/shim_allocator')
-            env['LIBDEPS'] = lds
+            shim_allocator = '$BUILD_DIR/third_party/shim_allocator'
+            if shim_allocator not in lds:
+                lds.append(shim_allocator)
+                env['LIBDEPS'] = lds
 
         return target, source
 

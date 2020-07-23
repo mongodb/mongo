@@ -328,7 +328,6 @@ env.Library(
         "$BUILD_DIR/mongo/util/net/ssl_manager",
         "$BUILD_DIR/mongo/util/net/ssl_parameters_auth",
         "auth/authorization_manager_global",
-        "serverinit",
     ],
 )
 
@@ -2017,7 +2016,6 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/s/sessions_collection_sharded',
-        '$BUILD_DIR/mongo/s/sessions_collection_sharded',
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/transport/service_entry_point',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
@@ -2275,11 +2273,10 @@ asioEnv.CppIntegrationTest(
         'exhaust_cursor_currentop_integration_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/network_interface_fixture',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
         '$BUILD_DIR/mongo/client/clientdriver_network',
-        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+        '$BUILD_DIR/mongo/executor/network_interface_fixture',
         '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
         '$BUILD_DIR/mongo/util/version_impl',
     ],
 )

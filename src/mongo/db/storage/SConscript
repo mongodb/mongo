@@ -180,16 +180,21 @@ env.Library(
 
 env.Library(
     target='encryption_hooks',
-    source= [
+    source=[
         'encryption_hooks.cpp',
-        ],
-    LIBDEPS= ['$BUILD_DIR/mongo/base',
-              '$BUILD_DIR/mongo/db/service_context'],
+    ],
+    LIBDEPS= [
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context'
+    ],
     LIBDEPS_DEPENDENTS=[
         '$BUILD_DIR/mongo/mongod_initializers',
         '$BUILD_DIR/mongo/mongos_initializers',
-        ],
-    )
+    ],
+    LIBDEPS_TAGS=[
+        'lint-allow-nonprivate-on-deps-dependents',
+        'lint-allow-bidirectional-edges',
+    ])
 
 env.Library(
     target='backup_cursor_hooks',
@@ -203,6 +208,10 @@ env.Library(
     LIBDEPS_DEPENDENTS=[
         '$BUILD_DIR/mongo/mongod_initializers',
     ],
+    LIBDEPS_TAGS=[
+        'lint-allow-nonprivate-on-deps-dependents',
+        'lint-allow-bidirectional-edges',
+    ]
 )
 
 env.Library(
@@ -463,7 +472,6 @@ env.CppUnitTest(
         'kv/kv_drop_pending_ident_reaper',
         'storage_engine_lock_file',
         'storage_engine_metadata',
-        'storage_repair_observer',
     ],
 )
 

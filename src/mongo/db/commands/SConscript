@@ -575,10 +575,8 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'map_reduce_agg',
-    ],
-    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl',
+        'map_reduce_agg',
     ],
 )
 

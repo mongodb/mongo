@@ -326,6 +326,9 @@ if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
             '$BUILD_DIR/mongo/mongos_initializers',
             '$BUILD_DIR/mongo/mongod_initializers',
         ],
+        LIBDEPS_TAGS=[
+            'lint-allow-nonprivate-on-deps-dependents',
+        ]
 
     )
 

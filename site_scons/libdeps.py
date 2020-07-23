@@ -52,6 +52,7 @@ automatically added when missing.
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import os
+import textwrap
 
 import SCons.Errors
 import SCons.Scanner
@@ -72,6 +73,237 @@ class dependency(object):
     def __str__(self):
         return str(self.target_node)
 
+class LibdepLinter(object):
+    """
+    This class stores the rules for linting the libdeps. Using a decorator,
+    new rules can easily be added to the class, and will be called when
+    linting occurs. Each rule is run on each libdep.
+
+    When a rule is broken, a LibdepLinterError exception will be raised.
+    Optionally the class can be configured to print the error message and
+    keep going with the build.
+
+    Each rule should provide a method to skip that rule on a given node,
+    by supplying the correct flag in the LIBDEPS_TAG environment var for
+    that node.
+
+    """
+
+    skip_linting = False
+    print_linter_errors = False
+
+    linting_time = 0
+    linting_infractions = 0
+    linting_rules_run = 0
+    registered_linting_time = False
+
+    @staticmethod
+    def _make_linter_decorator():
+        """
+        This is used for gathering the functions
+        by decorator that will be used for linting a given libdep.
+        """
+
+        funcs = {}
+        def linter_rule_func(func):
+            funcs[func.__name__] = func
+            return func
+
+        linter_rule_func.all = funcs
+        return linter_rule_func
+    linter_rule = _make_linter_decorator.__func__()
+
+    def __init__(self, env, target):
+        self.env = env
+        self.target = target
+        self.unique_libs = set()
+
+        # If we are in print mode, we will record some linting metrics,
+        # and print the results at the end of the build.
+        if self.__class__.print_linter_errors and not self.__class__.registered_linting_time:
+            import atexit
+            def print_linting_time():
+                print(f"Spent {self.__class__.linting_time} seconds linting libdeps.")
+                print(f"Found {self.__class__.linting_infractions} issues out of {self.__class__.linting_rules_run} libdeps rules checked.")
+            atexit.register(print_linting_time)
+            self.__class__.registered_linting_time = True
+
+    def lint_libdeps(self, libdeps):
+        """
+        Lint the given list of libdeps for all
+        rules.
+        """
+
+        # Build performance optimization if you
+        # are sure your build is clean.
+        if self.__class__.skip_linting:
+            return
+
+        # Record time spent linting if we are in print mode.
+        if self.__class__.print_linter_errors:
+            from timeit import default_timer as timer
+            start = timer()
+
+        linter_rules = [
+            getattr(self, linter_rule)
+            for linter_rule in self.linter_rule.all
+        ]
+
+        for libdep in libdeps:
+            for linter_rule in linter_rules:
+                linter_rule(libdep)
+
+        if self.__class__.print_linter_errors:
+            self.__class__.linting_time += timer() - start
+            self.__class__.linting_rules_run += (len(linter_rules)*len(libdeps))
+
+    def _raise_libdep_lint_exception(self, message):
+        """
+        Raises the LibdepLinterError exception or if configure
+        to do so, just prints the error.
+        """
+        prefix = "LibdepLinter: \n\t"
+        message = prefix + message.replace('\n', '\n\t') + '\n'
+        if self.__class__.print_linter_errors:
+            self.__class__.linting_infractions += 1
+            print(message)
+        else:
+            raise LibdepLinterError(message)
+
+    def _check_for_lint_tags(self, lint_tag, env=None):
+        """
+        Used to get the lint tag from the environment,
+        and if printing instead of raising exceptions,
+        will ignore the tags.
+        """
+
+        # ignore LIBDEP_TAGS if printing was selected
+        if self.__class__.print_linter_errors:
+            return False
+
+        target_env = env if env else self.env
+
+        if lint_tag in target_env.get("LIBDEPS_TAGS", []):
+            return True
+
+    def _get_deps_dependents(self, env=None):
+        """ util function to get all types of DEPS_DEPENDENTS"""
+        target_env = env if env else self.env
+        deps_dependents = target_env.get("LIBDEPS_DEPENDENTS", [])
+        deps_dependents += target_env.get("PROGDEPS_DEPENDENTS", [])
+        return deps_dependents
+
+    @linter_rule
+    def linter_rule_no_dups(self, libdep):
+        """
+        LIBDEP RULE:
+            A given node shall not link the same LIBDEP across public, private
+            or interface dependency types because it is ambiguous and unnecessary.
+        """
+        if self._check_for_lint_tags('lint-allow-dup-libdeps'):
+            return
+
+        if str(libdep) in self.unique_libs:
+            target_type = self.target[0].builder.get_name(self.env)
+            lib = os.path.basename(str(libdep))
+            self._raise_libdep_lint_exception(
+                f"{target_type} '{self.target[0]}' links '{lib}' multiple times."
+            )
+
+        self.unique_libs.add(str(libdep))
+
+    @linter_rule
+    def linter_rule_programs_link_private(self, libdep):
+        """
+        LIBDEP RULE:
+            All Programs shall only have public dependency's
+            because a Program will never be a dependency of another Program
+            or Library, and LIBDEP transitiveness does not apply. Public
+            transitiveness has no meaning in this case and is used just as default.
+        """
+        if self._check_for_lint_tags('lint-allow-program-links-private'):
+            return
+
+        if (self.target[0].builder.get_name(self.env) == "Program"
+            and libdep.dependency_type != dependency.Public):
+
+            lib = os.path.basename(str(libdep))
+            self._raise_libdep_lint_exception(
+                textwrap.dedent(f"""\
+                    Program '{self.target[0]}' links non-public library '{lib}
+                    A 'Program' can only have LIBDEPS libs, not _PRIVATE or _INTERFACE."""
+                ))
+
+    @linter_rule
+    def linter_rule_no_bidirectional_deps(self, libdep):
+        """
+        LIBDEP RULE:
+            And Library which issues reverse dependencies, shall not be directly
+            linked to by another node, to prevent forward and reverse linkages existing
+            at the same node. Instead the content of the library that needs to issue reverse
+            dependency needs to be separated from content that needs direct linkage into two
+            separate libraries, which can be linked correctly respectively.
+        """
+
+        if not libdep.target_node.env:
+            return
+        elif self._check_for_lint_tags('lint-allow-bidirectional-edges', libdep.target_node.env):
+            return
+        elif len(self._get_deps_dependents(libdep.target_node.env)) > 0:
+
+                target_type = self.target[0].builder.get_name(self.env)
+                lib = os.path.basename(str(libdep))
+                self._raise_libdep_lint_exception(textwrap.dedent(f"""\
+                    {target_type} '{self.target[0]}' links directly to DEPS_DEPENDENT node '{lib}'
+                    No node can link directly to a node that has DEPS_DEPENDENTS."""
+                ))
+
+    @linter_rule
+    def linter_rule_nonprivate_on_deps_dependents(self, libdep):
+        """
+        LIBDEP RULE:
+            A Library that issues reverse dependencies, shall not link libraries
+            with any kind of transitiveness, and will only link libraries privately.
+            This is because functionality that requires reverse dependencies should
+            not be transitive.
+        """
+        if self._check_for_lint_tags('lint-allow-nonprivate-on-deps-dependents'):
+            return
+
+        if (libdep.dependency_type != dependency.Private
+            and len(self._get_deps_dependents()) > 0):
+
+            target_type = self.target[0].builder.get_name(self.env)
+            lib = os.path.basename(str(libdep))
+            self._raise_libdep_lint_exception(textwrap.dedent(f"""\
+                {target_type} '{self.target[0]}' links non-private libdep '{lib}' and has DEP_DEPENDENTS.
+                A {target_type} can only have LIBDEP_PRIVATE depends if it has DEP_DEPENDENTS."""
+            ))
+
+    @linter_rule
+    def linter_rule_libdeps_must_be_list(self, libdep):
+        """
+        LIBDEP RULE:
+            LIBDEPS, LIBDEPS_PRIVATE, and LIBDEPS_INTERFACE must be set as lists in the
+            environment.
+        """
+        if self._check_for_lint_tags('lint-allow-nonlist-libdeps'):
+            return
+
+        libdeps_vars = list(dep_type_to_env_var.values()) + [
+            "LIBDEPS_DEPENDENTS",
+            'PROGDEPS_DEPENDENTS']
+
+        for dep_type_val in libdeps_vars:
+
+            libdeps_list = self.env.get(dep_type_val, [])
+            if not SCons.Util.is_List(libdeps_list):
+
+                target_type = self.target[0].builder.get_name(self.env)
+                self._raise_libdep_lint_exception(textwrap.dedent(f"""\
+                    Found non-list type '{libdeps_list}' while evaluating {dep_type_val} for {target_type} '{self.target[0]}'
+                    {dep_type_val} must be setup as a list."""
+                ))
 
 dependency_visibility_ignored = {
     dependency.Public: dependency.Public,
@@ -85,6 +317,11 @@ dependency_visibility_honored = {
     dependency.Interface: dependency.Interface,
 }
 
+dep_type_to_env_var = {
+    dependency.Public: "LIBDEPS",
+    dependency.Private: "LIBDEPS_PRIVATE",
+    dependency.Interface: "LIBDEPS_INTERFACE",
+}
 
 class DependencyCycleError(SCons.Errors.UserError):
     """Exception representing a cycle discovered in library dependencies."""
@@ -97,6 +334,9 @@ class DependencyCycleError(SCons.Errors.UserError):
         return "Library dependency cycle detected: " + " => ".join(
             str(n) for n in self.cycle_nodes
         )
+
+class LibdepLinterError(SCons.Errors.UserError):
+    """Exception representing a discongruent usages of libdeps"""
 
 
 def __get_sorted_direct_libdeps(node):
@@ -260,6 +500,33 @@ def __append_direct_libdeps(node, prereq_nodes):
     node.attributes.libdeps_direct.extend(prereq_nodes)
 
 
+def __get_node_with_ixes(env, node, node_builder_type):
+    """
+    Gets the node passed in node with the correct ixes applied
+    for the given builder type.
+    """
+
+    if not node:
+        return node
+
+    node_builder = env["BUILDERS"][node_builder_type]
+    node_factory = node_builder.target_factory or env.File
+
+    # Cache the ixes in a function scope global so we don't need
+    # to run scons performance intensive 'subst' each time
+    cache_key = (id(env), node_builder_type)
+    try:
+        prefix, suffix = __get_node_with_ixes.node_type_ixes[cache_key]
+    except KeyError:
+        prefix = node_builder.get_prefix(env)
+        suffix = node_builder.get_suffix(env)
+        __get_node_with_ixes.node_type_ixes[cache_key] = (prefix, suffix)
+
+    node_with_ixes = SCons.Util.adjustixes(node, prefix, suffix)
+    return node_factory(node_with_ixes)
+
+__get_node_with_ixes.node_type_ixes = dict()
+
 def make_libdeps_emitter(
     dependency_builder,
     dependency_map=dependency_visibility_ignored,
@@ -283,41 +550,39 @@ def make_libdeps_emitter(
         of the "target" list is made a prerequisite of the elements of LIBDEPS_DEPENDENTS.
         """
 
-        lib_builder = env["BUILDERS"][dependency_builder]
-        lib_node_factory = lib_builder.target_factory or env.File
+        # Get all the libdeps from the env so we can
+        # can append them to the current target_node.
+        libdeps = []
+        for dep_type in sorted(dependency_map.keys()):
 
-        prog_builder = env["BUILDERS"]["Program"]
-        prog_node_factory = prog_builder.target_factory or env.File
+            # Libraries may not be stored as a list in the env,
+            # so we must convert single library strings to a list.
+            libs = env.get(dep_type_to_env_var[dep_type])
+            if not SCons.Util.is_List(libs):
+                libs = [libs]
 
-        prereqs = [
-            dependency(l, dependency_map[dependency.Public])
-            for l in env.get(libdeps_env_var, [])
-            if l
-        ]
-        prereqs.extend(
-            dependency(l, dependency_map[dependency.Interface])
-            for l in env.get(libdeps_env_var + "_INTERFACE", [])
-            if l
-        )
-        prereqs.extend(
-            dependency(l, dependency_map[dependency.Private])
-            for l in env.get(libdeps_env_var + "_PRIVATE", [])
-            if l
-        )
+            for lib in libs:
+                if not lib:
+                    continue
+                lib_with_ixes = __get_node_with_ixes(env, lib, dependency_builder)
+                libdeps.append(dependency(lib_with_ixes, dep_type))
 
-        lib_builder_prefix = lib_builder.get_prefix(env)
-        lib_builder_suffix = lib_builder.get_suffix(env)
+        # Lint the libdeps to make sure they are following the rules.
+        # This will skip some or all of the checks depending on the options
+        # and LIBDEPS_TAGS used.
+        LibdepLinter(env, target).lint_libdeps(libdeps)
 
-        for prereq in prereqs:
-            prereqWithIxes = SCons.Util.adjustixes(
-                prereq.target_node, lib_builder_prefix, lib_builder_suffix
-            )
-            prereq.target_node = lib_node_factory(prereqWithIxes)
+        # We ignored the dependency_map until now because we needed to use
+        # original dependency value for linting. Now go back through and
+        # use the map to convert to the desired dependencies, for example
+        # all Public in the static linking case.
+        for libdep in libdeps:
+            libdep.dependency_type = dependency_map[libdep.dependency_type]
 
         for t in target:
             # target[0] must be a Node and not a string, or else libdeps will fail to
             # work properly.
-            __append_direct_libdeps(t, prereqs)
+            __append_direct_libdeps(t, libdeps)
 
         for dependent in env.get("LIBDEPS_DEPENDENTS", []):
             if dependent is None:
@@ -328,16 +593,12 @@ def make_libdeps_emitter(
                 visibility = dependent[1]
                 dependent = dependent[0]
 
-            dependentWithIxes = SCons.Util.adjustixes(
-                dependent, lib_builder_prefix, lib_builder_suffix
+            dependentNode = __get_node_with_ixes(
+                env, dependent, dependency_builder
             )
-            dependentNode = lib_node_factory(dependentWithIxes)
             __append_direct_libdeps(
                 dependentNode, [dependency(target[0], dependency_map[visibility])]
             )
-
-        prog_builder_prefix = prog_builder.get_prefix(env)
-        prog_builder_suffix = prog_builder.get_suffix(env)
 
         if not ignore_progdeps:
             for dependent in env.get("PROGDEPS_DEPENDENTS", []):
@@ -350,10 +611,9 @@ def make_libdeps_emitter(
                     visibility = dependent[1]
                     dependent = dependent[0]
 
-                dependentWithIxes = SCons.Util.adjustixes(
-                    dependent, prog_builder_prefix, prog_builder_suffix
+                dependentNode = __get_node_with_ixes(
+                    env, dependent, "Program"
                 )
-                dependentNode = prog_node_factory(dependentWithIxes)
                 __append_direct_libdeps(
                     dependentNode, [dependency(target[0], dependency_map[visibility])]
                 )
@@ -376,6 +636,7 @@ def expand_libdeps_with_extraction_flags(source, target, env, for_signature):
     whole_archive_start = env.subst("$LINK_WHOLE_ARCHIVE_LIB_START")
     whole_archive_end = env.subst("$LINK_WHOLE_ARCHIVE_LIB_END")
     whole_archive_separator = env.get("LINK_WHOLE_ARCHIVE_SEP", " ")
+
     for lib in libs:
         if isinstance(lib, (str, SCons.Node.FS.File, SCons.Node.FS.Entry)):
             lib_target = str(lib)
@@ -400,8 +661,11 @@ def expand_libdeps_with_extraction_flags(source, target, env, for_signature):
     return result
 
 
-def setup_environment(env, emitting_shared=False):
+def setup_environment(env, emitting_shared=False, linting='on'):
     """Set up the given build environment to do LIBDEPS tracking."""
+
+    LibdepLinter.skip_linting = linting == 'off'
+    LibdepLinter.print_linter_errors = linting == 'print'
 
     try:
         env["_LIBDEPS"]

@@ -255,7 +255,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
         '$BUILD_DIR/mongo/transport/message_compressor',
-        '$BUILD_DIR/mongo/util/net/ssl_manager',
     ],
 )
 

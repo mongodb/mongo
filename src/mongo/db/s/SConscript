@@ -408,7 +408,7 @@ env.CppUnitTest(
         'type_shard_identity_test.cpp',
         'vector_clock_shard_server_test.cpp',
     ],
-    LIBDEPS_PRIVATE=[
+    LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/keys_collection_client_direct',
         '$BUILD_DIR/mongo/db/logical_session_cache_impl',

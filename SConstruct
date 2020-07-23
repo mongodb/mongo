@@ -525,6 +525,15 @@ add_option('enable-usdt-probes',
     const='on',
 )
 
+add_option('libdeps-linting',
+    choices=['on', 'off', 'print'],
+    const='on',
+    default='on',
+    help='Enable linting of libdeps. Default is on, optionally \'print\' will not stop the build.',
+    nargs='?',
+    type='choice',
+)
+
 try:
     with open("version.json", "r") as version_fp:
         version_data = json.load(version_fp)
@@ -1643,7 +1652,10 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     # command but instead runs a function.
     env["BUILDERS"]["StaticLibrary"].action = SCons.Action.Action(write_uuid_to_file, "Generating placeholder library $TARGET")
 
-libdeps.setup_environment(env, emitting_shared=(link_model.startswith("dynamic")))
+libdeps.setup_environment(
+    env, 
+    emitting_shared=(link_model.startswith("dynamic")), 
+    linting=get_option('libdeps-linting'))
 
 # Both the abidw tool and the thin archive tool must be loaded after
 # libdeps, so that the scanners they inject can see the library

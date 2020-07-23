@@ -633,36 +633,39 @@ env.Library(
     ],
 )
 
-env.Library('member_data',
-            [
-                'member_data.cpp',
-            ],
-            LIBDEPS=[
-                'replica_set_messages',
-            ])
+env.Library(
+    target='member_data',
+    source=[
+        'member_data.cpp',
+    ],
+    LIBDEPS=[
+        'replica_set_messages',
+    ]
+)
 
-env.Library('topology_coordinator',
-            [
-                'heartbeat_response_action.cpp',
-                'topology_coordinator.cpp',
-                env.Idlc('topology_coordinator.idl')[0],
-            ],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/db/audit',
-                '$BUILD_DIR/mongo/rpc/metadata',
-                '$BUILD_DIR/mongo/util/fail_point',
-                'isself',
-                'member_data',
-                'replica_set_messages',
-                'repl_settings',
-                'repl_coordinator_interface',
-            ],
-            LIBDEPS_PRIVATE=[
-                'repl_server_parameters',
-                '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
-                '$BUILD_DIR/mongo/idl/server_parameter',
-                'repl_server_parameters',
-            ])
+env.Library(
+    target='topology_coordinator',
+    source=[
+        'heartbeat_response_action.cpp',
+        'topology_coordinator.cpp',
+        env.Idlc('topology_coordinator.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/util/fail_point',
+        'isself',
+        'member_data',
+        'replica_set_messages',
+        'repl_settings',
+        'repl_coordinator_interface',
+    ],
+    LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
+        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ]
+)
 
 env.Library(
     target='repl_coordinator_impl',
