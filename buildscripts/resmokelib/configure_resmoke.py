@@ -145,6 +145,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
 
     _config.MONGOS_SET_PARAMETERS = config.pop("mongos_set_parameters")
+    _config.MRLOG = config.pop("mrlog")
     _config.NO_JOURNAL = config.pop("no_journal")
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
     _config.NUM_REPLSET_NODES = config.pop("num_replset_nodes")
@@ -170,6 +171,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
         _config.SUITE_FILES = _config.SUITE_FILES.split(",")
     _config.TAG_FILE = config.pop("tag_file")
     _config.TRANSPORT_LAYER = config.pop("transport_layer")
+    _config.USER_FRIENDLY_OUTPUT = config.pop("user_friendly_output")
 
     # Internal testing options.
     _config.INTERNAL_PARAMS = config.pop("internal_params")

@@ -1,10 +1,13 @@
 """Module to hold the logger instances themselves."""
 
 import logging
+import shutil
+import subprocess
 import sys
 
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.core import redirect as redirect_lib
 from buildscripts.resmokelib.logging import buildlogger
 from buildscripts.resmokelib.logging import formatters
 
@@ -46,8 +49,34 @@ def _build_logger_server():
     return None
 
 
+def _setup_redirects():
+    redirect_cmds = []
+    redirects = []
+    if config.MRLOG:
+        redirect_cmds.append(config.MRLOG)
+
+    if config.USER_FRIENDLY_OUTPUT:
+        if not config.MRLOG and shutil.which("mrlog"):
+            redirect_cmds.append("mrlog")
+
+        redirect_cmds.append(["tee", config.USER_FRIENDLY_OUTPUT])
+        redirect_cmds.append([
+            "grep", "-Ea",
+            r"Summary of|Running.*\.\.\.|invariant|fassert|BACKTRACE|Invalid access|Workload\(s\) started|Workload\(s\)|WiredTiger error|AddressSanitizer|threads with tids|failed to load|Completed cmd|Completed stepdown"
+        ])
+
+    for idx, redirect in enumerate(redirect_cmds):
+        # The first redirect reads from stdout. Otherwise read from the previous redirect.
+        stdin = sys.stdout if idx == 0 else redirects[idx - 1].get_stdout()
+        # The last redirect writes back to real stdout file descriptor.
+        stdout = sys.__stdout__ if idx + 1 == len(redirect_cmds) else subprocess.PIPE
+        redirects.append(redirect_lib.Pipe(redirect, stdin, stdout))
+
+
 def configure_loggers():
-    """Configure the loggers."""
+    """Configure the loggers and setup redirects."""
+    _setup_redirects()
+
     buildlogger.BUILDLOGGER_FALLBACK = logging.Logger("buildlogger")
     # The 'buildlogger' prefix is not added to the fallback logger since the prefix of the original
     # logger will be there as part of the logged message.

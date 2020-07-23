@@ -33,6 +33,7 @@ from buildscripts.resmokelib import testing
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.core import process
 from buildscripts.resmokelib.core import jasper_process
+from buildscripts.resmokelib.core import redirect as redirect_lib
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
@@ -105,6 +106,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
 
     def execute(self):
         """Execute the 'run' subcommand."""
+
         self._setup_logging()
 
         try:
@@ -833,6 +835,17 @@ class RunPlugin(PluginInterface):
         parser.add_argument(
             "--replayFile", action="store", type=str, dest="replay_file", metavar="FILE", help=
             "Run the tests listed in the input file. This is an alternative to passing test files as positional arguments on the command line. Each line in the file must be a path to a test file relative to the current working directory. A short-hand for `resmoke run --replay_file foo` is `resmoke run @foo`."
+        )
+
+        parser.add_argument(
+            "--mrlog", action="store_const", const="mrlog", dest="mrlog", help=
+            "Pipe output through the `mrlog` binary for converting logv2 logs to human readable logs."
+        )
+
+        parser.add_argument(
+            "--userFriendlyOutput", action="store", type=str, dest="user_friendly_output",
+            metavar="FILE", help=
+            "Have resmoke redirect all output to FILE. Additionally, stdout will contain lines that typically indicate that the test is making progress, or an error has happened. If `mrlog` is in the path it will be used. `tee` and `egrep` must be in the path."
         )
 
         internal_options = parser.add_argument_group(
