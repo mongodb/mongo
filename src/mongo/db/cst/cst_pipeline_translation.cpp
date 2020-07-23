@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -341,6 +342,13 @@ auto translateLimit(const CNode& cst, const boost::intrusive_ptr<ExpressionConte
 }
 
 /**
+ * Unwrap a sample stage CNode and produce a DocumentSourceSample.
+ */
+auto translateSample(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return DocumentSourceSample::create(expCtx, translateNumToLong(cst.objectChildren()[0].second));
+}
+
+/**
  * Walk an aggregation pipeline stage object CNode and produce a DocumentSource.
  */
 boost::intrusive_ptr<DocumentSource> translateSource(
@@ -352,6 +360,8 @@ boost::intrusive_ptr<DocumentSource> translateSource(
             return translateSkip(cst.objectChildren()[0].second, expCtx);
         case KeyFieldname::limit:
             return translateLimit(cst.objectChildren()[0].second, expCtx);
+        case KeyFieldname::sample:
+            return translateSample(cst.objectChildren()[0].second, expCtx);
         default:
             MONGO_UNREACHABLE;
     }

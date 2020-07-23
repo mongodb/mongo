@@ -52,6 +52,8 @@
     ENUMIFY(unionWith)           \
     ENUMIFY(collArg)             \
     ENUMIFY(pipelineArg)         \
+    ENUMIFY(sample)              \
+    ENUMIFY(sizeArg)             \
     ENUMIFY(skip)                \
     ENUMIFY(limit)               \
     ENUMIFY(constExpr)           \

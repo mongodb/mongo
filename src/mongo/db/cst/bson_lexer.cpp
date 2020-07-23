@@ -41,13 +41,17 @@ namespace {
 // to be a user field name and is treated as a terminal by the parser.
 const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"_id", PipelineParserGen::token::ID},
+    // Stages and their arguments.
     {"$_internalInhibitOptimization", PipelineParserGen::token::STAGE_INHIBIT_OPTIMIZATION},
-    {"$unionWith", PipelineParserGen::token::STAGE_UNION_WITH},
-    {"$project", PipelineParserGen::token::STAGE_PROJECT},
-    {"$skip", PipelineParserGen::token::STAGE_SKIP},
     {"$limit", PipelineParserGen::token::STAGE_LIMIT},
+    {"$project", PipelineParserGen::token::STAGE_PROJECT},
+    {"$sample", PipelineParserGen::token::STAGE_SAMPLE},
+    {"size", PipelineParserGen::token::SIZE_ARG},
+    {"$skip", PipelineParserGen::token::STAGE_SKIP},
+    {"$unionWith", PipelineParserGen::token::STAGE_UNION_WITH},
     {"coll", PipelineParserGen::token::COLL_ARG},
     {"pipeline", PipelineParserGen::token::PIPELINE_ARG},
+    // Expressions
     {"$add", PipelineParserGen::token::ADD},
     {"$atan2", PipelineParserGen::token::ATAN2},
     {"$and", PipelineParserGen::token::AND},

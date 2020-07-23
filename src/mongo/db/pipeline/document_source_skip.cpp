@@ -100,6 +100,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
 
 intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx, long long nToSkip) {
+    uassert(15956, "Argument to $skip cannot be negative", nToSkip >= 0);
     intrusive_ptr<DocumentSourceSkip> skip(new DocumentSourceSkip(pExpCtx, nToSkip));
     return skip;
 }
@@ -110,7 +111,6 @@ intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
             str::stream() << "Argument to $skip must be a number not a " << typeName(elem.type()),
             elem.isNumber());
     auto nToSkip = elem.safeNumberLong();
-    uassert(15956, "Argument to $skip cannot be negative", nToSkip >= 0);
 
     return DocumentSourceSkip::create(pExpCtx, nToSkip);
 }

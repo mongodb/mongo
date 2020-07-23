@@ -92,17 +92,15 @@ const BSONObj randSortSpec = BSON("$rand" << BSON("$meta"
 intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(
     BSONElement specElem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(28745, "the $sample stage specification must be an object", specElem.type() == Object);
-    intrusive_ptr<DocumentSourceSample> sample(new DocumentSourceSample(expCtx));
 
     bool sizeSpecified = false;
+    long long size;
     for (auto&& elem : specElem.embeddedObject()) {
         auto fieldName = elem.fieldNameStringData();
 
         if (fieldName == "size") {
             uassert(28746, "size argument to $sample must be a number", elem.isNumber());
-            auto size = elem.safeNumberLong();
-            uassert(28747, "size argument to $sample must not be negative", size >= 0);
-            sample->_size = size;
+            size = elem.safeNumberLong();
             sizeSpecified = true;
         } else {
             uasserted(28748, str::stream() << "unrecognized option to $sample: " << fieldName);
@@ -110,8 +108,16 @@ intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(
     }
     uassert(28749, "$sample stage must specify a size", sizeSpecified);
 
-    sample->_sortStage = DocumentSourceSort::create(expCtx, randSortSpec, sample->_size);
+    return DocumentSourceSample::create(expCtx, size);
+}
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceSample::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, long long size) {
+    uassert(28747, "size argument to $sample must not be negative", size >= 0);
+
+    intrusive_ptr<DocumentSourceSample> sample(new DocumentSourceSample(expCtx));
+    sample->_size = size;
+    sample->_sortStage = DocumentSourceSort::create(expCtx, randSortSpec, sample->_size);
     return sample;
 }
 

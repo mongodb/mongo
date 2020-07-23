@@ -402,5 +402,84 @@ TEST(CstTest, BuildsAndPrintsNot) {
     }
 }
 
+TEST(CstGrammarTest, ParsesSampleWithNumericSizeArgument) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$sample: {size: NumberInt(1)}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT_EQ(stages[0].toBson().toString(), "{ sample: { sizeArg: \"<UserInt 1>\" } }");
+    }
+    {
+        // Although negative numbers are not valid, this is enforced at translation time.
+        CNode output;
+        auto input = fromjson("{pipeline: [{$sample: {size: NumberInt(-1)}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT_EQ(stages[0].toBson().toString(), "{ sample: { sizeArg: \"<UserInt -1>\" } }");
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$sample: {size: NumberLong(5)}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT_EQ(stages[0].toBson().toString(), "{ sample: { sizeArg: \"<UserLong 5>\" } }");
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$sample: {size: 10.0}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ sample: { sizeArg: \"<UserDouble 10.000000>\" } }");
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$sample: {size: 0}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT_EQ(stages[0].toBson().toString(), "{ sample: { sizeArg: \"<UserInt 0>\" } }");
+    }
+}
+
+TEST(CstGrammarTest, InvalidParseSample) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$sample: 2}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$sample: {notSize: 2}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$sample: {size: 'gots ta be a number'}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

@@ -124,14 +124,18 @@
 
     // Reserve pipeline stage names.
     STAGE_INHIBIT_OPTIMIZATION
-    STAGE_UNION_WITH
-    STAGE_SKIP
     STAGE_LIMIT
     STAGE_PROJECT
+    STAGE_SAMPLE
+    STAGE_SKIP
+    STAGE_UNION_WITH
 
     // $unionWith arguments.
     COLL_ARG
     PIPELINE_ARG
+
+    // $sample arguments.
+    SIZE_ARG
 
     // Expressions
     ADD
@@ -175,17 +179,26 @@
 //
 // Semantic values (aka the C++ types produced by the actions).
 //
-%nterm <CNode> stageList stage inhibitOptimization unionWith num skip limit project projectFields
-%nterm <CNode> projection compoundExpression expressionArray expressionObject expressionFields exprFixedTwoArg
-%nterm <CNode> expression maths add atan2 string binary undefined objectId bool date null regex
-%nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal minKey
-%nterm <CNode> maxKey simpleValue boolExps and or not literalEscapes const literal value
-%nterm <CNode> compoundValue valueArray valueObject valueFields
-%nterm <CNode> compExprs cmp eq gt gte lt lte ne
+
+// Possible user fieldnames.
 %nterm <CNode::Fieldname> projectionFieldname expressionFieldname stageAsUserFieldname
 %nterm <CNode::Fieldname> argAsUserFieldname aggExprAsUserFieldname invariableUserFieldname
 %nterm <CNode::Fieldname> idAsUserFieldname valueFieldname
 %nterm <std::pair<CNode::Fieldname, CNode>> projectField expressionField valueField
+
+// Literals.
+%nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal 
+%nterm <CNode> minKey maxKey value string binary undefined objectId bool date null regex
+%nterm <CNode> simpleValue compoundValue valueArray valueObject valueFields
+
+// Pipeline stages and related non-terminals.
+%nterm <CNode> stageList stage inhibitOptimization unionWith skip limit project sample
+%nterm <CNode> projectFields projection num
+
+// Aggregate expressions
+%nterm <CNode> expression compoundExpression exprFixedTwoArg expressionArray expressionObject
+%nterm <CNode> expressionFields maths add atan2 boolExps and or not literalEscapes const literal
+%nterm <CNode> compExprs cmp eq gt gte lt lte ne
 %nterm <std::vector<CNode>> expressions values
 
 //
@@ -213,7 +226,16 @@ stageList:
 START_ORDERED_OBJECT: { lexer.sortObjTokens(); } START_OBJECT;
 
 stage:
-    inhibitOptimization | unionWith | skip | limit | project
+    inhibitOptimization | unionWith | skip | limit | project | sample
+;
+
+sample: STAGE_SAMPLE START_OBJECT SIZE_ARG num END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::sample, 
+                CNode{CNode::ObjectChildren{
+                    {KeyFieldname::sizeArg, $num},
+                }}
+            }}};
+    }
 ;
 
 inhibitOptimization:
@@ -238,12 +260,12 @@ num:
 
 skip:
     STAGE_SKIP num {
-        $skip = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::skip, $num}}};
+        $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::skip, $num}}};
 };
 
 limit:
     STAGE_LIMIT num {
-        $limit = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::limit, $num}}};
+        $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::limit, $num}}};
 };
 
 project:
@@ -334,6 +356,9 @@ stageAsUserFieldname:
     | STAGE_PROJECT {
         $$ = UserFieldname{"$project"};
     }
+    | STAGE_SAMPLE {
+        $$ = UserFieldname{"$sample"};
+    }
 ;
 
 argAsUserFieldname:
@@ -345,6 +370,9 @@ argAsUserFieldname:
     }
     | PIPELINE_ARG {
         $$ = UserFieldname{"pipeline"};
+    }
+    | SIZE_ARG {
+        $$ = UserFieldname{"size"};
     }
 ;
 
@@ -395,6 +423,7 @@ aggExprAsUserFieldname:
     }
 ;
 
+// Rules for literal non-terminals. 
 string:
     STRING {
         $$ = CNode{UserString{$1}};
@@ -484,7 +513,7 @@ int:
         $$ = CNode{UserInt{$1}};
     }
     | INT_ZERO {
-        $$ = CNode{UserLong{0}};
+        $$ = CNode{UserInt{0}};
     }
 ;
 

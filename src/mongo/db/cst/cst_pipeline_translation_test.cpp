@@ -41,6 +41,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -446,15 +447,22 @@ TEST(CstPipelineTranslationTest, TranslatesSkipWithLong) {
     ASSERT_EQ((dynamic_cast<DocumentSourceSkip&>(**iter).getSkip()), 8223372036854775807);
 }
 
+TEST(CstPipelineTranslationTest, FailsToTranslateSkipWithNegativeValue) {
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserInt{-1}}}}}}};
+    ASSERT_THROWS_CODE(
+        cst_pipeline_translation::translatePipeline(cst, getExpCtx()), DBException, 15956);
+}
+
 TEST(CstPipelineTranslationTest, TranslatesLimitWithInt) {
     const auto cst = CNode{CNode::ArrayChildren{
-        CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserInt{10}}}}}}};
+        CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserInt{0}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
-    ASSERT(typeid(DocumentSourceLimit) == typeid(**iter));
-    ASSERT_EQ(10ll, dynamic_cast<DocumentSourceLimit&>(**iter).getLimit());
+    ASSERT(typeid(DocumentSourceSkip) == typeid(**iter));
+    ASSERT_EQ(0ll, dynamic_cast<DocumentSourceSkip&>(**iter).getSkip());
 }
 
 TEST(CstPipelineTranslationTest, TranslatesLimitWithDouble) {
@@ -477,6 +485,64 @@ TEST(CstPipelineTranslationTest, TranslatesLimitWithLong) {
     auto iter = sources.begin();
     ASSERT(typeid(DocumentSourceLimit) == typeid(**iter));
     ASSERT_EQ(123123123123, dynamic_cast<DocumentSourceLimit&>(**iter).getLimit());
+}
+
+TEST(CstPipelineTranslationTest, FailsToTranslateLimitWithZeroKey) {
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserInt{0}}}}}}};
+    ASSERT_THROWS_CODE(
+        cst_pipeline_translation::translatePipeline(cst, getExpCtx()), DBException, 15958);
+}
+
+TEST(CstPipelineTranslationTest, FailsToTranslateLimitWithNegativeValue) {
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserInt{-1}}}}}}};
+    ASSERT_THROWS_CODE(
+        cst_pipeline_translation::translatePipeline(cst, getExpCtx()), DBException, 15958);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesSampleWithValidSize) {
+    {
+        const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+            {KeyFieldname::sample,
+             CNode{CNode::ObjectChildren{{KeyFieldname::sizeArg, CNode{UserLong{5}}}}}}}}}};
+        auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+        auto& sources = pipeline->getSources();
+        ASSERT_EQ(1u, sources.size());
+        auto iter = sources.begin();
+        ASSERT(typeid(DocumentSourceSample) == typeid(**iter));
+        ASSERT_EQ(5ll, dynamic_cast<DocumentSourceSample&>(**iter).getSampleSize());
+    }
+    {
+        const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+            {KeyFieldname::sample,
+             CNode{CNode::ObjectChildren{{KeyFieldname::sizeArg, CNode{UserDouble{5.8}}}}}}}}}};
+        auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+        auto& sources = pipeline->getSources();
+        ASSERT_EQ(1u, sources.size());
+        auto iter = sources.begin();
+        ASSERT(typeid(DocumentSourceSample) == typeid(**iter));
+        ASSERT_EQ(5ll, dynamic_cast<DocumentSourceSample&>(**iter).getSampleSize());
+    }
+    {
+        const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+            {KeyFieldname::sample,
+             CNode{CNode::ObjectChildren{{KeyFieldname::sizeArg, CNode{UserLong{0}}}}}}}}}};
+        auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+        auto& sources = pipeline->getSources();
+        ASSERT_EQ(1u, sources.size());
+        auto iter = sources.begin();
+        ASSERT(typeid(DocumentSourceSample) == typeid(**iter));
+        ASSERT_EQ(0ll, dynamic_cast<DocumentSourceSample&>(**iter).getSampleSize());
+    }
+}
+
+TEST(CstPipelineTranslationTest, FailsToTranslateSampleWithNegativeSize) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::sample,
+         CNode{CNode::ObjectChildren{{KeyFieldname::sizeArg, CNode{UserInt{-1}}}}}}}}}};
+    ASSERT_THROWS_CODE(
+        cst_pipeline_translation::translatePipeline(cst, getExpCtx()), DBException, 28747);
 }
 
 TEST(CstPipelineTranslationTest, TranslatesCmpExpression) {

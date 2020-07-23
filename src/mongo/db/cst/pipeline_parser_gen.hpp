@@ -374,33 +374,6 @@ public:
             // SYMBOL
             char dummy6[sizeof(BSONSymbol)];
 
-            // stageList
-            // stage
-            // inhibitOptimization
-            // unionWith
-            // num
-            // skip
-            // limit
-            // project
-            // projectFields
-            // projection
-            // compoundExpression
-            // expressionArray
-            // expressionObject
-            // expressionFields
-            // exprFixedTwoArg
-            // expression
-            // maths
-            // add
-            // atan2
-            // string
-            // binary
-            // undefined
-            // objectId
-            // bool
-            // date
-            // null
-            // regex
             // dbPointer
             // javascript
             // symbol
@@ -412,7 +385,40 @@ public:
             // decimal
             // minKey
             // maxKey
+            // value
+            // string
+            // binary
+            // undefined
+            // objectId
+            // bool
+            // date
+            // null
+            // regex
             // simpleValue
+            // compoundValue
+            // valueArray
+            // valueObject
+            // valueFields
+            // stageList
+            // stage
+            // inhibitOptimization
+            // unionWith
+            // skip
+            // limit
+            // project
+            // sample
+            // projectFields
+            // projection
+            // num
+            // expression
+            // compoundExpression
+            // exprFixedTwoArg
+            // expressionArray
+            // expressionObject
+            // expressionFields
+            // maths
+            // add
+            // atan2
             // boolExps
             // and
             // or
@@ -420,11 +426,6 @@ public:
             // literalEscapes
             // const
             // literal
-            // value
-            // compoundValue
-            // valueArray
-            // valueObject
-            // valueFields
             // compExprs
             // cmp
             // eq
@@ -541,45 +542,47 @@ public:
             BOOL_TRUE = 12,
             BOOL_FALSE = 13,
             STAGE_INHIBIT_OPTIMIZATION = 14,
-            STAGE_UNION_WITH = 15,
-            STAGE_SKIP = 16,
-            STAGE_LIMIT = 17,
-            STAGE_PROJECT = 18,
-            COLL_ARG = 19,
-            PIPELINE_ARG = 20,
-            ADD = 21,
-            ATAN2 = 22,
-            AND = 23,
-            CONST_EXPR = 24,
-            LITERAL = 25,
-            OR = 26,
-            NOT = 27,
-            CMP = 28,
-            EQ = 29,
-            GT = 30,
-            GTE = 31,
-            LT = 32,
-            LTE = 33,
-            NE = 34,
-            FIELDNAME = 35,
-            STRING = 36,
-            BINARY = 37,
-            UNDEFINED = 38,
-            OBJECT_ID = 39,
-            DATE_LITERAL = 40,
-            JSNULL = 41,
-            REGEX = 42,
-            DB_POINTER = 43,
-            JAVASCRIPT = 44,
-            SYMBOL = 45,
-            JAVASCRIPT_W_SCOPE = 46,
-            INT_NON_ZERO = 47,
-            TIMESTAMP = 48,
-            LONG_NON_ZERO = 49,
-            DOUBLE_NON_ZERO = 50,
-            DECIMAL_NON_ZERO = 51,
-            MIN_KEY = 52,
-            MAX_KEY = 53
+            STAGE_LIMIT = 15,
+            STAGE_PROJECT = 16,
+            STAGE_SAMPLE = 17,
+            STAGE_SKIP = 18,
+            STAGE_UNION_WITH = 19,
+            COLL_ARG = 20,
+            PIPELINE_ARG = 21,
+            SIZE_ARG = 22,
+            ADD = 23,
+            ATAN2 = 24,
+            AND = 25,
+            CONST_EXPR = 26,
+            LITERAL = 27,
+            OR = 28,
+            NOT = 29,
+            CMP = 30,
+            EQ = 31,
+            GT = 32,
+            GTE = 33,
+            LT = 34,
+            LTE = 35,
+            NE = 36,
+            FIELDNAME = 37,
+            STRING = 38,
+            BINARY = 39,
+            UNDEFINED = 40,
+            OBJECT_ID = 41,
+            DATE_LITERAL = 42,
+            JSNULL = 43,
+            REGEX = 44,
+            DB_POINTER = 45,
+            JAVASCRIPT = 46,
+            SYMBOL = 47,
+            JAVASCRIPT_W_SCOPE = 48,
+            INT_NON_ZERO = 49,
+            TIMESTAMP = 50,
+            LONG_NON_ZERO = 51,
+            DOUBLE_NON_ZERO = 52,
+            DECIMAL_NON_ZERO = 53,
+            MIN_KEY = 54,
+            MAX_KEY = 55
         };
     };
 
@@ -803,160 +806,161 @@ public:
 
             // Type destructor.
             switch (yytype) {
-                case 37:  // BINARY
+                case 39:  // BINARY
                     value.template destroy<BSONBinData>();
                     break;
 
-                case 44:  // JAVASCRIPT
+                case 46:  // JAVASCRIPT
                     value.template destroy<BSONCode>();
                     break;
 
-                case 46:  // JAVASCRIPT_W_SCOPE
+                case 48:  // JAVASCRIPT_W_SCOPE
                     value.template destroy<BSONCodeWScope>();
                     break;
 
-                case 43:  // DB_POINTER
+                case 45:  // DB_POINTER
                     value.template destroy<BSONDBRef>();
                     break;
 
-                case 42:  // REGEX
+                case 44:  // REGEX
                     value.template destroy<BSONRegEx>();
                     break;
 
-                case 45:  // SYMBOL
+                case 47:  // SYMBOL
                     value.template destroy<BSONSymbol>();
                     break;
 
-                case 55:   // stageList
-                case 56:   // stage
-                case 57:   // inhibitOptimization
-                case 58:   // unionWith
-                case 59:   // num
-                case 60:   // skip
-                case 61:   // limit
-                case 62:   // project
-                case 63:   // projectFields
-                case 64:   // projection
-                case 65:   // compoundExpression
-                case 66:   // expressionArray
-                case 67:   // expressionObject
-                case 68:   // expressionFields
-                case 69:   // exprFixedTwoArg
-                case 70:   // expression
-                case 71:   // maths
-                case 72:   // add
-                case 73:   // atan2
-                case 74:   // string
-                case 75:   // binary
-                case 76:   // undefined
-                case 77:   // objectId
-                case 78:   // bool
-                case 79:   // date
-                case 80:   // null
-                case 81:   // regex
-                case 82:   // dbPointer
-                case 83:   // javascript
-                case 84:   // symbol
-                case 85:   // javascriptWScope
-                case 86:   // int
-                case 87:   // timestamp
-                case 88:   // long
-                case 89:   // double
-                case 90:   // decimal
-                case 91:   // minKey
-                case 92:   // maxKey
-                case 93:   // simpleValue
-                case 94:   // boolExps
-                case 95:   // and
-                case 96:   // or
-                case 97:   // not
-                case 98:   // literalEscapes
-                case 99:   // const
-                case 100:  // literal
-                case 101:  // value
-                case 102:  // compoundValue
-                case 103:  // valueArray
-                case 104:  // valueObject
-                case 105:  // valueFields
-                case 106:  // compExprs
-                case 107:  // cmp
-                case 108:  // eq
-                case 109:  // gt
-                case 110:  // gte
-                case 111:  // lt
-                case 112:  // lte
-                case 113:  // ne
+                case 68:   // dbPointer
+                case 69:   // javascript
+                case 70:   // symbol
+                case 71:   // javascriptWScope
+                case 72:   // int
+                case 73:   // timestamp
+                case 74:   // long
+                case 75:   // double
+                case 76:   // decimal
+                case 77:   // minKey
+                case 78:   // maxKey
+                case 79:   // value
+                case 80:   // string
+                case 81:   // binary
+                case 82:   // undefined
+                case 83:   // objectId
+                case 84:   // bool
+                case 85:   // date
+                case 86:   // null
+                case 87:   // regex
+                case 88:   // simpleValue
+                case 89:   // compoundValue
+                case 90:   // valueArray
+                case 91:   // valueObject
+                case 92:   // valueFields
+                case 93:   // stageList
+                case 94:   // stage
+                case 95:   // inhibitOptimization
+                case 96:   // unionWith
+                case 97:   // skip
+                case 98:   // limit
+                case 99:   // project
+                case 100:  // sample
+                case 101:  // projectFields
+                case 102:  // projection
+                case 103:  // num
+                case 104:  // expression
+                case 105:  // compoundExpression
+                case 106:  // exprFixedTwoArg
+                case 107:  // expressionArray
+                case 108:  // expressionObject
+                case 109:  // expressionFields
+                case 110:  // maths
+                case 111:  // add
+                case 112:  // atan2
+                case 113:  // boolExps
+                case 114:  // and
+                case 115:  // or
+                case 116:  // not
+                case 117:  // literalEscapes
+                case 118:  // const
+                case 119:  // literal
+                case 120:  // compExprs
+                case 121:  // cmp
+                case 122:  // eq
+                case 123:  // gt
+                case 124:  // gte
+                case 125:  // lt
+                case 126:  // lte
+                case 127:  // ne
                     value.template destroy<CNode>();
                     break;
 
-                case 114:  // projectionFieldname
-                case 115:  // expressionFieldname
-                case 116:  // stageAsUserFieldname
-                case 117:  // argAsUserFieldname
-                case 118:  // aggExprAsUserFieldname
-                case 119:  // invariableUserFieldname
-                case 120:  // idAsUserFieldname
-                case 121:  // valueFieldname
+                case 57:  // projectionFieldname
+                case 58:  // expressionFieldname
+                case 59:  // stageAsUserFieldname
+                case 60:  // argAsUserFieldname
+                case 61:  // aggExprAsUserFieldname
+                case 62:  // invariableUserFieldname
+                case 63:  // idAsUserFieldname
+                case 64:  // valueFieldname
                     value.template destroy<CNode::Fieldname>();
                     break;
 
-                case 40:  // DATE_LITERAL
+                case 42:  // DATE_LITERAL
                     value.template destroy<Date_t>();
                     break;
 
-                case 51:  // DECIMAL_NON_ZERO
+                case 53:  // DECIMAL_NON_ZERO
                     value.template destroy<Decimal128>();
                     break;
 
-                case 39:  // OBJECT_ID
+                case 41:  // OBJECT_ID
                     value.template destroy<OID>();
                     break;
 
-                case 48:  // TIMESTAMP
+                case 50:  // TIMESTAMP
                     value.template destroy<Timestamp>();
                     break;
 
-                case 53:  // MAX_KEY
+                case 55:  // MAX_KEY
                     value.template destroy<UserMaxKey>();
                     break;
 
-                case 52:  // MIN_KEY
+                case 54:  // MIN_KEY
                     value.template destroy<UserMinKey>();
                     break;
 
-                case 41:  // JSNULL
+                case 43:  // JSNULL
                     value.template destroy<UserNull>();
                     break;
 
-                case 38:  // UNDEFINED
+                case 40:  // UNDEFINED
                     value.template destroy<UserUndefined>();
                     break;
 
-                case 50:  // DOUBLE_NON_ZERO
+                case 52:  // DOUBLE_NON_ZERO
                     value.template destroy<double>();
                     break;
 
-                case 47:  // INT_NON_ZERO
+                case 49:  // INT_NON_ZERO
                     value.template destroy<int>();
                     break;
 
-                case 49:  // LONG_NON_ZERO
+                case 51:  // LONG_NON_ZERO
                     value.template destroy<long long>();
                     break;
 
-                case 122:  // projectField
-                case 123:  // expressionField
-                case 124:  // valueField
+                case 65:  // projectField
+                case 66:  // expressionField
+                case 67:  // valueField
                     value.template destroy<std::pair<CNode::Fieldname, CNode>>();
                     break;
 
-                case 35:  // FIELDNAME
-                case 36:  // STRING
+                case 37:  // FIELDNAME
+                case 38:  // STRING
                     value.template destroy<std::string>();
                     break;
 
-                case 125:  // expressions
-                case 126:  // values
+                case 128:  // expressions
+                case 129:  // values
                     value.template destroy<std::vector<CNode>>();
                     break;
 
@@ -1032,37 +1036,37 @@ public:
         /// Constructor for valueless symbols, and symbols from each type.
 #if 201103L <= YY_CPLUSPLUS
         symbol_type(int tok, location_type l) : super_type(token_type(tok), std::move(l)) {
-            YY_ASSERT(tok == token::END_OF_FILE || tok == token::START_OBJECT ||
-                      tok == token::END_OBJECT || tok == token::START_ARRAY ||
-                      tok == token::END_ARRAY || tok == token::ID || tok == token::INT_ZERO ||
-                      tok == token::LONG_ZERO || tok == token::DOUBLE_ZERO ||
-                      tok == token::DECIMAL_ZERO || tok == token::BOOL_TRUE ||
-                      tok == token::BOOL_FALSE || tok == token::STAGE_INHIBIT_OPTIMIZATION ||
-                      tok == token::STAGE_UNION_WITH || tok == token::STAGE_SKIP ||
-                      tok == token::STAGE_LIMIT || tok == token::STAGE_PROJECT ||
-                      tok == token::COLL_ARG || tok == token::PIPELINE_ARG || tok == token::ADD ||
-                      tok == token::ATAN2 || tok == token::AND || tok == token::CONST_EXPR ||
-                      tok == token::LITERAL || tok == token::OR || tok == token::NOT ||
-                      tok == token::CMP || tok == token::EQ || tok == token::GT ||
-                      tok == token::GTE || tok == token::LT || tok == token::LTE ||
-                      tok == token::NE);
+            YY_ASSERT(
+                tok == token::END_OF_FILE || tok == token::START_OBJECT ||
+                tok == token::END_OBJECT || tok == token::START_ARRAY || tok == token::END_ARRAY ||
+                tok == token::ID || tok == token::INT_ZERO || tok == token::LONG_ZERO ||
+                tok == token::DOUBLE_ZERO || tok == token::DECIMAL_ZERO ||
+                tok == token::BOOL_TRUE || tok == token::BOOL_FALSE ||
+                tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_LIMIT ||
+                tok == token::STAGE_PROJECT || tok == token::STAGE_SAMPLE ||
+                tok == token::STAGE_SKIP || tok == token::STAGE_UNION_WITH ||
+                tok == token::COLL_ARG || tok == token::PIPELINE_ARG || tok == token::SIZE_ARG ||
+                tok == token::ADD || tok == token::ATAN2 || tok == token::AND ||
+                tok == token::CONST_EXPR || tok == token::LITERAL || tok == token::OR ||
+                tok == token::NOT || tok == token::CMP || tok == token::EQ || tok == token::GT ||
+                tok == token::GTE || tok == token::LT || tok == token::LTE || tok == token::NE);
         }
 #else
         symbol_type(int tok, const location_type& l) : super_type(token_type(tok), l) {
-            YY_ASSERT(tok == token::END_OF_FILE || tok == token::START_OBJECT ||
-                      tok == token::END_OBJECT || tok == token::START_ARRAY ||
-                      tok == token::END_ARRAY || tok == token::ID || tok == token::INT_ZERO ||
-                      tok == token::LONG_ZERO || tok == token::DOUBLE_ZERO ||
-                      tok == token::DECIMAL_ZERO || tok == token::BOOL_TRUE ||
-                      tok == token::BOOL_FALSE || tok == token::STAGE_INHIBIT_OPTIMIZATION ||
-                      tok == token::STAGE_UNION_WITH || tok == token::STAGE_SKIP ||
-                      tok == token::STAGE_LIMIT || tok == token::STAGE_PROJECT ||
-                      tok == token::COLL_ARG || tok == token::PIPELINE_ARG || tok == token::ADD ||
-                      tok == token::ATAN2 || tok == token::AND || tok == token::CONST_EXPR ||
-                      tok == token::LITERAL || tok == token::OR || tok == token::NOT ||
-                      tok == token::CMP || tok == token::EQ || tok == token::GT ||
-                      tok == token::GTE || tok == token::LT || tok == token::LTE ||
-                      tok == token::NE);
+            YY_ASSERT(
+                tok == token::END_OF_FILE || tok == token::START_OBJECT ||
+                tok == token::END_OBJECT || tok == token::START_ARRAY || tok == token::END_ARRAY ||
+                tok == token::ID || tok == token::INT_ZERO || tok == token::LONG_ZERO ||
+                tok == token::DOUBLE_ZERO || tok == token::DECIMAL_ZERO ||
+                tok == token::BOOL_TRUE || tok == token::BOOL_FALSE ||
+                tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_LIMIT ||
+                tok == token::STAGE_PROJECT || tok == token::STAGE_SAMPLE ||
+                tok == token::STAGE_SKIP || tok == token::STAGE_UNION_WITH ||
+                tok == token::COLL_ARG || tok == token::PIPELINE_ARG || tok == token::SIZE_ARG ||
+                tok == token::ADD || tok == token::ATAN2 || tok == token::AND ||
+                tok == token::CONST_EXPR || tok == token::LITERAL || tok == token::OR ||
+                tok == token::NOT || tok == token::CMP || tok == token::EQ || tok == token::GT ||
+                tok == token::GTE || tok == token::LT || tok == token::LTE || tok == token::NE);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1418,24 +1422,6 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_STAGE_UNION_WITH(location_type l) {
-        return symbol_type(token::STAGE_UNION_WITH, std::move(l));
-    }
-#else
-    static symbol_type make_STAGE_UNION_WITH(const location_type& l) {
-        return symbol_type(token::STAGE_UNION_WITH, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_STAGE_SKIP(location_type l) {
-        return symbol_type(token::STAGE_SKIP, std::move(l));
-    }
-#else
-    static symbol_type make_STAGE_SKIP(const location_type& l) {
-        return symbol_type(token::STAGE_SKIP, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_STAGE_LIMIT(location_type l) {
         return symbol_type(token::STAGE_LIMIT, std::move(l));
     }
@@ -1454,6 +1440,33 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_STAGE_SAMPLE(location_type l) {
+        return symbol_type(token::STAGE_SAMPLE, std::move(l));
+    }
+#else
+    static symbol_type make_STAGE_SAMPLE(const location_type& l) {
+        return symbol_type(token::STAGE_SAMPLE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_STAGE_SKIP(location_type l) {
+        return symbol_type(token::STAGE_SKIP, std::move(l));
+    }
+#else
+    static symbol_type make_STAGE_SKIP(const location_type& l) {
+        return symbol_type(token::STAGE_SKIP, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_STAGE_UNION_WITH(location_type l) {
+        return symbol_type(token::STAGE_UNION_WITH, std::move(l));
+    }
+#else
+    static symbol_type make_STAGE_UNION_WITH(const location_type& l) {
+        return symbol_type(token::STAGE_UNION_WITH, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_COLL_ARG(location_type l) {
         return symbol_type(token::COLL_ARG, std::move(l));
     }
@@ -1469,6 +1482,15 @@ public:
 #else
     static symbol_type make_PIPELINE_ARG(const location_type& l) {
         return symbol_type(token::PIPELINE_ARG, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_SIZE_ARG(location_type l) {
+        return symbol_type(token::SIZE_ARG, std::move(l));
+    }
+#else
+    static symbol_type make_SIZE_ARG(const location_type& l) {
+        return symbol_type(token::SIZE_ARG, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2040,10 +2062,10 @@ private:
     /// Constants.
     enum {
         yyeof_ = 0,
-        yylast_ = 284,   ///< Last index in yytable_.
-        yynnts_ = 76,    ///< Number of nonterminal symbols.
+        yylast_ = 292,   ///< Last index in yytable_.
+        yynnts_ = 77,    ///< Number of nonterminal symbols.
         yyfinal_ = 5,    ///< Termination state number.
-        yyntokens_ = 54  ///< Number of tokens.
+        yyntokens_ = 56  ///< Number of tokens.
     };
 
 
@@ -2062,160 +2084,161 @@ template <typename Base>
 PipelineParserGen::basic_symbol<Base>::basic_symbol(basic_symbol&& that)
     : Base(std::move(that)), value(), location(std::move(that.location)) {
     switch (this->type_get()) {
-        case 37:  // BINARY
+        case 39:  // BINARY
             value.move<BSONBinData>(std::move(that.value));
             break;
 
-        case 44:  // JAVASCRIPT
+        case 46:  // JAVASCRIPT
             value.move<BSONCode>(std::move(that.value));
             break;
 
-        case 46:  // JAVASCRIPT_W_SCOPE
+        case 48:  // JAVASCRIPT_W_SCOPE
             value.move<BSONCodeWScope>(std::move(that.value));
             break;
 
-        case 43:  // DB_POINTER
+        case 45:  // DB_POINTER
             value.move<BSONDBRef>(std::move(that.value));
             break;
 
-        case 42:  // REGEX
+        case 44:  // REGEX
             value.move<BSONRegEx>(std::move(that.value));
             break;
 
-        case 45:  // SYMBOL
+        case 47:  // SYMBOL
             value.move<BSONSymbol>(std::move(that.value));
             break;
 
-        case 55:   // stageList
-        case 56:   // stage
-        case 57:   // inhibitOptimization
-        case 58:   // unionWith
-        case 59:   // num
-        case 60:   // skip
-        case 61:   // limit
-        case 62:   // project
-        case 63:   // projectFields
-        case 64:   // projection
-        case 65:   // compoundExpression
-        case 66:   // expressionArray
-        case 67:   // expressionObject
-        case 68:   // expressionFields
-        case 69:   // exprFixedTwoArg
-        case 70:   // expression
-        case 71:   // maths
-        case 72:   // add
-        case 73:   // atan2
-        case 74:   // string
-        case 75:   // binary
-        case 76:   // undefined
-        case 77:   // objectId
-        case 78:   // bool
-        case 79:   // date
-        case 80:   // null
-        case 81:   // regex
-        case 82:   // dbPointer
-        case 83:   // javascript
-        case 84:   // symbol
-        case 85:   // javascriptWScope
-        case 86:   // int
-        case 87:   // timestamp
-        case 88:   // long
-        case 89:   // double
-        case 90:   // decimal
-        case 91:   // minKey
-        case 92:   // maxKey
-        case 93:   // simpleValue
-        case 94:   // boolExps
-        case 95:   // and
-        case 96:   // or
-        case 97:   // not
-        case 98:   // literalEscapes
-        case 99:   // const
-        case 100:  // literal
-        case 101:  // value
-        case 102:  // compoundValue
-        case 103:  // valueArray
-        case 104:  // valueObject
-        case 105:  // valueFields
-        case 106:  // compExprs
-        case 107:  // cmp
-        case 108:  // eq
-        case 109:  // gt
-        case 110:  // gte
-        case 111:  // lt
-        case 112:  // lte
-        case 113:  // ne
+        case 68:   // dbPointer
+        case 69:   // javascript
+        case 70:   // symbol
+        case 71:   // javascriptWScope
+        case 72:   // int
+        case 73:   // timestamp
+        case 74:   // long
+        case 75:   // double
+        case 76:   // decimal
+        case 77:   // minKey
+        case 78:   // maxKey
+        case 79:   // value
+        case 80:   // string
+        case 81:   // binary
+        case 82:   // undefined
+        case 83:   // objectId
+        case 84:   // bool
+        case 85:   // date
+        case 86:   // null
+        case 87:   // regex
+        case 88:   // simpleValue
+        case 89:   // compoundValue
+        case 90:   // valueArray
+        case 91:   // valueObject
+        case 92:   // valueFields
+        case 93:   // stageList
+        case 94:   // stage
+        case 95:   // inhibitOptimization
+        case 96:   // unionWith
+        case 97:   // skip
+        case 98:   // limit
+        case 99:   // project
+        case 100:  // sample
+        case 101:  // projectFields
+        case 102:  // projection
+        case 103:  // num
+        case 104:  // expression
+        case 105:  // compoundExpression
+        case 106:  // exprFixedTwoArg
+        case 107:  // expressionArray
+        case 108:  // expressionObject
+        case 109:  // expressionFields
+        case 110:  // maths
+        case 111:  // add
+        case 112:  // atan2
+        case 113:  // boolExps
+        case 114:  // and
+        case 115:  // or
+        case 116:  // not
+        case 117:  // literalEscapes
+        case 118:  // const
+        case 119:  // literal
+        case 120:  // compExprs
+        case 121:  // cmp
+        case 122:  // eq
+        case 123:  // gt
+        case 124:  // gte
+        case 125:  // lt
+        case 126:  // lte
+        case 127:  // ne
             value.move<CNode>(std::move(that.value));
             break;
 
-        case 114:  // projectionFieldname
-        case 115:  // expressionFieldname
-        case 116:  // stageAsUserFieldname
-        case 117:  // argAsUserFieldname
-        case 118:  // aggExprAsUserFieldname
-        case 119:  // invariableUserFieldname
-        case 120:  // idAsUserFieldname
-        case 121:  // valueFieldname
+        case 57:  // projectionFieldname
+        case 58:  // expressionFieldname
+        case 59:  // stageAsUserFieldname
+        case 60:  // argAsUserFieldname
+        case 61:  // aggExprAsUserFieldname
+        case 62:  // invariableUserFieldname
+        case 63:  // idAsUserFieldname
+        case 64:  // valueFieldname
             value.move<CNode::Fieldname>(std::move(that.value));
             break;
 
-        case 40:  // DATE_LITERAL
+        case 42:  // DATE_LITERAL
             value.move<Date_t>(std::move(that.value));
             break;
 
-        case 51:  // DECIMAL_NON_ZERO
+        case 53:  // DECIMAL_NON_ZERO
             value.move<Decimal128>(std::move(that.value));
             break;
 
-        case 39:  // OBJECT_ID
+        case 41:  // OBJECT_ID
             value.move<OID>(std::move(that.value));
             break;
 
-        case 48:  // TIMESTAMP
+        case 50:  // TIMESTAMP
             value.move<Timestamp>(std::move(that.value));
             break;
 
-        case 53:  // MAX_KEY
+        case 55:  // MAX_KEY
             value.move<UserMaxKey>(std::move(that.value));
             break;
 
-        case 52:  // MIN_KEY
+        case 54:  // MIN_KEY
             value.move<UserMinKey>(std::move(that.value));
             break;
 
-        case 41:  // JSNULL
+        case 43:  // JSNULL
             value.move<UserNull>(std::move(that.value));
             break;
 
-        case 38:  // UNDEFINED
+        case 40:  // UNDEFINED
             value.move<UserUndefined>(std::move(that.value));
             break;
 
-        case 50:  // DOUBLE_NON_ZERO
+        case 52:  // DOUBLE_NON_ZERO
             value.move<double>(std::move(that.value));
             break;
 
-        case 47:  // INT_NON_ZERO
+        case 49:  // INT_NON_ZERO
             value.move<int>(std::move(that.value));
             break;
 
-        case 49:  // LONG_NON_ZERO
+        case 51:  // LONG_NON_ZERO
             value.move<long long>(std::move(that.value));
             break;
 
-        case 122:  // projectField
-        case 123:  // expressionField
-        case 124:  // valueField
+        case 65:  // projectField
+        case 66:  // expressionField
+        case 67:  // valueField
             value.move<std::pair<CNode::Fieldname, CNode>>(std::move(that.value));
             break;
 
-        case 35:  // FIELDNAME
-        case 36:  // STRING
+        case 37:  // FIELDNAME
+        case 38:  // STRING
             value.move<std::string>(std::move(that.value));
             break;
 
-        case 125:  // expressions
-        case 126:  // values
+        case 128:  // expressions
+        case 129:  // values
             value.move<std::vector<CNode>>(std::move(that.value));
             break;
 
@@ -2229,160 +2252,161 @@ template <typename Base>
 PipelineParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
     : Base(that), value(), location(that.location) {
     switch (this->type_get()) {
-        case 37:  // BINARY
+        case 39:  // BINARY
             value.copy<BSONBinData>(YY_MOVE(that.value));
             break;
 
-        case 44:  // JAVASCRIPT
+        case 46:  // JAVASCRIPT
             value.copy<BSONCode>(YY_MOVE(that.value));
             break;
 
-        case 46:  // JAVASCRIPT_W_SCOPE
+        case 48:  // JAVASCRIPT_W_SCOPE
             value.copy<BSONCodeWScope>(YY_MOVE(that.value));
             break;
 
-        case 43:  // DB_POINTER
+        case 45:  // DB_POINTER
             value.copy<BSONDBRef>(YY_MOVE(that.value));
             break;
 
-        case 42:  // REGEX
+        case 44:  // REGEX
             value.copy<BSONRegEx>(YY_MOVE(that.value));
             break;
 
-        case 45:  // SYMBOL
+        case 47:  // SYMBOL
             value.copy<BSONSymbol>(YY_MOVE(that.value));
             break;
 
-        case 55:   // stageList
-        case 56:   // stage
-        case 57:   // inhibitOptimization
-        case 58:   // unionWith
-        case 59:   // num
-        case 60:   // skip
-        case 61:   // limit
-        case 62:   // project
-        case 63:   // projectFields
-        case 64:   // projection
-        case 65:   // compoundExpression
-        case 66:   // expressionArray
-        case 67:   // expressionObject
-        case 68:   // expressionFields
-        case 69:   // exprFixedTwoArg
-        case 70:   // expression
-        case 71:   // maths
-        case 72:   // add
-        case 73:   // atan2
-        case 74:   // string
-        case 75:   // binary
-        case 76:   // undefined
-        case 77:   // objectId
-        case 78:   // bool
-        case 79:   // date
-        case 80:   // null
-        case 81:   // regex
-        case 82:   // dbPointer
-        case 83:   // javascript
-        case 84:   // symbol
-        case 85:   // javascriptWScope
-        case 86:   // int
-        case 87:   // timestamp
-        case 88:   // long
-        case 89:   // double
-        case 90:   // decimal
-        case 91:   // minKey
-        case 92:   // maxKey
-        case 93:   // simpleValue
-        case 94:   // boolExps
-        case 95:   // and
-        case 96:   // or
-        case 97:   // not
-        case 98:   // literalEscapes
-        case 99:   // const
-        case 100:  // literal
-        case 101:  // value
-        case 102:  // compoundValue
-        case 103:  // valueArray
-        case 104:  // valueObject
-        case 105:  // valueFields
-        case 106:  // compExprs
-        case 107:  // cmp
-        case 108:  // eq
-        case 109:  // gt
-        case 110:  // gte
-        case 111:  // lt
-        case 112:  // lte
-        case 113:  // ne
+        case 68:   // dbPointer
+        case 69:   // javascript
+        case 70:   // symbol
+        case 71:   // javascriptWScope
+        case 72:   // int
+        case 73:   // timestamp
+        case 74:   // long
+        case 75:   // double
+        case 76:   // decimal
+        case 77:   // minKey
+        case 78:   // maxKey
+        case 79:   // value
+        case 80:   // string
+        case 81:   // binary
+        case 82:   // undefined
+        case 83:   // objectId
+        case 84:   // bool
+        case 85:   // date
+        case 86:   // null
+        case 87:   // regex
+        case 88:   // simpleValue
+        case 89:   // compoundValue
+        case 90:   // valueArray
+        case 91:   // valueObject
+        case 92:   // valueFields
+        case 93:   // stageList
+        case 94:   // stage
+        case 95:   // inhibitOptimization
+        case 96:   // unionWith
+        case 97:   // skip
+        case 98:   // limit
+        case 99:   // project
+        case 100:  // sample
+        case 101:  // projectFields
+        case 102:  // projection
+        case 103:  // num
+        case 104:  // expression
+        case 105:  // compoundExpression
+        case 106:  // exprFixedTwoArg
+        case 107:  // expressionArray
+        case 108:  // expressionObject
+        case 109:  // expressionFields
+        case 110:  // maths
+        case 111:  // add
+        case 112:  // atan2
+        case 113:  // boolExps
+        case 114:  // and
+        case 115:  // or
+        case 116:  // not
+        case 117:  // literalEscapes
+        case 118:  // const
+        case 119:  // literal
+        case 120:  // compExprs
+        case 121:  // cmp
+        case 122:  // eq
+        case 123:  // gt
+        case 124:  // gte
+        case 125:  // lt
+        case 126:  // lte
+        case 127:  // ne
             value.copy<CNode>(YY_MOVE(that.value));
             break;
 
-        case 114:  // projectionFieldname
-        case 115:  // expressionFieldname
-        case 116:  // stageAsUserFieldname
-        case 117:  // argAsUserFieldname
-        case 118:  // aggExprAsUserFieldname
-        case 119:  // invariableUserFieldname
-        case 120:  // idAsUserFieldname
-        case 121:  // valueFieldname
+        case 57:  // projectionFieldname
+        case 58:  // expressionFieldname
+        case 59:  // stageAsUserFieldname
+        case 60:  // argAsUserFieldname
+        case 61:  // aggExprAsUserFieldname
+        case 62:  // invariableUserFieldname
+        case 63:  // idAsUserFieldname
+        case 64:  // valueFieldname
             value.copy<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case 40:  // DATE_LITERAL
+        case 42:  // DATE_LITERAL
             value.copy<Date_t>(YY_MOVE(that.value));
             break;
 
-        case 51:  // DECIMAL_NON_ZERO
+        case 53:  // DECIMAL_NON_ZERO
             value.copy<Decimal128>(YY_MOVE(that.value));
             break;
 
-        case 39:  // OBJECT_ID
+        case 41:  // OBJECT_ID
             value.copy<OID>(YY_MOVE(that.value));
             break;
 
-        case 48:  // TIMESTAMP
+        case 50:  // TIMESTAMP
             value.copy<Timestamp>(YY_MOVE(that.value));
             break;
 
-        case 53:  // MAX_KEY
+        case 55:  // MAX_KEY
             value.copy<UserMaxKey>(YY_MOVE(that.value));
             break;
 
-        case 52:  // MIN_KEY
+        case 54:  // MIN_KEY
             value.copy<UserMinKey>(YY_MOVE(that.value));
             break;
 
-        case 41:  // JSNULL
+        case 43:  // JSNULL
             value.copy<UserNull>(YY_MOVE(that.value));
             break;
 
-        case 38:  // UNDEFINED
+        case 40:  // UNDEFINED
             value.copy<UserUndefined>(YY_MOVE(that.value));
             break;
 
-        case 50:  // DOUBLE_NON_ZERO
+        case 52:  // DOUBLE_NON_ZERO
             value.copy<double>(YY_MOVE(that.value));
             break;
 
-        case 47:  // INT_NON_ZERO
+        case 49:  // INT_NON_ZERO
             value.copy<int>(YY_MOVE(that.value));
             break;
 
-        case 49:  // LONG_NON_ZERO
+        case 51:  // LONG_NON_ZERO
             value.copy<long long>(YY_MOVE(that.value));
             break;
 
-        case 122:  // projectField
-        case 123:  // expressionField
-        case 124:  // valueField
+        case 65:  // projectField
+        case 66:  // expressionField
+        case 67:  // valueField
             value.copy<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
             break;
 
-        case 35:  // FIELDNAME
-        case 36:  // STRING
+        case 37:  // FIELDNAME
+        case 38:  // STRING
             value.copy<std::string>(YY_MOVE(that.value));
             break;
 
-        case 125:  // expressions
-        case 126:  // values
+        case 128:  // expressions
+        case 129:  // values
             value.copy<std::vector<CNode>>(YY_MOVE(that.value));
             break;
 
@@ -2401,160 +2425,161 @@ template <typename Base>
 void PipelineParserGen::basic_symbol<Base>::move(basic_symbol& s) {
     super_type::move(s);
     switch (this->type_get()) {
-        case 37:  // BINARY
+        case 39:  // BINARY
             value.move<BSONBinData>(YY_MOVE(s.value));
             break;
 
-        case 44:  // JAVASCRIPT
+        case 46:  // JAVASCRIPT
             value.move<BSONCode>(YY_MOVE(s.value));
             break;
 
-        case 46:  // JAVASCRIPT_W_SCOPE
+        case 48:  // JAVASCRIPT_W_SCOPE
             value.move<BSONCodeWScope>(YY_MOVE(s.value));
             break;
 
-        case 43:  // DB_POINTER
+        case 45:  // DB_POINTER
             value.move<BSONDBRef>(YY_MOVE(s.value));
             break;
 
-        case 42:  // REGEX
+        case 44:  // REGEX
             value.move<BSONRegEx>(YY_MOVE(s.value));
             break;
 
-        case 45:  // SYMBOL
+        case 47:  // SYMBOL
             value.move<BSONSymbol>(YY_MOVE(s.value));
             break;
 
-        case 55:   // stageList
-        case 56:   // stage
-        case 57:   // inhibitOptimization
-        case 58:   // unionWith
-        case 59:   // num
-        case 60:   // skip
-        case 61:   // limit
-        case 62:   // project
-        case 63:   // projectFields
-        case 64:   // projection
-        case 65:   // compoundExpression
-        case 66:   // expressionArray
-        case 67:   // expressionObject
-        case 68:   // expressionFields
-        case 69:   // exprFixedTwoArg
-        case 70:   // expression
-        case 71:   // maths
-        case 72:   // add
-        case 73:   // atan2
-        case 74:   // string
-        case 75:   // binary
-        case 76:   // undefined
-        case 77:   // objectId
-        case 78:   // bool
-        case 79:   // date
-        case 80:   // null
-        case 81:   // regex
-        case 82:   // dbPointer
-        case 83:   // javascript
-        case 84:   // symbol
-        case 85:   // javascriptWScope
-        case 86:   // int
-        case 87:   // timestamp
-        case 88:   // long
-        case 89:   // double
-        case 90:   // decimal
-        case 91:   // minKey
-        case 92:   // maxKey
-        case 93:   // simpleValue
-        case 94:   // boolExps
-        case 95:   // and
-        case 96:   // or
-        case 97:   // not
-        case 98:   // literalEscapes
-        case 99:   // const
-        case 100:  // literal
-        case 101:  // value
-        case 102:  // compoundValue
-        case 103:  // valueArray
-        case 104:  // valueObject
-        case 105:  // valueFields
-        case 106:  // compExprs
-        case 107:  // cmp
-        case 108:  // eq
-        case 109:  // gt
-        case 110:  // gte
-        case 111:  // lt
-        case 112:  // lte
-        case 113:  // ne
+        case 68:   // dbPointer
+        case 69:   // javascript
+        case 70:   // symbol
+        case 71:   // javascriptWScope
+        case 72:   // int
+        case 73:   // timestamp
+        case 74:   // long
+        case 75:   // double
+        case 76:   // decimal
+        case 77:   // minKey
+        case 78:   // maxKey
+        case 79:   // value
+        case 80:   // string
+        case 81:   // binary
+        case 82:   // undefined
+        case 83:   // objectId
+        case 84:   // bool
+        case 85:   // date
+        case 86:   // null
+        case 87:   // regex
+        case 88:   // simpleValue
+        case 89:   // compoundValue
+        case 90:   // valueArray
+        case 91:   // valueObject
+        case 92:   // valueFields
+        case 93:   // stageList
+        case 94:   // stage
+        case 95:   // inhibitOptimization
+        case 96:   // unionWith
+        case 97:   // skip
+        case 98:   // limit
+        case 99:   // project
+        case 100:  // sample
+        case 101:  // projectFields
+        case 102:  // projection
+        case 103:  // num
+        case 104:  // expression
+        case 105:  // compoundExpression
+        case 106:  // exprFixedTwoArg
+        case 107:  // expressionArray
+        case 108:  // expressionObject
+        case 109:  // expressionFields
+        case 110:  // maths
+        case 111:  // add
+        case 112:  // atan2
+        case 113:  // boolExps
+        case 114:  // and
+        case 115:  // or
+        case 116:  // not
+        case 117:  // literalEscapes
+        case 118:  // const
+        case 119:  // literal
+        case 120:  // compExprs
+        case 121:  // cmp
+        case 122:  // eq
+        case 123:  // gt
+        case 124:  // gte
+        case 125:  // lt
+        case 126:  // lte
+        case 127:  // ne
             value.move<CNode>(YY_MOVE(s.value));
             break;
 
-        case 114:  // projectionFieldname
-        case 115:  // expressionFieldname
-        case 116:  // stageAsUserFieldname
-        case 117:  // argAsUserFieldname
-        case 118:  // aggExprAsUserFieldname
-        case 119:  // invariableUserFieldname
-        case 120:  // idAsUserFieldname
-        case 121:  // valueFieldname
+        case 57:  // projectionFieldname
+        case 58:  // expressionFieldname
+        case 59:  // stageAsUserFieldname
+        case 60:  // argAsUserFieldname
+        case 61:  // aggExprAsUserFieldname
+        case 62:  // invariableUserFieldname
+        case 63:  // idAsUserFieldname
+        case 64:  // valueFieldname
             value.move<CNode::Fieldname>(YY_MOVE(s.value));
             break;
 
-        case 40:  // DATE_LITERAL
+        case 42:  // DATE_LITERAL
             value.move<Date_t>(YY_MOVE(s.value));
             break;
 
-        case 51:  // DECIMAL_NON_ZERO
+        case 53:  // DECIMAL_NON_ZERO
             value.move<Decimal128>(YY_MOVE(s.value));
             break;
 
-        case 39:  // OBJECT_ID
+        case 41:  // OBJECT_ID
             value.move<OID>(YY_MOVE(s.value));
             break;
 
-        case 48:  // TIMESTAMP
+        case 50:  // TIMESTAMP
             value.move<Timestamp>(YY_MOVE(s.value));
             break;
 
-        case 53:  // MAX_KEY
+        case 55:  // MAX_KEY
             value.move<UserMaxKey>(YY_MOVE(s.value));
             break;
 
-        case 52:  // MIN_KEY
+        case 54:  // MIN_KEY
             value.move<UserMinKey>(YY_MOVE(s.value));
             break;
 
-        case 41:  // JSNULL
+        case 43:  // JSNULL
             value.move<UserNull>(YY_MOVE(s.value));
             break;
 
-        case 38:  // UNDEFINED
+        case 40:  // UNDEFINED
             value.move<UserUndefined>(YY_MOVE(s.value));
             break;
 
-        case 50:  // DOUBLE_NON_ZERO
+        case 52:  // DOUBLE_NON_ZERO
             value.move<double>(YY_MOVE(s.value));
             break;
 
-        case 47:  // INT_NON_ZERO
+        case 49:  // INT_NON_ZERO
             value.move<int>(YY_MOVE(s.value));
             break;
 
-        case 49:  // LONG_NON_ZERO
+        case 51:  // LONG_NON_ZERO
             value.move<long long>(YY_MOVE(s.value));
             break;
 
-        case 122:  // projectField
-        case 123:  // expressionField
-        case 124:  // valueField
+        case 65:  // projectField
+        case 66:  // expressionField
+        case 67:  // valueField
             value.move<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(s.value));
             break;
 
-        case 35:  // FIELDNAME
-        case 36:  // STRING
+        case 37:  // FIELDNAME
+        case 38:  // STRING
             value.move<std::string>(YY_MOVE(s.value));
             break;
 
-        case 125:  // expressions
-        case 126:  // values
+        case 128:  // expressions
+        case 129:  // values
             value.move<std::vector<CNode>>(YY_MOVE(s.value));
             break;
 
@@ -2593,7 +2618,7 @@ inline int PipelineParserGen::by_type::type_get() const YY_NOEXCEPT {
 
 #line 58 "src/mongo/db/cst/pipeline_grammar.yy"
 }  // namespace mongo
-#line 3187 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 3224 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 
 #endif  // !YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
