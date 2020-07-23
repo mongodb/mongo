@@ -104,4 +104,12 @@ TEST_F(ThreadSafetyContextTest, CreateThreadsAfterSafetyContext) {
     }
 }
 
+TEST_F(ThreadSafetyContextTest, SingleThreadedContext) {
+    ASSERT(ThreadSafetyContext::getThreadSafetyContext()->isSingleThreaded());
+    stdx::thread(
+        []() { ASSERT(!ThreadSafetyContext::getThreadSafetyContext()->isSingleThreaded()); })
+        .join();
+    ASSERT(!ThreadSafetyContext::getThreadSafetyContext()->isSingleThreaded());
+}
+
 }  // namespace mongo

@@ -70,6 +70,11 @@ public:
     // If not using `stdx::thread`, you must always call this method before spawning a new thread.
     void onThreadCreate() noexcept;
 
+    // Returns "true" if no threads have been created throughout the lifetime of the process.
+    bool isSingleThreaded() const noexcept {
+        return _isSingleThreaded.load();
+    }
+
     // Restricts the ability of resetting the context to the unit-test fixture.
     friend class ThreadSafetyContextTest;
 
