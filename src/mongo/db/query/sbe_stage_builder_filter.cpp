@@ -112,6 +112,10 @@ struct MatchExpressionVisitorContext {
     sbe::value::SlotId inputVar;
 };
 
+std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(long long limit = 1) {
+    return sbe::makeS<sbe::LimitSkipStage>(sbe::makeS<sbe::CoScanStage>(), limit, boost::none);
+}
+
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
     return sbe::makeE<sbe::EFunction>(
@@ -136,108 +140,128 @@ void checkForShortCircuitFromLogicalAnd(MatchExpressionVisitorContext* context) 
     }
 }
 
+enum class LeafArrayTraversalMode {
+    kArrayAndItsElements = 0,  // Visit both the array's elements _and_ the array itself
+    kArrayElementsOnly = 1,    // Visit the array's elements but don't visit the array itself
+};
+
 /**
  * A helper function to generate a path traversal plan stage at the given nested 'level' of the
  * traversal path. For example, for a dotted path expression {'a.b': 2}, the traversal sub-tree will
  * look like this:
  *
  *     traverse
- *          traversePredicateVar // the global traversal result
- *          elemPredicateVar1 // the result coming from the 'in' branch
+ *          outputVar1 // the traversal result
+ *          innerVar1 // the result coming from the 'in' branch
  *          fieldVar1 // field 'a' projected in the 'from' branch, this is the field we will be
  *                    // traversing
- *          {traversePredicateVar || elemPredicateVar1} // the folding expression - combining
- *                                                      // results for each element
- *          {traversePredicateVar} // final (early out) expression - when we hit the 'true' value,
- *                                 // we don't have to traverse the whole array
+ *          {outputVar1 || innerVar1} // the folding expression - combining
+ *                                    // results for each element
+ *          {outputVar1} // final (early out) expression - when we hit the 'true' value,
+ *                       // we don't have to traverse the whole array
  *      in
- *          project [elemPredicateVar1 = traversePredicateVar]
+ *          project [innerVar1 =                               // if getField(fieldVar1,'b') returns
+ *                    outputVar2 ||                            // an array, compare the array itself
+ *                    (fillEmpty(isArray(fieldVar), false) &&  // to 2 as well
+ *                     fillEmpty(fieldVar2==2, false))]
  *          traverse // nested traversal
- *              traversePredicateVar // the global traversal result
- *              elemPredicateVar2 // the result coming from the 'in' branch
+ *              outputVar2 // the traversal result
+ *              innerVar2 // the result coming from the 'in' branch
  *              fieldVar2 // field 'b' projected in the 'from' branch, this is the field we will be
  *                        // traversing
- *              {traversePredicateVar || elemPredicateVar2} // the folding expression
- *              {traversePredicateVar} // final (early out) expression
+ *              {outputVar2 || innerVar2} // the folding expression
+ *              {outputVar2} // final (early out) expression
  *          in
- *              project [elemPredicateVar2 = fieldVar2==2] // compare the field 'b' to 2 and store
- *                                                         // the bool result in elemPredicateVar2
+ *              project [innerVar2 =                        // compare the field 'b' to 2 and store
+ *                         fillEmpty(fieldVar2==2, false)]  // the bool result in innerVar2
  *              limit 1
  *              coscan
  *          from
- *              project [fieldVar2=getField(fieldVar1, 'b')] // project field 'b' from the document
- *                                                           // bound to 'fieldVar1', which is
- *                                                           // field 'a'
+ *              project [fieldVar2 = getField(fieldVar1, 'b')] // project field 'b' from the
+ *                                                             // document  bound to 'fieldVar1',
+ *                                                             // which is field 'a'
  *              limit 1
  *              coscan
  *      from
- *         project [fieldVar1=getField(inputVar, 'a')] // project field 'a' from the document bound
- *                                                     // to 'inputVar'
+ *         project [fieldVar1 = getField(inputVar, 'a')] // project field 'a' from the document
+ *                                                       // bound to 'inputVar'
  *         <inputStage>  // e.g., COLLSCAN
  */
-std::unique_ptr<sbe::PlanStage> generateTraverseHelper(MatchExpressionVisitorContext* context,
-                                                       std::unique_ptr<sbe::PlanStage> inputStage,
-                                                       sbe::value::SlotId inputVar,
-                                                       const PathMatchExpression* expr,
-                                                       MakePredicateEExprFn makeEExprCallback,
-                                                       size_t level) {
+std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverseHelper(
+    std::unique_ptr<sbe::PlanStage> inputStage,
+    sbe::value::SlotId inputVar,
+    const FieldPath& fp,
+    size_t level,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    const MakePredicateEExprFn& makePredicate,
+    LeafArrayTraversalMode mode) {
     using namespace std::literals;
 
-    FieldPath path{expr->path()};
-    invariant(level < path.getPathLength());
-
-    // The global traversal result.
-    const auto& traversePredicateVar = context->predicateVars.top();
-    // The field we will be traversing at the current nested level.
-    auto fieldVar{context->slotIdGenerator->generate()};
-    // The result coming from the 'in' branch of the traverse plan stage.
-    auto elemPredicateVar{context->slotIdGenerator->generate()};
+    invariant(level < fp.getPathLength());
 
     // Generate the projection stage to read a sub-field at the current nested level and bind it
     // to 'fieldVar'.
-    inputStage = sbe::makeProjectStage(
+    std::string_view fieldName{fp.getFieldName(level).rawData(), fp.getFieldName(level).size()};
+    auto fieldVar{slotIdGenerator->generate()};
+    auto fromBranch = sbe::makeProjectStage(
         std::move(inputStage),
         fieldVar,
-        sbe::makeE<sbe::EFunction>(
-            "getField"sv,
-            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputVar), sbe::makeE<sbe::EConstant>([&]() {
-                            auto fieldName = path.getFieldName(level);
-                            return std::string_view{fieldName.rawData(), fieldName.size()};
-                        }()))));
+        sbe::makeE<sbe::EFunction>("getField"sv,
+                                   sbe::makeEs(sbe::makeE<sbe::EVariable>(inputVar),
+                                               sbe::makeE<sbe::EConstant>(fieldName))));
 
-    std::unique_ptr<sbe::PlanStage> innerBranch;
-    if (level == path.getPathLength() - 1u) {
-        innerBranch = sbe::makeProjectStage(
-            sbe::makeS<sbe::LimitSkipStage>(sbe::makeS<sbe::CoScanStage>(), 1, boost::none),
-            elemPredicateVar,
-            makeEExprCallback(fieldVar));
-    } else {
-        // Generate nested traversal.
-        innerBranch = sbe::makeProjectStage(
-            generateTraverseHelper(
-                context,
-                sbe::makeS<sbe::LimitSkipStage>(sbe::makeS<sbe::CoScanStage>(), 1, boost::none),
-                fieldVar,
-                expr,
-                makeEExprCallback,
-                level + 1),
-            elemPredicateVar,
-            sbe::makeE<sbe::EVariable>(traversePredicateVar));
-    }
+    // Generate the 'in' branch for the TraverseStage that we're about to construct.
+    auto [innerVar, innerBranch] = (level == fp.getPathLength() - 1u)
+        // Base case: Genereate a ProjectStage to evaluate the predicate.
+        ? [&]() {
+              auto innerVar{slotIdGenerator->generate()};
+              return std::make_pair(
+                  innerVar,
+                  sbe::makeProjectStage(makeLimitCoScanTree(), innerVar, makePredicate(fieldVar)));
+          }()
+        // Recursive case.
+        : generateTraverseHelper(
+              makeLimitCoScanTree(), fieldVar, fp, level + 1, slotIdGenerator, makePredicate, mode);
 
-    // The traverse stage for the current nested level.
-    return sbe::makeS<sbe::TraverseStage>(
-        std::move(inputStage),
+    // Generate the traverse stage for the current nested level.
+    auto outputVar{slotIdGenerator->generate()};
+    auto outputStage = sbe::makeS<sbe::TraverseStage>(
+        std::move(fromBranch),
         std::move(innerBranch),
         fieldVar,
-        traversePredicateVar,
-        elemPredicateVar,
+        outputVar,
+        innerVar,
         sbe::makeSV(),
         sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                     sbe::makeE<sbe::EVariable>(traversePredicateVar),
-                                     sbe::makeE<sbe::EVariable>(elemPredicateVar)),
-        sbe::makeE<sbe::EVariable>(traversePredicateVar),
+                                     sbe::makeE<sbe::EVariable>(outputVar),
+                                     sbe::makeE<sbe::EVariable>(innerVar)),
+        sbe::makeE<sbe::EVariable>(outputVar),
         1);
+
+    // For the last level, if `mode` == kArrayAndItsElements and getField() returns an array we
+    // need to apply the predicate both to the elements of the array _and_ to the array itself.
+    // By itself, TraverseStage only applies the predicate to the elements of the array. Thus,
+    // for the last level, we add a ProjectStage so that we also apply the predicate to the array
+    // itself. (For cases where getField() doesn't return an array, this additional ProjectStage
+    // is effectively a no-op.)
+    if (mode == LeafArrayTraversalMode::kArrayAndItsElements && level == fp.getPathLength() - 1u) {
+        auto traverseVar = outputVar;
+        auto traverseStage = std::move(outputStage);
+        outputVar = slotIdGenerator->generate();
+        outputStage = sbe::makeProjectStage(
+            std::move(traverseStage),
+            outputVar,
+            sbe::makeE<sbe::EPrimBinary>(
+                sbe::EPrimBinary::logicOr,
+                sbe::makeE<sbe::EVariable>(traverseVar),
+                sbe::makeE<sbe::EPrimBinary>(
+                    sbe::EPrimBinary::logicAnd,
+                    makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
+                        "isArray", sbe::makeEs(sbe::makeE<sbe::EVariable>(fieldVar)))),
+                    makePredicate(fieldVar))));
+    }
+
+    return {outputVar, std::move(outputStage)};
 }
 
 /*
@@ -364,14 +388,19 @@ std::unique_ptr<sbe::PlanStage> generateTraverseForArraySizeHelper(
  */
 void generateTraverse(MatchExpressionVisitorContext* context,
                       const PathMatchExpression* expr,
-                      MakePredicateEExprFn makeEExprCallback) {
-    context->predicateVars.push(context->slotIdGenerator->generate());
-    context->inputStage = generateTraverseHelper(context,
-                                                 std::move(context->inputStage),
-                                                 context->inputVar,
-                                                 expr,
-                                                 std::move(makeEExprCallback),
-                                                 0);
+                      MakePredicateEExprFn makePredicate) {
+    FieldPath fp{expr->path()};
+
+    auto [slot, stage] = generateTraverseHelper(std::move(context->inputStage),
+                                                context->inputVar,
+                                                fp,
+                                                0,
+                                                context->slotIdGenerator,
+                                                makePredicate,
+                                                LeafArrayTraversalMode::kArrayAndItsElements);
+
+    context->predicateVars.push(slot);
+    context->inputStage = std::move(stage);
 
     // Check if can bail out early from the $and predicate if this expression is part of branch.
     checkForShortCircuitFromLogicalAnd(context);
