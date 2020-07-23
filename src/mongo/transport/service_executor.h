@@ -34,12 +34,9 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/bitwise_enum_operators.h"
-#include "mongo/transport/session.h"
 #include "mongo/transport/transport_mode.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
-#include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
@@ -95,24 +92,6 @@ public:
     void schedule(OutOfLineExecutor::Task func) override {
         internalAssert(scheduleTask([task = std::move(func)]() mutable { task(Status::OK()); },
                                     ScheduleFlags::kEmptyFlags));
-    }
-
-    /*
-     * Awaits the availability of incoming data for the specified session. On success, it will
-     * schedule the callback on current executor. Otherwise, it will invoke the callback with a
-     * non-okay status on the caller thread. The default implementation blocks the caller thread
-     * until data is available for reading. Other extensions of "ServiceExecutor" (e.g.,
-     * "ServiceExecutorFixed") may provide asynchronous variants.
-     */
-    virtual void runOnDataAvailable(Session* session,
-                                    OutOfLineExecutor::Task onCompletionCallback) {
-        invariant(session);
-        try {
-            session->waitForData().get();
-            schedule(std::move(onCompletionCallback));
-        } catch (DBException& e) {
-            onCompletionCallback(e.toStatus());
-        }
     }
 
     /*

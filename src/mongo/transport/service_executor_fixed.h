@@ -37,7 +37,6 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_executor.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
@@ -58,14 +57,6 @@ public:
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
     Status scheduleTask(Task task, ScheduleFlags flags) override;
-
-    void runOnDataAvailable(Session* session,
-                            OutOfLineExecutor::Task onCompletionCallback) override {
-        invariant(session);
-        session->waitForData()
-            .thenRunOn(shared_from_this())
-            .getAsync(std::move(onCompletionCallback));
-    }
 
     Mode transportMode() const override {
         return Mode::kSynchronous;
