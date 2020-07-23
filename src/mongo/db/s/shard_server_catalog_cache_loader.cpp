@@ -896,7 +896,13 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChun
     }
 
     _executor->schedule([this, nss](auto status) {
-        invariant(status);
+        if (!status.isOK()) {
+            if (ErrorCodes::isCancelationError(status)) {
+                return;
+            }
+
+            fassertFailedWithStatus(4826400, status);
+        }
 
         _runCollAndChunksTasks(nss);
     });
@@ -918,7 +924,13 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(Oper
     }
 
     _executor->schedule([this, name = dbName.toString()](auto status) {
-        invariant(status);
+        if (!status.isOK()) {
+            if (ErrorCodes::isCancelationError(status)) {
+                return;
+            }
+
+            fassertFailedWithStatus(4826401, status);
+        }
 
         _runDbTasks(name);
     });
@@ -972,7 +984,12 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
         }
     }
 
-    _executor->schedule([this, nss](auto status) {
+    _executor->schedule([this, nss](Status status) {
+        if (status.isOK()) {
+            _runCollAndChunksTasks(nss);
+            return;
+        }
+
         if (ErrorCodes::isCancelationError(status.code())) {
             LOGV2(22096,
                   "Cache loader failed to schedule a persisted metadata update task for namespace "
@@ -988,11 +1005,9 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
                 stdx::lock_guard<Latch> lock(_mutex);
                 _collAndChunkTaskLists.erase(nss);
             }
-            return;
+        } else {
+            fassertFailedWithStatus(4826402, status);
         }
-        invariant(status);
-
-        _runCollAndChunksTasks(nss);
     });
 }
 
@@ -1044,26 +1059,29 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
     }
 
     _executor->schedule([this, name = dbName.toString()](auto status) {
+        if (status.isOK()) {
+            _runDbTasks(name);
+            return;
+        }
+
         if (ErrorCodes::isCancelationError(status.code())) {
             LOGV2(22099,
-                  "Cache loader failed to schedule a persisted metadata update task for namespace "
-                  "{namespace} due to {error}. Clearing task list so that scheduling will be "
-                  "attempted by the next caller to refresh this namespace",
+                  "Cache loader failed to schedule a persisted metadata update task for database "
+                  "{database} due to {error}. Clearing task list so that scheduling will be "
+                  "attempted by the next caller to refresh this database",
                   "Cache loader failed to schedule a persisted metadata update task. Clearing task "
                   "list so that scheduling will be attempted by the next caller to refresh this "
-                  "namespace",
-                  "namespace"_attr = name,
+                  "database",
+                  "database"_attr = name,
                   "error"_attr = redact(status));
 
             {
                 stdx::lock_guard<Latch> lock(_mutex);
                 _dbTaskLists.erase(name);
             }
-            return;
+        } else {
+            fassertFailedWithStatus(4826403, status);
         }
-        invariant(status);
-
-        _runDbTasks(name);
     });
 }
 
