@@ -50,9 +50,9 @@ using CallbackHandle = TaskExecutor::CallbackHandle;
 using ResponseStatus = TaskExecutor::ResponseStatus;
 
 NetworkInterfaceMock::NetworkInterfaceMock()
-    : _waitingToRunMask(0),
+    : _clkSource(std::make_unique<ClockSourceMock>()),
+      _waitingToRunMask(0),
       _currentlyRunning(kNoThread),
-      _now(fassert(18653, dateFromISOString("2014-08-01T00:00:00Z"))),
       _hasStarted(false),
       _inShutdown(false),
       _executorNextWakeupDate(Date_t::max()) {}
@@ -416,8 +416,11 @@ Date_t NetworkInterfaceMock::runUntil(Date_t until) {
         if (until < newNow) {
             newNow = until;
         }
-        invariant(_now_inlock() <= newNow);
-        _now = newNow;
+
+        auto duration = newNow - _now_inlock();
+        invariant(duration >= Milliseconds{0});
+        _clkSource->advance(duration);
+
         _waitingToRunMask |= kExecutorThread;
     }
     _runReadyNetworkOperations_inlock(&lk);
@@ -427,8 +430,10 @@ Date_t NetworkInterfaceMock::runUntil(Date_t until) {
 void NetworkInterfaceMock::advanceTime(Date_t newTime) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
-    invariant(newTime > _now_inlock());
-    _now = newTime;
+
+    auto duration = newTime - _now_inlock();
+    invariant(duration > Milliseconds{0});
+    _clkSource->advance(duration);
 
     _waitingToRunMask |= kExecutorThread;
     _runReadyNetworkOperations_inlock(&lk);
@@ -718,11 +723,6 @@ NetworkInterfaceMock::InNetworkGuard::~InNetworkGuard() {
 
 NetworkInterfaceMock* NetworkInterfaceMock::InNetworkGuard::operator->() const {
     return _net;
-}
-
-NetworkInterfaceMockClockSource::NetworkInterfaceMockClockSource(NetworkInterfaceMock* net)
-    : _net(net) {
-    _tracksSystemClock = false;
 }
 
 }  // namespace executor

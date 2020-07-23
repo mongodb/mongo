@@ -41,15 +41,21 @@ namespace mongo {
 
 /**
  * Mock clock source that returns a fixed time until explicitly advanced.
+ *
+ * Each ClockSourceMock that is constructed tracks the same shared global understanding of time.
  */
 class ClockSourceMock : public ClockSource {
 public:
+    static constexpr auto kInitialNow = Date_t::fromMillisSinceEpoch(1);
+
     /**
      * Constructs a ClockSourceMock with the current time set to the Unix epoch.
      */
     ClockSourceMock() {
         _tracksSystemClock = false;
     }
+
+    static ClockSourceMock* get() noexcept;
 
     Milliseconds getPrecision() override;
     Date_t now() override;
@@ -63,15 +69,7 @@ public:
     /**
      * Resets the current time to the given value.
      */
-    void reset(Date_t newNow);
-
-private:
-    using Alarm = std::pair<Date_t, unique_function<void()>>;
-    void _processAlarms(stdx::unique_lock<stdx::mutex> lk);
-
-    stdx::mutex _mutex;  // NOLINT
-    Date_t _now{Date_t::fromMillisSinceEpoch(1)};
-    std::vector<Alarm> _alarms;
+    void reset(Date_t newNow = kInitialNow);
 };
 
 /**

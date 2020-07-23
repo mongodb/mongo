@@ -67,6 +67,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
@@ -340,10 +341,8 @@ protected:
         };
 
         auto* service = getGlobalServiceContext();
-        service->setFastClockSource(
-            std::make_unique<executor::NetworkInterfaceMockClockSource>(getNet()));
-        service->setPreciseClockSource(
-            std::make_unique<executor::NetworkInterfaceMockClockSource>(getNet()));
+        service->setFastClockSource(std::make_unique<ClockSourceMock>());
+        service->setPreciseClockSource(std::make_unique<ClockSourceMock>());
         ThreadPool::Options dbThreadPoolOptions;
         dbThreadPoolOptions.poolName = "dbthread";
         dbThreadPoolOptions.minThreads = 1U;

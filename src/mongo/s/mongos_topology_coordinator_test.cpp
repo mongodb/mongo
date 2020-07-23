@@ -49,18 +49,15 @@ public:
     virtual void setUp() {
         _topo = std::make_unique<MongosTopologyCoordinator>();
 
-        getServiceContext()->setFastClockSource(std::make_unique<ClockSourceMock>());
-        _fastClock = dynamic_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
-
-        getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
-        _preciseClock =
-            dynamic_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
+        // The fast clock is used by OperationContext::hasDeadlineExpired.
+        getServiceContext()->setFastClockSource(
+            std::make_unique<SharedClockSourceAdapter>(_clkSource));
+        // The precise clock is used by waitForConditionOrInterruptNoAssertUntil.
+        getServiceContext()->setPreciseClockSource(
+            std::make_unique<SharedClockSourceAdapter>(_clkSource));
     }
 
-    virtual void tearDown() {
-        _fastClock = nullptr;
-        _preciseClock = nullptr;
-    }
+    virtual void tearDown() {}
 
 protected:
     /**
@@ -74,24 +71,19 @@ protected:
      * Advance the time by millis on both clock source mocks.
      */
     void advanceTime(Milliseconds millis) {
-        _fastClock->advance(millis);
-        _preciseClock->advance(millis);
+        _clkSource->advance(millis);
     }
 
     /**
      * Assumes that the times on both clock source mocks is the same.
      */
     Date_t now() {
-        invariant(_fastClock->now() == _preciseClock->now());
-        return _fastClock->now();
+        return _clkSource->now();
     }
 
 private:
-    unique_ptr<MongosTopologyCoordinator> _topo;
-    // The fast clock is used by OperationContext::hasDeadlineExpired.
-    ClockSourceMock* _fastClock;
-    // The precise clock is used by waitForConditionOrInterruptNoAssertUntil.
-    ClockSourceMock* _preciseClock;
+    std::unique_ptr<MongosTopologyCoordinator> _topo;
+    std::shared_ptr<ClockSourceMock> _clkSource = std::make_shared<ClockSourceMock>();
 };
 
 TEST_F(MongosTopoCoordTest, MongosTopologyVersionCounterInitializedAtStartup) {
@@ -120,7 +112,6 @@ TEST_F(MongosTopoCoordTest, AwaitIsMasterResponseReturnsCurrentMongosTopologyVer
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
     auto halfwayToMaxAwaitTime = maxAwaitTime / 2;
-    auto halfwayToDeadline = now() + halfwayToMaxAwaitTime;
     auto deadline = now() + maxAwaitTime;
 
     // isMaster request with the current TopologyVersion should attempt to wait for maxAwaitTimeMS.
@@ -141,12 +132,10 @@ TEST_F(MongosTopoCoordTest, AwaitIsMasterResponseReturnsCurrentMongosTopologyVer
 
     // Advance the clocks halfway and make sure awaitIsMasterResponse did not return yet.
     advanceTime(halfwayToMaxAwaitTime);
-    ASSERT_EQUALS(halfwayToDeadline, now());
     ASSERT_FALSE(isMasterReturned);
 
     // Advance the clocks the rest of the way so that awaitIsMasterResponse times out.
     advanceTime(halfwayToMaxAwaitTime);
-    ASSERT_EQUALS(deadline, now());
     getIsMasterThread.join();
     ASSERT_TRUE(isMasterReturned);
 }
