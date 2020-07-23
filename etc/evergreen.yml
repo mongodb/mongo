@@ -3381,9 +3381,9 @@ functions:
   "gather failed unittests": &gather_failed_unittests
     command: shell.exec
     params:
+      shell: bash
       working_dir: "src"
       script: |
-
         set -eou pipefail
 
         mkdir unittest_binaries || true
