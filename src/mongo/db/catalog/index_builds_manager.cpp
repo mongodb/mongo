@@ -309,10 +309,9 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanupForRollback(OperationConte
     }
 
     LOGV2(20347,
-          "Index build aborted without cleanup for rollback: {uuid}: {reason}",
+          "Index build aborted without cleanup for rollback: {uuid}",
           "Index build aborted without cleanup for rollback",
-          logAttrs(buildUUID),
-          "reason"_attr = reason);
+          "buildUUID"_attr = buildUUID);
 
     builder.getValue()->abortWithoutCleanupForRollback(opCtx);
     return true;
