@@ -882,7 +882,7 @@ env_vars.Add('PKGDIR',
 
 env_vars.Add('PREFIX',
     help='Final installation location of files, will be made into a sub dir of $DESTDIR',
-    default='')
+    default='.')
 
 # Exposed to be able to cross compile Android/*nix from Windows without ending up with the .exe suffix.
 env_vars.Add('PROGSUFFIX',
@@ -4152,13 +4152,28 @@ env.AddPackageNameAlias(
     name="mh-debugsymbols",
 )
 
+def rpath_generator(env, source, target, for_signature):
+    # If the PREFIX_LIBDIR has an absolute path, we will use that directly as
+    # RPATH because that indicates the final install destination of the libraries.
+    prefix_libdir = env.subst('$PREFIX_LIBDIR')
+    if  os.path.isabs(prefix_libdir):
+        return ['$PREFIX_LIBDIR']
+
+    # If the PREFIX_LIBDIR is not an absolute path, we will use a relative path
+    # from the bin to the lib dir.
+    lib_rel = os.path.relpath(prefix_libdir, env.subst('$PREFIX_BINDIR'))
+
+    if env['PLATFORM'] == 'posix':\
+        return [env.Literal(f"\\$$ORIGIN/{lib_rel}")]
+
+    if env['PLATFORM'] == 'darwin':
+        return [f"@loader_path/{lib_rel}",]
+
+env['RPATH_GENERATOR'] = rpath_generator
+
 if env['PLATFORM'] == 'posix':
     env.AppendUnique(
-        RPATH=[
-            # In the future when we want to improve dynamic builds
-            # we should set this to $PREFIX ideally
-             env.Literal('\\$$ORIGIN/../lib'),
-        ],
+        RPATH='$RPATH_GENERATOR',
         LINKFLAGS=[
             # Most systems *require* -z,origin to make origin work, but android
             # blows up at runtime if it finds DF_ORIGIN_1 in DT_FLAGS_1.
@@ -4173,11 +4188,15 @@ if env['PLATFORM'] == 'posix':
         ]
     )
 elif env['PLATFORM'] == 'darwin':
+    # The darwin case uses a adhoc implementation of RPATH for SCons
+    # since SCons does not support RPATH directly for macOS:
+    #   https://github.com/SCons/scons/issues/2127
+    # so we setup RPATH and LINKFLAGS ourselves.
+    env['RPATHPREFIX'] = '-Wl,-rpath,'
+    env['RPATHSUFFIX'] = ''
+    env['RPATH'] = '$RPATH_GENERATOR'
     env.AppendUnique(
-        LINKFLAGS=[
-            '-Wl,-rpath,@loader_path/../lib',
-            '-Wl,-rpath,@loader_path/../Frameworks'
-        ],
+        LINKFLAGS="${_concat(RPATHPREFIX, RPATH, RPATHSUFFIX, __env__)}",
         SHLINKFLAGS=[
             "-Wl,-install_name,@rpath/${TARGET.file}",
         ],
