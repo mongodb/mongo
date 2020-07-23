@@ -331,8 +331,11 @@ public:
         _cache.invalidate(key);
     }
 
+    /**
+     * Invalidates all cached entries and in progress lookups with keys that matches the preidcate.
+     */
     template <typename Pred>
-    void invalidateIf(const Pred& predicate) {
+    void invalidateIfKey(const Pred& predicate) {
         stdx::lock_guard lg(_mutex);
         for (auto& entry : _inProgressLookups) {
             if (predicate(entry.first))
@@ -341,8 +344,18 @@ public:
         _cache.invalidateIf([&](const Key& key, const StoredValue*) { return predicate(key); });
     }
 
+    /**
+     * Invalidates all cached entries with stored values that matches the preidcate.
+     */
+    template <typename Pred>
+    void invalidateIfCachedValue(const Pred& predicate) {
+        stdx::lock_guard lg(_mutex);
+        _cache.invalidateIf(
+            [&](const Key&, const StoredValue* value) { return predicate(value->value); });
+    }
+
     void invalidateAll() {
-        invalidateIf([](const Key&) { return true; });
+        invalidateIfKey([](const Key&) { return true; });
     }
 
     /**
