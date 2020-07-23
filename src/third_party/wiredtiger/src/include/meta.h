@@ -95,8 +95,9 @@ struct __wt_block_mods {
     uint64_t offset; /* Zero bit offset for bitstring */
     uint64_t granularity;
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_BLOCK_MODS_VALID 0x1u /* Entry is valid */
-                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
+#define WT_BLOCK_MODS_RENAME 0x1u /* Entry is from a rename */
+#define WT_BLOCK_MODS_VALID 0x2u  /* Entry is valid */
+                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };
 

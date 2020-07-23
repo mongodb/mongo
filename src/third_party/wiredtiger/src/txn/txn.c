@@ -1587,10 +1587,13 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
              * If there are older updates to this key by the same transaction, set the repeated key
              * flag on this operation. This is later used in txn commit/rollback so we only resolve
              * each set of prepared updates once. Skip reserved updates, they're ignored as they're
-             * simply discarded when we find them.
+             * simply discarded when we find them. Also ignore updates created by instantiating fast
+             * truncation pages, they aren't linked into the transaction's modify list and so can't
+             * be considered.
              */
             for (tmp = upd->next; tmp != NULL && tmp->txnid == upd->txnid; tmp = tmp->next)
-                if (tmp->type != WT_UPDATE_RESERVE) {
+                if (tmp->type != WT_UPDATE_RESERVE &&
+                  !F_ISSET(tmp, WT_UPDATE_RESTORED_FAST_TRUNCATE)) {
                     F_SET(op, WT_TXN_OP_KEY_REPEATED);
                     break;
                 }

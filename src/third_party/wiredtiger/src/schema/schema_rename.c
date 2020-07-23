@@ -9,14 +9,40 @@
 #include "wt_internal.h"
 
 /*
+ * __rename_blkmod --
+ *     Reset the incremental backup information for a rename.
+ */
+static int
+__rename_blkmod(WT_SESSION_IMPL *session, const char *oldvalue, WT_ITEM *buf)
+{
+    WT_CKPT ckpt;
+    WT_DECL_RET;
+
+    WT_CLEAR(ckpt);
+    /*
+     * Replace the old file entries with new file entries. We need to recreate the incremental
+     * backup information to indicate copying the entire file in its bitmap.
+     */
+    /* First load any existing backup information into a temp checkpoint structure. */
+    WT_RET(__wt_meta_blk_mods_load(session, oldvalue, &ckpt, true));
+
+    /* Take the checkpoint structure and generate the metadata string. */
+    ret = __wt_ckpt_blkmod_to_meta(session, buf, &ckpt);
+    __wt_meta_checkpoint_free(session, &ckpt);
+    return (ret);
+}
+
+/*
  * __rename_file --
  *     WT_SESSION::rename for a file.
  */
 static int
 __rename_file(WT_SESSION_IMPL *session, const char *uri, const char *newuri)
 {
+    WT_DECL_ITEM(buf);
     WT_DECL_RET;
     char *newvalue, *oldvalue;
+    const char *filecfg[3] = {NULL, NULL, NULL};
     const char *filename, *newfile;
     bool exist;
 
@@ -33,6 +59,7 @@ __rename_file(WT_SESSION_IMPL *session, const char *uri, const char *newuri)
     WT_WITH_HANDLE_LIST_WRITE_LOCK(
       session, ret = __wt_conn_dhandle_close_all(session, uri, true, false));
     WT_ERR(ret);
+    WT_ERR(__wt_scr_alloc(session, 1024, &buf));
 
     /*
      * First, check if the file being renamed exists in the system. Doing this check first matches
@@ -54,13 +81,20 @@ __rename_file(WT_SESSION_IMPL *session, const char *uri, const char *newuri)
     default:
         WT_ERR(ret);
     }
+    __wt_free(session, newvalue);
     WT_ERR(__wt_fs_exist(session, newfile, &exist));
     if (exist)
         WT_ERR_MSG(session, EEXIST, "%s", newfile);
 
-    /* Replace the old file entries with new file entries. */
     WT_ERR(__wt_metadata_remove(session, uri));
-    WT_ERR(__wt_metadata_insert(session, newuri, oldvalue));
+    filecfg[0] = oldvalue;
+    if (F_ISSET(S2C(session), WT_CONN_INCR_BACKUP)) {
+        WT_ERR(__rename_blkmod(session, oldvalue, buf));
+        filecfg[1] = buf->mem;
+    } else
+        filecfg[1] = NULL;
+    WT_ERR(__wt_config_collapse(session, filecfg, &newvalue));
+    WT_ERR(__wt_metadata_insert(session, newuri, newvalue));
 
     /* Rename the underlying file. */
     WT_ERR(__wt_fs_rename(session, filename, newfile, false));
@@ -68,6 +102,7 @@ __rename_file(WT_SESSION_IMPL *session, const char *uri, const char *newuri)
         WT_ERR(__wt_meta_track_fileop(session, uri, newuri));
 
 err:
+    __wt_scr_free(session, &buf);
     __wt_free(session, newvalue);
     __wt_free(session, oldvalue);
     return (ret);
