@@ -2011,6 +2011,430 @@ public:
     }
 };
 
+class ValidateIndexWithMultikeyDocRepair : public ValidateBase {
+public:
+    // No need to test with background validation as repair mode is not supported in background
+    // validation.
+    ValidateIndexWithMultikeyDocRepair() : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+
+        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+
+        // Create a new collection and insert non-multikey document.
+        lockDb(MODE_X);
+        Collection* coll;
+        RecordId id1;
+        BSONObj doc = BSON("_id" << 1 << "a" << 1);
+        {
+            OpDebug* const nullOpDebug = nullptr;
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+
+            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug, true));
+            id1 = coll->getCursor(&_opCtx)->next()->id;
+            wunit.commit();
+        }
+
+        // Create non-multikey index.
+        const auto indexName = "non_mk_index";
+        auto status =
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                                     << static_cast<int>(kIndexVersion)));
+        ASSERT_OK(status);
+
+        releaseDb();
+        ensureValidateWorked();
+
+        // Set up a non-multikey index with multikey document.
+        {
+            lockDb(MODE_X);
+            IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam =
+                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+            InsertDeleteOptions options;
+            options.dupsAllowed = true;
+            options.logIfError = true;
+
+            // Remove non-multikey index entry.
+            {
+                WriteUnitOfWork wunit(&_opCtx);
+                KeyStringSet keys;
+                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                             doc,
+                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                             IndexAccessMethod::GetKeysContext::kRemovingKeys,
+                             &keys,
+                             nullptr,
+                             nullptr,
+                             id1,
+                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                ASSERT_EQ(keys.size(), 1);
+
+                int64_t numDeleted;
+                auto removeStatus =
+                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
+                ASSERT_OK(removeStatus);
+                ASSERT_EQUALS(numDeleted, 1);
+                wunit.commit();
+            }
+
+            // Update non-multikey document with multikey document.   {a: 1}   ->   {a: [2, 3]}
+            BSONObj mkDoc = BSON("_id" << 1 << "a" << BSON_ARRAY(2 << 3));
+            {
+                WriteUnitOfWork wunit(&_opCtx);
+                auto updateStatus = coll->getRecordStore()->updateRecord(
+                    &_opCtx, id1, mkDoc.objdata(), mkDoc.objsize());
+                ASSERT_OK(updateStatus);
+                wunit.commit();
+            }
+
+            // Insert index entries which satisfy the new multikey document.
+            {
+                WriteUnitOfWork wunit(&_opCtx);
+                KeyStringSet keys;
+                MultikeyPaths multikeyPaths;
+                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                             mkDoc,
+                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                             IndexAccessMethod::GetKeysContext::kAddingKeys,
+                             &keys,
+                             nullptr,
+                             &multikeyPaths,
+                             id1,
+                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                ASSERT_EQ(keys.size(), 2);
+                ASSERT_EQ(multikeyPaths.size(), 1);
+
+                // Insert index keys one at a time in order to avoid marking index as multikey
+                // and allows us to pass in an empty set of MultikeyPaths.
+                int64_t numInserted;
+                auto keysIterator = keys.begin();
+                auto insertStatus = iam->insertKeys(&_opCtx,
+                                                    coll,
+                                                    {*keysIterator},
+                                                    {},
+                                                    MultikeyPaths{},
+                                                    id1,
+                                                    options,
+                                                    nullptr,
+                                                    &numInserted);
+                ASSERT_EQUALS(numInserted, 1);
+                ASSERT_OK(insertStatus);
+
+                keysIterator++;
+                numInserted = 0;
+                insertStatus = iam->insertKeys(&_opCtx,
+                                               coll,
+                                               {*keysIterator},
+                                               {},
+                                               MultikeyPaths{},
+                                               id1,
+                                               options,
+                                               nullptr,
+                                               &numInserted);
+                ASSERT_EQUALS(numInserted, 1);
+                ASSERT_OK(insertStatus);
+                wunit.commit();
+            }
+            releaseDb();
+        }
+
+        // Confirm multikey document found on non-multikey index error detected by validate.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kNone,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Run validate in repair mode.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kRepair,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(true, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Confirm index updated as multikey and multikey paths added such that index does not have
+        // to be rebuilt.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kRepair,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
+class ValidateMultikeyPathCoverageRepair : public ValidateBase {
+public:
+    // No need to test with background validation as repair mode is not supported in background
+    // validation.
+    ValidateMultikeyPathCoverageRepair() : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+
+        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+
+        // Create a new collection and insert multikey document.
+        lockDb(MODE_X);
+        Collection* coll;
+        RecordId id1;
+        BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2) << "b" << 1);
+        {
+            OpDebug* const nullOpDebug = nullptr;
+
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+
+            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc1), nullOpDebug, true));
+            id1 = coll->getCursor(&_opCtx)->next()->id;
+            wunit.commit();
+        }
+
+        // Create a multikey index.
+        const auto indexName = "mk_index";
+        auto status = dbtests::createIndexFromSpec(&_opCtx,
+                                                   coll->ns().ns(),
+                                                   BSON("name" << indexName << "key"
+                                                               << BSON("a" << 1 << "b" << 1) << "v"
+                                                               << static_cast<int>(kIndexVersion)));
+        ASSERT_OK(status);
+
+        releaseDb();
+        ensureValidateWorked();
+
+        // Add a multikey document such that the multikey index's multikey paths do not cover it.
+        {
+            lockDb(MODE_X);
+
+            IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam =
+                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+            InsertDeleteOptions options;
+            options.dupsAllowed = true;
+            options.logIfError = true;
+
+            // Remove index keys for original document.
+            MultikeyPaths oldMultikeyPaths;
+            {
+                WriteUnitOfWork wunit(&_opCtx);
+                KeyStringSet keys;
+                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                             doc1,
+                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                             IndexAccessMethod::GetKeysContext::kRemovingKeys,
+                             &keys,
+                             nullptr,
+                             &oldMultikeyPaths,
+                             id1,
+                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                ASSERT_EQ(keys.size(), 2);
+
+                int64_t numDeleted;
+                auto removeStatus =
+                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
+                ASSERT_OK(removeStatus);
+                ASSERT_EQ(numDeleted, 2);
+                wunit.commit();
+            }
+
+            // Update multikey document with a different multikey documents (not coverd by multikey
+            // paths).   {a: [1, 2], b: 1}   ->   {a: 1, b: [4, 5]}
+            BSONObj doc2 = BSON("_id" << 1 << "a" << 1 << "b" << BSON_ARRAY(4 << 5));
+            {
+                WriteUnitOfWork wunit(&_opCtx);
+                auto updateStatus = coll->getRecordStore()->updateRecord(
+                    &_opCtx, id1, doc2.objdata(), doc2.objsize());
+                ASSERT_OK(updateStatus);
+                wunit.commit();
+            }
+
+            // We are using the multikeyPaths of the old document and passing them to this insert
+            // call (to avoid changing the multikey state).
+            {
+                WriteUnitOfWork wunit(&_opCtx);
+                KeyStringSet keys;
+                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                             doc2,
+                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                             IndexAccessMethod::GetKeysContext::kAddingKeys,
+                             &keys,
+                             nullptr,
+                             nullptr,
+                             id1,
+                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                ASSERT_EQ(keys.size(), 2);
+
+                int64_t numInserted;
+                auto insertStatus = iam->insertKeys(
+                    &_opCtx, coll, keys, {}, oldMultikeyPaths, id1, options, nullptr, &numInserted);
+
+                ASSERT_EQUALS(numInserted, 2);
+                ASSERT_OK(insertStatus);
+                wunit.commit();
+            }
+            releaseDb();
+        }
+
+        // Confirm multikey paths' insufficient coverage of multikey document detected by validate.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kNone,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Run validate in repair mode.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kRepair,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(true, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Confirm repair mode does not silently suppress validation errors.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kNone,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
 class ValidateTests : public OldStyleSuiteSpecification {
 public:
     ValidateTests() : OldStyleSuiteSpecification("validate_tests") {}
@@ -2062,6 +2486,9 @@ public:
         add<ValidateInvalidBSONResults<false, false>>();
         add<ValidateInvalidBSONResults<false, true>>();
         add<ValidateInvalidBSONRepair>();
+
+        add<ValidateIndexWithMultikeyDocRepair>();
+        add<ValidateMultikeyPathCoverageRepair>();
     }
 };
 

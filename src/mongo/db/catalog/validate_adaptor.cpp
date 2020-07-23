@@ -69,7 +69,8 @@ const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
 Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        const RecordId& recordId,
                                        const RecordData& record,
-                                       size_t* dataSize) {
+                                       size_t* dataSize,
+                                       ValidateResults* results) {
     BSONObj recordBson;
     try {
         recordBson = record.toBson();
@@ -88,7 +89,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         LOGV2(4666601, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
     }
 
-    const IndexCatalog* indexCatalog = _validateState->getCollection()->getIndexCatalog();
+    Collection* coll = _validateState->getCollection();
+    IndexCatalog* indexCatalog = coll->getIndexCatalog();
     if (!indexCatalog->haveAnyIndexes()) {
         return status;
     }
@@ -121,26 +123,60 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                 documentKeySet->size(),
                 {multikeyMetadataKeys->begin(), multikeyMetadataKeys->end()},
                 *documentMultikeyPaths)) {
-            std::string msg = str::stream()
-                << "Index " << descriptor->indexName() << " is not multi-key but has more than one"
-                << " key in document " << recordId;
-            ValidateResults& curRecordResults = (*_indexNsResultsMap)[descriptor->indexName()];
-            curRecordResults.errors.push_back(msg);
-            curRecordResults.valid = false;
-            if (crashOnMultikeyValidateFailure.shouldFail()) {
-                invariant(false, msg);
+            if (_validateState->shouldRunRepair()) {
+                writeConflictRetry(opCtx, "setIndexAsMultikey", coll->ns().ns(), [&] {
+                    WriteUnitOfWork wuow(opCtx);
+                    indexCatalog->setMultikeyPaths(opCtx, coll, descriptor, *documentMultikeyPaths);
+                    wuow.commit();
+                });
+
+                LOGV2(4614700,
+                      "Index set to multikey",
+                      "indexName"_attr = descriptor->indexName(),
+                      "collection"_attr = coll->ns().ns());
+                results->warnings.push_back(str::stream() << "Index " << descriptor->indexName()
+                                                          << " set to multikey.");
+                results->repaired = true;
+            } else {
+                ValidateResults& curRecordResults = (*_indexNsResultsMap)[descriptor->indexName()];
+                std::string msg = str::stream() << "Index " << descriptor->indexName()
+                                                << " is not multikey but has more than one"
+                                                << " key in document " << recordId;
+                curRecordResults.errors.push_back(msg);
+                curRecordResults.valid = false;
+                if (crashOnMultikeyValidateFailure.shouldFail()) {
+                    invariant(false, msg);
+                }
             }
         }
 
         if (index->isMultikey()) {
             const MultikeyPaths& indexPaths = index->getMultikeyPaths(opCtx);
             if (!MultikeyPathTracker::covers(indexPaths, *documentMultikeyPaths.get())) {
-                std::string msg = str::stream()
-                    << "Index " << descriptor->indexName()
-                    << " multi-key paths do not cover a document. RecordId: " << recordId;
-                ValidateResults& curRecordResults = (*_indexNsResultsMap)[descriptor->indexName()];
-                curRecordResults.errors.push_back(msg);
-                curRecordResults.valid = false;
+                if (_validateState->shouldRunRepair()) {
+                    writeConflictRetry(opCtx, "increaseMultikeyPathCoverage", coll->ns().ns(), [&] {
+                        WriteUnitOfWork wuow(opCtx);
+                        indexCatalog->setMultikeyPaths(
+                            opCtx, coll, descriptor, *documentMultikeyPaths);
+                        wuow.commit();
+                    });
+
+                    LOGV2(4614701,
+                          "Multikey paths updated to cover multikey document",
+                          "indexName"_attr = descriptor->indexName(),
+                          "collection"_attr = coll->ns().ns());
+                    results->warnings.push_back(str::stream() << "Index " << descriptor->indexName()
+                                                              << " multikey paths updated.");
+                    results->repaired = true;
+                } else {
+                    std::string msg = str::stream()
+                        << "Index " << descriptor->indexName()
+                        << " multikey paths do not cover a document. RecordId: " << recordId;
+                    ValidateResults& curRecordResults =
+                        (*_indexNsResultsMap)[descriptor->indexName()];
+                    curRecordResults.errors.push_back(msg);
+                    curRecordResults.valid = false;
+                }
             }
         }
 
@@ -334,7 +370,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         interruptIntervalNumBytes += dataSize;
         dataSizeTotal += dataSize;
         size_t validatedSize = 0;
-        Status status = validateRecord(opCtx, record->id, record->data, &validatedSize);
+        Status status = validateRecord(opCtx, record->id, record->data, &validatedSize, results);
 
         // Checks to ensure isInRecordIdOrder() is being used properly.
         if (prevRecordId.isValid()) {
