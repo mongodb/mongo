@@ -283,6 +283,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
         }
 
         opCtx->recoveryUnit()->onCommit([ns, this](auto commitTs) {
+            if (!_buildUUID) {
+                return;
+            }
+
             LOGV2(20346,
                   "Index build initialized: {buildUUID}: {nss} ({collection_uuid}): indexes: "
                   "{indexes_size}",
