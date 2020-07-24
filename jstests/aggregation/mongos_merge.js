@@ -15,7 +15,6 @@
  *   requires_sharding,
  *   requires_spawning_own_processes,
  *   requires_profiling,
- *   requires_fcv_46,
  * ]
  */
 
@@ -346,6 +345,14 @@ function runTestCasesWhoseMergeLocationDependsOnAllowDiskUse(allowDiskUse) {
     // All test cases should merge on mongoD if allowDiskUse is true, mongoS otherwise.
     const assertMergeOnMongoX = (allowDiskUse ? assertMergeOnMongoD : assertMergeOnMongoS);
 
+    // Test that a blocking $sort is only merged on mongoS if 'allowDiskUse' is not set.
+    assertMergeOnMongoX({
+        testName: "agg_mongos_merge_blocking_sort_no_disk_use",
+        pipeline: [{$match: {_id: {$gte: -200, $lte: 200}}}, {$sort: {_id: -1}}, {$sort: {a: 1}}],
+        allowDiskUse: allowDiskUse,
+        expectedCount: 400
+    });
+
     // Test that $group is only merged on mongoS if 'allowDiskUse' is not set.
     assertMergeOnMongoX({
         testName: "agg_mongos_merge_group_allow_disk_use",
@@ -353,20 +360,6 @@ function runTestCasesWhoseMergeLocationDependsOnAllowDiskUse(allowDiskUse) {
             [{$match: {_id: {$gte: -200, $lte: 200}}}, {$group: {_id: {$mod: ["$_id", 150]}}}],
         allowDiskUse: allowDiskUse,
         expectedCount: 299
-    });
-
-    // Adjacent $sort stages will be coalesced and merge sort will occur on anyShard when disk use
-    // is allowed, and on mongos otherwise.
-    assertMergeOnMongoX({
-        testName: "agg_mongos_merge_blocking_sort_allow_disk_use",
-        pipeline: [
-            {$match: {_id: {$gte: -200, $lte: 200}}},
-            {$sort: {_id: 1}},
-            {$_internalSplitPipeline: {}},
-            {$sort: {a: 1}}
-        ],
-        allowDiskUse: allowDiskUse,
-        expectedCount: 400
     });
 
     // Test that a blocking $sample is only merged on mongoS if 'allowDiskUse' is not set.
