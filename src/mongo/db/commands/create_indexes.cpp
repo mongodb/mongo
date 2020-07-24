@@ -614,6 +614,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
           "firstIndex"_attr = specs[0][IndexDescriptor::kIndexNameFieldName]);
     hangCreateIndexesBeforeStartingIndexBuild.pauseWhileSet(opCtx);
 
+    bool shouldContinueInBackground = false;
     try {
         auto buildIndexFuture = uassertStatusOK(indexBuildsCoord->startIndexBuild(
             opCtx, dbname, *collectionUUID, specs, buildUUID, protocol, indexBuildOptions));
@@ -640,9 +641,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 // background and will complete when this node receives a commitIndexBuild oplog
                 // entry from the new primary.
                 if (ErrorCodes::InterruptedDueToReplStateChange == interruptionEx.code()) {
-                    LOGV2(20442,
-                          "Index build: ignoring interrupt and continuing in background",
-                          "buildUUID"_attr = buildUUID);
+                    shouldContinueInBackground = true;
                     throw;
                 }
             }
@@ -678,9 +677,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             // background and will complete when this node receives a commitIndexBuild oplog
             // entry from the new primary.
             if (IndexBuildProtocol::kTwoPhase == protocol) {
-                LOGV2(20445,
-                      "Index build: ignoring interrupt and continuing in background",
-                      "buildUUID"_attr = buildUUID);
+                shouldContinueInBackground = true;
                 throw;
             }
 
@@ -709,8 +706,15 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             return true;
         }
 
+        if (shouldContinueInBackground) {
+            LOGV2(4760400,
+                  "Index build: ignoring interrupt and continuing in background",
+                  "buildUUID"_attr = buildUUID);
+        } else {
+            LOGV2(20449, "Index build: failed", "buildUUID"_attr = buildUUID, "error"_attr = ex);
+        }
+
         // All other errors should be forwarded to the caller with index build information included.
-        LOGV2(20449, "Index build: failed", "buildUUID"_attr = buildUUID, "error"_attr = ex);
         ex.addContext(str::stream() << "Index build failed: " << buildUUID << ": Collection " << ns
                                     << " ( " << *collectionUUID << " )");
 
