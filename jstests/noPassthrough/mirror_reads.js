@@ -49,8 +49,13 @@ function sendAndCheckReads({rst, cmd, minRate, maxRate}) {
                   `x ${numNodes} nodes`);
 
         let rate = readsMirrored / readsSeen / numNodes;
-        return (rate >= minRate) && (rate <= maxRate);
+        return (rate >= minRate) && (readsSeen >= kBurstCount);
     }, "Did not verify all requests within time limit", 10000);
+    let currentMirroredReads = getMirroredReadsStats(rst);
+    const resolvedRate = (currentMirroredReads.resolved - startMirroredReads.resolved) /
+        (currentMirroredReads.seen - startMirroredReads.seen) / rst.getSecondaries().length;
+    jsTestLog(`Comparing resolvedRate: ${resolvedRate} versus maxRate: ${maxRate}`);
+    assert(resolvedRate <= maxRate);
 
     jsTestLog(`Verified ${tojson(cmd)} was mirrored`);
 }
