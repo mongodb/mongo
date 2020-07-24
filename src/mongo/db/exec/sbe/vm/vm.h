@@ -45,7 +45,6 @@ std::pair<value::TypeTags, value::Value> genericNumericCompare(value::TypeTags l
                                                                value::TypeTags rhsTag,
                                                                value::Value rhsValue,
                                                                Op op) {
-
     if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {
             case value::TypeTags::NumberInt32: {
@@ -90,6 +89,13 @@ std::pair<value::TypeTags, value::Value> genericNumericCompare(value::TypeTags l
         // This is where Mongo differs from SQL.
         auto result = op(0, 0);
         return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+    } else if ((value::isArray(lhsTag) && value::isArray(rhsTag)) ||
+               (value::isObject(lhsTag) && value::isObject(rhsTag))) {
+        auto [tag, val] = value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue);
+        if (tag == value::TypeTags::NumberInt32) {
+            auto result = op(value::bitcastTo<int32_t>(val), 0);
+            return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+        }
     }
 
     return {value::TypeTags::Nothing, 0};
