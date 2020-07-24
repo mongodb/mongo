@@ -12,5 +12,9 @@ load("jstests/replsets/libs/prepare_standalone_replication_recovery.js");
 
 const testName = "standalone_replication_recovery_prepare_only";
 
+// This test completes with a prepared transaction still active, so we cannot enforce an accurate
+// fast count.
+TestData.skipEnforceFastCountOnValidate = true;
+
 testPrepareRecoverFromOplogAsStandalone(testName, /* commitBeforeRecovery */ false);
 })();

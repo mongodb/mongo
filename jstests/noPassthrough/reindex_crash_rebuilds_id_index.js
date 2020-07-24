@@ -11,6 +11,9 @@
 
 load("jstests/libs/get_index_helpers.js");  // For GetIndexHelpers.
 
+// This test triggers an unclean shutdown, which may cause inaccurate fast counts.
+TestData.skipEnforceFastCountOnValidate = true;
+
 const baseName = 'reindex_crash_rebuilds_id_index';
 const collName = baseName;
 const dbpath = MongoRunner.dataPath + baseName + '/';

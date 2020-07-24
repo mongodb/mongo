@@ -12,5 +12,8 @@ load("jstests/replsets/libs/prepare_standalone_replication_recovery.js");
 
 const testName = "standalone_replication_recovery_prepare_with_commit";
 
+// TODO (SERVER-49862): Re-enable fast count validation if possible.
+TestData.skipEnforceFastCountOnValidate = true;
+
 testPrepareRecoverFromOplogAsStandalone(testName, /* commitBeforeRecovery */ true);
 })();

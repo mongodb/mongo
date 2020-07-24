@@ -12,6 +12,8 @@ load("jstests/replsets/libs/rollback_test.js");
 load("jstests/libs/fail_point_util.js");
 
 TestData.rollbackShutdowns = true;
+TestData.allowUncleanShutdowns = true;
+
 let dbName = "test";
 let sourceCollName = "coll";
 

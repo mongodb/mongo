@@ -7,6 +7,9 @@
 (function() {
 "use strict";
 
+// This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
+TestData.skipEnforceFastCountOnValidate = true;
+
 load('jstests/libs/write_concern_util.js');
 
 var st = new ShardingTest({shards: 1});
