@@ -63,7 +63,7 @@ const RollbackResumableIndexBuildTest = class {
         const awaitDisableFailPointAfterContinuingInBackground = startParallelShell(
             funWithArgs(function(failPointName, buildUUID) {
                 // Wait for the index build to be continue in the background.
-                checkLog.containsJson(db.getMongo(), 20442, {
+                checkLog.containsJson(db.getMongo(), 4760400, {
                     buildUUID: function(uuid) {
                         return uuid["uuid"]["$uuid"] === buildUUID;
                     }
