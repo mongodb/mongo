@@ -622,9 +622,7 @@ public:
     }
     void visit(const LTEMatchExpression* expr) final {}
     void visit(const LTMatchExpression* expr) final {}
-    void visit(const ModMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
+    void visit(const ModMatchExpression* expr) final {}
     void visit(const NorMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
@@ -725,7 +723,24 @@ public:
     void visit(const LTMatchExpression* expr) final {
         generateTraverseForComparisonPredicate(_context, expr, sbe::EPrimBinary::less);
     }
-    void visit(const ModMatchExpression* expr) final {}
+    void visit(const ModMatchExpression* expr) final {
+        // The mod function returns the result of the mod operation between the operand and given
+        // divisor, so construct an expression to then compare the result of the operation to the
+        // given remainder.
+        auto makeEExprFn = [expr](sbe::value::SlotId inputSlot) {
+            return makeFillEmptyFalse(sbe::makeE<sbe::EPrimBinary>(
+                sbe::EPrimBinary::eq,
+                sbe::makeE<sbe::EFunction>(
+                    "mod",
+                    sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
+                                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                                           expr->getDivisor()))),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                           expr->getRemainder())));
+        };
+
+        generateTraverse(_context, expr, std::move(makeEExprFn));
+    }
     void visit(const NorMatchExpression* expr) final {}
     void visit(const NotMatchExpression* expr) final {}
     void visit(const OrMatchExpression* expr) final {

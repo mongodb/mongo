@@ -309,7 +309,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericMod(value::Type
                                                                      value::Value lhsValue,
                                                                      value::TypeTags rhsTag,
                                                                      value::Value rhsValue) {
-    auto assertNonZero = [](bool isZero) { uassert(4848403, "can't $mod by zero", !isZero); };
+    auto assertNonZero = [](bool nonZero) { uassert(4848403, "can't $mod by zero", nonZero); };
 
     if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {
