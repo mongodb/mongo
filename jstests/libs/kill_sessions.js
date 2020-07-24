@@ -133,7 +133,7 @@ var _kill_sessions_api_module = (function() {
                 }
 
                 return false;
-            }, "never started sleep", 30000, 1);
+            }, "never started sleep with 'secs' " + id, 30000, 1);
         });
 
         return new HangingOpHandle(thread, lsid);
