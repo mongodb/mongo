@@ -170,15 +170,15 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
     auto indexStatsMap =
         CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
             .getUsageStats();
-    for (auto&& indexStatsMapIter : indexStatsMap) {
+    for (auto&& indexStatsMapIter : *indexStatsMap) {
         auto indexName = indexStatsMapIter.first;
         auto stats = indexStatsMapIter.second;
         MutableDocument doc;
         doc["name"] = Value(indexName);
-        doc["key"] = Value(stats.indexKey);
+        doc["key"] = Value(stats->indexKey);
         doc["host"] = Value(host);
-        doc["accesses"]["ops"] = Value(stats.accesses.loadRelaxed());
-        doc["accesses"]["since"] = Value(stats.trackerStartTime);
+        doc["accesses"]["ops"] = Value(stats->accesses.loadRelaxed());
+        doc["accesses"]["since"] = Value(stats->trackerStartTime);
 
         if (addShardName)
             doc["shard"] = Value(getShardName(opCtx));
