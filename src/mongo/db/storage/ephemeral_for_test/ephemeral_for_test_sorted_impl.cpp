@@ -1242,6 +1242,7 @@ SortedDataInterfaceBase::SortedDataInterfaceBase(const Ordering& ordering, Strin
     : ::mongo::SortedDataInterface(KeyString::Version::V1, ordering),
       _prefix(ident.toString().append(1, '\1')),
       _identEnd(ident.toString().append(1, '\2')),
+      _desc(nullptr),
       _isPartial(false) {}
 
 SortedDataBuilderInterface* SortedDataInterfaceUnique::getBulkBuilder(OperationContext* opCtx,
