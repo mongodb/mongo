@@ -25,23 +25,26 @@ var $config = (function() {
         },
 
         snapshotScan: function snapshotScan(db, collName) {
-            const readErrorCodes = [
-                ErrorCodes.ShutdownInProgress,
-            ];
             if (!this.cursorId || this.cursorId == 0) {
-                doSnapshotFindAtClusterTime(db, collName, this, readErrorCodes, {_id: 1}, (res) => {
-                    let expectedDocs =
-                        [...Array(this.batchSize).keys()].map((i) => ({_id: i, x: 1}));
-                    assert.eq(res.cursor.firstBatch, expectedDocs, () => tojson(res));
-                    this.numDocScanned = this.batchSize;
-                });
+                doSnapshotFindAtClusterTime(
+                    db, collName, this, [ErrorCodes.ShutdownInProgress], {_id: 1}, (res) => {
+                        let expectedDocs =
+                            [...Array(this.batchSize).keys()].map((i) => ({_id: i, x: 1}));
+                        assert.eq(res.cursor.firstBatch, expectedDocs, () => tojson(res));
+                        this.numDocScanned = this.batchSize;
+                    });
             } else {
-                doSnapshotGetMoreAtClusterTime(db, collName, this, readErrorCodes, (res) => {
-                    let expectedDocs = [...Array(this.batchSize).keys()].map(
-                        (i) => ({_id: i + this.numDocScanned, x: 1}));
-                    assert.eq(res.cursor.nextBatch, expectedDocs, () => tojson(res));
-                    this.numDocScanned = this.numDocScanned + this.batchSize;
-                });
+                doSnapshotGetMoreAtClusterTime(
+                    db,
+                    collName,
+                    this,
+                    [ErrorCodes.ShutdownInProgress, ErrorCodes.Interrupted],
+                    (res) => {
+                        let expectedDocs = [...Array(this.batchSize).keys()].map(
+                            (i) => ({_id: i + this.numDocScanned, x: 1}));
+                        assert.eq(res.cursor.nextBatch, expectedDocs, () => tojson(res));
+                        this.numDocScanned = this.numDocScanned + this.batchSize;
+                    });
             }
         },
 
