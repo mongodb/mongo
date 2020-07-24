@@ -117,6 +117,7 @@ let testCases = {
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrShardCollection: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
+    _vectorClockPersist: {skip: "internal command"},
     abortTransaction: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));

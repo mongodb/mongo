@@ -33,6 +33,7 @@
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -82,6 +83,22 @@ protected:
 
 private:
     std::shared_ptr<KeysCollectionManager> _keyManager;
+};
+
+class VectorClockMongoDTestPrimary : public VectorClockMongoDTest {
+protected:
+    void setUp() override {
+        VectorClockMongoDTest::setUp();
+
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
+        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    }
+
+    void tearDown() override {
+        VectorClockMongoDTest::tearDown();
+    }
 };
 
 TEST_F(VectorClockMongoDTest, TickClusterTime) {
@@ -281,7 +298,7 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
     ASSERT_EQ(afterTime3.topologyTime().asTimestamp(), Timestamp(0, 0));
 }
 
-TEST_F(VectorClockMongoDTest, PersistVectorClockDocument) {
+TEST_F(VectorClockMongoDTestPrimary, PersistVectorClockDocument) {
     auto sc = getServiceContext();
     auto opCtx = operationContext();
 
@@ -306,7 +323,7 @@ TEST_F(VectorClockMongoDTest, PersistVectorClockDocument) {
     ASSERT_EQUALS(store.count(opCtx, VectorClock::stateQuery()), 1);
 }
 
-TEST_F(VectorClockMongoDTest, RecoverVectorClockDocument) {
+TEST_F(VectorClockMongoDTestPrimary, RecoverVectorClockDocument) {
     auto sc = getServiceContext();
     auto opCtx = operationContext();
     const auto configTime = LogicalTime(Timestamp(3, 3));
@@ -335,7 +352,7 @@ TEST_F(VectorClockMongoDTest, RecoverVectorClockDocument) {
     ASSERT_EQUALS(actualTopologyTime, topologyTime);
 }
 
-TEST_F(VectorClockMongoDTest, RecoverNotExistingVectorClockDocument) {
+TEST_F(VectorClockMongoDTestPrimary, RecoverNotExistingVectorClockDocument) {
     auto sc = getServiceContext();
     auto opCtx = operationContext();
     auto vc = VectorClockMutable::get(sc);
@@ -364,7 +381,7 @@ TEST_F(VectorClockMongoDTest, RecoverNotExistingVectorClockDocument) {
     ASSERT_EQUALS(actualTopologyTime, topologyTime);
 }
 
-TEST_F(VectorClockMongoDTest, SubsequentPersistRecoverVectorClockDocument) {
+TEST_F(VectorClockMongoDTestPrimary, SubsequentPersistRecoverVectorClockDocument) {
     auto sc = getServiceContext();
     auto opCtx = operationContext();
     auto vc = VectorClockMutable::get(sc);

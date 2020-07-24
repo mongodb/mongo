@@ -33,10 +33,13 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -247,7 +250,34 @@ private:
         }
 
         std::string getOperationName() override {
-            return "persist";
+            return "localPersist";
+        }
+    };
+
+    /*
+     * VectorClockStateOperation invoking PersistOperation on a shard server's primary.
+     */
+    class RemotePersistOperation : public VectorClockStateOperation {
+        void execute(VectorClockMongoD* vectorClock, OperationContext* opCtx) override {
+            auto const shardingState = ShardingState::get(opCtx);
+            invariant(shardingState->enabled());
+
+            auto selfShard = uassertStatusOK(
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardingState->shardId()));
+
+            auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                NamespaceString::kVectorClockNamespace.toString(),
+                BSON("_vectorClockPersist" << 1),
+                Seconds{30},
+                Shard::RetryPolicy::kIdempotent));
+
+            uassertStatusOK(cmdResponse.commandStatus);
+        }
+
+        std::string getOperationName() override {
+            return "remotePersist";
         }
     };
 
@@ -285,6 +315,7 @@ private:
     };
 
     PersistOperation _persistOperation;
+    RemotePersistOperation _remotePersistOperation;
     RecoverOperation _recoverOperation;
 };
 
@@ -431,7 +462,17 @@ void VectorClockMongoD::_recoverComponent(OperationContext* opCtx,
 }
 
 SharedSemiFuture<void> VectorClockMongoD::persist(OperationContext* opCtx) {
-    return _persistOperation.performOperation(this, opCtx->getServiceContext());
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+
+        if (replCoord->getMemberState().primary()) {
+            return _persistOperation.performOperation(this, opCtx->getServiceContext());
+        }
+
+        return _remotePersistOperation.performOperation(this, opCtx->getServiceContext());
+    }
+
+    return SharedSemiFuture<void>();
 }
 
 void VectorClockMongoD::waitForInMemoryVectorClockToBePersisted(OperationContext* opCtx) {
