@@ -342,7 +342,7 @@ bool StorageEngineImpl::_handleInternalIdents(OperationContext* opCtx,
 
     // Look at the contents to determine whether this ident will contain information for
     // resuming an index build.
-    // TODO SERVER-49125: differentiate the internal idents without looking at the contents.
+    // TODO SERVER-49215: differentiate the internal idents without looking at the contents.
     auto cursor = rs->getCursor(opCtx);
     auto record = cursor->next();
     if (record) {
