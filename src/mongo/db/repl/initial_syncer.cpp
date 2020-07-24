@@ -1087,8 +1087,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
 
     // Changing the featureCompatibilityVersion during initial sync is unsafe.
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    if (version > ServerGlobalParams::FeatureCompatibility::kLastLTS &&
-        version < ServerGlobalParams::FeatureCompatibility::kLatest) {
+    if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading(version)) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(
             lock,
             Status(ErrorCodes::IncompatibleServerVersion,

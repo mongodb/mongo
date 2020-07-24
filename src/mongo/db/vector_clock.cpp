@@ -160,9 +160,9 @@ public:
              BSONObjBuilder* out,
              LogicalTime time,
              Component component) const override {
-        const auto& fcv = serverGlobalParams.featureCompatibility;
-        if (fcv.isVersionInitialized() &&
-            fcv.getVersion() == ServerGlobalParams::FeatureCompatibility::Version::kVersion451) {
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                ServerGlobalParams::FeatureCompatibility::Version::kVersion451)) {
             return ActualFormat::out(service, opCtx, permitRefresh, out, time, component);
         }
         return false;

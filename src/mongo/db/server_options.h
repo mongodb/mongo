@@ -242,8 +242,44 @@ struct ServerGlobalParams {
             return _version.store(version);
         }
 
-        bool isVersion(Version version) {
-            return _version.load() == version;
+        bool isLessThanOrEqualTo(Version version, Version* versionReturn = nullptr) {
+            Version currentVersion = getVersion();
+            if (versionReturn != nullptr) {
+                *versionReturn = currentVersion;
+            }
+            return currentVersion <= version;
+        }
+
+        bool isGreaterThanOrEqualTo(Version version, Version* versionReturn = nullptr) {
+            Version currentVersion = getVersion();
+            if (versionReturn != nullptr) {
+                *versionReturn = currentVersion;
+            }
+            return currentVersion >= version;
+        }
+
+        bool isLessThan(Version version, Version* versionReturn = nullptr) {
+            Version currentVersion = getVersion();
+            if (versionReturn != nullptr) {
+                *versionReturn = currentVersion;
+            }
+            return currentVersion < version;
+        }
+
+        bool isGreaterThan(Version version, Version* versionReturn = nullptr) {
+            Version currentVersion = getVersion();
+            if (versionReturn != nullptr) {
+                *versionReturn = currentVersion;
+            }
+            return currentVersion > version;
+        }
+
+        // This function is to be used for generic FCV references only, and not for FCV-gating.
+        bool isUpgradingOrDowngrading(boost::optional<Version> version = boost::none) {
+            if (version == boost::none) {
+                version = getVersion();
+            }
+            return version != kLatest && version != kLastContinuous && version != kLastLTS;
         }
 
     private:

@@ -289,8 +289,9 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         // so that clients can re-route their operations.
         //
         // TODO SERVER-49138: Remove this FCV check once we branch for 4.8.
-        if (serverGlobalParams.featureCompatibility.isVersion(
-                ServerGlobalParams::FeatureCompatibility::Version::kVersion451);
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                    ServerGlobalParams::FeatureCompatibility::Version::kVersion451);
             auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx)) {
             mongosTopCoord->enterQuiesceModeAndWait(opCtx, quiesceTime);
         }

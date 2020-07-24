@@ -179,7 +179,8 @@ void ReplSetHeartbeatArgsV1::addToBSON(BSONObjBuilder* builder) const {
     builder->appendIntOrLL(kTermFieldName, _term);
 
     // TODO SERVER-49382: Remove this FCV check after we branch for 4.7.
-    if (serverGlobalParams.featureCompatibility.isVersion(
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
             ServerGlobalParams::FeatureCompatibility::Version::kVersion451)) {
         builder->append(kPrimaryIdFieldName, _primaryId);
     }

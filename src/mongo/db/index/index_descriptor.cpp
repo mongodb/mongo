@@ -179,8 +179,8 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
 
     // The partialFilterExpression is only part of the index signature if FCV has been set to 4.6.
     // TODO SERVER-47766: remove these FCV checks after we branch for 4.7.
-    auto isFCV46 = serverGlobalParams.featureCompatibility.getVersion() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion451;
+    auto isFCV46 = serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion451);
 
     // If we have a partial filter expression and the other index doesn't, or vice-versa, then the
     // two indexes are not equivalent. We therefore return Comparison::kDifferent immediately.

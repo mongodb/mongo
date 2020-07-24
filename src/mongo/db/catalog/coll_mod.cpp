@@ -233,18 +233,17 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 continue;
             }
         } else if (fieldName == "validator" && !isView) {
-            // Save this to a variable to avoid reading the atomic variable multiple times.
-            const auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
-
             // If the feature compatibility version is not kLatest, and we are validating features
             // as master, ban the use of new agg features introduced in kLatest to prevent them from
             // being persisted in the catalog.
             boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
                 maxFeatureCompatibilityVersion;
             // (Generic FCV reference): This FCV check should exist across LTS binary versions.
+            ServerGlobalParams::FeatureCompatibility::Version fcv;
             if (serverGlobalParams.validateFeaturesAsMaster.load() &&
-                currentFCV != ServerGlobalParams::FeatureCompatibility::kLatest) {
-                maxFeatureCompatibilityVersion = currentFCV;
+                serverGlobalParams.featureCompatibility.isLessThan(
+                    ServerGlobalParams::FeatureCompatibility::kLatest, &fcv)) {
+                maxFeatureCompatibilityVersion = fcv;
             }
             cmr.collValidator = coll->parseValidator(opCtx,
                                                      e.Obj().getOwned(),
