@@ -370,6 +370,8 @@ class ExpressionRangedArity : public ExpressionNaryBase<SubClass> {
 public:
     explicit ExpressionRangedArity(ExpressionContext* const expCtx)
         : ExpressionNaryBase<SubClass>(expCtx) {}
+    ExpressionRangedArity(ExpressionContext* const expCtx, Expression::ExpressionVector&& children)
+        : ExpressionNaryBase<SubClass>(expCtx, std::move(children)) {}
 
     void validateArguments(const Expression::ExpressionVector& args) const override {
         uassert(28667,
@@ -461,6 +463,9 @@ class ExpressionSingleNumericArg : public ExpressionFixedArity<SubClass, 1> {
 public:
     explicit ExpressionSingleNumericArg(ExpressionContext* const expCtx)
         : ExpressionFixedArity<SubClass, 1>(expCtx) {}
+    explicit ExpressionSingleNumericArg(ExpressionContext* const expCtx,
+                                        Expression::ExpressionVector&& children)
+        : ExpressionFixedArity<SubClass, 1>(expCtx, std::move(children)) {}
 
     virtual ~ExpressionSingleNumericArg() = default;
 
@@ -743,6 +748,8 @@ class ExpressionAbs final : public ExpressionSingleNumericArg<ExpressionAbs> {
 public:
     explicit ExpressionAbs(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionAbs>(expCtx) {}
+    explicit ExpressionAbs(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionSingleNumericArg<ExpressionAbs>(expCtx, std::move(children)) {}
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
@@ -943,6 +950,8 @@ class ExpressionCeil final : public ExpressionSingleNumericArg<ExpressionCeil> {
 public:
     explicit ExpressionCeil(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionCeil>(expCtx) {}
+    explicit ExpressionCeil(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionSingleNumericArg<ExpressionCeil>(expCtx, std::move(children)) {}
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
@@ -1314,6 +1323,8 @@ class ExpressionDivide final : public ExpressionFixedArity<ExpressionDivide, 2> 
 public:
     explicit ExpressionDivide(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionDivide, 2>(expCtx) {}
+    explicit ExpressionDivide(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionDivide, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1328,6 +1339,8 @@ class ExpressionExp final : public ExpressionSingleNumericArg<ExpressionExp> {
 public:
     explicit ExpressionExp(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionExp>(expCtx) {}
+    explicit ExpressionExp(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionSingleNumericArg<ExpressionExp>(expCtx, std::move(children)) {}
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
@@ -1464,6 +1477,8 @@ class ExpressionFloor final : public ExpressionSingleNumericArg<ExpressionFloor>
 public:
     explicit ExpressionFloor(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionFloor>(expCtx) {}
+    explicit ExpressionFloor(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionSingleNumericArg<ExpressionFloor>(expCtx, std::move(children)) {}
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
@@ -1643,6 +1658,8 @@ class ExpressionLn final : public ExpressionSingleNumericArg<ExpressionLn> {
 public:
     explicit ExpressionLn(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionLn>(expCtx) {}
+    explicit ExpressionLn(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionSingleNumericArg<ExpressionLn>(expCtx, std::move(children)) {}
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
@@ -1656,6 +1673,8 @@ class ExpressionLog final : public ExpressionFixedArity<ExpressionLog, 2> {
 public:
     explicit ExpressionLog(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionLog, 2>(expCtx) {}
+    explicit ExpressionLog(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionLog, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1669,6 +1688,8 @@ class ExpressionLog10 final : public ExpressionSingleNumericArg<ExpressionLog10>
 public:
     explicit ExpressionLog10(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionLog10>(expCtx) {}
+    explicit ExpressionLog10(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionSingleNumericArg<ExpressionLog10>(expCtx, std::move(children)) {}
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
@@ -1778,6 +1799,8 @@ class ExpressionMod final : public ExpressionFixedArity<ExpressionMod, 2> {
 public:
     explicit ExpressionMod(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionMod, 2>(expCtx) {}
+    explicit ExpressionMod(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionMod, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1792,6 +1815,8 @@ class ExpressionMultiply final : public ExpressionVariadic<ExpressionMultiply> {
 public:
     explicit ExpressionMultiply(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionMultiply>(expCtx) {}
+    explicit ExpressionMultiply(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionVariadic<ExpressionMultiply>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1929,6 +1954,8 @@ class ExpressionPow final : public ExpressionFixedArity<ExpressionPow, 2> {
 public:
     explicit ExpressionPow(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionPow, 2>(expCtx) {}
+    explicit ExpressionPow(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionPow, 2>(expCtx, std::move(children)) {}
 
     static boost::intrusive_ptr<Expression> create(ExpressionContext* const expCtx,
                                                    Value base,
@@ -2237,6 +2264,8 @@ class ExpressionRound final : public ExpressionRangedArity<ExpressionRound, 1, 2
 public:
     explicit ExpressionRound(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx) {}
+    explicit ExpressionRound(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2264,6 +2293,8 @@ class ExpressionSqrt final : public ExpressionSingleNumericArg<ExpressionSqrt> {
 public:
     explicit ExpressionSqrt(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionSqrt>(expCtx) {}
+    explicit ExpressionSqrt(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionSingleNumericArg<ExpressionSqrt>(expCtx, std::move(children)) {}
 
     Value evaluateNumericArg(const Value& numericArg) const final;
     const char* getOpName() const final;
@@ -2362,6 +2393,8 @@ class ExpressionSubtract final : public ExpressionFixedArity<ExpressionSubtract,
 public:
     explicit ExpressionSubtract(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx) {}
+    explicit ExpressionSubtract(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2507,6 +2540,8 @@ class ExpressionTrunc final : public ExpressionRangedArity<ExpressionTrunc, 1, 2
 public:
     explicit ExpressionTrunc(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx) {}
+    explicit ExpressionTrunc(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx, std::move(children)) {}
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
                                                   BSONElement elem,

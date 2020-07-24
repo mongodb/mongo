@@ -36,6 +36,21 @@
 #define KEYFIELDNAMES(ENUMIFY)   \
     ENUMIFY(add)                 \
     ENUMIFY(atan2)               \
+    ENUMIFY(abs)                 \
+    ENUMIFY(ceil)                \
+    ENUMIFY(divide)              \
+    ENUMIFY(exponent)            \
+    ENUMIFY(floor)               \
+    ENUMIFY(ln)                  \
+    ENUMIFY(log)                 \
+    ENUMIFY(logten)              \
+    ENUMIFY(mod)                 \
+    ENUMIFY(multiply)            \
+    ENUMIFY(pow)                 \
+    ENUMIFY(round)               \
+    ENUMIFY(sqrt)                \
+    ENUMIFY(subtract)            \
+    ENUMIFY(trunc)               \
     ENUMIFY(id)                  \
     ENUMIFY(andExpr)             \
     ENUMIFY(orExpr)              \

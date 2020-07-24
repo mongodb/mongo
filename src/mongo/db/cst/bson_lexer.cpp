@@ -80,6 +80,21 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"$toObjectId", PipelineParserGen::token::TO_OBJECT_ID},
     {"$toString", PipelineParserGen::token::TO_STRING},
     {"$type", PipelineParserGen::token::TYPE},
+    {"$abs", PipelineParserGen::token::ABS},
+    {"$ceil", PipelineParserGen::token::CEIL},
+    {"$divide", PipelineParserGen::token::DIVIDE},
+    {"$exp", PipelineParserGen::token::EXPONENT},
+    {"$floor", PipelineParserGen::token::FLOOR},
+    {"$ln", PipelineParserGen::token::LN},
+    {"$log", PipelineParserGen::token::LOG},
+    {"$log10", PipelineParserGen::token::LOGTEN},
+    {"$mod", PipelineParserGen::token::MOD},
+    {"$multiply", PipelineParserGen::token::MULTIPLY},
+    {"$pow", PipelineParserGen::token::POW},
+    {"$round", PipelineParserGen::token::ROUND},
+    {"$sqrt", PipelineParserGen::token::SQRT},
+    {"$subtract", PipelineParserGen::token::SUBTRACT},
+    {"$trunc", PipelineParserGen::token::TRUNC},
 };
 bool isCompound(PipelineParserGen::symbol_type token) {
     return token.type_get() == static_cast<int>(PipelineParserGen::token::START_OBJECT) ||

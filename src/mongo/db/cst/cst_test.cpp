@@ -629,5 +629,198 @@ TEST(CstTest, BuildsAndPrintsType) {
     }
 }
 
+TEST(CstGrammarTest, ParsesValidNumberAbs) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$abs: 1}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(), "{ project: { val: { abs: \"<UserInt 1>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidCeil) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$ceil: 1.5}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { ceil: \"<UserDouble 1.500000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidDivide) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$divide: [10, 5]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { divide: [ \"<UserInt 10>\", \"<UserInt 5>\" ] } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidExp) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$exp: 1.5}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { exponent: \"<UserDouble 1.500000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidFloor) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$floor: 1.5}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { floor: \"<UserDouble 1.500000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidLn) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$ln: [37, 10]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { ln: [ \"<UserInt 10>\", \"<UserInt 37>\" ] } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidLog) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$log: [10, 5]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { log: [ \"<UserInt 10>\", \"<UserInt 5>\" ] } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidLog10) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$log10: 1.5}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { logten: \"<UserDouble 1.500000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidMod) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$mod: [10, 5]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { mod: [ \"<UserInt 10>\", \"<UserInt 5>\" ] } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidMultiply) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$multiply: [10, 5]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { multiply: [ \"<UserInt 10>\", \"<UserInt 5>\" ] } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidPow) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$pow: [10, 5]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { pow: [ \"<UserInt 10>\", \"<UserInt 5>\" ] } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidRound) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$round: [1.234, 2]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    std::cout << "TEDLOG " << stages[0].toBson().toString() << "\n";
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { round: [ \"<UserDouble 1.234000>\", \"<UserInt 2>\" ] } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidSqrt) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$sqrt: 25}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(), "{ project: { val: { sqrt: \"<UserInt 25>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidSubtract) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$subtract: [10, 5]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { subtract: [ \"<UserInt 10>\", \"<UserInt 5>\" ] } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidTrunc) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {val: {$trunc: [1.234, 2]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { val: { trunc: [ \"<UserDouble 1.234000>\", \"<UserInt 2>\" ] } } }");
+}
 }  // namespace
 }  // namespace mongo

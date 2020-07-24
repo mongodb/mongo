@@ -254,6 +254,36 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
                 expCtx.get(), std::move(expressions[0]), BSONType::String);
         case KeyFieldname::type:
             return make_intrusive<ExpressionType>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::abs:
+            return make_intrusive<ExpressionAbs>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::ceil:
+            return make_intrusive<ExpressionCeil>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::divide:
+            return make_intrusive<ExpressionDivide>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::exponent:
+            return make_intrusive<ExpressionExp>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::floor:
+            return make_intrusive<ExpressionFloor>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::ln:
+            return make_intrusive<ExpressionLn>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::log:
+            return make_intrusive<ExpressionLog>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::logten:
+            return make_intrusive<ExpressionLog10>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::mod:
+            return make_intrusive<ExpressionMod>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::multiply:
+            return make_intrusive<ExpressionMultiply>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::pow:
+            return make_intrusive<ExpressionPow>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::round:
+            return make_intrusive<ExpressionRound>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::sqrt:
+            return make_intrusive<ExpressionSqrt>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::subtract:
+            return make_intrusive<ExpressionSubtract>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::trunc:
+            return make_intrusive<ExpressionTrunc>(expCtx.get(), std::move(expressions));
         default:
             MONGO_UNREACHABLE;
     }

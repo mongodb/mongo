@@ -162,6 +162,21 @@
     TO_OBJECT_ID
     TO_STRING
     TYPE
+    ABS
+    CEIL
+    DIVIDE
+    EXPONENT
+    FLOOR
+    LN
+    LOG
+    LOGTEN
+    MOD
+    MULTIPLY
+    POW
+    ROUND
+    SQRT
+    SUBTRACT
+    TRUNC
 
     // $convert arguments.
     INPUT_ARG
@@ -217,6 +232,7 @@
 %nterm <CNode> compExprs cmp eq gt gte lt lte ne
 %nterm <CNode> typeExpression typeValue convert toBool toDate toDecimal toDouble toInt toLong
 %nterm <CNode> toObjectId toString type
+%nterm <CNode> abs ceil divide exponent floor ln log logten mod multiply pow round sqrt subtract trunc
 %nterm <std::pair<CNode::Fieldname, CNode>> onErrorArg onNullArg
 %nterm <std::vector<CNode>> expressions values
 
@@ -482,9 +498,54 @@ aggExprAsUserFieldname:
     | TYPE {
         $$ = UserFieldname{"$type"};
     }
+    | ABS {
+        $$ = UserFieldname{"$abs"};
+    }
+    | CEIL {
+        $$ = UserFieldname{"$ceil"};
+    }
+    | DIVIDE {
+        $$ = UserFieldname{"$divide"};
+    }
+    | EXPONENT {
+        $$ = UserFieldname{"$exp"};
+    }
+    | FLOOR {
+        $$ = UserFieldname{"$floor"};
+    }
+    | LN {
+        $$ = UserFieldname{"$ln"};
+    }
+    | LOG {
+        $$ = UserFieldname{"$log"};
+    }
+    | LOGTEN {
+        $$ = UserFieldname{"$log10"};
+    }
+    | MOD {
+        $$ = UserFieldname{"$mod"};
+    }
+    | MULTIPLY {
+        $$ = UserFieldname{"$multiply"};
+    }
+    | POW {
+        $$ = UserFieldname{"$pow"};
+    }
+    | ROUND {
+        $$ = UserFieldname{"$round"};
+    }
+    | SQRT {
+       $$ = UserFieldname{"$sqrt"};
+    }
+    | SUBTRACT {
+       $$ = UserFieldname{"$subtract"};
+    }
+    | TRUNC {
+        $$ = UserFieldname{"$trunc"};
+    }
 ;
 
-// Rules for literal non-terminals. 
+// Rules for literal non-terminals.
 string:
     STRING {
         $$ = CNode{UserString{$1}};
@@ -705,8 +766,8 @@ idAsUserFieldname:
 ;
 
 maths:
-    add
-    | atan2
+    add | atan2 | abs | ceil | divide | exponent | floor | ln | log | logten | mod | multiply | pow
+| round | sqrt | subtract | trunc
 ;
 
 add:
@@ -725,7 +786,92 @@ atan2:
                                           $exprFixedTwoArg}}};
     }
 ;
-
+abs:
+    START_OBJECT ABS expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::abs, $expression}}};
+    }
+;
+ceil:
+    START_OBJECT CEIL expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::ceil, $expression}}};
+    }
+;
+divide:
+      START_OBJECT DIVIDE START_ARRAY expression[expr1] expression[expr2] END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::divide,
+                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+    }
+;
+exponent:
+        START_OBJECT EXPONENT expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::exponent, $expression}}};
+    }
+;
+floor:
+     START_OBJECT FLOOR expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::floor, $expression}}};
+    }
+;
+ln:
+  START_OBJECT LN expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::ln, $expression}}};
+ }
+;
+log:
+   START_OBJECT LOG START_ARRAY expression[expr1] expression[expr2] END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::log,
+                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+  }
+;
+logten:
+      START_OBJECT LOGTEN expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::logten, $expression}}};
+     }
+;
+mod:
+   START_OBJECT MOD START_ARRAY expression[expr1] expression[expr2] END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::mod,
+                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+  }
+;
+multiply:
+    START_OBJECT MULTIPLY START_ARRAY expression[expr1] expression[expr2] expressions END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::multiply,
+                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+        auto&& others = $expressions;
+        auto&& array = $$.objectChildren()[0].second.arrayChildren();
+        array.insert(array.end(), others.begin(), others.end());
+    }
+;
+pow:
+   START_OBJECT POW START_ARRAY expression[expr1] expression[expr2] END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::pow,
+                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+  }
+;
+round:
+   START_OBJECT ROUND START_ARRAY expression[expr1] expression[expr2] END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::round,
+                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+    }
+;
+sqrt:
+      START_OBJECT SQRT expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::sqrt, $expression}}};
+   }
+;
+subtract:
+   START_OBJECT SUBTRACT START_ARRAY expression[expr1] expression[expr2] END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::subtract,
+                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+       }
+;
+trunc:
+   START_OBJECT TRUNC START_ARRAY expression[expr1] expression[expr2] END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::trunc,
+                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+     }
+;
 boolExps:
     and | or | not
 ;
