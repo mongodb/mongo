@@ -209,8 +209,10 @@ std::unique_ptr<pcrecpp::RE> RegexMatchExpression::makeRegex(const std::string& 
                                          regex_util::flagsToPcreOptions(flags, true));
 }
 
-RegexMatchExpression::RegexMatchExpression(StringData path, const BSONElement& e)
-    : LeafMatchExpression(REGEX, path),
+RegexMatchExpression::RegexMatchExpression(StringData path,
+                                           const BSONElement& e,
+                                           clonable_ptr<ErrorAnnotation> annotation)
+    : LeafMatchExpression(REGEX, path, std::move(annotation)),
       _regex(e.regex()),
       _flags(e.regexFlags()),
       _re(makeRegex(_regex, _flags)) {
@@ -218,8 +220,11 @@ RegexMatchExpression::RegexMatchExpression(StringData path, const BSONElement& e
     _init();
 }
 
-RegexMatchExpression::RegexMatchExpression(StringData path, StringData regex, StringData options)
-    : LeafMatchExpression(REGEX, path),
+RegexMatchExpression::RegexMatchExpression(StringData path,
+                                           StringData regex,
+                                           StringData options,
+                                           clonable_ptr<ErrorAnnotation> annotation)
+    : LeafMatchExpression(REGEX, path, std::move(annotation)),
       _regex(regex.toString()),
       _flags(options.toString()),
       _re(new pcrecpp::RE(_regex.c_str(), regex_util::flagsToPcreOptions(_flags, true))) {
@@ -301,8 +306,13 @@ void RegexMatchExpression::shortDebugString(StringBuilder& debug) const {
 
 // ---------
 
-ModMatchExpression::ModMatchExpression(StringData path, int divisor, int remainder)
-    : LeafMatchExpression(MOD, path), _divisor(divisor), _remainder(remainder) {
+ModMatchExpression::ModMatchExpression(StringData path,
+                                       int divisor,
+                                       int remainder,
+                                       clonable_ptr<ErrorAnnotation> annotation)
+    : LeafMatchExpression(MOD, path, std::move(annotation)),
+      _divisor(divisor),
+      _remainder(remainder) {
     uassert(ErrorCodes::BadValue, "divisor cannot be 0", divisor != 0);
 }
 
@@ -339,7 +349,9 @@ bool ModMatchExpression::equivalent(const MatchExpression* other) const {
 
 // ------------------
 
-ExistsMatchExpression::ExistsMatchExpression(StringData path) : LeafMatchExpression(EXISTS, path) {}
+ExistsMatchExpression::ExistsMatchExpression(StringData path,
+                                             clonable_ptr<ErrorAnnotation> annotation)
+    : LeafMatchExpression(EXISTS, path, std::move(annotation)) {}
 
 bool ExistsMatchExpression::matchesSingleElement(const BSONElement& e,
                                                  MatchDetails* details) const {

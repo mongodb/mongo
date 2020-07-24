@@ -38,13 +38,18 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(ExprMatchExpressionMatchesReturnsFalseOnException);
 
 ExprMatchExpression::ExprMatchExpression(boost::intrusive_ptr<Expression> expr,
-                                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : MatchExpression(MatchType::EXPRESSION), _expCtx(expCtx), _expression(expr) {}
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         clonable_ptr<ErrorAnnotation> annotation)
+    : MatchExpression(MatchType::EXPRESSION, std::move(annotation)),
+      _expCtx(expCtx),
+      _expression(expr) {}
 
 ExprMatchExpression::ExprMatchExpression(BSONElement elem,
-                                         const boost::intrusive_ptr<ExpressionContext>& expCtx)
+                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         clonable_ptr<ErrorAnnotation> annotation)
     : ExprMatchExpression(Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState),
-                          expCtx) {}
+                          expCtx,
+                          std::move(annotation)) {}
 
 bool ExprMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
     if (_rewriteResult && _rewriteResult->matchExpression() &&
@@ -111,7 +116,8 @@ std::unique_ptr<MatchExpression> ExprMatchExpression::shallowClone() const {
     boost::intrusive_ptr<Expression> clonedExpr = Expression::parseOperand(
         _expCtx.get(), bob.obj().firstElement(), _expCtx->variablesParseState);
 
-    auto clone = std::make_unique<ExprMatchExpression>(std::move(clonedExpr), _expCtx);
+    auto clone =
+        std::make_unique<ExprMatchExpression>(std::move(clonedExpr), _expCtx, _errorAnnotation);
     if (_rewriteResult) {
         clone->_rewriteResult = _rewriteResult->clone();
     }

@@ -356,14 +356,19 @@ public:
     static std::unique_ptr<pcrecpp::RE> makeRegex(const std::string& regex,
                                                   const std::string& flags);
 
-    RegexMatchExpression(StringData path, const BSONElement& e);
-    RegexMatchExpression(StringData path, StringData regex, StringData options);
+    RegexMatchExpression(StringData path,
+                         const BSONElement& e,
+                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
+    RegexMatchExpression(StringData path,
+                         StringData regex,
+                         StringData options,
+                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     ~RegexMatchExpression();
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<RegexMatchExpression> e =
-            std::make_unique<RegexMatchExpression>(path(), _regex, _flags);
+            std::make_unique<RegexMatchExpression>(path(), _regex, _flags, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -411,11 +416,14 @@ private:
 
 class ModMatchExpression : public LeafMatchExpression {
 public:
-    ModMatchExpression(StringData path, int divisor, int remainder);
+    ModMatchExpression(StringData path,
+                       int divisor,
+                       int remainder,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ModMatchExpression> m =
-            std::make_unique<ModMatchExpression>(path(), _divisor, _remainder);
+            std::make_unique<ModMatchExpression>(path(), _divisor, _remainder, _errorAnnotation);
         if (getTag()) {
             m->setTag(getTag()->clone());
         }
@@ -456,10 +464,12 @@ private:
 
 class ExistsMatchExpression : public LeafMatchExpression {
 public:
-    explicit ExistsMatchExpression(StringData path);
+    explicit ExistsMatchExpression(StringData path,
+                                   clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<ExistsMatchExpression> e = std::make_unique<ExistsMatchExpression>(path());
+        std::unique_ptr<ExistsMatchExpression> e =
+            std::make_unique<ExistsMatchExpression>(path(), _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }

@@ -693,5 +693,350 @@ TEST(LogicalMatchExpression, NestedAndOrNorNotOneFailingClause) {
         "               'consideredValue': 25}}}]}}]}");
     verifyGeneratedError(query, document, expectedError);
 }
+// Miscellaneous operators.
+// $exists
+TEST(MiscellaneousMatchExpression, BasicExists) {
+    BSONObj query = BSON("a" << BSON("$exists" << true));
+    BSONObj document = BSON("b" << 1);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$exists"
+                                 << "specifiedAs" << query << "reason"
+                                 << "path does not exist");
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, NotExists) {
+    BSONObj query = BSON("a" << BSON("$exists" << false));
+    BSONObj document = BSON("a" << 1);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$exists"
+                                 << "specifiedAs" << query << "reason"
+                                 << "path does exist");
+    verifyGeneratedError(query, document, expectedError);
+}
+// $type
+TEST(MiscellaneousMatchExpression, BasicType) {
+    BSONObj query = BSON("a" << BSON("$type"
+                                     << "int"));
+    BSONObj document = BSON("a"
+                            << "one");
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$type"
+                                 << "specifiedAs" << query << "reason"
+                                 << "no matching types found for specified typeset"
+                                 << "consideredValue"
+                                 << "one"
+                                 << "consideredType"
+                                 << "string");
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, NotType) {
+    BSONObj failingClause = BSON("$type"
+                                 << "string");
+    BSONObj failingQuery = BSON("a" << failingClause);
+    BSONObj query = BSON("a" << BSON("$not" << failingClause));
+    BSONObj document = BSON("a"
+                            << "words");
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$not"
+                                 << "details"
+                                 << BSON("operatorName"
+                                         << "$type"
+                                         << "specifiedAs" << failingQuery << "reason"
+                                         << "matching types found for specified typeset"
+                                         << "consideredValue"
+                                         << "words"
+                                         << "consideredType"
+                                         << "string"));
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, TypeMissingPath) {
+    BSONObj query = BSON("a" << BSON("$type"
+                                     << "double"));
+    BSONObj document = BSON("b" << 1);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$type"
+                                 << "specifiedAs" << query << "reason"
+                                 << "field was missing");
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, TypeImplicitArrayTraversal) {
+    BSONObj query = BSON("a" << BSON("$type"
+                                     << "double"));
+    BSONObj document = BSON("a" << BSON_ARRAY("x"
+                                              << "y"
+                                              << "z"));
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$type"
+                                 << "specifiedAs" << query << "reason"
+                                 << "no matching types found for specified typeset"
+                                 << "consideredValues"
+                                 << BSON_ARRAY("x"
+                                               << "y"
+                                               << "z"
+                                               << BSON_ARRAY("x"
+                                                             << "y"
+                                                             << "z"))
+                                 << "consideredTypes"
+                                 << BSON_ARRAY("array"
+                                               << "string"));
+    verifyGeneratedError(query, document, expectedError);
+}
+// $expr
+TEST(MiscellaneousMatchExpression, BasicExpr) {
+    BSONObj query = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a"
+                                                             << "$b")));
+    BSONObj document = BSON("a" << 1 << "b" << 2);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$expr"
+                                 << "specifiedAs" << query << "reason"
+                                 << "$expr did not match"
+                                 << "expressionResult" << false);
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, NorExpr) {
+    BSONObj failingClause = BSON("$eq" << BSON_ARRAY("$a"
+                                                     << "$b"));
+    BSONObj failingQuery = BSON("$expr" << failingClause);
+    BSONObj query = BSON("$nor" << BSON_ARRAY(failingQuery));
+    BSONObj document = BSON("a" << 1 << "b" << 1);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$nor"
+                                 << "clausesNotSatisfied"
+                                 << BSON_ARRAY(BSON(
+                                        "index" << 0 << "details"
+                                                << BSON("operatorName"
+                                                        << "$expr"
+                                                        << "specifiedAs" << failingQuery << "reason"
+                                                        << "$expr did match"
+                                                        << "expressionResult" << true))));
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, ExprImplicitArrayTraversal) {
+    BSONObj query = BSON("$expr" << BSON("$eq" << BSON_ARRAY("$a"
+                                                             << "$b")));
+    BSONObj document = BSON("a" << BSON_ARRAY(0 << 1 << 2) << "b" << BSON_ARRAY(3 << 4 << 5));
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$expr"
+                                 << "specifiedAs" << query << "reason"
+                                 << "$expr did not match"
+                                 << "expressionResult" << false);
+    verifyGeneratedError(query, document, expectedError);
+}
+// $mod
+TEST(MiscellaneousMatchExpression, BasicMod) {
+    BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
+    BSONObj document = BSON("a" << 2);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$mod"
+                                 << "specifiedAs" << query << "reason"
+                                 << "$mod did not evaluate to expected remainder"
+                                 << "consideredValue" << 2);
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, NotMod) {
+    BSONObj failingClause = BSON("$mod" << BSON_ARRAY(2 << 1));
+    BSONObj failingQuery = BSON("a" << failingClause);
+    BSONObj query = BSON("a" << BSON("$not" << failingClause));
+    BSONObj document = BSON("a" << 2);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$not"
+                                 << "details"
+                                 << BSON("operatorName"
+                                         << "$mod"
+                                         << "specifiedAs" << failingQuery << "reason"
+                                         << "$mod did evaluate to expected remainder"
+                                         << "consideredValue" << 2));
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, ModMissingPath) {
+    BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
+    BSONObj document = BSON("b" << 2);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$mod"
+                                 << "specifiedAs" << query << "reason"
+                                 << "field was missing");
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversal) {
+    BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
+    BSONObj document = BSON("a" << BSON_ARRAY(0 << 2 << 4));
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$mod"
+                                 << "specifiedAs" << query << "reason"
+                                 << "$mod did not evaluate to expected remainder"
+                                 << "consideredValues"
+                                 << BSON_ARRAY(0 << 2 << 4 << BSON_ARRAY(0 << 2 << 4)));
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, ModNonNumeric) {
+    BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
+    BSONObj document = BSON("a"
+                            << "two");
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$mod"
+                                 << "specifiedAs" << query << "reason"
+                                 << "type mismatch"
+                                 << "consideredType"
+                                 << "string"
+                                 << "expectedTypes"
+                                 << BSON_ARRAY("decimal"
+                                               << "double"
+                                               << "int"
+                                               << "long")
+                                 << "consideredValue"
+                                 << "two");
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversalNonNumeric) {
+    BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
+    BSONObj document = BSON("a" << BSON_ARRAY("zero"
+                                              << "two"
+                                              << "four"));
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$mod"
+                                 << "specifiedAs" << query << "reason"
+                                 << "type mismatch"
+                                 << "consideredTypes"
+                                 << BSON_ARRAY("array"
+                                               << "string")
+                                 << "expectedTypes"
+                                 << BSON_ARRAY("decimal"
+                                               << "double"
+                                               << "int"
+                                               << "long")
+                                 << "consideredValues"
+                                 << BSON_ARRAY("zero"
+                                               << "two"
+                                               << "four"
+                                               << BSON_ARRAY("zero"
+                                                             << "two"
+                                                             << "four")));
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversalMixedTypes) {
+    BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
+    BSONObj document = BSON("a" << BSON_ARRAY(0 << "two"
+                                                << "four"));
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$mod"
+                                 << "specifiedAs" << query << "reason"
+                                 << "$mod did not evaluate to expected remainder"
+                                 << "consideredValues"
+                                 << BSON_ARRAY(0 << "two"
+                                                 << "four"
+                                                 << BSON_ARRAY(0 << "two"
+                                                                 << "four")));
+    verifyGeneratedError(query, document, expectedError);
+}
+// $regex
+TEST(MiscellaneousMatchExpression, BasicRegex) {
+    BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
+                                              << ""));
+    BSONObj document = BSON("a"
+                            << "one");
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$regex"
+                                 << "specifiedAs" << query << "reason"
+                                 << "regular expression did not match"
+                                 << "consideredValue"
+                                 << "one");
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, NotRegex) {
+    BSONObj failingClause = BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
+                                          << "");
+    BSONObj failingQuery = BSON("a" << failingClause);
+    BSONObj query = BSON("a" << BSON("$not" << failingClause));
+    BSONObj document = BSON("a"
+                            << "one");
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$not"
+                                 << "details"
+                                 << BSON("operatorName"
+                                         << "$regex"
+                                         << "specifiedAs" << failingQuery << "reason"
+                                         << "regular expression did match"
+                                         << "consideredValue"
+                                         << "one"));
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, RegexMissingPath) {
+    BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
+                                              << ""));
+    BSONObj document = BSON("b"
+                            << "myRegex");
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$regex"
+                                 << "specifiedAs" << query << "reason"
+                                 << "field was missing");
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversal) {
+    BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
+                                              << ""));
+    BSONObj document = BSON("a" << BSON_ARRAY("x"
+                                              << "y"
+                                              << "z"));
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$regex"
+                                 << "specifiedAs" << query << "reason"
+                                 << "regular expression did not match"
+                                 << "consideredValues"
+                                 << BSON_ARRAY("x"
+                                               << "y"
+                                               << "z"
+                                               << BSON_ARRAY("x"
+                                                             << "y"
+                                                             << "z")));
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, RegexNonString) {
+    BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
+                                              << ""));
+    BSONObj document = BSON("a" << 1);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$regex"
+                                 << "specifiedAs" << query << "reason"
+                                 << "type mismatch"
+                                 << "consideredType"
+                                 << "int"
+                                 << "expectedTypes"
+                                 << BSON_ARRAY("regex"
+                                               << "string"
+                                               << "symbol")
+                                 << "consideredValue" << 1);
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversalNonString) {
+    BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
+                                              << ""));
+    BSONObj document = BSON("a" << BSON_ARRAY(0 << 1 << 2));
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$regex"
+                                 << "specifiedAs" << query << "reason"
+                                 << "type mismatch"
+                                 << "consideredTypes"
+                                 << BSON_ARRAY("array"
+                                               << "int")
+                                 << "expectedTypes"
+                                 << BSON_ARRAY("regex"
+                                               << "string"
+                                               << "symbol")
+                                 << "consideredValues"
+                                 << BSON_ARRAY(0 << 1 << 2 << BSON_ARRAY(0 << 1 << 2)));
+    verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversalMixedTypes) {
+    BSONObj query = BSON("a" << BSON("$regex" << BSONRegEx("/myRegex/", "") << "$options"
+                                              << ""));
+    BSONObj document = BSON("a" << BSON_ARRAY("x" << 1 << 2));
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$regex"
+                                 << "specifiedAs" << query << "reason"
+                                 << "regular expression did not match"
+                                 << "consideredValues"
+                                 << BSON_ARRAY("x" << 1 << 2 << BSON_ARRAY("x" << 1 << 2)));
+    verifyGeneratedError(query, document, expectedError);
+}
 }  // namespace
 }  // namespace mongo

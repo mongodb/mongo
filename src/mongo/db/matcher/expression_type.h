@@ -54,9 +54,13 @@ public:
     explicit TypeMatchExpressionBase(MatchType matchType,
                                      StringData path,
                                      ElementPath::LeafArrayBehavior leafArrBehavior,
-                                     MatcherTypeSet typeSet)
-        : LeafMatchExpression(
-              matchType, path, leafArrBehavior, ElementPath::NonLeafArrayBehavior::kTraverse),
+                                     MatcherTypeSet typeSet,
+                                     clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : LeafMatchExpression(matchType,
+                              path,
+                              leafArrBehavior,
+                              ElementPath::NonLeafArrayBehavior::kTraverse,
+                              std::move(annotation)),
           _typeSet(std::move(typeSet)) {}
 
     virtual ~TypeMatchExpressionBase() = default;
@@ -67,7 +71,7 @@ public:
     virtual StringData name() const = 0;
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto expr = std::make_unique<T>(path(), _typeSet);
+        auto expr = std::make_unique<T>(path(), _typeSet, _errorAnnotation);
         if (getTag()) {
             expr->setTag(getTag()->clone());
         }
@@ -131,11 +135,14 @@ class TypeMatchExpression final : public TypeMatchExpressionBase<TypeMatchExpres
 public:
     static constexpr StringData kName = "$type"_sd;
 
-    TypeMatchExpression(StringData path, MatcherTypeSet typeSet)
+    TypeMatchExpression(StringData path,
+                        MatcherTypeSet typeSet,
+                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::TYPE_OPERATOR,
                                   path,
                                   ElementPath::LeafArrayBehavior::kTraverse,
-                                  typeSet) {}
+                                  typeSet,
+                                  std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -160,11 +167,14 @@ class InternalSchemaTypeExpression final
 public:
     static constexpr StringData kName = "$_internalSchemaType"_sd;
 
-    InternalSchemaTypeExpression(StringData path, MatcherTypeSet typeSet)
+    InternalSchemaTypeExpression(StringData path,
+                                 MatcherTypeSet typeSet,
+                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_TYPE,
                                   path,
                                   ElementPath::LeafArrayBehavior::kNoTraversal,
-                                  typeSet) {}
+                                  typeSet,
+                                  std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -269,11 +279,14 @@ class InternalSchemaBinDataEncryptedTypeExpression final
 public:
     static constexpr StringData kName = "$_internalSchemaBinDataEncryptedType"_sd;
 
-    InternalSchemaBinDataEncryptedTypeExpression(StringData path, MatcherTypeSet typeSet)
+    InternalSchemaBinDataEncryptedTypeExpression(StringData path,
+                                                 MatcherTypeSet typeSet,
+                                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE,
                                   path,
                                   ElementPath::LeafArrayBehavior::kNoTraversal,
-                                  typeSet) {}
+                                  typeSet,
+                                  std::move(annotation)) {}
 
     StringData name() const {
         return kName;

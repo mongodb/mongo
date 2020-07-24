@@ -503,10 +503,15 @@ StatusWithMatchExpression parseExpr(StringData name,
         return {Status(ErrorCodes::QueryFeatureNotAllowed, "$expr is not allowed in this context")};
     }
 
-    return {std::make_unique<ExprMatchExpression>(std::move(elem), expCtx)};
+    return {std::make_unique<ExprMatchExpression>(
+        std::move(elem),
+        expCtx,
+        createAnnotation(expCtx, elem.fieldNameStringData().toString(), elem.wrap()))};
 }
 
-StatusWithMatchExpression parseMOD(StringData name, BSONElement elem) {
+StatusWithMatchExpression parseMOD(StringData name,
+                                   BSONElement elem,
+                                   const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (elem.type() != BSONType::Array)
         return {Status(ErrorCodes::BadValue, "malformed mod, needs to be an array")};
 
@@ -527,10 +532,16 @@ StatusWithMatchExpression parseMOD(StringData name, BSONElement elem) {
     if (iter.more())
         return {Status(ErrorCodes::BadValue, "malformed mod, too many elements")};
 
-    return {std::make_unique<ModMatchExpression>(name, divisor.numberInt(), remainder.numberInt())};
+    return {std::make_unique<ModMatchExpression>(
+        name,
+        divisor.numberInt(),
+        remainder.numberInt(),
+        createAnnotation(
+            expCtx, elem.fieldNameStringData().toString(), BSON(name << elem.wrap())))};
 }
 
-StatusWithMatchExpression parseRegexDocument(StringData name, const BSONObj& doc) {
+StatusWithMatchExpression parseRegexDocument(
+    StringData name, const BSONObj& doc, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     StringData regex;
     StringData regexOptions;
 
@@ -575,7 +586,8 @@ StatusWithMatchExpression parseRegexDocument(StringData name, const BSONObj& doc
         }
     }
 
-    return {std::make_unique<RegexMatchExpression>(name, regex, regexOptions)};
+    return {std::make_unique<RegexMatchExpression>(
+        name, regex, regexOptions, createAnnotation(expCtx, "$regex", BSON(name << doc)))};
 }
 
 Status parseInExpression(InMatchExpression* inExpression,
@@ -602,7 +614,9 @@ Status parseInExpression(InMatchExpression* inExpression,
 }
 
 template <class T>
-StatusWithMatchExpression parseType(StringData name, BSONElement elt) {
+StatusWithMatchExpression parseType(StringData name,
+                                    BSONElement elt,
+                                    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto typeSet = MatcherTypeSet::parse(elt);
     if (!typeSet.isOK()) {
         return typeSet.getStatus();
@@ -613,7 +627,10 @@ StatusWithMatchExpression parseType(StringData name, BSONElement elt) {
                        str::stream() << name << " must match at least one type")};
     }
 
-    return {std::make_unique<T>(name, std::move(typeSet.getValue()))};
+    return {std::make_unique<T>(
+        name,
+        std::move(typeSet.getValue()),
+        createAnnotation(expCtx, elt.fieldNameStringData().toString(), BSON(name << elt.wrap())))};
 }
 
 /**
@@ -1593,19 +1610,23 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                 return {Status(ErrorCodes::BadValue, "$exists can't be eoo")};
             }
 
-            auto existsExpr = std::make_unique<ExistsMatchExpression>(name);
+            auto existsExpr = std::make_unique<ExistsMatchExpression>(
+                name,
+                createAnnotation(
+                    expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())));
             if (e.trueValue()) {
                 return {std::move(existsExpr)};
             }
 
-            return {std::make_unique<NotMatchExpression>(existsExpr.release())};
+            return {std::make_unique<NotMatchExpression>(
+                existsExpr.release(), createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend))};
         }
 
         case PathAcceptingKeyword::TYPE:
-            return parseType<TypeMatchExpression>(name, e);
+            return parseType<TypeMatchExpression>(name, e, expCtx);
 
         case PathAcceptingKeyword::MOD:
-            return parseMOD(name, e);
+            return parseMOD(name, e, expCtx);
 
         case PathAcceptingKeyword::OPTIONS: {
             // TODO: try to optimize this
@@ -1621,7 +1642,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         }
 
         case PathAcceptingKeyword::REGEX: {
-            return parseRegexDocument(name, context);
+            return parseRegexDocument(name, context, expCtx);
         }
 
         case PathAcceptingKeyword::ELEM_MATCH:
@@ -1789,7 +1810,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_TYPE: {
-            return parseType<InternalSchemaTypeExpression>(name, e);
+            return parseType<InternalSchemaTypeExpression>(name, e, expCtx);
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_EQ: {
@@ -1797,7 +1818,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE: {
-            return parseType<InternalSchemaBinDataEncryptedTypeExpression>(name, e);
+            return parseType<InternalSchemaBinDataEncryptedTypeExpression>(name, e, expCtx);
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE: {

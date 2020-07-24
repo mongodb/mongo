@@ -35,8 +35,10 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/match_expression_walker.h"
 
@@ -241,8 +243,28 @@ public:
     void visit(const EqualityMatchExpression* expr) final {
         generateComparisonError(expr);
     }
-    void visit(const ExistsMatchExpression* expr) final {}
-    void visit(const ExprMatchExpression* expr) final {}
+    void visit(const ExistsMatchExpression* expr) final {
+        static constexpr auto normalReason = "path does not exist";
+        static constexpr auto invertedReason = "path does exist";
+        _context->pushNewFrame(*expr);
+        if (_context->shouldGenerateError(*expr)) {
+            appendErrorDetails(*expr);
+            appendErrorReason(*expr, normalReason, invertedReason);
+        }
+    }
+    void visit(const ExprMatchExpression* expr) final {
+        static constexpr auto normalReason = "$expr did not match";
+        static constexpr auto invertedReason = "$expr did match";
+        _context->pushNewFrame(*expr);
+        if (_context->shouldGenerateError(*expr)) {
+            appendErrorDetails(*expr);
+            appendErrorReason(*expr, normalReason, invertedReason);
+            BSONObjBuilder& bob = _context->getCurrentObjBuilder();
+            // Append the result of $expr's aggregate expression. The result of the
+            // aggregate expression can be determined from the current inversion.
+            bob.append("expressionResult", _context->inversion == InvertError::kInverted);
+        }
+    }
     void visit(const GTEMatchExpression* expr) final {
         generateComparisonError(expr);
     }
@@ -284,7 +306,13 @@ public:
     void visit(const LTMatchExpression* expr) final {
         generateComparisonError(expr);
     }
-    void visit(const ModMatchExpression* expr) final {}
+    void visit(const ModMatchExpression* expr) final {
+        static constexpr auto kNormalReason = "$mod did not evaluate to expected remainder";
+        static constexpr auto kInvertedReason = "$mod did evaluate to expected remainder";
+        static const std::set<BSONType> expectedTypes{
+            NumberLong, NumberDouble, NumberDecimal, NumberInt};
+        generateLeafError(expr, kNormalReason, kInvertedReason, &expectedTypes);
+    }
     void visit(const NorMatchExpression* expr) final {
         preVisitTreeOperator(expr);
         // A NOR needs its children to call 'matches' in a normal context to discern which
@@ -306,7 +334,12 @@ public:
             _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
         }
     }
-    void visit(const RegexMatchExpression* expr) final {}
+    void visit(const RegexMatchExpression* expr) final {
+        static constexpr auto kNormalReason = "regular expression did not match";
+        static constexpr auto kInvertedReason = "regular expression did match";
+        static const std::set<BSONType> expectedTypes{String, Symbol, RegEx};
+        generateLeafError(expr, kNormalReason, kInvertedReason, &expectedTypes);
+    }
     void visit(const SizeMatchExpression* expr) final {}
     void visit(const TextMatchExpression* expr) final {
         MONGO_UNREACHABLE;
@@ -315,7 +348,19 @@ public:
         MONGO_UNREACHABLE;
     }
     void visit(const TwoDPtInAnnulusExpression* expr) final {}
-    void visit(const TypeMatchExpression* expr) final {}
+    void visit(const TypeMatchExpression* expr) final {
+        static constexpr auto normalReason = "no matching types found for specified typeset";
+        static constexpr auto invertedReason = "matching types found for specified typeset";
+        _context->pushNewFrame(*expr);
+        if (_context->shouldGenerateError(*expr)) {
+            appendErrorDetails(*expr);
+            BSONArray arr = createValuesArray(expr->path());
+            appendMissingField(arr);
+            appendErrorReason(*expr, normalReason, invertedReason);
+            appendConsideredValues(arr);
+            appendConsideredTypes(arr);
+        }
+    }
     void visit(const WhereMatchExpression* expr) final {
         MONGO_UNREACHABLE;
     }
@@ -331,20 +376,13 @@ private:
     void appendSpecifiedAs(const ErrorAnnotation& annotation, BSONObjBuilder* bob) {
         bob->append("specifiedAs", annotation.annotation);
     }
-
-    /**
-     * Given a pointer to a LeafMatchExpression 'expr', appends details to the current
-     * BSONObjBuilder tracked by '_context' describing why the document failed to match against
-     * 'expr'. In particular:
-     * - Appends "reason: field was missing" if expr's path is missing from the document.
-     * - Appends the specified 'reason' along with 'consideredValue' if the 'path' in the
-     * document resolves to a single value.
-     * - Appends the specified 'reason' along with 'consideredValues' if the 'path' in the
-     * document resolves to an array of values that is implicitly traversed by 'expr'.
-     */
-    void appendLeafErrorDetails(const LeafMatchExpression* expr, const std::string& reason) {
-        BSONObjBuilder* bob = &(_context->getCurrentObjBuilder());
-        ElementPath path(expr->path());
+    void appendErrorDetails(const MatchExpression& expr) {
+        auto annotation = expr.getErrorAnnotation();
+        BSONObjBuilder& bob = _context->getCurrentObjBuilder();
+        appendOperatorName(*annotation, &bob);
+        appendSpecifiedAs(*annotation, &bob);
+    }
+    BSONArray createValuesArray(ElementPath path) {
         MatchableDocument::IteratorHolder cursor(_context->doc, &path);
         BSONArrayBuilder bab;
         while (cursor->more()) {
@@ -355,34 +393,98 @@ private:
                 bab.append(elem);
             }
         }
-        auto size = bab.arrSize();
-        if (size == 0) {
-            bob->append("reason", "field was missing");
-        } else {
-            bob->append("reason", reason);
-            auto arr = bab.arr();
-            if (size == 1) {
-                bob->appendAs(arr[0], "consideredValue");
-            } else {
-                bob->append("consideredValues", arr);
-            }
+        return bab.arr();
+    }
+    /**
+     * Appends a missing field error if 'arr' is empty.
+     */
+    void appendMissingField(const BSONArray& arr) {
+        BSONObjBuilder& bob = _context->getCurrentObjBuilder();
+        if (arr.nFields() == 0) {
+            bob.append("reason", "field was missing");
         }
     }
 
-    void generateLeafError(const LeafMatchExpression* expr,
+    /**
+     * Appends a type mismatch error if no elements in 'arr' have one of the expected types.
+     */
+    void appendTypeMismatch(const BSONArray& arr, const std::set<BSONType>* expectedTypes) {
+        BSONObjBuilder& bob = _context->getCurrentObjBuilder();
+        if (bob.hasField("reason")) {
+            return;  // there's already a reason for failure
+        }
+        if (!expectedTypes) {
+            return;  // this operator accepts all types
+        }
+        for (auto&& elem : arr) {
+            if (expectedTypes->count(elem.type())) {
+                return;  // an element has one of the expected types
+            }
+        }
+        bob.append("reason", "type mismatch");
+        appendConsideredTypes(arr);
+        std::set<std::string> types;
+        for (auto&& elem : *expectedTypes) {
+            types.insert(typeName(elem));
+        }
+        if (types.size() == 1) {
+            bob.append("expectedType", *types.begin());
+        } else {
+            bob.append("expectedTypes", types);
+        }
+    }
+    void appendErrorReason(const MatchExpression& expr,
                            const std::string& normalReason,
                            const std::string& invertedReason) {
+        BSONObjBuilder& bob = _context->getCurrentObjBuilder();
+        if (bob.hasField("reason")) {
+            return;  // there's already a reason for failure
+        }
+        if (_context->inversion == InvertError::kNormal) {
+            bob.append("reason", normalReason);
+        } else {
+            bob.append("reason", invertedReason);
+        }
+    }
+    void appendConsideredValues(const BSONArray& arr) {
+        int size = arr.nFields();
+        if (size == 0) {
+            return;  // there are no values to append
+        }
+        BSONObjBuilder& bob = _context->getCurrentObjBuilder();
+        if (size == 1) {
+            bob.appendAs(arr[0], "consideredValue");
+        } else {
+            bob.append("consideredValues", arr);
+        }
+    }
+    void appendConsideredTypes(const BSONArray& arr) {
+        if (arr.nFields() == 0) {
+            return;  // no values means no considered types
+        }
+        BSONObjBuilder& bob = _context->getCurrentObjBuilder();
+        std::set<std::string> types;
+        for (auto&& elem : arr) {
+            types.insert(typeName(elem.type()));
+        }
+        if (types.size() == 1) {
+            bob.append("consideredType", *types.begin());
+        } else {
+            bob.append("consideredTypes", types);
+        }
+    }
+    void generateLeafError(const LeafMatchExpression* expr,
+                           const std::string& normalReason,
+                           const std::string& invertedReason,
+                           const std::set<BSONType>* expectedTypes = nullptr) {
         _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
-            auto annotation = expr->getErrorAnnotation();
-            BSONObjBuilder& bob = _context->getCurrentObjBuilder();
-            appendOperatorName(*annotation, &bob);
-            appendSpecifiedAs(*annotation, &bob);
-            if (_context->inversion == InvertError::kNormal) {
-                appendLeafErrorDetails(expr, normalReason);
-            } else {
-                appendLeafErrorDetails(expr, invertedReason);
-            }
+            appendErrorDetails(*expr);
+            BSONArray arr = createValuesArray(expr->path());
+            appendMissingField(arr);
+            appendTypeMismatch(arr, expectedTypes);
+            appendErrorReason(*expr, normalReason, invertedReason);
+            appendConsideredValues(arr);
         }
     }
 
@@ -508,8 +610,12 @@ public:
     void visit(const EqualityMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
-    void visit(const ExistsMatchExpression* expr) final {}
-    void visit(const ExprMatchExpression* expr) final {}
+    void visit(const ExistsMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
+    void visit(const ExprMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const GTEMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
@@ -549,7 +655,9 @@ public:
     void visit(const LTMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
-    void visit(const ModMatchExpression* expr) final {}
+    void visit(const ModMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const NorMatchExpression* expr) final {
         _context->flipInversion();
         postVisitTreeOperator(expr);
@@ -564,7 +672,9 @@ public:
     void visit(const OrMatchExpression* expr) final {
         postVisitTreeOperator(expr);
     }
-    void visit(const RegexMatchExpression* expr) final {}
+    void visit(const RegexMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const SizeMatchExpression* expr) final {}
     void visit(const TextMatchExpression* expr) final {
         MONGO_UNREACHABLE;
@@ -573,7 +683,9 @@ public:
         MONGO_UNREACHABLE;
     }
     void visit(const TwoDPtInAnnulusExpression* expr) final {}
-    void visit(const TypeMatchExpression* expr) final {}
+    void visit(const TypeMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const WhereMatchExpression* expr) final {
         MONGO_UNREACHABLE;
     }

@@ -46,10 +46,13 @@ namespace mongo {
  */
 class ExprMatchExpression final : public MatchExpression {
 public:
-    ExprMatchExpression(BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    ExprMatchExpression(BSONElement elem,
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     ExprMatchExpression(boost::intrusive_ptr<Expression> expr,
-                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final {
         MONGO_UNREACHABLE;
