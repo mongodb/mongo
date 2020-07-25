@@ -151,8 +151,6 @@ public:
     boost::optional<SharedSemiFuture<void>> trackOrphanedDataCleanup(
         ChunkRange const& orphans) const;
 
-    boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& from) const;
-
 private:
     // Management of the _metadata list is implemented in RangePreserver
     friend class RangePreserver;

@@ -141,31 +141,6 @@ public:
         OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op);
 
     /**
-     * Schedules any documents in `range` for immediate cleanup iff no running queries can depend
-     * on them, and adds the range to the list of ranges being received.
-     *
-     * Returns a future that will be resolved when the deletion has completed or failed.
-     */
-    SharedSemiFuture<void> beginReceive(ChunkRange const& range);
-
-    /*
-     * Removes `range` from the list of ranges being received, and schedules any documents in the
-     * range for immediate cleanup. Does not block.
-     */
-    void forgetReceive(const ChunkRange& range);
-
-    /**
-     * Clears the list of chunks that are being received as a part of an incoming migration.
-     */
-    void clearReceivingChunks();
-
-    /**
-     * Returns a range _not_ owned by this shard that starts no lower than the specified
-     * startingFrom key value, if any, or boost::none if there is no such range.
-     */
-    boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& startingFrom);
-
-    /**
      * Schedules documents in `range` for cleanup after any running queries that may depend on them
      * have terminated. Does not block. Fails if range overlaps any current local shard chunk.
      * Passed kDelayed, an additional delay (configured via server parameter orphanCleanupDelaySecs)
@@ -187,13 +162,6 @@ public:
                                const NamespaceString& nss,
                                const UUID& collectionUuid,
                                ChunkRange orphanRange);
-
-    /**
-     * Appends information about any chunks for which incoming migration has been requested, but the
-     * shard hasn't yet synchronised with the config server on whether that migration actually
-     * committed.
-     */
-    void appendPendingReceiveChunks(BSONArrayBuilder* builder);
 
     std::uint64_t getNumMetadataManagerChanges_forTest() {
         return _numMetadataManagerChanges;

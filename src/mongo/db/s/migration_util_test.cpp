@@ -58,14 +58,6 @@ UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
     return autoColl.getCollection()->uuid();
 }
 
-void addRangeToReceivingChunks(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const ChunkRange& range) {
-    AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-
-    std::ignore = CollectionShardingRuntime::get(opCtx, nss)->beginReceive(range);
-}
-
 template <typename ShardKey>
 RangeDeletionTask createDeletionTask(const NamespaceString& nss,
                                      const UUID& uuid,
