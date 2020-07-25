@@ -59,14 +59,14 @@ void TopologyEventsPublisher::onTopologyDescriptionChangedEvent(
     _scheduleNextDelivery();
 }
 
-void TopologyEventsPublisher::onServerHandshakeCompleteEvent(IsMasterRTT durationMs,
+void TopologyEventsPublisher::onServerHandshakeCompleteEvent(IsMasterRTT duration,
                                                              const HostAndPort& address,
                                                              const BSONObj reply) {
     {
         stdx::lock_guard<Mutex> lock(_eventQueueMutex);
         EventPtr event = std::make_unique<Event>();
         event->type = EventType::HANDSHAKE_COMPLETE;
-        event->duration = duration_cast<IsMasterRTT>(durationMs);
+        event->duration = duration;
         event->hostAndPort = address;
         event->reply = reply;
         _eventQueue.push_back(std::move(event));
@@ -136,13 +136,13 @@ void TopologyEventsPublisher::onServerPingFailedEvent(const HostAndPort& hostAnd
     _scheduleNextDelivery();
 }
 
-void TopologyEventsPublisher::onServerPingSucceededEvent(IsMasterRTT durationMS,
+void TopologyEventsPublisher::onServerPingSucceededEvent(IsMasterRTT duration,
                                                          const HostAndPort& hostAndPort) {
     {
         stdx::lock_guard lock(_eventQueueMutex);
         EventPtr event = std::make_unique<Event>();
         event->type = EventType::PING_SUCCESS;
-        event->duration = duration_cast<IsMasterRTT>(durationMS);
+        event->duration = duration;
         event->hostAndPort = hostAndPort;
         _eventQueue.push_back(std::move(event));
     }
@@ -193,13 +193,10 @@ void TopologyEventsPublisher::_sendEvent(TopologyListenerPtr listener, const Eve
             break;
         case EventType::HANDSHAKE_COMPLETE:
             listener->onServerHandshakeCompleteEvent(
-                sdam::IsMasterRTT(duration_cast<Milliseconds>(event.duration)),
-                event.hostAndPort,
-                event.reply);
+                event.duration, event.hostAndPort, event.reply);
             break;
         case EventType::PING_SUCCESS:
-            listener->onServerPingSucceededEvent(duration_cast<IsMasterRTT>(event.duration),
-                                                 event.hostAndPort);
+            listener->onServerPingSucceededEvent(event.duration, event.hostAndPort);
             break;
         case EventType::PING_FAILURE:
             listener->onServerPingFailedEvent(event.hostAndPort, event.status);

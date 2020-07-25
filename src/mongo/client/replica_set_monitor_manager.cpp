@@ -51,6 +51,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
@@ -89,7 +90,7 @@ Status ReplicaSetMonitorManagerNetworkConnectionHook::validateHost(
                 try {
                     if (isMasterReply.status.isOK()) {
                         publisher->onServerHandshakeCompleteEvent(
-                            isMasterReply.elapsedMillis.get(), remoteHost, isMasterReply.data);
+                            *isMasterReply.elapsed, remoteHost, isMasterReply.data);
                     } else {
                         publisher->onServerHandshakeFailedEvent(
                             remoteHost, isMasterReply.status, isMasterReply.data);

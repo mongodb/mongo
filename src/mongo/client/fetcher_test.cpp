@@ -175,7 +175,7 @@ void FetcherTest::_callback(const StatusWith<Fetcher::QueryResponse>& result,
         cursorId = batchData.cursorId;
         nss = batchData.nss;
         documents = batchData.documents;
-        elapsedMillis = batchData.elapsedMillis;
+        elapsedMillis = duration_cast<Milliseconds>(batchData.elapsed);
         first = batchData.first;
     }
 
