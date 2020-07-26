@@ -34,6 +34,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -223,7 +224,7 @@ write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry
 
     if (vField.ok() && vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
         // Make sure there's a diff field.
-        BSONElement diff = oField["diff"];
+        BSONElement diff = oField[update_oplog_entry::kDiffObjectFieldName];
         uassert(4772601,
                 str::stream() << "Expected 'diff' field to be an object, instead got type: "
                               << diff.type(),

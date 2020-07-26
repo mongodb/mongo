@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,32 +29,22 @@
 
 #pragma once
 
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/update/document_diff_serialization.h"
-#include "mongo/db/update/update_oplog_entry_version.h"
+
+namespace mongo {
+namespace change_stream_document_diff_parser {
+struct DeltaUpdateDescription {
+    Document updatedFields;
+    std::vector<Value> removedFields;
+    std::vector<Value> truncatedArrays;
+};
 
 /**
- * This provides helpers for creating oplog entries. To create a $v: 1 modifier-style oplog
- * entry, a LogBuilder must be used instead.
+ * Parses a document diff to generate update fields in the format required by the change streams.
  */
-namespace mongo::update_oplog_entry {
-static inline constexpr StringData kDiffObjectFieldName = "diff"_sd;
+DeltaUpdateDescription parseDiff(const doc_diff::Diff& diff);
 
-constexpr size_t kSizeOfDeltaOplogEntryMetadata = 15;
-
-/**
- * Given a diff, produce the contents for the 'o' field of a $v: 2 delta-style oplog entry.
- */
-inline BSONObj makeDeltaOplogEntry(const doc_diff::Diff& diff) {
-    BSONObjBuilder builder;
-    builder.append("$v", static_cast<int>(UpdateOplogEntryVersion::kDeltaV2));
-    builder.append(kDiffObjectFieldName, diff);
-    return builder.obj();
-}
-
-/**
- * Produce the contents of the 'o' field of a replacement style oplog entry.
- */
-inline BSONObj makeReplacementOplogEntry(const BSONObj& replacement) {
-    return replacement;
-}
-}  // namespace mongo::update_oplog_entry
+}  // namespace change_stream_document_diff_parser
+}  // namespace mongo

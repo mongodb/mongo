@@ -48,6 +48,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/update_index_data',
         '$BUILD_DIR/mongo/db/vector_clock_mutable',
         'update_common',
+        'update_document_diff',
     ],
 )
 
@@ -55,15 +56,13 @@ env.Library(
     target='update',
     source=[
         'delta_executor.cpp',
-        'document_diff_applier.cpp',
-        'document_diff_calculator.cpp',
-        'document_diff_serialization.cpp',
         'object_replace_executor.cpp',
         'pipeline_executor.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        'update_nodes'
+        'update_nodes',
+        'update_document_diff',
     ],
 )
 
@@ -91,6 +90,21 @@ env.Library(
         'update',
     ],
 )
+
+env.Library(
+    target='update_document_diff',
+    source=[
+        'document_diff_calculator.cpp',
+        'document_diff_applier.cpp',
+        'document_diff_serialization.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/update_index_data',
+    ],
+)
+
 env.CppUnitTest(
     target='db_update_test',
     source=[

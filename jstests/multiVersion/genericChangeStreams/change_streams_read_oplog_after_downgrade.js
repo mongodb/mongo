@@ -32,6 +32,9 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {sk: 1}}));
 
+const largeStr = '*'.repeat(512);
+const giantStr = '*'.repeat(1024);
+
 //  Define a set of standard write tests. These tests will be run for every new version and should
 //  not be modified. Each test case should have a function with field name 'generateOpLogEntry'
 //  which takes a collection object as input.
@@ -42,7 +45,12 @@ const standardTestCases = [
         generateOpLogEntry: function(coll) {
             assert.commandWorked(coll.runCommand({
                 insert: coll.getName(),
-                documents: [{sk: 1}, {sk: 2}, {sk: -1}, {sk: -2}],
+                documents: [
+                    {sk: 1},
+                    {sk: 2, giantStr: giantStr},
+                    {sk: -1},
+                    {sk: -2, giantStr: giantStr, obj: {a: 1, b: 2}}
+                ],
                 ordered: false
             }));
         }
@@ -71,15 +79,36 @@ const standardTestCases = [
                 updates: [{q: {sk: 1}, u: {sk: 1, a: 2}}, {q: {sk: -1}, u: {sk: -1, a: 2}}]
             }));
         }
-
     },
-    // Pipeline style update.
+    // Pipeline style update (delta type diff).
     {
-        testName: "PipelineStyleUpdate",
+        testName: "PipelineStyleUpdateDeltaOplog",
         generateOpLogEntry: function(coll) {
             assert.commandWorked(coll.runCommand({
                 update: shardedColl.getName(),
-                updates: [{q: {sk: 2}, u: [{$set: {a: 3}}]}, {q: {sk: -2}, u: [{$set: {a: 3}}]}]
+                updates: [
+                    {q: {sk: 2}, u: [{$set: {a: 3}}]},
+                    {q: {sk: -2}, u: [{$set: {a: 3}}]},
+                    {
+                        q: {sk: 2},
+                        u: [
+                            {$replaceRoot: {newRoot: {sk: 2}}},
+                            {$addFields: {"a": "updated", "b": 2}},
+                            {$project: {"sk": true, "a": true}},
+                        ]
+                    }
+                ]
+            }));
+        }
+    },
+    // Pipeline style update (replacement style diff).
+    {
+        testName: "PipelineStyleUpdateReplacementOplog",
+        generateOpLogEntry: function(coll) {
+            assert.commandWorked(coll.runCommand({
+                update: shardedColl.getName(),
+                updates:
+                    [{q: {sk: -2}, u: [{$replaceRoot: {newRoot: {sk: -2, largeStr: largeStr}}}]}]
             }));
         }
     },
