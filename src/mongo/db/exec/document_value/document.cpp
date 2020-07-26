@@ -422,6 +422,13 @@ Document::Document(std::initializer_list<std::pair<StringData, ImplicitValue>> i
     *this = mutableDoc.freeze();
 }
 
+Document::Document(std::vector<std::pair<StringData, Value>> fields) {
+    MutableDocument mutableDoc(fields.size());
+    for (auto&& pair : fields)
+        mutableDoc.addField(pair.first, pair.second);
+    *this = mutableDoc.freeze();
+}
+
 BSONObjBuilder& operator<<(BSONObjBuilderValueStream& builder, const Document& doc) {
     BSONObjBuilder subobj(builder.subobjStart());
     doc.toBson(&subobj);

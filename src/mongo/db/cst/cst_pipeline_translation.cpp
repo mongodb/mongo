@@ -33,11 +33,14 @@
 #include <boost/optional.hpp>
 #include <iterator>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/cst_pipeline_translation.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -54,8 +57,55 @@
 
 namespace mongo::cst_pipeline_translation {
 namespace {
+Value translateLiteralToValue(const CNode& cst);
+Value translateLiteralLeaf(const CNode& cst);
 boost::intrusive_ptr<Expression> translateExpression(
     const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
+ * Walk a literal array payload and produce a Value. This function is neccesary because Aggregation
+ * Expression literals are required to be collapsed into Values inside ExpressionConst but
+ * uncollapsed otherwise.
+ */
+auto translateLiteralArrayToValue(const CNode::ArrayChildren& array) {
+    auto values = std::vector<Value>{};
+    static_cast<void>(
+        std::transform(array.begin(), array.end(), std::back_inserter(values), [&](auto&& elem) {
+            return translateLiteralToValue(elem);
+        }));
+    return Value{std::move(values)};
+}
+
+/**
+ * Walk a literal object payload and produce a Value. This function is neccesary because Aggregation
+ * Expression literals are required to be collapsed into Values inside ExpressionConst but
+ * uncollapsed otherwise.
+ */
+auto translateLiteralObjectToValue(const CNode::ObjectChildren& object) {
+    auto fields = std::vector<std::pair<StringData, Value>>{};
+    static_cast<void>(
+        std::transform(object.begin(), object.end(), std::back_inserter(fields), [&](auto&& field) {
+            return std::pair{StringData{stdx::get<UserFieldname>(field.first)},
+                             translateLiteralToValue(field.second)};
+        }));
+    return Value{Document{std::move(fields)}};
+}
+
+/**
+ * Walk a purely literal CNode and produce a Value. This function is neccesary because Aggregation
+ * Expression literals are required to be collapsed into Values inside ExpressionConst but
+ * uncollapsed otherwise.
+ */
+Value translateLiteralToValue(const CNode& cst) {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [](const CNode::ArrayChildren& array) { return translateLiteralArrayToValue(array); },
+            [](const CNode::ObjectChildren& object) {
+                return translateLiteralObjectToValue(object);
+            },
+            [&](auto&& payload) { return translateLiteralLeaf(cst); }},
+        cst.payload);
+}
 
 /**
  * Walk a literal array payload and produce an ExpressionArray.
@@ -89,6 +139,12 @@ auto translateLiteralObject(const CNode::ObjectChildren& object,
  */
 boost::intrusive_ptr<Expression> translateFunctionObject(
     const CNode::ObjectChildren& object, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // Constants require using Value instead of Expression to build the tree in agg.
+    if (stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::constExpr ||
+        stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::literal)
+        return make_intrusive<ExpressionConstant>(
+            expCtx.get(), std::move(translateLiteralToValue(object[0].second)));
+
     auto expressions = std::vector<boost::intrusive_ptr<Expression>>{};
     // This assumes the Expression is in array-form.
     auto&& array = object[0].second.arrayChildren();
@@ -115,7 +171,7 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
 /**
  * Walk a literal leaf CNode and produce an agg Value.
  */
-auto translateLiteralLeaf(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+Value translateLiteralLeaf(const CNode& cst) {
     return stdx::visit(
         visit_helper::Overloaded{
             // These are illegal since they're non-leaf.
@@ -157,7 +213,7 @@ boost::intrusive_ptr<Expression> translateExpression(
             [](const NonZeroKey&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
             // Everything else is a literal leaf.
             [&](auto &&) -> boost::intrusive_ptr<Expression> {
-                return ExpressionConstant::create(expCtx.get(), translateLiteralLeaf(cst, expCtx));
+                return ExpressionConstant::create(expCtx.get(), translateLiteralLeaf(cst));
             }},
         cst.payload);
 }

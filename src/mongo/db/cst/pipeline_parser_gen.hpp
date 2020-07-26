@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.6.
+// A Bison parser, made by GNU Bison 3.6.3.
 
 // Skeleton interface for Bison LALR(1) parsers in C++
 
@@ -32,7 +32,7 @@
 
 
 /**
- ** \file src/mongo/db/cst/pipeline_parser_gen.hpp
+ ** \file pipeline_parser_gen.hpp
  ** Define the mongo::parser class.
  */
 
@@ -42,10 +42,10 @@
 // especially those whose name start with YY_ or yy_.  They are
 // private implementation details that can be changed or removed.
 
-#ifndef YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
-#define YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#ifndef YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#define YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
 // "%code requires" blocks.
-#line 66 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 66 "pipeline_grammar.yy"
 
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/key_fieldname.h"
@@ -61,7 +61,7 @@ class BSONLexer;
 #pragma warning(disable : 4065)
 #endif
 
-#line 65 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 65 "pipeline_parser_gen.hpp"
 
 #include <cassert>
 #include <cstdlib>  // std::abort
@@ -190,9 +190,9 @@ class BSONLexer;
 #define YYDEBUG 0
 #endif
 
-#line 58 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 58 "pipeline_grammar.yy"
 namespace mongo {
-#line 200 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 200 "pipeline_parser_gen.hpp"
 
 
 /// A Bison parser.
@@ -367,6 +367,24 @@ public:
 
         /// An auxiliary type to compute the largest semantic type.
         union union_type {
+            // BINARY
+            char dummy1[sizeof(BSONBinData)];
+
+            // JAVASCRIPT
+            char dummy2[sizeof(BSONCode)];
+
+            // JAVASCRIPT_W_SCOPE
+            char dummy3[sizeof(BSONCodeWScope)];
+
+            // DB_POINTER
+            char dummy4[sizeof(BSONDBRef)];
+
+            // REGEX
+            char dummy5[sizeof(BSONRegEx)];
+
+            // SYMBOL
+            char dummy6[sizeof(BSONSymbol)];
+
             // stageList
             // stage
             // inhibitOptimization
@@ -378,46 +396,102 @@ public:
             // projectFields
             // projection
             // compoundExpression
+            // expressionArray
+            // expressionObject
+            // expressionFields
             // expression
             // maths
             // add
             // atan2
             // string
+            // binary
+            // undefined
+            // objectId
+            // bool
+            // date
+            // null
+            // regex
+            // dbPointer
+            // javascript
+            // symbol
+            // javascriptWScope
             // int
+            // timestamp
             // long
             // double
-            // bool
-            // value
+            // decimal
+            // minKey
+            // maxKey
+            // simpleValue
             // boolExps
             // and
             // or
             // not
-            char dummy1[sizeof(CNode)];
+            // literalEscapes
+            // const
+            // literal
+            // value
+            // compoundValue
+            // valueArray
+            // valueObject
+            // valueFields
+            char dummy7[sizeof(CNode)];
 
             // projectionFieldname
-            char dummy2[sizeof(CNode::Fieldname)];
+            // expressionFieldname
+            // stageAsUserFieldname
+            // argAsUserFieldname
+            // aggExprAsUserFieldname
+            // invariableUserFieldname
+            // idAsUserFieldname
+            // valueFieldname
+            char dummy8[sizeof(CNode::Fieldname)];
+
+            // DATE
+            char dummy9[sizeof(Date_t)];
 
             // DECIMAL_NON_ZERO
-            char dummy3[sizeof(Decimal128)];
+            char dummy10[sizeof(Decimal128)];
+
+            // OBJECT_ID
+            char dummy11[sizeof(OID)];
+
+            // TIMESTAMP
+            char dummy12[sizeof(Timestamp)];
+
+            // MAX_KEY
+            char dummy13[sizeof(UserMaxKey)];
+
+            // MIN_KEY
+            char dummy14[sizeof(UserMinKey)];
+
+            // JSNULL
+            char dummy15[sizeof(UserNull)];
+
+            // UNDEFINED
+            char dummy16[sizeof(UserUndefined)];
 
             // DOUBLE_NON_ZERO
-            char dummy4[sizeof(double)];
+            char dummy17[sizeof(double)];
 
             // INT_NON_ZERO
-            char dummy5[sizeof(int)];
+            char dummy18[sizeof(int)];
 
             // LONG_NON_ZERO
-            char dummy6[sizeof(long long)];
+            char dummy19[sizeof(long long)];
 
             // projectField
-            char dummy7[sizeof(std::pair<CNode::Fieldname, CNode>)];
+            // expressionField
+            // valueField
+            char dummy20[sizeof(std::pair<CNode::Fieldname, CNode>)];
 
             // FIELDNAME
             // STRING
-            char dummy8[sizeof(std::string)];
+            char dummy21[sizeof(std::string)];
 
             // expressions
-            char dummy9[sizeof(std::vector<CNode>)];
+            // values
+            char dummy22[sizeof(std::vector<CNode>)];
         };
 
         /// The size of the largest semantic type.
@@ -469,8 +543,8 @@ public:
             LONG_ZERO = 9,                    // LONG_ZERO
             DOUBLE_ZERO = 10,                 // DOUBLE_ZERO
             DECIMAL_ZERO = 11,                // DECIMAL_ZERO
-            TRUE = 12,                        // TRUE
-            FALSE = 13,                       // FALSE
+            BOOL_TRUE = 12,                   // BOOL_TRUE
+            BOOL_FALSE = 13,                  // BOOL_FALSE
             STAGE_INHIBIT_OPTIMIZATION = 14,  // STAGE_INHIBIT_OPTIMIZATION
             STAGE_UNION_WITH = 15,            // STAGE_UNION_WITH
             STAGE_SKIP = 16,                  // STAGE_SKIP
@@ -481,14 +555,29 @@ public:
             ADD = 21,                         // ADD
             ATAN2 = 22,                       // ATAN2
             AND = 23,                         // AND
-            OR = 24,                          // OR
-            NOT = 25,                         // NOT
-            FIELDNAME = 26,                   // FIELDNAME
-            STRING = 27,                      // STRING
-            INT_NON_ZERO = 28,                // INT_NON_ZERO
-            LONG_NON_ZERO = 29,               // LONG_NON_ZERO
-            DOUBLE_NON_ZERO = 30,             // DOUBLE_NON_ZERO
-            DECIMAL_NON_ZERO = 31             // DECIMAL_NON_ZERO
+            CONST = 24,                       // CONST
+            LITERAL = 25,                     // LITERAL
+            OR = 26,                          // OR
+            NOT = 27,                         // NOT
+            FIELDNAME = 28,                   // FIELDNAME
+            STRING = 29,                      // STRING
+            BINARY = 30,                      // BINARY
+            UNDEFINED = 31,                   // UNDEFINED
+            OBJECT_ID = 32,                   // OBJECT_ID
+            DATE = 33,                        // DATE
+            JSNULL = 34,                      // JSNULL
+            REGEX = 35,                       // REGEX
+            DB_POINTER = 36,                  // DB_POINTER
+            JAVASCRIPT = 37,                  // JAVASCRIPT
+            SYMBOL = 38,                      // SYMBOL
+            JAVASCRIPT_W_SCOPE = 39,          // JAVASCRIPT_W_SCOPE
+            INT_NON_ZERO = 40,                // INT_NON_ZERO
+            TIMESTAMP = 41,                   // TIMESTAMP
+            LONG_NON_ZERO = 42,               // LONG_NON_ZERO
+            DOUBLE_NON_ZERO = 43,             // DOUBLE_NON_ZERO
+            DECIMAL_NON_ZERO = 44,            // DECIMAL_NON_ZERO
+            MIN_KEY = 45,                     // MIN_KEY
+            MAX_KEY = 46                      // MAX_KEY
         };
         /// Backward compatibility alias (Bison 3.6).
         typedef token_kind_type yytokentype;
@@ -503,7 +592,7 @@ public:
     /// Symbol kinds.
     struct symbol_kind {
         enum symbol_kind_type {
-            YYNTOKENS = 32,  ///< Number of tokens.
+            YYNTOKENS = 47,  ///< Number of tokens.
             S_YYEMPTY = -2,
             S_YYEOF = 0,                        // "EOF"
             S_YYerror = 1,                      // error
@@ -517,8 +606,8 @@ public:
             S_LONG_ZERO = 9,                    // LONG_ZERO
             S_DOUBLE_ZERO = 10,                 // DOUBLE_ZERO
             S_DECIMAL_ZERO = 11,                // DECIMAL_ZERO
-            S_TRUE = 12,                        // TRUE
-            S_FALSE = 13,                       // FALSE
+            S_BOOL_TRUE = 12,                   // BOOL_TRUE
+            S_BOOL_FALSE = 13,                  // BOOL_FALSE
             S_STAGE_INHIBIT_OPTIMIZATION = 14,  // STAGE_INHIBIT_OPTIMIZATION
             S_STAGE_UNION_WITH = 15,            // STAGE_UNION_WITH
             S_STAGE_SKIP = 16,                  // STAGE_SKIP
@@ -529,46 +618,96 @@ public:
             S_ADD = 21,                         // ADD
             S_ATAN2 = 22,                       // ATAN2
             S_AND = 23,                         // AND
-            S_OR = 24,                          // OR
-            S_NOT = 25,                         // NOT
-            S_FIELDNAME = 26,                   // FIELDNAME
-            S_STRING = 27,                      // STRING
-            S_INT_NON_ZERO = 28,                // INT_NON_ZERO
-            S_LONG_NON_ZERO = 29,               // LONG_NON_ZERO
-            S_DOUBLE_NON_ZERO = 30,             // DOUBLE_NON_ZERO
-            S_DECIMAL_NON_ZERO = 31,            // DECIMAL_NON_ZERO
-            S_YYACCEPT = 32,                    // $accept
-            S_stageList = 33,                   // stageList
-            S_stage = 34,                       // stage
-            S_inhibitOptimization = 35,         // inhibitOptimization
-            S_unionWith = 36,                   // unionWith
-            S_num = 37,                         // num
-            S_skip = 38,                        // skip
-            S_limit = 39,                       // limit
-            S_project = 40,                     // project
-            S_projectFields = 41,               // projectFields
-            S_projection = 42,                  // projection
-            S_compoundExpression = 43,          // compoundExpression
-            S_expression = 44,                  // expression
-            S_maths = 45,                       // maths
-            S_add = 46,                         // add
-            S_atan2 = 47,                       // atan2
-            S_string = 48,                      // string
-            S_int = 49,                         // int
-            S_long = 50,                        // long
-            S_double = 51,                      // double
-            S_bool = 52,                        // bool
-            S_value = 53,                       // value
-            S_boolExps = 54,                    // boolExps
-            S_and = 55,                         // and
-            S_or = 56,                          // or
-            S_not = 57,                         // not
-            S_projectionFieldname = 58,         // projectionFieldname
-            S_projectField = 59,                // projectField
-            S_expressions = 60,                 // expressions
-            S_pipeline = 61,                    // pipeline
-            S_START_ORDERED_OBJECT = 62,        // START_ORDERED_OBJECT
-            S_63_1 = 63                         // $@1
+            S_CONST = 24,                       // CONST
+            S_LITERAL = 25,                     // LITERAL
+            S_OR = 26,                          // OR
+            S_NOT = 27,                         // NOT
+            S_FIELDNAME = 28,                   // FIELDNAME
+            S_STRING = 29,                      // STRING
+            S_BINARY = 30,                      // BINARY
+            S_UNDEFINED = 31,                   // UNDEFINED
+            S_OBJECT_ID = 32,                   // OBJECT_ID
+            S_DATE = 33,                        // DATE
+            S_JSNULL = 34,                      // JSNULL
+            S_REGEX = 35,                       // REGEX
+            S_DB_POINTER = 36,                  // DB_POINTER
+            S_JAVASCRIPT = 37,                  // JAVASCRIPT
+            S_SYMBOL = 38,                      // SYMBOL
+            S_JAVASCRIPT_W_SCOPE = 39,          // JAVASCRIPT_W_SCOPE
+            S_INT_NON_ZERO = 40,                // INT_NON_ZERO
+            S_TIMESTAMP = 41,                   // TIMESTAMP
+            S_LONG_NON_ZERO = 42,               // LONG_NON_ZERO
+            S_DOUBLE_NON_ZERO = 43,             // DOUBLE_NON_ZERO
+            S_DECIMAL_NON_ZERO = 44,            // DECIMAL_NON_ZERO
+            S_MIN_KEY = 45,                     // MIN_KEY
+            S_MAX_KEY = 46,                     // MAX_KEY
+            S_YYACCEPT = 47,                    // $accept
+            S_stageList = 48,                   // stageList
+            S_stage = 49,                       // stage
+            S_inhibitOptimization = 50,         // inhibitOptimization
+            S_unionWith = 51,                   // unionWith
+            S_num = 52,                         // num
+            S_skip = 53,                        // skip
+            S_limit = 54,                       // limit
+            S_project = 55,                     // project
+            S_projectFields = 56,               // projectFields
+            S_projection = 57,                  // projection
+            S_compoundExpression = 58,          // compoundExpression
+            S_expressionArray = 59,             // expressionArray
+            S_expressionObject = 60,            // expressionObject
+            S_expressionFields = 61,            // expressionFields
+            S_expression = 62,                  // expression
+            S_maths = 63,                       // maths
+            S_add = 64,                         // add
+            S_atan2 = 65,                       // atan2
+            S_string = 66,                      // string
+            S_binary = 67,                      // binary
+            S_undefined = 68,                   // undefined
+            S_objectId = 69,                    // objectId
+            S_bool = 70,                        // bool
+            S_date = 71,                        // date
+            S_null = 72,                        // null
+            S_regex = 73,                       // regex
+            S_dbPointer = 74,                   // dbPointer
+            S_javascript = 75,                  // javascript
+            S_symbol = 76,                      // symbol
+            S_javascriptWScope = 77,            // javascriptWScope
+            S_int = 78,                         // int
+            S_timestamp = 79,                   // timestamp
+            S_long = 80,                        // long
+            S_double = 81,                      // double
+            S_decimal = 82,                     // decimal
+            S_minKey = 83,                      // minKey
+            S_maxKey = 84,                      // maxKey
+            S_simpleValue = 85,                 // simpleValue
+            S_boolExps = 86,                    // boolExps
+            S_and = 87,                         // and
+            S_or = 88,                          // or
+            S_not = 89,                         // not
+            S_literalEscapes = 90,              // literalEscapes
+            S_const = 91,                       // const
+            S_literal = 92,                     // literal
+            S_value = 93,                       // value
+            S_compoundValue = 94,               // compoundValue
+            S_valueArray = 95,                  // valueArray
+            S_valueObject = 96,                 // valueObject
+            S_valueFields = 97,                 // valueFields
+            S_projectionFieldname = 98,         // projectionFieldname
+            S_expressionFieldname = 99,         // expressionFieldname
+            S_stageAsUserFieldname = 100,       // stageAsUserFieldname
+            S_argAsUserFieldname = 101,         // argAsUserFieldname
+            S_aggExprAsUserFieldname = 102,     // aggExprAsUserFieldname
+            S_invariableUserFieldname = 103,    // invariableUserFieldname
+            S_idAsUserFieldname = 104,          // idAsUserFieldname
+            S_valueFieldname = 105,             // valueFieldname
+            S_projectField = 106,               // projectField
+            S_expressionField = 107,            // expressionField
+            S_valueField = 108,                 // valueField
+            S_expressions = 109,                // expressions
+            S_values = 110,                     // values
+            S_pipeline = 111,                   // pipeline
+            S_START_ORDERED_OBJECT = 112,       // START_ORDERED_OBJECT
+            S_113_1 = 113                       // $@1
         };
     };
 
@@ -597,64 +736,151 @@ public:
         basic_symbol(basic_symbol&& that)
             : Base(std::move(that)), value(), location(std::move(that.location)) {
             switch (this->kind()) {
-                case 33:  // stageList
-                case 34:  // stage
-                case 35:  // inhibitOptimization
-                case 36:  // unionWith
-                case 37:  // num
-                case 38:  // skip
-                case 39:  // limit
-                case 40:  // project
-                case 41:  // projectFields
-                case 42:  // projection
-                case 43:  // compoundExpression
-                case 44:  // expression
-                case 45:  // maths
-                case 46:  // add
-                case 47:  // atan2
-                case 48:  // string
-                case 49:  // int
-                case 50:  // long
-                case 51:  // double
-                case 52:  // bool
-                case 53:  // value
-                case 54:  // boolExps
-                case 55:  // and
-                case 56:  // or
-                case 57:  // not
+                case 30:  // BINARY
+                    value.move<BSONBinData>(std::move(that.value));
+                    break;
+
+                case 37:  // JAVASCRIPT
+                    value.move<BSONCode>(std::move(that.value));
+                    break;
+
+                case 39:  // JAVASCRIPT_W_SCOPE
+                    value.move<BSONCodeWScope>(std::move(that.value));
+                    break;
+
+                case 36:  // DB_POINTER
+                    value.move<BSONDBRef>(std::move(that.value));
+                    break;
+
+                case 35:  // REGEX
+                    value.move<BSONRegEx>(std::move(that.value));
+                    break;
+
+                case 38:  // SYMBOL
+                    value.move<BSONSymbol>(std::move(that.value));
+                    break;
+
+                case 48:  // stageList
+                case 49:  // stage
+                case 50:  // inhibitOptimization
+                case 51:  // unionWith
+                case 52:  // num
+                case 53:  // skip
+                case 54:  // limit
+                case 55:  // project
+                case 56:  // projectFields
+                case 57:  // projection
+                case 58:  // compoundExpression
+                case 59:  // expressionArray
+                case 60:  // expressionObject
+                case 61:  // expressionFields
+                case 62:  // expression
+                case 63:  // maths
+                case 64:  // add
+                case 65:  // atan2
+                case 66:  // string
+                case 67:  // binary
+                case 68:  // undefined
+                case 69:  // objectId
+                case 70:  // bool
+                case 71:  // date
+                case 72:  // null
+                case 73:  // regex
+                case 74:  // dbPointer
+                case 75:  // javascript
+                case 76:  // symbol
+                case 77:  // javascriptWScope
+                case 78:  // int
+                case 79:  // timestamp
+                case 80:  // long
+                case 81:  // double
+                case 82:  // decimal
+                case 83:  // minKey
+                case 84:  // maxKey
+                case 85:  // simpleValue
+                case 86:  // boolExps
+                case 87:  // and
+                case 88:  // or
+                case 89:  // not
+                case 90:  // literalEscapes
+                case 91:  // const
+                case 92:  // literal
+                case 93:  // value
+                case 94:  // compoundValue
+                case 95:  // valueArray
+                case 96:  // valueObject
+                case 97:  // valueFields
                     value.move<CNode>(std::move(that.value));
                     break;
 
-                case 58:  // projectionFieldname
+                case 98:   // projectionFieldname
+                case 99:   // expressionFieldname
+                case 100:  // stageAsUserFieldname
+                case 101:  // argAsUserFieldname
+                case 102:  // aggExprAsUserFieldname
+                case 103:  // invariableUserFieldname
+                case 104:  // idAsUserFieldname
+                case 105:  // valueFieldname
                     value.move<CNode::Fieldname>(std::move(that.value));
                     break;
 
-                case 31:  // DECIMAL_NON_ZERO
+                case 33:  // DATE
+                    value.move<Date_t>(std::move(that.value));
+                    break;
+
+                case 44:  // DECIMAL_NON_ZERO
                     value.move<Decimal128>(std::move(that.value));
                     break;
 
-                case 30:  // DOUBLE_NON_ZERO
+                case 32:  // OBJECT_ID
+                    value.move<OID>(std::move(that.value));
+                    break;
+
+                case 41:  // TIMESTAMP
+                    value.move<Timestamp>(std::move(that.value));
+                    break;
+
+                case 46:  // MAX_KEY
+                    value.move<UserMaxKey>(std::move(that.value));
+                    break;
+
+                case 45:  // MIN_KEY
+                    value.move<UserMinKey>(std::move(that.value));
+                    break;
+
+                case 34:  // JSNULL
+                    value.move<UserNull>(std::move(that.value));
+                    break;
+
+                case 31:  // UNDEFINED
+                    value.move<UserUndefined>(std::move(that.value));
+                    break;
+
+                case 43:  // DOUBLE_NON_ZERO
                     value.move<double>(std::move(that.value));
                     break;
 
-                case 28:  // INT_NON_ZERO
+                case 40:  // INT_NON_ZERO
                     value.move<int>(std::move(that.value));
                     break;
 
-                case 29:  // LONG_NON_ZERO
+                case 42:  // LONG_NON_ZERO
                     value.move<long long>(std::move(that.value));
                     break;
 
-                case 59:  // projectField
+                case 106:  // projectField
+                case 107:  // expressionField
+                case 108:  // valueField
                     value.move<std::pair<CNode::Fieldname, CNode>>(std::move(that.value));
                     break;
 
-                case 26:  // FIELDNAME
-                case 27:  // STRING
+                case 28:  // FIELDNAME
+                case 29:  // STRING
                     value.move<std::string>(std::move(that.value));
                     break;
 
-                case 60:  // expressions
+                case 109:  // expressions
+                case 110:  // values
                     value.move<std::vector<CNode>>(std::move(that.value));
                     break;
 
@@ -675,6 +901,48 @@ public:
         basic_symbol(typename Base::kind_type t, const location_type& l) : Base(t), location(l) {}
 #endif
 #if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, BSONBinData&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const BSONBinData& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, BSONCode&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const BSONCode& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, BSONCodeWScope&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const BSONCodeWScope& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, BSONDBRef&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const BSONDBRef& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, BSONRegEx&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const BSONRegEx& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, BSONSymbol&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const BSONSymbol& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, CNode&& v, location_type&& l)
             : Base(t), value(std::move(v)), location(std::move(l)) {}
 #else
@@ -689,10 +957,59 @@ public:
             : Base(t), value(v), location(l) {}
 #endif
 #if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, Date_t&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const Date_t& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
         basic_symbol(typename Base::kind_type t, Decimal128&& v, location_type&& l)
             : Base(t), value(std::move(v)), location(std::move(l)) {}
 #else
         basic_symbol(typename Base::kind_type t, const Decimal128& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, OID&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const OID& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, Timestamp&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const Timestamp& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, UserMaxKey&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const UserMaxKey& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, UserMinKey&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const UserMinKey& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, UserNull&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const UserNull& v, const location_type& l)
+            : Base(t), value(v), location(l) {}
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        basic_symbol(typename Base::kind_type t, UserUndefined&& v, location_type&& l)
+            : Base(t), value(std::move(v)), location(std::move(l)) {}
+#else
+        basic_symbol(typename Base::kind_type t, const UserUndefined& v, const location_type& l)
             : Base(t), value(v), location(l) {}
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -762,64 +1079,151 @@ public:
 
             // Value type destructor.
             switch (yykind) {
-                case 33:  // stageList
-                case 34:  // stage
-                case 35:  // inhibitOptimization
-                case 36:  // unionWith
-                case 37:  // num
-                case 38:  // skip
-                case 39:  // limit
-                case 40:  // project
-                case 41:  // projectFields
-                case 42:  // projection
-                case 43:  // compoundExpression
-                case 44:  // expression
-                case 45:  // maths
-                case 46:  // add
-                case 47:  // atan2
-                case 48:  // string
-                case 49:  // int
-                case 50:  // long
-                case 51:  // double
-                case 52:  // bool
-                case 53:  // value
-                case 54:  // boolExps
-                case 55:  // and
-                case 56:  // or
-                case 57:  // not
+                case 30:  // BINARY
+                    value.template destroy<BSONBinData>();
+                    break;
+
+                case 37:  // JAVASCRIPT
+                    value.template destroy<BSONCode>();
+                    break;
+
+                case 39:  // JAVASCRIPT_W_SCOPE
+                    value.template destroy<BSONCodeWScope>();
+                    break;
+
+                case 36:  // DB_POINTER
+                    value.template destroy<BSONDBRef>();
+                    break;
+
+                case 35:  // REGEX
+                    value.template destroy<BSONRegEx>();
+                    break;
+
+                case 38:  // SYMBOL
+                    value.template destroy<BSONSymbol>();
+                    break;
+
+                case 48:  // stageList
+                case 49:  // stage
+                case 50:  // inhibitOptimization
+                case 51:  // unionWith
+                case 52:  // num
+                case 53:  // skip
+                case 54:  // limit
+                case 55:  // project
+                case 56:  // projectFields
+                case 57:  // projection
+                case 58:  // compoundExpression
+                case 59:  // expressionArray
+                case 60:  // expressionObject
+                case 61:  // expressionFields
+                case 62:  // expression
+                case 63:  // maths
+                case 64:  // add
+                case 65:  // atan2
+                case 66:  // string
+                case 67:  // binary
+                case 68:  // undefined
+                case 69:  // objectId
+                case 70:  // bool
+                case 71:  // date
+                case 72:  // null
+                case 73:  // regex
+                case 74:  // dbPointer
+                case 75:  // javascript
+                case 76:  // symbol
+                case 77:  // javascriptWScope
+                case 78:  // int
+                case 79:  // timestamp
+                case 80:  // long
+                case 81:  // double
+                case 82:  // decimal
+                case 83:  // minKey
+                case 84:  // maxKey
+                case 85:  // simpleValue
+                case 86:  // boolExps
+                case 87:  // and
+                case 88:  // or
+                case 89:  // not
+                case 90:  // literalEscapes
+                case 91:  // const
+                case 92:  // literal
+                case 93:  // value
+                case 94:  // compoundValue
+                case 95:  // valueArray
+                case 96:  // valueObject
+                case 97:  // valueFields
                     value.template destroy<CNode>();
                     break;
 
-                case 58:  // projectionFieldname
+                case 98:   // projectionFieldname
+                case 99:   // expressionFieldname
+                case 100:  // stageAsUserFieldname
+                case 101:  // argAsUserFieldname
+                case 102:  // aggExprAsUserFieldname
+                case 103:  // invariableUserFieldname
+                case 104:  // idAsUserFieldname
+                case 105:  // valueFieldname
                     value.template destroy<CNode::Fieldname>();
                     break;
 
-                case 31:  // DECIMAL_NON_ZERO
+                case 33:  // DATE
+                    value.template destroy<Date_t>();
+                    break;
+
+                case 44:  // DECIMAL_NON_ZERO
                     value.template destroy<Decimal128>();
                     break;
 
-                case 30:  // DOUBLE_NON_ZERO
+                case 32:  // OBJECT_ID
+                    value.template destroy<OID>();
+                    break;
+
+                case 41:  // TIMESTAMP
+                    value.template destroy<Timestamp>();
+                    break;
+
+                case 46:  // MAX_KEY
+                    value.template destroy<UserMaxKey>();
+                    break;
+
+                case 45:  // MIN_KEY
+                    value.template destroy<UserMinKey>();
+                    break;
+
+                case 34:  // JSNULL
+                    value.template destroy<UserNull>();
+                    break;
+
+                case 31:  // UNDEFINED
+                    value.template destroy<UserUndefined>();
+                    break;
+
+                case 43:  // DOUBLE_NON_ZERO
                     value.template destroy<double>();
                     break;
 
-                case 28:  // INT_NON_ZERO
+                case 40:  // INT_NON_ZERO
                     value.template destroy<int>();
                     break;
 
-                case 29:  // LONG_NON_ZERO
+                case 42:  // LONG_NON_ZERO
                     value.template destroy<long long>();
                     break;
 
-                case 59:  // projectField
+                case 106:  // projectField
+                case 107:  // expressionField
+                case 108:  // valueField
                     value.template destroy<std::pair<CNode::Fieldname, CNode>>();
                     break;
 
-                case 26:  // FIELDNAME
-                case 27:  // STRING
+                case 28:  // FIELDNAME
+                case 29:  // STRING
                     value.template destroy<std::string>();
                     break;
 
-                case 60:  // expressions
+                case 109:  // expressions
+                case 110:  // values
                     value.template destroy<std::vector<CNode>>();
                     break;
 
@@ -829,6 +1233,14 @@ public:
 
             Base::clear();
         }
+
+#if YYDEBUG || 0
+        /// The user-facing name of this symbol.
+        const char* name() const YY_NOEXCEPT {
+            return PipelineParserGen::symbol_name(this->kind());
+        }
+#endif  // #if YYDEBUG || 0
+
 
         /// Backward compatibility (Bison 3.6).
         symbol_kind_type type_get() const YY_NOEXCEPT;
@@ -908,12 +1320,13 @@ public:
                       tok == token::START_ARRAY || tok == token::END_ARRAY || tok == token::ID ||
                       tok == token::INT_ZERO || tok == token::LONG_ZERO ||
                       tok == token::DOUBLE_ZERO || tok == token::DECIMAL_ZERO ||
-                      tok == token::TRUE || tok == token::FALSE ||
+                      tok == token::BOOL_TRUE || tok == token::BOOL_FALSE ||
                       tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_UNION_WITH ||
                       tok == token::STAGE_SKIP || tok == token::STAGE_LIMIT ||
                       tok == token::STAGE_PROJECT || tok == token::COLL_ARG ||
                       tok == token::PIPELINE_ARG || tok == token::ADD || tok == token::ATAN2 ||
-                      tok == token::AND || tok == token::OR || tok == token::NOT);
+                      tok == token::AND || tok == token::CONST || tok == token::LITERAL ||
+                      tok == token::OR || tok == token::NOT);
         }
 #else
         symbol_type(int tok, const location_type& l) : super_type(token_type(tok), l) {
@@ -922,12 +1335,90 @@ public:
                       tok == token::START_ARRAY || tok == token::END_ARRAY || tok == token::ID ||
                       tok == token::INT_ZERO || tok == token::LONG_ZERO ||
                       tok == token::DOUBLE_ZERO || tok == token::DECIMAL_ZERO ||
-                      tok == token::TRUE || tok == token::FALSE ||
+                      tok == token::BOOL_TRUE || tok == token::BOOL_FALSE ||
                       tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_UNION_WITH ||
                       tok == token::STAGE_SKIP || tok == token::STAGE_LIMIT ||
                       tok == token::STAGE_PROJECT || tok == token::COLL_ARG ||
                       tok == token::PIPELINE_ARG || tok == token::ADD || tok == token::ATAN2 ||
-                      tok == token::AND || tok == token::OR || tok == token::NOT);
+                      tok == token::AND || tok == token::CONST || tok == token::LITERAL ||
+                      tok == token::OR || tok == token::NOT);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, BSONBinData v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::BINARY);
+        }
+#else
+        symbol_type(int tok, const BSONBinData& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::BINARY);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, BSONCode v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::JAVASCRIPT);
+        }
+#else
+        symbol_type(int tok, const BSONCode& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::JAVASCRIPT);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, BSONCodeWScope v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::JAVASCRIPT_W_SCOPE);
+        }
+#else
+        symbol_type(int tok, const BSONCodeWScope& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::JAVASCRIPT_W_SCOPE);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, BSONDBRef v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::DB_POINTER);
+        }
+#else
+        symbol_type(int tok, const BSONDBRef& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::DB_POINTER);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, BSONRegEx v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::REGEX);
+        }
+#else
+        symbol_type(int tok, const BSONRegEx& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::REGEX);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, BSONSymbol v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::SYMBOL);
+        }
+#else
+        symbol_type(int tok, const BSONSymbol& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::SYMBOL);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, Date_t v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::DATE);
+        }
+#else
+        symbol_type(int tok, const Date_t& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::DATE);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -939,6 +1430,72 @@ public:
         symbol_type(int tok, const Decimal128& v, const location_type& l)
             : super_type(token_type(tok), v, l) {
             YY_ASSERT(tok == token::DECIMAL_NON_ZERO);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, OID v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::OBJECT_ID);
+        }
+#else
+        symbol_type(int tok, const OID& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::OBJECT_ID);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, Timestamp v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::TIMESTAMP);
+        }
+#else
+        symbol_type(int tok, const Timestamp& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::TIMESTAMP);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, UserMaxKey v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::MAX_KEY);
+        }
+#else
+        symbol_type(int tok, const UserMaxKey& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::MAX_KEY);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, UserMinKey v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::MIN_KEY);
+        }
+#else
+        symbol_type(int tok, const UserMinKey& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::MIN_KEY);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, UserNull v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::JSNULL);
+        }
+#else
+        symbol_type(int tok, const UserNull& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::JSNULL);
+        }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+        symbol_type(int tok, UserUndefined v, location_type l)
+            : super_type(token_type(tok), std::move(v), std::move(l)) {
+            YY_ASSERT(tok == token::UNDEFINED);
+        }
+#else
+        symbol_type(int tok, const UserUndefined& v, const location_type& l)
+            : super_type(token_type(tok), v, l) {
+            YY_ASSERT(tok == token::UNDEFINED);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1027,6 +1584,13 @@ public:
 
     /// Report a syntax error.
     void error(const syntax_error& err);
+
+#if YYDEBUG || 0
+    /// The user-facing name of the symbol whose (internal) number is
+    /// YYSYMBOL.  No bounds checking.
+    static const char* symbol_name(symbol_kind_type yysymbol);
+#endif  // #if YYDEBUG || 0
+
 
     // Implementation of make_symbol for each symbol type.
 #if 201103L <= YY_CPLUSPLUS
@@ -1138,21 +1702,21 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_TRUE(location_type l) {
-        return symbol_type(token::TRUE, std::move(l));
+    static symbol_type make_BOOL_TRUE(location_type l) {
+        return symbol_type(token::BOOL_TRUE, std::move(l));
     }
 #else
-    static symbol_type make_TRUE(const location_type& l) {
-        return symbol_type(token::TRUE, l);
+    static symbol_type make_BOOL_TRUE(const location_type& l) {
+        return symbol_type(token::BOOL_TRUE, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_FALSE(location_type l) {
-        return symbol_type(token::FALSE, std::move(l));
+    static symbol_type make_BOOL_FALSE(location_type l) {
+        return symbol_type(token::BOOL_FALSE, std::move(l));
     }
 #else
-    static symbol_type make_FALSE(const location_type& l) {
-        return symbol_type(token::FALSE, l);
+    static symbol_type make_BOOL_FALSE(const location_type& l) {
+        return symbol_type(token::BOOL_FALSE, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1246,6 +1810,24 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_CONST(location_type l) {
+        return symbol_type(token::CONST, std::move(l));
+    }
+#else
+    static symbol_type make_CONST(const location_type& l) {
+        return symbol_type(token::CONST, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_LITERAL(location_type l) {
+        return symbol_type(token::LITERAL, std::move(l));
+    }
+#else
+    static symbol_type make_LITERAL(const location_type& l) {
+        return symbol_type(token::LITERAL, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_OR(location_type l) {
         return symbol_type(token::OR, std::move(l));
     }
@@ -1282,12 +1864,111 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_BINARY(BSONBinData v, location_type l) {
+        return symbol_type(token::BINARY, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_BINARY(const BSONBinData& v, const location_type& l) {
+        return symbol_type(token::BINARY, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_UNDEFINED(UserUndefined v, location_type l) {
+        return symbol_type(token::UNDEFINED, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_UNDEFINED(const UserUndefined& v, const location_type& l) {
+        return symbol_type(token::UNDEFINED, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_OBJECT_ID(OID v, location_type l) {
+        return symbol_type(token::OBJECT_ID, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_OBJECT_ID(const OID& v, const location_type& l) {
+        return symbol_type(token::OBJECT_ID, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_DATE(Date_t v, location_type l) {
+        return symbol_type(token::DATE, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_DATE(const Date_t& v, const location_type& l) {
+        return symbol_type(token::DATE, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_JSNULL(UserNull v, location_type l) {
+        return symbol_type(token::JSNULL, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_JSNULL(const UserNull& v, const location_type& l) {
+        return symbol_type(token::JSNULL, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_REGEX(BSONRegEx v, location_type l) {
+        return symbol_type(token::REGEX, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_REGEX(const BSONRegEx& v, const location_type& l) {
+        return symbol_type(token::REGEX, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_DB_POINTER(BSONDBRef v, location_type l) {
+        return symbol_type(token::DB_POINTER, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_DB_POINTER(const BSONDBRef& v, const location_type& l) {
+        return symbol_type(token::DB_POINTER, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_JAVASCRIPT(BSONCode v, location_type l) {
+        return symbol_type(token::JAVASCRIPT, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_JAVASCRIPT(const BSONCode& v, const location_type& l) {
+        return symbol_type(token::JAVASCRIPT, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_SYMBOL(BSONSymbol v, location_type l) {
+        return symbol_type(token::SYMBOL, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_SYMBOL(const BSONSymbol& v, const location_type& l) {
+        return symbol_type(token::SYMBOL, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_JAVASCRIPT_W_SCOPE(BSONCodeWScope v, location_type l) {
+        return symbol_type(token::JAVASCRIPT_W_SCOPE, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_JAVASCRIPT_W_SCOPE(const BSONCodeWScope& v, const location_type& l) {
+        return symbol_type(token::JAVASCRIPT_W_SCOPE, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_INT_NON_ZERO(int v, location_type l) {
         return symbol_type(token::INT_NON_ZERO, std::move(v), std::move(l));
     }
 #else
     static symbol_type make_INT_NON_ZERO(const int& v, const location_type& l) {
         return symbol_type(token::INT_NON_ZERO, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_TIMESTAMP(Timestamp v, location_type l) {
+        return symbol_type(token::TIMESTAMP, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_TIMESTAMP(const Timestamp& v, const location_type& l) {
+        return symbol_type(token::TIMESTAMP, v, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1317,6 +1998,24 @@ public:
         return symbol_type(token::DECIMAL_NON_ZERO, v, l);
     }
 #endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_MIN_KEY(UserMinKey v, location_type l) {
+        return symbol_type(token::MIN_KEY, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_MIN_KEY(const UserMinKey& v, const location_type& l) {
+        return symbol_type(token::MIN_KEY, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_MAX_KEY(UserMaxKey v, location_type l) {
+        return symbol_type(token::MAX_KEY, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_MAX_KEY(const UserMaxKey& v, const location_type& l) {
+        return symbol_type(token::MAX_KEY, v, l);
+    }
+#endif
 
 
 private:
@@ -1329,7 +2028,7 @@ private:
 
 
     /// Stored state numbers (used for stacks).
-    typedef signed char state_type;
+    typedef unsigned char state_type;
 
     /// Compute post-reduction state.
     /// \param yystate   the current state
@@ -1344,7 +2043,7 @@ private:
     /// \param yyvalue   the value to check
     static bool yy_table_value_is_error_(int yyvalue);
 
-    static const signed char yypact_ninf_;
+    static const short yypact_ninf_;
     static const signed char yytable_ninf_;
 
     /// Convert a scanner token kind \a t to a symbol kind.
@@ -1353,10 +2052,6 @@ private:
     static symbol_kind_type yytranslate_(int t);
 
 #if YYDEBUG || 0
-    /// The user-facing name of the symbol whose (internal) number is
-    /// YYSYMBOL.  No bounds checking.
-    static const char* symbol_name(symbol_kind_type yysymbol);
-
     /// For a symbol, its name in clear.
     static const char* const yytname_[];
 #endif  // #if YYDEBUG || 0
@@ -1365,25 +2060,25 @@ private:
     // Tables.
     // YYPACT[STATE-NUM] -- Index in YYTABLE of the portion describing
     // STATE-NUM.
-    static const signed char yypact_[];
+    static const short yypact_[];
 
     // YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
     // Performed when YYTABLE does not specify something else to do.  Zero
     // means the default is an error.
-    static const signed char yydefact_[];
+    static const unsigned char yydefact_[];
 
     // YYPGOTO[NTERM-NUM].
-    static const signed char yypgoto_[];
+    static const short yypgoto_[];
 
     // YYDEFGOTO[NTERM-NUM].
-    static const signed char yydefgoto_[];
+    static const short yydefgoto_[];
 
     // YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
     // positive, shift that token.  If negative, reduce the rule whose
     // number is the opposite.  If YYTABLE_NINF, syntax error.
-    static const signed char yytable_[];
+    static const unsigned char yytable_[];
 
-    static const signed char yycheck_[];
+    static const short yycheck_[];
 
     // YYSTOS[STATE-NUM] -- The (internal number of the) accessing
     // symbol of state STATE-NUM.
@@ -1597,8 +2292,8 @@ private:
 
     /// Constants.
     enum {
-        yylast_ = 108,  ///< Last index in yytable_.
-        yynnts_ = 32,   ///< Number of nonterminal symbols.
+        yylast_ = 249,  ///< Last index in yytable_.
+        yynnts_ = 67,   ///< Number of nonterminal symbols.
         yyfinal_ = 5    ///< Termination state number.
     };
 
@@ -1617,64 +2312,151 @@ template <typename Base>
 PipelineParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
     : Base(that), value(), location(that.location) {
     switch (this->kind()) {
-        case 33:  // stageList
-        case 34:  // stage
-        case 35:  // inhibitOptimization
-        case 36:  // unionWith
-        case 37:  // num
-        case 38:  // skip
-        case 39:  // limit
-        case 40:  // project
-        case 41:  // projectFields
-        case 42:  // projection
-        case 43:  // compoundExpression
-        case 44:  // expression
-        case 45:  // maths
-        case 46:  // add
-        case 47:  // atan2
-        case 48:  // string
-        case 49:  // int
-        case 50:  // long
-        case 51:  // double
-        case 52:  // bool
-        case 53:  // value
-        case 54:  // boolExps
-        case 55:  // and
-        case 56:  // or
-        case 57:  // not
+        case 30:  // BINARY
+            value.copy<BSONBinData>(YY_MOVE(that.value));
+            break;
+
+        case 37:  // JAVASCRIPT
+            value.copy<BSONCode>(YY_MOVE(that.value));
+            break;
+
+        case 39:  // JAVASCRIPT_W_SCOPE
+            value.copy<BSONCodeWScope>(YY_MOVE(that.value));
+            break;
+
+        case 36:  // DB_POINTER
+            value.copy<BSONDBRef>(YY_MOVE(that.value));
+            break;
+
+        case 35:  // REGEX
+            value.copy<BSONRegEx>(YY_MOVE(that.value));
+            break;
+
+        case 38:  // SYMBOL
+            value.copy<BSONSymbol>(YY_MOVE(that.value));
+            break;
+
+        case 48:  // stageList
+        case 49:  // stage
+        case 50:  // inhibitOptimization
+        case 51:  // unionWith
+        case 52:  // num
+        case 53:  // skip
+        case 54:  // limit
+        case 55:  // project
+        case 56:  // projectFields
+        case 57:  // projection
+        case 58:  // compoundExpression
+        case 59:  // expressionArray
+        case 60:  // expressionObject
+        case 61:  // expressionFields
+        case 62:  // expression
+        case 63:  // maths
+        case 64:  // add
+        case 65:  // atan2
+        case 66:  // string
+        case 67:  // binary
+        case 68:  // undefined
+        case 69:  // objectId
+        case 70:  // bool
+        case 71:  // date
+        case 72:  // null
+        case 73:  // regex
+        case 74:  // dbPointer
+        case 75:  // javascript
+        case 76:  // symbol
+        case 77:  // javascriptWScope
+        case 78:  // int
+        case 79:  // timestamp
+        case 80:  // long
+        case 81:  // double
+        case 82:  // decimal
+        case 83:  // minKey
+        case 84:  // maxKey
+        case 85:  // simpleValue
+        case 86:  // boolExps
+        case 87:  // and
+        case 88:  // or
+        case 89:  // not
+        case 90:  // literalEscapes
+        case 91:  // const
+        case 92:  // literal
+        case 93:  // value
+        case 94:  // compoundValue
+        case 95:  // valueArray
+        case 96:  // valueObject
+        case 97:  // valueFields
             value.copy<CNode>(YY_MOVE(that.value));
             break;
 
-        case 58:  // projectionFieldname
+        case 98:   // projectionFieldname
+        case 99:   // expressionFieldname
+        case 100:  // stageAsUserFieldname
+        case 101:  // argAsUserFieldname
+        case 102:  // aggExprAsUserFieldname
+        case 103:  // invariableUserFieldname
+        case 104:  // idAsUserFieldname
+        case 105:  // valueFieldname
             value.copy<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case 31:  // DECIMAL_NON_ZERO
+        case 33:  // DATE
+            value.copy<Date_t>(YY_MOVE(that.value));
+            break;
+
+        case 44:  // DECIMAL_NON_ZERO
             value.copy<Decimal128>(YY_MOVE(that.value));
             break;
 
-        case 30:  // DOUBLE_NON_ZERO
+        case 32:  // OBJECT_ID
+            value.copy<OID>(YY_MOVE(that.value));
+            break;
+
+        case 41:  // TIMESTAMP
+            value.copy<Timestamp>(YY_MOVE(that.value));
+            break;
+
+        case 46:  // MAX_KEY
+            value.copy<UserMaxKey>(YY_MOVE(that.value));
+            break;
+
+        case 45:  // MIN_KEY
+            value.copy<UserMinKey>(YY_MOVE(that.value));
+            break;
+
+        case 34:  // JSNULL
+            value.copy<UserNull>(YY_MOVE(that.value));
+            break;
+
+        case 31:  // UNDEFINED
+            value.copy<UserUndefined>(YY_MOVE(that.value));
+            break;
+
+        case 43:  // DOUBLE_NON_ZERO
             value.copy<double>(YY_MOVE(that.value));
             break;
 
-        case 28:  // INT_NON_ZERO
+        case 40:  // INT_NON_ZERO
             value.copy<int>(YY_MOVE(that.value));
             break;
 
-        case 29:  // LONG_NON_ZERO
+        case 42:  // LONG_NON_ZERO
             value.copy<long long>(YY_MOVE(that.value));
             break;
 
-        case 59:  // projectField
+        case 106:  // projectField
+        case 107:  // expressionField
+        case 108:  // valueField
             value.copy<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
             break;
 
-        case 26:  // FIELDNAME
-        case 27:  // STRING
+        case 28:  // FIELDNAME
+        case 29:  // STRING
             value.copy<std::string>(YY_MOVE(that.value));
             break;
 
-        case 60:  // expressions
+        case 109:  // expressions
+        case 110:  // values
             value.copy<std::vector<CNode>>(YY_MOVE(that.value));
             break;
 
@@ -1699,64 +2481,151 @@ template <typename Base>
 void PipelineParserGen::basic_symbol<Base>::move(basic_symbol& s) {
     super_type::move(s);
     switch (this->kind()) {
-        case 33:  // stageList
-        case 34:  // stage
-        case 35:  // inhibitOptimization
-        case 36:  // unionWith
-        case 37:  // num
-        case 38:  // skip
-        case 39:  // limit
-        case 40:  // project
-        case 41:  // projectFields
-        case 42:  // projection
-        case 43:  // compoundExpression
-        case 44:  // expression
-        case 45:  // maths
-        case 46:  // add
-        case 47:  // atan2
-        case 48:  // string
-        case 49:  // int
-        case 50:  // long
-        case 51:  // double
-        case 52:  // bool
-        case 53:  // value
-        case 54:  // boolExps
-        case 55:  // and
-        case 56:  // or
-        case 57:  // not
+        case 30:  // BINARY
+            value.move<BSONBinData>(YY_MOVE(s.value));
+            break;
+
+        case 37:  // JAVASCRIPT
+            value.move<BSONCode>(YY_MOVE(s.value));
+            break;
+
+        case 39:  // JAVASCRIPT_W_SCOPE
+            value.move<BSONCodeWScope>(YY_MOVE(s.value));
+            break;
+
+        case 36:  // DB_POINTER
+            value.move<BSONDBRef>(YY_MOVE(s.value));
+            break;
+
+        case 35:  // REGEX
+            value.move<BSONRegEx>(YY_MOVE(s.value));
+            break;
+
+        case 38:  // SYMBOL
+            value.move<BSONSymbol>(YY_MOVE(s.value));
+            break;
+
+        case 48:  // stageList
+        case 49:  // stage
+        case 50:  // inhibitOptimization
+        case 51:  // unionWith
+        case 52:  // num
+        case 53:  // skip
+        case 54:  // limit
+        case 55:  // project
+        case 56:  // projectFields
+        case 57:  // projection
+        case 58:  // compoundExpression
+        case 59:  // expressionArray
+        case 60:  // expressionObject
+        case 61:  // expressionFields
+        case 62:  // expression
+        case 63:  // maths
+        case 64:  // add
+        case 65:  // atan2
+        case 66:  // string
+        case 67:  // binary
+        case 68:  // undefined
+        case 69:  // objectId
+        case 70:  // bool
+        case 71:  // date
+        case 72:  // null
+        case 73:  // regex
+        case 74:  // dbPointer
+        case 75:  // javascript
+        case 76:  // symbol
+        case 77:  // javascriptWScope
+        case 78:  // int
+        case 79:  // timestamp
+        case 80:  // long
+        case 81:  // double
+        case 82:  // decimal
+        case 83:  // minKey
+        case 84:  // maxKey
+        case 85:  // simpleValue
+        case 86:  // boolExps
+        case 87:  // and
+        case 88:  // or
+        case 89:  // not
+        case 90:  // literalEscapes
+        case 91:  // const
+        case 92:  // literal
+        case 93:  // value
+        case 94:  // compoundValue
+        case 95:  // valueArray
+        case 96:  // valueObject
+        case 97:  // valueFields
             value.move<CNode>(YY_MOVE(s.value));
             break;
 
-        case 58:  // projectionFieldname
+        case 98:   // projectionFieldname
+        case 99:   // expressionFieldname
+        case 100:  // stageAsUserFieldname
+        case 101:  // argAsUserFieldname
+        case 102:  // aggExprAsUserFieldname
+        case 103:  // invariableUserFieldname
+        case 104:  // idAsUserFieldname
+        case 105:  // valueFieldname
             value.move<CNode::Fieldname>(YY_MOVE(s.value));
             break;
 
-        case 31:  // DECIMAL_NON_ZERO
+        case 33:  // DATE
+            value.move<Date_t>(YY_MOVE(s.value));
+            break;
+
+        case 44:  // DECIMAL_NON_ZERO
             value.move<Decimal128>(YY_MOVE(s.value));
             break;
 
-        case 30:  // DOUBLE_NON_ZERO
+        case 32:  // OBJECT_ID
+            value.move<OID>(YY_MOVE(s.value));
+            break;
+
+        case 41:  // TIMESTAMP
+            value.move<Timestamp>(YY_MOVE(s.value));
+            break;
+
+        case 46:  // MAX_KEY
+            value.move<UserMaxKey>(YY_MOVE(s.value));
+            break;
+
+        case 45:  // MIN_KEY
+            value.move<UserMinKey>(YY_MOVE(s.value));
+            break;
+
+        case 34:  // JSNULL
+            value.move<UserNull>(YY_MOVE(s.value));
+            break;
+
+        case 31:  // UNDEFINED
+            value.move<UserUndefined>(YY_MOVE(s.value));
+            break;
+
+        case 43:  // DOUBLE_NON_ZERO
             value.move<double>(YY_MOVE(s.value));
             break;
 
-        case 28:  // INT_NON_ZERO
+        case 40:  // INT_NON_ZERO
             value.move<int>(YY_MOVE(s.value));
             break;
 
-        case 29:  // LONG_NON_ZERO
+        case 42:  // LONG_NON_ZERO
             value.move<long long>(YY_MOVE(s.value));
             break;
 
-        case 59:  // projectField
+        case 106:  // projectField
+        case 107:  // expressionField
+        case 108:  // valueField
             value.move<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(s.value));
             break;
 
-        case 26:  // FIELDNAME
-        case 27:  // STRING
+        case 28:  // FIELDNAME
+        case 29:  // STRING
             value.move<std::string>(YY_MOVE(s.value));
             break;
 
-        case 60:  // expressions
+        case 109:  // expressions
+        case 110:  // values
             value.move<std::vector<CNode>>(YY_MOVE(s.value));
             break;
 
@@ -1798,9 +2667,9 @@ inline PipelineParserGen::symbol_kind_type PipelineParserGen::by_kind::type_get(
     return this->kind();
 }
 
-#line 58 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 58 "pipeline_grammar.yy"
 }  // namespace mongo
-#line 2178 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 3241 "pipeline_parser_gen.hpp"
 
 
-#endif  // !YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#endif  // !YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED

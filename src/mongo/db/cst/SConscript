@@ -34,6 +34,7 @@ env.CppUnitTest(
     target='cst_pipeline_translation_test',
     source=[
         'cst_pipeline_translation_test.cpp',
+        'cst_literals_test.cpp',
     ],
     LIBDEPS=[
         'cst',

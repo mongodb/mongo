@@ -55,14 +55,14 @@ auto getExpCtx() {
     return boost::intrusive_ptr<ExpressionContextForTest>{new ExpressionContextForTest(nss)};
 }
 
-TEST(CstTest, TranslatesEmpty) {
+TEST(CstPipelineTranslationTest, TranslatesEmpty) {
     const auto cst = CNode{CNode::ArrayChildren{}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(0u, sources.size());
 }
 
-TEST(CstTest, TranslatesEmptyProject) {
+TEST(CstPipelineTranslationTest, TranslatesEmptyProject) {
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
@@ -72,7 +72,7 @@ TEST(CstTest, TranslatesEmptyProject) {
     ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter));
 }
 
-TEST(CstTest, TranslatesEmptyProjects) {
+TEST(CstPipelineTranslationTest, TranslatesEmptyProjects) {
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}},
         CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}},
@@ -86,7 +86,7 @@ TEST(CstTest, TranslatesEmptyProjects) {
     ASSERT(typeid(DocumentSourceSingleDocumentTransformation) == typeid(**iter));
 }
 
-TEST(CstTest, TranslatesOneFieldInclusionProjectionStage) {
+TEST(CstPipelineTranslationTest, TranslatesOneFieldInclusionProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}}}}}}}}};
@@ -101,7 +101,7 @@ TEST(CstTest, TranslatesOneFieldInclusionProjectionStage) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstTest, TranslatesMultifieldInclusionProjection) {
+TEST(CstPipelineTranslationTest, TranslatesMultifieldInclusionProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{{KeyFieldname::id, CNode{KeyValue::trueKey}},
@@ -118,7 +118,7 @@ TEST(CstTest, TranslatesMultifieldInclusionProjection) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstTest, TranslatesOneFieldExclusionProjectionStage) {
+TEST(CstPipelineTranslationTest, TranslatesOneFieldExclusionProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::falseKey}}}}}}}}};
@@ -133,7 +133,7 @@ TEST(CstTest, TranslatesOneFieldExclusionProjectionStage) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstTest, TranslatesMultifieldExclusionProjection) {
+TEST(CstPipelineTranslationTest, TranslatesMultifieldExclusionProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{{KeyFieldname::id, CNode{KeyValue::falseKey}},
@@ -150,7 +150,7 @@ TEST(CstTest, TranslatesMultifieldExclusionProjection) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstTest, FailsToTranslateInclusionExclusionMixedProjectionStage) {
+TEST(CstPipelineTranslationTest, FailsToTranslateInclusionExclusionMixedProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}},
@@ -159,7 +159,7 @@ TEST(CstTest, FailsToTranslateInclusionExclusionMixedProjectionStage) {
         cst_pipeline_translation::translatePipeline(cst, getExpCtx()), DBException, 4933100);
 }
 
-TEST(CstTest, TranslatesComputedProjection) {
+TEST(CstPipelineTranslationTest, TranslatesComputedProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{
@@ -190,7 +190,7 @@ TEST(CstTest, TranslatesComputedProjection) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstTest, FailsToTranslateComputedExclusionMixedProjectionStage) {
+TEST(CstPipelineTranslationTest, FailsToTranslateComputedExclusionMixedProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{
@@ -203,7 +203,7 @@ TEST(CstTest, FailsToTranslateComputedExclusionMixedProjectionStage) {
         cst_pipeline_translation::translatePipeline(cst, getExpCtx()), DBException, 4933100);
 }
 
-TEST(CstTest, TranslatesComputedInclusionMixedProjectionStage) {
+TEST(CstPipelineTranslationTest, TranslatesComputedInclusionMixedProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{
@@ -225,7 +225,7 @@ TEST(CstTest, TranslatesComputedInclusionMixedProjectionStage) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstTest, TranslatesMultipleProjectionStages) {
+TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStages) {
     // [
     //     { $project: { a: true },
     //     { $project: { b: false },
@@ -290,7 +290,7 @@ TEST(CstTest, TranslatesMultipleProjectionStages) {
     }
 }
 
-TEST(CstTest, TranslatesMultipleProjectionStagesWithAndOrNot) {
+TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStagesWithAndOrNot) {
     // [
     //     { $project: { a: { $not: [
     //         { $const: 0 } },
@@ -348,7 +348,7 @@ TEST(CstTest, TranslatesMultipleProjectionStagesWithAndOrNot) {
     }
 }
 
-TEST(CstTest, TranslatesComputedProjectionWithAndOr) {
+TEST(CstPipelineTranslationTest, TranslatesComputedProjectionWithAndOr) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{
@@ -386,7 +386,7 @@ TEST(CstTest, TranslatesComputedProjectionWithAndOr) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstTest, TranslatesComputedProjectionWithExpressionOnId) {
+TEST(CstPipelineTranslationTest, TranslatesComputedProjectionWithExpressionOnId) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::project,
          CNode{CNode::ObjectChildren{
@@ -413,7 +413,7 @@ TEST(CstTest, TranslatesComputedProjectionWithExpressionOnId) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstTest, TranslatesSkipWithInt) {
+TEST(CstPipelineTranslationTest, TranslatesSkipWithInt) {
     auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserInt{5}}}}}}};
@@ -426,7 +426,7 @@ TEST(CstTest, TranslatesSkipWithInt) {
     ASSERT_EQ((dynamic_cast<DocumentSourceSkip&>(**iter).getSkip()), 5ll);
 }
 
-TEST(CstTest, TranslatesSkipWithDouble) {
+TEST(CstPipelineTranslationTest, TranslatesSkipWithDouble) {
     auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserDouble{5.5}}}}}}};
@@ -439,7 +439,7 @@ TEST(CstTest, TranslatesSkipWithDouble) {
     ASSERT_EQ((dynamic_cast<DocumentSourceSkip&>(**iter).getSkip()), 5ll);
 }
 
-TEST(CstTest, TranslatesSkipWithLong) {
+TEST(CstPipelineTranslationTest, TranslatesSkipWithLong) {
     auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserLong{8223372036854775807}}}}}}};
@@ -452,7 +452,7 @@ TEST(CstTest, TranslatesSkipWithLong) {
     ASSERT_EQ((dynamic_cast<DocumentSourceSkip&>(**iter).getSkip()), 8223372036854775807);
 }
 
-TEST(CstTest, TranslatesLimitWithInt) {
+TEST(CstPipelineTranslationTest, TranslatesLimitWithInt) {
     auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserInt{10}}}}}}};
@@ -465,7 +465,7 @@ TEST(CstTest, TranslatesLimitWithInt) {
     ASSERT_EQ(10ll, dynamic_cast<DocumentSourceLimit&>(**iter).getLimit());
 }
 
-TEST(CstTest, TranslatesLimitWithDouble) {
+TEST(CstPipelineTranslationTest, TranslatesLimitWithDouble) {
     auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserDouble{10.5}}}}}}};
@@ -478,7 +478,7 @@ TEST(CstTest, TranslatesLimitWithDouble) {
     ASSERT_EQ(10ll, dynamic_cast<DocumentSourceLimit&>(**iter).getLimit());
 }
 
-TEST(CstTest, TranslatesLimitWithLong) {
+TEST(CstPipelineTranslationTest, TranslatesLimitWithLong) {
     auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserLong{123123123123}}}}}}};

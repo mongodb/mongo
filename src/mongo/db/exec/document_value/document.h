@@ -119,6 +119,7 @@ public:
      * auto document = Document{{"hello", "world"}, {"number": 1}};
      */
     Document(std::initializer_list<std::pair<StringData, ImplicitValue>> initializerList);
+    Document(std::vector<std::pair<StringData, Value>> fields);
 
     void swap(Document& rhs) {
         _storage.swap(rhs._storage);

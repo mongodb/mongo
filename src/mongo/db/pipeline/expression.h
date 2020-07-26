@@ -531,6 +531,8 @@ public:
  */
 class ExpressionConstant final : public Expression {
 public:
+    ExpressionConstant(ExpressionContext* const expCtx, const Value& value);
+
     boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root, Variables* variables) const final;
     Value serialize(bool explain) const final;
@@ -585,8 +587,6 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const override;
 
 private:
-    ExpressionConstant(ExpressionContext* const expCtx, const Value& value);
-
     Value _value;
 };
 

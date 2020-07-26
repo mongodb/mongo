@@ -119,8 +119,8 @@
     LONG_ZERO
     DOUBLE_ZERO
     DECIMAL_ZERO
-    TRUE
-    FALSE
+    BOOL_TRUE
+    BOOL_FALSE
 
     // Reserve pipeline stage names.
     STAGE_INHIBIT_OPTIMIZATION
@@ -137,29 +137,49 @@
     ADD
     ATAN2
     AND
+    CONST
+    LITERAL
     OR
     NOT
+    
 
     END_OF_FILE 0 "EOF"
 ;
 
 %token <std::string> FIELDNAME
 %token <std::string> STRING
+%token <BSONBinData> BINARY
+%token <UserUndefined> UNDEFINED
+%token <OID> OBJECT_ID
+%token <Date_t> DATE
+%token <UserNull> JSNULL
+%token <BSONRegEx> REGEX
+%token <BSONDBRef> DB_POINTER
+%token <BSONCode> JAVASCRIPT
+%token <BSONSymbol> SYMBOL
+%token <BSONCodeWScope> JAVASCRIPT_W_SCOPE
 %token <int> INT_NON_ZERO
+%token <Timestamp> TIMESTAMP
 %token <long long> LONG_NON_ZERO
 %token <double> DOUBLE_NON_ZERO
 %token <Decimal128> DECIMAL_NON_ZERO
+%token <UserMinKey> MIN_KEY
+%token <UserMaxKey> MAX_KEY
 
 //
 // Semantic values (aka the C++ types produced by the actions).
 //
-%nterm <CNode> stageList stage inhibitOptimization unionWith num skip limit
-%nterm <CNode> project projectFields projection
-%nterm <CNode> compoundExpression expression maths add atan2 string int long double bool value 
-%nterm <CNode> boolExps and or not
-%nterm <CNode::Fieldname> projectionFieldname
-%nterm <std::pair<CNode::Fieldname, CNode>> projectField
-%nterm <std::vector<CNode>> expressions
+%nterm <CNode> stageList stage inhibitOptimization unionWith num skip limit project projectFields
+%nterm <CNode> projection compoundExpression expressionArray expressionObject expressionFields
+%nterm <CNode> expression maths add atan2 string binary undefined objectId bool date null regex
+%nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal minKey
+%nterm <CNode> maxKey simpleValue boolExps and or not literalEscapes const literal value
+%nterm <CNode> compoundValue valueArray valueObject valueFields
+%nterm <CNode::Fieldname> projectionFieldname expressionFieldname stageAsUserFieldname
+%nterm <CNode::Fieldname> argAsUserFieldname aggExprAsUserFieldname invariableUserFieldname
+%nterm <CNode::Fieldname> idAsUserFieldname valueFieldname
+%nterm <std::pair<CNode::Fieldname, CNode>> projectField expressionField valueField
+%nterm <std::vector<CNode>> expressions values
 
 //
 // Grammar rules
@@ -206,7 +226,7 @@ unionWith:
 };
 
 num:
-   int | long | double
+   int | long | double | decimal
 ;
 
 skip:
@@ -270,37 +290,61 @@ projection:
     | DECIMAL_ZERO {
         $$ = CNode{KeyValue::decimalZeroKey};
     }
-    | TRUE {
+    | BOOL_TRUE {
         $$ = CNode{KeyValue::trueKey};
     }
-    | FALSE {
+    | BOOL_FALSE {
         $$ = CNode{KeyValue::falseKey};
     }
     | compoundExpression
 ;
 
 projectionFieldname:
+    invariableUserFieldname | stageAsUserFieldname | argAsUserFieldname | aggExprAsUserFieldname
+;
+
+invariableUserFieldname:
     FIELDNAME {
         $$ = UserFieldname{$1};
     }
-    // Here we need to list all key Fieldnames so they can be converted back to string in contexts
+;
+
+stageAsUserFieldname:
+    // Here we need to list all agg stage keys so they can be converted back to string in contexts
     // where they're not special. It's laborious but this is the perennial Bison way.
-    | STAGE_INHIBIT_OPTIMIZATION {
+    STAGE_INHIBIT_OPTIMIZATION {
         $$ = UserFieldname{"$_internalInhibitOptimization"};
     }
     | STAGE_UNION_WITH {
         $$ = UserFieldname{"$unionWith"};
     }
+    | STAGE_SKIP {
+        $$ = UserFieldname{"$skip"};
+    }
+    | STAGE_LIMIT {
+        $$ = UserFieldname{"$limit"};
+    }
     | STAGE_PROJECT {
         $$ = UserFieldname{"$project"};
     }
-    | COLL_ARG {
+;
+
+argAsUserFieldname:
+    // Here we need to list all keys representing args passed to operators so they can be converted
+    // back to string in contexts where they're not special. It's laborious but this is the
+    // perennial Bison way.
+    COLL_ARG {
         $$ = UserFieldname{"coll"};
     }
     | PIPELINE_ARG {
         $$ = UserFieldname{"pipeline"};
     }
-    | ADD {
+;
+
+aggExprAsUserFieldname:
+    // Here we need to list all agg expressions so they can be converted back to string in contexts
+    // where they're not special. It's laborious but this is the perennial Bison way.
+    ADD {
         $$ = UserFieldname{"$add"};
     }
     | ATAN2 {
@@ -308,6 +352,12 @@ projectionFieldname:
     }
     | AND {
         $$ = UserFieldname{"$and"};
+    }
+    | CONST {
+        $$ = UserFieldname{"$const"};
+    }
+    | LITERAL {
+        $$ = UserFieldname{"$literal"};
     }
     | OR {
         $$ = UserFieldname{"$or"};
@@ -320,6 +370,84 @@ projectionFieldname:
 string:
     STRING {
         $$ = CNode{UserString{$1}};
+    }
+;
+
+binary:
+    BINARY {
+        $$ = CNode{UserBinary{$1}};
+    }
+;
+
+undefined:
+    UNDEFINED {
+        $$ = CNode{UserUndefined{}};
+    }
+;
+
+objectId:
+    OBJECT_ID {
+        $$ = CNode{UserObjectId{}};
+    }
+;
+
+date:
+    DATE {
+        $$ = CNode{UserDate{$1}};
+    }
+;
+
+null:
+    JSNULL {
+        $$ = CNode{UserNull{}};
+    }
+;
+
+regex:
+    REGEX {
+        $$ = CNode{UserRegex{$1}};
+    }
+;
+
+dbPointer:
+    DB_POINTER {
+        $$ = CNode{UserDBPointer{$1}};
+    }
+;
+
+javascript:
+    JAVASCRIPT {
+        $$ = CNode{UserJavascript{$1}};
+    }
+;
+
+symbol:
+    SYMBOL {
+        $$ = CNode{UserSymbol{$1}};
+    }
+;
+
+javascriptWScope:
+    JAVASCRIPT_W_SCOPE {
+        $$ = CNode{UserJavascriptWithScope{$1}};
+    }
+;
+
+timestamp:
+    TIMESTAMP {
+        $$ = CNode{UserTimestamp{$1}};
+    }
+;
+
+minKey:
+    MIN_KEY {
+        $$ = CNode{UserMinKey{$1}};
+    }
+;
+
+maxKey:
+    MAX_KEY {
+        $$ = CNode{UserMaxKey{$1}};
     }
 ;
 
@@ -350,21 +478,44 @@ double:
     }
 ;
 
+decimal:
+    DECIMAL_NON_ZERO {
+        $$ = CNode{UserDecimal{$1}};
+    }
+    | DECIMAL_ZERO {
+        $$ = CNode{UserDecimal{0.0}};
+    }
+;
+
 bool:
-    TRUE {
+    BOOL_TRUE {
         $$ = CNode{UserBoolean{true}};
     }
-    | FALSE {
+    | BOOL_FALSE {
         $$ = CNode{UserBoolean{false}};
     }
 ;
 
-value:
+simpleValue:
     string
+    | binary
+    | undefined
+    | objectId
+    | date
+    | null
+    | regex
+    | dbPointer
+    | javascript
+    | symbol
+    | javascriptWScope
     | int
     | long
     | double
+    | decimal
     | bool
+    | timestamp
+    | minKey
+    | maxKey
 ;
 
 // Zero or more expressions. Specify mandatory expressions in a rule using the 'expression'
@@ -376,20 +527,64 @@ expressions:
         $$ = $expressionArg;
         $$.emplace_back($expression);
     }
+;
 
 expression:
-    value
-    | compoundExpression
+    simpleValue | compoundExpression
 ;
 
 compoundExpression:
-    maths | boolExps
+    expressionArray | expressionObject | maths | boolExps | literalEscapes
+;
+
+// These are arrays occuring in Expressions outside of $const/$literal. They may contain further
+// Expressions.
+expressionArray:
+    START_ARRAY expressions END_ARRAY {
+        $$ = CNode{$expressions};
+    }
+;
+
+// These are objects occuring in Expressions outside of $const/$literal. They may contain further
+// Expressions.
+expressionObject:
+    START_OBJECT expressionFields END_OBJECT {
+        $$ = $expressionFields;
+    }
+;
+
+expressionFields:
+    %empty {
+        $$ = CNode::noopLeaf();
+    }
+    | expressionFields[expressionArg] expressionField {
+        $$ = $expressionArg;
+        $$.objectChildren().emplace_back($expressionField);
+    }
+;
+
+expressionField:
+    expressionFieldname expression {
+        $$ = {$expressionFieldname, $expression};
+    }
+;
+
+// All fieldnames that don't indicate agg functons/operators.
+expressionFieldname:
+    invariableUserFieldname | stageAsUserFieldname | argAsUserFieldname | idAsUserFieldname
+;
+
+idAsUserFieldname:
+    ID {
+        $$ = UserFieldname{"_id"};
+    }
 ;
 
 maths:
     add
     | atan2
 ;
+
 add:
     START_OBJECT ADD START_ARRAY expression[expr1] expression[expr2] expressions END_ARRAY END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::add,
@@ -408,7 +603,7 @@ atan2:
 ;
 
 boolExps:
-    and| or | not
+    and | or | not
 ;
 
 and:
@@ -436,6 +631,77 @@ not:
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::notExpr,
                                           CNode{CNode::ArrayChildren{$expression}}}}};
     }
+;
+
+literalEscapes:
+    const | literal
+;
+
+const:
+    START_OBJECT CONST START_ARRAY value END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::constExpr,
+                                          CNode{CNode::ArrayChildren{$value}}}}};
+    }
+;
+
+literal:
+    START_OBJECT LITERAL START_ARRAY value END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::literal,
+                                          CNode{CNode::ArrayChildren{$value}}}}};
+    }
+;
+
+value:
+    simpleValue | compoundValue
+;
+
+compoundValue:
+    valueArray | valueObject
+;
+
+valueArray:
+    START_ARRAY values END_ARRAY {
+        $$ = CNode{$values};
+    }
+;
+
+values:
+    %empty { }
+    | value values[valuesArg] {
+        $$ = $valuesArg;
+        $$.emplace_back($value);
+    }
+;
+
+valueObject:
+    START_OBJECT valueFields END_OBJECT {
+        $$ = $valueFields;
+    }
+;
+
+valueFields:
+    %empty {
+        $$ = CNode::noopLeaf();
+    }
+    | valueFields[valueArg] valueField {
+        $$ = $valueArg;
+        $$.objectChildren().emplace_back($valueField);
+    }
+;
+
+valueField:
+    valueFieldname value {
+        $$ = {$valueFieldname, $value};
+    }
+;
+
+// All fieldnames.
+valueFieldname:
+    invariableUserFieldname
+    | stageAsUserFieldname
+    | argAsUserFieldname
+    | aggExprAsUserFieldname
+    | idAsUserFieldname
 ;
 
 %%
