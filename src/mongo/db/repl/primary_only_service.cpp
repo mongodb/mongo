@@ -227,6 +227,10 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateIns
     auto [it2, inserted] =
         _instances.emplace(instanceID.getOwned(), constructInstance(std::move(initialState)));
     invariant(inserted);
+
+    // Kick off async work to run the instance
+    it2->second->scheduleRun(_scopedExecutor);
+
     return it2->second;
 }
 
@@ -240,6 +244,21 @@ boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyServic
     }
 
     return it->second;
+}
+
+void PrimaryOnlyService::Instance::scheduleRun(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    invariant(!_running);
+    _running = true;
+
+    (*executor)->schedule([this, executor = std::move(executor)](auto status) {
+        if (ErrorCodes::isCancelationError(status) || ErrorCodes::NotMaster == status) {
+            return;
+        }
+        invariant(status);
+
+        run(std::move(executor));
+    });
 }
 
 }  // namespace repl

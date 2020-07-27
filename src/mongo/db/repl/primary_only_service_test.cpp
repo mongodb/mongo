@@ -29,7 +29,6 @@
 
 #include <memory>
 
-
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_impl.h"
@@ -41,6 +40,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/future.h"
 
 using namespace mongo;
 using namespace mongo::repl;
@@ -70,8 +70,12 @@ public:
         Instance(const BSONObj& state)
             : PrimaryOnlyService::TypedInstance<Instance>(), _state(state) {}
 
-        SemiFuture<RunOnceResult> runOnce(OperationContext* opCtx) override {
-            return SemiFuture<RunOnceResult>::makeReady(RunOnceResult::kComplete());
+        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override {
+            _completionPromise.emplaceValue();
+        }
+
+        void waitForCompletion() {
+            _completionPromise.getFuture().wait();
         }
 
         const BSONObj& getState() const {
@@ -80,6 +84,7 @@ public:
 
     private:
         BSONObj _state;
+        SharedPromise<void> _completionPromise;
     };
 };
 
@@ -91,9 +96,8 @@ public:
 
         WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
 
+        auto opCtx = cc().makeOperationContext();
         {
-            auto opCtx = cc().makeOperationContext();
-
             auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
             ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
             ASSERT_OK(replCoord->updateTerm(opCtx.get(), 1));
@@ -114,6 +118,7 @@ public:
                 std::make_unique<TestService>(getServiceContext());
 
             _registry->registerService(std::move(service));
+            _registry->onStartup(opCtx.get());
             _registry->onStepUpComplete(nullptr, 1);
         }
 
@@ -148,8 +153,17 @@ DEATH_TEST_F(PrimaryOnlyServiceTest,
     registry.registerService(std::move(service2));
 }
 
-TEST_F(PrimaryOnlyServiceTest, LookupInstance) {
+TEST_F(PrimaryOnlyServiceTest, BasicCreateInstance) {
+    auto instance = TestService::Instance::getOrCreate(_service,
+                                                       BSON("_id" << 0 << "state"
+                                                                  << "foo"));
+    ASSERT(instance.get());
+    ASSERT_EQ(0, instance->getState()["_id"].Int());
+    ASSERT_EQ("foo", instance->getState()["state"].String());
+    instance->waitForCompletion();
+}
 
+TEST_F(PrimaryOnlyServiceTest, LookupInstance) {
     auto instance = TestService::Instance::getOrCreate(_service,
                                                        BSON("_id" << 0 << "state"
                                                                   << "foo"));
@@ -166,7 +180,6 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstance) {
 }
 
 TEST_F(PrimaryOnlyServiceTest, DoubleCreateInstance) {
-
     auto instance = TestService::Instance::getOrCreate(_service,
                                                        BSON("_id" << 0 << "state"
                                                                   << "foo"));

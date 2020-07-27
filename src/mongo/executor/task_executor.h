@@ -213,6 +213,10 @@ public:
                                                      Date_t deadline = Date_t::max()) = 0;
 
 
+    /**
+     * Schedules the given Task to run in this executor.
+     * Note that 'func' is implicitly noexcept and should not ever leak exceptions.
+     */
     void schedule(OutOfLineExecutor::Task func) final override;
 
     /**
@@ -224,6 +228,8 @@ public:
      * error, make sure it is an actual CallbackFn, not a lambda or other value that implicitly
      * converts to CallbackFn, since such a value would be moved from and invalidated during
      * conversion with no way to recover it.
+     *
+     * "work" should be considered implicitly 'noexcept' and thus should not throw any exceptions.
      *
      * May be called by client threads or callbacks running in the executor.
      *
@@ -243,6 +249,8 @@ public:
      * error, make sure it is an actual CallbackFn, not a lambda or other value that implicitly
      * converts to CallbackFn, since such a value would be moved from and invalidated during
      * conversion with no way to recover it.
+     *
+     * "work" should be considered implicitly 'noexcept' and thus should not throw any exceptions.
      *
      * May be called by client threads or callbacks running in the executor.
      *

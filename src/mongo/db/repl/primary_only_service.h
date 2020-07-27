@@ -41,9 +41,7 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/future.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -86,42 +84,26 @@ public:
      */
     class Instance {
     public:
-        struct RunOnceResult {
-            enum State {
-                kKeepRunning,
-                kFinished,
-            };
-            // If set to kFinished signals that the task this Instance represents is complete, and
-            // both the in-memory Instance object and the on-disk state document can be cleaned up.
-            State state = kKeepRunning;
-
-            // If set, signals that the next call to 'runOnce' on this instance shouldn't occur
-            // until this optime is majority committed.
-            boost::optional<OpTime> optime;
-
-            static RunOnceResult kComplete() {
-                return RunOnceResult{kFinished, boost::none};
-            }
-
-            static RunOnceResult kKeepGoing(OpTime ot) {
-                return RunOnceResult{kKeepRunning, std::move(ot)};
-            }
-
-        private:
-            RunOnceResult(State st, boost::optional<OpTime> ot)
-                : state(std::move(st)), optime(std::move(ot)) {}
-        };
-
         virtual ~Instance() = default;
 
         /**
-         * This is the main function that PrimaryOnlyService implementations will need to implement,
-         * and is where the bulk of the work those services perform is executed. The
-         * PrimaryOnlyService machinery will call this function repeatedly until the RunOnceResult
-         * returned has 'complete' set to true, at which point the state document will be deleted
-         * and the Instance destroyed.
+         * Schedules work to call this instance's 'run' method against the provided
+         * ScopedTaskExecutor. Also includes checking to ensure that run is only ever scheduled
+         * once.
          */
-        virtual SemiFuture<RunOnceResult> runOnce(OperationContext* opCtx) = 0;
+        void scheduleRun(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+
+    protected:
+        /**
+         * This is the main function that PrimaryOnlyService implementations will need to implement,
+         * and is where the bulk of the work those services perform is scheduled. All work run for
+         * this Instance should be scheduled on 'executor'. Instances are responsible for inserting,
+         * updating, and deleting their state documents as needed.
+         */
+        virtual void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept = 0;
+
+    private:
+        bool _running = false;
     };
 
     /**
