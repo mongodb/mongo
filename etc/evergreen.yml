@@ -11210,7 +11210,7 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=requires_mmapv1
     lang_environment: LANG=C
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic --allocator=system
     scons_cache_scope: shared
     scons_cache_mode: all
     tooltags: "ssl sasl"
