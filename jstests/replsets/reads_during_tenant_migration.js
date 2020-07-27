@@ -21,6 +21,8 @@ const kMaxTimeMS = 3000;
 const kRecipientConnString = "testConnString";
 const kMigrationId = UUID();
 
+const kTenantMigrationsColl = 'tenantMigrationDonors';
+
 assert.commandWorked(primary.adminCommand({
     donorStartMigration: 1,
     migrationId: kMigrationId,
@@ -37,8 +39,9 @@ rst.awaitLastOpCommitted();
 jsTest.log(
     "Test that the donorStartMigration command correctly sets the durable migration state to blocking");
 
-const donorDoc = primary.getDB("config").migrationDonors.findOne();
-const oplogEntry = primary.getDB("local").oplog.rs.findOne({ns: "config.migrationDonors", op: "u"});
+const donorDoc = primary.getDB("config")[kTenantMigrationsColl].findOne();
+const oplogEntry =
+    primary.getDB("local").oplog.rs.findOne({ns: `config.${kTenantMigrationsColl}`, op: "u"});
 
 assert.eq(donorDoc._id, kMigrationId);
 assert.eq(donorDoc.databasePrefix, kDbPrefix);

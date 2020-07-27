@@ -39,7 +39,7 @@
 namespace mongo {
 
 /**
- * The MigratingTenantAccessBlocker is used to block and eventually reject reads and writes to a
+ * The TenantMigrationAccessBlocker is used to block and eventually reject reads and writes to a
  * database while the Atlas Serverless tenant that owns the database is being migrated from this
  * replica set to another replica set.
  *
@@ -55,7 +55,7 @@ namespace mongo {
  *         try {
  *             return f();
  *         } catch (const MigrationConflictException&) {
- *             MigratingTenantAccessBlocker::get(db).checkIfCanWriteOrBlock(opCtx);
+ *             TenantMigrationAccessBlocker::get(db).checkIfCanWriteOrBlock(opCtx);
  *         }
  *     }
  * }
@@ -111,9 +111,9 @@ namespace mongo {
  * If the "commit" or "abort" write aborts or rolls back via replication rollback, the node calls
  * rollBackCommitOrAbort, which cancels the asynchronous task.
  */
-class MigratingTenantAccessBlocker {
+class TenantMigrationAccessBlocker {
 public:
-    MigratingTenantAccessBlocker(ServiceContext* serviceContext, executor::TaskExecutor* executor);
+    TenantMigrationAccessBlocker(ServiceContext* serviceContext, executor::TaskExecutor* executor);
 
     //
     // Called by all writes and reads against the database.
@@ -149,7 +149,7 @@ private:
     executor::TaskExecutor* _executor;
 
     // Protects the state below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MigratingTenantAccessBlocker::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlocker::_mutex");
 
     Access _access{Access::kAllow};
     boost::optional<Timestamp> _blockTimestamp;

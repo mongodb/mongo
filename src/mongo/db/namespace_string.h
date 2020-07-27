@@ -107,7 +107,7 @@ public:
     static const NamespaceString kMigrationCoordinatorsNamespace;
 
     // Namespace for storing the persisted state of tenant migration donors.
-    static const NamespaceString kMigrationDonorsNamespace;
+    static const NamespaceString kTenantMigrationDonorsNamespace;
 
     // Namespace for replica set configuration settings.
     static const NamespaceString kSystemReplSetNamespace;

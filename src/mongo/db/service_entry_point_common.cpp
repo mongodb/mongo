@@ -64,14 +64,14 @@
 #include "mongo/db/query/find.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/read_write_concern_defaults.h"
-#include "mongo/db/repl/migrating_tenant_access_blocker_by_prefix.h"
-#include "mongo/db/repl/migrating_tenant_donor_util.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
+#include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/db/run_op_kill_cursors.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -520,7 +520,7 @@ void invokeWithNoSession(OperationContext* opCtx,
                          const OpMsgRequest& request,
                          CommandInvocation* invocation,
                          rpc::ReplyBuilderInterface* replyBuilder) {
-    migrating_tenant_donor_util::checkIfCanReadOrBlock(opCtx, request.getDatabase());
+    tenant_migration::checkIfCanReadOrBlock(opCtx, request.getDatabase());
     CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
 }
 
@@ -625,7 +625,7 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
         }
     }
 
-    migrating_tenant_donor_util::checkIfCanReadOrBlock(opCtx, request.getDatabase());
+    tenant_migration::checkIfCanReadOrBlock(opCtx, request.getDatabase());
 
     try {
         CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
@@ -869,8 +869,7 @@ bool runCommandImpl(OperationContext* opCtx,
     });
 
     behaviors.waitForLinearizableReadConcern(opCtx);
-    migrating_tenant_donor_util::checkIfLinearizableReadWasAllowedOrThrow(opCtx,
-                                                                          request.getDatabase());
+    tenant_migration::checkIfLinearizableReadWasAllowedOrThrow(opCtx, request.getDatabase());
 
     // Wait for data to satisfy the read concern level, if necessary.
     behaviors.waitForSpeculativeMajorityReadConcern(opCtx);

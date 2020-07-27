@@ -27,31 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/db/repl/migrating_tenant_access_blocker_by_prefix.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/repl/tenant_migration_access_blocker.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
-namespace {
-class MigratingTenantAccessBlockerServerStatus final : public ServerStatusSection {
+class TenantMigrationAccessBlockerByPrefix {
+    TenantMigrationAccessBlockerByPrefix(const TenantMigrationAccessBlockerByPrefix&) = delete;
+    TenantMigrationAccessBlockerByPrefix& operator=(const TenantMigrationAccessBlockerByPrefix&) =
+        delete;
 
 public:
-    MigratingTenantAccessBlockerServerStatus()
-        : ServerStatusSection("migratingTenantAccessBlocker") {}
+    TenantMigrationAccessBlockerByPrefix() = default;
+    static const ServiceContext::Decoration<TenantMigrationAccessBlockerByPrefix> get;
 
-    bool includeByDefault() const override {
-        return true;
-    }
-    BSONObj generateSection(OperationContext* opCtx,
-                            const BSONElement& configElement) const override {
-        BSONObjBuilder result;
-        MigratingTenantAccessBlockerByPrefix::get(opCtx->getServiceContext())
-            .appendInfoForServerStatus(&result);
-        return result.obj();
-    }
-} migratingTenantAccessBlockerServerStatus;
-}  // namespace
+    void appendInfoForServerStatus(BSONObjBuilder* builder);
+    void add(StringData dbPrefix, std::shared_ptr<TenantMigrationAccessBlocker> mtab);
+    void remove(StringData dbPrefix);
+    std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlocker(
+        StringData dbName);
+
+private:
+    using MigratingTenantAccessBlockersMap =
+        StringMap<std::shared_ptr<TenantMigrationAccessBlocker>>;
+
+    Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerByPrefix::_mutex");
+    MigratingTenantAccessBlockersMap _migratingTenantAccessBlockers;
+};
+
 }  // namespace mongo

@@ -28,9 +28,9 @@
  */
 
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/migrate_tenant_cmds_gen.h"
-#include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
-#include "mongo/db/repl/migrating_tenant_donor_util.h"
+#include "mongo/db/commands/tenant_migration_cmds_gen.h"
+#include "mongo/db/repl/tenant_migration_donor_util.h"
+#include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 
 namespace mongo {
 namespace {
@@ -52,7 +52,7 @@ public:
                 requestBody.getDatabasePrefix().toString(),
                 TenantMigrationDonorStateEnum::kDataSync);
 
-            migrating_tenant_donor_util::dataSync(opCtx, donorStateDoc);
+            tenant_migration::dataSync(opCtx, donorStateDoc);
         }
 
 

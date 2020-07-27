@@ -29,20 +29,20 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
-#include "mongo/db/repl/migrating_tenant_access_blocker_by_prefix.h"
-#include "mongo/db/repl/migrating_tenant_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
+#include "mongo/db/repl/tenant_migration_access_blocker.h"
 
 namespace mongo {
 
-const ServiceContext::Decoration<MigratingTenantAccessBlockerByPrefix>
-    MigratingTenantAccessBlockerByPrefix::get =
-        ServiceContext::declareDecoration<MigratingTenantAccessBlockerByPrefix>();
+const ServiceContext::Decoration<TenantMigrationAccessBlockerByPrefix>
+    TenantMigrationAccessBlockerByPrefix::get =
+        ServiceContext::declareDecoration<TenantMigrationAccessBlockerByPrefix>();
 
 /**
  * Invariants that no entry for dbPrefix exists and then adds the entry for (dbPrefix, mtab)
  */
-void MigratingTenantAccessBlockerByPrefix::add(StringData dbPrefix,
-                                               std::shared_ptr<MigratingTenantAccessBlocker> mtab) {
+void TenantMigrationAccessBlockerByPrefix::add(StringData dbPrefix,
+                                               std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     auto it = _migratingTenantAccessBlockers.find(dbPrefix);
@@ -55,7 +55,7 @@ void MigratingTenantAccessBlockerByPrefix::add(StringData dbPrefix,
 /**
  * Invariants that an entry for dbPrefix exists, and then removes the entry for (dbPrefix, mtab)
  */
-void MigratingTenantAccessBlockerByPrefix::remove(StringData dbPrefix) {
+void TenantMigrationAccessBlockerByPrefix::remove(StringData dbPrefix) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     auto it = _migratingTenantAccessBlockers.find(dbPrefix);
@@ -66,16 +66,16 @@ void MigratingTenantAccessBlockerByPrefix::remove(StringData dbPrefix) {
 
 
 /**
- * Iterates through each of the MigratingTenantAccessBlockers and
- * returns the first MigratingTenantBlocker it finds whose dbPrefix is a prefix for dbName.
+ * Iterates through each of the TenantMigrationAccessBlockers and
+ * returns the first TenantMigrationAccessBlocker it finds whose dbPrefix is a prefix for dbName.
  */
-std::shared_ptr<MigratingTenantAccessBlocker>
-MigratingTenantAccessBlockerByPrefix::getMigratingTenantBlocker(StringData dbName) {
+std::shared_ptr<TenantMigrationAccessBlocker>
+TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlocker(StringData dbName) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     auto doesDBNameStartWithPrefix =
         [dbName](
-            const std::pair<std::string, std::shared_ptr<MigratingTenantAccessBlocker>>& blocker) {
+            const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
             StringData dbPrefix = blocker.first;
             return dbName.startsWith(dbPrefix);
         };
@@ -95,11 +95,11 @@ MigratingTenantAccessBlockerByPrefix::getMigratingTenantBlocker(StringData dbNam
  * Iterates through each of the MigratingTenantAccessBlockers stored by the mapping
  * and appends the server status of each blocker to the BSONObjBuilder.
  */
-void MigratingTenantAccessBlockerByPrefix::appendInfoForServerStatus(BSONObjBuilder* builder) {
+void TenantMigrationAccessBlockerByPrefix::appendInfoForServerStatus(BSONObjBuilder* builder) {
 
     auto appendBlockerStatus =
         [builder](
-            const std::pair<std::string, std::shared_ptr<MigratingTenantAccessBlocker>>& blocker) {
+            const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
             BSONObjBuilder tenantBuilder;
             blocker.second->appendInfoForServerStatus(&tenantBuilder);
             builder->append(blocker.first, tenantBuilder.obj());

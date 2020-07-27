@@ -1218,11 +1218,11 @@ env.Library(
 env.Library(
     target='migrating_tenant',
     source=[
-        'migrating_tenant_access_blocker.cpp',
-        'migrating_tenant_access_blocker_by_prefix.cpp',
-        'migrating_tenant_access_blocker_server_status_section.cpp',
-        'migrating_tenant_donor_util.cpp',
-        env.Idlc('migrate_tenant_state_machine.idl')[0],
+        'tenant_migration_access_blocker.cpp',
+        'tenant_migration_access_blocker_by_prefix.cpp',
+        'tenant_migration_access_blocker_server_status_section.cpp',
+        'tenant_migration_donor_util.cpp',
+        env.Idlc('tenant_migration_state_machine.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

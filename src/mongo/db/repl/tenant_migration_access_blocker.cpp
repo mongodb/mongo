@@ -30,16 +30,16 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/repl/migrating_tenant_access_blocker.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_access_blocker.h"
 
 namespace mongo {
 
-MigratingTenantAccessBlocker::MigratingTenantAccessBlocker(ServiceContext* serviceContext,
+TenantMigrationAccessBlocker::TenantMigrationAccessBlocker(ServiceContext* serviceContext,
                                                            executor::TaskExecutor* executor)
     : _serviceContext(serviceContext), _executor(executor) {}
 
-void MigratingTenantAccessBlocker::checkIfCanWriteOrThrow() {
+void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
     stdx::lock_guard<Latch> lg(_mutex);
 
     switch (_access) {
@@ -57,7 +57,7 @@ void MigratingTenantAccessBlocker::checkIfCanWriteOrThrow() {
     }
 }
 
-void MigratingTenantAccessBlocker::checkIfCanWriteOrBlock(OperationContext* opCtx) {
+void TenantMigrationAccessBlocker::checkIfCanWriteOrBlock(OperationContext* opCtx) {
     stdx::unique_lock<Latch> ul(_mutex);
 
     opCtx->waitForConditionOrInterrupt(_transitionOutOfBlockingCV, ul, [&]() {
@@ -69,7 +69,7 @@ void MigratingTenantAccessBlocker::checkIfCanWriteOrBlock(OperationContext* opCt
             _access == Access::kAllow);
 }
 
-void MigratingTenantAccessBlocker::checkIfCanDoClusterTimeReadOrBlock(
+void TenantMigrationAccessBlocker::checkIfCanDoClusterTimeReadOrBlock(
     OperationContext* opCtx, const Timestamp& readTimestamp) {
     stdx::unique_lock<Latch> ul(_mutex);
 
@@ -86,7 +86,7 @@ void MigratingTenantAccessBlocker::checkIfCanDoClusterTimeReadOrBlock(
             canRead());
 }
 
-void MigratingTenantAccessBlocker::checkIfLinearizableReadWasAllowedOrThrow(
+void TenantMigrationAccessBlocker::checkIfLinearizableReadWasAllowedOrThrow(
     OperationContext* opCtx) {
     stdx::lock_guard<Latch> lg(_mutex);
     uassert(ErrorCodes::TenantMigrationCommitted,
@@ -94,7 +94,7 @@ void MigratingTenantAccessBlocker::checkIfLinearizableReadWasAllowedOrThrow(
             _access != Access::kReject);
 }
 
-void MigratingTenantAccessBlocker::startBlockingWrites() {
+void TenantMigrationAccessBlocker::startBlockingWrites() {
     stdx::lock_guard<Latch> lg(_mutex);
 
     invariant(_access == Access::kAllow);
@@ -105,7 +105,7 @@ void MigratingTenantAccessBlocker::startBlockingWrites() {
     _access = Access::kBlockWrites;
 }
 
-void MigratingTenantAccessBlocker::startBlockingReadsAfter(const Timestamp& blockTimestamp) {
+void TenantMigrationAccessBlocker::startBlockingReadsAfter(const Timestamp& blockTimestamp) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     invariant(_access == Access::kBlockWrites);
@@ -117,7 +117,7 @@ void MigratingTenantAccessBlocker::startBlockingReadsAfter(const Timestamp& bloc
     _blockTimestamp = blockTimestamp;
 }
 
-void MigratingTenantAccessBlocker::rollBackStartBlocking() {
+void TenantMigrationAccessBlocker::rollBackStartBlocking() {
     stdx::lock_guard<Latch> lg(_mutex);
 
     invariant(_access == Access::kBlockWrites || _access == Access::kBlockWritesAndReads);
@@ -129,7 +129,7 @@ void MigratingTenantAccessBlocker::rollBackStartBlocking() {
     _transitionOutOfBlockingCV.notify_all();
 }
 
-void MigratingTenantAccessBlocker::commit(repl::OpTime commitOpTime) {
+void TenantMigrationAccessBlocker::commit(repl::OpTime commitOpTime) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     invariant(_access == Access::kBlockWritesAndReads);
@@ -154,7 +154,7 @@ void MigratingTenantAccessBlocker::commit(repl::OpTime commitOpTime) {
     _waitForOpTimeToMajorityCommit(commitOpTime, callbackFn);
 }
 
-void MigratingTenantAccessBlocker::abort(repl::OpTime abortOpTime) {
+void TenantMigrationAccessBlocker::abort(repl::OpTime abortOpTime) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     invariant(_access == Access::kBlockWritesAndReads);
@@ -182,7 +182,7 @@ void MigratingTenantAccessBlocker::abort(repl::OpTime abortOpTime) {
     _waitForOpTimeToMajorityCommit(abortOpTime, callbackFn);
 }
 
-void MigratingTenantAccessBlocker::rollBackCommitOrAbort() {
+void TenantMigrationAccessBlocker::rollBackCommitOrAbort() {
     stdx::lock_guard<Latch> lg(_mutex);
 
     invariant(_access == Access::kBlockWritesAndReads);
@@ -197,7 +197,7 @@ void MigratingTenantAccessBlocker::rollBackCommitOrAbort() {
     _waitForCommitOrAbortToMajorityCommitOpCtx = nullptr;
 }
 
-void MigratingTenantAccessBlocker::_waitForOpTimeToMajorityCommit(
+void TenantMigrationAccessBlocker::_waitForOpTimeToMajorityCommit(
     repl::OpTime opTime, std::function<void()> callbackFn) {
     uassertStatusOK(
         _executor->scheduleWork([&](const executor::TaskExecutor::CallbackArgs& cbData) {
@@ -213,7 +213,7 @@ void MigratingTenantAccessBlocker::_waitForOpTimeToMajorityCommit(
                     return;
                 }
 
-                ThreadClient tc("MigratingTenantAccessBlocker::commit", _serviceContext);
+                ThreadClient tc("TenantMigrationAccessBlocker::commit", _serviceContext);
                 const auto opCtxHolder = tc->makeOperationContext();
                 const auto opCtx = opCtxHolder.get();
 
@@ -244,7 +244,7 @@ void MigratingTenantAccessBlocker::_waitForOpTimeToMajorityCommit(
         }));
 }
 
-void MigratingTenantAccessBlocker::appendInfoForServerStatus(BSONObjBuilder* builder) const {
+void TenantMigrationAccessBlocker::appendInfoForServerStatus(BSONObjBuilder* builder) const {
     builder->append("access", _access);
     if (_blockTimestamp) {
         builder->append("blockTimestamp", _blockTimestamp.get());

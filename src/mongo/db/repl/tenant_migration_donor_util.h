@@ -30,12 +30,12 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/migrate_tenant_state_machine_gen.h"
+#include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/executor/task_executor.h"
 
 namespace mongo {
 
-namespace migrating_tenant_donor_util {
+namespace tenant_migration {
 
 /**
  * Sends recipientSyncData to the recipient until success and starts blocking writes and causal
@@ -44,10 +44,10 @@ namespace migrating_tenant_donor_util {
 void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& originalDonorStateDoc);
 
 /**
- * Updates the MigratingTenantAccessBlocker for the tenant migration represented by the given
+ * Updates the TenantMigrationAccessBlocker for the tenant migration represented by the given
  * config.migrationDonors document.
  */
-void onTenantMigrationDonorStateTransition(OperationContext* opCtx, const BSONObj& doc);
+void onDonorStateTransition(OperationContext* opCtx, const BSONObj& doc);
 
 /**
  * If the operation has read concern "snapshot" or includes afterClusterTime, and the database is
@@ -62,6 +62,6 @@ void checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName);
  */
 void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringData dbName);
 
-}  // namespace migrating_tenant_donor_util
+}  // namespace tenant_migration
 
 }  // namespace mongo

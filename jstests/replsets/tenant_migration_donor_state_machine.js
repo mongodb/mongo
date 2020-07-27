@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-// An object that mirrors the access states for the MigratingTenantAccessBlockers.
+// An object that mirrors the access states for the TenantMigrationAccessBlocker.
 const accessState = {
     kAllow: 0,
     kBlockingWrites: 1,
@@ -41,17 +41,16 @@ assert.commandWorked(donorPrimary.adminCommand({
 }));
 
 jsTest.log('Running the serverStatus command.');
-const migratingTenantServerStatus =
-    donorPrimary.adminCommand({serverStatus: 1}).migratingTenantAccessBlocker;
+const tenantMigrationServerStatus =
+    donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
 
-jsTest.log(tojson(migratingTenantServerStatus));
 // The donorStartMigration does the blocking write after updating the in-memory
 // access state to kBlockingWrites, and on completing the write the access state is
 // updated to kBlockingReadsAndWrites. Since the command doesn't return until the
 // write is completed, the state is always kBlockingReadsAndWrites after the
 // command returns.
-assert.eq(migratingTenantServerStatus[kDBPrefix].access, accessState.kBlockingReadsAndWrites);
-assert(migratingTenantServerStatus[kDBPrefix].blockTimestamp);
+assert.eq(tenantMigrationServerStatus[kDBPrefix].access, accessState.kBlockingReadsAndWrites);
+assert(tenantMigrationServerStatus[kDBPrefix].blockTimestamp);
 
 donorRst.stopSet();
 })();

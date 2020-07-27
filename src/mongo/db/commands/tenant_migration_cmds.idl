@@ -30,7 +30,7 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/client/read_preference.h"
-    - "mongo/db/repl/migrating_tenant_util.h"
+    - "mongo/db/repl/tenant_migration_util.h"
 
 imports:
   - "mongo/client/read_preference_setting.idl"
