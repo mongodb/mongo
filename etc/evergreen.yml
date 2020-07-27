@@ -1495,7 +1495,7 @@ functions:
           echo "UndoDB produced recordings that were $recording_size (uncompressed) on disk"
           if [[ $resmoke_exit_code = 0 ]]; then
             echo "Resmoke exited successfully. UndoDB recordings will not be saved."
-            rm *.undo
+            rm *.undo || true
           fi
         fi
 
@@ -12409,7 +12409,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - rhel62-small
+  - rhel62-large
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: rhel62
@@ -12422,10 +12422,9 @@ buildvariants:
     large_distro_name: rhel62-large
     num_scons_link_jobs_available: 0.99
     record_with: --recordWith /opt/undodb5/bin/live-record
+    exec_timeout_secs: 14400 # 4 hours
   tasks:
   - name: compile_without_package_TG
-    distros:
-    - rhel62-large
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
@@ -12437,4 +12436,3 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
-  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
