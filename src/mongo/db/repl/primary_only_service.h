@@ -175,14 +175,13 @@ public:
     virtual NamespaceString getStateDocumentsNS() const = 0;
 
     /**
-     * Virtual shutdown method where derived services can put their specific shutdown logic.
+     * Constructs and starts up _executor.
      */
-    virtual void shutdownImpl() = 0;
+    void startup(OperationContext* opCtx);
 
     /**
-     * Releases all running Instances, then shuts down and joins _executor, ensuring that there are
-     * no remaining tasks running.
-     * Ends by calling shutdownImpl so that derived services can clean up their local state.
+     * Releases all running Instances, then shuts down and joins _executor, ensuring that
+     * there are no remaining tasks running.
      */
     void shutdown();
 
@@ -202,11 +201,6 @@ public:
     void onStepDown();
 
 protected:
-    /**
-     * Returns a ScopedTaskExecutor used to run instances of this service.
-     */
-    virtual std::unique_ptr<executor::ScopedTaskExecutor> getTaskExecutor() = 0;
-
     /**
      * Constructs a new Instance object with the given initial state.
      */
@@ -233,16 +227,18 @@ private:
 
     Mutex _mutex = MONGO_MAKE_LATCH("PrimaryOnlyService::_mutex");
 
-    // A ScopedTaskExecutor that is used to schedule calls to runOnce against Instance objects.
-    // PrimaryOnlyService implementations are responsible for creating a TaskExecutor configured
-    // with the desired options.  The size of the thread pool within the TaskExecutor limits the
-    // number of Instances of this PrimaryOnlyService that can be actively running on a thread
-    // simultaneously (though it does not limit the number of Instance objects that can
-    // simultaneously exist).
-    // This ScopedTaskExecutor wraps the TaskExecutor owned by the PrimaryOnlyService
-    // implementation, and is created at stepUp and destroyed at stepDown so that all outstanding
-    // tasks get interrupted.
-    std::unique_ptr<executor::ScopedTaskExecutor> _executor;
+    // A ScopedTaskExecutor that is used to perform all work run on behalf of an Instance.
+    // This ScopedTaskExecutor wraps _executor and is created at stepUp and destroyed at
+    // stepDown so that all outstanding tasks get interrupted.
+    std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
+
+    // The concrete TaskExecutor backing _scopedExecutor. While _scopedExecutor is created and
+    // destroyed with each stepUp/stepDown, _executor persists for the lifetime of the process. We
+    // want _executor to survive failover to prevent us from having to reallocate lots of
+    // thread and connection resources on every stepUp. Service instances should never have access
+    // to _executor directly, they should only ever use _scopedExecutor so that they get the
+    // guarantee that all outstanding tasks are interrupted at stepDown.
+    std::shared_ptr<executor::TaskExecutor> _executor;
 
     enum class State {
         kRunning,
@@ -291,7 +287,7 @@ public:
      */
     void shutdown();
 
-    void onStartup(OperationContext*) final {}
+    void onStartup(OperationContext*) final;
     void onStepUpBegin(OperationContext*, long long term) final {}
     void onBecomeArbiter() final {}
     void onStepUpComplete(OperationContext*, long long term) final;

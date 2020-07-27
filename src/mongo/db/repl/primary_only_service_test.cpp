@@ -29,10 +29,9 @@
 
 #include <memory>
 
-#include "mongo/db/auth/authorization_session.h"
+
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/oplog.h"
@@ -40,14 +39,8 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/thread_pool.h"
 
 using namespace mongo;
 using namespace mongo::repl;
@@ -56,27 +49,8 @@ constexpr StringData kTestServiceName = "TestService"_sd;
 
 class TestService final : public PrimaryOnlyService {
 public:
-    explicit TestService(ServiceContext* serviceContext)
-        : PrimaryOnlyService(serviceContext), _executor(makeTaskExecutor(serviceContext)) {
-        _executor->startup();
-    }
+    explicit TestService(ServiceContext* serviceContext) : PrimaryOnlyService(serviceContext) {}
     ~TestService() = default;
-
-    std::shared_ptr<executor::TaskExecutor> makeTaskExecutor(ServiceContext* serviceContext) {
-        ThreadPool::Options threadPoolOptions;
-        threadPoolOptions.threadNamePrefix = getServiceName() + "-";
-        threadPoolOptions.poolName = getServiceName() + "ThreadPool";
-        threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str());
-            AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
-        };
-
-        auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-        hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
-        return std::make_shared<executor::ThreadPoolTaskExecutor>(
-            std::make_unique<ThreadPool>(threadPoolOptions),
-            executor::makeNetworkInterface("TestServiceNetwork", nullptr, std::move(hookList)));
-    }
 
     StringData getServiceName() const override {
         return kTestServiceName;
@@ -89,16 +63,6 @@ public:
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
         const BSONObj& initialState) const override {
         return std::make_shared<TestService::Instance>(initialState);
-    }
-
-    std::unique_ptr<executor::ScopedTaskExecutor> getTaskExecutor() override {
-        return std::make_unique<executor::ScopedTaskExecutor>(_executor);
-    }
-
-    void shutdownImpl() override {
-        _executor->shutdown();
-        _executor->join();
-        _executor.reset();
     }
 
     class Instance final : public PrimaryOnlyService::TypedInstance<Instance> {
@@ -117,9 +81,6 @@ public:
     private:
         BSONObj _state;
     };
-
-private:
-    std::shared_ptr<executor::TaskExecutor> _executor;
 };
 
 class PrimaryOnlyServiceTest : public ServiceContextMongoDTest {

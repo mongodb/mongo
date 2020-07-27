@@ -33,15 +33,23 @@
 
 #include "mongo/db/repl/primary_only_service.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace repl {
@@ -54,6 +62,9 @@ const auto _registryDecoration = ServiceContext::declareDecoration<PrimaryOnlySe
 const auto _registryRegisterer =
     ReplicaSetAwareServiceRegistry::Registerer<PrimaryOnlyServiceRegistry>(
         "PrimaryOnlyServiceRegistry");
+
+const Status kExecutorShutdownStatus(ErrorCodes::InterruptedDueToReplStateChange,
+                                     "PrimaryOnlyService executor shut down due to stepDown");
 
 // Throws on error.
 void insertDocument(OperationContext* opCtx,
@@ -96,6 +107,12 @@ PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupService(StringData service
     return servicePtr;
 }
 
+void PrimaryOnlyServiceRegistry::onStartup(OperationContext* opCtx) {
+    for (auto& service : _services) {
+        service.second->startup(opCtx);
+    }
+}
+
 void PrimaryOnlyServiceRegistry::onStepUpComplete(OperationContext*, long long term) {
     for (auto& service : _services) {
         service.second->onStepUp(term);
@@ -117,8 +134,26 @@ void PrimaryOnlyServiceRegistry::shutdown() {
 PrimaryOnlyService::PrimaryOnlyService(ServiceContext* serviceContext)
     : _serviceContext(serviceContext) {}
 
+void PrimaryOnlyService::startup(OperationContext* opCtx) {
+    ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.threadNamePrefix = getServiceName() + "-";
+    threadPoolOptions.poolName = getServiceName() + "ThreadPool";
+    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+    };
+
+    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+    hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
+    _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(threadPoolOptions),
+        executor::makeNetworkInterface(getServiceName() + "Network", nullptr, std::move(hookList)));
+    _executor->startup();
+}
+
 void PrimaryOnlyService::onStepUp(long long term) {
-    auto executor2 = getTaskExecutor();
+    auto newThenOldScopedExecutor =
+        std::make_shared<executor::ScopedTaskExecutor>(_executor, kExecutorShutdownStatus);
 
     {
         stdx::lock_guard lk(_mutex);
@@ -128,46 +163,45 @@ void PrimaryOnlyService::onStepUp(long long term) {
         _term = term;
         _state = State::kRunning;
 
-        // Install a new executor, while moving the old one into 'executor2' so it can be accessed
-        // outside of _mutex.
-        _executor.swap(executor2);
+        // Install a new executor, while moving the old one into 'newThenOldScopedExecutor' so it
+        // can be accessed outside of _mutex.
+        _scopedExecutor.swap(newThenOldScopedExecutor);
     }
 
-    // Ensure that all tasks from the previous term have completed.
-    if (executor2) {
-        (*executor2)->join();
+    // Ensure that all tasks from the previous term have completed before allowing tasks to be
+    // scheduled on the new executor.
+    if (newThenOldScopedExecutor) {
+        (*newThenOldScopedExecutor)->join();
     }
 }
 
 void PrimaryOnlyService::onStepDown() {
     stdx::lock_guard lk(_mutex);
 
-    if (_executor) {
-        (*_executor)->shutdown();
+    if (_scopedExecutor) {
+        (*_scopedExecutor)->shutdown();
     }
     _state = State::kPaused;
     _instances.clear();
 }
 
 void PrimaryOnlyService::shutdown() {
+
+    std::shared_ptr<executor::TaskExecutor> savedExecutor;
+
     {
-        std::unique_ptr<executor::ScopedTaskExecutor> savedExecutor;
+        stdx::lock_guard lk(_mutex);
 
-        {
-            stdx::lock_guard lk(_mutex);
-
-            _executor.swap(savedExecutor);
-            _state = State::kShutdown;
-            _instances.clear();
-        }
-
-        if (savedExecutor) {
-            (*savedExecutor)->shutdown();
-            (*savedExecutor)->join();
-        }
+        _executor.swap(savedExecutor);
+        _scopedExecutor.reset();
+        _state = State::kShutdown;
+        _instances.clear();
     }
 
-    shutdownImpl();
+    if (savedExecutor) {
+        savedExecutor->shutdown();
+        savedExecutor->join();
+    }
 }
 
 std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateInstance(
