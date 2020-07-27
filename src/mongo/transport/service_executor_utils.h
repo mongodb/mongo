@@ -29,36 +29,25 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/transport/service_executor.h"
+#include <functional>
+
+#include "mongo/transport/session.h"
+#include "mongo/util/functional.h"
 
 namespace mongo {
+
 namespace transport {
+class ServiceExecutor;
+}
 
-/**
- * The noop service executor provides the necessary interface for some unittests. Doesn't actually
- * execute any work
+Status launchServiceWorkerThread(unique_function<void()> task) noexcept;
+
+/* The default implementation for "ServiceExecutor::runOnDataAvailable()", which blocks the caller
+ * thread until data is available for reading. On success, it schedules "callback" on "executor".
+ * Other implementations (e.g., "ServiceExecutorFixed") may provide asynchronous variants.
  */
-class ServiceExecutorNoop final : public ServiceExecutor {
-public:
-    explicit ServiceExecutorNoop(ServiceContext* ctx) {}
+void scheduleCallbackOnDataAvailable(transport::Session* session,
+                                     unique_function<void(Status)> callback,
+                                     transport::ServiceExecutor* executor) noexcept;
 
-    Status start() override {
-        return Status::OK();
-    }
-    Status shutdown(Milliseconds timeout) override {
-        return Status::OK();
-    }
-    Status schedule(Task task, ScheduleFlags flags) override {
-        return Status::OK();
-    }
-
-    Mode transportMode() const override {
-        return Mode::kSynchronous;
-    }
-
-    void appendStats(BSONObjBuilder* bob) const override {}
-};
-
-}  // namespace transport
 }  // namespace mongo

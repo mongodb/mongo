@@ -62,6 +62,9 @@ public:
         return Mode::kSynchronous;
     }
 
+    void runOnDataAvailable(Session* session,
+                            OutOfLineExecutor::Task onCompletionCallback) override;
+
     void appendStats(BSONObjBuilder* bob) const override;
 
 private:

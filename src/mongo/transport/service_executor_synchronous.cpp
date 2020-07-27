@@ -35,8 +35,8 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_gen.h"
+#include "mongo/transport/service_executor_utils.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {
@@ -140,6 +140,12 @@ void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
     *bob << kExecutorLabel << kExecutorName << kThreadsRunning
          << static_cast<int>(_numRunningWorkerThreads.loadRelaxed());
 }
+
+void ServiceExecutorSynchronous::runOnDataAvailable(Session* session,
+                                                    OutOfLineExecutor::Task onCompletionCallback) {
+    scheduleCallbackOnDataAvailable(session, std::move(onCompletionCallback), this);
+}
+
 
 }  // namespace transport
 }  // namespace mongo

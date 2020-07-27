@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/transport/service_entry_point_utils.h"
+#include "mongo/transport/service_executor_utils.h"
 
 #include <fmt/format.h>
 #include <functional>
@@ -39,6 +39,7 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/thread_safety_context.h"
@@ -126,6 +127,18 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
     }
 
     return Status::OK();
+}
+
+void scheduleCallbackOnDataAvailable(transport::Session* session,
+                                     unique_function<void(Status)> callback,
+                                     transport::ServiceExecutor* executor) noexcept {
+    invariant(session);
+    try {
+        session->waitForData().get();
+        executor->schedule(std::move(callback));
+    } catch (DBException& e) {
+        callback(e.toStatus());
+    }
 }
 
 }  // namespace mongo

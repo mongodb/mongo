@@ -44,6 +44,7 @@
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/service_executor_utils.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -264,6 +265,11 @@ public:
 
     Mode transportMode() const override {
         return Mode::kSynchronous;
+    }
+
+    void runOnDataAvailable(Session* session,
+                            OutOfLineExecutor::Task onCompletionCallback) override {
+        scheduleCallbackOnDataAvailable(session, std::move(onCompletionCallback), this);
     }
 
     void appendStats(BSONObjBuilder* bob) const override {}

@@ -8,7 +8,6 @@ env.Library(
     target='transport_layer_common',
     source=[
         'ismaster_metrics.cpp',
-        'service_entry_point_utils.cpp',
         'session.cpp',
         'transport_layer.cpp',
     ],
@@ -89,6 +88,7 @@ tlEnv.Library(
         'service_executor_fixed.cpp',
         'service_executor_reserved.cpp',
         'service_executor_synchronous.cpp',
+        'service_executor_utils.cpp',
         env.Idlc('service_executor.idl')[0],
     ],
     LIBDEPS=[

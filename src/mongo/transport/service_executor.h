@@ -45,6 +45,8 @@ class ServiceContext;
 
 namespace transport {
 
+class Session;
+
 /*
  * This is the interface for all ServiceExecutors.
  */
@@ -93,6 +95,14 @@ public:
         internalAssert(scheduleTask([task = std::move(func)]() mutable { task(Status::OK()); },
                                     ScheduleFlags::kEmptyFlags));
     }
+
+    /*
+     * Awaits the availability of incoming data for the specified session. On success, it will
+     * schedule the callback on current executor. Otherwise, it will invoke the callback with a
+     * non-okay status on the caller thread.
+     */
+    virtual void runOnDataAvailable(Session* session,
+                                    OutOfLineExecutor::Task onCompletionCallback) = 0;
 
     /*
      * Stops and joins the ServiceExecutor. Any outstanding tasks will not be executed, and any

@@ -34,6 +34,8 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor_gen.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -147,6 +149,12 @@ Status ServiceExecutorFixed::scheduleTask(Task task, ScheduleFlags flags) {
     }
 
     return Status::OK();
+}
+
+void ServiceExecutorFixed::runOnDataAvailable(Session* session,
+                                              OutOfLineExecutor::Task onCompletionCallback) {
+    invariant(session);
+    session->waitForData().thenRunOn(shared_from_this()).getAsync(std::move(onCompletionCallback));
 }
 
 void ServiceExecutorFixed::appendStats(BSONObjBuilder* bob) const {
