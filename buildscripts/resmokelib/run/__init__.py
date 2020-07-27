@@ -859,7 +859,17 @@ class RunPlugin(PluginInterface):
                   " located in the resmokeconfig/suites/ directory, then the basename"
                   " without the .yml extension can be specified, e.g. 'console'."))
 
-        # Used for testing resmoke. Do not set this.
+        # Used for testing resmoke.
+        #
+        # `is_inner_level`:
+        #     Marks the resmoke process as a child of a parent resmoke process, meaning that"
+        #     it was started by a shell process which itself was started by a top-level"
+        #     resmoke process. This is used to ensure the hang-analyzer is called properly."
+        #
+        # `test_archival`:
+        #     Allows unit testing of resmoke's archival feature where we write out the names
+        #     of the files to be archived, instead of doing the actual archival, which can
+        #     be time and resource intensive.
         internal_options.add_argument("--internalParam", action="append", dest="internal_params",
                                       help=argparse.SUPPRESS)
 
