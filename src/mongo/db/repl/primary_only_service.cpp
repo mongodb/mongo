@@ -126,6 +126,7 @@ void PrimaryOnlyService::onStepUp(long long term) {
         invariant(term > _term,
                   str::stream() << "term " << term << " is not greater than " << _term);
         _term = term;
+        _state = State::kRunning;
 
         // Install a new executor, while moving the old one into 'executor2' so it can be accessed
         // outside of _mutex.
@@ -169,59 +170,34 @@ void PrimaryOnlyService::shutdown() {
     shutdownImpl();
 }
 
-SemiFuture<PrimaryOnlyService::InstanceID> PrimaryOnlyService::startNewInstance(
-    OperationContext* opCtx, BSONObj initialState) {
-
+std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateInstance(
+    BSONObj initialState) {
     const auto idElem = initialState["_id"];
     uassert(4908702,
             str::stream() << "Missing _id element when adding new instance of PrimaryOnlyService \""
                           << getServiceName() << "\"",
             !idElem.eoo());
-    InstanceID instanceID = idElem.wrap().getOwned();
+    InstanceID instanceID = idElem.wrap();
 
-    // Write initial state document to service's state document collection
-    insertDocument(opCtx, getStateDocumentsNS(), initialState);
-    const OpTime writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    stdx::lock_guard lk(_mutex);
+    uassert(
+        ErrorCodes::NotMaster,
+        str::stream() << "Not Primary when trying to create a new instance of PrimaryOnlyService "
+                      << getServiceName(),
+        _state == State::kRunning);
 
-    // Wait for the new instance's state document insert to be replicated to a majority and then
-    // create, register, and return corresponding Instance object.
-    return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(writeOpTime)
-        .thenRunOn(**_executor)
-        .then([this,
-               instanceID = std::move(instanceID),
-               initialState = std::move(initialState),
-               writeTerm = writeOpTime.getTerm()] {
-            if (MONGO_unlikely(PrimaryOnlyServiceHangBeforeCreatingInstance.shouldFail())) {
-                PrimaryOnlyServiceHangBeforeCreatingInstance.pauseWhileSet();
-            }
-
-            auto instance = constructInstance(initialState);
-
-            stdx::lock_guard lk(_mutex);
-
-            if (_state == State::kPaused || _term > writeTerm) {
-                return instanceID;
-            }
-            invariant(_state == State::kRunning);
-            invariant(_term == writeTerm);
-
-            auto [_, inserted] = _instances.emplace(instanceID, instance);
-            invariant(
-                inserted,
-                str::stream()
-                    << "Starting new PrimaryOnlyService of type " << getServiceName()
-                    << " failed; a service instance of that type already exists with instance ID: "
-                    << instanceID.toString());
-
-            // TODO(SERVER-49239): schedule first call to runOnce().
-            return instanceID;
-        })
-        .semi();
+    auto it = _instances.find(instanceID);
+    if (it != _instances.end()) {
+        return it->second;
+    }
+    auto [it2, inserted] =
+        _instances.emplace(instanceID.getOwned(), constructInstance(std::move(initialState)));
+    invariant(inserted);
+    return it2->second;
 }
 
-boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>>
-PrimaryOnlyService::lookupInstanceBase(const InstanceID& id) {
+boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::lookupInstance(
+    const InstanceID& id) {
     stdx::lock_guard lk(_mutex);
 
     auto it = _instances.find(id);

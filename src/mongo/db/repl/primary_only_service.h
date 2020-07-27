@@ -136,17 +136,27 @@ public:
         virtual ~TypedInstance() = default;
 
         /**
-         * Same functionality as PrimaryOnlyService::lookupInstanceBase, but returns a pointer of
+         * Same functionality as PrimaryOnlyService::lookupInstance, but returns a pointer of
          * the proper derived class for the Instance.
          */
         static boost::optional<std::shared_ptr<InstanceType>> lookup(PrimaryOnlyService* service,
                                                                      const InstanceID& id) {
-            auto instance = service->lookupInstanceBase(id);
+            auto instance = service->lookupInstance(id);
             if (!instance) {
                 return boost::none;
             }
 
             return checked_pointer_cast<InstanceType>(instance.get());
+        }
+
+        /**
+         * Same functionality as PrimaryOnlyService::getOrCreateInstance, but returns a pointer of
+         * the proper derived class for the Instance.
+         */
+        static std::shared_ptr<InstanceType> getOrCreate(PrimaryOnlyService* service,
+                                                         BSONObj initialState) {
+            auto instance = service->getOrCreateInstance(std::move(initialState));
+            return checked_pointer_cast<InstanceType>(instance);
         }
     };
 
@@ -191,14 +201,6 @@ public:
      */
     void onStepDown();
 
-    /**
-     * Writes the given 'initialState' object to the service's state document collection and then
-     * schedules work to construct an in-memory instance object and start it running, as soon as the
-     * write of the state object is majority committed.  This is the main way that consumers can
-     * start up new PrimaryOnlyService tasks.
-     */
-    SemiFuture<InstanceID> startNewInstance(OperationContext* opCtx, BSONObj initialState);
-
 protected:
     /**
      * Returns a ScopedTaskExecutor used to run instances of this service.
@@ -212,10 +214,19 @@ protected:
 
     /**
      * Given an InstanceId returns the corresponding running Instance object, or boost::none if
-     * there is none. Note that 'lookupInstanceBase' will not find a newly added Instance until the
-     * Future returned by the call to 'startNewInstance' that added it resolves.
+     * there is none.
      */
-    boost::optional<std::shared_ptr<Instance>> lookupInstanceBase(const InstanceID& id);
+    boost::optional<std::shared_ptr<Instance>> lookupInstance(const InstanceID& id);
+
+    /**
+     * Extracts an InstanceID from the _id field of the given 'initialState' object. If an Instance
+     * with the extracted InstanceID already exists in _intances, returns it.  If not, constructs a
+     * new Instance (by calling constructInstance()), registers it in _instances, and returns it.
+     * It is illegal to call this more than once with 'initialState' documents that have the same
+     * _id but are otherwise not completely identical.
+     * Throws NotMaster if the node is not currently primary.
+     */
+    std::shared_ptr<Instance> getOrCreateInstance(BSONObj initialState);
 
 private:
     ServiceContext* const _serviceContext;
@@ -239,7 +250,7 @@ private:
         kShutdown,
     };
 
-    State _state = State::kRunning;
+    State _state = State::kPaused;
 
     // The term that this service is running under.
     long long _term = OpTime::kUninitializedTerm;
