@@ -1426,6 +1426,24 @@ TEST_F(RadixStoreTest, MergeInsertions) {
     ASSERT_EQ(itemsVisited, 4);
 }
 
+TEST_F(RadixStoreTest, MergeAllDifferentLeafOnlyOtherChanged) {
+    baseStore.insert({"aa", "a"});
+
+    otherStore = baseStore;
+    otherStore.update({"aa", "b"});
+
+    thisStore = baseStore;
+    // Force 'aa' to get a new node but still be a leaf
+    thisStore.insert({"aaa", "a"});
+    thisStore.erase("aaa");
+
+    // This should not be a merge conflict, only other actually changed 'aa'
+    thisStore.merge3(baseStore, otherStore);
+
+    expected.insert({"aa", "b"});
+    ASSERT_TRUE(thisStore == expected);
+}
+
 TEST_F(RadixStoreTest, MergeConflictingPathCompressedKeys) {
     // This test creates a "simple" merge problem where 'otherStore' has an insertion, and
     // 'thisStore' has a non-conflicting insertion. However, due to the path compression, the trees
