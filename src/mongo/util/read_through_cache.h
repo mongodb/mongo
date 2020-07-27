@@ -98,14 +98,14 @@ protected:
 };
 
 template <typename Result, typename Key, typename Value, typename Time>
-struct ReadThroughCacheLookupFnImpl {
-    using fn = unique_function<Result(
+struct ReadThroughCacheLookup {
+    using Fn = unique_function<Result(
         OperationContext*, const Key&, const Value& cachedValue, const Time& timeInStore)>;
 };
 
 template <typename Result, typename Key, typename Value>
-struct ReadThroughCacheLookupFnImpl<Result, Key, Value, CacheNotCausallyConsistent> {
-    using fn = unique_function<Result(OperationContext*, const Key&, const Value& cachedValue)>;
+struct ReadThroughCacheLookup<Result, Key, Value, CacheNotCausallyConsistent> {
+    using Fn = unique_function<Result(OperationContext*, const Key&, const Value& cachedValue)>;
 };
 
 /**
@@ -218,8 +218,7 @@ public:
         Time t;
     };
 
-    using LookupFn =
-        typename ReadThroughCacheLookupFnImpl<LookupResult, Key, ValueHandle, Time>::fn;
+    using LookupFn = typename ReadThroughCacheLookup<LookupResult, Key, ValueHandle, Time>::Fn;
 
     // Exposed publicly so it can be unit-tested indepedently of the usages in this class. Must not
     // be used independently.
@@ -260,11 +259,11 @@ public:
             return it->second->addWaiter(ul);
 
         // Schedule an asynchronous lookup for the key
-        auto [cachedValue, timeInStore] = _cache.getCachedValueAndTime(key);
+        auto [cachedValue, timeInStore] = _cache.getCachedValueAndTimeInStore(key);
         auto [it, emplaced] = _inProgressLookups.emplace(
             key,
             std::make_unique<InProgressLookup>(
-                *this, key, ValueHandle(std::move(cachedValue)), timeInStore));
+                *this, key, ValueHandle(std::move(cachedValue)), std::move(timeInStore)));
         invariant(emplaced);
         auto& inProgressLookup = *it->second;
         auto sharedFutureToReturn = inProgressLookup.addWaiter(ul);

@@ -408,7 +408,7 @@ public:
      * which can either be from the time of insertion or from the latest call to
      * 'advanceTimeInStore'. Otherwise, returns a nullptr ValueHandle and Time().
      */
-    std::pair<ValueHandle, Time> getCachedValueAndTime(const Key& key) {
+    std::pair<ValueHandle, Time> getCachedValueAndTimeInStore(const Key& key) {
         stdx::lock_guard<Latch> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
