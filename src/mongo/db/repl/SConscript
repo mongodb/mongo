@@ -1330,6 +1330,7 @@ env.CppUnitTest(
         'multiapplier_test.cpp',
         'oplog_applier_impl_test.cpp',
         'oplog_applier_test.cpp',
+        'oplog_batcher_test_fixture.cpp',
         'oplog_buffer_collection_test.cpp',
         'oplog_buffer_proxy_test.cpp',
         'oplog_entry_test.cpp',
@@ -1360,6 +1361,7 @@ env.CppUnitTest(
         'sync_source_resolver_test.cpp',
         'task_runner_test.cpp',
         'task_runner_test_fixture.cpp',
+        'tenant_oplog_batcher_test.cpp',
         'vote_requester_test.cpp',
         'wait_for_majority_service_test.cpp',
     ],
@@ -1439,6 +1441,7 @@ env.CppUnitTest(
         'sync_source_selector_mock',
         'task_executor_mock',
         'task_runner',
+        'tenant_oplog_processing',
         'wait_for_majority_service',
     ],
 )
@@ -1590,5 +1593,18 @@ env.Library(
         '$BUILD_DIR/mongo/executor/scoped_task_executor',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         'wait_for_majority_service',
+    ],
+)
+
+env.Library(
+    target='tenant_oplog_processing',
+    source=[
+        'tenant_oplog_batcher.cpp'
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        'abstract_async_component',
+        'oplog',
+        'oplog_application_interface',
     ],
 )

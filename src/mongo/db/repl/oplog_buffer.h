@@ -205,5 +205,31 @@ public:
     Counter64 maxSize;
 };
 
+/**
+ * An OplogBuffer interface which also supports random access by timestamp.
+ * The entries in a RandomAccessOplogBuffer must be pushed in strict timestamp order.
+ *
+ * The user of a RandomAccesOplogBuffer may seek to or find timestamps which have already been read
+ * from the buffer.  It is up to the implementing subclass to ensure that such timestamps are
+ * available to be read.
+ */
+class RandomAccessOplogBuffer : public OplogBuffer {
+public:
+    /**
+     * Retrieves an oplog entry by timestamp. Returns ErrorCodes::NoSuchKey if no such entry is
+     * found.  Does not change current position of oplog buffer.
+     */
+    virtual StatusWith<Value> findByTimestamp(OperationContext* opCtx, const Timestamp& ts) = 0;
+
+    /**
+     * Change current position of oplog buffer to point to the entry with timestamp 'ts'.  If
+     * 'exact' is true, return NoSuchKey if the timestamp is not found. Otherwise, position will
+     * be before the next timestamp greater than or equal to 'ts'.
+     */
+    virtual Status seekToTimestamp(OperationContext* opCtx,
+                                   const Timestamp& ts,
+                                   bool exact = true) = 0;
+};
+
 }  // namespace repl
 }  // namespace mongo

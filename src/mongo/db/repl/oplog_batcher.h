@@ -173,6 +173,18 @@ public:
     StatusWith<std::vector<OplogEntry>> getNextApplierBatch(OperationContext* opCtx,
                                                             const BatchLimits& batchLimits);
 
+    /**
+     * Helper method indicating that this oplog entry must be in a batch of its own.
+     */
+    static bool mustProcessIndividually(const OplogEntry& entry);
+
+    /**
+     * Returns the number of logical operations represented by an oplog entry.
+     * This is usually one but may be greater than one in certain cases, such as in a
+     * commitTransaction command.
+     */
+    static std::size_t getOpCount(const OplogEntry& entry);
+
 private:
     /**
      * If slaveDelay is enabled, this function calculates the most recent timestamp of any oplog

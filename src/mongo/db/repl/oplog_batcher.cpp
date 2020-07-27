@@ -102,6 +102,7 @@ bool isUnpreparedCommit(const OplogEntry& entry) {
 
     return true;
 }
+}  // namespace
 
 /**
  * Returns true if this oplog entry must be processed in its own batch and cannot be grouped with
@@ -131,7 +132,8 @@ bool isUnpreparedCommit(const OplogEntry& entry) {
  * to avoid scenarios where parts of the transaction is batched with other operations not in the
  * transaction.
  */
-bool mustProcessIndividually(const OplogEntry& entry) {
+/* static */
+bool OplogBatcher::mustProcessIndividually(const OplogEntry& entry) {
     if (entry.isCommand()) {
         // If none of the following cases is true, we'll return false to
         // cover unprepared CRUD applyOps and unprepared CRUD commits.
@@ -145,12 +147,7 @@ bool mustProcessIndividually(const OplogEntry& entry) {
         nss.isPrivilegeCollection();
 }
 
-/**
- * Returns the number of logical operations represented by an oplog entry.
- * This is usually one but may be greater than one in certain cases, such as in a commitTransaction
- * command.
- */
-std::size_t getOpCount(const OplogEntry& entry) {
+std::size_t OplogBatcher::getOpCount(const OplogEntry& entry) {
     if (isUnpreparedCommit(entry)) {
         auto count = entry.getObject().getIntField(CommitTransactionOplogObject::kCountFieldName);
         if (count > 0) {
@@ -159,7 +156,6 @@ std::size_t getOpCount(const OplogEntry& entry) {
     }
     return 1U;
 }
-}  // namespace
 
 StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
     OperationContext* opCtx, const BatchLimits& batchLimits) {
