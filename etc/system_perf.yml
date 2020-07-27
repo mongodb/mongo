@@ -787,6 +787,31 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+# The following two initial sync logkeeper automation tasks are only used in the commented-out
+# "Linux ReplSet Initial Sync LogKeeper Snapshot Update" variant below and are only intended to be
+# run in patch builds to update FCV for logkeeper datasets.
+- name: initialsync-logkeeper-short-s3-update
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "initialsync-logkeeper-short-s3-update"
+        setup: "initialsync-logkeeper-short-s3-update"
+        # Update this to Logkeeper dataset with FCV set to latest after each LTS release.
+        dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-4.4.tgz"
+    - func: "deploy cluster"
+    - func: "run test"
+
+- name: initialsync-logkeeper-snapshot-update
+  priority: 5
+  exec_timeout_secs: 216000 # 2.5 days
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "initialsync-logkeeper-snapshot-update"
+    - func: "deploy cluster"
+    - func: "run test"
+
 - name: initialsync-large
   priority: 5
   commands:
@@ -1545,6 +1570,32 @@ buildvariants:
     - name: initialsync-logkeeper
     - name: genny_patch_tasks
     - name: genny_auto_tasks
+
+# Uncomment this to run logkeeper FCV updates automatically. This is only intended to be run in
+# patch builds.
+#- name: linux-replSet-initialsync-logkeeper-snapshot-update
+#  display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
+#  batchtime: 10080 # 7 days
+#  modules: *modules
+#  expansions:
+#    setup: initialsync-logkeeper
+#    cluster: initialsync-logkeeper-snapshot-update
+#    # Update this to latest snapshot after each LTS release.
+#    snapshotId: snap-0b0b8b2ad16e8f14e
+#    platform: linux
+#    authentication: disabled
+#    storageEngine: wiredTiger
+#    project_dir: *project_dir
+#  run_on:
+#    - "rhel70-perf-initialsync-logkeeper"
+#  depends_on:
+#    - name: compile
+#      variant: compile-amazon2
+#    - name: genny_generate_all_tasks
+#      variant: compile-amazon2
+#  tasks:
+#    - name: initialsync-logkeeper-snapshot-update
+#    - name: initialsync-logkeeper-short-s3-update
 
 - name: linux-replSet-auth-delay
   display_name: Linux 3-Node ReplSet (Auth Delay)
