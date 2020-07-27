@@ -1,5 +1,5 @@
 /*
- * Tests that migrations behave correctly between v4.4 and v4.6 when one or both nodes have the
+ * Tests that migrations behave correctly between v4.4 and v4.7+ when one or both nodes have the
  * 'disableResumableRangeDeleter' parameter set to true.
  *
  * requires_persistence because this test restarts shards and expects them to have their data files.
@@ -38,16 +38,16 @@ const st = new ShardingTest({
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
 
-const v46shard = st.rs0;
+const vLatestShard = st.rs0;
 const v44shard = st.rs1;
 
 //
-// Tests with v4.6 donor, v4.4 recipient
+// Tests with v4.7+ donor, v4.4 recipient
 //
 
 (() => {
-    jsTestLog("v4.6 donor, v4.4 recipient, both disableResumableRangeDeleter=false");
-    setDisableResumableRangeDeleter(false, v46shard);
+    jsTestLog("v4.7+ donor, v4.4 recipient, both disableResumableRangeDeleter=false");
+    setDisableResumableRangeDeleter(false, vLatestShard);
     setDisableResumableRangeDeleter(false, v44shard);
     const [collName, ns] = getNewNs(dbName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
@@ -56,8 +56,8 @@ const v44shard = st.rs1;
 
 (() => {
     jsTestLog(
-        "v4.6 donor with disableResumableRangeDeleter=true, v4.4 recipient with disableResumableRangeDeleter=false");
-    setDisableResumableRangeDeleter(true, v46shard);
+        "v4.7+ donor with disableResumableRangeDeleter=true, v4.4 recipient with disableResumableRangeDeleter=false");
+    setDisableResumableRangeDeleter(true, vLatestShard);
     setDisableResumableRangeDeleter(false, v44shard);
     const [collName, ns] = getNewNs(dbName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
@@ -65,8 +65,8 @@ const v44shard = st.rs1;
 })();
 
 (() => {
-    jsTestLog("v4.6 donor, v4.4 recipient, both disableResumableRangeDeleter=true");
-    setDisableResumableRangeDeleter(true, v46shard);
+    jsTestLog("v4.7+ donor, v4.4 recipient, both disableResumableRangeDeleter=true");
+    setDisableResumableRangeDeleter(true, vLatestShard);
     setDisableResumableRangeDeleter(true, v44shard);
     const [collName, ns] = getNewNs(dbName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
@@ -75,8 +75,8 @@ const v44shard = st.rs1;
 
 (() => {
     jsTestLog(
-        "v4.6 donor with disableResumableRangeDeleter=false, v4.4 recipient with disableResumableRangeDeleter=true");
-    setDisableResumableRangeDeleter(false, v46shard);
+        "v4.7+ donor with disableResumableRangeDeleter=false, v4.4 recipient with disableResumableRangeDeleter=true");
+    setDisableResumableRangeDeleter(false, vLatestShard);
     setDisableResumableRangeDeleter(true, v44shard);
     const [collName, ns] = getNewNs(dbName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
@@ -84,47 +84,47 @@ const v44shard = st.rs1;
 })();
 
 //
-// Tests with v4.4 donor, v4.6 recipient
+// Tests with v4.4 donor, v4.7+ recipient
 //
 
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
 
 (() => {
-    jsTestLog("v4.4 donor, v4.6 recipient, both disableResumableRangeDeleter=false");
+    jsTestLog("v4.4 donor, v4.7+ recipient, both disableResumableRangeDeleter=false");
     setDisableResumableRangeDeleter(false, v44shard);
-    setDisableResumableRangeDeleter(false, v46shard);
+    setDisableResumableRangeDeleter(false, vLatestShard);
     const [collName, ns] = getNewNs(dbName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: v46shard.name}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: vLatestShard.name}));
 })();
 
 (() => {
     jsTestLog(
-        "v4.4 donor with disableResumableRangeDeleter=true, v4.6 recipient with disableResumableRangeDeleter=false");
+        "v4.4 donor with disableResumableRangeDeleter=true, v4.7+ recipient with disableResumableRangeDeleter=false");
     setDisableResumableRangeDeleter(true, v44shard);
-    setDisableResumableRangeDeleter(false, v46shard);
+    setDisableResumableRangeDeleter(false, vLatestShard);
     const [collName, ns] = getNewNs(dbName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: v46shard.name}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: vLatestShard.name}));
 })();
 
 (() => {
-    jsTestLog("v4.4 donor, v4.6 recipient, both disableResumableRangeDeleter=true");
+    jsTestLog("v4.4 donor, v4.7+ recipient, both disableResumableRangeDeleter=true");
     setDisableResumableRangeDeleter(true, v44shard);
-    setDisableResumableRangeDeleter(true, v46shard);
+    setDisableResumableRangeDeleter(true, vLatestShard);
     const [collName, ns] = getNewNs(dbName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: v46shard.name}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: vLatestShard.name}));
 })();
 
 (() => {
     jsTestLog(
-        "v4.4 donor with disableResumableRangeDeleter=false, v4.6 recipient with disableResumableRangeDeleter=true");
+        "v4.4 donor with disableResumableRangeDeleter=false, v4.7+ recipient with disableResumableRangeDeleter=true");
     setDisableResumableRangeDeleter(false, v44shard);
-    setDisableResumableRangeDeleter(true, v46shard);
+    setDisableResumableRangeDeleter(true, vLatestShard);
     const [collName, ns] = getNewNs(dbName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: v46shard.name}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: vLatestShard.name}));
 })();
 
 st.stop();

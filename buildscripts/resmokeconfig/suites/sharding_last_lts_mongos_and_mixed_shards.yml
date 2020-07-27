@@ -30,7 +30,7 @@ selector:
   - jstests/sharding/test_stacked_migration_cleanup.js
   - jstests/sharding/kill_pinned_cursor.js
   - jstests/sharding/killop.js
-  # Enable when 4.6 becomes last-lts
+  # Enable when 5.0 becomes last-lts
   - jstests/sharding/mongos_dataSize.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js

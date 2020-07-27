@@ -1051,12 +1051,12 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                 (opCtx->getServiceContext()->getPreciseClockSource()->now() - stepDownStartTime));
     }
 
-    // TODO SERVER-49138: Remove this FCV check once we branch for 4.8.
-    // We must FCV gate the Quiesce mode feature so that a 4.6 node entering Quiesce mode in a mixed
-    // 4.4/4.6 replica set does not delay a 4.4 node from finding a valid sync source.
+    // TODO SERVER-49138: Remove this FCV check when 5.0 becomes last-lts.
+    // We must FCV gate the Quiesce mode feature so that a 4.7+ node entering Quiesce mode in a
+    // mixed 4.4/4.7+ replica set does not delay a 4.4 node from finding a valid sync source.
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            ServerGlobalParams::FeatureCompatibility::Version::kVersion451)) {
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion47)) {
         if (auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
             replCoord && replCoord->enterQuiesceModeIfSecondary(shutdownTimeout)) {
             ServiceContext::UniqueOperationContext uniqueOpCtx;

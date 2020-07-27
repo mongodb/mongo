@@ -42,7 +42,7 @@
 namespace mongo {
 namespace {
 
-// No-op command; deprecated as of v4.6.
+// No-op command; deprecated as of v4.7.
 class UnsetShardingCommand : public BasicCommand {
 public:
     UnsetShardingCommand() : BasicCommand("unsetSharding") {}

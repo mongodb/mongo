@@ -46,7 +46,7 @@ const char kCmdName[] = "setShardVersion";
 const char kForceRefresh[] = "forceRefresh";
 const char kAuthoritative[] = "authoritative";
 const char kNoConnectionVersioning[] =
-    "noConnectionVersioning";  // TODO (SERVER-47956): Remove after 4.6 is released
+    "noConnectionVersioning";  // TODO (SERVER-47956): Remove after 5.0 becomes last-lts.
 
 }  // namespace
 

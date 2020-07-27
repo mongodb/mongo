@@ -162,7 +162,7 @@ public:
              Component component) const override {
         if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                ServerGlobalParams::FeatureCompatibility::Version::kVersion451)) {
+                ServerGlobalParams::FeatureCompatibility::Version::kVersion47)) {
             return ActualFormat::out(service, opCtx, permitRefresh, out, time, component);
         }
         return false;

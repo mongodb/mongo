@@ -10,7 +10,7 @@
  * multiple times.
  */
 
-var latestFCV = "4.5.1";
+var latestFCV = "4.7";
 var lastContinuousFCV = "4.4";
 var lastLTSFCV = "4.4";
 // The number of versions since the last-lts version. When numVersionsSinceLastLTS = 1,

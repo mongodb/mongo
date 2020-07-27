@@ -288,10 +288,10 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         // At this point, we will start responding to any isMaster request with ShutdownInProgress
         // so that clients can re-route their operations.
         //
-        // TODO SERVER-49138: Remove this FCV check once we branch for 4.8.
+        // TODO SERVER-49138: Remove this FCV check when 5.0 becomes last-lts.
         if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
                 serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                    ServerGlobalParams::FeatureCompatibility::Version::kVersion451);
+                    ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
             auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx)) {
             mongosTopCoord->enterQuiesceModeAndWait(opCtx, quiesceTime);
         }

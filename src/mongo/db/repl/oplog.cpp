@@ -1227,7 +1227,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             request.setQuery(updateCriteria);
             auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(o);
             if (updateMod.type() == write_ops::UpdateModification::Type::kDelta) {
-                // We may only use delta oplog entries when in FCV 4.5 or in the "downgrading to
+                // We may only use delta oplog entries when in FCV 4.7 or in the "downgrading to
                 // 4.4" state. The latter case can happen when a $v:2 update is logged in the
                 // window between the oplog entry which sets the target FCV to 4.4 (putting the
                 // node in a "downgrading state") and the entry which removes the target FCV
@@ -1256,13 +1256,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 const bool fromApplyOpsCmd = mode == OplogApplication::Mode::kApplyOpsCmd;
 
                 uassert(4773100,
-                        "Delta oplog entries may not be used in FCV below 4.5",
+                        "Delta oplog entries may not be used in FCV below 4.7",
                         fcvVersion ==
-                                ServerGlobalParams::FeatureCompatibility::Version::kVersion451 ||
+                                ServerGlobalParams::FeatureCompatibility::Version::kVersion47 ||
                             (!fromApplyOpsCmd &&
                              fcvVersion ==
                                  ServerGlobalParams::FeatureCompatibility::Version::
-                                     kDowngradingFrom451To44));
+                                     kDowngradingFrom47To44));
             }
 
             request.setUpdateModification(std::move(updateMod));

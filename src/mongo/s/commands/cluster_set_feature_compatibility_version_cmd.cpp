@@ -73,11 +73,11 @@ public:
         using FCVP = FeatureCompatibilityVersionParser;
         return str::stream()
             << "Set the featureCompatibilityVersion used by this cluster. If set to '"
-            << FCVP::kVersion44 << "', then " << FCVP::kVersion451
-            << " features are disabled. If set to '" << FCVP::kVersion451 << "', then "
-            << FCVP::kVersion451
+            << FCVP::kVersion44 << "', then " << FCVP::kVersion47
+            << " features are disabled. If set to '" << FCVP::kVersion47 << "', then "
+            << FCVP::kVersion47
             << " features are enabled, and all nodes in the cluster must be binary version "
-            << FCVP::kVersion451 << ". See "
+            << FCVP::kVersion47 << ". See "
             << feature_compatibility_version_documentation::kCompatibilityLink << ".";
     }
 

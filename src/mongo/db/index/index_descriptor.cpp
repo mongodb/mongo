@@ -177,14 +177,14 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
         return Comparison::kDifferent;
     }
 
-    // The partialFilterExpression is only part of the index signature if FCV has been set to 4.6.
-    // TODO SERVER-47766: remove these FCV checks after we branch for 4.7.
-    auto isFCV46 = serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion451);
+    // The partialFilterExpression is only part of the index signature if FCV has been set to 4.7+.
+    // TODO SERVER-47766: remove these FCV checks when 5.0 becomes last-lts.
+    auto isFCVAtLeast47 = serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
 
     // If we have a partial filter expression and the other index doesn't, or vice-versa, then the
     // two indexes are not equivalent. We therefore return Comparison::kDifferent immediately.
-    if (isFCV46 && isPartial() != other->descriptor()->isPartial()) {
+    if (isFCVAtLeast47 && isPartial() != other->descriptor()->isPartial()) {
         return Comparison::kDifferent;
     }
     // Compare 'partialFilterExpression' in each descriptor to see if they are equivalent. We use
@@ -193,7 +193,7 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     // For instance, under a case-sensitive collation, the predicates {a: "blah"} and {a: "BLAH"}
     // would match the same set of documents, but these are not currently considered equivalent.
     // TODO SERVER-47664: take collation into account while comparing string predicates.
-    if (isFCV46 && other->getFilterExpression()) {
+    if (isFCVAtLeast47 && other->getFilterExpression()) {
         auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), ns);
         auto filter = MatchExpressionParser::parseAndNormalize(partialFilterExpression(), expCtx);
         if (!filter->equivalent(other->getFilterExpression())) {
@@ -211,10 +211,10 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     std::map<StringData, BSONElement> newOptionsMap;
     populateOptionsMap(newOptionsMap, other->descriptor()->infoObj());
 
-    // If the FCV has not been upgraded to 4.6, add partialFilterExpression to the options map. It
+    // If the FCV has not been upgraded to 4.7+, add partialFilterExpression to the options map. It
     // does not contribute to the index signature, but can determine whether or not the candidate
     // index is identical to the existing index.
-    if (!isFCV46) {
+    if (!isFCVAtLeast47) {
         existingOptionsMap[IndexDescriptor::kPartialFilterExprFieldName] =
             other->descriptor()->infoObj()[IndexDescriptor::kPartialFilterExprFieldName];
         newOptionsMap[IndexDescriptor::kPartialFilterExprFieldName] =

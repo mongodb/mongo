@@ -353,7 +353,7 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
     return Status::OK();
 }
 
-// A 4.6 mongoS issues $mergeCursors pipelines with ChunkVersion::IGNORED. On the shard, this will
+// A 4.7+ mongoS issues $mergeCursors pipelines with ChunkVersion::IGNORED. On the shard, this will
 // skip the versioning check but also marks the operation as versioned, so the shard knows that any
 // sub-operations executed by the merging pipeline should also be versioned. We manually set the
 // IGNORED version here if we are running a $mergeCursors pipeline and the operation is not already

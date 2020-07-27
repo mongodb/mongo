@@ -45,8 +45,8 @@ namespace {
 bool isShardConfigEvent(const Document& eventDoc) {
     // TODO SERVER-44039: we continue to generate 'kNewShardDetected' events for compatibility
     // with 4.2, even though we no longer rely on them to detect new shards. We swallow the event
-    // here. We may wish to remove this mechanism entirely 4.6, or retain it for future cases where
-    // a change stream is targeted to a subset of shards. See SERVER-44039 for details.
+    // here. We may wish to remove this mechanism entirely in 4.7+, or retain it for future cases
+    // where a change stream is targeted to a subset of shards. See SERVER-44039 for details.
     if (eventDoc[DocumentSourceChangeStream::kOperationTypeField].getStringData() ==
         DocumentSourceChangeStream::kNewShardDetectedOpType) {
         return true;

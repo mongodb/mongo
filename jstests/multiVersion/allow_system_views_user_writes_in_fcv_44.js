@@ -1,7 +1,7 @@
 /**
  * Tests that users are allowed to write to the system.views collecion if not on the latest FCV.
  *
- * TODO (SERVER-49545): Remove this test after branching for 4.8.
+ * TODO (SERVER-49545): Remove this test when 5.0 becomes last-lts.
  */
 (function() {
 "use strict";

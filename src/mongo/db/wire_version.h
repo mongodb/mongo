@@ -83,12 +83,12 @@ enum WireVersion {
     // Supports resumable initial sync (4.4+).
     RESUMABLE_INITIAL_SYNC = 9,
 
-    // Supports features available from 4.5.1 and onwards.
-    WIRE_VERSION_451 = 10,
+    // Supports features available from 4.7 and onwards.
+    WIRE_VERSION_47 = 10,
 
     // Set this to the highest value in this enum - it will be the default maxWireVersion for
     // the WireSpec values.
-    LATEST_WIRE_VERSION = WIRE_VERSION_451,
+    LATEST_WIRE_VERSION = WIRE_VERSION_47,
 
     // Set this to LATEST_WIRE_VERSION - 1.
     LAST_CONT_WIRE_VERSION = LATEST_WIRE_VERSION - 1,

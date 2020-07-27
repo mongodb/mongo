@@ -274,7 +274,7 @@ Status UpdateDriver::update(OperationContext* opCtx,
     if (_logOp && logOpRec) {
         const auto& fcv = serverGlobalParams.featureCompatibility;
         const bool fcvAllowsV2Entries = fcv.isVersionInitialized() &&
-            fcv.getVersion() == ServerGlobalParams::FeatureCompatibility::Version::kVersion451;
+            fcv.getVersion() == ServerGlobalParams::FeatureCompatibility::Version::kVersion47;
 
         applyParams.logMode = fcvAllowsV2Entries && internalQueryEnableLoggingV2OplogEntries.load()
             ? ApplyParams::LogMode::kGenerateOplogEntry

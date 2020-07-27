@@ -142,7 +142,7 @@ const rst = new ReplSetTest({nodes: 2, nodeOpts: {noCleanData: true}});
     // them via applyOps.
     runUpdateAndCheckV2EntriesNotLogged(coll);
 
-    // The error code used by 4.4 in this scenario is different from the one used in 4.6.
+    // The error code used by 4.4 in this scenario is different from the one used in 4.7+.
     const k44ApplyOpsUnknownUpdateVersionErrorCode = 40682;
     checkApplyOpsOfV2Entries(coll, k44ApplyOpsUnknownUpdateVersionErrorCode);
 
@@ -252,7 +252,7 @@ const rst = new ReplSetTest({nodes: 2, nodeOpts: {noCleanData: true}});
         assert.commandWorked(coll.insert({_id: 1, padding: kGiantStr}));
 
         // First we are going to run a $v:2 eligible update and have it hang after it checks the
-        // FCV. It will read a value of 4.5/4.6, and based on that, decide to log a $v: 2 oplog
+        // FCV. It will read a value of 4.7+, and based on that, decide to log a $v: 2 oplog
         // entry.
 
         const kPipelineFCVCheckFPName = "hangAfterPipelineUpdateFCVCheck";

@@ -156,9 +156,9 @@ struct ServerGlobalParams {
 
     struct FeatureCompatibility {
         /**
-         * The combination of the fields (version, targetVersion) in the featureCompatiiblityVersion
-         * document in the server configuration collection (admin.system.version) are represented by
-         * this enum and determine this node's behavior.
+         * The combination of the fields (version, targetVersion, previousVersion) in the
+         * featureCompatiiblityVersion document in the server configuration collection
+         * (admin.system.version) are represented by this enum and determine this node's behavior.
          *
          * Features can be gated for specific versions, or ranges of versions above or below some
          * minimum or maximum version, respectively.
@@ -166,28 +166,26 @@ struct ServerGlobalParams {
          * The legal enum (and featureCompatibilityVersion document) states are:
          *
          * kFullyDowngradedTo44
-         * (4.4, Unset): Only 4.4 features are available, and new and existing storage
-         *               engine entries use the 4.4 format
+         * (4.4, Unset, Unset): Only 4.4 features are available, and new and existing storage engine
+         *                      entries use the 4.4 format
          *
-         * kUpgradingFrom44To451
-         * (4.4, 4.5.1): Only 4.4 features are available, but new storage engine entries
-         *             use the 4.5.1 format, and existing entries may have either the
-         *             4.4 or 4.5.1 format
+         * kUpgradingFrom44To47
+         * (4.4, 4.7, Unset): Only 4.4 features are available, but new storage engine entries
+         *                    use the 4.7 format, and existing entries may have either the 4.4 or
+         *                    4.7 format
          *
-         * kVersion451
-         * (4.5.1, Unset): 4.5.1 features are available, and new and existing storage
-         *               engine entries use the 4.5.1 format
+         * kVersion47
+         * (4.7, Unset, Unset): 4.7 features are available, and new and existing storage engine
+         *                      entries use the 4.7 format
          *
-         * kDowngradingFrom451To44
-         * (4.4, 4.4): Only 4.4 features are available and new storage engine
-         *             entries use the 4.4 format, but existing entries may have
-         *             either the 4.4 or 4.5.1 format
+         * kDowngradingFrom47To44
+         * (4.4, 4.4, 4.7): Only 4.4 features are available and new storage engine entries use the
+         *                  4.4 format, but existing entries may have either the 4.4 or 4.7 format
          *
          * kUnsetDefault44Behavior
-         * (Unset, Unset): This is the case on startup before the fCV document is
-         *                 loaded into memory. isVersionInitialized() will return
-         *                 false, and getVersion() will return the default
-         *                 (kFullyDowngradedTo44).
+         * (Unset, Unset, Unset): This is the case on startup before the fCV document is loaded into
+         *                        memory. isVersionInitialized() will return false, and getVersion()
+         *                        will return the default (kUnsetDefault44Behavior).
          *
          */
         enum class Version {
@@ -196,26 +194,26 @@ struct ServerGlobalParams {
             // lower than some maximum, respectively.
             kUnsetDefault44Behavior = 0,
             kFullyDowngradedTo44 = 1,
-            kDowngradingFrom451To44 = 2,
-            kUpgradingFrom44To451 = 3,
-            kVersion451 = 4,
+            kDowngradingFrom47To44 = 2,
+            kUpgradingFrom44To47 = 3,
+            kVersion47 = 4,
         };
 
         // These constants should only be used for generic FCV references. Generic references are
         // FCV references that are expected to exist across LTS binary versions.
-        static constexpr Version kLatest = Version::kVersion451;
+        static constexpr Version kLatest = Version::kVersion47;
         static constexpr Version kLastContinuous = Version::kFullyDowngradedTo44;
         static constexpr Version kLastLTS = Version::kFullyDowngradedTo44;
 
         // These constants should only be used for generic FCV references. Generic references are
         // FCV references that are expected to exist across LTS binary versions.
         // NOTE: DO NOT USE THEM FOR REGULAR FCV CHECKS.
-        static constexpr Version kUpgradingFromLastLTSToLatest = Version::kUpgradingFrom44To451;
+        static constexpr Version kUpgradingFromLastLTSToLatest = Version::kUpgradingFrom44To47;
         static constexpr Version kUpgradingFromLastContinuousToLatest =
-            Version::kUpgradingFrom44To451;
-        static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom451To44;
+            Version::kUpgradingFrom44To47;
+        static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom47To44;
         static constexpr Version kDowngradingFromLatestToLastContinuous =
-            Version::kDowngradingFrom451To44;
+            Version::kDowngradingFrom47To44;
 
         /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This

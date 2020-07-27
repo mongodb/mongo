@@ -933,7 +933,7 @@ bool StorageEngineImpl::supportsResumableIndexBuilds() const {
     return enableResumableIndexBuilds && supportsReadConcernMajority() && !isEphemeral() &&
         serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            ServerGlobalParams::FeatureCompatibility::Version::kVersion451) &&
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion47) &&
         !repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
 }
 

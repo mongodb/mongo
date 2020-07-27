@@ -41,7 +41,7 @@
 namespace mongo {
 namespace {
 
-// This commmand is deprecated and is currently a no-op as of v4.6.
+// This commmand is deprecated and is currently a no-op as of v4.7.
 
 class CmdShardingResetError : public BasicCommand {
 public:

@@ -3152,8 +3152,9 @@ Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder
 }
 
 bool ReplicationCoordinatorImpl::_supportsAutomaticReconfig() const {
+    // TODO SERVER-48545: Remove this when 5.0 becomes last-lts.
     return serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion451);
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
 }
 
 Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCtx,
@@ -3363,7 +3364,8 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     int myIndex = _selfIndex;
     lk.unlock();
 
-    // Automatic reconfig ("newlyAdded" field in repl config) is supported only from FCV4.6+.
+    // TODO SERVER-48545: Remove this when 5.0 becomes last-lts.
+    // Automatic reconfig ("newlyAdded" field in repl config) is supported only from FCV4.7+.
     // So, acquire FCV mutex lock in shared mode to block writers from modifying the fcv document
     // to make sure fcv is not changed between getNewConfig() and storing the new config
     // document locally.
@@ -3418,7 +3420,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
 
     // We need to take fcv lock only for 2 cases:
     // 1) For fcv 4.4, addition of new voter nodes.
-    // 2) For fcv 4.6+, only if the current config doesn't contain the 'newlyAdded' field but the
+    // 2) For fcv 4.7+, only if the current config doesn't contain the 'newlyAdded' field but the
     // new config got mutated to append 'newlyAdded' field.
     if (force || !needsFcvLock()) {
         fixedFcvRegion.release();

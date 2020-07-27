@@ -1,7 +1,7 @@
 /*
  * Tests that a node does not enter quiesce mode during shutdown if we are in FCV 4.4.
  *
- * TODO SERVER-49138: Remove this test once we branch for 4.8.
+ * TODO SERVER-49138: Remove this test when 5.0 becomes last-lts.
  *
  * @tags: [multiversion_incompatible]
  */

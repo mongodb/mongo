@@ -368,9 +368,9 @@ StatusWith<std::unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(
                               << ". Unrecognized field '" << fieldName
                               << "'. This command may be meant for a mongocryptd process.");
 
-            // TODO SERVER-47065: A 4.6 node still has to accept the '_use44SortKeys' field, since
-            // it could be included in a command sent from a 4.4 mongos. In 4.7 development, this
-            // code to tolerate the '_use44SortKeys' field can be deleted.
+            // TODO SERVER-47065: A 4.7+ node still has to accept the '_use44SortKeys' field, since
+            // it could be included in a command sent from a 4.4 mongos. When 5.0 becomes last-lts,
+            // this code to tolerate the '_use44SortKeys' field can be deleted.
         } else if (!isGenericArgument(fieldName)) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "

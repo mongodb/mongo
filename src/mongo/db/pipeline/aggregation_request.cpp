@@ -190,7 +190,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             auto writeConcern = uassertStatusOK(WriteConcernOptions::parse(elem.embeddedObject()));
             request.setWriteConcern(writeConcern);
         } else if (kRuntimeConstantsName == fieldName) {
-            // TODO SERVER-46384: Remove 'runtimeConstants' in 4.5 since it is redundant with 'let'
+            // TODO SERVER-46384: Remove 'runtimeConstants' in 4.7 since it is redundant with 'let'
             try {
                 IDLParserErrorContext ctx("internalRuntimeConstants");
                 request.setRuntimeConstants(RuntimeConstants::parse(ctx, elem.Obj()));
@@ -211,14 +211,15 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                         str::stream() << kUse44SortKeysName << " must be a boolean, not a "
                                       << typeName(elem.type())};
             }
-            // TODO SERVER-47065: A 4.6 node still has to accept the 'use44SortKeys' field, since it
-            // could be included in a command sent from a 4.4 mongos or 4.4 mongod. In 4.7, this
-            // code to tolerate the 'use44SortKeys' field can be deleted.
+            // TODO SERVER-47065: A 4.7+ node still has to accept the 'use44SortKeys' field, since
+            // it could be included in a command sent from a 4.4 mongos or 4.4 mongod. When 5.0
+            // becomes last-lts, this code to tolerate the 'use44SortKeys' field can be deleted.
         } else if (fieldName == "useNewUpsert"_sd) {
             // TODO SERVER-46751: we must retain the ability to ingest the 'useNewUpsert' field for
-            // 4.6 upgrade purposes, since a 4.4 mongoS will always send {useNewUpsert:true} to the
-            // shards. We do nothing with it because useNewUpsert will be automatically used in 4.6
-            // when appropriate. Remove this final vestige of useNewUpsert during the 4.7 dev cycle.
+            // 4.7+ upgrade purposes, since a 4.4 mongoS will always send {useNewUpsert:true} to the
+            // shards. We do nothing with it because useNewUpsert will be automatically used in 4.7+
+            // when appropriate. Remove this final vestige of useNewUpsert when 5.0 becomes
+            // last-lts.
         } else if (fieldName == kIsMapReduceCommandName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,

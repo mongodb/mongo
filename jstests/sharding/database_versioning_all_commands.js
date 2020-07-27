@@ -667,7 +667,7 @@ let testCases = {
 };
 
 commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
-    testCases[cmd] = {skip: "must define test coverage for 4.6 backwards compatibility"};
+    testCases[cmd] = {skip: "must define test coverage for latest version backwards compatibility"};
 });
 
 const st = new ShardingTest({shards: 2, mongos: 2});

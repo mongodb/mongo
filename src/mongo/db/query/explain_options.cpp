@@ -88,7 +88,7 @@ StatusWith<ExplainOptions::Verbosity> ExplainOptions::parseCmdBSON(const BSONObj
             // TODO SERVER-48560: we ingest these fields for compatibility with 4.4,
             // whose mongoS incorrectly adds them to the explain command for an
             // aggregation instead of adding them into the wrapped aggregate command
-            // itself. Remove this block when we branch for 4.8.
+            // itself. Remove this block when 5.0 becomes last-lts.
             continue;
         } else if (!isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,

@@ -680,10 +680,10 @@ public:
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         // TODO (SERVER-48639): Due to the way that '_configsvrShardCollection' processes the
-        // collation parameter in 4.6 and earlier, the incoming request's collation can have the
+        // collation parameter in 5.0 and earlier, the incoming request's collation can have the
         // following states:
         //
-        //   - Boost::none: (not possible before 4.7 development) The end user's request did not
+        //   - Boost::none: (not possible before 5.1 development) The end user's request did not
         //                  specify a collation
         //   - Empty BSON : Either the end user did not specify a collation and the collection did
         //                  not exist when '_configsvrShardCollection' was called, or the collection

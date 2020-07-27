@@ -113,7 +113,7 @@ public:
 
 } poolStatsCmd;
 
-// This command currently returns nothing, since the shard connection pool no longer exists (v4.6).
+// This command currently returns nothing, since the shard connection pool no longer exists (v4.7+).
 class ShardedPoolStats final : public BasicCommand {
 public:
     ShardedPoolStats() : BasicCommand("shardConnPoolStats") {}

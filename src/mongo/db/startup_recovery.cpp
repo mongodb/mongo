@@ -194,8 +194,7 @@ Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
 auto downgradeError =
     Status{ErrorCodes::MustDowngrade,
            str::stream() << "UPGRADE PROBLEM: The data files need to be fully upgraded to version "
-                            "4.4 before attempting "
-                            "an upgrade to 4.5.1; see "
+                            "4.4 before attempting a binary upgrade; see "
                          << feature_compatibility_version_documentation::kUpgradeLink
                          << " for more details."};
 

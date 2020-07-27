@@ -50,7 +50,7 @@ enum class UpdateOplogEntryVersion {
     // arrayFilters and $[] syntax.
     kUpdateNodeV1 = 1,
 
-    // Delta style update, introduced in 4.6. When a pipeline based update is executed, the pre and
+    // Delta style update, introduced in 4.7. When a pipeline based update is executed, the pre and
     // post images are diffed, producing a delta. The delta is recorded in the oplog. On
     // secondaries, the delta is applied to the pre-image to recover the post image.
     //
