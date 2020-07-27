@@ -58,10 +58,19 @@ import SCons.Errors
 import SCons.Scanner
 import SCons.Util
 
-libdeps_env_var = "LIBDEPS"
-syslibdeps_env_var = "SYSLIBDEPS"
-missing_syslibdep = "MISSING_LIBDEP_"
 
+class Constants:
+    Libdeps = "LIBDEPS"
+    LibdepsPrivate = "LIBDEPS_PRIVATE"
+    LibdepsInterface ="LIBDEPS_INTERFACE"
+    LibdepsDependents = "LIBDEPS_DEPENDENTS"
+    ProgdepsDependents = "PROGDEPS_DEPENDENTS"
+    SysLibdeps = "SYSLIBDEPS"
+    LibdepsCached = "LIBDEPS_cached"
+    SysLibdepsCached = "SYSLIBDEPS_cached"
+    MissingLibdep = "MISSING_LIBDEP_"
+    LibdepsTags = "LIBDEPS_TAGS"
+    LibdepsTagExpansion = "LIBDEPS_TAG_EXPANSIONS"
 
 class dependency(object):
     Public, Private, Interface = list(range(3))
@@ -183,14 +192,14 @@ class LibdepLinter(object):
 
         target_env = env if env else self.env
 
-        if lint_tag in target_env.get("LIBDEPS_TAGS", []):
+        if lint_tag in target_env.get(Constants.LibdepsTags, []):
             return True
 
     def _get_deps_dependents(self, env=None):
         """ util function to get all types of DEPS_DEPENDENTS"""
         target_env = env if env else self.env
-        deps_dependents = target_env.get("LIBDEPS_DEPENDENTS", [])
-        deps_dependents += target_env.get("PROGDEPS_DEPENDENTS", [])
+        deps_dependents = target_env.get(Constants.LibdepsDependents, [])
+        deps_dependents += target_env.get(Constants.ProgdepsDependents, [])
         return deps_dependents
 
     @linter_rule
@@ -218,7 +227,7 @@ class LibdepLinter(object):
         LIBDEP RULE:
             All Programs shall only have public dependency's
             because a Program will never be a dependency of another Program
-            or Library, and LIBDEP transitiveness does not apply. Public
+            or Library, and LIBDEPS transitiveness does not apply. Public
             transitiveness has no meaning in this case and is used just as default.
         """
         if self._check_for_lint_tags('lint-allow-program-links-private'):
@@ -231,7 +240,8 @@ class LibdepLinter(object):
             self._raise_libdep_lint_exception(
                 textwrap.dedent(f"""\
                     Program '{self.target[0]}' links non-public library '{lib}
-                    A 'Program' can only have LIBDEPS libs, not _PRIVATE or _INTERFACE."""
+                    A 'Program' can only have {Constants.Libdeps} libs,
+                    not {Constants.LibdepsPrivate} or {Constants.LibdepsInterface}."""
                 ))
 
     @linter_rule
@@ -254,8 +264,8 @@ class LibdepLinter(object):
                 target_type = self.target[0].builder.get_name(self.env)
                 lib = os.path.basename(str(libdep))
                 self._raise_libdep_lint_exception(textwrap.dedent(f"""\
-                    {target_type} '{self.target[0]}' links directly to DEPS_DEPENDENT node '{lib}'
-                    No node can link directly to a node that has DEPS_DEPENDENTS."""
+                    {target_type} '{self.target[0]}' links directly to a reverse dependency node '{lib}'
+                    No node can link directly to a node that has {Constants.LibdepsDependents} or {Constants.ProgdepsDependents}."""
                 ))
 
     @linter_rule
@@ -276,8 +286,8 @@ class LibdepLinter(object):
             target_type = self.target[0].builder.get_name(self.env)
             lib = os.path.basename(str(libdep))
             self._raise_libdep_lint_exception(textwrap.dedent(f"""\
-                {target_type} '{self.target[0]}' links non-private libdep '{lib}' and has DEP_DEPENDENTS.
-                A {target_type} can only have LIBDEP_PRIVATE depends if it has DEP_DEPENDENTS."""
+                {target_type} '{self.target[0]}' links non-private libdep '{lib}' and has a reverse dependency.
+                A {target_type} can only have {Constants.LibdepsPrivate} depends if it has {Constants.LibdepsDependents} or {Constants.ProgdepsDependents}."""
             ))
 
     @linter_rule
@@ -291,8 +301,8 @@ class LibdepLinter(object):
             return
 
         libdeps_vars = list(dep_type_to_env_var.values()) + [
-            "LIBDEPS_DEPENDENTS",
-            'PROGDEPS_DEPENDENTS']
+            Constants.LibdepsDependents,
+            Constants.ProgdepsDependents]
 
         for dep_type_val in libdeps_vars:
 
@@ -318,9 +328,9 @@ dependency_visibility_honored = {
 }
 
 dep_type_to_env_var = {
-    dependency.Public: "LIBDEPS",
-    dependency.Private: "LIBDEPS_PRIVATE",
-    dependency.Interface: "LIBDEPS_INTERFACE",
+    dependency.Public: Constants.Libdeps,
+    dependency.Private: Constants.LibdepsPrivate,
+    dependency.Interface: Constants.LibdepsInterface,
 }
 
 class DependencyCycleError(SCons.Errors.UserError):
@@ -377,9 +387,7 @@ def __get_libdeps(node):
     Computes the dependencies if they're not already cached.
     """
 
-    cached_var_name = libdeps_env_var + "_cached"
-
-    cache = getattr(node.attributes, cached_var_name, None)
+    cache = getattr(node.attributes, Constants.LibdepsCached, None)
     if cache is not None:
         return cache
 
@@ -392,7 +400,7 @@ def __get_libdeps(node):
             __libdeps_visit(child, marked, tsorted, walking)
 
     tsorted.reverse()
-    setattr(node.attributes, cached_var_name, tsorted)
+    setattr(node.attributes, Constants.LibdepsCached, tsorted)
 
     return tsorted
 
@@ -402,33 +410,32 @@ def __get_syslibdeps(node):
 
     These are the depencencies listed with SYSLIBDEPS, and are linked using -l.
     """
-    cached_var_name = syslibdeps_env_var + "_cached"
-    result = getattr(node.attributes, cached_var_name, None)
+    result = getattr(node.attributes, Constants.SysLibdepsCached, None)
     if result is not None:
         return result
 
-    result = node.get_env().Flatten(node.get_env().get(syslibdeps_env_var, []))
+    result = node.get_env().Flatten(node.get_env().get(Constants.SysLibdeps, []))
     for lib in __get_libdeps(node):
-        for syslib in lib.get_env().get(syslibdeps_env_var, []):
+        for syslib in lib.get_env().get(Constants.SysLibdeps, []):
             if not syslib:
                 continue
 
-            if type(syslib) is str and syslib.startswith(missing_syslibdep):
+            if type(syslib) is str and syslib.startswith(Constants.MissingLibdep):
                 print(
                     "Target '{}' depends on the availability of a "
                     "system provided library for '{}', "
-                    "but no suitable library was found during configuration.".format(str(node), syslib[len(missing_syslibdep) :])
+                    "but no suitable library was found during configuration.".format(str(node), syslib[len(Constants.MissingLibdep) :])
                 )
                 node.get_env().Exit(1)
 
             result.append(syslib)
 
-    setattr(node.attributes, cached_var_name, result)
+    setattr(node.attributes, Constants.SysLibdepsCached, result)
     return result
 
 
 def __missing_syslib(name):
-    return missing_syslibdep + name
+    return Constants.MissingLibdep + name
 
 
 def update_scanner(builder):
@@ -584,7 +591,7 @@ def make_libdeps_emitter(
             # work properly.
             __append_direct_libdeps(t, libdeps)
 
-        for dependent in env.get("LIBDEPS_DEPENDENTS", []):
+        for dependent in env.get(Constants.LibdepsDependents, []):
             if dependent is None:
                 continue
 
@@ -601,7 +608,7 @@ def make_libdeps_emitter(
             )
 
         if not ignore_progdeps:
-            for dependent in env.get("PROGDEPS_DEPENDENTS", []):
+            for dependent in env.get(Constants.ProgdepsDependents, []):
                 if dependent is None:
                     continue
 
@@ -625,7 +632,7 @@ def make_libdeps_emitter(
 
 def expand_libdeps_tags(source, target, env, for_signature):
     results = []
-    for expansion in env.get("LIBDEPS_TAG_EXPANSIONS", []):
+    for expansion in env.get(Constants.LibdepsTagExpansion, []):
         results.append(expansion(source, target, env, for_signature))
     return results
 
@@ -640,10 +647,10 @@ def expand_libdeps_with_extraction_flags(source, target, env, for_signature):
     for lib in libs:
         if isinstance(lib, (str, SCons.Node.FS.File, SCons.Node.FS.Entry)):
             lib_target = str(lib)
-            lib_tags = lib.get_env().get("LIBDEPS_TAGS", [])
+            lib_tags = lib.get_env().get(Constants.LibdepsTags, [])
         else:
             lib_target = env.subst("$TARGET", target=lib)
-            lib_tags = env.File(lib).get_env().get("LIBDEPS_TAGS", [])
+            lib_tags = env.File(lib).get_env().get(Constants.LibdepsTags, [])
 
         if "init-no-global-side-effects" in lib_tags:
             result.append(lib_target)
@@ -677,8 +684,8 @@ def setup_environment(env, emitting_shared=False, linting='on'):
     env["_LIBDEPS_OBJS"] = get_libdeps_objs
     env["_SYSLIBDEPS"] = get_syslibdeps
 
-    env[libdeps_env_var] = SCons.Util.CLVar()
-    env[syslibdeps_env_var] = SCons.Util.CLVar()
+    env[Constants.Libdeps] = SCons.Util.CLVar()
+    env[Constants.SysLibdeps] = SCons.Util.CLVar()
 
     # We need a way for environments to alter just which libdeps
     # emitter they want, without altering the overall program or
