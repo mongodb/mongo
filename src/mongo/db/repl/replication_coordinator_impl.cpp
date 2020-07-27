@@ -882,6 +882,8 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
 
     _replExecutor->startup();
 
+    ReplicaSetAwareServiceRegistry::get(_service).onStartup(opCtx);
+
     bool doneLoadingConfig = _startLoadLocalConfig(opCtx);
     if (doneLoadingConfig) {
         // If we're not done loading the config, then the config state will be set by

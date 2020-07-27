@@ -72,6 +72,9 @@ namespace mongo {
  *     }
  *
  *     // Mandatory:
+ *     void onStartup(OperationContext* opCtx) final {
+ *         // ...
+ *     }
  *     void onStepUpBegin(OperationContext* opCtx) final {
  *         // ...
  *     }
@@ -105,7 +108,14 @@ namespace mongo {
 class ReplicaSetAwareInterface {
 public:
     /**
-     * Called prior to stepping up as PRIMARY, ie. after drain mode has completed.
+     * Called once during ReplicationCoordinator startup. A place to put startup logic such as
+     * initializing thread pools. Cannot depend on the ReplicaSetConfig being loaded yet. Database
+     * reads and writes to unreplicated collections are permitted.
+     */
+    virtual void onStartup(OperationContext* opCtx) = 0;
+
+    /**
+     * Called prior to stepping up as PRIMARY, i.e. after drain mode has completed.
      */
     virtual void onStepUpBegin(OperationContext* opCtx, long long term) = 0;
 
@@ -171,6 +181,7 @@ public:
 
     static ReplicaSetAwareServiceRegistry& get(ServiceContext* serviceContext);
 
+    void onStartup(OperationContext* opCtx) final;
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;
     void onStepDown() final;

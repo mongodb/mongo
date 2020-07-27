@@ -85,6 +85,7 @@ protected:
     LogicalTime _tick(Component component, uint64_t nTicks) override;
 
 private:
+    void onStartup(OperationContext* opCtx) override {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override {}
     void onStepUpComplete(OperationContext* opCtx, long long term) override {}
     void onStepDown() override {}

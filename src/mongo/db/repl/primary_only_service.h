@@ -291,8 +291,9 @@ public:
      */
     void shutdown();
 
+    void onStartup(OperationContext*) final {}
     void onStepUpBegin(OperationContext*, long long term) final {}
-    void onBecomeArbiter() final{};
+    void onBecomeArbiter() final {}
     void onStepUpComplete(OperationContext*, long long term) final;
     void onStepDown() final;
 
