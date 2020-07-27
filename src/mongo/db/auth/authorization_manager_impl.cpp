@@ -608,7 +608,7 @@ void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx, St
     LOGV2_DEBUG(20236, 2, "Invalidating all users from database", "database"_attr = dbname);
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
-    _userCache.invalidateIfKey(
+    _userCache.invalidateIf(
         [&](const UserRequest& userRequest) { return userRequest.name.getDB() == dbname; });
 }
 
