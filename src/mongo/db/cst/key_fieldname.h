@@ -40,6 +40,13 @@
     ENUMIFY(andExpr)             \
     ENUMIFY(orExpr)              \
     ENUMIFY(notExpr)             \
+    ENUMIFY(cmp)                 \
+    ENUMIFY(eq)                  \
+    ENUMIFY(gt)                  \
+    ENUMIFY(gte)                 \
+    ENUMIFY(lt)                  \
+    ENUMIFY(lte)                 \
+    ENUMIFY(ne)                  \
     ENUMIFY(project)             \
     ENUMIFY(inhibitOptimization) \
     ENUMIFY(unionWith)           \

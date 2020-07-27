@@ -59,8 +59,6 @@ namespace mongo::cst_pipeline_translation {
 namespace {
 Value translateLiteralToValue(const CNode& cst);
 Value translateLiteralLeaf(const CNode& cst);
-boost::intrusive_ptr<Expression> translateExpression(
-    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
  * Walk a literal array payload and produce a Value. This function is neccesary because Aggregation
@@ -163,6 +161,27 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
             return make_intrusive<ExpressionOr>(expCtx.get(), std::move(expressions));
         case KeyFieldname::notExpr:
             return make_intrusive<ExpressionNot>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::cmp:
+            return make_intrusive<ExpressionCompare>(
+                expCtx.get(), ExpressionCompare::CMP, std::move(expressions));
+        case KeyFieldname::eq:
+            return make_intrusive<ExpressionCompare>(
+                expCtx.get(), ExpressionCompare::EQ, std::move(expressions));
+        case KeyFieldname::gt:
+            return make_intrusive<ExpressionCompare>(
+                expCtx.get(), ExpressionCompare::GT, std::move(expressions));
+        case KeyFieldname::gte:
+            return make_intrusive<ExpressionCompare>(
+                expCtx.get(), ExpressionCompare::GTE, std::move(expressions));
+        case KeyFieldname::lt:
+            return make_intrusive<ExpressionCompare>(
+                expCtx.get(), ExpressionCompare::LT, std::move(expressions));
+        case KeyFieldname::lte:
+            return make_intrusive<ExpressionCompare>(
+                expCtx.get(), ExpressionCompare::LTE, std::move(expressions));
+        case KeyFieldname::ne:
+            return make_intrusive<ExpressionCompare>(
+                expCtx.get(), ExpressionCompare::NE, std::move(expressions));
         default:
             MONGO_UNREACHABLE;
     }
@@ -190,33 +209,6 @@ Value translateLiteralLeaf(const CNode& cst) {
         cst.payload);
 }
 
-/**
- * Walk an expression CNode and produce an agg Expression.
- */
-boost::intrusive_ptr<Expression> translateExpression(
-    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return stdx::visit(
-        visit_helper::Overloaded{
-            // When we're not inside an agg operator/function, this is a non-leaf literal.
-            [&](const CNode::ArrayChildren& array) -> boost::intrusive_ptr<Expression> {
-                return translateLiteralArray(array, expCtx);
-            },
-            // This is either a literal object or an agg operator/function.
-            [&](const CNode::ObjectChildren& object) -> boost::intrusive_ptr<Expression> {
-                if (!object.empty() && stdx::holds_alternative<KeyFieldname>(object[0].first))
-                    return translateFunctionObject(object, expCtx);
-                else
-                    return translateLiteralObject(object, expCtx);
-            },
-            // If a key occurs outside a particular agg operator/function, it was misplaced.
-            [](const KeyValue&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
-            [](const NonZeroKey&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
-            // Everything else is a literal leaf.
-            [&](auto &&) -> boost::intrusive_ptr<Expression> {
-                return ExpressionConstant::create(expCtx.get(), translateLiteralLeaf(cst));
-            }},
-        cst.payload);
-}
 
 /**
  * Walk a projection CNode and produce a ProjectionASTNode. Also returns whether this was an
@@ -366,6 +358,34 @@ boost::intrusive_ptr<DocumentSource> translateSource(
 }
 
 }  // namespace
+
+/**
+ * Walk an expression CNode and produce an agg Expression.
+ */
+boost::intrusive_ptr<Expression> translateExpression(
+    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            // When we're not inside an agg operator/function, this is a non-leaf literal.
+            [&](const CNode::ArrayChildren& array) -> boost::intrusive_ptr<Expression> {
+                return translateLiteralArray(array, expCtx);
+            },
+            // This is either a literal object or an agg operator/function.
+            [&](const CNode::ObjectChildren& object) -> boost::intrusive_ptr<Expression> {
+                if (!object.empty() && stdx::holds_alternative<KeyFieldname>(object[0].first))
+                    return translateFunctionObject(object, expCtx);
+                else
+                    return translateLiteralObject(object, expCtx);
+            },
+            // If a key occurs outside a particular agg operator/function, it was misplaced.
+            [](const KeyValue&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
+            [](const NonZeroKey&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
+            // Everything else is a literal leaf.
+            [&](auto &&) -> boost::intrusive_ptr<Expression> {
+                return ExpressionConstant::create(expCtx.get(), translateLiteralLeaf(cst));
+            }},
+        cst.payload);
+}
 
 /**
  * Walk a pipeline array CNode and produce a Pipeline.

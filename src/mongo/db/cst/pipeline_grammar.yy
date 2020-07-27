@@ -141,7 +141,13 @@
     LITERAL
     OR
     NOT
-    
+    CMP
+    EQ
+    GT
+    GTE
+    LT
+    LTE
+    NE
 
     END_OF_FILE 0 "EOF"
 ;
@@ -170,11 +176,12 @@
 // Semantic values (aka the C++ types produced by the actions).
 //
 %nterm <CNode> stageList stage inhibitOptimization unionWith num skip limit project projectFields
-%nterm <CNode> projection compoundExpression expressionArray expressionObject expressionFields
+%nterm <CNode> projection compoundExpression expressionArray expressionObject expressionFields exprFixedTwoArg
 %nterm <CNode> expression maths add atan2 string binary undefined objectId bool date null regex
 %nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal minKey
 %nterm <CNode> maxKey simpleValue boolExps and or not literalEscapes const literal value
 %nterm <CNode> compoundValue valueArray valueObject valueFields
+%nterm <CNode> compExprs cmp eq gt gte lt lte ne
 %nterm <CNode::Fieldname> projectionFieldname expressionFieldname stageAsUserFieldname
 %nterm <CNode::Fieldname> argAsUserFieldname aggExprAsUserFieldname invariableUserFieldname
 %nterm <CNode::Fieldname> idAsUserFieldname valueFieldname
@@ -365,6 +372,27 @@ aggExprAsUserFieldname:
     | NOT {
         $$ = UserFieldname{"$not"};
     }
+    | CMP {
+        $$ = UserFieldname{"$cmp"};
+    }
+    | EQ {
+        $$ = UserFieldname{"$eq"};
+    }
+    | GT {
+        $$ = UserFieldname{"$gt"};
+    }
+    | GTE {
+        $$ = UserFieldname{"$gte"};
+    }
+    | LT {
+        $$ = UserFieldname{"$lt"};
+    }
+    | LTE {
+        $$ = UserFieldname{"$lte"};
+    }
+    | NE {
+        $$ = UserFieldname{"$ne"};
+    }
 ;
 
 string:
@@ -533,8 +561,13 @@ expression:
     simpleValue | compoundExpression
 ;
 
+// Helper rule for expressions which take exactly two expression arguments.
+exprFixedTwoArg: START_ARRAY expression[expr1] expression[expr2] END_ARRAY {
+    $$ = CNode{CNode::ArrayChildren{$expr1, $expr2}};
+};
+
 compoundExpression:
-    expressionArray | expressionObject | maths | boolExps | literalEscapes
+    expressionArray | expressionObject | maths | boolExps | literalEscapes | compExprs
 ;
 
 // These are arrays occuring in Expressions outside of $const/$literal. They may contain further
@@ -596,9 +629,9 @@ add:
 ;
 
 atan2:
-    START_OBJECT ATAN2 START_ARRAY expression[expr1] expression[expr2] END_ARRAY END_OBJECT {
+    START_OBJECT ATAN2 exprFixedTwoArg END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::atan2,
-                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
+                                          $exprFixedTwoArg}}};
     }
 ;
 
@@ -703,5 +736,42 @@ valueFieldname:
     | aggExprAsUserFieldname
     | idAsUserFieldname
 ;
+
+compExprs: cmp | eq | gt | gte | lt | lte | ne;
+
+cmp: START_OBJECT CMP exprFixedTwoArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::cmp,
+                                          $exprFixedTwoArg}}};
+};
+
+eq: START_OBJECT EQ exprFixedTwoArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::eq,
+                                          $exprFixedTwoArg}}};
+};
+
+gt: START_OBJECT GT exprFixedTwoArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::gt,
+                                          $exprFixedTwoArg}}};
+};
+
+gte: START_OBJECT GTE exprFixedTwoArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::gte,
+                                          $exprFixedTwoArg}}};
+};
+
+lt: START_OBJECT LT exprFixedTwoArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::lt,
+                                          $exprFixedTwoArg}}};
+};
+
+lte: START_OBJECT LTE exprFixedTwoArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::lte,
+                                          $exprFixedTwoArg}}};
+};
+
+ne: START_OBJECT NE exprFixedTwoArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::ne,
+                                          $exprFixedTwoArg}}};
+};
 
 %%

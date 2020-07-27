@@ -402,57 +402,5 @@ TEST(CstTest, BuildsAndPrintsNot) {
     }
 }
 
-TEST(CstGrammarTest, ParsesProjectWithAnd) {
-    CNode output;
-    auto input = fromjson(
-        "{pipeline: [{$project: {_id: 9.10, a: {$and: [4, {$and: [7, 8]}]}, b: {$and: [2, "
-        "-3]}}}]}");
-    BSONLexer lexer(input["pipeline"].Array());
-    auto parseTree = PipelineParserGen(lexer, &output);
-    ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
-    ASSERT_EQ(1, stages.size());
-    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
-    ASSERT_EQ(
-        stages[0].toBson().toString(),
-        "{ project: { id: \"<NonZeroKey of type double 9.100000>\", a: { andExpr: [ "
-        "\"<UserInt 4>\", { andExpr: [ \"<UserInt 7>\", \"<UserInt 8>\" ] } ] }, b: { andExpr: [ "
-        "\"<UserInt 2>\", \"<UserInt -3>\" ] } } }");
-}
-
-TEST(CstGrammarTest, ParsesProjectWithOr) {
-    CNode output;
-    auto input = fromjson(
-        "{pipeline: [{$project: {_id: 9.10, a: {$or: [4, {$or: [7, 8]}]}, b: {$or: [2, -3]}}}]}");
-    BSONLexer lexer(input["pipeline"].Array());
-    auto parseTree = PipelineParserGen(lexer, &output);
-    ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
-    ASSERT_EQ(1, stages.size());
-    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
-    ASSERT_EQ(
-        stages[0].toBson().toString(),
-        "{ project: { id: \"<NonZeroKey of type double 9.100000>\", a: { orExpr: [ "
-        "\"<UserInt 4>\", { orExpr: [ \"<UserInt 7>\", \"<UserInt 8>\" ] } ] }, b: { orExpr: [ "
-        "\"<UserInt 2>\", \"<UserInt -3>\" ] } } }");
-}
-
-TEST(CstGrammarTest, ParsesProjectWithNot) {
-    CNode output;
-    auto input = fromjson(
-        "{pipeline: [{$project: {_id: 9.10, a: {$not: [4]}, b: {$and: [1.0, {$not: "
-        "[true]}]}}}]}");
-    BSONLexer lexer(input["pipeline"].Array());
-    auto parseTree = PipelineParserGen(lexer, &output);
-    ASSERT_EQ(0, parseTree.parse());
-    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
-    ASSERT_EQ(1, stages.size());
-    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
-    ASSERT_EQ(stages[0].toBson().toString(),
-              "{ project: { id: \"<NonZeroKey of type double 9.100000>\", a: { notExpr: [ "
-              "\"<UserInt 4>\" ] }, b: { andExpr: [ \"<UserDouble 1.000000>\", { notExpr: [ "
-              "\"<UserBoolean 1>\" ] } ] } } }");
-}
-
 }  // namespace
 }  // namespace mongo

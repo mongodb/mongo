@@ -54,8 +54,15 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"$or", PipelineParserGen::token::OR},
     {"$not", PipelineParserGen::token::NOT},
     {"$const", PipelineParserGen::token::CONST_EXPR},
-    {"$literal", PipelineParserGen::token::LITERAL}};
-
+    {"$literal", PipelineParserGen::token::LITERAL},
+    {"$cmp", PipelineParserGen::token::CMP},
+    {"$eq", PipelineParserGen::token::EQ},
+    {"$gt", PipelineParserGen::token::GT},
+    {"$gte", PipelineParserGen::token::GTE},
+    {"$lt", PipelineParserGen::token::LT},
+    {"$lte", PipelineParserGen::token::LTE},
+    {"$ne", PipelineParserGen::token::NE},
+};
 bool isCompound(PipelineParserGen::symbol_type token) {
     return token.type_get() == static_cast<int>(PipelineParserGen::token::START_OBJECT) ||
         token.type_get() == static_cast<int>(PipelineParserGen::token::START_ARRAY);

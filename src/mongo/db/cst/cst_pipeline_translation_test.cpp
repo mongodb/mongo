@@ -414,11 +414,9 @@ TEST(CstPipelineTranslationTest, TranslatesComputedProjectionWithExpressionOnId)
 }
 
 TEST(CstPipelineTranslationTest, TranslatesSkipWithInt) {
-    auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserInt{5}}}}}}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
@@ -427,11 +425,9 @@ TEST(CstPipelineTranslationTest, TranslatesSkipWithInt) {
 }
 
 TEST(CstPipelineTranslationTest, TranslatesSkipWithDouble) {
-    auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserDouble{5.5}}}}}}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
@@ -440,11 +436,9 @@ TEST(CstPipelineTranslationTest, TranslatesSkipWithDouble) {
 }
 
 TEST(CstPipelineTranslationTest, TranslatesSkipWithLong) {
-    auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::skip, CNode{UserLong{8223372036854775807}}}}}}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
@@ -453,11 +447,9 @@ TEST(CstPipelineTranslationTest, TranslatesSkipWithLong) {
 }
 
 TEST(CstPipelineTranslationTest, TranslatesLimitWithInt) {
-    auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserInt{10}}}}}}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
@@ -466,11 +458,9 @@ TEST(CstPipelineTranslationTest, TranslatesLimitWithInt) {
 }
 
 TEST(CstPipelineTranslationTest, TranslatesLimitWithDouble) {
-    auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserDouble{10.5}}}}}}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
@@ -479,16 +469,77 @@ TEST(CstPipelineTranslationTest, TranslatesLimitWithDouble) {
 }
 
 TEST(CstPipelineTranslationTest, TranslatesLimitWithLong) {
-    auto nss = NamespaceString{"db", "coll"};
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::limit, CNode{UserLong{123123123123}}}}}}};
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
-    auto pipeline = cst_pipeline_translation::translatePipeline(cst, expCtx);
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
     ASSERT(typeid(DocumentSourceLimit) == typeid(**iter));
     ASSERT_EQ(123123123123, dynamic_cast<DocumentSourceLimit&>(**iter).getLimit());
+}
+
+TEST(CstPipelineTranslationTest, TranslatesCmpExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::cmp,
+         CNode{CNode::ArrayChildren{CNode{UserLong{1}}, CNode{UserDouble{2.5}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT(dynamic_cast<ExpressionCompare*>(expr.get()));
+    ASSERT_EQ(ExpressionCompare::CmpOp::CMP, dynamic_cast<ExpressionCompare*>(expr.get())->getOp());
+}
+
+TEST(CstPipelineTranslationTest, TranslatesEqExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::eq,
+         CNode{CNode::ArrayChildren{CNode{UserLong{1}}, CNode{UserDouble{2.5}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT(dynamic_cast<ExpressionCompare*>(expr.get()));
+    ASSERT_EQ(ExpressionCompare::CmpOp::EQ, dynamic_cast<ExpressionCompare*>(expr.get())->getOp());
+}
+
+TEST(CstPipelineTranslationTest, TranslatesGtExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::gt,
+         CNode{CNode::ArrayChildren{CNode{UserLong{1}}, CNode{UserDouble{2.5}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT(dynamic_cast<ExpressionCompare*>(expr.get()));
+    ASSERT_EQ(ExpressionCompare::CmpOp::GT, dynamic_cast<ExpressionCompare*>(expr.get())->getOp());
+}
+
+TEST(CstPipelineTranslationTest, TranslatesGteExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::gte,
+         CNode{CNode::ArrayChildren{CNode{UserLong{1}}, CNode{UserDouble{2.5}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT(dynamic_cast<ExpressionCompare*>(expr.get()));
+    ASSERT_EQ(ExpressionCompare::CmpOp::GTE, dynamic_cast<ExpressionCompare*>(expr.get())->getOp());
+}
+
+TEST(CstPipelineTranslationTest, TranslatesLtExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::lt,
+         CNode{CNode::ArrayChildren{CNode{UserLong{1}}, CNode{UserDouble{2.5}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT(dynamic_cast<ExpressionCompare*>(expr.get()));
+    ASSERT_EQ(ExpressionCompare::CmpOp::LT, dynamic_cast<ExpressionCompare*>(expr.get())->getOp());
+}
+
+TEST(CstPipelineTranslationTest, TranslatesLteExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::lte,
+         CNode{CNode::ArrayChildren{CNode{UserLong{1}}, CNode{UserDouble{2.5}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT(dynamic_cast<ExpressionCompare*>(expr.get()));
+    ASSERT_EQ(ExpressionCompare::CmpOp::LTE, dynamic_cast<ExpressionCompare*>(expr.get())->getOp());
+}
+
+TEST(CstPipelineTranslationTest, TranslatesNeExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::ne,
+         CNode{CNode::ArrayChildren{CNode{UserLong{1}}, CNode{UserDouble{2.5}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT(dynamic_cast<ExpressionCompare*>(expr.get()));
+    ASSERT_EQ(ExpressionCompare::CmpOp::NE, dynamic_cast<ExpressionCompare*>(expr.get())->getOp());
 }
 
 }  // namespace

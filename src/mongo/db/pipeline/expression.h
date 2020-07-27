@@ -994,7 +994,9 @@ public:
     };
 
     ExpressionCompare(ExpressionContext* const expCtx, CmpOp cmpOp)
-        : ExpressionFixedArity<ExpressionCompare, 2>(expCtx), cmpOp(cmpOp) {}
+        : ExpressionFixedArity(expCtx), cmpOp(cmpOp) {}
+    ExpressionCompare(ExpressionContext* const expCtx, CmpOp cmpOp, ExpressionVector&& children)
+        : ExpressionFixedArity(expCtx, std::move(children)), cmpOp(cmpOp) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;

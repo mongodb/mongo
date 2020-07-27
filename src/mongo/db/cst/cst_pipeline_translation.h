@@ -38,6 +38,12 @@
 namespace mongo::cst_pipeline_translation {
 
 /**
+ * Walk an expression CNode and produce an agg Expression.
+ */
+boost::intrusive_ptr<Expression> translateExpression(
+    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
  * Walk a pipeline array CNode and produce a Pipeline.
  */
 std::unique_ptr<Pipeline, PipelineDeleter> translatePipeline(
