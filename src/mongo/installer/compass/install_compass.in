@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-from __future__ import print_function
+#!@python_interpreter@
 
 # This script downloads the latest version of Compass and installs it on
 # non-windows platforms.
@@ -57,19 +56,19 @@ def download_pkg(link, pkg_format=''):
         subprocess.check_call(['curl', '--fail', '-L', '-o', filename, link],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as error:
-        print('Unable to download MongoDB Compass, please check your internet' \
+        print 'Unable to download MongoDB Compass, please check your internet' \
             ' connection. If the issue persists go to' \
             ' https://www.mongodb.com/download-center?jmp=hero#compass' \
-            ' to download the compass installer for your platform.')
+            ' to download the compass installer for your platform.'
 
     try:
         out = subprocess.check_output(['file', filename]).decode('utf-8')
     except subprocess.CalledProcessError as error:
-        print('Got an unexpected error checking file type %s' % error)
+        print 'Got an unexpected error checking file type %s' % error
         sys.exit(1)
 
     if 'ASCII Text' in out:
-        print('Unknown package format downloaded. Appears there was an HTTP error.')
+        print 'Unknown package format downloaded. Appears there was an HTTP error.'
         sys.exit(1)
 
     return filename
@@ -84,20 +83,20 @@ def install_mac(dmg):
                 ['hdiutil', 'attach', '-nobrowse', '-noautoopen', '-mountpoint', tmp, dmg],
                 stdout=fnull, stderr=fnull)
         except subprocess.CalledProcessError as error:
-            print('Problem running hdiutil: %s' % error)
+            print 'Problem running hdiutil: %s' % error
 
         try:
             apps = [f for f in os.listdir(tmp) if f.endswith('.app')]
             for app in apps:
                 if path.isdir('/Applications/' + app):
-                    print('Old version found removing...')
+                    print 'Old version found removing...'
                     shutil.rmtree('/Applications/' + app)
-                print('Copying %s to /Applications' % app)
+                print 'Copying %s to /Applications' % app
                 shutil.copytree(path.join(tmp, app), '/Applications/' + app)
         # We don't really care about what errors come up here. Just log the failure
         # and use the finally to make sure we always unmount the dmg.
         except IOError:
-            print('Unknown error copying MongoDB Compass to /Applications/')
+            print 'Unknown error copying MongoDB Compass to /Applications/'
         finally:
             subprocess.check_call(['hdiutil', 'detach', tmp], stdout=fnull, stderr=fnull)
 
@@ -121,15 +120,22 @@ def install_linux(pkg_format, pkg_file):
     elif pkg_format == 'dnf':
         install = ['dnf', 'install', '--assumeyes', pkg_file]
     else:
-        print('No available installation methods.')
+        print 'No available installation methods.'
         sys.exit(1)
 
     subprocess.check_call(install)
 
 
-def is_supported_distro(pkg_format):
-    if pkg_format in ('apt', 'yum', 'dnf'):
+def is_supported_distro():
+    distro_name, version_number, extra = platform.linux_distribution()
+
+    if (distro_name == 'Ubuntu' and float(version_number) >= 14.04):
         return True
+
+    if (('Red Hat Enterprise Linux' in distro_name or 'CentOS' in distro_name)
+            and (float(version_number) >= 7.0)):
+        return True
+
     return False
 
 
@@ -156,51 +162,51 @@ def download_and_install_compass():
         os_type = 'osx'
 
     if os_type.startswith('linux') and os.getuid() != 0:
-        print('You must run this script as root.')
+        print 'You must run this script as root.'
         sys.exit(1)
 
-    if os_type.startswith('linux') and not is_supported_distro(pkg_format):
-        print('You are using an unsupported Linux distribution.\n' \
+    if os_type.startswith('linux') and not is_supported_distro():
+        print 'You are using an unsupported Linux distribution.\n' \
             'Please visit: https://compass.mongodb.com/community-supported-platforms' \
-            ' to view available community supported packages.')
+            ' to view available community supported packages.'
         sys.exit(1)
 
     if os_type == 'osx' and not is_supported_mac_version():
-        print('You are using an unsupported Mac OSX version. Please upgrade\n' \
-            'to at least version 10.10 (Yosemite) to install Compass.')
+        print 'You are using an unsupported Mac OSX version. Please upgrade\n' \
+            'to at least version 10.10 (Yosemite) to install Compass.'
         sys.exit(1)
 
     if platform.machine() != 'x86_64':
-        print('Sorry, MongoDB Compass is only supported on 64 bit platforms.' \
+        print 'Sorry, MongoDB Compass is only supported on 64 bit platforms.' \
             ' If you believe you\'re seeing this message in error please open a' \
-            ' ticket on the SERVER project at https://jira.mongodb.org/')
+            ' ticket on the SERVER project at https://jira.mongodb.org/'
 
-    link = 'https://compass.mongodb.com/api/v2/download/latest/compass/stable/' + os_type
-    print('Downloading the package...')
+    link = 'https://compass.mongodb.com/api/v2/download/latest/@compass_type@/stable/' + os_type
+    print 'Downloading the package...'
     try:
         pkg = download_pkg(link, pkg_format=pkg_format)
     # This should not execute we are catching errors in all of these functions
     # but these are a catch all so we don't just dump Python stack traces to
     # the user in the case we have a new failure case we didn't think about.
     except Exception:
-        print('Unkown error downloading compass. Please open a ticket on the' \
-            ' SERVER project at https://jira.mongodb.org/')
+        print 'Unkown error downloading compass. Please open a ticket on the' \
+            ' SERVER project at https://jira.mongodb.org/'
 
-    print('Installing the package...')
+    print 'Installing the package...'
     try:
         if os_type == 'osx':
             install_mac(pkg)
         elif os_type.startswith('linux'):
             install_linux(pkg_format, pkg)
         else:
-            print('Unrecognized os_type: %s' % os_type)
+            print 'Unrecognized os_type: %s' % os_type
     except Exception:
-        print('Unkown error downloading compass. Please open a ticket on the' \
-            ' SERVER project at https://jira.mongodb.org/')
+        print 'Unkown error downloading compass. Please open a ticket on the' \
+            ' SERVER project at https://jira.mongodb.org/'
 
-    print('Cleaning up...')
+    print 'Cleaning up...'
     os.remove(pkg)
-    print('Done!')
+    print 'Done!'
 
 
 if __name__ == '__main__':
