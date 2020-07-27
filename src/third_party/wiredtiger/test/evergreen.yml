@@ -55,7 +55,7 @@ functions:
         set -o verbose
         if [ "$OS" != "Windows_NT" ]; then
           sh reconf
-          ${configure_env_vars|CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC"} \
+          ${configure_env_vars|CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"} \
             ../configure ${configure_python_setting|} \
             ${posix_configure_flags|--enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL}
         fi
@@ -122,7 +122,7 @@ functions:
           set -o verbose
           sh reconf
           if [ "$OS" != "Windows_NT" ]; then
-            CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC" \
+            CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC" \
               ../configure ${configure_python_setting|} \
               --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
           fi
@@ -371,7 +371,7 @@ variables:
           configure_env_vars:
             CC="/opt/mongodbtoolchain/v3/bin/clang -fsanitize=address"
             PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC -fno-omit-frame-pointer"
-          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
+          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "format test script"
         vars:
           format_test_script_args: -R -t 360
@@ -467,25 +467,25 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=gcc-4.8 CXX=g++-4.8 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=gcc-4.8 CXX=g++-4.8 ADD_CFLAGS="-ggdb -fPIC"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=gcc-5 CXX=g++-5 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=gcc-5 CXX=g++-5 ADD_CFLAGS="-ggdb -fPIC"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=gcc-6 CXX=g++-6 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=gcc-6 CXX=g++-6 ADD_CFLAGS="-ggdb -fPIC"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=gcc-6 CXX=g++-6 CFLAGS="-ggdb -fPIC" CPPFLAGS=-fvisibility=hidden
+          configure_env_vars: CC=gcc-6 CXX=g++-6 ADD_CFLAGS="-ggdb -fPIC" CPPFLAGS=-fvisibility=hidden
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=gcc-7 CXX=g++-7 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=gcc-7 CXX=g++-7 ADD_CFLAGS="-ggdb -fPIC"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=gcc-8 CXX=g++-8 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=gcc-8 CXX=g++-8 ADD_CFLAGS="-ggdb -fPIC"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=gcc-9 CXX=g++-9 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=gcc-9 CXX=g++-9 ADD_CFLAGS="-ggdb -fPIC"
 
   - name: compile-clang
     tags: ["pull_request", "pull_request_compilers"]
@@ -493,22 +493,22 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=clang-3.9 CXX=clang++-3.9 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=clang-3.9 CXX=clang++-3.9 ADD_CFLAGS="-ggdb -fPIC"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=clang-4.0 CXX=clang++-4.0 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=clang-4.0 CXX=clang++-4.0 ADD_CFLAGS="-ggdb -fPIC"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=clang-5.0 CXX=clang++-5.0 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=clang-5.0 CXX=clang++-5.0 ADD_CFLAGS="-ggdb -fPIC"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=clang-6.0 CXX=clang++-6.0 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=clang-6.0 CXX=clang++-6.0 ADD_CFLAGS="-ggdb -fPIC"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=clang-7 CXX=clang++-7 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=clang-7 CXX=clang++-7 ADD_CFLAGS="-ggdb -fPIC"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=clang-8 CXX=clang++-8 CFLAGS="-ggdb -fPIC"
+          configure_env_vars: CC=clang-8 CXX=clang++-8 ADD_CFLAGS="-ggdb -fPIC"
 
   - name: make-check-test
     depends_on:
@@ -1782,8 +1782,8 @@ tasks:
       # Handle special build combination for running all the diagnostic tests.
       - func: "configure wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-g -Werror"
-          posix_configure_flags: --enable-silent-rules --enable-diagnostic --disable-static
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-g -Werror"
+          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
       - func: "make wiredtiger"
         vars:
           make_command: make all
@@ -1874,7 +1874,7 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="--coverage -fPIC -ggdb" LDFLAGS=--coverage
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="--coverage -fPIC -ggdb" LDFLAGS=--coverage
           posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-strict --enable-python --with-builtins=lz4,snappy,zlib
       - func: "make check all"
       - func: "unit test"
@@ -1982,7 +1982,7 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          posix_configure_flags: ac_cv_func_ftruncate=no
+          posix_configure_flags: --enable-strict ac_cv_func_ftruncate=no
       - command: shell.exec
         params:
           working_dir: "wiredtiger/build_posix"
@@ -1998,8 +1998,8 @@ tasks:
       - func: "get project"
       - func: "configure wiredtiger"
         vars:
-          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-g -Werror"
-          posix_configure_flags: --enable-silent-rules --enable-diagnostic --disable-static
+          configure_env_vars: CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-g -Werror"
+          posix_configure_flags: --enable-silent-rules --enable-strict --enable-diagnostic --disable-static
       - func: "make wiredtiger"
 
       # Run the long version of make check, that includes the full csuite tests
@@ -2121,7 +2121,7 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
-          posix_configure_flags: --disable-shared --with-builtins=snappy,zlib
+          posix_configure_flags: --enable-strict --disable-shared --with-builtins=snappy,zlib
       - command: shell.exec
         params:
           working_dir: "wiredtiger/build_posix"
@@ -2133,7 +2133,7 @@ tasks:
             # Delete wt util
             rm -f wt
             # Build static wt util
-            make CC='eval "g++ -static"' ${smp_command|}
+            ${make_command|make} CC='eval "g++ -static"' ${smp_command|}
             # -V option displays Wiredtiger library version
             ./wt -V
 
@@ -2185,7 +2185,7 @@ tasks:
         vars:
           configure_env_vars:
             CXX=/opt/mongodbtoolchain/v3/bin/g++
-            PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC"
+            PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/bench/workgen/runner"
@@ -2223,7 +2223,7 @@ tasks:
             CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
             CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer
             -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
-          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
+          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "format test script"
         vars:
           test_env_vars:
@@ -2248,7 +2248,7 @@ tasks:
             CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
             CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer
             -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
-          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
+          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "format test script"
         # To emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
         # Run smoke tests, don't stop at failed tests, use default config
@@ -2488,7 +2488,7 @@ buildvariants:
   run_on:
   - macos-1012
   expansions:
-    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH CFLAGS="-ggdb -fPIC"
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
     smp_command: -j $(sysctl -n hw.logicalcpu)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
