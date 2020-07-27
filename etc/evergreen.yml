@@ -10020,7 +10020,7 @@ buildvariants:
   - enterprise
   expansions:
     lang_environment: LANG=C
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic --allocator=system
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
     scons_cache_mode: all
