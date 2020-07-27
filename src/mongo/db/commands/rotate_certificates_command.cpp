@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
 
@@ -33,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rotate_certificates_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
@@ -63,6 +65,10 @@ public:
             if (SSLManagerCoordinator::get()) {
                 SSLManagerCoordinator::get()->rotate();
             }
+            auto messageArg = request().getMessage();
+            auto message = messageArg.get_value_or("");
+            LOGV2(4988500, "Certificate rotation completed successfully", "message"_attr = message);
+
 #endif
         }
 

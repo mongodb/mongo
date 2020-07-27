@@ -368,7 +368,6 @@ void SSLManagerCoordinator::rotate() {
     invariant(tl != nullptr);
     uassertStatusOK(tl->rotateCertificates(manager));
     _manager = manager;
-    LOGV2(4913400, "Successfully rotated X509 certificates.");
 #endif
 }
 
