@@ -11,6 +11,7 @@ selector:
   - jstests/concurrency/fsm_workloads/agg_group_external.js
   - jstests/concurrency/fsm_workloads/agg_sort.js
   - jstests/concurrency/fsm_workloads/agg_sort_external.js
+  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
 
   # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
   - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
