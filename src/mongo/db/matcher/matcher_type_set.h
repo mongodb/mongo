@@ -104,6 +104,13 @@ struct MatcherTypeSet {
         return !allNumbers && bsonTypes.empty();
     }
 
+    /**
+     * Returns a bitmask representing the set of BSONTypes that this MatcherTypeSet contains.
+     *
+     * For details on how these bitmasks are encoded, see mongo::getBSONTypeMask().
+     */
+    uint32_t getBSONTypeMask() const;
+
     void toBSONArray(BSONArrayBuilder* builder) const;
 
     BSONArray toBSONArray() const {

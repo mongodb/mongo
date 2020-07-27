@@ -381,5 +381,28 @@ public:
 private:
     value::TypeTags _target;
 };
+
+/**
+ * This is a type match expression. It checks if a variable's BSONType is present within a given
+ * set of BSONTypes encoded as a bitmask (_typeMask). If the variable's BSONType is in the set,
+ * this expression returns true, otherwise it returns false.
+ */
+class ETypeMatch final : public EExpression {
+public:
+    ETypeMatch(std::unique_ptr<EExpression> variable, uint32_t typeMask) : _typeMask(typeMask) {
+        _nodes.emplace_back(std::move(variable));
+        validateNodes();
+    }
+
+    std::unique_ptr<EExpression> clone() const override;
+
+    std::unique_ptr<vm::CodeFragment> compile(CompileCtx& ctx) const override;
+
+    std::vector<DebugPrinter::Block> debugPrint() const override;
+
+private:
+    uint32_t _typeMask;
+};
+
 }  // namespace sbe
 }  // namespace mongo

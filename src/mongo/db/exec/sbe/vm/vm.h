@@ -141,6 +141,7 @@ struct Instruction {
         isArray,
         isString,
         isNumber,
+        typeMatch,
 
         function,
 
@@ -241,6 +242,7 @@ public:
     void appendIsArray();
     void appendIsString();
     void appendIsNumber();
+    void appendTypeMatch(uint32_t typeMask);
     void appendFunction(Builtin f, uint8_t arity);
     void appendJump(int jumpOffset);
     void appendJumpTrue(int jumpOffset);

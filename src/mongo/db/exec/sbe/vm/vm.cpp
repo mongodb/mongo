@@ -93,6 +93,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isArray
     0,  // isString
     0,  // isNumber
+    0,  // typeMatch
 
     0,  // function is special, the stack offset is encoded in the instruction itself
 
@@ -300,6 +301,17 @@ void CodeFragment::appendIsString() {
 
 void CodeFragment::appendIsNumber() {
     appendSimpleInstruction(Instruction::isNumber);
+}
+
+void CodeFragment::appendTypeMatch(uint32_t typeMask) {
+    Instruction i;
+    i.tag = Instruction::typeMatch;
+    adjustStackSimple(i);
+
+    auto offset = allocateSpace(sizeof(Instruction) + sizeof(typeMask));
+
+    offset += value::writeToMemory(offset, i);
+    offset += value::writeToMemory(offset, typeMask);
 }
 
 void CodeFragment::appendFunction(Builtin f, uint8_t arity) {
@@ -1565,6 +1577,22 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(CodeFragment* c
 
                     if (tag != value::TypeTags::Nothing) {
                         topStack(false, value::TypeTags::Boolean, value::isNumber(tag));
+                    }
+
+                    if (owned) {
+                        value::releaseValue(tag, val);
+                    }
+                    break;
+                }
+                case Instruction::typeMatch: {
+                    auto typeMask = value::readFromMemory<uint32_t>(pcPointer);
+                    pcPointer += sizeof(typeMask);
+
+                    auto [owned, tag, val] = getFromStack(0);
+
+                    if (tag != value::TypeTags::Nothing) {
+                        bool matches = static_cast<bool>(getBSONTypeMask(tag) & typeMask);
+                        topStack(false, value::TypeTags::Boolean, matches);
                     }
 
                     if (owned) {

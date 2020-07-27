@@ -161,7 +161,7 @@ enum class LeafArrayTraversalMode {
  *                       // we don't have to traverse the whole array
  *      in
  *          project [innerVar1 =                               // if getField(fieldVar1,'b') returns
- *                    outputVar2 ||                            // an array, compare the array itself
+ *                    fillEmpty(outputVar2, false) ||          // an array, compare the array itself
  *                    (fillEmpty(isArray(fieldVar), false) &&  // to 2 as well
  *                     fillEmpty(fieldVar2==2, false))]
  *          traverse // nested traversal
@@ -253,7 +253,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverseH
             outputVar,
             sbe::makeE<sbe::EPrimBinary>(
                 sbe::EPrimBinary::logicOr,
-                sbe::makeE<sbe::EVariable>(traverseVar),
+                makeFillEmptyFalse(sbe::makeE<sbe::EVariable>(traverseVar)),
                 sbe::makeE<sbe::EPrimBinary>(
                     sbe::EPrimBinary::logicAnd,
                     makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
@@ -643,9 +643,7 @@ public:
     void visit(const TwoDPtInAnnulusExpression* expr) final {
         unsupportedExpression(expr);
     }
-    void visit(const TypeMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
+    void visit(const TypeMatchExpression* expr) final {}
     void visit(const WhereMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
@@ -783,7 +781,14 @@ public:
     void visit(const TextMatchExpression* expr) final {}
     void visit(const TextNoOpMatchExpression* expr) final {}
     void visit(const TwoDPtInAnnulusExpression* expr) final {}
-    void visit(const TypeMatchExpression* expr) final {}
+    void visit(const TypeMatchExpression* expr) final {
+        auto makeEExprFn = [expr](sbe::value::SlotId inputSlot) {
+            const MatcherTypeSet& ts = expr->typeSet();
+            return sbe::makeE<sbe::ETypeMatch>(sbe::makeE<sbe::EVariable>(inputSlot),
+                                               ts.getBSONTypeMask());
+        };
+        generateTraverse(_context, expr, std::move(makeEExprFn));
+    }
     void visit(const WhereMatchExpression* expr) final {}
     void visit(const WhereNoOpMatchExpression* expr) final {}
 

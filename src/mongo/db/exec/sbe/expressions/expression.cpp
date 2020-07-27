@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 
+#include <iomanip>
 #include <sstream>
 
 #include "mongo/db/exec/sbe/stages/spool.h"
@@ -656,6 +657,38 @@ std::vector<DebugPrinter::Block> ENumericConvert::debugPrint() const {
     }
 
     ret.emplace_back("`)");
+    return ret;
+}
+
+std::unique_ptr<EExpression> ETypeMatch::clone() const {
+    return std::make_unique<ETypeMatch>(_nodes[0]->clone(), _typeMask);
+}
+
+std::unique_ptr<vm::CodeFragment> ETypeMatch::compile(CompileCtx& ctx) const {
+    auto code = std::make_unique<vm::CodeFragment>();
+
+    auto variable = _nodes[0]->compile(ctx);
+    code->append(std::move(variable));
+    code->appendTypeMatch(_typeMask);
+
+    return code;
+}
+
+std::vector<DebugPrinter::Block> ETypeMatch::debugPrint() const {
+    std::vector<DebugPrinter::Block> ret;
+
+    DebugPrinter::addKeyword(ret, "typeMatch");
+
+    ret.emplace_back("(`");
+
+    DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());
+    ret.emplace_back(DebugPrinter::Block("`,"));
+    std::stringstream ss;
+    ss << "0x" << std::setfill('0') << std::uppercase << std::setw(8) << std::hex << _typeMask;
+    ret.emplace_back(ss.str());
+
+    ret.emplace_back("`)");
+
     return ret;
 }
 

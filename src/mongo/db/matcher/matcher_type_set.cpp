@@ -33,6 +33,7 @@
 
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
+#include "mongo/db/query/bson_typemask.h"
 
 namespace mongo {
 namespace {
@@ -171,6 +172,22 @@ void MatcherTypeSet::toBSONArray(BSONArrayBuilder* builder) const {
     for (auto type : bsonTypes) {
         builder->append(type);
     }
+}
+
+uint32_t MatcherTypeSet::getBSONTypeMask() const {
+    uint32_t mask = 0;
+    if (allNumbers) {
+        mask |= (mongo::getBSONTypeMask(BSONType::NumberInt) |
+                 mongo::getBSONTypeMask(BSONType::NumberLong) |
+                 mongo::getBSONTypeMask(BSONType::NumberDouble) |
+                 mongo::getBSONTypeMask(BSONType::NumberDecimal));
+    }
+
+    for (auto t : bsonTypes) {
+        mask |= mongo::getBSONTypeMask(t);
+    }
+
+    return mask;
 }
 
 BSONTypeSet BSONTypeSet::parseFromBSON(const BSONElement& element) {

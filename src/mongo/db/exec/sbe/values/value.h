@@ -42,6 +42,7 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/db/query/bson_typemask.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/represent_as.h"
@@ -135,6 +136,19 @@ inline constexpr bool isArray(TypeTags tag) noexcept {
 
 inline constexpr bool isObjectId(TypeTags tag) noexcept {
     return tag == TypeTags::ObjectId || tag == TypeTags::bsonObjectId;
+}
+
+BSONType tagToType(TypeTags tag) noexcept;
+
+/**
+ * This function takes an SBE TypeTag, looks up the corresponding BSONType t, and then returns a
+ * bitmask representation of a set of BSONTypes that contains only BSONType t.
+ *
+ * For details on how sets of BSONTypes are represented as bitmasks, see mongo::getBSONTypeMask().
+ */
+inline uint32_t getBSONTypeMask(value::TypeTags tag) noexcept {
+    BSONType t = value::tagToType(tag);
+    return getBSONTypeMask(t);
 }
 
 /**
