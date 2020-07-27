@@ -83,8 +83,12 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
     invariant(opCtx->lockState());
     invariant(opCtx->recoveryUnit());
 
-    if (opCtx->lockState()->inAWriteUnitOfWork() ||
-        MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {
+    // This failpoint disables exception handling for write conflicts. Only allow this exception to
+    // escape user operations. Do not allow exceptions to escape internal threads, which may rely on
+    // this exception handler to avoid crashing.
+    bool userSkipWriteConflictRetry = MONGO_unlikely(skipWriteConflictRetries.shouldFail()) &&
+        opCtx->getClient()->isFromUserConnection();
+    if (opCtx->lockState()->inAWriteUnitOfWork() || userSkipWriteConflictRetry) {
         return f();
     }
 
