@@ -3907,6 +3907,7 @@ if get_option('ninja') != 'disabled':
         ninja_builder.generate(env)
     else:
         ninja_builder = Tool("ninja_next")
+        env["NINJA_BUILDDIR"] = env.Dir("$BUILD_DIR/ninja")
         ninja_builder.generate(env)
 
         ninjaConf = Configure(env, help=False, custom_tests = {
