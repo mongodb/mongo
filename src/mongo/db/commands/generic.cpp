@@ -184,6 +184,8 @@ public:
             if (c->secondaryAllowed(opCtx->getServiceContext()) ==
                 Command::AllowedOnSecondary::kOptIn)
                 temp.append("slaveOverrideOk", true);
+            temp.append("apiVersions", c->apiVersions());
+            temp.append("deprecatedApiVersions", c->deprecatedApiVersions());
             temp.done();
         }
         b.done();
