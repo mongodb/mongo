@@ -142,8 +142,8 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
     // Constants require using Value instead of Expression to build the tree in agg.
     if (stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::constExpr ||
         stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::literal)
-        return make_intrusive<ExpressionConstant>(
-            expCtx.get(), std::move(translateLiteralToValue(object[0].second)));
+        return make_intrusive<ExpressionConstant>(expCtx.get(),
+                                                  translateLiteralToValue(object[0].second));
 
     auto expressions = std::vector<boost::intrusive_ptr<Expression>>{};
     // This assumes the Expression is in array-form.
