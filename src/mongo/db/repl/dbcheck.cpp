@@ -242,17 +242,14 @@ std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
     auto uuidIt = std::find(collectionUUIDs.begin(), collectionUUIDs.end(), uuid);
     invariant(uuidIt != collectionUUIDs.end());
 
-    auto prevIt = std::prev(uuidIt);
-    auto nextIt = std::next(uuidIt);
-
     boost::optional<UUID> prevUUID;
     boost::optional<UUID> nextUUID;
 
-    if (prevIt != collectionUUIDs.end()) {
-        prevUUID = *prevIt;
+    if (uuidIt != collectionUUIDs.begin()) {
+        prevUUID = *std::prev(uuidIt);
     }
 
-    if (nextIt != collectionUUIDs.end()) {
+    if (auto nextIt = std::next(uuidIt); nextIt != collectionUUIDs.end()) {
         nextUUID = *nextIt;
     }
 
