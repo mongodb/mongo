@@ -37,7 +37,7 @@ The various builders supplied in the ReplyBuilderInterface can be appended toget
 This interface acts as a cursor to build a response message to be sent out back to the client.
 
 ## See Also
-For details on egress networking, see [this document][egress_networking].
+For details on egress networking, see [this document][egress_networking]. For details on command dispatch, see [this document][command_dispatch].
 
 [ServiceExecutor]: service_executor.h
 [ServiceStateMachine]: service_state_machine.h
@@ -46,3 +46,4 @@ For details on egress networking, see [this document][egress_networking].
 [ReplyBuilderInterface]: ../rpc/reply_builder_interface.h
 [DocSequenceBuilder]: ../rpc/op_msg.h
 [egress_networking]: ../../../docs/egress_networking.md
+[command_dispatch]: ../../../docs/command_dispatch.md

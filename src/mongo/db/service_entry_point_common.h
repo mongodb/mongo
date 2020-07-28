@@ -49,7 +49,7 @@ extern FailPoint skipCheckingForNotMasterInCommandDispatch;
 
 /**
  * Helpers for writing ServiceEntryPointImpl implementations from a reusable core.
- * Implementations are ServiceEntryPointMongo and ServiceEntryPointEmbedded, which share
+ * Implementations are ServiceEntryPointMongod and ServiceEntryPointEmbedded, which share
  * most of their code, but vary in small details captured by the Hooks customization
  * interface.
  */
