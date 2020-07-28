@@ -98,6 +98,10 @@ assert.commandWorked(st.rs0.getPrimary().getDB('admin').runCommand({
     epoch: res.versionEpoch,
 }));
 
+// Ensure all the config nodes agree on a config optime that reflects the second split in case a new
+// primary config server steps up.
+st.configRS.awaitLastOpCommitted();
+
 // Perform a read on the config primary to have the mongos get the latest config optime since the
 // last two splits were performed directly on the shards.
 assert.neq(null, st.s.getDB('config').databases.findOne());
