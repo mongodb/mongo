@@ -26,7 +26,7 @@ def get_processes(process_ids, interesting_processes, process_match, logger):
 
     :param process_ids: List of PIDs to match on.
     :param interesting_processes: List of process names to match on.
-    :param process_match: String describing the process match to use.
+    :param process_match: 'exact' or 'contains'.
     :param logger: Where to log output.
     :param all_processes: List of all running (pid, process_name) pairs to search through.
 
