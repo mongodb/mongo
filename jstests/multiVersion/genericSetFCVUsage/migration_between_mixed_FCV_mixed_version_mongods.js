@@ -15,39 +15,48 @@
 // version.
 TestData.skipCheckOrphans = true;
 
-let st = new ShardingTest({
-    shards: [{binVersion: "latest"}, {binVersion: "last-lts"}],
-    mongos: {binVersion: "latest"},
-    other: {shardAsReplicaSet: false},
-});
+function runTest(downgradeVersion) {
+    jsTestLog("Running test with downgradeVersion: " + downgradeVersion);
+    const downgradeFCV = binVersionToFCV(downgradeVersion);
 
-let testDB = st.s.getDB("test");
+    let st = new ShardingTest({
+        shards: [{binVersion: "latest"}, {binVersion: downgradeFCV}],
+        mongos: {binVersion: "latest"},
+        other: {shardAsReplicaSet: false},
+    });
 
-// Create a sharded collection with primary shard 0.
-assert.commandWorked(st.s.adminCommand({enableSharding: testDB.getName()}));
-st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
-assert.commandWorked(st.s.adminCommand({shardCollection: testDB.coll.getFullName(), key: {a: 1}}));
+    let testDB = st.s.getDB("test");
 
-// Set the featureCompatibilityVersion to latestFCV. This will fail because the
-// featureCompatibilityVersion cannot be set to latestFCV on shard 1, but it will set the
-// featureCompatibilityVersion to latestFCV on shard 0.
-assert.commandFailed(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-checkFCV(st.configRS.getPrimary().getDB("admin"), lastLTSFCV, latestFCV);
-checkFCV(st.shard0.getDB("admin"), latestFCV);
-checkFCV(st.shard1.getDB("admin"), lastLTSFCV);
+    // Create a sharded collection with primary shard 0.
+    assert.commandWorked(st.s.adminCommand({enableSharding: testDB.getName()}));
+    st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: testDB.coll.getFullName(), key: {a: 1}}));
 
-// It is not possible to move a chunk from a latestFCV shard to a last-lts binary version
-// shard. Pass explicit writeConcern (which requires secondaryThrottle: true) to avoid problems
-// if the last-lts doesn't automatically include writeConcern when running _recvChunkStart on the
-// newer shard.
-assert.commandFailedWithCode(st.s.adminCommand({
-    moveChunk: testDB.coll.getFullName(),
-    find: {a: 1},
-    to: st.shard1.shardName,
-    secondaryThrottle: true,
-    writeConcern: {w: 1}
-}),
-                             ErrorCodes.IncompatibleServerVersion);
+    // Set the featureCompatibilityVersion to latestFCV. This will fail because the
+    // featureCompatibilityVersion cannot be set to latestFCV on shard 1, but it will set the
+    // featureCompatibilityVersion to latestFCV on shard 0.
+    assert.commandFailed(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    checkFCV(st.configRS.getPrimary().getDB("admin"), downgradeFCV, latestFCV);
+    checkFCV(st.shard0.getDB("admin"), latestFCV);
+    checkFCV(st.shard1.getDB("admin"), downgradeFCV);
 
-st.stop();
+    // It is not possible to move a chunk from a latestFCV shard to a downgraded binary version
+    // shard. Pass explicit writeConcern (which requires secondaryThrottle: true) to avoid problems
+    // if the downgraded version doesn't automatically include writeConcern when running
+    // _recvChunkStart on the newer shard.
+    assert.commandFailedWithCode(st.s.adminCommand({
+        moveChunk: testDB.coll.getFullName(),
+        find: {a: 1},
+        to: st.shard1.shardName,
+        secondaryThrottle: true,
+        writeConcern: {w: 1}
+    }),
+                                 ErrorCodes.IncompatibleServerVersion);
+
+    st.stop();
+}
+
+runTest('last-continuous');
+runTest('last-lts');
 })();

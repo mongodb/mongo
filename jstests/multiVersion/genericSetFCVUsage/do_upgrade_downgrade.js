@@ -9,7 +9,6 @@ load("jstests/libs/check_uuids.js");
 load("jstests/libs/check_unique_indexes.js");
 
 const latestBinary = "latest";
-const lastLTSBinary = "last-lts";
 
 let setFCV = function(adminDB, version) {
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: version}));
@@ -126,7 +125,9 @@ let startMongodWithVersion = function(nodeOptions, ver, path) {
 //
 // Standalone tests.
 //
-let standaloneTest = function(nodeOptions) {
+let standaloneTest = function(nodeOptions, downgradeVersion) {
+    jsTestLog("Running standalone test with 'downgradeVersion': " + downgradeVersion);
+    const downgradeFCV = binVersionToFCV(downgradeVersion);
     let noCleanDataOptions = Object.assign({noCleanData: true}, nodeOptions);
 
     // New latest binary version standalone.
@@ -139,7 +140,7 @@ let standaloneTest = function(nodeOptions) {
 
     if (!nodeOptions.hasOwnProperty("shardsvr")) {
         // Initially featureCompatibilityVersion is latest except for when we run with shardsvr.
-        // We expect featureCompatibilityVersion to be last-lts for shardsvr.
+        // We expect featureCompatibilityVersion to be downgradeFCV for shardsvr.
         checkFCV(adminDB, latestFCV);
 
         // Ensure all collections have UUIDs and all unique indexes have new version in latest
@@ -147,12 +148,11 @@ let standaloneTest = function(nodeOptions) {
         checkCollectionUUIDs(adminDB);
         checkUniqueIndexFormatVersion(adminDB);
 
-        // Set featureCompatibilityVersion to last-lts.
-        setFCV(adminDB, lastLTSFCV);
+        setFCV(adminDB, downgradeFCV);
     }
 
-    // Ensure featureCompatibilityVersion is last-lts and all collections still have UUIDs.
-    checkFCV(adminDB, lastLTSFCV);
+    // Ensure featureCompatibilityVersion is downgraded and all collections still have UUIDs.
+    checkFCV(adminDB, downgradeFCV);
     checkCollectionUUIDs(adminDB);
 
     // Drop and recreate unique indexes with the older FCV
@@ -161,19 +161,19 @@ let standaloneTest = function(nodeOptions) {
     // Stop latest binary version mongod.
     MongoRunner.stopMongod(conn);
 
-    // Start last-lts binary version mongod with same dbpath
-    jsTest.log("Starting a last-lts binVersion standalone to test downgrade");
-    let lastLTSConn = startMongodWithVersion(noCleanDataOptions, lastLTSBinary);
-    let lastLTSAdminDB = lastLTSConn.getDB("admin");
+    // Start the downgraded binary version mongod with same dbpath
+    jsTest.log("Starting a downgraded binVersion standalone to test downgrade");
+    let downgradedConn = startMongodWithVersion(noCleanDataOptions, downgradeVersion);
+    let downgradedAdminDB = downgradedConn.getDB("admin");
 
     // Check FCV document.
-    checkFCV(lastLTSAdminDB, lastLTSFCV);
+    checkFCV(downgradedAdminDB, downgradeFCV);
 
-    // Ensure all collections still have UUIDs on a last-lts mongod.
-    checkCollectionUUIDs(lastLTSAdminDB);
+    // Ensure all collections still have UUIDs on a downgraded mongod.
+    checkCollectionUUIDs(downgradedAdminDB);
 
-    // Stop last-lts binary version mongod.
-    MongoRunner.stopMongod(lastLTSConn);
+    // Stop downgraded binary version mongod.
+    MongoRunner.stopMongod(downgradedConn);
 
     // Start latest binary version mongod again.
     jsTest.log("Starting a latest binVersion standalone to test upgrade");
@@ -194,7 +194,9 @@ let standaloneTest = function(nodeOptions) {
 //
 // Replica set tests.
 //
-let replicaSetTest = function(nodeOptions) {
+let replicaSetTest = function(nodeOptions, downgradeVersion) {
+    jsTestLog("Running replica set test with 'downgradeVersion': " + downgradeVersion);
+    const downgradeFCV = binVersionToFCV(downgradeVersion);
     // New latest binary version replica set.
     jsTest.log("Starting a latest binVersion ReplSetTest");
     let rst = new ReplSetTest({nodes: 3, nodeOptions: nodeOptions});
@@ -215,7 +217,7 @@ let replicaSetTest = function(nodeOptions) {
 
     if (!nodeOptions.hasOwnProperty("shardsvr")) {
         // Initially featureCompatibilityVersion is latest on primary and secondaries except for
-        // when we run with shardsvr. We expect featureCompatibilityVersion to be last-lts
+        // when we run with shardsvr. We expect featureCompatibilityVersion to be 'downgradeVersion'
         // for shardsvr.
         checkFCV(primaryAdminDB, latestFCV);
 
@@ -234,16 +236,17 @@ let replicaSetTest = function(nodeOptions) {
             checkUniqueIndexFormatVersion(secondaryAdminDB);
         }
 
-        // Change featureCompatibilityVersion to last-lts.
-        setFCV(primaryAdminDB, lastLTSFCV);
+        // Change featureCompatibilityVersion to downgradeFCV.
+        setFCV(primaryAdminDB, downgradeFCV);
         rst.awaitReplication();
     }
 
-    // Ensure featureCompatibilityVersion is last-lts and all collections still have UUIDs.
-    checkFCV(primaryAdminDB, lastLTSFCV);
+    // Ensure featureCompatibilityVersion is 'downgradeVersion' and all collections still have
+    // UUIDs.
+    checkFCV(primaryAdminDB, downgradeFCV);
     for (let j = 0; j < secondaries.length; j++) {
         let secondaryAdminDB = secondaries[j].getDB("admin");
-        checkFCV(secondaryAdminDB, lastLTSFCV);
+        checkFCV(secondaryAdminDB, downgradeFCV);
     }
 
     checkCollectionUUIDs(primaryAdminDB);
@@ -265,23 +268,23 @@ let replicaSetTest = function(nodeOptions) {
     rst.stopSet(null /* signal */, true /* forRestart */);
 
     // Downgrade the ReplSetTest binaries and make sure everything is okay.
-    jsTest.log("Starting a last-lts binVersion ReplSetTest to test downgrade");
-    rst.startSet({restart: true, binVersion: lastLTSBinary});
+    jsTest.log("Starting a " + downgradeVersion + " binVersion ReplSetTest to test downgrade");
+    rst.startSet({restart: true, binVersion: downgradeVersion});
 
-    // Check that the featureCompatiblityVersion is set to last-lts and all
+    // Check that the featureCompatiblityVersion is set to downgradeFCV and all
     // collections still have UUIDs.
-    let lastLTSPrimaryAdminDB = rst.getPrimary().getDB("admin");
-    let lastLTSSecondaries = rst.getSecondaries();
+    let downgradedPrimaryAdminDB = rst.getPrimary().getDB("admin");
+    let downgradedSecondaries = rst.getSecondaries();
 
-    checkFCV(lastLTSPrimaryAdminDB, lastLTSFCV);
-    for (let j = 0; j < lastLTSSecondaries.length; j++) {
-        let secondaryAdminDB = lastLTSSecondaries[j].getDB("admin");
-        checkFCV(secondaryAdminDB, lastLTSFCV);
+    checkFCV(downgradedPrimaryAdminDB, downgradeFCV);
+    for (let j = 0; j < downgradedSecondaries.length; j++) {
+        let secondaryAdminDB = downgradedSecondaries[j].getDB("admin");
+        checkFCV(secondaryAdminDB, downgradeFCV);
     }
 
-    checkCollectionUUIDs(lastLTSPrimaryAdminDB);
+    checkCollectionUUIDs(downgradedPrimaryAdminDB);
     for (let j = 0; j < secondaries.length; j++) {
-        let secondaryAdminDB = lastLTSSecondaries[j].getDB("admin");
+        let secondaryAdminDB = downgradedSecondaries[j].getDB("admin");
         checkCollectionUUIDs(secondaryAdminDB);
     }
 
@@ -316,14 +319,20 @@ let replicaSetTest = function(nodeOptions) {
 };
 
 // Do tests for regular standalones and replica sets.
-standaloneTest({});
-replicaSetTest({});
+standaloneTest({}, 'last-continuous');
+standaloneTest({}, 'last-lts');
+replicaSetTest({}, 'last-continuous');
+replicaSetTest({}, 'last-lts');
 
 // Do tests for standalones and replica sets started with --shardsvr.
-standaloneTest({shardsvr: ""});
-replicaSetTest({shardsvr: ""});
+standaloneTest({shardsvr: ""}, 'last-continuous');
+standaloneTest({shardsvr: ""}, 'last-lts');
+replicaSetTest({shardsvr: ""}, 'last-continuous');
+replicaSetTest({shardsvr: ""}, 'last-lts');
 
 // Do tests for standalones and replica sets started with --configsvr.
-standaloneTest({configsvr: ""});
-replicaSetTest({configsvr: ""});
+standaloneTest({configsvr: ""}, 'last-continuous');
+standaloneTest({configsvr: ""}, 'last-lts');
+replicaSetTest({configsvr: ""}, 'last-continuous');
+standaloneTest({configsvr: ""}, 'last-lts');
 })();

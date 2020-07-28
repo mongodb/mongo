@@ -16,28 +16,37 @@ function makeTopologyChangeLogMsgRegex(rs, minWireVersion, maxWireVersion) {
             rs.nodes.length));
 }
 
-const st = new ShardingTest(
-    {mongos: [{setParameter: {replicaSetMonitorProtocol: "sdam"}}], config: 1, shards: 0});
+function runTest(downgradeFCV) {
+    jsTestLog("Running test with downgradeFCV: " + downgradeFCV);
+    const st = new ShardingTest(
+        {mongos: [{setParameter: {replicaSetMonitorProtocol: "sdam"}}], config: 1, shards: 0});
 
-const latestWireVersion = st.configRS.getPrimary().getMaxWireVersion();
-const lastContinuousRegex =
-    makeTopologyChangeLogMsgRegex(st.configRS, latestWireVersion - 1, latestWireVersion);
-const latestRegex =
-    makeTopologyChangeLogMsgRegex(st.configRS, latestWireVersion, latestWireVersion);
+    const latestWireVersion = st.configRS.getPrimary().getMaxWireVersion();
+    const downgradedWireVersion = downgradeFCV === "last-continuous"
+        ? latestWireVersion - 1
+        : latestWireVersion - numVersionsSinceLastLTS;
+    const downgradeRegex =
+        makeTopologyChangeLogMsgRegex(st.configRS, downgradedWireVersion, latestWireVersion);
+    const latestRegex =
+        makeTopologyChangeLogMsgRegex(st.configRS, latestWireVersion, latestWireVersion);
 
-jsTest.log(
-    "Verify that the RSM on the mongos sees that the config server node has the latest wire version");
-checkLog.contains(st.s, latestRegex);
+    jsTest.log(
+        "Verify that the RSM on the mongos sees that the config server node has the latest wire version");
+    checkLog.contains(st.s, latestRegex);
 
-jsTest.log("Downgrade FCV and verify that the RSM on the mongos detects the topology change");
-assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV}));
-checkLog.contains(st.s, lastContinuousRegex);
+    jsTest.log("Downgrade FCV and verify that the RSM on the mongos detects the topology change");
+    assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+    checkLog.contains(st.s, downgradeRegex);
 
-jsTest.log("Upgrade FCV and verify that the RSM on the mongos detects the topology change");
-assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-checkLog.contains(st.s, latestRegex);
+    jsTest.log("Upgrade FCV and verify that the RSM on the mongos detects the topology change");
+    assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    checkLog.contains(st.s, latestRegex);
 
-st.stop();
+    st.stop();
+}
+
+runTest(lastContinuousFCV);
+runTest(lastLTSFCV);
 })();

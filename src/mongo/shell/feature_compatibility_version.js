@@ -13,6 +13,21 @@
 var latestFCV = "4.5.1";
 var lastContinuousFCV = "4.4";
 var lastLTSFCV = "4.4";
+// The number of versions since the last-lts version. When numVersionsSinceLastLTS = 1,
+// lastContinuousFCV is equal to lastLTSFCV. This is used to calculate the expected minWireVersion
+// in jstests that use the lastLTSFCV. This should be updated on each release.
+var numVersionsSinceLastLTS = 1;
+
+/**
+ * Returns the FCV associated with a binary version.
+ * eg. An input of 'last-lts' will return lastLTSFCV.
+ */
+function binVersionToFCV(binVersion) {
+    if (binVersion === "latest") {
+        return latestFCV;
+    }
+    return binVersion === "last-lts" ? lastLTSFCV : lastContinuousFCV;
+}
 
 /**
  * Checks the featureCompatibilityVersion document and server parameter. The

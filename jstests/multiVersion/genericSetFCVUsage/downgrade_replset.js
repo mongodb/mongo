@@ -1,11 +1,9 @@
-// Test the downgrade of a replica set from latest version
-// to last-lts version succeeds, while reads and writes continue.
+// Test the downgrade of a replica set succeeds, while reads and writes continue.
 
 load('./jstests/multiVersion/libs/multi_rs.js');
 load('./jstests/libs/test_background_ops.js');
 
 let newVersion = "latest";
-let oldVersion = "last-lts";
 
 let name = "replsetdowngrade";
 let nodes = {
@@ -14,7 +12,9 @@ let nodes = {
     n3: {binVersion: newVersion}
 };
 
-function runDowngradeTest() {
+function runDowngradeTest(downgradeVersion) {
+    jsTestLog("Running test with 'downgradeVersion': " + downgradeVersion);
+    const downgradeFCV = binVersionToFCV(downgradeVersion);
     let rst = new ReplSetTest({name: name, nodes: nodes, waitForKeys: true});
     rst.startSet();
     rst.initiate();
@@ -26,11 +26,11 @@ function runDowngradeTest() {
     let primaryAdminDB = rst.getPrimary().getDB("admin");
     checkFCV(primaryAdminDB, latestFCV);
 
-    // We wait for the feature compatibility version to be set to lastLTSFCV on all nodes of the
-    // replica set in order to ensure that all nodes can be successfully downgraded. This
+    // We wait for the feature compatibility version to be set to the downgraded FCV on all nodes of
+    // the replica set in order to ensure that all nodes can be successfully downgraded. This
     // effectively allows us to emulate upgrading to the latest version with existing data files and
-    // then trying to downgrade back to lastLTSFCV.
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    // then trying to downgrade the FCV.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
     rst.awaitReplication();
 
     jsTest.log("Inserting documents into collection.");
@@ -51,7 +51,7 @@ function runDowngradeTest() {
     let joinFindInsert = startParallelOps(primary, insertDocuments, [rst.getURL(), coll]);
 
     jsTest.log("Downgrading replica set..");
-    rst.upgradeSet({binVersion: oldVersion});
+    rst.upgradeSet({binVersion: downgradeVersion});
     jsTest.log("Downgrade complete.");
 
     // We save a reference to the old primary so that we can call reconnect() on it before
@@ -70,4 +70,5 @@ function runDowngradeTest() {
     rst.stopSet();
 }
 
-runDowngradeTest();
+runDowngradeTest('last-continuous');
+runDowngradeTest('last-lts');
