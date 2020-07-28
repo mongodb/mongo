@@ -10,10 +10,6 @@ if (determineSSLProvider() !== "openssl") {
     return;
 }
 
-if (!supportsStapling()) {
-    return;
-}
-
 let mock_ocsp = new MockOCSPServer();
 mock_ocsp.start();
 

@@ -54,12 +54,6 @@ rstest.stopSet();
 
 mock_ocsp.stop();
 
-// The next few tests depend on stapling
-// being available.
-if (!supportsStapling()) {
-    return;
-}
-
 mock_ocsp = new MockOCSPServer();
 mock_ocsp.start();
 
