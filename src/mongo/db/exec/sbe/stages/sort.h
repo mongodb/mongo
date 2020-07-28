@@ -35,6 +35,8 @@
 namespace mongo {
 template <typename Key, typename Value>
 class SortIteratorInterface;
+template <typename Key, typename Value>
+class Sorter;
 }  // namespace mongo
 
 namespace mongo::sbe {
@@ -64,11 +66,7 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
 private:
-    using TableType = std::
-        multimap<value::MaterializedRow, value::MaterializedRow, value::MaterializedRowComparator>;
-
-    using SortKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
-    using SortValueAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
+    void makeSorter();
 
     using SorterIterator = SortIteratorInterface<value::MaterializedRow, value::MaterializedRow>;
     using SorterData = std::pair<value::MaterializedRow, value::MaterializedRow>;
@@ -83,16 +81,12 @@ private:
     std::vector<value::SlotAccessor*> _inKeyAccessors;
     std::vector<value::SlotAccessor*> _inValueAccessors;
 
-    value::SlotMap<value::SwitchAccessor> _outAccessors;
+    value::SlotMap<std::unique_ptr<value::SlotAccessor>> _outAccessors;
 
-    TableType _st;
-    TableType::iterator _stIt;
-
-    // Data that has already been spilled.
-    std::vector<std::shared_ptr<SorterIterator>> _iters;
     std::unique_ptr<SorterIterator> _mergeIt;
     SorterData _mergeData;
     SorterData* _mergeDataIt{&_mergeData};
+    std::unique_ptr<Sorter<value::MaterializedRow, value::MaterializedRow>> _sorter;
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.

@@ -80,13 +80,12 @@ void SpoolEagerProducerStage::open(bool reOpen) {
     }
 
     while (_children[0]->getNext() == PlanState::ADVANCED) {
-        value::MaterializedRow vals;
-        vals._fields.reserve(_inAccessors.size());
+        value::MaterializedRow vals{_inAccessors.size()};
 
+        size_t idx = 0;
         for (auto accessor : _inAccessors) {
-            vals._fields.push_back(value::OwnedValueAccessor{});
             auto [tag, val] = accessor->copyOrMoveValue();
-            vals._fields.back().reset(true, tag, val);
+            vals.reset(idx++, true, tag, val);
         }
 
         _buffer->emplace_back(std::move(vals));
@@ -220,16 +219,14 @@ PlanState SpoolLazyProducerStage::getNext() {
         if (pass) {
             // We either haven't got a predicate, or it has passed. In both cases, we need pass
             // through the input values, and store them into the buffer.
-            value::MaterializedRow vals;
-            vals._fields.reserve(_inAccessors.size());
+            value::MaterializedRow vals{_inAccessors.size()};
 
             for (size_t idx = 0; idx < _inAccessors.size(); ++idx) {
                 auto [tag, val] = _inAccessors[idx]->getViewOfValue();
                 _outAccessors[_vals[idx]].reset(tag, val);
 
-                vals._fields.push_back(value::OwnedValueAccessor{});
                 auto [copyTag, copyVal] = value::copyValue(tag, val);
-                vals._fields.back().reset(true, copyTag, copyVal);
+                vals.reset(idx, true, copyTag, copyVal);
             }
 
             _buffer->emplace_back(std::move(vals));

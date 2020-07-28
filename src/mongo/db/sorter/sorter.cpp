@@ -142,6 +142,8 @@ public:
     template <typename Container>
     InMemIterator(const Container& input) : _data(input.begin(), input.end()) {}
 
+    InMemIterator(std::deque<Data> input) : _data(std::move(input)) {}
+
     void openSource() {}
     void closeSource() {}
 
@@ -590,12 +592,24 @@ public:
             spill();
     }
 
+    void emplace(Key&& key, Value&& val) override {
+        invariant(!_done);
+
+        _memUsed += key.memUsageForSorter();
+        _memUsed += val.memUsageForSorter();
+
+        _data.emplace_back(std::move(key), std::move(val));
+
+        if (_memUsed > _opts.maxMemoryUsageBytes)
+            spill();
+    }
+
     Iterator* done() {
         invariant(!_done);
 
         if (this->_iters.empty()) {
             sort();
-            return new InMemIterator<Key, Value>(_data);
+            return new InMemIterator<Key, Value>(std::move(_data));
         }
 
         spill();

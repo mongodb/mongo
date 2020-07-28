@@ -582,7 +582,7 @@ Status PlanCache::set(const CanonicalQuery& query,
                       "match the number of solutions");
     }
 
-    const size_t newWorks = stdx::visit(
+    auto newWorks = stdx::visit(
         visit_helper::Overloaded{[](std::vector<std::unique_ptr<PlanStageStats>>& stats) {
                                      return stats[0]->common.works;
                                  },

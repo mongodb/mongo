@@ -104,21 +104,20 @@ void HashAggStage::open(bool reOpen) {
     _children[0]->open(reOpen);
 
     while (_children[0]->getNext() == PlanState::ADVANCED) {
-        value::MaterializedRow key;
-        key._fields.resize(_inKeyAccessors.size());
+        value::MaterializedRow key{_inKeyAccessors.size()};
         // Copy keys in order to do the lookup.
         size_t idx = 0;
         for (auto& p : _inKeyAccessors) {
             auto [tag, val] = p->getViewOfValue();
-            key._fields[idx++].reset(false, tag, val);
+            key.reset(idx++, false, tag, val);
         }
 
-        auto [it, inserted] = _ht.emplace(std::move(key), value::MaterializedRow{});
+        auto [it, inserted] = _ht.try_emplace(std::move(key), value::MaterializedRow{0});
         if (inserted) {
             // Copy keys.
             const_cast<value::MaterializedRow&>(it->first).makeOwned();
             // Initialize accumulators.
-            it->second._fields.resize(_outAggAccessors.size());
+            it->second.resize(_outAggAccessors.size());
         }
 
         // Accumulate.

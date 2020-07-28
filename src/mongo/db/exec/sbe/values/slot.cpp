@@ -156,14 +156,12 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
 
 MaterializedRow MaterializedRow::deserializeForSorter(BufReader& buf,
                                                       const SorterDeserializeSettings&) {
-    MaterializedRow result;
-
     auto cnt = buf.read<size_t>();
-    result._fields.resize(cnt);
+    MaterializedRow result{cnt};
 
     for (size_t idx = 0; idx < cnt; ++idx) {
         auto [tag, val] = deserializeTagVal(buf);
-        result._fields[idx].reset(true, tag, val);
+        result.reset(idx, true, tag, val);
     }
 
     return result;
@@ -266,10 +264,10 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
 }
 
 void MaterializedRow::serializeForSorter(BufBuilder& buf) const {
-    buf.appendNum(_fields.size());
+    buf.appendNum(size());
 
-    for (size_t idx = 0; idx < _fields.size(); ++idx) {
-        auto [tag, val] = _fields[idx].getViewOfValue();
+    for (size_t idx = 0; idx < size(); ++idx) {
+        auto [tag, val] = getViewOfValue(idx);
         serializeTagValue(buf, tag, val);
     }
 }
@@ -349,8 +347,8 @@ static int getApproximateSize(TypeTags tag, Value val) {
 int MaterializedRow::memUsageForSorter() const {
     int result = sizeof(MaterializedRow);
 
-    for (size_t idx = 0; idx < _fields.size(); ++idx) {
-        auto [tag, val] = _fields[idx].getViewOfValue();
+    for (size_t idx = 0; idx < size(); ++idx) {
+        auto [tag, val] = getViewOfValue(idx);
         result += getApproximateSize(tag, val);
     }
 

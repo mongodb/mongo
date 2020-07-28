@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/value.h"
+#include <boost/container/small_vector.hpp>
 
 namespace mongo {
 class BufReader;
@@ -189,9 +190,9 @@ private:
         }
     }
 
+    bool _owned{false};
     TypeTags _tag{TypeTags::Nothing};
     Value _val;
-    bool _owned{false};
 };
 
 /**
@@ -271,7 +272,7 @@ public:
     MaterializedRowKeyAccessor(T& it, size_t slot) : _it(it), _slot(slot) {}
 
     std::pair<TypeTags, Value> getViewOfValue() const override {
-        return _it->first._fields[_slot].getViewOfValue();
+        return _it->first.getViewOfValue(_slot);
     }
     std::pair<TypeTags, Value> copyOrMoveValue() override {
         // We can never move out values from keys.
@@ -299,14 +300,14 @@ public:
     MaterializedRowValueAccessor(T& it, size_t slot) : _it(it), _slot(slot) {}
 
     std::pair<TypeTags, Value> getViewOfValue() const override {
-        return _it->second._fields[_slot].getViewOfValue();
+        return _it->second.getViewOfValue(_slot);
     }
     std::pair<TypeTags, Value> copyOrMoveValue() override {
-        return _it->second._fields[_slot].copyOrMoveValue();
+        return _it->second.copyOrMoveValue(_slot);
     }
 
     void reset(bool owned, TypeTags tag, Value val) {
-        _it->second._fields[_slot].reset(owned, tag, val);
+        _it->second.reset(_slot, owned, tag, val);
     }
 
 private:
@@ -329,14 +330,14 @@ public:
         : _container(container), _it(it), _slot(slot) {}
 
     std::pair<TypeTags, Value> getViewOfValue() const override {
-        return _container[_it]._fields[_slot].getViewOfValue();
+        return _container[_it].getViewOfValue(_slot);
     }
     std::pair<TypeTags, Value> copyOrMoveValue() override {
-        return _container[_it]._fields[_slot].copyOrMoveValue();
+        return _container[_it].copyOrMoveValue(_slot);
     }
 
     void reset(bool owned, TypeTags tag, Value val) {
-        _container[_it]._fields[_slot].reset(owned, tag, val);
+        _container[_it].reset(_slot, owned, tag, val);
     }
 
 private:
@@ -345,22 +346,102 @@ private:
     const size_t _slot;
 };
 
-struct MaterializedRow {
+/**
+ * This class holds values in a buffer. The most common usage is a sort and hash agg plan stages.
+ */
+class MaterializedRow {
+public:
+    MaterializedRow(size_t count = 0) {
+        resize(count);
+    }
+
+    MaterializedRow(const MaterializedRow& other) {
+        resize(other.size());
+        copy(other);
+    }
+
+    MaterializedRow(MaterializedRow&& other) {
+        swap(*this, other);
+    }
+
+    ~MaterializedRow() {
+        if (_data) {
+            release();
+            delete[] _data;
+        }
+    }
+
+    MaterializedRow& operator=(MaterializedRow other) {
+        swap(*this, other);
+        return *this;
+    }
+
+    /**
+     * Make deep copies of values stored in the buffer.
+     */
     void makeOwned() {
-        for (auto& f : _fields) {
-            auto [tag, val] = f.getViewOfValue();
-            auto [copyTag, copyVal] = copyValue(tag, val);
-            f.reset(copyTag, copyVal);
+        for (size_t idx = 0; idx < _count; ++idx) {
+            if (!owned()[idx]) {
+                auto [tag, val] = value::copyValue(tags()[idx], values()[idx]);
+                values()[idx] = val;
+                tags()[idx] = tag;
+                owned()[idx] = true;
+            }
+        }
+    }
+
+    std::pair<value::TypeTags, value::Value> getViewOfValue(size_t idx) const {
+        return {tags()[idx], values()[idx]};
+    }
+
+    std::pair<value::TypeTags, value::Value> copyOrMoveValue(size_t idx) {
+        if (owned()[idx]) {
+            owned()[idx] = false;
+            return {tags()[idx], values()[idx]};
+        } else {
+            return value::copyValue(tags()[idx], values()[idx]);
+        }
+    }
+
+    void reset(size_t idx, bool own, value::TypeTags tag, value::Value val) {
+        if (owned()[idx]) {
+            value::releaseValue(tags()[idx], values()[idx]);
+            owned()[idx] = false;
+        }
+        values()[idx] = val;
+        tags()[idx] = tag;
+        owned()[idx] = own;
+    }
+
+    size_t size() const {
+        return _count;
+    }
+
+    void resize(size_t count) {
+        if (_data) {
+            release();
+            delete[] _data;
+            _data = nullptr;
+            _count = 0;
+        }
+
+        if (count) {
+            _data = new char[sizeInBytes(count)];
+            _count = count;
+            auto ownedPtr = owned();
+            while (count--) {
+                *ownedPtr++ = false;
+            }
         }
     }
 
     bool operator==(const MaterializedRow& rhs) const {
-        for (size_t idx = 0; idx < _fields.size(); ++idx) {
-            auto [lhsTag, lhsVal] = _fields[idx].getViewOfValue();
-            auto [rhsTag, rhsVal] = rhs._fields[idx].getViewOfValue();
+        for (size_t idx = 0; idx < size(); ++idx) {
+            auto [lhsTag, lhsVal] = getViewOfValue(idx);
+            auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
             auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
 
-            if (tag != TypeTags::NumberInt32 || val != 0) {
+            if (tag != value::TypeTags::NumberInt32 || val != 0) {
                 return false;
             }
         }
@@ -373,18 +454,77 @@ struct MaterializedRow {
     static MaterializedRow deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
     void serializeForSorter(BufBuilder& buf) const;
     int memUsageForSorter() const;
+    auto getOwned() const {
+        auto result = *this;
+        result.makeOwned();
+        return result;
+    }
 
-    std::vector<OwnedValueAccessor> _fields;
+private:
+    static size_t sizeInBytes(size_t count) {
+        return count * (sizeof(value::Value) + sizeof(value::TypeTags) + sizeof(bool));
+    }
+
+    value::Value* values() const {
+        return reinterpret_cast<value::Value*>(_data);
+    }
+
+    value::TypeTags* tags() const {
+        return reinterpret_cast<value::TypeTags*>(_data + _count * sizeof(value::Value));
+    }
+
+    bool* owned() const {
+        return reinterpret_cast<bool*>(_data +
+                                       _count * (sizeof(value::Value) + sizeof(value::TypeTags)));
+    }
+
+    void release() {
+        for (size_t idx = 0; idx < _count; ++idx) {
+            if (owned()[idx]) {
+                value::releaseValue(tags()[idx], values()[idx]);
+                owned()[idx] = false;
+            }
+        }
+    }
+
+    /**
+     * Makes a deep copy on the incoming row.
+     */
+    void copy(const MaterializedRow& other) {
+        invariant(_count == other._count);
+
+        for (size_t idx = 0; idx < _count; ++idx) {
+            if (other.owned()[idx]) {
+                auto [tag, val] = value::copyValue(other.tags()[idx], other.values()[idx]);
+                values()[idx] = val;
+                tags()[idx] = tag;
+                owned()[idx] = true;
+            } else {
+                values()[idx] = other.values()[idx];
+                tags()[idx] = other.tags()[idx];
+                owned()[idx] = false;
+            }
+        }
+    }
+
+    friend void swap(MaterializedRow& lhs, MaterializedRow& rhs) noexcept {
+        std::swap(lhs._data, rhs._data);
+        std::swap(lhs._count, rhs._count);
+    }
+
+    char* _data{nullptr};
+    size_t _count{0};
 };
+
 
 struct MaterializedRowComparator {
     MaterializedRowComparator(const std::vector<value::SortDirection>& direction)
         : _direction(direction) {}
 
     bool operator()(const MaterializedRow& lhs, const MaterializedRow& rhs) const {
-        for (size_t idx = 0; idx < lhs._fields.size(); ++idx) {
-            auto [lhsTag, lhsVal] = lhs._fields[idx].getViewOfValue();
-            auto [rhsTag, rhsVal] = rhs._fields[idx].getViewOfValue();
+        for (size_t idx = 0; idx < lhs.size(); ++idx) {
+            auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
+            auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
             auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
             if (tag != TypeTags::NumberInt32) {
                 return false;
@@ -410,8 +550,8 @@ struct MaterializedRowComparator {
 struct MaterializedRowHasher {
     std::size_t operator()(const MaterializedRow& k) const {
         size_t res = 17;
-        for (auto& f : k._fields) {
-            auto [tag, val] = f.getViewOfValue();
+        for (size_t idx = 0; idx < k.size(); ++idx) {
+            auto [tag, val] = k.getViewOfValue(idx);
             res = res * 31 + hashValue(tag, val);
         }
         return res;

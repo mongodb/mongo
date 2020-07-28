@@ -46,7 +46,8 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
       _outerCond(std::move(outerCond)),
       _outerProjects(std::move(outerProjects)),
       _innerCond(std::move(innerCond)),
-      _innerProjects(std::move(innerProjects)) {
+      _innerProjects(std::move(innerProjects)),
+      _probeKey(0) {
     if (_outerCond.size() != _innerCond.size()) {
         uasserted(4822823, "left and right size do not match");
     }
@@ -98,7 +99,7 @@ void HashJoinStage::prepare(CompileCtx& ctx) {
         _outOuterAccessors[slot] = _outOuterProjectAccessors.back().get();
     }
 
-    _probeKey._fields.resize(_inInnerKeyAccessors.size());
+    _probeKey.resize(_inInnerKeyAccessors.size());
 
     _compiled = true;
 }
@@ -119,25 +120,22 @@ void HashJoinStage::open(bool reOpen) {
     _commonStats.opens++;
     _children[0]->open(reOpen);
     // Insert the outer side into the hash table.
-
     while (_children[0]->getNext() == PlanState::ADVANCED) {
-        value::MaterializedRow key;
-        value::MaterializedRow project;
-        key._fields.reserve(_inOuterKeyAccessors.size());
-        project._fields.reserve(_inOuterProjectAccessors.size());
+        value::MaterializedRow key{_inOuterKeyAccessors.size()};
+        value::MaterializedRow project{_inOuterProjectAccessors.size()};
 
+        size_t idx = 0;
         // Copy keys in order to do the lookup.
         for (auto& p : _inOuterKeyAccessors) {
-            key._fields.push_back(value::OwnedValueAccessor{});
             auto [tag, val] = p->copyOrMoveValue();
-            key._fields.back().reset(true, tag, val);
+            key.reset(idx++, true, tag, val);
         }
 
+        idx = 0;
         // Copy projects.
         for (auto& p : _inOuterProjectAccessors) {
-            project._fields.push_back(value::OwnedValueAccessor{});
             auto [tag, val] = p->copyOrMoveValue();
-            project._fields.back().reset(true, tag, val);
+            project.reset(idx++, true, tag, val);
         }
 
         _ht.emplace(std::move(key), std::move(project));
@@ -168,7 +166,7 @@ PlanState HashJoinStage::getNext() {
             size_t idx = 0;
             for (auto& p : _inInnerKeyAccessors) {
                 auto [tag, val] = p->getViewOfValue();
-                _probeKey._fields[idx++].reset(false, tag, val);
+                _probeKey.reset(idx++, false, tag, val);
             }
 
             auto [low, hi] = _ht.equal_range(_probeKey);
