@@ -60,15 +60,12 @@ const char kNetName[] = "TenantMigrationWorkerNetwork";
 /**
  * Creates a task executor to be used for tenant migration.
  */
-std::shared_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(
+std::unique_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(
     ServiceContext* serviceContext) {
     ThreadPool::Options tpOptions;
     tpOptions.threadNamePrefix = kThreadNamePrefix;
     tpOptions.poolName = kPoolName;
     tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
-    tpOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
-    };
 
     return std::make_unique<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(tpOptions),
@@ -85,7 +82,7 @@ std::shared_ptr<TenantMigrationAccessBlocker> startBlockingWritesForTenant(
     auto serviceContext = opCtx->getServiceContext();
 
     auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
-        serviceContext, makeTenantMigrationExecutor(serviceContext).get());
+        serviceContext, makeTenantMigrationExecutor(serviceContext));
 
     mtab->startBlockingWrites();
 
@@ -114,7 +111,7 @@ void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocumen
 
         mtab = std::make_shared<TenantMigrationAccessBlocker>(
             opCtx->getServiceContext(),
-            tenant_migration::makeTenantMigrationExecutor(opCtx->getServiceContext()).get());
+            tenant_migration::makeTenantMigrationExecutor(opCtx->getServiceContext()));
         mtabByPrefix.add(donorStateDoc.getDatabasePrefix(), mtab);
         mtab->startBlockingWrites();
     }
@@ -125,6 +122,32 @@ void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocumen
     // startBlockingReadsAfter just needs to be called before the "start blocking" write's oplog
     // hole is filled.
     mtab->startBlockingReadsAfter(donorStateDoc.getBlockTimestamp().get());
+}
+
+/**
+ * Transitions the TenantMigrationAccessBlocker to the committed state.
+ */
+void onTransitionToCommitted(OperationContext* opCtx, TenantMigrationDonorDocument& donorStateDoc) {
+    invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kCommitted);
+    invariant(donorStateDoc.getCommitOrAbortOpTime());
+
+    auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
+    auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(donorStateDoc.getDatabasePrefix());
+    invariant(mtab);
+    mtab->commit(donorStateDoc.getCommitOrAbortOpTime().get());
+}
+
+/**
+ * Transitions the TenantMigrationAccessBlocker to the aborted state.
+ */
+void onTransitionToAborted(OperationContext* opCtx, TenantMigrationDonorDocument& donorStateDoc) {
+    invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted);
+    invariant(donorStateDoc.getCommitOrAbortOpTime());
+
+    auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
+    auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(donorStateDoc.getDatabasePrefix());
+    invariant(mtab);
+    mtab->abort(donorStateDoc.getCommitOrAbortOpTime().get());
 }
 
 /**
@@ -233,7 +256,7 @@ void startMigration(OperationContext* opCtx, TenantMigrationDonorDocument donorS
         // the data has become consistent).
 
         // Enter "blocking" state.
-        auto mtab = startBlockingWritesForTenant(opCtx, donorStateDoc);
+        mtab = startBlockingWritesForTenant(opCtx, donorStateDoc);
 
         updateDonorStateDocument(opCtx, donorStateDoc, TenantMigrationDonorStateEnum::kBlocking);
 
@@ -247,11 +270,15 @@ void startMigration(OperationContext* opCtx, TenantMigrationDonorDocument donorS
     } catch (DBException&) {
         // Enter "abort" state.
         updateDonorStateDocument(opCtx, donorStateDoc, TenantMigrationDonorStateEnum::kAborted);
+        if (mtab) {
+            mtab->onCompletion().get();
+        }
         throw;
     }
 
     // Enter "commit" state.
     updateDonorStateDocument(opCtx, donorStateDoc, TenantMigrationDonorStateEnum::kCommitted);
+    mtab->onCompletion().get();
 }
 
 void onDonorStateTransition(OperationContext* opCtx, const BSONObj& donorStateDoc) {
@@ -265,8 +292,10 @@ void onDonorStateTransition(OperationContext* opCtx, const BSONObj& donorStateDo
             onTransitionToBlocking(opCtx, parsedDonorStateDoc);
             break;
         case TenantMigrationDonorStateEnum::kCommitted:
+            onTransitionToCommitted(opCtx, parsedDonorStateDoc);
             break;
         case TenantMigrationDonorStateEnum::kAborted:
+            onTransitionToAborted(opCtx, parsedDonorStateDoc);
             break;
         default:
             MONGO_UNREACHABLE;

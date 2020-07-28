@@ -32,12 +32,22 @@
 #include "mongo/db/client.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 
-TenantMigrationAccessBlocker::TenantMigrationAccessBlocker(ServiceContext* serviceContext,
-                                                           executor::TaskExecutor* executor)
-    : _serviceContext(serviceContext), _executor(executor) {}
+namespace {
+
+MONGO_FAIL_POINT_DEFINE(tenantMigrationBlockRead);
+MONGO_FAIL_POINT_DEFINE(tenantMigrationBlockWrite);
+
+}  // namespace
+
+TenantMigrationAccessBlocker::TenantMigrationAccessBlocker(
+    ServiceContext* serviceContext, std::unique_ptr<executor::TaskExecutor> executor)
+    : _serviceContext(serviceContext), _executor(std::move(executor)) {
+    _executor->startup();
+}
 
 void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
     stdx::lock_guard<Latch> lg(_mutex);
@@ -47,6 +57,7 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
             return;
         case Access::kBlockWrites:
         case Access::kBlockWritesAndReads:
+            tenantMigrationBlockWrite.shouldFail();
             uasserted(ErrorCodes::TenantMigrationConflict,
                       "Write must block until this tenant migration commits or aborts");
         case Access::kReject:
@@ -77,6 +88,10 @@ void TenantMigrationAccessBlocker::checkIfCanDoClusterTimeReadOrBlock(
         return _access == Access::kAllow || _access == Access::kBlockWrites ||
             readTimestamp < *_blockTimestamp;
     };
+
+    if (!canRead()) {
+        tenantMigrationBlockRead.shouldFail();
+    }
 
     opCtx->waitForConditionOrInterrupt(
         _transitionOutOfBlockingCV, ul, [&]() { return canRead() || _access == Access::kReject; });
@@ -149,6 +164,7 @@ void TenantMigrationAccessBlocker::commit(repl::OpTime commitOpTime) {
 
         _access = Access::kReject;
         _transitionOutOfBlockingCV.notify_all();
+        _completionPromise.emplaceValue();
     };
 
     _waitForOpTimeToMajorityCommit(commitOpTime, callbackFn);
@@ -177,6 +193,8 @@ void TenantMigrationAccessBlocker::abort(repl::OpTime abortOpTime) {
         _commitOrAbortOpTime.reset();
         _waitForCommitOrAbortToMajorityCommitOpCtx = nullptr;
         _transitionOutOfBlockingCV.notify_all();
+        _completionPromise.setError(
+            {ErrorCodes::TenantMigrationAborted, "tenant migration aborted"});
     };
 
     _waitForOpTimeToMajorityCommit(abortOpTime, callbackFn);
@@ -197,10 +215,14 @@ void TenantMigrationAccessBlocker::rollBackCommitOrAbort() {
     _waitForCommitOrAbortToMajorityCommitOpCtx = nullptr;
 }
 
+SharedSemiFuture<void> TenantMigrationAccessBlocker::onCompletion() {
+    return _completionPromise.getFuture();
+}
+
 void TenantMigrationAccessBlocker::_waitForOpTimeToMajorityCommit(
     repl::OpTime opTime, std::function<void()> callbackFn) {
     uassertStatusOK(
-        _executor->scheduleWork([&](const executor::TaskExecutor::CallbackArgs& cbData) {
+        _executor->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& cbData) {
             if (!cbData.status.isOK()) {
                 return;
             }
@@ -230,13 +252,8 @@ void TenantMigrationAccessBlocker::_waitForOpTimeToMajorityCommit(
                     _waitForCommitOrAbortToMajorityCommitOpCtx = opCtx;
                 }
 
-                try {
-                    repl::ReplicationCoordinator::get(opCtx)->waitUntilSnapshotCommitted(
-                        opCtx, opTime.getTimestamp());
-                    status = Status::OK();
-                } catch (const DBException& ex) {
-                    status = ex.toStatus();
-                }
+                status = repl::ReplicationCoordinator::get(opCtx)->waitUntilMajorityOpTime(opCtx,
+                                                                                           opTime);
             }
 
             // 'opTime' became majority committed.

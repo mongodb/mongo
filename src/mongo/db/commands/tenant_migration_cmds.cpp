@@ -30,7 +30,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/tenant_migration_cmds_gen.h"
 #include "mongo/db/repl/tenant_migration_donor_util.h"
-#include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 
 namespace mongo {
 namespace {

@@ -1,6 +1,6 @@
 /**
- * Tests that the donor rejects writes that are executed while the migration is in the blocking
- * state.
+ * Tests that the donor blocks writes that are executed while the migration in the blocking state,
+ * then rejects the writes if the migration commits or aborts.
  *
  * @tags: [requires_fcv_46]
  */
@@ -38,6 +38,24 @@ function startMigration(host, dbName, recipientConnString) {
         databasePrefix: dbName,
         readPreference: {mode: "primary"}
     });
+}
+
+/**
+ * To be used to resume a migration that is paused after entering the blocking state. Waits for the
+ * number of blocked reads to reach 'targetBlockedWrites' and unpauses the migration.
+ */
+function resumeMigrationAfterBlockingWrite(host, targetBlockedWrites) {
+    load("jstests/libs/fail_point_util.js");
+    const primary = new Mongo(host);
+
+    assert.commandWorked(primary.adminCommand({
+        waitForFailPoint: "tenantMigrationBlockWrite",
+        timesEntered: targetBlockedWrites,
+        maxTimeMS: kDefaultWaitForFailPointTimeout
+    }));
+
+    assert.commandWorked(primary.adminCommand(
+        {configureFailPoint: "pauseTenantMigrationAfterBlockingStarts", mode: "off"}));
 }
 
 function createCollectionAndInsertDocs(primaryDB, collName, isCapped, numDocs = kNumInitialDocs) {
@@ -181,17 +199,52 @@ function runCommand(testOpts, expectedError) {
 }
 
 /**
- * Test that the write succeeds when there is no migration.
+ * Tests that the write succeeds when there is no migration.
  */
-function testWriteCommandSucceeded(testCase, testOpts) {
+function testWriteNoMigration(testCase, testOpts) {
     runCommand(testOpts);
     testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }
 
 /**
- * Tests that the donor rejects writes that are executed in the blocking state.
+ * Tests that the donor rejects writes after the migration commits.
  */
-function testWriteCommandWhenMigrationIsInBlocking(testCase, testOpts) {
+function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts) {
+    assert.commandWorked(testOpts.primaryDB.adminCommand({
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: kRecipientConnString,
+        databasePrefix: testOpts.dbName,
+        readPreference: {mode: "primary"}
+    }));
+
+    runCommand(testOpts, ErrorCodes.TenantMigrationCommitted);
+    testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+}
+
+/**
+ * Tests that the donor does not reject writes after the migration aborts.
+ */
+function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
+    let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
+    assert.commandFailedWithCode(testOpts.primaryDB.adminCommand({
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: kRecipientConnString,
+        databasePrefix: testOpts.dbName,
+        readPreference: {mode: "primary"}
+    }),
+                                 ErrorCodes.TenantMigrationAborted);
+    abortFp.off();
+
+    runCommand(testOpts);
+    testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+}
+
+/**
+ * Tests that the donor blocks writes that are executed in the blocking state.
+ */
+function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
     let blockingFp =
         configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
     let migrationThread =
@@ -209,6 +262,85 @@ function testWriteCommandWhenMigrationIsInBlocking(testCase, testOpts) {
     migrationThread.join();
     assert.commandWorked(migrationThread.returnData());
 
+    testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+}
+
+/**
+ * Tests that the donor blocks writes that are executed in the blocking state and rejects them after
+ * the migration commits.
+ */
+function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, testOpts) {
+    let blockingFp =
+        configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const targetBlockedWrites =
+        assert
+            .commandWorked(testOpts.primaryDB.adminCommand(
+                {configureFailPoint: "tenantMigrationBlockWrite", mode: "alwaysOn"}))
+            .count +
+        1;
+
+    let migrationThread =
+        new Thread(startMigration, testOpts.primaryHost, testOpts.dbName, kRecipientConnString);
+    let resumeMigrationThread =
+        new Thread(resumeMigrationAfterBlockingWrite, testOpts.primaryHost, targetBlockedWrites);
+
+    // Run the command after the migration enters the blocking state.
+    resumeMigrationThread.start();
+    migrationThread.start();
+    blockingFp.wait();
+
+    // The migration should unpause and commit after the write is blocked. Verify that the write is
+    // rejected.
+    // TODO (SERVER-49181): assert that the command fails with TenantMigrationCommitted once the
+    // donor starts blocking writes until the migration commits or aborts instead of throwing an
+    // error immediately.
+    runCommand(testOpts, ErrorCodes.TenantMigrationConflict);
+
+    // Verify that the migration succeeded.
+    resumeMigrationThread.join();
+    migrationThread.join();
+    assert.commandWorked(migrationThread.returnData());
+
+    testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+}
+
+/**
+ * Tests that the donor blocks writes that are executed in the blocking state and rejects them after
+ * the migration aborts.
+ */
+function testBlockedReadGetsUnblockedAndRejectedIfMigrationAborts(testCase, testOpts) {
+    let blockingFp =
+        configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
+    const targetBlockedWrites =
+        assert
+            .commandWorked(testOpts.primaryDB.adminCommand(
+                {configureFailPoint: "tenantMigrationBlockWrite", mode: "alwaysOn"}))
+            .count +
+        1;
+
+    let migrationThread =
+        new Thread(startMigration, testOpts.primaryHost, testOpts.dbName, kRecipientConnString);
+    let resumeMigrationThread =
+        new Thread(resumeMigrationAfterBlockingWrite, testOpts.primaryHost, targetBlockedWrites);
+
+    // Run the command after the migration enters the blocking state.
+    resumeMigrationThread.start();
+    migrationThread.start();
+    blockingFp.wait();
+
+    // The migration should unpause and abort after the write is blocked. Verify that the write is
+    // rejected.
+    // TODO (SERVER-49181): assert that the command succeeds due to internal retries.
+    runCommand(testOpts, ErrorCodes.TenantMigrationConflict);
+
+    // Verify that the migration aborted due to the simulated error.
+    resumeMigrationThread.join();
+    migrationThread.join();
+    abortFp.off();
+    assert.commandFailedWithCode(migrationThread.returnData(), ErrorCodes.TenantMigrationAborted);
+
+    // TODO (SERVER-49181): replace with assertCommandSucceeded.
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }
 
@@ -696,8 +828,12 @@ for (let command of Object.keys(testCases)) {
 
 // Run test cases.
 const testFuncs = {
-    noMigration: testWriteCommandSucceeded,  // verify that the test cases are correct.
-    inBlocking: testWriteCommandWhenMigrationIsInBlocking,
+    noMigration: testWriteNoMigration,  // verify that the test cases are correct.
+    inCommitted: testWriteIsRejectedIfSentAfterMigrationHasCommitted,
+    inAborted: testWriteIsAcceptedIfSentAfterMigrationHasAborted,
+    inBlocking: testWriteBlocksIfMigrationIsInBlocking,
+    inBlockingThenCommitted: testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits,
+    inBlockingThenAborted: testBlockedReadGetsUnblockedAndRejectedIfMigrationAborts
 };
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {

@@ -68,7 +68,9 @@ const kConfigDonorsNS = "config.tenantMigrationDonors";
     blockingFp.off();
     migrationThread.join();
 
-    // TODO (SERVER-49176): test that mtab is updated correctly.
+    mtab = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
+    assert.eq(mtab[dbName].access, accessState.kReject);
+    assert(mtab[dbName].commitOrAbortOpTime);
 
     donorDoc = donorPrimary.getCollection(kConfigDonorsNS).findOne({databasePrefix: dbName});
     let commitOplogEntry =
@@ -89,10 +91,12 @@ const kConfigDonorsNS = "config.tenantMigrationDonors";
         databasePrefix: dbName,
         readPreference: {mode: "primary"}
     }),
-                                 ErrorCodes.InternalError);
+                                 ErrorCodes.TenantMigrationAborted);
     abortFp.off();
 
-    // TODO (SERVER-49176): test that mtab is updated correctly.
+    const mtab = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
+    assert.eq(mtab[dbName].access, accessState.kAllow);
+    assert(!mtab[dbName].commitOrAbortOpTime);
 
     const donorDoc = donorPrimary.getCollection(kConfigDonorsNS).findOne({databasePrefix: dbName});
     const abortOplogEntry =

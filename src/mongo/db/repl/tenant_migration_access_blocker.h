@@ -113,7 +113,8 @@ namespace mongo {
  */
 class TenantMigrationAccessBlocker {
 public:
-    TenantMigrationAccessBlocker(ServiceContext* serviceContext, executor::TaskExecutor* executor);
+    TenantMigrationAccessBlocker(ServiceContext* serviceContext,
+                                 std::unique_ptr<executor::TaskExecutor> executor);
 
     //
     // Called by all writes and reads against the database.
@@ -138,6 +139,8 @@ public:
     void abort(repl::OpTime opTime);
     void rollBackCommitOrAbort();
 
+    SharedSemiFuture<void> onCompletion();
+
     void appendInfoForServerStatus(BSONObjBuilder* builder) const;
 
 private:
@@ -146,16 +149,20 @@ private:
     enum class Access { kAllow, kBlockWrites, kBlockWritesAndReads, kReject };
 
     ServiceContext* _serviceContext;
-    executor::TaskExecutor* _executor;
+    std::unique_ptr<executor::TaskExecutor> _executor;
 
     // Protects the state below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlocker::_mutex");
 
     Access _access{Access::kAllow};
+
     boost::optional<Timestamp> _blockTimestamp;
+
     boost::optional<repl::OpTime> _commitOrAbortOpTime;
     OperationContext* _waitForCommitOrAbortToMajorityCommitOpCtx{nullptr};
+
     stdx::condition_variable _transitionOutOfBlockingCV;
+    SharedPromise<void> _completionPromise;
 };
 
 }  // namespace mongo
