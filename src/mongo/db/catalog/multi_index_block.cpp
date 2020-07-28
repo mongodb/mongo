@@ -51,6 +51,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
@@ -299,8 +300,11 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 
         wunit.commit();
         return indexInfoObjs;
-        // Avoid converting WCE to Status
     } catch (const WriteConflictException&) {
+        // Avoid converting WCE to Status.
+        throw;
+    } catch (const TenantMigrationConflictException&) {
+        // Avoid converting TenantMigrationConflictException to Status.
         throw;
     } catch (...) {
         auto status = exceptionToStatus();

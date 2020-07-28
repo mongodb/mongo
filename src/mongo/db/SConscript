@@ -65,6 +65,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/index_names',
+        '$BUILD_DIR/mongo/db/repl/tenant_migration_conflict_info',
         '$BUILD_DIR/mongo/db/write_concern_options',
         'shutdown_in_progress_quiesce_info',
     ]

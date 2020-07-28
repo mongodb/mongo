@@ -94,18 +94,13 @@ TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlocker(StringData
  * and appends the server status of each blocker to the BSONObjBuilder.
  */
 void TenantMigrationAccessBlockerByPrefix::appendInfoForServerStatus(BSONObjBuilder* builder) {
-
-    auto appendBlockerStatus =
+    std::for_each(
+        _tenantMigrationAccessBlockers.begin(),
+        _tenantMigrationAccessBlockers.end(),
         [builder](
             const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
-            BSONObjBuilder tenantBuilder;
-            blocker.second->appendInfoForServerStatus(&tenantBuilder);
-            builder->append(blocker.first, tenantBuilder.obj());
-        };
-
-    std::for_each(_tenantMigrationAccessBlockers.begin(),
-                  _tenantMigrationAccessBlockers.end(),
-                  appendBlockerStatus);
+            blocker.second->appendInfoForServerStatus(builder);
+        });
 }
 
 }  // namespace mongo

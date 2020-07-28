@@ -1,6 +1,7 @@
 /**
  * Tests that the donor blocks writes that are executed while the migration in the blocking state,
- * then rejects the writes if the migration commits or aborts.
+ * then rejects the writes if the migration commits and and internally retries the writes if the
+ * migration aborts.
  *
  * @tags: [requires_fcv_46]
  */
@@ -28,6 +29,7 @@ const kNumInitialDocs = 2;  // num initial docs to insert into test collections.
 const kMaxSize = 1024;      // max size of capped collections.
 const kTxnNumber = NumberLong(0);
 const kRecipientConnString = "testConnString";
+const kMaxTimeMS = 1 * 1000;
 
 function startMigration(host, dbName, recipientConnString) {
     const primary = new Mongo(host);
@@ -253,9 +255,8 @@ function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
     // Run the command after the migration enters the blocking state.
     migrationThread.start();
     blockingFp.wait();
-    // TODO (SERVER-49181): assert that the command fails with MaxTimeMSExpired after the donor
-    // starts blocking writes instead of throwing an error.
-    runCommand(testOpts, ErrorCodes.TenantMigrationConflict);
+    testOpts.command.maxTimeMS = kMaxTimeMS;
+    runCommand(testOpts, ErrorCodes.MaxTimeMSExpired);
 
     // Allow the migration to complete.
     blockingFp.off();
@@ -291,10 +292,7 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
 
     // The migration should unpause and commit after the write is blocked. Verify that the write is
     // rejected.
-    // TODO (SERVER-49181): assert that the command fails with TenantMigrationCommitted once the
-    // donor starts blocking writes until the migration commits or aborts instead of throwing an
-    // error immediately.
-    runCommand(testOpts, ErrorCodes.TenantMigrationConflict);
+    runCommand(testOpts, ErrorCodes.TenantMigrationCommitted);
 
     // Verify that the migration succeeded.
     resumeMigrationThread.join();
@@ -305,10 +303,10 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
 }
 
 /**
- * Tests that the donor blocks writes that are executed in the blocking state and rejects them after
- * the migration aborts.
+ * Tests that the donor blocks writes that are executed in the blocking state and internally retries
+ * them after the migration aborts.
  */
-function testBlockedReadGetsUnblockedAndRejectedIfMigrationAborts(testCase, testOpts) {
+function testBlockedReadGetsUnblockedAndRetriedIfMigrationAborts(testCase, testOpts) {
     let blockingFp =
         configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
     let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
@@ -330,9 +328,8 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationAborts(testCase, test
     blockingFp.wait();
 
     // The migration should unpause and abort after the write is blocked. Verify that the write is
-    // rejected.
-    // TODO (SERVER-49181): assert that the command succeeds due to internal retries.
-    runCommand(testOpts, ErrorCodes.TenantMigrationConflict);
+    // retried and succeeds.
+    runCommand(testOpts);
 
     // Verify that the migration aborted due to the simulated error.
     resumeMigrationThread.join();
@@ -340,8 +337,7 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationAborts(testCase, test
     abortFp.off();
     assert.commandFailedWithCode(migrationThread.returnData(), ErrorCodes.TenantMigrationAborted);
 
-    // TODO (SERVER-49181): replace with assertCommandSucceeded.
-    testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }
 
 const isNotWriteCommand = "not a write command";
@@ -833,7 +829,7 @@ const testFuncs = {
     inAborted: testWriteIsAcceptedIfSentAfterMigrationHasAborted,
     inBlocking: testWriteBlocksIfMigrationIsInBlocking,
     inBlockingThenCommitted: testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits,
-    inBlockingThenAborted: testBlockedReadGetsUnblockedAndRejectedIfMigrationAborts
+    inBlockingThenAborted: testBlockedReadGetsUnblockedAndRetriedIfMigrationAborts
 };
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {

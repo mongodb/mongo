@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/tenant_migration_cmds_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
+#include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/reply_builder_interface.h"
 
 namespace mongo {
 
@@ -67,6 +72,47 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
  * blocking state. Throws TenantMigrationCommitted if it is in committed.
  */
 void onWriteToDatabase(OperationContext* opCtx, StringData dbName);
+
+/**
+ * Runs the argument function 'callable' as many times as needed for it to complete or throw an
+ * exception or return a non-OK status (as indicated in 'replyBuilder') other than
+ * TenantMigrationConflict. Clears 'replyBuilder' before each retry.
+ */
+template <typename Callable>
+void migrationConflictRetry(OperationContext* opCtx,
+                            Callable&& callable,
+                            rpc::ReplyBuilderInterface* replyBuilder) {
+    auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
+
+    while (true) {
+        try {
+            // callable will modify replyBuilder.
+            callable();
+            auto replyBodyBuilder = replyBuilder->getBodyBuilder();
+
+            // getStatusFromWriteCommandReply expects an 'ok' field.
+            CommandHelpers::extractOrAppendOk(replyBodyBuilder);
+
+            // Commands such as insert, update, delete, and applyOps return the result as a status
+            // rather than throwing.
+            const auto status = getStatusFromWriteCommandReply(replyBodyBuilder.asTempObj());
+
+            if (status == ErrorCodes::TenantMigrationConflict) {
+                uassertStatusOK(status);
+            }
+            break;
+        } catch (const TenantMigrationConflictException& ex) {
+            auto migrationConflictInfo = ex.extraInfo<TenantMigrationConflictInfo>();
+            invariant(migrationConflictInfo);
+
+            if (auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(
+                    migrationConflictInfo->getDatabasePrefix())) {
+                mtab->checkIfCanWriteOrBlock(opCtx);
+            }
+            replyBuilder->getBodyBuilder().resetToEmpty();
+        }
+    }
+}
 
 }  // namespace tenant_migration
 

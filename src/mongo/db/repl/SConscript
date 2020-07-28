@@ -1221,6 +1221,16 @@ env.Library(
 )
 
 env.Library(
+    target='tenant_migration_conflict_info',
+    source= [
+        'tenant_migration_conflict_info.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='tenant_migration_donor',
     source=[
         'tenant_migration_access_blocker.cpp',
@@ -1241,6 +1251,7 @@ env.Library(
         'local_oplog_info',
         'optime',
         'repl_coordinator_interface',
+        'tenant_migration_conflict_info'
     ],
 )
 

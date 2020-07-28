@@ -32,6 +32,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -44,8 +45,12 @@ MONGO_FAIL_POINT_DEFINE(tenantMigrationBlockWrite);
 }  // namespace
 
 TenantMigrationAccessBlocker::TenantMigrationAccessBlocker(
-    ServiceContext* serviceContext, std::unique_ptr<executor::TaskExecutor> executor)
-    : _serviceContext(serviceContext), _executor(std::move(executor)) {
+    ServiceContext* serviceContext,
+    std::unique_ptr<executor::TaskExecutor> executor,
+    std::string dbPrefix)
+    : _serviceContext(serviceContext),
+      _executor(std::move(executor)),
+      _dbPrefix(std::move(dbPrefix)) {
     _executor->startup();
 }
 
@@ -57,8 +62,7 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
             return;
         case Access::kBlockWrites:
         case Access::kBlockWritesAndReads:
-            tenantMigrationBlockWrite.shouldFail();
-            uasserted(ErrorCodes::TenantMigrationConflict,
+            uasserted(TenantMigrationConflictInfo(_dbPrefix),
                       "Write must block until this tenant migration commits or aborts");
         case Access::kReject:
             uasserted(ErrorCodes::TenantMigrationCommitted,
@@ -71,9 +75,14 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
 void TenantMigrationAccessBlocker::checkIfCanWriteOrBlock(OperationContext* opCtx) {
     stdx::unique_lock<Latch> ul(_mutex);
 
-    opCtx->waitForConditionOrInterrupt(_transitionOutOfBlockingCV, ul, [&]() {
-        return _access == Access::kAllow || _access == Access::kReject;
-    });
+    auto canWrite = [&]() { return _access == Access::kAllow; };
+
+    if (!canWrite()) {
+        tenantMigrationBlockWrite.shouldFail();
+    }
+
+    opCtx->waitForConditionOrInterrupt(
+        _transitionOutOfBlockingCV, ul, [&]() { return canWrite() || _access == Access::kReject; });
 
     uassert(ErrorCodes::TenantMigrationCommitted,
             "Write must be re-routed to the new owner of this database",
@@ -262,14 +271,15 @@ void TenantMigrationAccessBlocker::_waitForOpTimeToMajorityCommit(
 }
 
 void TenantMigrationAccessBlocker::appendInfoForServerStatus(BSONObjBuilder* builder) const {
-    builder->append("access", _access);
+    BSONObjBuilder tenantBuilder;
+    tenantBuilder.append("access", _access);
     if (_blockTimestamp) {
-        builder->append("blockTimestamp", _blockTimestamp.get());
+        tenantBuilder.append("blockTimestamp", _blockTimestamp.get());
     }
-
     if (_commitOrAbortOpTime) {
-        builder->append("commitOrAbortOpTime", _commitOrAbortOpTime->toBSON());
+        tenantBuilder.append("commitOrAbortOpTime", _commitOrAbortOpTime->toBSON());
     }
+    builder->append(_dbPrefix, tenantBuilder.obj());
 }
 
 }  // namespace mongo

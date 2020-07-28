@@ -82,7 +82,9 @@ std::shared_ptr<TenantMigrationAccessBlocker> startBlockingWritesForTenant(
     auto serviceContext = opCtx->getServiceContext();
 
     auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
-        serviceContext, makeTenantMigrationExecutor(serviceContext));
+        serviceContext,
+        makeTenantMigrationExecutor(serviceContext),
+        donorStateDoc.getDatabasePrefix().toString());
 
     mtab->startBlockingWrites();
 
@@ -111,7 +113,8 @@ void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocumen
 
         mtab = std::make_shared<TenantMigrationAccessBlocker>(
             opCtx->getServiceContext(),
-            tenant_migration::makeTenantMigrationExecutor(opCtx->getServiceContext()));
+            tenant_migration::makeTenantMigrationExecutor(opCtx->getServiceContext()),
+            donorStateDoc.getDatabasePrefix().toString());
         mtabByPrefix.add(donorStateDoc.getDatabasePrefix(), mtab);
         mtab->startBlockingWrites();
     }

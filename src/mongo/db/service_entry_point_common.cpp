@@ -520,7 +520,10 @@ void invokeWithNoSession(OperationContext* opCtx,
                          CommandInvocation* invocation,
                          rpc::ReplyBuilderInterface* replyBuilder) {
     tenant_migration::checkIfCanReadOrBlock(opCtx, request.getDatabase());
-    CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
+    tenant_migration::migrationConflictRetry(
+        opCtx,
+        [&] { CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder); },
+        replyBuilder);
 }
 
 void invokeWithSessionCheckedOut(OperationContext* opCtx,
@@ -627,7 +630,10 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
     tenant_migration::checkIfCanReadOrBlock(opCtx, request.getDatabase());
 
     try {
-        CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder);
+        tenant_migration::migrationConflictRetry(
+            opCtx,
+            [&] { CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder); },
+            replyBuilder);
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {
         // Exceptions are used to resolve views in a sharded cluster, so they should be handled
         // specially to avoid unnecessary aborts.

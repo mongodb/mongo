@@ -114,7 +114,8 @@ namespace mongo {
 class TenantMigrationAccessBlocker {
 public:
     TenantMigrationAccessBlocker(ServiceContext* serviceContext,
-                                 std::unique_ptr<executor::TaskExecutor> executor);
+                                 std::unique_ptr<executor::TaskExecutor> executor,
+                                 std::string dbPrefix);
 
     //
     // Called by all writes and reads against the database.
@@ -150,6 +151,7 @@ private:
 
     ServiceContext* _serviceContext;
     std::unique_ptr<executor::TaskExecutor> _executor;
+    std::string _dbPrefix;
 
     // Protects the state below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlocker::_mutex");
