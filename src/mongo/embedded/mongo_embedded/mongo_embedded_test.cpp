@@ -600,7 +600,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "setParameter",
                                           "sleep",
                                           "startSession",
-                                          "testDeprecation",
                                           "update",
                                           "validate",
                                           "waitForFailPoint",
