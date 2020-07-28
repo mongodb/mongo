@@ -24,7 +24,6 @@ command_type: system
 pre_error_fails_task: true
 oom_tracker: true
 
-
 # Files that match an ignore-list pattern will not trigger a build, if they're the only modified
 # files in the patch.
 ignore:
@@ -3187,53 +3186,20 @@ functions:
       script: |
         set -o verbose
 
-        # Set what processes to look for. For most tasks, we rely on resmoke to figure out its subprocesses
-        # and run the hang analyzer on those. For non-resmoke tasks, we enumerate the process list here.
-        if [[ ${task_name} == *"jepsen"* ]]; then
-          hang_analyzer_option="-o file -o stdout -p dbtest,java,mongo,mongod,mongos,python,_test";
-        else
-          hang_analyzer_option="-o file -o stdout -m contains -p python"
+        hang_analyzer_option="-o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test}"
+
+        if [ ${hang_analyzer_dump_core|true} = true ]; then
+          hang_analyzer_option="-c $hang_analyzer_option"
         fi
 
         ${activate_virtualenv}
-        # echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option"
+        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option"
         PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option
 
         # Call hang analyzer for tasks that are running remote mongo processes
         if [ -n "${private_ip_address}" ]; then
           $python buildscripts/powercycle_operations.py runHangAnalyzerOnRemoteInstance
         fi
-
-  "wait for resmoke to shutdown":
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        proc="resmoke.py"
-        if [ "Windows_NT" = "$OS" ]; then
-          check_resmoke() {
-            resmoke_info=$(wmic process | grep resmoke.py)
-          }
-          while [ 1 ]
-          do
-            check_resmoke
-            if ! [[ "$resmoke_info" =~ .*"$proc".* ]]; then
-              break
-            fi
-            sleep 5
-          done
-        else
-          get_pids() { proc_pids=$(pgrep -f $1); }
-          while [ 1 ]
-          do
-            get_pids $proc
-            if [ -z "$proc_pids" ]; then
-              break
-            fi
-            sleep 5
-          done
-        fi
-
 
   "tar hang analyzer debugger files": &tar_hang_analyzer_debugger_files
     command: archive.targz_pack
@@ -3431,7 +3397,6 @@ timeout:
   - func: "get EC2 address"
   - func: "update EC2 address"
   - func: "run hang analyzer"
-  - func: "wait for resmoke to shutdown"
 
 
 #######################################
@@ -7320,6 +7285,7 @@ tasks:
   - command: expansions.update
     <<: *powercycle_expansions
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
       client_options: "--numCrudClients=20 --numFsmClients=20 --writeConcern='{\"w\": \"majority\"}'"
