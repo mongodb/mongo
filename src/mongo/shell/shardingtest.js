@@ -1039,6 +1039,13 @@ var ShardingTest = function(params) {
     }
 
     /**
+     * Runs a find on the namespace to force a refresh of the node's catalog cache.
+     */
+    this.refreshCatalogCacheForNs = function(node, ns) {
+        node.getCollection(ns).findOne();
+    };
+
+    /**
      * Returns if there is a new feature compatibility version for the "latest" version. This must
      * be manually changed if and when there is a new feature compatibility version.
      */
