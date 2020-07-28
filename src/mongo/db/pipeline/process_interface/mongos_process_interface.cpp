@@ -38,6 +38,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -48,6 +49,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/router_exec_stage.h"
 #include "mongo/s/transaction_router.h"
@@ -108,8 +110,15 @@ std::unique_ptr<Pipeline, PipelineDeleter> MongosProcessInterface::attachCursorS
     return sharded_agg_helpers::attachCursorToPipeline(ownedPipeline, allowTargetingShards);
 }
 
-BSONObj MongosProcessInterface::attachCursorSourceAndExplain(Pipeline* ownedPipeline,
-                                                             ExplainOptions::Verbosity verbosity) {
+BSONObj MongosProcessInterface::preparePipelineAndExplain(Pipeline* ownedPipeline,
+                                                          ExplainOptions::Verbosity verbosity) {
+    auto firstStage = ownedPipeline->peekFront();
+    // We don't want to serialize and send a MergeCursors stage to the shards.
+    if (firstStage &&
+        (typeid(*firstStage) == typeid(DocumentSourceMerge) ||
+         typeid(*firstStage) == typeid(DocumentSourceMergeCursors))) {
+        ownedPipeline->popFront();
+    }
     return sharded_agg_helpers::targetShardsForExplain(ownedPipeline);
 }
 

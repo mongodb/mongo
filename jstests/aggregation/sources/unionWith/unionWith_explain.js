@@ -35,6 +35,17 @@ function buildErrorString(unionExplain, realExplain, field) {
         "\nRegular:\n" + tojson(realExplain);
 }
 
+function docEqWithIgnoredFields(union, regular) {
+    return documentEq(union, regular, false /* verbose */, null /* valueComparator */, [
+        "executionTimeMillis",
+        "executionTimeMillisEstimate",
+        "saveState",
+        "restoreState",
+        "works",
+        "needTime",
+    ]);
+}
+
 function assertExplainEq(unionExplain, regularExplain) {
     if (FixtureHelpers.isMongos(testDB)) {
         const splitPipe = unionExplain.splitPipeline;
@@ -48,22 +59,32 @@ function assertExplainEq(unionExplain, regularExplain) {
                       regularExplain.splitPipeline,
                       buildErrorString(unionSubExplain, regularExplain, "splitPipeline"));
         } else {
-            assert(documentEq(unionSubExplain.splitPipeline, regularExplain.splitPipeline),
-                   buildErrorString(unionSubExplain, regularExplain, "splitPipeline"));
+            assert(
+                docEqWithIgnoredFields(unionSubExplain.splitPipeline, regularExplain.splitPipeline),
+                buildErrorString(unionSubExplain, regularExplain, "splitPipeline"));
         }
         assert.eq(unionSubExplain.mergeType,
                   regularExplain.mergeType,
                   buildErrorString(unionSubExplain, regularExplain, "mergeType"));
-        assert(documentEq(unionSubExplain.shards, regularExplain.shards),
+        assert(docEqWithIgnoredFields(unionSubExplain.shards, regularExplain.shards),
                buildErrorString(unionSubExplain, regularExplain, "shards"));
     } else {
         const unionStage = getUnionWithStage(unionExplain.stages);
         const unionSubExplain = unionStage.$unionWith.pipeline;
-        const realExplain = regularExplain.stages;
-        assert(arrayEq(unionSubExplain, realExplain),
-               buildErrorString(unionSubExplain, realExplain));
+        if ("executionStats" in unionSubExplain[0].$cursor) {
+            const unionSubStats =
+                unionStage.$unionWith.pipeline[0].$cursor.executionStats.executionStages;
+            const realStats = regularExplain.executionStats.executionStages;
+            assert(docEqWithIgnoredFields(unionSubStats, realStats),
+                   buildErrorString(unionSubStats, realStats));
+        } else {
+            const realExplain = regularExplain.stages;
+            assert(arrayEq(unionSubExplain, realExplain),
+                   buildErrorString(unionSubExplain, realExplain));
+        }
     }
 }
+
 function testPipeline(pipeline) {
     let unionResult = collA.aggregate([{$unionWith: {coll: collB.getName(), pipeline: pipeline}}],
                                       {explain: true});
@@ -126,4 +147,32 @@ var result = assert.commandWorked(testDB.runCommand({
         cursor: {},
     }
 }));
+
+// Test that execution stats inner cursor is populated.
+result = collA.explain("executionStats").aggregate([{"$unionWith": collB.getName()}]);
+var expectedResult = collB.explain("executionStats").aggregate([]);
+assert(result.ok, result);
+assert(expectedResult.ok, result);
+// If we attached a fresh cursor stage, the number returned would still be zero.
+if (FixtureHelpers.isMongos(testDB)) {
+    if (result.splitPipeline != null) {
+        const pipeline = result.splitPipeline.mergerPart;
+        const unionStage = getUnionWithStage(pipeline);
+        assert(docEqWithIgnoredFields(expectedResult.shards, unionStage.$unionWith.pipeline.shards),
+               buildErrorString(unionStage, expectedResult));
+    }
+} else {
+    assert(result.stages[1].$unionWith.pipeline[0].$cursor.executionStats.nreturned != 0, result);
+}
+
+// Test an index scan.
+const indexedColl = testDB.indexed;
+assert.commandWorked(indexedColl.createIndex({val: 1}));
+indexedColl.insert([{val: 0}, {val: 1}, {val: 2}, {val: 3}]);
+result = collA.explain("executionStats").aggregate([
+    {$unionWith: {coll: indexedColl.getName(), pipeline: [{$match: {val: {$gt: 2}}}]}}
+]);
+expectedResult = indexedColl.explain("executionStats").aggregate([{$match: {val: {$gt: 2}}}]);
+
+assertExplainEq(result, expectedResult);
 })();

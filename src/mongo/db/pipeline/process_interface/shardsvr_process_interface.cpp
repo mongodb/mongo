@@ -38,7 +38,9 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
+#include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
+#include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -47,6 +49,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/write_ops/cluster_write.h"
 
 namespace mongo {
@@ -143,8 +146,16 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
     return {{response.getN(), response.getNModified()}};
 }
 
-BSONObj ShardServerProcessInterface::attachCursorSourceAndExplain(
+BSONObj ShardServerProcessInterface::preparePipelineAndExplain(
     Pipeline* ownedPipeline, ExplainOptions::Verbosity verbosity) {
+    auto firstStage = ownedPipeline->peekFront();
+    // We don't want to send an internal stage to the shards.
+    if (firstStage &&
+        (typeid(*firstStage) == typeid(DocumentSourceMerge) ||
+         typeid(*firstStage) == typeid(DocumentSourceMergeCursors) ||
+         typeid(*firstStage) == typeid(DocumentSourceCursor))) {
+        ownedPipeline->popFront();
+    }
     return sharded_agg_helpers::targetShardsForExplain(ownedPipeline);
 }
 

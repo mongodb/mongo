@@ -274,8 +274,8 @@ public:
      * {"pipeline": <explainOutput>}. Note that <explainOutput> can be an object (shardsvr) or an
      * array (non_shardsvr).
      */
-    virtual BSONObj attachCursorSourceAndExplain(Pipeline* ownedPipeline,
-                                                 ExplainOptions::Verbosity verbosity) = 0;
+    virtual BSONObj preparePipelineAndExplain(Pipeline* ownedPipeline,
+                                              ExplainOptions::Verbosity verbosity) = 0;
 
     /**
      * Accepts a pipeline and returns a new one which will draw input from the underlying
