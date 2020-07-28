@@ -1653,8 +1653,8 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     env["BUILDERS"]["StaticLibrary"].action = SCons.Action.Action(write_uuid_to_file, "Generating placeholder library $TARGET")
 
 libdeps.setup_environment(
-    env, 
-    emitting_shared=(link_model.startswith("dynamic")), 
+    env,
+    emitting_shared=(link_model.startswith("dynamic")),
     linting=get_option('libdeps-linting'))
 
 # Both the abidw tool and the thin archive tool must be loaded after
@@ -3901,6 +3901,7 @@ if get_option('ninja') != 'disabled':
         ninja_builder.generate(env)
     else:
         ninja_builder = Tool("ninja_next")
+        env["NINJA_BUILDDIR"] = env.Dir("$BUILD_DIR/ninja")
         ninja_builder.generate(env)
 
         ninjaConf = Configure(env, help=False, custom_tests = {
