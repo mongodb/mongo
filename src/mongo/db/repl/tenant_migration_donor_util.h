@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/commands/tenant_migration_cmds_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/executor/task_executor.h"
@@ -38,10 +39,9 @@ namespace mongo {
 namespace tenant_migration {
 
 /**
- * Sends recipientSyncData to the recipient until success and starts blocking writes and causal
- * reads.
+ * Starts a tenant migration as defined in the given donor's state document.
  */
-void dataSync(OperationContext* opCtx, const TenantMigrationDonorDocument& originalDonorStateDoc);
+void startMigration(OperationContext* opCtx, TenantMigrationDonorDocument donorStateDoc);
 
 /**
  * Updates the TenantMigrationAccessBlocker for the tenant migration represented by the given

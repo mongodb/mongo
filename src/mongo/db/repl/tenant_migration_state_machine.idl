@@ -70,6 +70,11 @@ structs:
                     "The timestamp at which writes and causal reads against the databases
                     being migrated should start blocking."
                 optional: true
+            commitOrAbortOpTime:
+                type: optime
+                description:
+                    "The opTime at which the donor's state document was set to 'committed' or 'aborted'."
+                optional: true
             garbageCollect:
                 type: bool
                 description: "A boolean that determines whether the state machine should be deleted after a delay via the TTL monitor."

@@ -61,7 +61,7 @@ namespace mongo {
  * }
  *
  * Writes call checkIfCanWriteOrThrow after being assigned an OpTime but before committing. The
- * method throws MigratingTenantConflict if writes are being blocked, which is caught in the loop.
+ * method throws TenantMigrationConflict if writes are being blocked, which is caught in the loop.
  * The write then blocks until the migration either commits (in which case checkIfCanWriteOrBlock
  * throws an error that causes the write to be rejected) or aborts (in which case
  * checkIfCanWriteOrBlock returns successfully and the write is retried in the loop). This loop is

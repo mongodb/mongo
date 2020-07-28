@@ -51,11 +51,11 @@ public:
         StringData dbName);
 
 private:
-    using MigratingTenantAccessBlockersMap =
+    using TenantMigrationAccessBlockersMap =
         StringMap<std::shared_ptr<TenantMigrationAccessBlocker>>;
 
     Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerByPrefix::_mutex");
-    MigratingTenantAccessBlockersMap _migratingTenantAccessBlockers;
+    TenantMigrationAccessBlockersMap _tenantMigrationAccessBlockers;
 };
 
 }  // namespace mongo

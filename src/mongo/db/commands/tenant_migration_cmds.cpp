@@ -52,7 +52,7 @@ public:
                 requestBody.getDatabasePrefix().toString(),
                 TenantMigrationDonorStateEnum::kDataSync);
 
-            tenant_migration::dataSync(opCtx, donorStateDoc);
+            tenant_migration::startMigration(opCtx, donorStateDoc);
         }
 
 

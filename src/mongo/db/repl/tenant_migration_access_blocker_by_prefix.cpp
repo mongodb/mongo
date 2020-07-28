@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
 #include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
 
@@ -45,10 +43,10 @@ void TenantMigrationAccessBlockerByPrefix::add(StringData dbPrefix,
                                                std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    auto it = _migratingTenantAccessBlockers.find(dbPrefix);
-    invariant(it == _migratingTenantAccessBlockers.end());
+    auto it = _tenantMigrationAccessBlockers.find(dbPrefix);
+    invariant(it == _tenantMigrationAccessBlockers.end());
 
-    _migratingTenantAccessBlockers.emplace(dbPrefix, mtab);
+    _tenantMigrationAccessBlockers.emplace(dbPrefix, mtab);
 }
 
 
@@ -58,10 +56,10 @@ void TenantMigrationAccessBlockerByPrefix::add(StringData dbPrefix,
 void TenantMigrationAccessBlockerByPrefix::remove(StringData dbPrefix) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    auto it = _migratingTenantAccessBlockers.find(dbPrefix);
-    invariant(it != _migratingTenantAccessBlockers.end());
+    auto it = _tenantMigrationAccessBlockers.find(dbPrefix);
+    invariant(it != _tenantMigrationAccessBlockers.end());
 
-    _migratingTenantAccessBlockers.erase(it);
+    _tenantMigrationAccessBlockers.erase(it);
 }
 
 
@@ -80,11 +78,11 @@ TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlocker(StringData
             return dbName.startsWith(dbPrefix);
         };
 
-    auto it = std::find_if(_migratingTenantAccessBlockers.begin(),
-                           _migratingTenantAccessBlockers.end(),
+    auto it = std::find_if(_tenantMigrationAccessBlockers.begin(),
+                           _tenantMigrationAccessBlockers.end(),
                            doesDBNameStartWithPrefix);
 
-    if (it == _migratingTenantAccessBlockers.end()) {
+    if (it == _tenantMigrationAccessBlockers.end()) {
         return nullptr;
     } else {
         return it->second;
@@ -92,7 +90,7 @@ TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlocker(StringData
 }
 
 /**
- * Iterates through each of the MigratingTenantAccessBlockers stored by the mapping
+ * Iterates through each of the TenantMigrationAccessBlockers stored by the mapping
  * and appends the server status of each blocker to the BSONObjBuilder.
  */
 void TenantMigrationAccessBlockerByPrefix::appendInfoForServerStatus(BSONObjBuilder* builder) {
@@ -105,8 +103,8 @@ void TenantMigrationAccessBlockerByPrefix::appendInfoForServerStatus(BSONObjBuil
             builder->append(blocker.first, tenantBuilder.obj());
         };
 
-    std::for_each(_migratingTenantAccessBlockers.begin(),
-                  _migratingTenantAccessBlockers.end(),
+    std::for_each(_tenantMigrationAccessBlockers.begin(),
+                  _tenantMigrationAccessBlockers.end(),
                   appendBlockerStatus);
 }
 

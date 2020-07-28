@@ -1,6 +1,6 @@
 /**
- * Tests that causal reads are properly blocked or rejected if executed after the migration
- * transitions to the read blocking state.
+ * Test that that the donor blocks clusterTime reads that are executed while the migration is in
+ * the blocking state but does not block linearizable reads.
  *
  * @tags: [requires_fcv_46, requires_majority_read_concern]
  */
@@ -8,122 +8,162 @@
 (function() {
 'use strict';
 
-const rst = new ReplSetTest({nodes: 2});
+load("jstests/libs/fail_point_util.js");
+load("jstests/libs/parallelTester.js");
+
+const kMaxTimeMS = 5 * 1000;
+const kRecipientConnString = "testConnString";
+const kConfigDonorsNS = "config.tenantMigrationDonors";
+
+function startMigration(host, dbName, recipientConnString) {
+    const primary = new Mongo(host);
+    return primary.adminCommand({
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: recipientConnString,
+        databasePrefix: dbName,
+        readPreference: {mode: "primary"}
+    });
+}
+
+function runCommand(db, cmd, expectedError) {
+    const res = db.runCommand(cmd);
+    if (expectedError) {
+        assert.commandFailedWithCode(res, expectedError);
+    } else {
+        assert.commandWorked(res);
+    }
+}
+
+/**
+ * Tests that the donor blocks clusterTime reads in the blocking state with readTimestamp >=
+ * blockingTimestamp but does not block linearizable reads.
+ */
+function testReadCommandWhenMigrationIsInBlocking(rst, testCase, dbName, collName) {
+    const primary = rst.getPrimary();
+
+    let blockingFp = configureFailPoint(primary, "pauseTenantMigrationAfterBlockingStarts");
+    let migrationThread = new Thread(startMigration, primary.host, dbName, kRecipientConnString);
+
+    // Wait for the migration to enter the blocking state.
+    migrationThread.start();
+    blockingFp.wait();
+
+    // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
+    // the oplog on all the secondaries to ensure that snapshot reads on the secondaries with
+    // unspecified atClusterTime have read timestamp >= blockTimestamp.
+    rst.awaitLastOpCommitted();
+
+    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({databasePrefix: dbName});
+    const command = testCase.requiresReadTimestamp
+        ? testCase.command(collName, donorDoc.blockTimestamp)
+        : testCase.command(collName);
+    command.maxTimeMS = kMaxTimeMS;
+
+    const nodes = testCase.isSupportedOnSecondaries ? rst.nodes : [primary];
+    nodes.forEach(node => {
+        const db = node.getDB(dbName);
+        runCommand(db, command, testCase.isLinearizableRead ? null : ErrorCodes.MaxTimeMSExpired);
+    });
+
+    blockingFp.off();
+    migrationThread.join();
+    assert.commandWorked(migrationThread.returnData());
+}
+
+const testCases = {
+    snapshotReadWithAtClusterTime: {
+        isSupportedOnSecondaries: true,
+        requiresReadTimestamp: true,
+        command: function(collName, readTimestamp) {
+            return {
+                find: collName,
+                readConcern: {
+                    level: "snapshot",
+                    atClusterTime: readTimestamp,
+                }
+            };
+        },
+    },
+    snapshotReadWithoutAtClusterTime: {
+        isSupportedOnSecondaries: true,
+        command: function(collName) {
+            return {
+                find: collName,
+                readConcern: {
+                    level: "snapshot",
+                }
+            };
+        },
+    },
+    snapshotReadWithAtClusterTimeInTxn: {
+        isSupportedOnSecondaries: false,
+        requiresReadTimestamp: true,
+        command: function(collName, readTimestamp) {
+            return {
+                find: collName,
+                lsid: {id: UUID()},
+                txnNumber: NumberLong(0),
+                startTransaction: true,
+                autocommit: false,
+                readConcern: {level: "snapshot", atClusterTime: readTimestamp}
+            };
+        }
+    },
+    snapshotReadWithoutAtClusterTimeInTxn: {
+        isSupportedOnSecondaries: false,
+        command: function(collName) {
+            return {
+                find: collName,
+                lsid: {id: UUID()},
+                txnNumber: NumberLong(0),
+                startTransaction: true,
+                autocommit: false,
+                readConcern: {level: "snapshot"}
+            };
+        }
+    },
+    readWithAfterClusterTime: {
+        isSupportedOnSecondaries: true,
+        requiresReadTimestamp: true,
+        command: function(collName, readTimestamp) {
+            return {
+                find: collName,
+                readConcern: {
+                    afterClusterTime: readTimestamp,
+                }
+            };
+        },
+    },
+    linearizableRead: {
+        isSupportedOnSecondaries: false,
+        isLinearizableRead: true,
+        command: function(collName) {
+            return {
+                find: collName,
+                readConcern: {level: "linearizable"},
+            };
+        }
+    }
+};
+
+const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}]});
 rst.startSet();
 rst.initiate();
-const primary = rst.getPrimary();
 
-const kDbPrefix = "testPrefix";
-const kDbName = kDbPrefix + "0";
 const kCollName = "testColl";
-const kMaxTimeMS = 3000;
 
-const kRecipientConnString = "testConnString";
-const kMigrationId = UUID();
+// Run test cases.
+const testFuncs = {
+    inBlocking: testReadCommandWhenMigrationIsInBlocking,
+};
 
-const kTenantMigrationsColl = 'tenantMigrationDonors';
-
-assert.commandWorked(primary.adminCommand({
-    donorStartMigration: 1,
-    migrationId: kMigrationId,
-    recipientConnectionString: kRecipientConnString,
-    databasePrefix: kDbPrefix,
-    readPreference: {mode: "primary"}
-}));
-
-// Wait for the last oplog entry on the primary to be visible in the committed snapshot view of the
-// oplog on the secondary to ensure that snapshot reads on the secondary will have read timestamp
-// >= blockTimestamp.
-rst.awaitLastOpCommitted();
-
-jsTest.log(
-    "Test that the donorStartMigration command correctly sets the durable migration state to blocking");
-
-const donorDoc = primary.getDB("config")[kTenantMigrationsColl].findOne();
-const oplogEntry =
-    primary.getDB("local").oplog.rs.findOne({ns: `config.${kTenantMigrationsColl}`, op: "u"});
-
-assert.eq(donorDoc._id, kMigrationId);
-assert.eq(donorDoc.databasePrefix, kDbPrefix);
-assert.eq(donorDoc.state, "blocking");
-assert.eq(donorDoc.blockTimestamp, oplogEntry.ts);
-
-jsTest.log("Test atClusterTime and afterClusterTime reads");
-
-rst.nodes.forEach((node) => {
-    assert.commandWorked(node.getDB(kDbName).runCommand({find: kCollName}));
-
-    // Test snapshot reads with and without atClusterTime.
-    assert.commandFailedWithCode(node.getDB(kDbName).runCommand({
-        find: kCollName,
-        readConcern: {
-            level: "snapshot",
-            atClusterTime: donorDoc.blockTimestamp,
-        },
-        maxTimeMS: kMaxTimeMS,
-    }),
-                                 ErrorCodes.MaxTimeMSExpired);
-
-    assert.commandFailedWithCode(node.getDB(kDbName).runCommand({
-        find: kCollName,
-        readConcern: {
-            level: "snapshot",
-        },
-        maxTimeMS: kMaxTimeMS,
-    }),
-                                 ErrorCodes.MaxTimeMSExpired);
-
-    // Test read with afterClusterTime.
-    assert.commandFailedWithCode(node.getDB(kDbName).runCommand({
-        find: kCollName,
-        readConcern: {
-            afterClusterTime: donorDoc.blockTimestamp,
-        },
-        maxTimeMS: kMaxTimeMS,
-    }),
-                                 ErrorCodes.MaxTimeMSExpired);
-});
-
-// Test snapshot read with atClusterTime inside transaction.
-assert.commandFailedWithCode(primary.getDB(kDbName).runCommand({
-    find: kCollName,
-    lsid: {id: UUID()},
-    txnNumber: NumberLong(0),
-    startTransaction: true,
-    autocommit: false,
-    readConcern: {level: "snapshot", atClusterTime: donorDoc.blockTimestamp},
-    maxTimeMS: kMaxTimeMS,
-}),
-                             ErrorCodes.MaxTimeMSExpired);
-
-// Test snapshot read without atClusterTime inside transaction.
-assert.commandFailedWithCode(primary.getDB(kDbName).runCommand({
-    find: kCollName,
-    lsid: {id: UUID()},
-    txnNumber: NumberLong(0),
-    startTransaction: true,
-    autocommit: false,
-    readConcern: {level: "snapshot"},
-    maxTimeMS: kMaxTimeMS,
-}),
-                             ErrorCodes.MaxTimeMSExpired);
-
-jsTest.log("Test linearizable reads");
-
-// Test that linearizable reads are not blocked in the blocking state.
-assert.commandWorked(primary.getDB(kDbName).runCommand({
-    find: kCollName,
-    readConcern: {level: "linearizable"},
-    maxTimeMS: kMaxTimeMS,
-}));
-
-// TODO (SERVER-49175): Uncomment this test case when committing is handled.
-// assert.commandFailedWithCode(primary.getDB(kDbName).runCommand({
-//     find: kCollName,
-//     readConcern: {level: "linearizable"},
-//     maxTimeMS: kMaxTimeMS,
-// }),
-//                              ErrorCodes.TenantMigrationCommitted);
+for (const [testName, testFunc] of Object.entries(testFuncs)) {
+    for (const [commandName, testCase] of Object.entries(testCases)) {
+        let dbName = commandName + "-" + testName + "0";
+        testFunc(rst, testCase, dbName, kCollName);
+    }
+}
 
 rst.stopSet();
 })();

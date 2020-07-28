@@ -7,6 +7,9 @@
 (function() {
 'use strict';
 
+load("jstests/libs/fail_point_util.js");
+load("jstests/libs/parallelTester.js");
+
 const kTestDoc = {
     x: -1
 };
@@ -26,14 +29,15 @@ const kMaxSize = 1024;      // max size of capped collections.
 const kTxnNumber = NumberLong(0);
 const kRecipientConnString = "testConnString";
 
-function startMigration(primary, dbName) {
-    assert.commandWorked(primary.adminCommand({
+function startMigration(host, dbName, recipientConnString) {
+    const primary = new Mongo(host);
+    return primary.adminCommand({
         donorStartMigration: 1,
         migrationId: UUID(),
-        recipientConnectionString: kRecipientConnString,
+        recipientConnectionString: recipientConnString,
         databasePrefix: dbName,
         readPreference: {mode: "primary"}
-    }));
+    });
 }
 
 function createCollectionAndInsertDocs(primaryDB, collName, isCapped, numDocs = kNumInitialDocs) {
@@ -127,6 +131,7 @@ function makeTestOptions(primary, testCase, dbName, collName, useTransaction, us
     return {
         primaryConn,
         primaryDB,
+        primaryHost: useSession ? primaryConn.getClient().host : primaryConn.host,
         runAgainstAdminDb: testCase.runAgainstAdminDb,
         command,
         dbName,
@@ -175,14 +180,35 @@ function runCommand(testOpts, expectedError) {
     }
 }
 
+/**
+ * Test that the write succeeds when there is no migration.
+ */
 function testWriteCommandSucceeded(testCase, testOpts) {
     runCommand(testOpts);
     testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }
 
-function testWriteCommandBlocked(testCase, testOpts) {
-    startMigration(testOpts.primaryDB, testOpts.dbName);
+/**
+ * Tests that the donor rejects writes that are executed in the blocking state.
+ */
+function testWriteCommandWhenMigrationIsInBlocking(testCase, testOpts) {
+    let blockingFp =
+        configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    let migrationThread =
+        new Thread(startMigration, testOpts.primaryHost, testOpts.dbName, kRecipientConnString);
+
+    // Run the command after the migration enters the blocking state.
+    migrationThread.start();
+    blockingFp.wait();
+    // TODO (SERVER-49181): assert that the command fails with MaxTimeMSExpired after the donor
+    // starts blocking writes instead of throwing an error.
     runCommand(testOpts, ErrorCodes.TenantMigrationConflict);
+
+    // Allow the migration to complete.
+    blockingFp.off();
+    migrationThread.join();
+    assert.commandWorked(migrationThread.returnData());
+
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }
 
@@ -661,7 +687,6 @@ rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
 
-const kDbPrefix = "testDb";
 const kCollName = "testColl";
 
 // Validate test cases for all commands.
@@ -671,24 +696,23 @@ for (let command of Object.keys(testCases)) {
 
 // Run test cases.
 const testFuncs = {
-    noTenantMigrationActive: testWriteCommandSucceeded,  // verify that the test cases are correct.
-    tenantMigrationInBlocking: testWriteCommandBlocked,
+    noMigration: testWriteCommandSucceeded,  // verify that the test cases are correct.
+    inBlocking: testWriteCommandWhenMigrationIsInBlocking,
 };
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
-    for (let command of Object.keys(testCases)) {
-        let testCase = testCases[command];
-        let baseDbName = kDbPrefix + "-" + testName + "-" + command;
+    for (const [commandName, testCase] of Object.entries(testCases)) {
+        let baseDbName = commandName + "-" + testName + "0";
 
         if (testCase.skip) {
-            print("Skipping " + command + ": " + testCase.skip);
+            print("Skipping " + commandName + ": " + testCase.skip);
             continue;
         }
 
         runTest(primary, testCase, testFunc, baseDbName + "Basic", kCollName);
 
         // TODO (SERVER-49844): Test transactional writes during migration.
-        if (testCase.isSupportedInTransaction && testName == "noTenantMigrationActive") {
+        if (testCase.isSupportedInTransaction && testName == "noMigration") {
             runTest(
                 primary, testCase, testFunc, baseDbName + "Txn", kCollName, {useTransaction: true});
         }
