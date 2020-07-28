@@ -508,6 +508,20 @@ void generateLogicalAnd(MatchExpressionVisitorContext* context, const AndMatchEx
 }
 
 /**
+ * Generates and pushes a constant boolean expression for either alwaysTrue or alwaysFalse.
+ */
+void generateAlwaysBoolean(MatchExpressionVisitorContext* context, bool value) {
+    context->predicateVars.push(context->slotIdGenerator->generate());
+    context->inputStage =
+        sbe::makeProjectStage(std::move(context->inputStage),
+                              context->predicateVars.top(),
+                              sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, value));
+
+    // Check if can bail out early from the $and predicate if this expression is part of branch.
+    checkForShortCircuitFromLogicalAnd(context);
+}
+
+/**
  * A match expression pre-visitor used for maintaining nested logical expressions while traversing
  * the match expression tree.
  */
@@ -515,12 +529,8 @@ class MatchExpressionPreVisitor final : public MatchExpressionConstVisitor {
 public:
     MatchExpressionPreVisitor(MatchExpressionVisitorContext* context) : _context(context) {}
 
-    void visit(const AlwaysFalseMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
-    void visit(const AlwaysTrueMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
+    void visit(const AlwaysFalseMatchExpression* expr) final {}
+    void visit(const AlwaysTrueMatchExpression* expr) final {}
     void visit(const AndMatchExpression* expr) final {
         _context->nestedLogicalExprs.push({expr, expr->numChildren()});
     }
@@ -669,8 +679,12 @@ class MatchExpressionPostVisitor final : public MatchExpressionConstVisitor {
 public:
     MatchExpressionPostVisitor(MatchExpressionVisitorContext* context) : _context(context) {}
 
-    void visit(const AlwaysFalseMatchExpression* expr) final {}
-    void visit(const AlwaysTrueMatchExpression* expr) final {}
+    void visit(const AlwaysFalseMatchExpression* expr) final {
+        generateAlwaysBoolean(_context, false);
+    }
+    void visit(const AlwaysTrueMatchExpression* expr) final {
+        generateAlwaysBoolean(_context, true);
+    }
     void visit(const AndMatchExpression* expr) final {
         _context->nestedLogicalExprs.pop();
         generateLogicalAnd(_context, expr);
