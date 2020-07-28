@@ -257,22 +257,17 @@ Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosi
         auto pipeCopy = Pipeline::create(_pipeline->getSources(), _pipeline->getContext());
 
         // If we have already started getting documents from the sub-pipeline, this is an explain
-        // that has done some execution. We don't want to serialize the mergeCursors stage, and
-        // explain will attach a new cursor stage if we were reading local only. Therefore, remove
-        // the cursor stage of the pipeline. There is an implicit invariant that if we are in
-        // either of these states, the pipeline starts with one of the two cursor stages.
-        if (_executionState != ExecutionProgress::kStartingSubPipeline &&
-            _executionState != ExecutionProgress::kIteratingSource) {
-            pipeCopy->popFront();
-        }
-        BSONObj explainObj = pExpCtx->mongoProcessInterface->attachCursorSourceAndExplain(
-            pipeCopy.release(), *explain);
+        // that has done some execution. We don't want to serialize the mergeCursors stage, so if
+        // we have a cursor stage we tell the process interface to remove it in the case it is a
+        // mergeCursors stage.
+        BSONObj explainLocal =
+            pExpCtx->mongoProcessInterface->preparePipelineAndExplain(pipeCopy.release(), *explain);
         LOGV2_DEBUG(4553501, 3, "$unionWith attached cursor to pipeline for explain");
         // We expect this to be an explanation of a pipeline -- there should only be one field.
-        invariant(explainObj.nFields() == 1);
+        invariant(explainLocal.nFields() == 1);
         return Value(
             DOC(getSourceName() << DOC("coll" << _pipeline->getContext()->ns.coll() << "pipeline"
-                                              << explainObj.firstElement())));
+                                              << explainLocal.firstElement())));
     } else {
         BSONArrayBuilder bab;
         for (auto&& stage : _pipeline->serialize())

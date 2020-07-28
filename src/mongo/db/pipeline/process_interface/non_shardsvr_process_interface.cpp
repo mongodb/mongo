@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/pipeline/document_source_cursor.h"
 
 namespace mongo {
 
@@ -171,11 +172,24 @@ void NonShardServerProcessInterface::dropCollection(OperationContext* opCtx,
         opCtx, ns, {}, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
 }
 
-BSONObj NonShardServerProcessInterface::attachCursorSourceAndExplain(
+BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
     Pipeline* ownedPipeline, ExplainOptions::Verbosity verbosity) {
-    auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
+    std::vector<Value> pipelineVec;
+    auto firstStage = ownedPipeline->peekFront();
+    // If the pipeline already has a cursor explain with that one, otherwise attach a new one like
+    // we would for a normal execution and explain that.
+    if (firstStage && typeid(*firstStage) == typeid(DocumentSourceCursor)) {
+        // Managed pipeline goes out of scope at the end of this else block, but we've already
+        // extracted the necessary information and won't need it again.
+        std::unique_ptr<Pipeline, PipelineDeleter> managedPipeline(
+            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
+        pipelineVec = managedPipeline->writeExplainOps(verbosity);
+        ownedPipeline = nullptr;
+    } else {
+        auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
+        pipelineVec = pipelineWithCursor->writeExplainOps(verbosity);
+    }
     BSONArrayBuilder bab;
-    auto pipelineVec = pipelineWithCursor->writeExplainOps(verbosity);
     for (auto&& stage : pipelineVec) {
         bab << stage;
     }
