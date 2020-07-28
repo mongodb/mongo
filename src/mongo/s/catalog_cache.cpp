@@ -614,7 +614,7 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
 
     _cacheLoader.getDatabase(dbName)
         .thenRunOn(_executor)
-        .then([=](const DatabaseType& dbt) noexcept {
+        .then([ =, dbName = dbName.toString() ](const DatabaseType& dbt) noexcept {
             const auto dbVersionAfterRefresh = dbt.getVersion();
             const auto dbVersionHasChanged =
                 (!dbEntry->dbt ||
@@ -641,7 +641,7 @@ void CatalogCache::_scheduleDatabaseRefresh(WithLock lk,
 
             dbEntry->dbt = std::move(dbt);
         })
-        .onError([=](Status errStatus) noexcept {
+        .onError([ =, dbName = dbName.toString() ](Status errStatus) noexcept {
             stdx::lock_guard<Latch> lg(_mutex);
 
             LOGV2_OPTIONS(24100,

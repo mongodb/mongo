@@ -456,7 +456,7 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoader::getDatabase(StringData d
 
     return ExecutorFuture<void>(_executor)
         .then([this,
-               dbName = std::move(dbName),
+               dbName = dbName.toString(),
                isPrimary = std::move(isPrimary),
                term = std::move(term)]() {
             ThreadClient tc("ShardServerCatalogCacheLoader::getDatabase",
