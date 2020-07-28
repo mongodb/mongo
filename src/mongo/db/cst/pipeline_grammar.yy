@@ -137,7 +137,7 @@
     ADD
     ATAN2
     AND
-    CONST
+    CONST_EXPR
     LITERAL
     OR
     NOT
@@ -151,7 +151,7 @@
 %token <BSONBinData> BINARY
 %token <UserUndefined> UNDEFINED
 %token <OID> OBJECT_ID
-%token <Date_t> DATE
+%token <Date_t> DATE_LITERAL
 %token <UserNull> JSNULL
 %token <BSONRegEx> REGEX
 %token <BSONDBRef> DB_POINTER
@@ -353,7 +353,7 @@ aggExprAsUserFieldname:
     | AND {
         $$ = UserFieldname{"$and"};
     }
-    | CONST {
+    | CONST_EXPR {
         $$ = UserFieldname{"$const"};
     }
     | LITERAL {
@@ -392,7 +392,7 @@ objectId:
 ;
 
 date:
-    DATE {
+    DATE_LITERAL {
         $$ = CNode{UserDate{$1}};
     }
 ;
@@ -638,7 +638,7 @@ literalEscapes:
 ;
 
 const:
-    START_OBJECT CONST START_ARRAY value END_ARRAY END_OBJECT {
+    START_OBJECT CONST_EXPR START_ARRAY value END_ARRAY END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::constExpr,
                                           CNode{CNode::ArrayChildren{$value}}}}};
     }

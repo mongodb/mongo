@@ -286,7 +286,7 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_ty
             value.YY_MOVE_OR_COPY<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case 33:  // DATE
+        case 33:  // DATE_LITERAL
             value.YY_MOVE_OR_COPY<Date_t>(YY_MOVE(that.value));
             break;
 
@@ -447,7 +447,7 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_RE
             value.move<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case 33:  // DATE
+        case 33:  // DATE_LITERAL
             value.move<Date_t>(YY_MOVE(that.value));
             break;
 
@@ -608,7 +608,7 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
             value.copy<CNode::Fieldname>(that.value);
             break;
 
-        case 33:  // DATE
+        case 33:  // DATE_LITERAL
             value.copy<Date_t>(that.value);
             break;
 
@@ -768,7 +768,7 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
             value.move<CNode::Fieldname>(that.value);
             break;
 
-        case 33:  // DATE
+        case 33:  // DATE_LITERAL
             value.move<Date_t>(that.value);
             break;
 
@@ -1139,7 +1139,7 @@ int PipelineParserGen::parse() {
                     yylhs.value.emplace<CNode::Fieldname>();
                     break;
 
-                case 33:  // DATE
+                case 33:  // DATE_LITERAL
                     yylhs.value.emplace<Date_t>();
                     break;
 
@@ -2780,7 +2780,7 @@ const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    "ADD",
                                                    "ATAN2",
                                                    "AND",
-                                                   "CONST",
+                                                   "CONST_EXPR",
                                                    "LITERAL",
                                                    "OR",
                                                    "NOT",
@@ -2789,7 +2789,7 @@ const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    "BINARY",
                                                    "UNDEFINED",
                                                    "OBJECT_ID",
-                                                   "DATE",
+                                                   "DATE_LITERAL",
                                                    "JSNULL",
                                                    "REGEX",
                                                    "DB_POINTER",
@@ -2906,6 +2906,6 @@ void PipelineParserGen::yy_reduce_print_(int yyrule) const {
 
 #line 58 "pipeline_grammar.yy"
 }  // namespace mongo
-#line 2824 "pipeline_parser_gen.cpp"
+#line 2825 "pipeline_parser_gen.cpp"
 
 #line 707 "pipeline_grammar.yy"

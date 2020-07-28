@@ -53,7 +53,7 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"$and", PipelineParserGen::token::AND},
     {"$or", PipelineParserGen::token::OR},
     {"$not", PipelineParserGen::token::NOT},
-    {"$const", PipelineParserGen::token::CONST},
+    {"$const", PipelineParserGen::token::CONST_EXPR},
     {"$literal", PipelineParserGen::token::LITERAL}};
 
 bool isCompound(PipelineParserGen::symbol_type token) {
@@ -188,7 +188,7 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
                                  getNextLoc());
             break;
         case BSONType::Date:
-            _tokens.emplace_back(PipelineParserGen::make_DATE(elem.date(), getNextLoc()));
+            _tokens.emplace_back(PipelineParserGen::make_DATE_LITERAL(elem.date(), getNextLoc()));
             break;
         case BSONType::jstNULL:
             _tokens.emplace_back(PipelineParserGen::make_JSNULL(UserNull{}, getNextLoc()));

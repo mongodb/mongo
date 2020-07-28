@@ -447,7 +447,7 @@ public:
             // valueFieldname
             char dummy8[sizeof(CNode::Fieldname)];
 
-            // DATE
+            // DATE_LITERAL
             char dummy9[sizeof(Date_t)];
 
             // DECIMAL_NON_ZERO
@@ -555,7 +555,7 @@ public:
             ADD = 21,                         // ADD
             ATAN2 = 22,                       // ATAN2
             AND = 23,                         // AND
-            CONST = 24,                       // CONST
+            CONST_EXPR = 24,                  // CONST_EXPR
             LITERAL = 25,                     // LITERAL
             OR = 26,                          // OR
             NOT = 27,                         // NOT
@@ -564,7 +564,7 @@ public:
             BINARY = 30,                      // BINARY
             UNDEFINED = 31,                   // UNDEFINED
             OBJECT_ID = 32,                   // OBJECT_ID
-            DATE = 33,                        // DATE
+            DATE_LITERAL = 33,                // DATE_LITERAL
             JSNULL = 34,                      // JSNULL
             REGEX = 35,                       // REGEX
             DB_POINTER = 36,                  // DB_POINTER
@@ -618,7 +618,7 @@ public:
             S_ADD = 21,                         // ADD
             S_ATAN2 = 22,                       // ATAN2
             S_AND = 23,                         // AND
-            S_CONST = 24,                       // CONST
+            S_CONST_EXPR = 24,                  // CONST_EXPR
             S_LITERAL = 25,                     // LITERAL
             S_OR = 26,                          // OR
             S_NOT = 27,                         // NOT
@@ -627,7 +627,7 @@ public:
             S_BINARY = 30,                      // BINARY
             S_UNDEFINED = 31,                   // UNDEFINED
             S_OBJECT_ID = 32,                   // OBJECT_ID
-            S_DATE = 33,                        // DATE
+            S_DATE_LITERAL = 33,                // DATE_LITERAL
             S_JSNULL = 34,                      // JSNULL
             S_REGEX = 35,                       // REGEX
             S_DB_POINTER = 36,                  // DB_POINTER
@@ -824,7 +824,7 @@ public:
                     value.move<CNode::Fieldname>(std::move(that.value));
                     break;
 
-                case 33:  // DATE
+                case 33:  // DATE_LITERAL
                     value.move<Date_t>(std::move(that.value));
                     break;
 
@@ -1167,7 +1167,7 @@ public:
                     value.template destroy<CNode::Fieldname>();
                     break;
 
-                case 33:  // DATE
+                case 33:  // DATE_LITERAL
                     value.template destroy<Date_t>();
                     break;
 
@@ -1325,7 +1325,7 @@ public:
                       tok == token::STAGE_SKIP || tok == token::STAGE_LIMIT ||
                       tok == token::STAGE_PROJECT || tok == token::COLL_ARG ||
                       tok == token::PIPELINE_ARG || tok == token::ADD || tok == token::ATAN2 ||
-                      tok == token::AND || tok == token::CONST || tok == token::LITERAL ||
+                      tok == token::AND || tok == token::CONST_EXPR || tok == token::LITERAL ||
                       tok == token::OR || tok == token::NOT);
         }
 #else
@@ -1340,7 +1340,7 @@ public:
                       tok == token::STAGE_SKIP || tok == token::STAGE_LIMIT ||
                       tok == token::STAGE_PROJECT || tok == token::COLL_ARG ||
                       tok == token::PIPELINE_ARG || tok == token::ADD || tok == token::ATAN2 ||
-                      tok == token::AND || tok == token::CONST || tok == token::LITERAL ||
+                      tok == token::AND || tok == token::CONST_EXPR || tok == token::LITERAL ||
                       tok == token::OR || tok == token::NOT);
         }
 #endif
@@ -1413,12 +1413,12 @@ public:
 #if 201103L <= YY_CPLUSPLUS
         symbol_type(int tok, Date_t v, location_type l)
             : super_type(token_type(tok), std::move(v), std::move(l)) {
-            YY_ASSERT(tok == token::DATE);
+            YY_ASSERT(tok == token::DATE_LITERAL);
         }
 #else
         symbol_type(int tok, const Date_t& v, const location_type& l)
             : super_type(token_type(tok), v, l) {
-            YY_ASSERT(tok == token::DATE);
+            YY_ASSERT(tok == token::DATE_LITERAL);
         }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1810,12 +1810,12 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_CONST(location_type l) {
-        return symbol_type(token::CONST, std::move(l));
+    static symbol_type make_CONST_EXPR(location_type l) {
+        return symbol_type(token::CONST_EXPR, std::move(l));
     }
 #else
-    static symbol_type make_CONST(const location_type& l) {
-        return symbol_type(token::CONST, l);
+    static symbol_type make_CONST_EXPR(const location_type& l) {
+        return symbol_type(token::CONST_EXPR, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1891,12 +1891,12 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_DATE(Date_t v, location_type l) {
-        return symbol_type(token::DATE, std::move(v), std::move(l));
+    static symbol_type make_DATE_LITERAL(Date_t v, location_type l) {
+        return symbol_type(token::DATE_LITERAL, std::move(v), std::move(l));
     }
 #else
-    static symbol_type make_DATE(const Date_t& v, const location_type& l) {
-        return symbol_type(token::DATE, v, l);
+    static symbol_type make_DATE_LITERAL(const Date_t& v, const location_type& l) {
+        return symbol_type(token::DATE_LITERAL, v, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2400,7 +2400,7 @@ PipelineParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
             value.copy<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case 33:  // DATE
+        case 33:  // DATE_LITERAL
             value.copy<Date_t>(YY_MOVE(that.value));
             break;
 
@@ -2569,7 +2569,7 @@ void PipelineParserGen::basic_symbol<Base>::move(basic_symbol& s) {
             value.move<CNode::Fieldname>(YY_MOVE(s.value));
             break;
 
-        case 33:  // DATE
+        case 33:  // DATE_LITERAL
             value.move<Date_t>(YY_MOVE(s.value));
             break;
 
