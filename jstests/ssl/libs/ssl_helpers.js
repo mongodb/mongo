@@ -368,6 +368,13 @@ function opensslVersionAsInt() {
     return version;
 }
 
-function supportsStapling() {
-    return opensslVersionAsInt() >= 0x01000200;
+function copyCertificateFile(a, b) {
+    if (_isWindows()) {
+        // correctly replace forward slashes for Windows
+        a = a.replace(/\//g, "\\");
+        b = b.replace(/\//g, "\\");
+        assert.eq(0, runProgram("cmd.exe", "/c", "copy", a, b));
+        return;
+    }
+    assert.eq(0, runProgram("cp", a, b));
 }

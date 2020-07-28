@@ -7488,7 +7488,7 @@ tasks:
 
 - <<: *task_template
   name: ocsp
-  tags: ["ssl", "ocsp"]
+  tags: ["ssl", "encrypt", "ocsp"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -11125,7 +11125,7 @@ buildvariants:
   - name: compile_TG
     distros:
     - rhel70
-  - name: ssl_gen
+  - name: .ssl
   - name: jsCore
   - name: external_auth
 

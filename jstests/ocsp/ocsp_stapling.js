@@ -10,10 +10,6 @@ if (determineSSLProvider() !== "openssl") {
     return;
 }
 
-if (!supportsStapling()) {
-    return;
-}
-
 function test(serverCert, caCert, responderCertPair) {
     const ocsp_options = {
         sslMode: "requireSSL",

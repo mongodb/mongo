@@ -427,6 +427,7 @@ public:
 
 using UniqueSSLContext =
     std::unique_ptr<SSL_CTX, OpenSSLDeleter<decltype(::SSL_CTX_free), ::SSL_CTX_free>>;
+using UniqueSSL = std::unique_ptr<SSL, OpenSSLDeleter<decltype(::SSL_free), ::SSL_free>>;
 static const int BUFFER_SIZE = 8 * 1024;
 
 using UniqueX509 = std::unique_ptr<X509, OpenSSLDeleter<decltype(X509_free), ::X509_free>>;
@@ -1715,13 +1716,32 @@ Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorP
 
 using StoreCtxVerifiedChain = std::unique_ptr<STACK_OF(X509), X509StackDeleter>;
 
-#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+/** getCertificateForContext provides access to the X509* used by the provided SSL_CTX*.
+ * OpenSSL 1.0.2 provides SSL_CTX_get0_certificate, which provides direct access to the pointer.
+ * OpenSSL 1.0.1 only exposes the pointer on a per-connection basis via SSL_get_certificate.
+ * We must provide different implementations depending on the symbols available at compile-time.
+ * On 1.0.1, we must ensure that the lifetime of SSL object is longer than the X509 pointer we're
+ * inspecting.
+ */
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
+std::tuple<UniqueSSL, X509*> getCertificateForContext(SSL_CTX* context) {
+    UniqueSSL ssl(SSL_new(context));
+    X509* ret = SSL_get_certificate(ssl.get());
+    return std::make_tuple(std::move(ssl), ret);
+}
+#else
+std::tuple<X509*> getCertificateForContext(SSL_CTX* context) {
+    return std::make_tuple(SSL_CTX_get0_certificate(context));
+}
+#endif
+
 Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
     if (MONGO_unlikely(disableStapling.shouldFail()) || !tlsOCSPEnabled) {
         return Status::OK();
     }
 
-    X509* cert = SSL_CTX_get0_certificate(context);
+    auto certificateHolder = getCertificateForContext(context);
+    X509* cert = std::get<X509*>(certificateHolder);
     if (!cert) {
         return getSSLFailure(
             "Could not staple because could not get certificate from SSL Context.");
@@ -1846,11 +1866,6 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
 
     return Status::OK();
 }
-#else
-Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
-    return Status::OK();
-}
-#endif
 
 Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
                                          const SSLParams& params,
