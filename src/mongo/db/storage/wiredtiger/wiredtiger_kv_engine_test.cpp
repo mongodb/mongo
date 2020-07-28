@@ -251,7 +251,21 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     // timestamp greater than this will also trigger a checkpoint. The following loop of the
     // CheckpointThread will observe the new `checkpointDelaySecs` value.
     _engine->setInitialDataTimestamp(Timestamp(1, 1));
-    wiredTigerGlobalOptions.checkpointDelaySecs = 1;
+
+
+    // Ignore data race on this variable when running with TSAN, this is only an issue in this
+    // unittest and not in mongod
+    []()
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+        __attribute__((no_sanitize("thread")))
+#endif
+#endif
+    {
+        wiredTigerGlobalOptions.checkpointDelaySecs = 1;
+    }
+    ();
+
 
     // To diagnose any intermittent failures, maximize logging from WiredTigerKVEngine and friends.
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kStorage,
