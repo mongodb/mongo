@@ -2259,9 +2259,9 @@ struct __wt_connection {
 	 * @config{eviction_updates_trigger, trigger application threads to perform eviction when
 	 * the cache contains at least this many bytes of updates.  It is a percentage of the cache
 	 * size if the value is within the range of 1 to 100 or an absolute size when greater than
-	 * 100. Calculated as half of \c eviction_dirty_trigger by default.  The value is not
+	 * 100\. Calculated as half of \c eviction_dirty_trigger by default.  The value is not
 	 * allowed to exceed the \c cache_size.  This setting only alters behavior if it is lower
-	 * than eviction_trigger., an integer between 0 and 10TB; default \c 0.}
+	 * than \c eviction_trigger., an integer between 0 and 10TB; default \c 0.}
 	 * @config{file_manager = (, control how file handles are managed., a set of related
 	 * configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
@@ -2919,10 +2919,10 @@ struct __wt_connection {
  * integer between 0 and 10TB; default \c 0.}
  * @config{eviction_updates_trigger, trigger application threads to perform eviction when the cache
  * contains at least this many bytes of updates.  It is a percentage of the cache size if the value
- * is within the range of 1 to 100 or an absolute size when greater than 100. Calculated as half of
+ * is within the range of 1 to 100 or an absolute size when greater than 100\. Calculated as half of
  * \c eviction_dirty_trigger by default.  The value is not allowed to exceed the \c cache_size.
- * This setting only alters behavior if it is lower than eviction_trigger., an integer between 0 and
- * 10TB; default \c 0.}
+ * This setting only alters behavior if it is lower than \c eviction_trigger., an integer between 0
+ * and 10TB; default \c 0.}
  * @config{exclusive, fail if the database already exists\, generally used with the \c create
  * option., a boolean flag; default \c false.}
  * @config{extensions, list of shared library extensions to load (using dlopen). Any values

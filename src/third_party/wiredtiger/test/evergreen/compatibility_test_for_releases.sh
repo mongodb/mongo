@@ -14,6 +14,7 @@ bflag()
 {
         # Return if the branch's format command takes the -B flag for backward compatibility.
         test "$1" = "develop" && echo "-B "
+        test "$1" = "mongodb-4.6" && echo "-B "
         test "$1" = "mongodb-4.4" && echo "-B "
         return 0
 }
@@ -186,10 +187,11 @@ cd "$top"
 if [ "$long" = true ]; then
     (build_branch mongodb-3.4)
     (build_branch mongodb-3.6)
+    (build_branch mongodb-4.0)
 fi
-(build_branch mongodb-4.0)
 (build_branch mongodb-4.2)
 (build_branch mongodb-4.4)
+(build_branch mongodb-4.6)
 (build_branch develop)
 
 # Get the names of the last two WiredTiger releases, wt1 is the most recent release, wt2 is the
@@ -206,10 +208,11 @@ fi
 if [ "$long" = true ]; then
     (run_format mongodb-3.4 "fix row var")
     (run_format mongodb-3.6 "fix row var")
+    (run_format mongodb-4.0 "fix row var")
 fi
-(run_format mongodb-4.0 "fix row var")
 (run_format mongodb-4.2 "fix row var")
 (run_format mongodb-4.4 "row")
+(run_format mongodb-4.6 "row")
 (run_format develop "row")
 if [ "$long" = true ]; then
     (run_format "$wt1" "fix row var")
@@ -220,11 +223,11 @@ fi
 if [ "$long" = true ]; then
     (verify_branches mongodb-3.6 mongodb-3.4 "fix row var")
     (verify_branches mongodb-4.0 mongodb-3.6 "fix row var")
+    (verify_branches mongodb-4.2 mongodb-4.0 "fix row var")
 fi
-(verify_branches mongodb-4.2 mongodb-4.0 "fix row var")
 (verify_branches mongodb-4.4 mongodb-4.2 "fix row var")
-(verify_branches develop mongodb-4.4 "row")
-(verify_branches develop mongodb-4.2 "row")
+(verify_branches mongodb-4.6 mongodb-4.4 "row")
+(verify_branches develop mongodb-4.6 "row")
 if [ "$long" = true ]; then
     (verify_branches "$wt1" "$wt2" "row")
     (verify_branches develop "$wt1" "row")
@@ -232,12 +235,12 @@ fi
 
 # Verify forward compatibility for supported access methods.
 (verify_branches mongodb-4.2 mongodb-4.4 "row")
-(verify_branches mongodb-4.2 develop "row")
-(verify_branches mongodb-4.4 develop "row")
+(verify_branches mongodb-4.4 mongodb-4.6 "row")
+(verify_branches mongodb-4.6 develop "row")
 
 # Upgrade/downgrade testing for supported access methods.
 (upgrade_downgrade mongodb-4.2 mongodb-4.4 "row")
-(upgrade_downgrade mongodb-4.2 develop "row")
-(upgrade_downgrade mongodb-4.4 develop "row")
+(upgrade_downgrade mongodb-4.4 mongodb-4.6"row")
+(upgrade_downgrade mongodb-4.6 develop "row")
 
 exit 0
