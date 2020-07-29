@@ -3517,7 +3517,7 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
-        targets: install-all
+        targets: install-all-meta
         compiling_for_test: true
         task_compile_flags: >-
           --detect-odr-violations
