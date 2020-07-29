@@ -203,12 +203,14 @@ private:
     std::map<UUID, std::unique_ptr<MultiIndexBlock>> _builders;
 
     /**
-     * Deletes records containing duplicate keys and inserts them into a local lost and found
-     * collection titled "local.system.lost_and_found.<original collection UUID>".
+     * Deletes record containing duplicate keys and insert it into a local lost and found collection
+     * titled "local.system.lost_and_found.<original collection UUID>". Returns the size of the
+     * record removed.
      */
-    StatusWith<long long> _moveDocsToLostAndFound(OperationContext* opCtx,
-                                                  NamespaceString ns,
-                                                  std::set<RecordId>* dupRecords);
+    StatusWith<int> _moveRecordToLostAndFound(OperationContext* opCtx,
+                                              NamespaceString ns,
+                                              NamespaceString lostAndFoundNss,
+                                              RecordId dupRecord);
 };
 
 }  // namespace mongo

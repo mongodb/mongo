@@ -66,6 +66,7 @@ class IndexAccessMethod {
 
 public:
     using KeyHandlerFn = std::function<Status(const KeyString::Value&)>;
+    using RecordIdHandlerFn = std::function<Status(const RecordId&)>;
 
     IndexAccessMethod() = default;
     virtual ~IndexAccessMethod() = default;
@@ -263,14 +264,16 @@ public:
      * @param mayInterrupt - Is this commit interruptible (will cancel)
      * @param dupsAllowed - If false and 'dupRecords' is not null, append with the RecordIds of
      *                      the uninserted duplicates.
-     * @param onDuplicateKey - Will be called for each duplicate key inserted into the index.
-     * @param dupRecords - If not null, is filled with the RecordIds of uninserted duplicate keys.
+     * @param onDuplicateKeyInserted - Will be called for each duplicate key inserted into the
+     * index.
+     * @param onDuplicateRecord - If not nullptr, will be called for each RecordId of uninserted
+     * duplicate keys.
      */
     virtual Status commitBulk(OperationContext* opCtx,
                               BulkBuilder* bulk,
                               bool dupsAllowed,
-                              KeyHandlerFn&& onDuplicateKey,
-                              std::set<RecordId>* dupRecords) = 0;
+                              KeyHandlerFn&& onDuplicateKeyInserted,
+                              RecordIdHandlerFn&& onDuplicateRecord) = 0;
 
     /**
      * Specifies whether getKeys should relax the index constraints or not, in order of most
@@ -494,8 +497,8 @@ public:
     Status commitBulk(OperationContext* opCtx,
                       BulkBuilder* bulk,
                       bool dupsAllowed,
-                      KeyHandlerFn&& onDuplicateKey,
-                      std::set<RecordId>* dupRecords) final;
+                      KeyHandlerFn&& onDuplicateKeyInserted,
+                      RecordIdHandlerFn&& onDuplicateRecord) final;
 
     void getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                  const BSONObj& obj,
@@ -551,6 +554,14 @@ private:
                       const KeyString::Value& keyString,
                       const RecordId& loc,
                       bool dupsAllowed);
+    /**
+     * While inserting keys into index (from external sorter), if a duplicate key is detected
+     * (when duplicates are not allowed), 'onDuplicateRecord' will be called if passed, otherwise a
+     * DuplicateKey error will be returned.
+     */
+    Status _handleDuplicateKey(OperationContext* opCtx,
+                               const KeyString::Value& dataKey,
+                               RecordIdHandlerFn&& onDuplicateRecord);
 
     const std::unique_ptr<SortedDataInterface> _newInterface;
 };
