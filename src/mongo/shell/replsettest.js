@@ -3460,6 +3460,26 @@ var ReplSetTest = function(opts) {
         self.name = conf._id;
     }
 
+    /**
+     * Constructor, which instantiates the ReplSetTest object from existing nodes.
+     */
+    function _constructFromExistingNodes(
+        {name, nodeHosts, nodeOptions, keyFile, host, waitForKeys}) {
+        print('Recreating replica set from existing nodes ' + tojson(nodeHosts));
+
+        self.name = name;
+        self.ports = nodeHosts.map(node => node.split(':')[1]);
+        self.nodes = nodeHosts.map((node) => {
+            const conn = Mongo(node);
+            conn.name = conn.host;
+            return conn;
+        });
+        self.host = host;
+        self.waitForKeys = waitForKeys;
+        self.keyFile = keyFile;
+        self.nodeOptions = nodeOptions;
+    }
+
     if (typeof opts === 'string' || opts instanceof String) {
         retryOnNetworkError(function() {
             // The primary may unexpectedly step down during startup if under heavy load
@@ -3467,6 +3487,8 @@ var ReplSetTest = function(opts) {
             // its connections.
             _constructFromExistingSeedNode(opts);
         }, 60);
+    } else if (typeof opts.rstArgs === "object") {
+        _constructFromExistingNodes(opts.rstArgs);
     } else {
         _constructStartNewInstances(opts);
     }
