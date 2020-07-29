@@ -33,8 +33,11 @@
 #define WT_HS_FILE "WiredTigerHS.wt"     /* History store table */
 #define WT_HS_URI "file:WiredTigerHS.wt" /* History store table URI */
 
-#define WT_SYSTEM_PREFIX "system:"             /* System URI prefix */
-#define WT_SYSTEM_CKPT_URI "system:checkpoint" /* Checkpoint URI */
+#define WT_SYSTEM_PREFIX "system:"               /* System URI prefix */
+#define WT_SYSTEM_CKPT_TS "checkpoint_timestamp" /* Checkpoint timestamp name */
+#define WT_SYSTEM_CKPT_URI "system:checkpoint"   /* Checkpoint timestamp URI */
+#define WT_SYSTEM_OLDEST_TS "oldest_timestamp"   /* Oldest timestamp name */
+#define WT_SYSTEM_OLDEST_URI "system:oldest"     /* Oldest timestamp URI */
 
 /*
  * Optimize comparisons against the metafile URI, flag handles that reference the metadata file.

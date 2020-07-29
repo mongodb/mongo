@@ -1471,8 +1471,12 @@ retry:
 
         /*
          * Skip files that are configured to stick in cache until we become aggressive.
+         *
+         * If the file is contributing heavily to our cache usage then ignore the "stickiness" of
+         * its pages.
          */
-        if (btree->evict_priority != 0 && !__wt_cache_aggressive(session))
+        if (btree->evict_priority != 0 && !__wt_cache_aggressive(session) &&
+          !__wt_btree_dominating_cache(session, btree))
             continue;
 
         /*

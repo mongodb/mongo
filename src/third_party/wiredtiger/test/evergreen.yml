@@ -2223,7 +2223,7 @@ tasks:
             CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
             CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer
             -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
-          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
+          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "format test script"
         vars:
           test_env_vars:
@@ -2248,7 +2248,7 @@ tasks:
             CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
             CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer
             -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
-          posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
+          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "format test script"
         # To emulate the original Jenkins job's test coverage, we are running the smoke test 16 times
         # Run smoke tests, don't stop at failed tests, use default config

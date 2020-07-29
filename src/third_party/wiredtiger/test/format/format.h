@@ -402,6 +402,7 @@ void operations(u_int, bool);
 void path_setup(const char *);
 void set_alarm(u_int);
 void set_core_off(void);
+void set_oldest_timestamp(void);
 void snap_init(TINFO *);
 void snap_teardown(TINFO *);
 void snap_op_init(TINFO *, uint64_t, bool);

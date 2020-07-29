@@ -547,7 +547,7 @@ reopen_file(int *fdp, char *buf, size_t buflen, const char *filename, int oflag)
  */
 static void
 incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABLE_INFO *tinfo,
-  ACTIVE_FILES *master_active)
+  ACTIVE_FILES *current_active)
 {
     ACTIVE_FILES active;
     WT_CURSOR *cursor, *file_cursor;
@@ -560,7 +560,7 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
     char *filename;
 
     VERBOSE(2, "INCREMENTAL BACKUP: %s\n", backup_home);
-    active_files_print(master_active, "master list before incremental backup");
+    active_files_print(current_active, "current list before incremental backup");
     WT_CLEAR(rbuf);
     WT_CLEAR(wbuf);
     rfd = wfd = -1;
@@ -637,10 +637,10 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
     VERBOSE(2, " finished incremental backup: %d files, %d range copy, %d file copy\n", nfiles,
       nrange, ncopy);
     active_files_sort(&active);
-    active_files_remove_missing(master_active, &active, backup_home);
+    active_files_remove_missing(current_active, &active, backup_home);
 
-    /* Move the current active list to the master list */
-    active_files_move(master_active, &active);
+    /* Move the active list to the current list. */
+    active_files_move(current_active, &active);
 }
 
 static void

@@ -303,7 +303,8 @@ timestamp_parse(WT_SESSION *session, const char *str, uint64_t *tsp)
     char *p;
 
     *tsp = strtoull(str, &p, 16);
-    WT_ASSERT((WT_SESSION_IMPL *)session, p - str <= 16);
+    if (session != NULL)
+        WT_ASSERT((WT_SESSION_IMPL *)session, p - str <= 16);
 }
 
 /*
@@ -353,6 +354,39 @@ timestamp(void *arg)
 
     testutil_check(session->close(session, NULL));
     return (WT_THREAD_RET_VALUE);
+}
+
+/*
+ * set_oldest_timestamp --
+ *     Query the oldest timestamp from wiredtiger and set it as our global oldest timestamp. This
+ *     should only be called on runs for pre existing databases.
+ */
+void
+set_oldest_timestamp(void)
+{
+    static const char *oldest_timestamp_str = "oldest_timestamp=";
+
+    WT_CONNECTION *conn;
+    WT_DECL_RET;
+    uint64_t oldest_ts;
+    char buf[WT_TS_HEX_STRING_SIZE * 2 + 64], tsbuf[WT_TS_HEX_STRING_SIZE];
+
+    conn = g.wts_conn;
+
+    if ((ret = conn->query_timestamp(conn, tsbuf, "get=oldest")) == 0) {
+        timestamp_parse(NULL, tsbuf, &oldest_ts);
+        g.timestamp = oldest_ts;
+        testutil_check(
+          __wt_snprintf(buf, sizeof(buf), "%s%" PRIx64, oldest_timestamp_str, g.oldest_timestamp));
+    } else if (ret != WT_NOTFOUND)
+        /*
+         * Its possible there may not be an oldest timestamp as such we could get not found. This
+         * should be okay assuming timestamps are not configured if they are, it's still okay as we
+         * could have configured timestamps after not running with timestamps. As such only error if
+         * we get a non not found error. If we were supposed to fail with not found we'll see an
+         * error later on anyway.
+         */
+        testutil_die(ret, "unable to query oldest timestamp");
 }
 
 /*

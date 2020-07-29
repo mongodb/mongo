@@ -350,20 +350,50 @@ __txn_log_recover(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, WT_LS
 }
 
 /*
+ * __recovery_retrieve_timestamp --
+ *     Retrieve a timestamp from the metadata.
+ */
+static int
+__recovery_retrieve_timestamp(
+  WT_RECOVERY *r, const char *system_uri, const char *timestamp_name, wt_timestamp_t *timestampp)
+{
+    WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    char *sys_config;
+
+    sys_config = NULL;
+
+    session = r->session;
+
+    /* Search the metadata for the system information. */
+    WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, system_uri, &sys_config), false);
+    if (sys_config != NULL) {
+        WT_CLEAR(cval);
+        WT_ERR_NOTFOUND_OK(__wt_config_getones(session, sys_config, timestamp_name, &cval), false);
+        if (cval.len != 0) {
+            __wt_verbose(session, WT_VERB_RECOVERY, "Recovery %s %.*s", timestamp_name,
+              (int)cval.len, cval.str);
+            WT_ERR(__wt_txn_parse_timestamp_raw(session, timestamp_name, timestampp, &cval));
+        }
+    }
+
+err:
+    __wt_free(session, sys_config);
+    return (ret);
+}
+
+/*
  * __recovery_set_checkpoint_timestamp --
  *     Set the checkpoint timestamp as retrieved from the metadata file.
  */
 static int
 __recovery_set_checkpoint_timestamp(WT_RECOVERY *r)
 {
-    WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
     WT_SESSION_IMPL *session;
     wt_timestamp_t ckpt_timestamp;
-    char ts_string[WT_TS_INT_STRING_SIZE], *sys_config;
-
-    sys_config = NULL;
+    char ts_string[WT_TS_INT_STRING_SIZE];
 
     session = r->session;
     conn = S2C(session);
@@ -373,18 +403,8 @@ __recovery_set_checkpoint_timestamp(WT_RECOVERY *r)
      */
     ckpt_timestamp = 0;
 
-    /* Search in the metadata for the system information. */
-    WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, WT_SYSTEM_CKPT_URI, &sys_config), false);
-    if (sys_config != NULL) {
-        WT_CLEAR(cval);
-        WT_ERR_NOTFOUND_OK(
-          __wt_config_getones(session, sys_config, "checkpoint_timestamp", &cval), false);
-        if (cval.len != 0) {
-            __wt_verbose(
-              session, WT_VERB_RECOVERY, "Recovery timestamp %.*s", (int)cval.len, cval.str);
-            WT_ERR(__wt_txn_parse_timestamp_raw(session, "recovery", &ckpt_timestamp, &cval));
-        }
-    }
+    WT_RET(
+      __recovery_retrieve_timestamp(r, WT_SYSTEM_CKPT_URI, WT_SYSTEM_CKPT_TS, &ckpt_timestamp));
 
     /*
      * Set the recovery checkpoint timestamp and the metadata checkpoint timestamp so that the
@@ -396,9 +416,39 @@ __recovery_set_checkpoint_timestamp(WT_RECOVERY *r)
       "Set global recovery timestamp: %s",
       __wt_timestamp_to_string(conn->txn_global.recovery_timestamp, ts_string));
 
-err:
-    __wt_free(session, sys_config);
-    return (ret);
+    return (0);
+}
+
+/*
+ * __recovery_set_oldest_timestamp --
+ *     Set the oldest timestamp as retrieved from the metadata file.
+ */
+static int
+__recovery_set_oldest_timestamp(WT_RECOVERY *r)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_SESSION_IMPL *session;
+    wt_timestamp_t oldest_timestamp;
+    char ts_string[WT_TS_INT_STRING_SIZE];
+
+    session = r->session;
+    conn = S2C(session);
+    /*
+     * Read the system checkpoint information from the metadata file and save the oldest timestamp
+     * of the last checkpoint for later query. This gets saved in the connection.
+     */
+    oldest_timestamp = 0;
+
+    WT_RET(__recovery_retrieve_timestamp(
+      r, WT_SYSTEM_OLDEST_URI, WT_SYSTEM_OLDEST_TS, &oldest_timestamp));
+    conn->txn_global.oldest_timestamp = oldest_timestamp;
+    conn->txn_global.has_oldest_timestamp = oldest_timestamp != WT_TS_NONE;
+
+    __wt_verbose(session, WT_VERB_RECOVERY | WT_VERB_RECOVERY_PROGRESS,
+      "Set global oldest timestamp: %s",
+      __wt_timestamp_to_string(conn->txn_global.oldest_timestamp, ts_string));
+
+    return (0);
 }
 
 /*
@@ -768,7 +818,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
 
 done:
     WT_ERR(__recovery_set_checkpoint_timestamp(&r));
-
+    WT_ERR(__recovery_set_oldest_timestamp(&r));
     /*
      * Perform rollback to stable only when the following conditions met.
      * 1. The connection is not read-only. A read-only connection expects that there shouldn't be
@@ -797,11 +847,8 @@ done:
          * written. The rollback to stable operation should only rollback the latest page changes
          * solely based on the write generation numbers.
          */
-
         WT_ASSERT(session, conn->txn_global.has_stable_timestamp == false &&
             conn->txn_global.stable_timestamp == WT_TS_NONE);
-        WT_ASSERT(session, conn->txn_global.has_oldest_timestamp == false &&
-            conn->txn_global.oldest_timestamp == WT_TS_NONE);
 
         /*
          * Set the stable timestamp from recovery timestamp and process the trees for rollback to
@@ -810,12 +857,6 @@ done:
         conn->txn_global.stable_timestamp = conn->txn_global.recovery_timestamp;
         conn->txn_global.has_stable_timestamp = true;
 
-        /*
-         * Set the oldest timestamp to WT_TS_NONE to make sure that we didn't remove any history
-         * window as part of rollback to stable operation.
-         */
-        conn->txn_global.oldest_timestamp = WT_TS_NONE;
-        conn->txn_global.has_oldest_timestamp = true;
         __wt_verbose(session, WT_VERB_RTS,
           "Performing recovery rollback_to_stable with stable timestamp: %s and oldest timestamp: "
           "%s",
@@ -823,10 +864,6 @@ done:
           __wt_timestamp_to_string(conn->txn_global.oldest_timestamp, ts_string[1]));
 
         WT_ERR(__wt_rollback_to_stable(session, NULL, false));
-
-        /* Reset the oldest timestamp. */
-        conn->txn_global.oldest_timestamp = WT_TS_NONE;
-        conn->txn_global.has_oldest_timestamp = false;
     } else if (do_checkpoint)
         /*
          * Forcibly log a checkpoint so the next open is fast and keep the metadata up to date with

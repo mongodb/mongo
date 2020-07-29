@@ -917,12 +917,9 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
 {
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
-    char hex_timestamp[2 * sizeof(wt_timestamp_t) + 2];
+    char hex_timestamp[WT_TS_HEX_STRING_SIZE];
 
     WT_ERR(__wt_scr_alloc(session, 0, &buf));
-    hex_timestamp[0] = '0';
-    hex_timestamp[1] = '\0';
-
     /*
      * We need to record the timestamp of the checkpoint in the metadata. The timestamp value is set
      * at a higher level, either in checkpoint or in recovery.
@@ -937,8 +934,18 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
     if (strcmp(hex_timestamp, "0") == 0)
         WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, WT_SYSTEM_CKPT_URI), false);
     else {
-        WT_ERR(__wt_buf_catfmt(session, buf, "checkpoint_timestamp=\"%s\"", hex_timestamp));
+        WT_ERR(__wt_buf_fmt(session, buf, WT_SYSTEM_CKPT_TS "=\"%s\"", hex_timestamp));
         WT_ERR(__wt_metadata_update(session, WT_SYSTEM_CKPT_URI, buf->data));
+    }
+
+    /* We also need to record the oldest timestamp in the metadata so we can set it on startup. */
+    __wt_timestamp_to_hex_string(
+      S2C(session)->txn_global.checkpoint_oldest_timestamp, hex_timestamp);
+    if (strcmp(hex_timestamp, "0") == 0)
+        WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, WT_SYSTEM_OLDEST_URI), false);
+    else {
+        WT_ERR(__wt_buf_fmt(session, buf, WT_SYSTEM_OLDEST_TS "=\"%s\"", hex_timestamp));
+        WT_ERR(__wt_metadata_update(session, WT_SYSTEM_OLDEST_URI, buf->data));
     }
 
 err:
