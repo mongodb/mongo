@@ -18,10 +18,8 @@ import signal
 import sys
 import traceback
 
-import psutil
-
-from buildscripts.resmokelib.hang_analyzer import extractor
 from buildscripts.resmokelib.hang_analyzer import dumper
+from buildscripts.resmokelib.hang_analyzer import extractor
 from buildscripts.resmokelib.hang_analyzer import process
 from buildscripts.resmokelib.hang_analyzer import process_list
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
@@ -30,13 +28,11 @@ from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 class HangAnalyzer(Subcommand):
     """Main class for the hang analyzer subcommand."""
 
-    def __init__(self, options, logger=None, **kwargs):  # pylint: disable=unused-argument
+    def __init__(self, options):
         """
         Configure processe lists based on options.
 
         :param options: Options as parsed by parser.py
-        :param logger: Logger to be used. If not specified, one will be created.
-        :param kwargs: additional args
         """
         self.options = options
         self.root_logger = None
@@ -47,7 +43,6 @@ class HangAnalyzer(Subcommand):
         self.process_ids = []
 
         self._configure_processes()
-        self._setup_logging(logger)
 
     def execute(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         """
@@ -56,7 +51,7 @@ class HangAnalyzer(Subcommand):
         1. Get a list of interesting processes
         2. Dump useful information or take core dumps
         """
-
+        self._setup_logging()
         self._log_system_info()
 
         extractor.extract_debug_symbols(self.root_logger)
@@ -143,20 +138,17 @@ class HangAnalyzer(Subcommand):
             self.go_processes = self.options.go_process_names.split(',')
             self.interesting_processes += self.go_processes
 
-    def _setup_logging(self, logger):
-        if logger is None:
-            self.root_logger = logging.Logger("hang_analyzer", level=logging.DEBUG)
-        else:
-            self.root_logger = logger
+    def _setup_logging(self):
+        self.root_logger = logging.Logger("hang_analyzer", level=logging.DEBUG)
 
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(logging.Formatter(fmt="%(message)s"))
         self.root_logger.addHandler(handler)
 
-    def _log_system_info(self):
         self.root_logger.info("Python Version: %s", sys.version)
         self.root_logger.info("OS: %s", platform.platform())
 
+    def _log_system_info(self):
         try:
             if sys.platform == "win32" or sys.platform == "cygwin":
                 distro = platform.win32_ver()
@@ -198,7 +190,7 @@ class HangAnalyzerPlugin(PluginInterface):
     def parse(self, subcommand, parser, parsed_args, **kwargs):
         """Parse command-line options."""
         if subcommand == 'hang-analyzer':
-            return HangAnalyzer(parsed_args, **kwargs)
+            return HangAnalyzer(parsed_args)
         return None
 
     def add_subcommand(self, subparsers):
