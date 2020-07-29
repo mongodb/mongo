@@ -48,7 +48,7 @@ TEST(CstExpressionTest, ParsesProjectWithAnd) {
     auto input = fromjson(
         "{pipeline: [{$project: {_id: 9.10, a: {$and: [4, {$and: [7, 8]}]}, b: {$and: [2, "
         "-3]}}}]}");
-    BSONLexer lexer(input["pipeline"].Array());
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -65,7 +65,7 @@ TEST(CstExpressionTest, ParsesProjectWithOr) {
     CNode output;
     auto input = fromjson(
         "{pipeline: [{$project: {_id: 9.10, a: {$or: [4, {$or: [7, 8]}]}, b: {$or: [2, -3]}}}]}");
-    BSONLexer lexer(input["pipeline"].Array());
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -83,7 +83,7 @@ TEST(CstExpressionTest, ParsesProjectWithNot) {
     auto input = fromjson(
         "{pipeline: [{$project: {_id: 9.10, a: {$not: [4]}, b: {$and: [1.0, {$not: "
         "[true]}]}}}]}");
-    BSONLexer lexer(input["pipeline"].Array());
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -99,7 +99,7 @@ TEST(CstExpressionTest, ParsesComparisonExpressions) {
     auto parseAndTest = [](StringData expr) {
         CNode output;
         auto input = fromjson("{pipeline: [{$project: {_id: {$" + expr + ": [1, 2.5]}}}]}");
-        BSONLexer lexer(input["pipeline"].Array());
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
         auto parseTree = PipelineParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
         auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -120,21 +120,21 @@ TEST(CstExpressionTest, FailsToParseInvalidComparisonExpressions) {
         {
             CNode output;
             auto input = fromjson("{pipeline: [{$project: {_id: {$" + expr + ": [1]}}}]}");
-            BSONLexer lexer(input["pipeline"].Array());
+            BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
             auto parseTree = PipelineParserGen(lexer, &output);
             ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
         }
         {
             CNode output;
             auto input = fromjson("{pipeline: [{$project: {_id: {$" + expr + ": [1, 2, 3]}}}]}");
-            BSONLexer lexer(input["pipeline"].Array());
+            BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
             auto parseTree = PipelineParserGen(lexer, &output);
             ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
         }
         {
             CNode output;
             auto input = fromjson("{pipeline: [{$project: {_id: {$" + expr + ": 1}}}]}");
-            BSONLexer lexer(input["pipeline"].Array());
+            BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
             auto parseTree = PipelineParserGen(lexer, &output);
             ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
         }
@@ -149,14 +149,14 @@ TEST(CstExpressionTest, FailsToParseInvalidConvertExpressions) {
     {
         CNode output;
         auto input = fromjson("{pipeline: [{$project: {a: {$convert: {input: 'x', to: true}}}}]}");
-        BSONLexer lexer(input["pipeline"].Array());
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
         auto parseTree = PipelineParserGen(lexer, &output);
         ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
     }
     {
         CNode output;
         auto input = fromjson("{pipeline: [{$project: {a: {$convert: {input: 'x'}}}}]}");
-        BSONLexer lexer(input["pipeline"].Array());
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
         auto parseTree = PipelineParserGen(lexer, &output);
         ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
     }
@@ -168,7 +168,7 @@ TEST(CstExpressionTest, ParsesConvertExpressions) {
         "{pipeline: [{$project: {a: {$toBool: 1}, b: {$toDate: 1100000000000}, "
         "c: {$toDecimal: 5}, d: {$toDouble: -2}, e: {$toInt: 1.999999}, "
         "f: {$toLong: 1.999999}, g: {$toObjectId: '$_id'}, h: {$toString: false}}}]}");
-    BSONLexer lexer(input["pipeline"].Array());
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -187,7 +187,7 @@ TEST(CstExpressionTest, ParsesConvertExpressionsNoOptArgs) {
     auto input = fromjson(
         "{pipeline: [{$project: {a: {$convert: {input: 1, to: 'string'}}, "
         "b: {$convert : {input: 'true', to: 'bool'}}}}]}");
-    BSONLexer lexer(input["pipeline"].Array());
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -207,7 +207,7 @@ TEST(CstExpressionTest, ParsesConvertExpressionsWithOptArgs) {
         "{pipeline: [{$project: {a: {$convert: {input: 1, to: 'string', "
         "onError: 'Could not convert'}}, b : {$convert : {input: "
         "true, to : 'double', onNull : 0}}}}]}");
-    BSONLexer lexer(input["pipeline"].Array());
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);

@@ -206,16 +206,17 @@
 %token <Decimal128> DECIMAL_NON_ZERO
 %token <UserMinKey> MIN_KEY
 %token <UserMaxKey> MAX_KEY
+%token START_PIPELINE START_MATCH
 
 //
 // Semantic values (aka the C++ types produced by the actions).
 //
 
 // Possible user fieldnames.
-%nterm <CNode::Fieldname> projectionFieldname expressionFieldname stageAsUserFieldname
+%nterm <CNode::Fieldname> projectionFieldname expressionFieldname stageAsUserFieldname filterFieldname
 %nterm <CNode::Fieldname> argAsUserFieldname aggExprAsUserFieldname invariableUserFieldname
 %nterm <CNode::Fieldname> idAsUserFieldname valueFieldname
-%nterm <std::pair<CNode::Fieldname, CNode>> projectField expressionField valueField
+%nterm <std::pair<CNode::Fieldname, CNode>> projectField expressionField valueField filterField
 
 // Literals.
 %nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal 
@@ -235,11 +236,20 @@
 %nterm <CNode> abs ceil divide exponent floor ln log logten mod multiply pow round sqrt subtract trunc
 %nterm <std::pair<CNode::Fieldname, CNode>> onErrorArg onNullArg
 %nterm <std::vector<CNode>> expressions values
+%nterm <CNode> matchExpression filterFields filterVal
 
+%start start;
 //
 // Grammar rules
 //
 %%
+
+start: 
+    START_PIPELINE pipeline
+    | START_MATCH matchExpression {
+        *cst = CNode{$matchExpression};
+    }
+;
 
 // Entry point to pipeline parsing.
 pipeline:
@@ -364,6 +374,39 @@ projection:
 ;
 
 projectionFieldname:
+    invariableUserFieldname | stageAsUserFieldname | argAsUserFieldname | aggExprAsUserFieldname
+;
+
+matchExpression:
+    START_OBJECT filterFields END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::match, $filterFields}}};
+    }
+;
+
+filterFields:
+    %empty {
+        $$ = CNode::noopLeaf();
+    }
+    | filterFields[filterArg] filterField {
+        $$ = $filterArg;
+        $$.objectChildren().emplace_back($filterField);
+    }
+;
+
+filterField:
+    ID filterVal {
+        $$ = {KeyFieldname::id, $filterVal};
+    }
+    | filterFieldname filterVal {
+        $$ = {$filterFieldname, $filterVal};
+    }
+;
+
+filterVal:
+    value
+;
+
+filterFieldname:
     invariableUserFieldname | stageAsUserFieldname | argAsUserFieldname | aggExprAsUserFieldname
 ;
 
@@ -545,7 +588,7 @@ aggExprAsUserFieldname:
     }
 ;
 
-// Rules for literal non-terminals.
+// Rules for literal non-terminals. 
 string:
     STRING {
         $$ = CNode{UserString{$1}};

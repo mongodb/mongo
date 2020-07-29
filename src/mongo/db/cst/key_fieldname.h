@@ -63,6 +63,7 @@
     ENUMIFY(lte)                 \
     ENUMIFY(ne)                  \
     ENUMIFY(project)             \
+    ENUMIFY(match)               \
     ENUMIFY(inhibitOptimization) \
     ENUMIFY(unionWith)           \
     ENUMIFY(collArg)             \

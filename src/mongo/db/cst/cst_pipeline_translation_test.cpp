@@ -42,6 +42,7 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -64,7 +65,7 @@ TEST(CstPipelineTranslationTest, TranslatesEmpty) {
     ASSERT_EQ(0u, sources.size());
 }
 
-TEST(CstPipelineTranslationTest, TranslatesEmptyProject) {
+TEST(CstTest, TranslatesEmptyProject) {
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());

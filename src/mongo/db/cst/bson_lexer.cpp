@@ -291,7 +291,27 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
     }
 }
 
-BSONLexer::BSONLexer(std::vector<BSONElement> pipeline) {
+BSONLexer::BSONLexer(BSONObj obj, PipelineParserGen::token_type startingToken) {
+
+    _tokens.emplace_back(startingToken, getNextLoc());
+    _tokens.emplace_back(PipelineParserGen::token::START_OBJECT, getNextLoc());
+    for (auto&& elem : obj) {
+        // Include field names in the object.
+        tokenize(elem, true);
+    }
+    _tokens.emplace_back(PipelineParserGen::token::END_OBJECT, getNextLoc());
+
+    // Final token must indicate EOF.
+    _tokens.emplace_back(PipelineParserGen::make_END_OF_FILE(getNextLoc()));
+
+    // Reset the position to use in yylex().
+    _position = 0;
+};
+
+BSONLexer::BSONLexer(std::vector<BSONElement> pipeline,
+                     PipelineParserGen::token_type startingToken) {
+
+    _tokens.emplace_back(startingToken, getNextLoc());
     _tokens.emplace_back(PipelineParserGen::token::START_ARRAY, getNextLoc());
     for (auto&& elem : pipeline) {
         // Don't include field names for stages of the pipeline (aka indexes of the pipeline array).

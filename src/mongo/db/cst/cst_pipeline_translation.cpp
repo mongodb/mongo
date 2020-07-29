@@ -44,6 +44,7 @@
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -442,10 +443,20 @@ auto translateLimit(const CNode& cst, const boost::intrusive_ptr<ExpressionConte
 }
 
 /**
- * Unwrap a sample stage CNode and produce a DocumentSourceSample.
+ * Unwrap a sample stage CNode and produce a DocumentSourceMatch.
  */
 auto translateSample(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return DocumentSourceSample::create(expCtx, translateNumToLong(cst.objectChildren()[0].second));
+}
+
+/**
+ * Unwrap a match stage CNode and produce a DocumentSourceSample.
+ */
+auto translateMatch(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // TODO SERVER-48790, Implement CST to MatchExpression/Query command translation.
+    // And add corresponding tests in cst_pipeline_translation_test.cpp.
+    auto placeholder = fromjson("{}");
+    return DocumentSourceMatch::create(placeholder, expCtx);
 }
 
 /**
@@ -456,6 +467,8 @@ boost::intrusive_ptr<DocumentSource> translateSource(
     switch (cst.firstKeyFieldname()) {
         case KeyFieldname::project:
             return translateProject(cst.objectChildren()[0].second, expCtx);
+        case KeyFieldname::match:
+            return translateMatch(cst.objectChildren()[0].second, expCtx);
         case KeyFieldname::skip:
             return translateSkip(cst.objectChildren()[0].second, expCtx);
         case KeyFieldname::limit:

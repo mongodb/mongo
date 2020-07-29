@@ -40,7 +40,8 @@ namespace mongo {
 
 class BSONLexer {
 public:
-    explicit BSONLexer(std::vector<BSONElement> input);
+    BSONLexer(BSONObj obj, PipelineParserGen::token_type startingToken);
+    BSONLexer(std::vector<BSONElement> pipeline, PipelineParserGen::token_type startingToken);
 
     /**
      * Retrieves the next token in the stream.
