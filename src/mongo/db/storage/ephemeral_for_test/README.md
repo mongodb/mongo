@@ -50,13 +50,14 @@ as recursively any nodes unique to that tree. The root node of the tree has some
 namely a `_count` and `_datasize`, which contain the total number of key-value pairs in the tree as
 well as the total size in bytes of all key-value pairs.
 
-### Iterators (Needs Work)
+### Iterators
 
-A `RadixStore::iterator` has a shared reference to the root of the tree as well as a pointer to the
-current node. Currently, on successful commit, the new root of the tree automatically adds itself to
-the `_nextVersion` link of the previous master thus establishing a linked list of committed
-versions. Iterators use this list to move themselves to a newer version when available. These
-versions are only versions of the tree made by the same client. This is needed so the client's
+The radix tree is an ordered data structure and traversal of the tree is done with depth-first
+search. A `radix_iterator` has a shared reference to the root of the tree as well as a pointer
+to the current node. Currently, on successful commit, the new root of the tree automatically adds
+itself to the `_nextVersion` link of the previous master thus establishing a linked list of
+committed versions. Iterators use this list to move themselves to a newer version when available.
+These versions are only versions of the tree made by the same client. This is needed so the client's
 iterators can see their own write.
 
 
@@ -69,11 +70,38 @@ tables are called [_idents_](#ephemeral-storage-engine-glossary). However, to su
 with changes spanning multiple idents, this storage engine uses a single radix store and prefixes
 each key with the ident, so that in effect each ident has its own branch in the radix tree.
 
+### `RecoveryUnit`
+
+The RecoveryUnit is the abstraction of how transactions are implemented on the storage engine as
+described [_above_](#transactions-on-the-radix-store). It is responsible for creating a local fork
+of the radix tree and merge in any changes to the master tree on commit. When a transaction is
+rolled back the RecoveryUnit can simply release its reference to the forked radix store. This
+guarantees
+[_atomicity_](https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/README.md#atomicity)
+on the storage engine. 
+
 ### `RecordStore`
-_Todo._
+
+The RecordStore is the abstraction on how to read or write data with the storage engine. It is also
+responsible for implementing the oplog collection with the correct semantics, this is handled in the
+[VisibilityManager](#visibilitymanager). The RecordStore accesses the radix store via the
+[_RecoveryUnit_](#recoveryunit), this ensures
+[_isolation_](https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/README.md#isolation)
+on the storage engine.
+
+### `VisibilityManager`
+
+The visibility manager is a system internal to the storage engine to keep track of uncommitted
+inserts and reserved timestamps to implement [_oplog
+visibility_](https://github.com/mongodb/mongo/blob/master/src/mongo/db/catalog/README.md#oplog-visibility).
 
 ### `SortedDataInterface`
-_Todo._
+
+The SortedDataInterface is the implementation for indexes. Indexes are implemented on top of the
+radix store like any other [_idents_](#ephemeral-storage-engine-glossary) where the data contains
+the necessary information to be able to find a record belonging to another ident without searching
+for it. There are two types of indexes in the implementation, unique and non-unique. Both index
+types may contain duplicate entries but are optimized for their regular use-case.
 
 # Ephemeral Storage Engine Glossary
 
