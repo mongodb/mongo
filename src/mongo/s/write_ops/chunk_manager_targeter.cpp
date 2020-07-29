@@ -721,7 +721,8 @@ void ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasCha
     //
 
     if (_needsTargetingRefresh) {
-        // Reset the field
+        _remoteShardVersions.clear();
+        _remoteDbVersion = boost::none;
         _needsTargetingRefresh = false;
 
         // If we couldn't target, we might need to refresh if we haven't remotely refreshed
