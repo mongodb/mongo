@@ -7,88 +7,116 @@
 (function() {
 'use strict';
 
-var st = new ShardingTest({shards: 2, mongos: 1});
+load("jstests/libs/feature_compatibility_version.js");
 
-var mongos = st.s0;
-var admin = mongos.getDB("admin");
-var coll = mongos.getCollection("foo.bar");
+function runTest(shouldIncrementChunkMajorVersionOnChunkSplits) {
+    var st = new ShardingTest({
+        shards: 2,
+        mongos: 1,
+        other: {
+            configOptions: {
+                setParameter: {
+                    incrementChunkMajorVersionOnChunkSplits:
+                        shouldIncrementChunkMajorVersionOnChunkSplits
+                }
+            }
+        }
+    });
 
-assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
-printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
-assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);
-assert(admin.runCommand({split: coll + "", middle: {_id: 0}}).ok);
+    if (shouldIncrementChunkMajorVersionOnChunkSplits) {
+        assert.commandWorked(
+            st.configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    }
 
-st.printShardingStatus();
+    var mongos = st.s0;
+    var admin = mongos.getDB("admin");
+    var coll = mongos.getCollection("foo.bar");
 
-jsTest.log("Testing failed migrations...");
+    assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
+    printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
+    assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);
+    assert(admin.runCommand({split: coll + "", middle: {_id: 0}}).ok);
 
-var oldVersion = null;
-var newVersion = null;
+    st.printShardingStatus();
 
-// failMigrationCommit -- this creates an error that aborts the migration before the commit
-// migration command is sent.
-assert.commandWorked(st.shard0.getDB("admin").runCommand(
-    {configureFailPoint: 'failMigrationCommit', mode: 'alwaysOn'}));
+    jsTest.log("Testing failed migrations...");
 
-// The split command above bumps the shard version, and this is obtained by the router via a
-// refresh at the end of the command, but the shard does not know about it yet. This find will
-// cause the shard to refresh so that this next check for 'oldVersion' sees the most recent
-// version prior to the migration.
-coll.findOne();
+    var oldVersion = null;
+    var newVersion = null;
 
-oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+    // failMigrationCommit -- this creates an error that aborts the migration before the commit
+    // migration command is sent.
+    assert.commandWorked(st.shard0.getDB("admin").runCommand(
+        {configureFailPoint: 'failMigrationCommit', mode: 'alwaysOn'}));
 
-assert.commandFailed(
-    admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
+    if (shouldIncrementChunkMajorVersionOnChunkSplits) {
+        // The split command above bumps the shard version, and this is obtained by the router via a
+        // refresh at the end of the command, but the shard does not know about it yet. This find
+        // will cause the shard to refresh so that this next check for 'oldVersion' sees the most
+        // recent version prior to the migration.
+        coll.findOne();
+    }
 
-newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+    oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
-assert.eq(oldVersion.t,
-          newVersion.t,
-          "The shard version major value should not change after a failed migration");
-// Split does not cause a shard routing table refresh, but the moveChunk attempt will.
-assert.eq(2,
-          newVersion.i,
-          "The shard routing table should refresh on a failed migration and show the split");
+    assert.commandFailed(
+        admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
 
-assert.commandWorked(
-    st.shard0.getDB("admin").runCommand({configureFailPoint: 'failMigrationCommit', mode: 'off'}));
+    newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
-// migrationCommitNetworkError -- mimic migration commit command returning a network error,
-// whereupon the config server is queried to determine that this commit was successful.
-assert.commandWorked(st.shard0.getDB("admin").runCommand(
-    {configureFailPoint: 'migrationCommitNetworkError', mode: 'alwaysOn'}));
+    assert.eq(oldVersion.t,
+              newVersion.t,
+              "The shard version major value should not change after a failed migration");
+    // Split does not cause a shard routing table refresh, but the moveChunk attempt will.
+    assert.eq(2,
+              newVersion.i,
+              "The shard routing table should refresh on a failed migration and show the split");
 
-// Run a migration where there will still be chunks in the collection remaining on the shard
-// afterwards. This will cause the collection's shardVersion to be bumped higher.
-oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+    assert.commandWorked(st.shard0.getDB("admin").runCommand(
+        {configureFailPoint: 'failMigrationCommit', mode: 'off'}));
 
-assert.commandWorked(
-    admin.runCommand({moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName}));
+    // migrationCommitNetworkError -- mimic migration commit command returning a network error,
+    // whereupon the config server is queried to determine that this commit was successful.
+    assert.commandWorked(st.shard0.getDB("admin").runCommand(
+        {configureFailPoint: 'migrationCommitNetworkError', mode: 'alwaysOn'}));
 
-newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+    // Run a migration where there will still be chunks in the collection remaining on the shard
+    // afterwards. This will cause the collection's shardVersion to be bumped higher.
+    oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
-assert.lt(oldVersion.t, newVersion.t, "The major value in the shard version should have increased");
-assert.eq(1, newVersion.i, "The minor value in the shard version should be 1");
+    assert.commandWorked(
+        admin.runCommand({moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName}));
 
-// Run a migration to move off the shard's last chunk in the collection. The collection's
-// shardVersion will be reset.
-oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+    newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
-assert.commandWorked(
-    admin.runCommand({moveChunk: coll + "", find: {_id: -1}, to: st.shard1.shardName}));
+    assert.lt(
+        oldVersion.t, newVersion.t, "The major value in the shard version should have increased");
+    assert.eq(1, newVersion.i, "The minor value in the shard version should be 1");
 
-newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
+    // Run a migration to move off the shard's last chunk in the collection. The collection's
+    // shardVersion will be reset.
+    oldVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
-assert.gt(oldVersion.t,
-          newVersion.t,
-          "The version prior to the migration should be greater than the reset value");
+    assert.commandWorked(
+        admin.runCommand({moveChunk: coll + "", find: {_id: -1}, to: st.shard1.shardName}));
 
-assert.eq(0, newVersion.t, "The shard version should have reset, but the major value is not zero");
-assert.eq(0, newVersion.i, "The shard version should have reset, but the minor value is not zero");
+    newVersion = st.shard0.getDB("admin").runCommand({getShardVersion: coll.toString()}).global;
 
-assert.commandWorked(st.shard0.getDB("admin").runCommand(
-    {configureFailPoint: 'migrationCommitNetworkError', mode: 'off'}));
+    assert.gt(oldVersion.t,
+              newVersion.t,
+              "The version prior to the migration should be greater than the reset value");
 
-st.stop();
+    assert.eq(
+        0, newVersion.t, "The shard version should have reset, but the major value is not zero");
+    assert.eq(
+        0, newVersion.i, "The shard version should have reset, but the minor value is not zero");
+
+    assert.commandWorked(st.shard0.getDB("admin").runCommand(
+        {configureFailPoint: 'migrationCommitNetworkError', mode: 'off'}));
+
+    st.stop();
+}
+
+runTest(true);
+runTest(false);
 })();

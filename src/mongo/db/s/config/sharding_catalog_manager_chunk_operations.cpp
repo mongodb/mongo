@@ -43,6 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -355,9 +356,16 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     std::vector<ChunkType> newChunks;
 
     ChunkVersion currentMaxVersion = collVersion;
-    // Increment the major version only if the shard that owns the chunk being split has version ==
-    // collection version. See SERVER-41480 for details.
-    if (shardVersion == collVersion) {
+
+    // If the incrementChunkMajorVersionOnChunkSplits flag is set, increment
+    // the major version only if the shard that owns the chunk being split has
+    // version == collection version. See SERVER-41480 for details.
+    //
+    // This flag is only useful if there are some 4.0 routers still in the
+    // cluster, so we only use it if FCV is not fully upgraded.
+    const auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+    if (currentFCV != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo42 &&
+        incrementChunkMajorVersionOnChunkSplits.load() && shardVersion == collVersion) {
         currentMaxVersion.incMajor();
     }
 

@@ -293,6 +293,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/sharding_legacy_api',
+        'sharding_runtime_d_params',
         'balancer',
         'type_shard_identity',
     ],

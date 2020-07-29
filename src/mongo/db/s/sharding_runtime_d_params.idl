@@ -115,3 +115,11 @@ server_parameters:
         cpp_varname: minNumChunksForSessionsCollection
         default: 1024
         validator: { gte: 1, lte: 1000000 }
+
+    incrementChunkMajorVersionOnChunkSplits:
+        description: >-
+          If true, causes chunk splits to increment the collection major version in certain cases.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: incrementChunkMajorVersionOnChunkSplits
+        default: false
