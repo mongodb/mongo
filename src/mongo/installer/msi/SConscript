@@ -118,21 +118,19 @@ env.Command(objects,
             ' -dMongoDBVersion=' + full_version +
             ' -dLicenseSource=distsrc'
             r' -dEnterpriseBase=' + enterprisebase + '\\'
-            ' -dBinarySource=' + buildDir + r'\mongo'
-            ' -dEnterpriseToolBinarySource=' + enterpriseToolBuildDir +
+            ' -dBinarySource=' + "\"$DESTDIR\\$PREFIX_BINDIR\"" +
             ' -dMergeModulesBasePath=' + "\"${MSVS['VCREDISTMERGEMODULEPATH']}\"" +
             ' -dMergeModuleFileCRT=' + env.GetMergeModuleNameForFeature('CRT') +
             ' -dEdition=' + msi_edition +
             ' -d"ProductId=*\"'
             ' -dUpgradeCode=' + upgrade_code +
-            ' -dCustomActionDll=' + buildDir + r'\mongo\installer\msi\ca\mongoca.dll'
+            ' -dCustomActionDll=' + "\"$DESTDIR\\$PREFIX_BINDIR\\mongoca.dll\"" +
             ' -dConfiguration=Release'
             ' -dOutDir=' + buildDir + r'\msi'
             ' -dPlatform=' + msi_platform +
             ' -dFlavor=' + msi_flavor +
             r' -dProjectDir=buildscripts\packaging\msi\\'
             ' -dProjectName=MongoDB'
-            ' -dCompassDir=' + buildDir + r'\mongo\installer\compass'
             ' -dTargetDir=' + buildDir + r'\msi'
             ' -dTargetExt=.msi'
             ' -dTargetFileName=${SERVER_ARCHIVE}'
@@ -167,19 +165,19 @@ pre_msi_cmd = env.Command(pre_msi,
 env.NoCache(pre_msi_cmd)
 
 # Generated Dependencies
-env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/shell/mongo.exe')
-env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/db/mongod.exe')
-env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/s/mongos.exe')
-env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/installer/msi/ca/mongoca.dll')
-env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/installer/compass/Install-Compass.ps1')
+env.Depends(pre_msi_cmd, '$DESTDIR/$PREFIX_BINDIR/mongo.exe')
+env.Depends(pre_msi_cmd, '$DESTDIR/$PREFIX_BINDIR/mongod.exe')
+env.Depends(pre_msi_cmd, '$DESTDIR/$PREFIX_BINDIR/mongos.exe')
+env.Depends(pre_msi_cmd, '$DESTDIR/$PREFIX_BINDIR/mongoca.dll')
+env.Depends(pre_msi_cmd, '$DESTDIR/$PREFIX_BINDIR/Install-Compass.ps1')
 
 # Source Dependencies
 env.Depends(pre_msi_cmd, '#buildscripts/packaging/msi/mongod.yaml')
 
 if 'enterprise' in env['MONGO_MODULES']:
-    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongodecrypt.exe")
-    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongoldap.exe")
-    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongocryptd.exe")
+    env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongodecrypt.exe")
+    env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongoldap.exe")
+    env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongocryptd.exe")
 
 msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
 env.Command(msi,

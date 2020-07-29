@@ -30,8 +30,6 @@ ca = env.SharedLibrary(
         'customaction.cpp',
         'customaction.def',
     ],
-    # We don't want the usual auto install rules to apply to this file.
-    AIB_IGNORE=True,
     # We don't want any special allocator here either.
     DISABLE_ALLOCATOR_SHIM_INJECTION=True,
 )
