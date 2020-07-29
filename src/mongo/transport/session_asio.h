@@ -713,6 +713,15 @@ private:
                 }
             };
             return doHandshake().then([this](size_t size) {
+                if (_sslSocket->get_sni()) {
+                    auto sniName = _sslSocket->get_sni().get();
+                    LOGV2_DEBUG(4908000,
+                                2,
+                                "Client connected with SNI extension",
+                                "sniName"_attr = sniName);
+                } else {
+                    LOGV2_DEBUG(4908001, 2, "Client connected without SNI extension");
+                }
                 if (SSLPeerInfo::forSession(shared_from_this()).subjectName.empty()) {
                     return getSSLManager()
                         ->parseAndValidatePeerCertificate(_sslSocket->native_handle(),
