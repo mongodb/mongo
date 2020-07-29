@@ -751,6 +751,11 @@ TEST_F(RadixStoreTest, UpdateTest) {
     ASSERT_TRUE(it2 == thisStore.end());
 }
 
+TEST_F(RadixStoreTest, UpdateExistingSameDataTest) {
+    thisStore.insert({"a", "a"});
+    ASSERT_FALSE(thisStore.update({"a", "a"}).second);
+}
+
 TEST_F(RadixStoreTest, DuplicateKeyTest) {
     std::string msg1 = "Hello, world!";
     std::string msg2 = msg1 + "!!";

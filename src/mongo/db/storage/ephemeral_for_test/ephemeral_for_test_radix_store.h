@@ -570,6 +570,10 @@ public:
         if (item == RadixStore::end())
             return std::make_pair(item, false);
 
+        // Setting the same value is a no-op
+        if (item->second == value.second)
+            return std::make_pair(item, false);
+
         return _upsertWithCopyOnSharedNodes(key, std::move(value));
     }
 
