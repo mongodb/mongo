@@ -216,10 +216,8 @@ public:
      * which is not history-aware.
      *
      * Returns a BSON object with the newly produced chunk versions after the migration:
-     *  - migratedChunkVersion - the version of the chunk, which was migrated
-     *  - controlChunkVersion (optional) - the version of the "control" chunk, which was changed in
-     *      order to reflect the change on the donor. This value will be missing if the last chunk
-     *      on the donor shard was migrated out.
+     *   - shardVersion - The new shard version of the source shard
+     *   - collectionVersion - The new collection version after the commit
      */
     StatusWith<BSONObj> commitChunkMigration(OperationContext* opCtx,
                                              const NamespaceString& nss,

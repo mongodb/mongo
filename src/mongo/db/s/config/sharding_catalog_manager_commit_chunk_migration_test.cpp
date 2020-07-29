@@ -48,7 +48,7 @@ using CommitChunkMigrate = ConfigServerTestFixture;
 
 const NamespaceString kNamespace("TestDB.TestColl");
 
-TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithControlChunk) {
+TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -96,22 +96,18 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithControlChunk) {
                                                             validAfter));
 
     // Verify the versions returned match expected values.
-    auto mver = assertGet(ChunkVersion::parseWithField(versions, "migratedChunkVersion"));
-    ASSERT_EQ(ChunkVersion(migratedChunk.getVersion().majorVersion() + 1,
-                           0,
-                           migratedChunk.getVersion().epoch()),
-              mver);
-
-    auto cver = assertGet(ChunkVersion::parseWithField(versions, "controlChunkVersion"));
+    auto mver = assertGet(ChunkVersion::parseWithField(versions, "shardVersion"));
     ASSERT_EQ(ChunkVersion(migratedChunk.getVersion().majorVersion() + 1,
                            1,
                            migratedChunk.getVersion().epoch()),
-              cver);
+              mver);
 
-    // Verify the chunks ended up in the right shards, and versions match the values returned.
+    // Verify that a collection version is returned
+    auto cver = assertGet(ChunkVersion::parseWithField(versions, "collectionVersion"));
+
+    // Verify the chunks ended up in the right shards.
     auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), migratedChunk.getMin()));
     ASSERT_EQ("shard1", chunkDoc0.getShard().toString());
-    ASSERT_EQ(mver, chunkDoc0.getVersion());
 
     // The migrated chunk's history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
@@ -119,7 +115,6 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithControlChunk) {
 
     auto chunkDoc1 = uassertStatusOK(getChunkDoc(operationContext(), controlChunk.getMin()));
     ASSERT_EQ("shard0", chunkDoc1.getShard().toString());
-    ASSERT_EQ(cver, chunkDoc1.getVersion());
 
     // The control chunk's history and jumbo status should be unchanged.
     ASSERT_EQ(1UL, chunkDoc1.getHistory().size());
@@ -175,17 +170,13 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
 
     // Verify the version returned matches expected value.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::parseWithField(versions, "migratedChunkVersion");
+    auto mver = ChunkVersion::parseWithField(versions, "shardVersion");
     ASSERT_OK(mver.getStatus());
-    ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, origVersion.epoch()), mver.getValue());
+    ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch()), mver.getValue());
 
-    auto cver = ChunkVersion::parseWithField(versions, "controlChunkVersion");
-    ASSERT_NOT_OK(cver.getStatus());
-
-    // Verify the chunk ended up in the right shard, and version matches the value returned.
+    // Verify the chunk ended up in the right shard.
     auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), chunkMin));
     ASSERT_EQ("shard1", chunkDoc0.getShard().toString());
-    ASSERT_EQ(mver.getValue(), chunkDoc0.getVersion());
     // The history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
@@ -237,17 +228,14 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
 
     // Verify the version returned matches expected value.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::parseWithField(versions, "migratedChunkVersion");
+    auto mver = ChunkVersion::parseWithField(versions, "shardVersion");
     ASSERT_OK(mver.getStatus());
-    ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, origVersion.epoch()), mver.getValue());
+    ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch()), mver.getValue());
 
-    auto cver = ChunkVersion::parseWithField(versions, "controlChunkVersion");
-    ASSERT_NOT_OK(cver.getStatus());
-
-    // Verify the chunk ended up in the right shard, and version matches the value returned.
+    // Verify the chunk ended up in the right shard.
     auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), chunkMin));
     ASSERT_EQ("shard1", chunkDoc0.getShard().toString());
-    ASSERT_EQ(mver.getValue(), chunkDoc0.getVersion());
+
     // The new history entry should be added, but the old one preserved.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
@@ -516,16 +504,13 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
 
     // Verify the versions returned match expected values.
     BSONObj versions = resultBSON.getValue();
-    auto mver = ChunkVersion::parseWithField(versions, "migratedChunkVersion");
+    auto mver = ChunkVersion::parseWithField(versions, "shardVersion");
     ASSERT_OK(mver.getStatus());
-    ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, origVersion.epoch()), mver.getValue());
+    ASSERT_EQ(ChunkVersion(0, 0, origVersion.epoch()), mver.getValue());
 
-    ASSERT_TRUE(versions["controlChunkVersion"].eoo());
-
-    // Verify the chunks ended up in the right shards, and versions match the values returned.
+    // Verify the chunks ended up in the right shards.
     auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), chunkMin));
     ASSERT_EQ(shard1.getName(), chunkDoc0.getShard().toString());
-    ASSERT_EQ(mver.getValue(), chunkDoc0.getVersion());
 
     // The migrated chunk's history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());

@@ -145,14 +145,21 @@ BSONArray buildMergeChunksTransactionPrecond(const std::vector<ChunkType>& chunk
     return preCond.arr();
 }
 
-Status checkChunkMatchesRequest(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const ChunkType& requestedChunk,
-                                const ShardId& shard) {
+/*
+ * Check that the chunk still exists and return its metadata.
+ */
+StatusWith<ChunkType> getCurrentChunk(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const ChunkType& requestedChunk) {
+    uassert(4683300,
+            "Config server rejecting commitChunkMigration request that does not have a "
+            "ChunkVersion",
+            requestedChunk.isVersionSet() && requestedChunk.getVersion().isSet() &&
+                requestedChunk.getVersion().epoch().isSet());
+
     BSONObj chunkQuery =
         BSON(ChunkType::ns() << nss.ns() << ChunkType::min() << requestedChunk.getMin()
-                             << ChunkType::max() << requestedChunk.getMax() << ChunkType::shard()
-                             << shard);
+                             << ChunkType::max() << requestedChunk.getMax());
 
     // Must use local read concern because we're going to perform subsequent writes.
     auto findResponseWith =
@@ -164,37 +171,18 @@ Status checkChunkMatchesRequest(OperationContext* opCtx,
             chunkQuery,
             BSONObj(),
             1);
+
     if (!findResponseWith.isOK()) {
         return findResponseWith.getStatus();
     }
 
     if (findResponseWith.getValue().docs.empty()) {
         return {ErrorCodes::Error(40165),
-                str::stream()
-                    << "Could not find the chunk (" << chunkQuery.toString()
-                    << ") on the shard. Cannot execute the migration commit with invalid chunks."};
+                str::stream() << "Could not find the chunk (" << requestedChunk.toString()
+                              << "). Cannot execute the migration commit with invalid chunks."};
     }
 
-    const auto currentChunk =
-        uassertStatusOK(ChunkType::fromConfigBSON(findResponseWith.getValue().docs.front()));
-
-    uassert(4683300,
-            "Config server rejecting commitChunkMigration request that does not have a "
-            "ChunkVersion",
-            requestedChunk.isVersionSet() && requestedChunk.getVersion().isSet() &&
-                requestedChunk.getVersion().epoch().isSet());
-
-    if (requestedChunk.getVersion().epoch() != currentChunk.getVersion().epoch() ||
-        requestedChunk.getVersion().isOlderThan(currentChunk.getVersion())) {
-        return {ErrorCodes::ConflictingOperationInProgress,
-                str::stream()
-                    << "Rejecting migration request because the version of the requested chunk "
-                    << requestedChunk.toConfigBSON()
-                    << " is older than the version of the current chunk "
-                    << currentChunk.toConfigBSON()};
-    }
-
-    return Status::OK();
+    return uassertStatusOK(ChunkType::fromConfigBSON(findResponseWith.getValue().docs.front()));
 }
 
 BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
@@ -636,6 +624,53 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     return Status::OK();
 }
 
+BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const ShardId& fromShard) {
+    BSONObjBuilder result;
+
+    auto swCollectionVersion = getMaxChunkVersionFromQueryResponse(
+        nss,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            BSON("ns" << nss.ns()),          // Query all chunks for this namespace.
+            BSON(ChunkType::lastmod << -1),  // Sort by version.
+            1));                             // Limit 1.
+
+    uassert(4914700,
+            str::stream() << "Couldn't retrieve collection version from config server",
+            swCollectionVersion.isOK());
+
+    auto swDonorShardVersion = getMaxChunkVersionFromQueryResponse(
+        nss,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            BSON("ns" << nss.ns() << "shard"
+                      << fromShard),         // Query all chunks for this namespace and shard.
+            BSON(ChunkType::lastmod << -1),  // Sort by version.
+            1));                             // Limit 1.
+
+    auto collectionVersion = swCollectionVersion.getValue();
+    auto shardVersion = swDonorShardVersion.isOK() ? swDonorShardVersion.getValue()
+                                                   : ChunkVersion(0, 0, collectionVersion.epoch());
+    uassert(4914701,
+            str::stream() << "Aborting due to metadata corruption. Collection version '"
+                          << collectionVersion.toString() << "' and shard version '"
+                          << shardVersion.toString() << "'.",
+            collectionVersion >= shardVersion);
+
+    collectionVersion.appendWithField(&result, "collectionVersion");
+    shardVersion.appendWithField(&result, "shardVersion");
+
+    return result.obj();
+}
+
 StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -732,10 +767,34 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
                               << migratedChunk.getRange().toString() << ")."};
     }
 
-    // Check that migratedChunk has not been modified since the migration started.
-    auto migratedOnShard = checkChunkMatchesRequest(opCtx, nss, migratedChunk, fromShard);
-    if (!migratedOnShard.isOK()) {
-        return migratedOnShard;
+    // Check if chunk still exists and which shard owns it
+    auto swCurrentChunk = getCurrentChunk(opCtx, nss, migratedChunk);
+
+    if (!swCurrentChunk.isOK()) {
+        return swCurrentChunk.getStatus();
+    }
+
+    auto currentChunk = swCurrentChunk.getValue();
+
+    if (currentChunk.getShard() == toShard) {
+        // The commit was already done successfully
+        return getShardAndCollectionVersion(opCtx, nss, fromShard);
+    }
+
+    uassert(4914702,
+            str::stream() << "Migrated  chunk " << migratedChunk.toString()
+                          << " from ns: " << nss.ns() << " not owned by donor " << fromShard
+                          << " neither by recipient " << toShard,
+            currentChunk.getShard() == fromShard);
+
+    if (migratedChunk.getVersion().epoch() != currentChunk.getVersion().epoch() ||
+        migratedChunk.getVersion().isOlderThan(currentChunk.getVersion())) {
+        return {ErrorCodes::ConflictingOperationInProgress,
+                str::stream()
+                    << "Rejecting migration request because the version of the requested chunk "
+                    << migratedChunk.toConfigBSON()
+                    << " is older than the version of the current chunk "
+                    << currentChunk.toConfigBSON() << " on the shard " << fromShard.toString()};
     }
 
     auto controlChunk = getControlChunkForMigrate(opCtx, nss, migratedChunk, fromShard);
@@ -826,13 +885,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         return applyOpsCommandResponse.getValue().commandStatus;
     }
 
-    BSONObjBuilder result;
-    newMigratedChunk.getVersion().appendWithField(&result, "migratedChunkVersion");
-    if (controlChunk) {
-        newControlChunk->getVersion().appendWithField(&result, "controlChunkVersion");
-    }
-
-    return result.obj();
+    return getShardAndCollectionVersion(opCtx, nss, fromShard);
 }
 
 StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(OperationContext* opCtx,
