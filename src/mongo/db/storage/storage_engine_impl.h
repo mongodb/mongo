@@ -268,12 +268,6 @@ public:
         void startup();
 
         /**
-         * Notify all of the listeners listening for the given TimestampType when a change for that
-         * timestamp has occured.
-         */
-        void notifyAll(TimestampType type, Timestamp newTimestamp);
-
-        /**
          * Adds a new listener to the monitor if it isn't already registered. A listener can only be
          * bound to one type of timestamp at a time.
          */

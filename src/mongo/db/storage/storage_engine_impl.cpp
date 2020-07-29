@@ -1003,9 +1003,8 @@ void StorageEngineImpl::TimestampMonitor::startup() {
             Timestamp checkpoint = _currentTimestamps.checkpoint;
             Timestamp oldest = _currentTimestamps.oldest;
             Timestamp stable = _currentTimestamps.stable;
+            Timestamp minOfCheckpointAndOldest = _currentTimestamps.minOfCheckpointAndOldest;
 
-            // Take a global lock in MODE_IS while fetching timestamps to guarantee that
-            // rollback-to-stable isn't running concurrently.
             try {
                 auto opCtx = client->getOperationContext();
                 mongo::ServiceContext::UniqueOperationContext uOpCtx;
@@ -1014,39 +1013,48 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                     opCtx = uOpCtx.get();
                 }
 
-                ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-                    opCtx->lockState());
-                Lock::GlobalLock lock(opCtx, MODE_IS);
+                {
+                    // Take a global lock in MODE_IS while fetching timestamps to guarantee that
+                    // rollback-to-stable isn't running concurrently.
+                    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+                        opCtx->lockState());
+                    Lock::GlobalLock lock(opCtx, MODE_IS);
 
-                // The checkpoint timestamp is not cached in mongod and needs to be fetched with a
-                // call into WiredTiger, all the other timestamps are cached in mongod.
-                checkpoint = _engine->getCheckpointTimestamp();
-                oldest = _engine->getOldestTimestamp();
-                stable = _engine->getStableTimestamp();
-
-                Timestamp minOfCheckpointAndOldest =
-                    (checkpoint.isNull() || (checkpoint > oldest)) ? oldest : checkpoint;
-
-                // Notify listeners if the timestamps changed.
-                if (_currentTimestamps.checkpoint != checkpoint) {
-                    _currentTimestamps.checkpoint = checkpoint;
-                    notifyAll(TimestampType::kCheckpoint, checkpoint);
+                    // The checkpoint timestamp is not cached in mongod and needs to be fetched with
+                    // a call into WiredTiger, all the other timestamps are cached in mongod.
+                    checkpoint = _engine->getCheckpointTimestamp();
+                    oldest = _engine->getOldestTimestamp();
+                    stable = _engine->getStableTimestamp();
+                    minOfCheckpointAndOldest =
+                        (checkpoint.isNull() || (checkpoint > oldest)) ? oldest : checkpoint;
                 }
 
-                if (_currentTimestamps.oldest != oldest) {
-                    _currentTimestamps.oldest = oldest;
-                    notifyAll(TimestampType::kOldest, oldest);
+                {
+                    stdx::lock_guard<Latch> lock(_monitorMutex);
+                    for (const auto& listener : _listeners) {
+                        // Notify the listener if the timestamp changed.
+                        if (listener->getType() == TimestampType::kCheckpoint &&
+                            _currentTimestamps.checkpoint != checkpoint) {
+                            listener->notify(checkpoint);
+                        } else if (listener->getType() == TimestampType::kOldest &&
+                                   _currentTimestamps.oldest != oldest) {
+                            listener->notify(oldest);
+                        } else if (listener->getType() == TimestampType::kStable &&
+                                   _currentTimestamps.stable != stable) {
+                            listener->notify(stable);
+                        } else if (listener->getType() ==
+                                       TimestampType::kMinOfCheckpointAndOldest &&
+                                   _currentTimestamps.minOfCheckpointAndOldest !=
+                                       minOfCheckpointAndOldest) {
+                            listener->notify(minOfCheckpointAndOldest);
+                        }
+                    }
                 }
 
-                if (_currentTimestamps.stable != stable) {
-                    _currentTimestamps.stable = stable;
-                    notifyAll(TimestampType::kStable, stable);
-                }
-
-                if (_currentTimestamps.minOfCheckpointAndOldest != minOfCheckpointAndOldest) {
-                    _currentTimestamps.minOfCheckpointAndOldest = minOfCheckpointAndOldest;
-                    notifyAll(TimestampType::kMinOfCheckpointAndOldest, minOfCheckpointAndOldest);
-                }
+                _currentTimestamps.checkpoint = checkpoint;
+                _currentTimestamps.oldest = oldest;
+                _currentTimestamps.stable = stable;
+                _currentTimestamps.minOfCheckpointAndOldest = minOfCheckpointAndOldest;
             } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
                 if (!ErrorCodes::isCancelationError(ex))
                     throw;
@@ -1064,15 +1072,6 @@ void StorageEngineImpl::TimestampMonitor::startup() {
     _job = _periodicRunner->makeJob(std::move(job));
     _job.start();
     _running = true;
-}
-
-void StorageEngineImpl::TimestampMonitor::notifyAll(TimestampType type, Timestamp newTimestamp) {
-    stdx::lock_guard<Latch> lock(_monitorMutex);
-    for (auto& listener : _listeners) {
-        if (listener->getType() == type) {
-            listener->notify(newTimestamp);
-        }
-    }
 }
 
 void StorageEngineImpl::TimestampMonitor::addListener(TimestampListener* listener) {

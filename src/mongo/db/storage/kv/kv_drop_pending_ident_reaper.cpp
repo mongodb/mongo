@@ -103,38 +103,36 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
         return;
     }
 
-
-    {
-        // Guards against catalog changes while dropping idents using KVEngine::dropIdent().
+    for (const auto& timestampAndIdentInfo : toDrop) {
+        // Guards against catalog changes while dropping idents using KVEngine::dropIdent(). Yields
+        // after dropping each ident.
         Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
-        for (const auto& timestampAndIdentInfo : toDrop) {
-            const auto& dropTimestamp = timestampAndIdentInfo.first;
-            const auto& identInfo = timestampAndIdentInfo.second;
-            const auto& nss = identInfo.nss;
-            const auto& ident = identInfo.ident;
-            LOGV2(22237,
-                  "Completing drop for ident {ident} (ns: {namespace}) with drop timestamp "
-                  "{dropTimestamp}",
-                  "Completing drop for ident",
-                  "ident"_attr = ident,
-                  "namespace"_attr = nss,
-                  "dropTimestamp"_attr = dropTimestamp);
-            WriteUnitOfWork wuow(opCtx);
-            auto status = _engine->dropIdent(opCtx, opCtx->recoveryUnit(), ident);
-            if (!status.isOK()) {
-                LOGV2_FATAL_NOTRACE(
-                    51022,
-                    "Failed to remove drop-pending ident {ident}(ns: {namespace}) with drop "
-                    "timestamp {dropTimestamp}: {error}",
-                    "Failed to remove drop-pending ident",
-                    "ident"_attr = ident,
-                    "namespace"_attr = nss,
-                    "dropTimestamp"_attr = dropTimestamp,
-                    "error"_attr = status);
-            }
-            wuow.commit();
+        const auto& dropTimestamp = timestampAndIdentInfo.first;
+        const auto& identInfo = timestampAndIdentInfo.second;
+        const auto& nss = identInfo.nss;
+        const auto& ident = identInfo.ident;
+        LOGV2(22237,
+              "Completing drop for ident {ident} (ns: {namespace}) with drop timestamp "
+              "{dropTimestamp}",
+              "Completing drop for ident",
+              "ident"_attr = ident,
+              "namespace"_attr = nss,
+              "dropTimestamp"_attr = dropTimestamp);
+        WriteUnitOfWork wuow(opCtx);
+        auto status = _engine->dropIdent(opCtx, opCtx->recoveryUnit(), ident);
+        if (!status.isOK()) {
+            LOGV2_FATAL_NOTRACE(
+                51022,
+                "Failed to remove drop-pending ident {ident}(ns: {namespace}) with drop "
+                "timestamp {dropTimestamp}: {error}",
+                "Failed to remove drop-pending ident",
+                "ident"_attr = ident,
+                "namespace"_attr = nss,
+                "dropTimestamp"_attr = dropTimestamp,
+                "error"_attr = status);
         }
+        wuow.commit();
     }
 
     {
