@@ -105,7 +105,8 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
                           const boost::optional<StmtId>& statementId,
                           const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                           const boost::optional<OpTime>& preImageOpTime,
-                          const boost::optional<OpTime>& postImageOpTime) {
+                          const boost::optional<OpTime>& postImageOpTime,
+                          const boost::optional<ShardId>& destinedRecipient) {
     BSONObjBuilder builder;
     sessionInfo.serialize(&builder);
     builder.append(OplogEntryBase::kTimestampFieldName, opTime.getTimestamp());
@@ -145,6 +146,10 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     if (postImageOpTime) {
         const BSONObj localObject = postImageOpTime.get().toBSON();
         builder.append(OplogEntryBase::kPostImageOpTimeFieldName, localObject);
+    }
+    if (destinedRecipient) {
+        builder.append(OplogEntryBase::kDestinedRecipientFieldName,
+                       destinedRecipient.get().toString());
     }
     return builder.obj();
 }
@@ -308,7 +313,8 @@ OplogEntry::OplogEntry(OpTime opTime,
                        const boost::optional<StmtId>& statementId,
                        const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                        const boost::optional<OpTime>& preImageOpTime,
-                       const boost::optional<OpTime>& postImageOpTime)
+                       const boost::optional<OpTime>& postImageOpTime,
+                       const boost::optional<ShardId>& destinedRecipient)
     : OplogEntry(makeOplogEntryDoc(opTime,
                                    hash,
                                    opType,
@@ -324,7 +330,8 @@ OplogEntry::OplogEntry(OpTime opTime,
                                    statementId,
                                    prevWriteOpTimeInTransaction,
                                    preImageOpTime,
-                                   postImageOpTime)) {}
+                                   postImageOpTime,
+                                   destinedRecipient)) {}
 
 bool OplogEntry::isCommand() const {
     return getOpType() == OpTypeEnum::kCommand;

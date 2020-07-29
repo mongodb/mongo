@@ -168,6 +168,14 @@ public:
         getOpTimeAndWallTimeBase().setWallClockTime(std::move(value));
     }
 
+    void setDestinedRecipient(boost::optional<ShardId> value) {
+        getDurableReplOperation().setDestinedRecipient(std::move(value));
+    }
+
+    const boost::optional<ShardId>& getDestinedRecipient() const {
+        return getDurableReplOperation().getDestinedRecipient();
+    }
+
     /**
      * Sets the OpTime of the oplog entry.
      */
@@ -195,6 +203,7 @@ class OplogEntry : private MutableOplogEntry {
 public:
     // Make field names accessible.
     using MutableOplogEntry::k_idFieldName;
+    using MutableOplogEntry::kDestinedRecipientFieldName;
     using MutableOplogEntry::kDurableReplOperationFieldName;
     using MutableOplogEntry::kFromMigrateFieldName;
     using MutableOplogEntry::kHashFieldName;
@@ -219,6 +228,7 @@ public:
 
     // Make serialize() and getters accessible.
     using MutableOplogEntry::get_id;
+    using MutableOplogEntry::getDestinedRecipient;
     using MutableOplogEntry::getDurableReplOperation;
     using MutableOplogEntry::getFromMigrate;
     using MutableOplogEntry::getHash;
@@ -289,7 +299,8 @@ public:
                const boost::optional<StmtId>& statementId,
                const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                const boost::optional<OpTime>& preImageOpTime,
-               const boost::optional<OpTime>& postImageOpTime);
+               const boost::optional<OpTime>& postImageOpTime,
+               const boost::optional<ShardId>& destinedRecipient);
 
     // DEPRECATED: This constructor can throw. Use static parse method instead.
     explicit OplogEntry(BSONObj raw);

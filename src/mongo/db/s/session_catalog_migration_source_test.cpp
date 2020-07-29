@@ -80,7 +80,8 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         stmtId,                           // statement id
         prevWriteOpTimeInTransaction,     // optime of previous write within same transaction
         preImageOpTime,                   // pre-image optime
-        postImageOpTime);                 // post-image optime
+        postImageOpTime,                  // post-image optime
+        boost::none);                     // ShardId of resharding recipient
 }
 
 repl::OplogEntry makeOplogEntry(repl::OpTime opTime,

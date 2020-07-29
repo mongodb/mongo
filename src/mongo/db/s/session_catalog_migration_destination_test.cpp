@@ -91,22 +91,23 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<StmtId> stmtId,
                                 boost::optional<repl::OpTime> preImageOpTime = boost::none,
                                 boost::optional<repl::OpTime> postImageOpTime = boost::none) {
-    return repl::OplogEntry(opTime,            // optime
-                            0,                 // hash
-                            opType,            // opType
-                            kNs,               // namespace
-                            boost::none,       // uuid
-                            boost::none,       // fromMigrate
-                            0,                 // version
-                            object,            // o
-                            object2,           // o2
-                            sessionInfo,       // sessionInfo
-                            boost::none,       // isUpsert
-                            wallClockTime,     // wall clock time
-                            stmtId,            // statement id
-                            boost::none,       // optime of previous write within same transaction
-                            preImageOpTime,    // pre-image optime
-                            postImageOpTime);  // post-image optime
+    return repl::OplogEntry(opTime,           // optime
+                            0,                // hash
+                            opType,           // opType
+                            kNs,              // namespace
+                            boost::none,      // uuid
+                            boost::none,      // fromMigrate
+                            0,                // version
+                            object,           // o
+                            object2,          // o2
+                            sessionInfo,      // sessionInfo
+                            boost::none,      // isUpsert
+                            wallClockTime,    // wall clock time
+                            stmtId,           // statement id
+                            boost::none,      // optime of previous write within same transaction
+                            preImageOpTime,   // pre-image optime
+                            postImageOpTime,  // post-image optime
+                            boost::none);     // ShardId of resharding recipient
 }
 
 repl::OplogEntry extractInnerOplog(const repl::OplogEntry& oplog) {

@@ -81,7 +81,8 @@ OplogEntry makeOplogEntry(int ts) {
                       boost::none,                  // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
-                      boost::none);  // post-image optime
+                      boost::none,   // post-image optime
+                      boost::none);  // ShardId of resharding recipient
 }
 
 TEST_F(MultiApplierTest, InvalidConstruction) {

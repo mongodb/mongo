@@ -36,6 +36,7 @@ imports:
     - "mongo/db/logical_session_id.idl"
     - "mongo/db/repl/optime_and_wall_time_base.idl"
     - "mongo/db/repl/replication_types.idl"
+    - "mongo/s/sharding_types.idl"
 
 enums:
     OpType:
@@ -89,6 +90,12 @@ structs:
                 optional: true
                 description: "The optime of another oplog entry that contains the document
                               before an update/remove was applied."
+            destinedRecipient:
+                cpp_name: destinedRecipient
+                type: shard_id
+                optional: true
+                description: "The destined recipient for this op under the new shard key pattern.
+                              Only included when a resharding operation is in progress."
 
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.

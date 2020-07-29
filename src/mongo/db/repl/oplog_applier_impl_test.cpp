@@ -101,7 +101,8 @@ OplogEntry makeOplogEntry(OpTypeEnum opType,
                       boost::none,                 // statement id
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
-                      boost::none);  // post-image optime
+                      boost::none,   // post-image optime
+                      boost::none);  // ShardId of resharding recipient
 }
 
 OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollectionUUID uuid) {
@@ -2525,7 +2526,8 @@ public:
                                 boost::none,    // statement id
                                 boost::none,    // optime of previous write within same transaction
                                 boost::none,    // pre-image optime
-                                boost::none);   // post-image optime
+                                boost::none,    // post-image optime
+                                boost::none);   // ShardId of resharding recipient
     }
 
     /**
@@ -2553,7 +2555,8 @@ public:
                                 boost::none,    // statement id
                                 boost::none,    // optime of previous write within same transaction
                                 boost::none,    // pre-image optime
-                                boost::none);   // post-image optime
+                                boost::none,    // post-image optime
+                                boost::none);   // ShardId of resharding recipient
     }
 
     void checkTxnTable(const OperationSessionInfo& sessionInfo,
