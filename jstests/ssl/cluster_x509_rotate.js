@@ -5,10 +5,6 @@
 
 load('jstests/ssl/libs/ssl_helpers.js');
 
-if (determineSSLProvider() === "openssl") {
-    return;
-}
-
 const dbPath = MongoRunner.toRealDir("$dataDir/cluster_x509_rotate_test/");
 mkdir(dbPath);
 

@@ -146,7 +146,8 @@ public:
 #endif
 
 #ifdef MONGO_CONFIG_SSL
-    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager) override;
+    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
+                              bool asyncOCSPStaple) override;
 
     std::shared_ptr<SSLManagerInterface> getSSLManager() {
         return _sslContext.get()->manager;

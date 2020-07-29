@@ -1097,7 +1097,7 @@ public:
      * Sets the OCSP Response to be stapled to the TLS Connection. Sets the _ocspStaplingAnchor
      * object in the class.
      */
-    Status stapleOCSPResponse(SSL_CTX* context) final;
+    Status stapleOCSPResponse(SSL_CTX* context, bool asyncOCSPStaple) final;
 
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
@@ -1785,7 +1785,7 @@ std::tuple<X509*> getCertificateForContext(SSL_CTX* context) {
 }
 #endif
 
-Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
+Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context, bool asyncOCSPStaple) {
     if (MONGO_unlikely(disableStapling.shouldFail()) || !tlsOCSPEnabled) {
         return Status::OK();
     }
@@ -1803,7 +1803,9 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
         return Status::OK();
     }
 
-    auto fetchAndStaple = [context, cert]() -> Future<Milliseconds> {
+    auto pf = makePromiseFuture<void>();
+    auto fetchAndStaple =
+        [context, cert, asyncOCSPStaple](Promise<void>* promise) -> Future<Milliseconds> {
         // Generate a new verified X509StoreContext to get our own certificate chain
         UniqueX509StoreCtx storeCtx(X509_STORE_CTX_new());
         if (!storeCtx) {
@@ -1832,50 +1834,62 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
 
         auto ocspContext = std::move(swOCSPContext.getValue());
 
-        return dispatchRequests(
-                   context, std::move(intermediateCerts), ocspContext, OCSPPurpose::kStaple)
-            .onCompletion([](StatusWith<OCSPFetchResponse> swResponse) -> Milliseconds {
-                std::shared_ptr<SSLManagerInterface> sslManager =
-                    theSSLManagerCoordinator->getSSLManager();
-                std::shared_ptr<SSLManagerOpenSSL> theSSLManagerCast =
-                    std::static_pointer_cast<SSLManagerOpenSSL>(sslManager);
 
-                Mutex* sharedResponseMutex = theSSLManagerCast->getSharedResponseMutex();
+        auto stapleResponse =
+            [asyncOCSPStaple,
+             promise](StatusWith<OCSPFetchResponse> swResponse) mutable -> Milliseconds {
+            // protect against pf going out of scope when asynchronous
+            if (!asyncOCSPStaple && promise != nullptr) {
+                promise->setWith([&] {
+                    return (swResponse == ErrorCodes::OCSPCertificateStatusUnknown)
+                        ? Status::OK()
+                        : swResponse.getValue().statusOfResponse;
+                });
+            }
 
-                stdx::lock_guard<mongo::Mutex> guard(*sharedResponseMutex);
+            std::shared_ptr<SSLManagerInterface> sslManager =
+                theSSLManagerCoordinator->getSSLManager();
+            std::shared_ptr<SSLManagerOpenSSL> theSSLManagerCast =
+                std::static_pointer_cast<SSLManagerOpenSSL>(sslManager);
 
-                std::shared_ptr<OCSPStaplingContext> ocspStaplingContext =
-                    theSSLManagerCast->getOcspStaplingContext(guard);
+            Mutex* sharedResponseMutex = theSSLManagerCast->getSharedResponseMutex();
 
-                if (!swResponse.isOK()) {
-                    LOGV2_WARNING(23233, "Could not staple OCSP response to outgoing certificate.");
+            stdx::lock_guard<mongo::Mutex> guard(*sharedResponseMutex);
 
-                    if (ocspStaplingContext && ocspStaplingContext->sharedResponseForServer &&
-                        ocspStaplingContext->sharedResponseNextUpdate <
-                            (Date_t::now() + kOCSPUnknownStatusRefreshRate)) {
+            std::shared_ptr<OCSPStaplingContext> ocspStaplingContext =
+                theSSLManagerCast->getOcspStaplingContext(guard);
 
-                        theSSLManagerCast->setOcspStaplingContext(
-                            guard, std::make_shared<OCSPStaplingContext>());
+            if (!swResponse.isOK()) {
+                LOGV2_WARNING(23233, "Could not staple OCSP response to outgoing certificate.");
 
-                        LOGV2_WARNING(
-                            4633601,
-                            "Server will remove and not staple the expiring OCSP Response.");
-                    }
+                if (ocspStaplingContext && ocspStaplingContext->sharedResponseForServer &&
+                    ocspStaplingContext->sharedResponseNextUpdate <
+                        (Date_t::now() + kOCSPUnknownStatusRefreshRate)) {
 
-                    return kOCSPUnknownStatusRefreshRate;
+                    theSSLManagerCast->setOcspStaplingContext(
+                        guard, std::make_shared<OCSPStaplingContext>());
+
+                    LOGV2_WARNING(4633601,
+                                  "Server will remove and not staple the expiring OCSP Response.");
                 }
 
-                theSSLManagerCast->setOcspStaplingContext(
-                    guard,
-                    std::make_shared<OCSPStaplingContext>(
-                        std::move(swResponse.getValue().response),
-                        swResponse.getValue().nextStapleRefresh()));
-                return swResponse.getValue().fetchNewResponseDuration();
-            });
+                return kOCSPUnknownStatusRefreshRate;
+            }
+
+            theSSLManagerCast->setOcspStaplingContext(
+                guard,
+                std::make_shared<OCSPStaplingContext>(std::move(swResponse.getValue().response),
+                                                      swResponse.getValue().nextStapleRefresh()));
+            return swResponse.getValue().fetchNewResponseDuration();
+        };
+
+        return dispatchRequests(
+                   context, std::move(intermediateCerts), ocspContext, OCSPPurpose::kStaple)
+            .onCompletion(stapleResponse);
     };
 
-    fetchAndStaple().getAsync(
-        [this, fetchAndStaple](StatusWith<Milliseconds> swDurationInitial) mutable {
+    fetchAndStaple(&(pf.promise))
+        .getAsync([this, fetchAndStaple](StatusWith<Milliseconds> swDurationInitial) mutable {
             stdx::lock_guard<Latch> lock(this->_staplingMutex);
 
             if (this->_ocspStaplingAnchor) {
@@ -1899,7 +1913,8 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
                 getGlobalServiceContext()->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob(
                     "OCSP Fetch and Staple",
                     [this, fetchAndStaple](Client* client) {
-                        fetchAndStaple().getAsync([this](StatusWith<Milliseconds> swDuration) {
+                        fetchAndStaple(nullptr).getAsync([this](
+                                                             StatusWith<Milliseconds> swDuration) {
                             stdx::lock_guard<Latch> lock(this->_staplingMutex);
 
                             if (!swDuration.isOK()) {
@@ -1924,6 +1939,14 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context) {
     SSL_CTX_set_tlsext_status_cb(context, ocspServerCallback);
     SSL_CTX_set_tlsext_status_arg(context, static_cast<void*>(this));
 
+    if (!asyncOCSPStaple) {
+        Status stapleStatus = pf.future.getNoThrow();
+        if (stapleStatus == ErrorCodes::OCSPCertificateStatusRevoked) {
+            return Status(ErrorCodes::OCSPCertificateStatusRevoked,
+                          str::stream()
+                              << "Certificate is revoked" << getSSLErrorMessage(ERR_get_error()));
+        }
+    }
     return Status::OK();
 }
 

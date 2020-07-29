@@ -5,10 +5,6 @@
 
 load('jstests/ssl/libs/ssl_helpers.js');
 
-if (determineSSLProvider() === "openssl") {
-    return;
-}
-
 function deleteFile(file) {
     if (_isWindows()) {
         // correctly replace forward slashes for Windows

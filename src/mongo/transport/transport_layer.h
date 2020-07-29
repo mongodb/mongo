@@ -128,7 +128,8 @@ public:
 
 #ifdef MONGO_CONFIG_SSL
     /** Rotate the in-use certificates for new connections. */
-    virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager) = 0;
+    virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
+                                      bool asyncOCSPStaple) = 0;
 #endif
 
 private:

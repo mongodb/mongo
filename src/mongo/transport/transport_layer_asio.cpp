@@ -1004,7 +1004,7 @@ Status TransportLayerASIO::setup() {
     if (SSLManagerCoordinator::get()) {
         manager = SSLManagerCoordinator::get()->getSSLManager();
     }
-    return rotateCertificates(manager);
+    return rotateCertificates(manager, true);
 #endif
 
     return Status::OK();
@@ -1182,7 +1182,8 @@ SSLParams::SSLModes TransportLayerASIO::_sslMode() const {
     return static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load());
 }
 
-Status TransportLayerASIO::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager) {
+Status TransportLayerASIO::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
+                                              bool asyncOCSPStaple) {
     auto newSSLContext = std::make_shared<SSLConnectionContext>();
     newSSLContext->manager = manager;
     const auto& sslParams = getSSLGlobalParams();
@@ -1198,8 +1199,9 @@ Status TransportLayerASIO::rotateCertificates(std::shared_ptr<SSLManagerInterfac
             return status;
         }
 
-        auto resp =
-            newSSLContext->manager->stapleOCSPResponse(newSSLContext->ingress->native_handle());
+        auto resp = newSSLContext->manager->stapleOCSPResponse(
+            newSSLContext->ingress->native_handle(), asyncOCSPStaple);
+
         if (!resp.isOK()) {
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream()

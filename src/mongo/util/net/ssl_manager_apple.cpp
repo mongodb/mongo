@@ -1266,7 +1266,7 @@ public:
                                                         const HostAndPort& hostForLogging,
                                                         const ExecutorPtr& reactor) final;
 
-    Status stapleOCSPResponse(asio::ssl::apple::Context* context) final;
+    Status stapleOCSPResponse(asio::ssl::apple::Context* context, bool asyncOCSPStaple) final;
 
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
@@ -1485,7 +1485,8 @@ StatusWith<TLSVersion> mapTLSVersion(SSLContextRef ssl) {
     }
 }
 
-Status SSLManagerApple::stapleOCSPResponse(asio::ssl::apple::Context* context) {
+Status SSLManagerApple::stapleOCSPResponse(asio::ssl::apple::Context* context,
+                                           bool asyncOCSPStaple) {
     return Status::OK();
 }
 

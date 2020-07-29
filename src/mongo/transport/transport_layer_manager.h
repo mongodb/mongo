@@ -103,7 +103,8 @@ public:
     }
 
 #ifdef MONGO_CONFIG_SSL
-    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager) override;
+    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
+                              bool asyncOCSPStaple) override;
 #endif
 private:
     template <typename Callable>

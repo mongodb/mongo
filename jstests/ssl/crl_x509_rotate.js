@@ -5,7 +5,7 @@
 
 load('jstests/ssl/libs/ssl_helpers.js');
 
-if (determineSSLProvider() === "openssl" || determineSSLProvider() === "apple") {
+if (determineSSLProvider() === "apple") {
     return;
 }
 

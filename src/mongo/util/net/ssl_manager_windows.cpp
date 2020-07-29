@@ -285,7 +285,7 @@ public:
                                                         const HostAndPort& hostForLogging,
                                                         const ExecutorPtr& reactor) final;
 
-    Status stapleOCSPResponse(SCHANNEL_CRED* cred) final;
+    Status stapleOCSPResponse(SCHANNEL_CRED* cred, bool asyncOCSPStaple) final;
 
     const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
@@ -1943,7 +1943,7 @@ StatusWith<TLSVersion> mapTLSVersion(PCtxtHandle ssl) {
     }
 }
 
-Status SSLManagerWindows::stapleOCSPResponse(SCHANNEL_CRED* cred) {
+Status SSLManagerWindows::stapleOCSPResponse(SCHANNEL_CRED* cred, bool asyncOCSPStaple) {
     return Status::OK();
 }
 

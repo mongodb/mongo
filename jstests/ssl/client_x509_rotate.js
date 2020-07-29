@@ -5,10 +5,6 @@
 
 load('jstests/ssl/libs/ssl_helpers.js');
 
-if (determineSSLProvider() === "openssl") {
-    return;
-}
-
 let mongos;
 function getConnPoolHosts() {
     const ret = mongos.adminCommand({connPoolStats: 1});
