@@ -3,7 +3,7 @@
 	<Fragment>
     <DirectoryRef Id="BIN">
       <Component Id="InstallCompass" Guid="FDB7B7C4-B78F-4A85-8F98-E8E49F6027B2">
-        <File Id="InstallCompassScript" Name="InstallCompass.ps1" Source="$(var.CompassDir)\Install-Compass.ps1" />
+        <File Id="InstallCompassScript" Name="InstallCompass.ps1" Source="$(var.BinarySource)\Install-Compass.ps1" />
       </Component>
       <Component Id="c_mongo" Guid="395C3DA5-A905-409C-AD96-29BFFF5E12D6">
         <File Id="f_mongo" Name="mongo.exe" Source="$(var.BinarySource)\mongo.exe"
@@ -57,11 +57,11 @@
       </Component>
       <?if $(var.Edition) = Enterprise ?>
         <Component Id="c_mongodecrypt" Guid="B81B0CED-8CAD-4A92-BABC-7C473BBFF44E">
-          <File Id="f_mongodecrypt" Name="mongodecrypt.exe" Source="$(var.EnterpriseToolBinarySource)\mongodecrypt.exe"
+          <File Id="f_mongodecrypt" Name="mongodecrypt.exe" Source="$(var.BinarySource)\mongodecrypt.exe"
                 DiskId="1" KeyPath="yes"/>
         </Component>
         <Component Id="c_mongoldap" Guid="553E4E3D-ED32-4ABA-8F27-3A7525C3145C">
-          <File Id="f_mongoldap" Name="mongoldap.exe" Source="$(var.EnterpriseToolBinarySource)\mongoldap.exe"
+          <File Id="f_mongoldap" Name="mongoldap.exe" Source="$(var.BinarySource)\mongoldap.exe"
                 DiskId="1" KeyPath="yes"/>
         </Component>
         <Component Id="c_sasl" Guid="6632B1B8-9F0C-452C-9101-BE6044471CAC">
@@ -81,11 +81,11 @@
                 DiskId="1" KeyPath="yes" />
         </Component>
         <Component Id="c_mongocryptd" Guid="D243D194-B765-4DF8-BC67-8F4C329AD1B5">
-          <File Id="f_mongocryptd" Name="mongocryptd.exe" Source="$(var.EnterpriseToolBinarySource)\mongocryptd.exe"
+          <File Id="f_mongocryptd" Name="mongocryptd.exe" Source="$(var.BinarySource)\mongocryptd.exe"
                 DiskId ="1" KeyPath="yes"/>
         </Component>
         <Component Id="c_mongocryptdPdb" Guid="49950D1E-55B0-4146-AEDE-C60C6B086ABF">
-          <File Id="f_mongocryptdPdb" Name="mongocryptd.pdb" Source="$(var.EnterpriseToolBinarySource)\mongocryptd.pdb"
+          <File Id="f_mongocryptdPdb" Name="mongocryptd.pdb" Source="$(var.BinarySource)\mongocryptd.pdb"
                 DiskId ="1" KeyPath="yes"/>
         </Component>
       <?endif ?>
