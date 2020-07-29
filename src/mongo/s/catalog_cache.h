@@ -130,10 +130,8 @@ class CatalogCache {
     CatalogCache& operator=(const CatalogCache&) = delete;
 
 public:
-    CatalogCache(ServiceContext* service,
-                 CatalogCacheLoader& cacheLoader,
-                 std::shared_ptr<ThreadPool> executor);
-    ~CatalogCache();
+    CatalogCache(ServiceContext* service, CatalogCacheLoader& cacheLoader);
+    ~CatalogCache() = default;
 
     /**
      * Blocking method that ensures the specified database is in the cache, loading it if necessary,
@@ -299,13 +297,6 @@ public:
      * was marked as needing refresh, updates the relevant counters inside the Stats struct.
      */
     void checkAndRecordOperationBlockedByRefresh(OperationContext* opCtx, mongo::LogicalOp opType);
-
-    /**
-     * Returns a ThreadPool with default options to be used for CatalogCache.
-     *
-     * The returned ThreadPool is already started up.
-     */
-    static std::shared_ptr<ThreadPool> makeDefaultThreadPool();
 
 private:
     // Make the cache entries friends so they can access the private classes below

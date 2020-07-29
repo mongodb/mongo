@@ -419,12 +419,11 @@ Status initializeSharding(OperationContext* opCtx) {
     auto shardFactory =
         std::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    auto catalogCacheExecutor = CatalogCache::makeDefaultThreadPool();
     CatalogCacheLoader::set(opCtx->getServiceContext(),
-                            std::make_unique<ConfigServerCatalogCacheLoader>(catalogCacheExecutor));
+                            std::make_unique<ConfigServerCatalogCacheLoader>());
 
-    auto catalogCache = std::make_unique<CatalogCache>(
-        opCtx->getServiceContext(), CatalogCacheLoader::get(opCtx), catalogCacheExecutor);
+    auto catalogCache =
+        std::make_unique<CatalogCache>(opCtx->getServiceContext(), CatalogCacheLoader::get(opCtx));
 
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.

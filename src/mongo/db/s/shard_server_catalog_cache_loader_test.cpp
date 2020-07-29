@@ -92,11 +92,9 @@ void ShardServerCatalogCacheLoaderTest::setUp() {
 
     // Create mock remote and real shard loader, retaining a pointer to the mock remote loader so
     // that unit tests can manipulate it to return certain responses.
-    _catalogCacheExecutor = CatalogCache::makeDefaultThreadPool();
-    auto mockLoader = std::make_unique<CatalogCacheLoaderMock>(catalogCacheExecutor());
+    auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
     _remoteLoaderMock = mockLoader.get();
-    _shardLoader = std::make_unique<ShardServerCatalogCacheLoader>(std::move(mockLoader),
-                                                                   catalogCacheExecutor());
+    _shardLoader = std::make_unique<ShardServerCatalogCacheLoader>(std::move(mockLoader));
 
     // Set the shard loader to primary mode, and set it for testing.
     _shardLoader->initializeReplicaSetRole(true);

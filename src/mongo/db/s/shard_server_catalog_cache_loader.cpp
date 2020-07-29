@@ -352,8 +352,17 @@ ChunkVersion getLocalVersion(OperationContext* opCtx, const NamespaceString& nss
 }  // namespace
 
 ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
-    std::unique_ptr<CatalogCacheLoader> configServerLoader, std::shared_ptr<ThreadPool> executor)
-    : _configServerLoader(std::move(configServerLoader)), _executor(executor) {}
+    std::unique_ptr<CatalogCacheLoader> configServerLoader)
+    : _configServerLoader(std::move(configServerLoader)),
+      _executor(std::make_shared<ThreadPool>([] {
+          ThreadPool::Options options;
+          options.poolName = "ShardServerCatalogCacheLoader";
+          options.minThreads = 0;
+          options.maxThreads = 6;
+          return options;
+      }())) {
+    _executor->startup();
+}
 
 ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
     shutDown();

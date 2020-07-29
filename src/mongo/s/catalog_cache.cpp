@@ -136,25 +136,18 @@ std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
 
 }  // namespace
 
-std::shared_ptr<ThreadPool> CatalogCache::makeDefaultThreadPool() {
-    ThreadPool::Options options;
-    options.poolName = "CatalogCache";
-    options.minThreads = 0;
-    options.maxThreads = ThreadPool::Options::kUnlimited;
-
-    auto executor = std::make_shared<ThreadPool>(std::move(options));
-    executor->startup();
-    return executor;
-}
-
-CatalogCache::CatalogCache(ServiceContext* const service,
-                           CatalogCacheLoader& cacheLoader,
-                           std::shared_ptr<ThreadPool> executor)
+CatalogCache::CatalogCache(ServiceContext* const service, CatalogCacheLoader& cacheLoader)
     : _cacheLoader(cacheLoader),
-      _executor(executor),
-      _databaseCache(service, *_executor, _cacheLoader) {}
-
-CatalogCache::~CatalogCache() = default;
+      _executor(std::make_shared<ThreadPool>([] {
+          ThreadPool::Options options;
+          options.poolName = "CatalogCache";
+          options.minThreads = 0;
+          options.maxThreads = 6;
+          return options;
+      }())),
+      _databaseCache(service, *_executor, _cacheLoader) {
+    _executor->startup();
+}
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName) {

@@ -43,7 +43,7 @@ class CatalogCacheLoaderMock final : public CatalogCacheLoader {
     CatalogCacheLoaderMock& operator=(const CatalogCacheLoaderMock&) = delete;
 
 public:
-    CatalogCacheLoaderMock(std::shared_ptr<ThreadPool> executor);
+    CatalogCacheLoaderMock() = default;
     ~CatalogCacheLoaderMock() = default;
 
     /**
@@ -90,9 +90,6 @@ private:
 
     StatusWith<std::vector<ChunkType>> _swChunksReturnValue{
         Status(ErrorCodes::InternalError, "config loader mock chunks response is uninitialized")};
-
-    // Thread pool on which to mock load chunk metadata.
-    std::shared_ptr<ThreadPool> _executor;
 };
 
 }  // namespace mongo

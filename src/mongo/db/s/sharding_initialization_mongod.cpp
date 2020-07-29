@@ -535,21 +535,16 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         std::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     auto const service = opCtx->getServiceContext();
-    auto catalogCacheExecutor = CatalogCache::makeDefaultThreadPool();
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (storageGlobalParams.readOnly) {
-            CatalogCacheLoader::set(
-                service, std::make_unique<ReadOnlyCatalogCacheLoader>(catalogCacheExecutor));
+            CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());
         } else {
-            CatalogCacheLoader::set(
-                service,
-                std::make_unique<ShardServerCatalogCacheLoader>(
-                    std::make_unique<ConfigServerCatalogCacheLoader>(catalogCacheExecutor),
-                    catalogCacheExecutor));
+            CatalogCacheLoader::set(service,
+                                    std::make_unique<ShardServerCatalogCacheLoader>(
+                                        std::make_unique<ConfigServerCatalogCacheLoader>()));
         }
     } else {
-        CatalogCacheLoader::set(
-            service, std::make_unique<ConfigServerCatalogCacheLoader>(catalogCacheExecutor));
+        CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
     }
 
     auto validator = LogicalTimeValidator::get(service);
@@ -559,8 +554,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
 
     globalConnPool.addHook(new ShardingConnectionHook(makeEgressHooksList(service)));
 
-    auto catalogCache = std::make_unique<CatalogCache>(
-        service, CatalogCacheLoader::get(opCtx), catalogCacheExecutor);
+    auto catalogCache = std::make_unique<CatalogCache>(service, CatalogCacheLoader::get(opCtx));
 
     // List of hooks which will be called by the ShardRegistry when it discovers a shard has been
     // removed.

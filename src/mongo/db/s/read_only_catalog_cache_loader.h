@@ -40,8 +40,7 @@ namespace mongo {
  */
 class ReadOnlyCatalogCacheLoader final : public CatalogCacheLoader {
 public:
-    ReadOnlyCatalogCacheLoader(std::shared_ptr<ThreadPool> executor)
-        : _configServerLoader(executor){};
+    ReadOnlyCatalogCacheLoader() = default;
     ~ReadOnlyCatalogCacheLoader();
 
     void initializeReplicaSetRole(bool isPrimary) override {}

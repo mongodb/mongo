@@ -36,8 +36,9 @@ namespace mongo {
 
 class ConfigServerCatalogCacheLoader final : public CatalogCacheLoader {
 public:
-    ConfigServerCatalogCacheLoader(std::shared_ptr<ThreadPool> executor);
+    ConfigServerCatalogCacheLoader();
     ~ConfigServerCatalogCacheLoader() = default;
+    ;
 
     /**
      * These functions should never be called. They trigger invariants if called.

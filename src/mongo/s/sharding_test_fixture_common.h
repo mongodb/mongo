@@ -83,10 +83,6 @@ protected:
         return _distLockManager;
     }
 
-    std::shared_ptr<ThreadPool> catalogCacheExecutor() const {
-        invariant(_catalogCacheExecutor);
-        return _catalogCacheExecutor;
-    }
     /**
      * Blocking methods, which receive one message from the network and respond using the responses
      * returned from the input function. This is a syntactic sugar for simple, single request +
@@ -151,8 +147,6 @@ protected:
     // Since the DistLockManager is currently a private member of ShardingCatalogClient, we
     // store a raw pointer to it here.
     DistLockManager* _distLockManager = nullptr;
-
-    std::shared_ptr<ThreadPool> _catalogCacheExecutor = nullptr;
 
 private:
     // Keeps the lifetime of the operation context

@@ -40,9 +40,6 @@ namespace mongo {
 
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
-CatalogCacheLoaderMock::CatalogCacheLoaderMock(std::shared_ptr<ThreadPool> executor)
-    : _executor(executor) {}
-
 void CatalogCacheLoaderMock::initializeReplicaSetRole(bool isPrimary) {
     MONGO_UNREACHABLE;
 }
@@ -73,37 +70,35 @@ void CatalogCacheLoaderMock::waitForDatabaseFlush(OperationContext* opCtx, Strin
 SemiFuture<CollectionAndChangedChunks> CatalogCacheLoaderMock::getChunksSince(
     const NamespaceString& nss, ChunkVersion version) {
 
-    return ExecutorFuture<void>(_executor)
-        .then([this] {
-            uassertStatusOK(_swCollectionReturnValue);
-            uassertStatusOK(_swChunksReturnValue);
+    return makeReadyFutureWith([this] {
+               uassertStatusOK(_swCollectionReturnValue);
+               uassertStatusOK(_swChunksReturnValue);
 
-            // We swap the chunks out of _swChunksReturnValue to ensure if this task is
-            // scheduled multiple times that we don't inform the ChunkManager about a chunk it
-            // has already updated.
-            std::vector<ChunkType> chunks;
-            _swChunksReturnValue.getValue().swap(chunks);
+               // We swap the chunks out of _swChunksReturnValue to ensure if this task is
+               // scheduled multiple times that we don't inform the ChunkManager about a chunk it
+               // has already updated.
+               std::vector<ChunkType> chunks;
+               _swChunksReturnValue.getValue().swap(chunks);
 
-            return CollectionAndChangedChunks(
-                _swCollectionReturnValue.getValue().getUUID(),
-                _swCollectionReturnValue.getValue().getEpoch(),
-                _swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
-                _swCollectionReturnValue.getValue().getDefaultCollation(),
-                _swCollectionReturnValue.getValue().getUnique(),
-                std::move(chunks));
-        })
+               return CollectionAndChangedChunks(
+                   _swCollectionReturnValue.getValue().getUUID(),
+                   _swCollectionReturnValue.getValue().getEpoch(),
+                   _swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
+                   _swCollectionReturnValue.getValue().getDefaultCollation(),
+                   _swCollectionReturnValue.getValue().getUnique(),
+                   std::move(chunks));
+           })
         .semi();
 }
 
 SemiFuture<DatabaseType> CatalogCacheLoaderMock::getDatabase(StringData dbName) {
-    return ExecutorFuture<void>(_executor)
-        .then([this] {
-            uassertStatusOK(_swDatabaseReturnValue);
-            return DatabaseType(_swDatabaseReturnValue.getValue().getName(),
-                                _swDatabaseReturnValue.getValue().getPrimary(),
-                                _swDatabaseReturnValue.getValue().getSharded(),
-                                _swDatabaseReturnValue.getValue().getVersion());
-        })
+    return makeReadyFutureWith([this] {
+               uassertStatusOK(_swDatabaseReturnValue);
+               return DatabaseType(_swDatabaseReturnValue.getValue().getName(),
+                                   _swDatabaseReturnValue.getValue().getPrimary(),
+                                   _swDatabaseReturnValue.getValue().getSharded(),
+                                   _swDatabaseReturnValue.getValue().getVersion());
+           })
         .semi();
 }
 

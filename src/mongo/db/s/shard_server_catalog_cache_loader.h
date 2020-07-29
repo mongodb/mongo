@@ -50,8 +50,7 @@ class ShardServerCatalogCacheLoader : public CatalogCacheLoader {
     ShardServerCatalogCacheLoader& operator=(const ShardServerCatalogCacheLoader&) = delete;
 
 public:
-    ShardServerCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> configServerLoader,
-                                  std::shared_ptr<ThreadPool> executor);
+    ShardServerCatalogCacheLoader(std::unique_ptr<CatalogCacheLoader> configServerLoader);
     ~ShardServerCatalogCacheLoader();
 
     /**

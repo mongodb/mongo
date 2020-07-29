@@ -65,12 +65,9 @@ void ShardServerTestFixture::setUp() {
     _clusterId = OID::gen();
     ShardingState::get(getServiceContext())->setInitialized(_myShardName, _clusterId);
 
-    _catalogCacheExecutor = CatalogCache::makeDefaultThreadPool();
-    CatalogCacheLoader::set(
-        getServiceContext(),
-        std::make_unique<ShardServerCatalogCacheLoader>(
-            std::make_unique<ConfigServerCatalogCacheLoader>(catalogCacheExecutor()),
-            catalogCacheExecutor()));
+    CatalogCacheLoader::set(getServiceContext(),
+                            std::make_unique<ShardServerCatalogCacheLoader>(
+                                std::make_unique<ConfigServerCatalogCacheLoader>()));
 
     uassertStatusOK(
         initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));

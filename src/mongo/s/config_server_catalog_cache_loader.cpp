@@ -119,8 +119,16 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
 
 }  // namespace
 
-ConfigServerCatalogCacheLoader::ConfigServerCatalogCacheLoader(std::shared_ptr<ThreadPool> executor)
-    : _executor(executor) {}
+ConfigServerCatalogCacheLoader::ConfigServerCatalogCacheLoader()
+    : _executor(std::make_shared<ThreadPool>([] {
+          ThreadPool::Options options;
+          options.poolName = "ConfigServerCatalogCacheLoader";
+          options.minThreads = 0;
+          options.maxThreads = 6;
+          return options;
+      }())) {
+    _executor->startup();
+}
 
 void ConfigServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
     MONGO_UNREACHABLE;
@@ -134,7 +142,10 @@ void ConfigServerCatalogCacheLoader::onStepUp() {
     MONGO_UNREACHABLE;
 }
 
-void ConfigServerCatalogCacheLoader::shutDown() {}
+void ConfigServerCatalogCacheLoader::shutDown() {
+    _executor->shutdown();
+    _executor->join();
+}
 
 void ConfigServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
     MONGO_UNREACHABLE;
