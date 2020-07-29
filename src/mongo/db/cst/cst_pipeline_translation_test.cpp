@@ -39,6 +39,7 @@
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_sample.h"
@@ -96,7 +97,7 @@ TEST(CstPipelineTranslationTest, TranslatesOneFieldInclusionProjectionStage) {
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
-    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
         BSON("_id" << true << "a" << true) ==
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
@@ -113,7 +114,7 @@ TEST(CstPipelineTranslationTest, TranslatesMultifieldInclusionProjection) {
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
-    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
         BSON("_id" << true << "a" << true << "b" << true) ==
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
@@ -128,7 +129,7 @@ TEST(CstPipelineTranslationTest, TranslatesOneFieldExclusionProjectionStage) {
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
-    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
         BSON("a" << false) ==
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
@@ -145,7 +146,7 @@ TEST(CstPipelineTranslationTest, TranslatesMultifieldExclusionProjection) {
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
-    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
         BSON("_id" << false << "a" << false << "b" << false) ==
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
@@ -180,7 +181,7 @@ TEST(CstPipelineTranslationTest, TranslatesComputedProjection) {
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
-    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
         BSON("_id" << true << "a"
                    << BSON("$atan2" << BSON_ARRAY(BSON("$const" << 1) << BSON("$const" << 0)))
@@ -218,7 +219,7 @@ TEST(CstPipelineTranslationTest, TranslatesComputedInclusionMixedProjectionStage
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
-    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
         BSON("_id" << true << "a"
                    << BSON("$add" << BSON_ARRAY(BSON("$const" << 0ll) << BSON("$const" << 1)))
@@ -262,24 +263,21 @@ TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStages) {
     auto iter = sources.begin();
     {
         auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter++);
-        // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be
-        // insensitive.
+        // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
         ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
             BSON("_id" << true << "a" << true) ==
             singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
     }
     {
         auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter++);
-        // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be
-        // insensitive.
+        // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
         ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
             BSON("b" << false) ==
             singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
     }
     {
         auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
-        // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be
-        // insensitive.
+        // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
         ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
             BSON("_id" << true << "c"
                        << BSON("$add"
@@ -328,7 +326,7 @@ TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStagesWithAndOrNot)
     auto iter = sources.begin();
     {
         auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter++);
-        // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be
+        // DocumenSourceSingleDocumentTransformation reorders fields so we need to be
         // insensitive.
         ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
             BSON("_id" << true << "a" << BSON("$not" << BSON_ARRAY(BSON("$const" << 0)))) ==
@@ -336,7 +334,7 @@ TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStagesWithAndOrNot)
     }
     {
         auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
-        // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be
+        // DocumenSourceSingleDocumentTransformation reorders fields so we need to be
         // insensitive.
         ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
             BSON("_id" << true << "c"
@@ -374,7 +372,7 @@ TEST(CstPipelineTranslationTest, TranslatesComputedProjectionWithAndOr) {
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
-    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
         BSON("_id" << true << "a"
                    << BSON("$and" << BSON_ARRAY(BSON("$const" << 1) << BSON(
@@ -405,7 +403,7 @@ TEST(CstPipelineTranslationTest, TranslatesComputedProjectionWithExpressionOnId)
     ASSERT_EQ(1u, sources.size());
     auto iter = sources.begin();
     auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
-    // DocumenSourceSingleDoucmentTransformation reorders fields so we need to be insensitive.
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
         BSON("_id" << BSON(
                  "$add" << BSON_ARRAY(
@@ -606,6 +604,142 @@ TEST(CstPipelineTranslationTest, TranslatesNeExpression) {
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT(dynamic_cast<ExpressionCompare*>(expr.get()));
     ASSERT_EQ(ExpressionCompare::CmpOp::NE, dynamic_cast<ExpressionCompare*>(expr.get())->getOp());
+}
+
+TEST(CstPipelineTranslationTest, TranslatesProjectionWithConvert) {
+    // [
+    //     { $project: { a: { $convert: { input: "true", to: "bool"} },
+    //                  { b: { $convert: { input: 1.999999, to: "int",
+    //                                     onError: "Can't convert", onNull: NumberInt("1") } } }
+    //     } }
+    // ]
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::project,
+         CNode{CNode::ObjectChildren{
+             {UserFieldname{"a"},
+              CNode{CNode::ObjectChildren{
+                  {KeyFieldname::convert,
+                   CNode{CNode::ObjectChildren{
+                       {KeyFieldname::inputArg, CNode{UserBoolean{true}}},
+                       {KeyFieldname::toArg, CNode{UserString{"bool"}}},
+                       {KeyFieldname::onErrorArg, CNode{KeyValue::absentKey}},
+                       {KeyFieldname::onNullArg, CNode{KeyValue::absentKey}}}}}}}},
+             {UserFieldname{"b"},
+              CNode{CNode::ObjectChildren{
+                  {KeyFieldname::convert,
+                   CNode{CNode::ObjectChildren{
+                       {KeyFieldname::inputArg, CNode{UserDouble{1.999999}}},
+                       {KeyFieldname::toArg, CNode{UserString{"int"}}},
+                       {KeyFieldname::onErrorArg, CNode{UserString{"Can't convert"}}},
+                       {KeyFieldname::onNullArg, CNode{UserInt{1}}}}}}}}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("_id" << true << "a"
+                   << BSON("$convert" << BSON("input" << BSON("$const" << true) << "to"
+                                                      << BSON("$const"
+                                                              << "bool")))
+                   << "b"
+                   << BSON("$convert" << BSON("input" << BSON("$const" << 1.999999) << "to"
+                                                      << BSON("$const"
+                                                              << "int")
+                                                      << "onError"
+                                                      << BSON("$const"
+                                                              << "Can't convert")
+                                                      << "onNull" << BSON("$const" << 1)))) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesConvertExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::convert,
+         CNode{CNode::ObjectChildren{{KeyFieldname::inputArg, CNode{UserString{"true"}}},
+                                     {KeyFieldname::toArg, CNode{UserString{"bool"}}},
+                                     {KeyFieldname::onErrorArg, CNode{KeyValue::absentKey}},
+                                     {KeyFieldname::onNullArg, CNode{UserInt{1}}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson(
+            "{$convert: {input: {$const: 'true'}, to: {$const: 'bool'}, onNull: {$const: 1}}}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesToBoolExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::toBool, CNode{UserInt{0}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$convert: {input: {$const: 0}, to: {$const: 'bool'}}}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesToDateExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::toDate, CNode{UserLong{0}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$convert: {input: {$const: 0}, to: {$const: 'date'}}}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesToDecimalExpression) {
+    const auto cst =
+        CNode{CNode::ObjectChildren{{KeyFieldname::toDecimal, CNode{UserDouble{2.02}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$convert: {input: {$const: 2.02}, to: {$const: 'decimal'}}}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesToDoubleExpression) {
+    const auto cst =
+        CNode{CNode::ObjectChildren{{KeyFieldname::toDouble, CNode{UserString{"5.5"}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$convert: {input: {$const: '5.5'}, to: {$const: 'double'}}}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesToIntExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::toInt, CNode{UserBoolean{true}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$convert: {input: {$const: true}, to: {$const: 'int'}}}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesToLongExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::toLong, CNode{UserDecimal{1.0}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$convert: {input: {$const: 1.0}, to: {$const: 'long'}}}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesToObjectIdExpression) {
+    const auto cst =
+        CNode{CNode::ObjectChildren{{KeyFieldname::toObjectId, CNode{UserString{"$_id"}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$convert: {input: {$const: '$_id'}, to: {$const: 'objectId'}}}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesToStringExpression) {
+    const auto cst =
+        CNode{CNode::ObjectChildren{{KeyFieldname::toString, CNode{UserBoolean{true}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$convert: {input: {$const: true}, to: {$const: 'string'}}}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesTypeExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::type, CNode{UserLong{1}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT(dynamic_cast<ExpressionType*>(expr.get()));
 }
 
 }  // namespace

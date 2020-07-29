@@ -145,5 +145,81 @@ TEST(CstExpressionTest, FailsToParseInvalidComparisonExpressions) {
     }
 }
 
+TEST(CstExpressionTest, FailsToParseInvalidConvertExpressions) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: {a: {$convert: {input: 'x', to: true}}}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: {a: {$convert: {input: 'x'}}}}]}");
+        BSONLexer lexer(input["pipeline"].Array());
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesConvertExpressions) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: {a: {$toBool: 1}, b: {$toDate: 1100000000000}, "
+        "c: {$toDecimal: 5}, d: {$toDouble: -2}, e: {$toInt: 1.999999}, "
+        "f: {$toLong: 1.999999}, g: {$toObjectId: '$_id'}, h: {$toString: false}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { a: { toBool: \"<UserInt 1>\" }, b: { toDate: \"<UserLong "
+              "1100000000000>\" }, c: { toDecimal: \"<UserInt 5>\" }, d: { toDouble: \"<UserInt "
+              "-2>\" }, e: { toInt: \"<UserDouble 1.999999>\" }, f: { toLong: \"<UserDouble "
+              "1.999999>\" }, g: { toObjectId: \"<UserString $_id>\" }, h: { toString: "
+              "\"<UserBoolean 0>\" } } }");
+}
+
+TEST(CstExpressionTest, ParsesConvertExpressionsNoOptArgs) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: {a: {$convert: {input: 1, to: 'string'}}, "
+        "b: {$convert : {input: 'true', to: 'bool'}}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { a: { convert: { inputArg: \"<UserInt 1>\", toArg: \"<UserString "
+              "string>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: \"<KeyValue "
+              "absentKey>\" } }, b: { convert: { inputArg: \"<UserString true>\", toArg: "
+              "\"<UserString bool>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
+              "\"<KeyValue absentKey>\" } } } }");
+}
+
+TEST(CstExpressionTest, ParsesConvertExpressionsWithOptArgs) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: {a: {$convert: {input: 1, to: 'string', "
+        "onError: 'Could not convert'}}, b : {$convert : {input: "
+        "true, to : 'double', onNull : 0}}}}]}");
+    BSONLexer lexer(input["pipeline"].Array());
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ project: { a: { convert: { inputArg: \"<UserInt 1>\", toArg: \"<UserString "
+              "string>\", onErrorArg: \"<UserString Could not convert>\", onNullArg: \"<KeyValue "
+              "absentKey>\" } }, b: { convert: { inputArg: \"<UserBoolean 1>\", toArg: "
+              "\"<UserString double>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
+              "\"<UserInt 0>\" } } } }");
+}
+
 }  // namespace
 }  // namespace mongo

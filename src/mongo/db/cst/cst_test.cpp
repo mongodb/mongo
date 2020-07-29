@@ -481,5 +481,153 @@ TEST(CstGrammarTest, InvalidParseSample) {
     }
 }
 
+TEST(CstTest, BuildsAndPrintsConvert) {
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::convert,
+             CNode{CNode::ObjectChildren{{KeyFieldname::inputArg, CNode{UserInt{3}}},
+                                         {KeyFieldname::toArg, CNode{UserString{"string"}}}}}}}};
+        ASSERT_BSONOBJ_EQ(
+            fromjson("{convert: {inputArg: \"<UserInt 3>\", toArg: \"<UserString string>\"}}"),
+            cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::convert,
+             CNode{CNode::ObjectChildren{{KeyFieldname::inputArg, CNode{CNode::ArrayChildren{}}},
+                                         {KeyFieldname::toArg, CNode{UserInt{8}}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{convert: {inputArg: [], toArg: \"<UserInt 8>\"}}"),
+                          cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::convert,
+             CNode{CNode::ObjectChildren{
+                 {KeyFieldname::inputArg,
+                  CNode{CNode::ObjectChildren{
+                      {KeyFieldname::add,
+                       CNode{CNode::ArrayChildren{CNode{UserInt{4}}, CNode{UserInt{5}}}}}}}},
+                 {KeyFieldname::toArg, CNode{UserInt{1}}}}}}}};
+        ASSERT_BSONOBJ_EQ(
+            fromjson(
+                "{convert: {inputArg: {add: [\"<UserInt 4>\", \"<UserInt 5>\"]}, toArg: \"<UserInt "
+                "1>\"}}"),
+            cst.toBson());
+    }
+}
+
+TEST(CstTest, BuildsAndPrintsToBool) {
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::toBool, CNode{UserString{"a"}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toBool: \"<UserString a>\"}"), cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::toBool, CNode{UserNull{}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toBool: \"<UserNull>\"}"), cst.toBson());
+    }
+}
+
+TEST(CstTest, BuildsAndPrintsToDate) {
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::toDate, CNode{UserString{"2018-03-03"}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toDate: \"<UserString 2018-03-03>\"}"), cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::toDate, CNode{UserObjectId{"5ab9c3da31c2ab715d421285"}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toDate: \"<UserObjectId 5ab9c3da31c2ab715d421285>\"}"),
+                          cst.toBson());
+    }
+}
+
+TEST(CstTest, BuildsAndPrintsToDecimal) {
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::toDecimal, CNode{UserBoolean{false}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toDecimal: \"<UserBoolean 0>\"}"), cst.toBson());
+    }
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::toDecimal, CNode{UserString{"-5.5"}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toDecimal: \"<UserString -5.5>\"}"), cst.toBson());
+    }
+}
+
+TEST(CstTest, BuildsAndPrintsToDouble) {
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::toDouble, CNode{UserBoolean{true}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toDouble: \"<UserBoolean 1>\"}"), cst.toBson());
+    }
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::toDouble, CNode{UserLong{10000}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toDouble: \"<UserLong 10000>\"}"), cst.toBson());
+    }
+}
+
+TEST(CstTest, BuildsAndPrintsToInt) {
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::toInt, CNode{UserString{"-2"}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toInt: \"<UserString -2>\"}"), cst.toBson());
+    }
+    {
+        const auto cst = CNode{
+            CNode::ObjectChildren{{KeyFieldname::toInt, CNode{UserDecimal{5.50000000000000}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toInt: \"<UserDecimal 5.50000000000000>\"}"), cst.toBson());
+    }
+}
+
+TEST(CstTest, BuildsAndPrintsToLong) {
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::toLong, CNode{UserString{"-2"}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toLong: \"<UserString -2>\"}"), cst.toBson());
+    }
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::toLong, CNode{UserInt{10000}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toLong: \"<UserInt 10000>\"}"), cst.toBson());
+    }
+}
+
+TEST(CstTest, BuildsAndPrintsToObjectId) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::toObjectId, CNode{UserString{"5ab9cbfa31c2ab715d42129e"}}}}};
+    ASSERT_BSONOBJ_EQ(fromjson("{toObjectId: \"<UserString 5ab9cbfa31c2ab715d42129e>\"}"),
+                      cst.toBson());
+}
+
+TEST(CstTest, BuildsAndPrintsToString) {
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::toString, CNode{UserDouble{2.5}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toString: \"<UserDouble 2.500000>\"}"), cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::toString, CNode{UserObjectId{"5ab9cbfa31c2ab715d42129e"}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{toString: \"<UserObjectId 5ab9cbfa31c2ab715d42129e>\"}"),
+                          cst.toBson());
+    }
+}
+
+TEST(CstTest, BuildsAndPrintsType) {
+    {
+        const auto cst =
+            CNode{CNode::ObjectChildren{{KeyFieldname::type, CNode{UserString{"$a"}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{type: \"<UserString $a>\"}"), cst.toBson());
+    }
+    {
+        const auto cst = CNode{CNode::ObjectChildren{
+            {KeyFieldname::type,
+             CNode{CNode::ArrayChildren{CNode{CNode::ArrayChildren{CNode{UserInt{1}}}}}}}}};
+        ASSERT_BSONOBJ_EQ(fromjson("{type: [[\"<UserInt 1>\"]]}"), cst.toBson());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

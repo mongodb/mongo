@@ -152,6 +152,22 @@
     LT
     LTE
     NE
+    CONVERT
+    TO_BOOL
+    TO_DATE
+    TO_DECIMAL
+    TO_DOUBLE
+    TO_INT
+    TO_LONG
+    TO_OBJECT_ID
+    TO_STRING
+    TYPE
+
+    // $convert arguments.
+    INPUT_ARG
+    TO_ARG
+    ON_ERROR_ARG
+    ON_NULL_ARG
 
     END_OF_FILE 0 "EOF"
 ;
@@ -199,6 +215,9 @@
 %nterm <CNode> expression compoundExpression exprFixedTwoArg expressionArray expressionObject
 %nterm <CNode> expressionFields maths add atan2 boolExps and or not literalEscapes const literal
 %nterm <CNode> compExprs cmp eq gt gte lt lte ne
+%nterm <CNode> typeExpression typeValue convert toBool toDate toDecimal toDouble toInt toLong
+%nterm <CNode> toObjectId toString type
+%nterm <std::pair<CNode::Fieldname, CNode>> onErrorArg onNullArg
 %nterm <std::vector<CNode>> expressions values
 
 //
@@ -374,6 +393,18 @@ argAsUserFieldname:
     | SIZE_ARG {
         $$ = UserFieldname{"size"};
     }
+    | INPUT_ARG {
+        $$ = UserFieldname{"input"};
+    }
+    | TO_ARG {
+        $$ = UserFieldname{"to"};
+    }
+    | ON_ERROR_ARG {
+        $$ = UserFieldname{"onError"};
+    }
+    | ON_NULL_ARG {
+        $$ = UserFieldname{"onNull"};
+    }
 ;
 
 aggExprAsUserFieldname:
@@ -420,6 +451,36 @@ aggExprAsUserFieldname:
     }
     | NE {
         $$ = UserFieldname{"$ne"};
+    }
+    | CONVERT {
+        $$ = UserFieldname{"$convert"};
+    }
+    | TO_BOOL {
+        $$ = UserFieldname{"$toBool"};
+    }
+    | TO_DATE {
+        $$ = UserFieldname{"$toDate"};
+    }
+    | TO_DECIMAL {
+        $$ = UserFieldname{"$toDecimal"};
+    }
+    | TO_DOUBLE {
+        $$ = UserFieldname{"$toDouble"};
+    }
+    | TO_INT {
+        $$ = UserFieldname{"$toInt"};
+    }
+    | TO_LONG {
+        $$ = UserFieldname{"$toLong"};
+    }
+    | TO_OBJECT_ID {
+        $$ = UserFieldname{"$toObjectId"};
+    }
+    | TO_STRING {
+        $$ = UserFieldname{"$toString"};
+    }
+    | TYPE {
+        $$ = UserFieldname{"$type"};
     }
 ;
 
@@ -597,6 +658,7 @@ exprFixedTwoArg: START_ARRAY expression[expr1] expression[expr2] END_ARRAY {
 
 compoundExpression:
     expressionArray | expressionObject | maths | boolExps | literalEscapes | compExprs
+    | typeExpression
 ;
 
 // These are arrays occuring in Expressions outside of $const/$literal. They may contain further
@@ -802,5 +864,97 @@ ne: START_OBJECT NE exprFixedTwoArg END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::ne,
                                           $exprFixedTwoArg}}};
 };
+
+typeExpression:
+    convert
+    | toBool
+    | toDate
+    | toDecimal
+    | toDouble
+    | toInt
+    | toLong
+    | toObjectId
+    | toString
+    | type
+;
+
+// Used in 'to' argument for $convert. Can be any valid expression that resolves to a string
+// or numeric identifier of a BSON type.
+typeValue:
+    string | int | long | double | decimal;
+
+// Optional argument for $convert.
+onErrorArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::onErrorArg, CNode{KeyValue::absentKey}};
+    }
+    | ON_ERROR_ARG expression {
+        $$ = std::pair{KeyFieldname::onErrorArg, $expression};
+    }
+;
+
+// Optional argument for $convert.
+onNullArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::onNullArg, CNode{KeyValue::absentKey}};
+    }
+    | ON_NULL_ARG expression {
+        $$ = std::pair{KeyFieldname::onNullArg, $expression};
+    }
+;
+
+convert:
+    START_OBJECT CONVERT START_ORDERED_OBJECT INPUT_ARG expression TO_ARG typeValue onErrorArg onNullArg END_OBJECT END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::convert, CNode{CNode::ObjectChildren{
+                                         {KeyFieldname::inputArg, $expression},
+                                         {KeyFieldname::toArg, $typeValue},
+                                         $onErrorArg, $onNullArg}}}}};
+    }
+;
+
+toBool:
+    START_OBJECT TO_BOOL expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::toBool, $expression}}};
+    }
+
+toDate:
+    START_OBJECT TO_DATE expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::toDate, $expression}}};
+    }
+
+toDecimal:
+    START_OBJECT TO_DECIMAL expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::toDecimal, $expression}}};
+    }
+
+toDouble:
+    START_OBJECT TO_DOUBLE expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::toDouble, $expression}}};
+    }
+
+toInt:
+    START_OBJECT TO_INT expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::toInt, $expression}}};
+    }
+
+toLong:
+    START_OBJECT TO_LONG expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::toLong, $expression}}};
+    }
+
+toObjectId:
+    START_OBJECT TO_OBJECT_ID expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::toObjectId, $expression}}};
+    }
+
+toString:
+    START_OBJECT TO_STRING expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::toString, $expression}}};
+    }
+
+type:
+    START_OBJECT TYPE expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::type, $expression}}};
+    }
 
 %%

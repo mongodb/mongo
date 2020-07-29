@@ -2525,6 +2525,9 @@ public:
     explicit ExpressionType(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionType, 1>(expCtx) {}
 
+    ExpressionType(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionType, 1>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -2671,6 +2674,11 @@ private:
 
 class ExpressionConvert final : public Expression {
 public:
+    ExpressionConvert(ExpressionContext* const expCtx,
+                      boost::intrusive_ptr<Expression> input,
+                      boost::intrusive_ptr<Expression> to,
+                      boost::intrusive_ptr<Expression> onError,
+                      boost::intrusive_ptr<Expression> onNull);
     /**
      * Creates a $convert expression converting from 'input' to the type given by 'toType'. Leaves
      * 'onNull' and 'onError' unspecified.
@@ -2695,12 +2703,6 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
-    ExpressionConvert(ExpressionContext* const,
-                      boost::intrusive_ptr<Expression> input,
-                      boost::intrusive_ptr<Expression> to,
-                      boost::intrusive_ptr<Expression> onError,
-                      boost::intrusive_ptr<Expression> onNull);
-
     BSONType computeTargetType(Value typeName) const;
     Value performConversion(BSONType targetType, Value inputValue) const;
 

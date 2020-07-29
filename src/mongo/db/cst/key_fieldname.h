@@ -57,7 +57,21 @@
     ENUMIFY(skip)                \
     ENUMIFY(limit)               \
     ENUMIFY(constExpr)           \
-    ENUMIFY(literal)
+    ENUMIFY(literal)             \
+    ENUMIFY(convert)             \
+    ENUMIFY(inputArg)            \
+    ENUMIFY(toArg)               \
+    ENUMIFY(onErrorArg)          \
+    ENUMIFY(onNullArg)           \
+    ENUMIFY(toBool)              \
+    ENUMIFY(toDate)              \
+    ENUMIFY(toDecimal)           \
+    ENUMIFY(toDouble)            \
+    ENUMIFY(toInt)               \
+    ENUMIFY(toLong)              \
+    ENUMIFY(toObjectId)          \
+    ENUMIFY(toString)            \
+    ENUMIFY(type)
 
 MAKE_PRINTABLE_ENUM(KeyFieldname, KEYFIELDNAMES);
 MAKE_PRINTABLE_ENUM_STRING_ARRAY(key_fieldname, KeyFieldname, KEYFIELDNAMES);
