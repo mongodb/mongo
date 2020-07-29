@@ -33,6 +33,8 @@
 
 #include "mongo/db/repl/primary_only_service.h"
 
+#include <utility>
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
@@ -152,9 +154,9 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
 }
 
 void PrimaryOnlyService::onStepUp(long long term) {
+    InstanceMap savedInstances;
     auto newThenOldScopedExecutor =
         std::make_shared<executor::ScopedTaskExecutor>(_executor, kExecutorShutdownStatus);
-
     {
         stdx::lock_guard lk(_mutex);
 
@@ -165,12 +167,16 @@ void PrimaryOnlyService::onStepUp(long long term) {
 
         // Install a new executor, while moving the old one into 'newThenOldScopedExecutor' so it
         // can be accessed outside of _mutex.
-        _scopedExecutor.swap(newThenOldScopedExecutor);
+        using std::swap;
+        swap(newThenOldScopedExecutor, _scopedExecutor);
+        // Don't destroy the Instances until all outstanding tasks run against them are complete.
+        swap(savedInstances, _instances);
     }
 
     // Ensure that all tasks from the previous term have completed before allowing tasks to be
     // scheduled on the new executor.
     if (newThenOldScopedExecutor) {
+        // Shutdown happens in onStepDown of previous term, so we only need to join() here.
         (*newThenOldScopedExecutor)->join();
     }
 }
@@ -182,26 +188,31 @@ void PrimaryOnlyService::onStepDown() {
         (*_scopedExecutor)->shutdown();
     }
     _state = State::kPaused;
-    _instances.clear();
 }
 
 void PrimaryOnlyService::shutdown() {
-
+    InstanceMap savedInstances;
     std::shared_ptr<executor::TaskExecutor> savedExecutor;
 
     {
         stdx::lock_guard lk(_mutex);
 
-        _executor.swap(savedExecutor);
+        // Save the executor to join() with it outside of _mutex.
+        using std::swap;
+        swap(savedExecutor, _executor);
+        // Maintain the lifetime of the instances until all outstanding tasks using them are
+        // complete.
+        swap(savedInstances, _instances);
+
         _scopedExecutor.reset();
         _state = State::kShutdown;
-        _instances.clear();
     }
 
     if (savedExecutor) {
         savedExecutor->shutdown();
         savedExecutor->join();
     }
+    savedInstances.clear();
 }
 
 std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateInstance(

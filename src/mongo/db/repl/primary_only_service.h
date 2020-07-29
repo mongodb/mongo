@@ -234,7 +234,8 @@ private:
     long long _term = OpTime::kUninitializedTerm;
 
     // Map of running instances, keyed by InstanceID.
-    SimpleBSONObjUnorderedMap<std::shared_ptr<Instance>> _instances;
+    using InstanceMap = SimpleBSONObjUnorderedMap<std::shared_ptr<Instance>>;
+    InstanceMap _instances;
 };
 
 /**
