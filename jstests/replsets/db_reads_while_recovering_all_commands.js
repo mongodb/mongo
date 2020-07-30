@@ -199,12 +199,12 @@
             expectedErrorCode: ErrorCodes.NotMasterOrSecondary
         },
         handshake: {skip: isNotAUserDataRead},
+        hello: {skip: isNotAUserDataRead},
         hostInfo: {skip: isNotAUserDataRead},
         httpClientRequest: {skip: isNotAUserDataRead},
         insert: {skip: isPrimaryOnly},
         internalRenameIfOptionsAndIndexesMatch: {skip: isAnInternalCommand},
         invalidateUserCache: {skip: isNotAUserDataRead},
-        isMaster: {skip: isNotAUserDataRead},
         journalLatencyTest: {skip: isNotAUserDataRead},
         killAllSessions: {skip: isNotAUserDataRead},
         killAllSessionsByPattern: {skip: isNotAUserDataRead},

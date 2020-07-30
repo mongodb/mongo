@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_session_cache.h"
@@ -48,9 +49,14 @@
 namespace mongo {
 namespace {
 
-class CmdIsMaster : public BasicCommand {
+constexpr auto kHelloString = "hello"_sd;
+// Aliases for the hello command in order to provide backwards compatibility.
+constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
+constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
+
+class CmdHello : public BasicCommand {
 public:
-    CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
+    CmdHello() : BasicCommand(kHelloString, {kCamelCaseIsMasterString, kLowerCaseIsMasterString}) {}
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -141,7 +147,7 @@ public:
         return true;
     }
 
-} isMaster;
+} hello;
 
 }  // namespace
 }  // namespace mongo

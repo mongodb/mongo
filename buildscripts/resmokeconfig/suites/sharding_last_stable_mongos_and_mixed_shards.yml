@@ -122,6 +122,8 @@ selector:
   - jstests/sharding/explain_cmd.js
   # Enable when SERVER-44733 is backported
   - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
+  # Cannot run in multiversion scenario since the hello alias will not exist in 3.4.
+  - jstests/sharding/ismaster.js
 executor:
   config:
     shell_options:

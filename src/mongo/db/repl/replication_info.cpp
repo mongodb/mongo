@@ -33,6 +33,7 @@
 #include <list>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
@@ -69,6 +70,11 @@ using std::stringstream;
 
 namespace repl {
 namespace {
+
+constexpr auto kHelloString = "hello"_sd;
+// Aliases for the hello command in order to provide backwards compatibility.
+constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
+constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
 
 void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int level) {
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
@@ -214,8 +220,10 @@ public:
     }
 } oplogInfoServerStatus;
 
-class CmdIsMaster : public BasicCommand {
+class CmdHello final : public BasicCommand {
 public:
+    CmdHello() : BasicCommand(kHelloString, {kCamelCaseIsMasterString, kLowerCaseIsMasterString}) {}
+
     bool requiresAuth() const override {
         return false;
     }
@@ -233,7 +241,6 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
     virtual bool run(OperationContext* opCtx,
                      const string&,
                      const BSONObj& cmdObj,
@@ -403,7 +410,7 @@ public:
 
         return true;
     }
-} cmdismaster;
+} cmdhello;
 
 OpCounterServerStatusSection replOpCounterServerStatusSection("opcountersRepl", &replOpCounters);
 
