@@ -16,10 +16,9 @@ class TestJasperLogging(unittest.TestCase):
     """Unit test for the cedar logging endpoint with the jasper.proto file."""
 
     def test_logging_endpoint(self):
-        if not config.EVERGREEN_TASK_ID or sys.platform == "x86_64":
-            print(
-                "Testing jasper logging endpoint should only be tested in Evergreen on non-x86_64 platforms, skipping..."
-            )
+        # TODO: remove True with SERVER-48156.
+        if not config.EVERGREEN_TASK_ID or True:
+            print("Testing jasper logging endpoint should only be tested in Evergreen, skipping...")
             return
 
         import grpc
