@@ -392,7 +392,6 @@ env.CppUnitTest(
         'active_migrations_registry_test.cpp',
         'active_move_primaries_registry_test.cpp',
         'active_shard_collection_registry_test.cpp',
-        'catalog_cache_loader_mock.cpp',
         'chunk_split_state_driver_test.cpp',
         'migration_chunk_cloner_source_legacy_test.cpp',
         'migration_destination_manager_test.cpp',

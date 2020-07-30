@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/catalog_cache_loader_mock.h"
+#include "mongo/s/catalog_cache_loader_mock.h"
 
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/type_chunk.h"

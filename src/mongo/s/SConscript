@@ -196,6 +196,7 @@ env.Library(
     target='sharding_test_fixture_common',
     source=[
         'sharding_test_fixture_common.cpp',
+        'catalog_cache_loader_mock.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
@@ -565,6 +566,7 @@ env.CppUnitTest(
         'append_raw_responses_test.cpp',
         'balancer_configuration_test.cpp',
         'build_versioned_requests_for_targeted_shards_test.cpp',
+        'catalog_cache_test.cpp',
         'catalog_cache_refresh_test.cpp',
         'catalog/type_changelog_test.cpp',
         'catalog/type_chunk_test.cpp',

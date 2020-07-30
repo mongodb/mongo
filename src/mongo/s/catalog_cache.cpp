@@ -162,23 +162,6 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
             return {ErrorCodes::NamespaceNotFound,
                     str::stream() << "database " << dbName << " not found"};
         }
-        const auto primaryShardExists =
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->getPrimary()).isOK();
-
-        if (!primaryShardExists) {
-            LOGV2_FOR_CATALOG_REFRESH(
-                4947103,
-                2,
-                "Invalidating cached database entry because its primary shard hasn't been found",
-                "db"_attr = dbName);
-            _databaseCache.invalidate(dbName.toString());
-            dbEntry = _databaseCache.acquire(opCtx, dbName.toString());
-            if (!dbEntry) {
-                return {ErrorCodes::NamespaceNotFound,
-                        str::stream() << "database " << dbName << " not found"};
-            }
-        }
-
         const auto primaryShard = uassertStatusOKWithContext(
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->getPrimary()),
             str::stream() << "could not find the primary shard for database " << dbName);
@@ -436,24 +419,19 @@ void CatalogCache::invalidateShardForShardedCollection(const NamespaceString& ns
 }
 
 void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    LOGV2_DEBUG(4997600,
+                1,
+                "Invalidating databases and collections referencing a specific shard",
+                "shardId"_attr = shardId);
 
-    LOGV2(22643,
-          "Starting to invalidate collections with data on shard {shardId}",
-          "Starting to invalidate collections referencing a specific shard",
-          "shardId"_attr = shardId);
+    _databaseCache.invalidateCachedValueIf(
+        [&](const DatabaseType& dbt) { return dbt.getPrimary() == shardId; });
+
+    stdx::lock_guard<Latch> lg(_mutex);
 
     // Invalidate collections which contain data on this shard.
     for (const auto& [db, collInfoMap] : _collectionsByDb) {
         for (const auto& [collNs, collRoutingInfoEntry] : collInfoMap) {
-
-            LOGV2_DEBUG(22646,
-                        3,
-                        "Checking if collection {namespace} has data on shard {shardId}",
-                        "Checking if collection has data on specific shard",
-                        "namespace"_attr = collNs,
-                        "shardId"_attr = shardId);
-
             if (!collRoutingInfoEntry->needsRefresh && collRoutingInfoEntry->routingInfo) {
                 // The set of shards on which this collection contains chunks.
                 std::set<ShardId> shardsOwningDataForCollection;

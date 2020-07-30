@@ -183,7 +183,7 @@ TEST_F(ReadThroughCacheTest, FetchInvalidateKeyAndRefetch) {
             ASSERT(cache.acquire(_opCtx, "TestKey"));
             ASSERT_EQ(i, cache.countLookups);
 
-            cache.invalidateIfKey([](const std::string& key) { return key == "TestKey"; });
+            cache.invalidateKeyIf([](const std::string& key) { return key == "TestKey"; });
         }
     };
 
@@ -221,7 +221,7 @@ TEST_F(ReadThroughCacheTest, FetchInvalidateValueAndRefetch) {
             ASSERT(cache.acquire(_opCtx, "TestKey"));
             ASSERT_EQ(i, cache.countLookups);
 
-            cache.invalidateIfCachedValue(
+            cache.invalidateCachedValueIf(
                 [i](const CachedValue& value) { return value.counter == 100 * i; });
         }
     };
