@@ -808,22 +808,13 @@ for full_dir, archive_dir in list(env["ARCHIVE_ADDITION_DIR_MAP"].items()):
 for target in env["DIST_BINARIES"]:
     installBinary(env, "db/modules/" + target)
 
-compass_type = 'compass'
-
 compass_script = "install_compass"
 if env.TargetOSIs('windows'):
     # On windows the .in needs to be explicitly added to the file.
-    compass_script = "Install-Compass.ps1.in"
+    compass_script = "Install-Compass.ps1"
 
-compass_python_interpreter = '/usr/bin/env python2'
-if env.TargetOSIs('darwin'):
-    compass_python_interpreter = '/usr/bin/env python'
+compass_installer = f"#/src/mongo/installer/compass/{compass_script}"
 
-compass_installer = env.Substfile('#/src/mongo/installer/compass/' + compass_script,
-                                  SUBST_DICT=[
-                                      ('@compass_type@', compass_type),
-                                      ('@python_interpreter@', compass_python_interpreter),
-                                  ])
 distBinaries.append(compass_installer)
 
 if not hygienic:
