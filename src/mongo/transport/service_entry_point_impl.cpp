@@ -164,7 +164,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     if (connectionCount > _maxNumConnections && !usingMaxConnOverride) {
         if (!quiet) {
             LOGV2(22942,
-                  "connection refused because too many open connections",
+                  "Connection refused because there are too many open connections",
                   "connectionCount"_attr = connectionCount);
         }
         return;
@@ -174,9 +174,9 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
 
     if (!quiet) {
         LOGV2(22943,
-              "connection accepted",
+              "Connection accepted",
               "remote"_attr = session->remote(),
-              "sessionId"_attr = session->id(),
+              "connectionId"_attr = session->id(),
               "connectionCount"_attr = connectionCount);
     }
 
@@ -193,8 +193,9 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
 
         if (!quiet) {
             LOGV2(22944,
-                  "connection ended",
+                  "Connection ended",
                   "remote"_attr = remote,
+                  "connectionId"_attr = session->id(),
                   "connectionCount"_attr = connectionCount);
         }
     });
