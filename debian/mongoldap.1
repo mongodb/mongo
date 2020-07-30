@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOLDAP" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
+.TH "MONGOLDAP" "1" "Jun 23, 2020" "4.4" "mongodb-manual"
 .SH NAME
 mongoldap \- MongoDB LDAP Configuration Testing Utility
 .
@@ -34,6 +34,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .INDENT 0.0
 .IP \(bu 2
 \fI\%Synopsis\fP
+.IP \(bu 2
+\fI\%Installation\fP
 .IP \(bu 2
 \fI\%Usage\fP
 .IP \(bu 2
@@ -80,6 +82,88 @@ Run \fI\%mongoldap\fP from the system command line, not the \fBmongo\fP shell.
 .sp
 This document provides a complete overview of all command line options for
 \fI\%mongoldap\fP\&.
+.SH INSTALLATION
+.sp
+The \fI\%mongoldap\fP tool is part of the \fIMongoDB Database Tools Extra\fP
+package, and can be \fI\%installed with the MongoDB Server\fP or as a
+\fI\%standalone installation\fP\&.
+.SS Install with Server
+.sp
+To install \fI\%mongoldap\fP as part of a MongoDB Enterprise Server
+installation:
+.INDENT 0.0
+.IP \(bu 2
+Follow the instructions for your platform:
+Install MongoDB Enterprise Server
+.IP \(bu 2
+After completing the installation, \fI\%mongoldap\fP and the other
+included tools are available in the same location as the Server.
+.sp
+\fBNOTE:\fP
+.INDENT 2.0
+.INDENT 3.5
+For the Windows \fB\&.msi\fP installer wizard, the
+Complete installation option includes \fI\%mongoldap\fP\&.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SS Install as Standalone
+.sp
+To install \fI\%mongoldap\fP as a standalone installation:
+.INDENT 0.0
+.IP \(bu 2
+Follow the download link for MongoDB Enterprise Edition:
+\fI\%MongoDB Enterprise Download Center\fP
+.IP \(bu 2
+Select your Platform (operating system) from the dropdown
+menu, then select the appropriate Package for your
+platform according to the following chart:
+.TS
+center;
+|l|l|.
+_
+T{
+OS
+T}	T{
+Package
+T}
+_
+T{
+\fILinux\fP
+T}	T{
+\fBtgz\fP package
+T}
+_
+T{
+\fIWindows\fP
+T}	T{
+\fBzip\fP package
+T}
+_
+T{
+\fImacOS\fP
+T}	T{
+\fBtgz\fP package
+T}
+_
+.TE
+.IP \(bu 2
+Once downloaded, unpack the archive and copy \fI\%mongoldap\fP to a
+location on your hard drive.
+.INDENT 2.0
+.INDENT 3.5
+.SS Tip
+.sp
+Linux and macOS users may wish to copy \fI\%mongoldap\fP to a filesystem
+location that is defined in the \fB$PATH\fP environment variable, such
+as \fB/usr/bin\fP\&. Doing so allows referencing \fI\%mongoldap\fP directly
+on the command line by name, without needing to specify its full
+path, or first navigating to its parent directory. See the
+installation guide for your platform
+for more information.
+.UNINDENT
+.UNINDENT
+.UNINDENT
 .SH USAGE
 .sp
 \fBNOTE:\fP
@@ -128,7 +212,7 @@ for \fI\%mongoldap\fP\&.
 .sp
 .nf
 .ft C
-mongoldap \-\-config <path\-to\-config> \-\-user "bob@dba.example.com" \-\-password "secret123"
+mongoldap \-\-config=<path\-to\-config> \-\-user="bob@dba.example.com" \-\-password="secret123"
 .ft P
 .fi
 .UNINDENT
@@ -169,7 +253,7 @@ Executing query against LDAP server...
 .SH OPTIONS
 .INDENT 0.0
 .TP
-.B \-\-config <filename>, \-f <filename>
+.B \-\-config=<filename>, \-f=<filename>
 Specifies a configuration file for runtime configuration options.
 The options are equivalent to the command\-line
 configuration options. See /reference/configuration\-options for
@@ -188,30 +272,31 @@ including UTF\-8.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-user <string>
+.B \-\-user=<string>
 Username for \fBmongoldap\fP to use when attempting LDAP authentication or
 authorization.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-password <string>
-Password of the \fB\-\-user\fP for \fBmongoldap\fP to use when attempting LDAP
-authentication. Not required for LDAP authorization.
+.B \-\-password=<string>
+Password of the \fI\%\-\-user\fP for
+\fBmongoldap\fP to use when attempting LDAP authentication. Not
+required for LDAP authorization.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapServers <host1>:<port>,<host2>:<port>,...,<hostN>:<port>
+.B \-\-ldapServers=<host1>:<port>,<host2>:<port>,...,<hostN>:<port>
 New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
-The LDAP server against which the \fBmongoldap\fP executes LDAP operations
-against to authenticate users or determine what actions a user is authorized
-to perform on a given database. If the LDAP server specified has any
-replicated instances, you may specify the host and port of each replicated
-server in a comma\-delimited list.
+The LDAP server against which the \fBmongoldap\fP authenticates users or
+determines what actions a user is authorized to perform on a given
+database. If the LDAP server specified has any replicated instances,
+you may specify the host and port of each replicated server in a
+comma\-delimited list.
 .sp
-If your LDAP infrastrucure partitions the LDAP directory over multiple LDAP
-servers, specify \fIone\fP LDAP server any of its replicated instances to
+If your LDAP infrastructure partitions the LDAP directory over multiple LDAP
+servers, specify \fIone\fP LDAP server or any of its replicated instances to
 \fI\%\-\-ldapServers\fP\&. MongoDB supports following LDAP referrals as defined in \fI\%RFC 4511
 4.1.10\fP\&. Do not use \fI\%\-\-ldapServers\fP
 for listing every LDAP server in your infrastructure.
@@ -223,7 +308,7 @@ If unset, \fBmongoldap\fP cannot use LDAP authentication or authorization\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapQueryUser <string>
+.B \-\-ldapQueryUser=<string>
 New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
@@ -258,7 +343,7 @@ both \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the sam
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapQueryPassword <string>
+.B \-\-ldapQueryPassword=<string>
 New in version 3.4: Available in MongoDB Enterprise only.
 .sp
 The password used to bind to an LDAP server when using
@@ -282,8 +367,8 @@ both \fI\%\-\-ldapQueryPassword\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapBindWithOSDefaults <bool>
-\fIDefault\fP: False
+.B \-\-ldapBindWithOSDefaults=<bool>
+\fIDefault\fP: false
 .sp
 New in version 3.4: Available in MongoDB Enterprise for the Windows platform only.
 
@@ -306,31 +391,48 @@ Use \fI\%\-\-ldapBindWithOSDefaults\fP to replace \fI\%\-\-ldapQueryUser\fP and
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapBindMethod <string>
+.B \-\-ldapBindMethod=<string>
 \fIDefault\fP: simple
 .sp
 New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
-The method \fBmongoldap\fP uses to authenticate to an LDAP server.
-Use with \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapQueryPassword\fP to
-connect to the LDAP server.
+The method \fBmongoldap\fP uses to authenticate to an LDAP
+server. Use with \fI\%\-\-ldapQueryUser\fP and \fI\%\-\-ldapQueryPassword\fP to connect to the LDAP server.
 .sp
-\fI\%\-\-ldapBindMethod\fP supports the following values:
-.INDENT 7.0
-.IP \(bu 2
-\fBsimple\fP \- \fBmongoldap\fP uses simple authentication.
-.IP \(bu 2
-\fBsasl\fP \- \fBmongoldap\fP uses SASL protocol for authentication
-.UNINDENT
+\fI\%\-\-ldapBindMethod\fP supports
+the following values:
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+\fBsimple\fP
+T}	T{
+\fBmongoldap\fP uses simple authentication.
+T}
+_
+T{
+\fBsasl\fP
+T}	T{
+\fBmongoldap\fP uses SASL protocol for authentication.
+T}
+_
+.TE
 .sp
 If you specify \fBsasl\fP, you can configure the available SASL mechanisms
-using \fI\%\-\-ldapBindSASLMechanisms\fP\&. \fBmongoldap\fP defaults to
+using \fI\%\-\-ldapBindSaslMechanisms\fP\&. \fBmongoldap\fP defaults to
 using \fBDIGEST\-MD5\fP mechanism.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapBindSASLMechanisms <string>
+.B \-\-ldapBindSaslMechanisms=<string>
 \fIDefault\fP: DIGEST\-MD5
 .sp
 New in version 3.4: Available in MongoDB Enterprise only.
@@ -405,7 +507,7 @@ For Windows, please see the \fI\%Windows SASL documentation\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapTransportSecurity <string>
+.B \-\-ldapTransportSecurity=<string>
 \fIDefault\fP: tls
 .sp
 New in version 3.4: Available in MongoDB Enterprise only.
@@ -440,7 +542,7 @@ credentials between \fBmongoldap\fP and the LDAP server.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapTimeoutMS <long>
+.B \-\-ldapTimeoutMS=<long>
 \fIDefault\fP: 10000
 .sp
 New in version 3.4: Available in MongoDB Enterprise only.
@@ -459,7 +561,7 @@ This setting can be configured on a running \fBmongoldap\fP using
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapUserToDNMapping <string>
+.B \-\-ldapUserToDNMapping=<string>
 New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
@@ -575,10 +677,17 @@ username against the \fBmatch\fP filter.  If a match is found,
 authenticating the user. \fBmongoldap\fP does not check the remaining documents
 in the array.
 .sp
-If the given document does not match the provided authentication name, or
-the transformation described by the document fails, \fBmongoldap\fP continues
-through the list of documents to find additional matches. If no matches are
-found in any document, \fBmongoldap\fP returns an error.
+If the given document does not match the provided authentication
+name, \fBmongoldap\fP continues through the list of documents
+to find additional matches. If no matches are found in any document,
+or the transformation the document describes fails,
+\fBmongoldap\fP returns an error.
+.sp
+Starting in MongoDB 4.4, \fBmongoldap\fP also returns an error
+if one of the transformations cannot be evaluated due to networking
+or authentication failures to the LDAP server. \fBmongoldap\fP
+rejects the connection request and does not check the remaining
+documents in the array.
 .INDENT 7.0
 .INDENT 3.5
 .SH EXAMPLE
@@ -639,7 +748,7 @@ This setting can be configured on a running \fBmongoldap\fP using the
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapAuthzQueryTemplate <string>
+.B \-\-ldapAuthzQueryTemplate=<string>
 New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
@@ -743,6 +852,6 @@ use your preferred LDAP resource.
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2008-2019
+2008-2020
 .\" Generated by docutils manpage writer.
 .

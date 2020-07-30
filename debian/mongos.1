@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOS" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
+.TH "MONGOS" "1" "Jun 23, 2020" "4.4" "mongodb-manual"
 .SH NAME
 mongos \- MongoDB Sharded Cluster Query Router
 .
@@ -51,6 +51,10 @@ any other MongoDB instance.
 .INDENT 0.0
 .IP \(bu 2
 Never change the name of the \fI\%mongos\fP binary.
+.IP \(bu 2
+Starting in version 4.4, \fI\%mongos\fP
+can support hedged reads to minimize
+latencies.
 .IP \(bu 2
 Starting in version 4.0, MongoDB disables support for TLS 1.0
 encryption on systems where TLS 1.1+ is available. For
@@ -366,15 +370,16 @@ maximum size of the connection pool.
 This setting prevents the \fI\%mongos\fP from causing connection spikes on
 the individual shards\&. Spikes like these may disrupt the
 operation and memory allocation of the sharded cluster\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-logpath <path>
+Sends all diagnostic logging information to a log file instead of to
+standard output or to the host\(aqs syslog system. MongoDB creates
+the log file at the path you specify.
 .sp
-\fBNOTE:\fP
-.INDENT 7.0
-.INDENT 3.5
-Changed in version 2.6: MongoDB removed the upward limit on the \fBmaxIncomingConnections\fP
-setting.
-
-.UNINDENT
-.UNINDENT
+By default, MongoDB will move any existing log file rather than overwrite
+it. To instead append to the log file, set the \fI\%\-\-logappend\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -419,20 +424,28 @@ must  enable the \fI\%\-\-syslog\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-logpath <path>
-Sends all diagnostic logging information to a log file instead of to
-standard output or to the host\(aqs syslog system. MongoDB creates
-the log file at the path you specify.
-.sp
-By default, MongoDB will move any existing log file rather than overwrite
-it. To instead append to the log file, set the \fI\%\-\-logappend\fP option.
-.UNINDENT
-.INDENT 0.0
-.TP
 .B \-\-logappend
 Appends new entries to the end of the existing log file when the \fBmongos\fP
 instance restarts. Without this option, \fBmongod\fP will back up the
 existing log and create a new file.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-logRotate <string>
+\fIDefault\fP: rename
+.sp
+Determines the behavior for the \fBlogRotate\fP command.
+Specify either \fBrename\fP or \fBreopen\fP:
+.INDENT 7.0
+.IP \(bu 2
+\fBrename\fP renames the log file.
+.IP \(bu 2
+\fBreopen\fP closes and reopens the log file following the typical
+Linux/Unix log rotate behavior. Use \fBreopen\fP when using the
+Linux/Unix logrotate utility to avoid log loss.
+.sp
+If you specify \fBreopen\fP, you must also use \fI\%\-\-logappend\fP\&.
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -464,20 +477,8 @@ due to the lack of data related to a log event. See the
 process logging manual page for an
 example of the effect of \fI\%\-\-redactClientLogData\fP on log output.
 .sp
-You can enable or disable log redaction on a running \fBmongos\fP
-using the \fBsetParameter\fP database command.
-.INDENT 7.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-db.adminCommand(
-  { setParameter: 1, redactClientLogData : true | false }
-)
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
+On a running \fBmongos\fP, use \fBsetParameter\fP with the
+\fBredactClientLogData\fP parameter to configure this setting.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -497,13 +498,6 @@ Description
 T}
 _
 T{
-\fBctime\fP
-T}	T{
-Displays timestamps as \fBWed Dec 31
-18:17:54.811\fP\&.
-T}
-_
-T{
 \fBiso8601\-utc\fP
 T}	T{
 Displays timestamps in Coordinated Universal Time (UTC) in the
@@ -516,19 +510,50 @@ T{
 T}	T{
 Displays timestamps in local time in the ISO\-8601
 format. For example, for New York at the start of the Epoch:
-\fB1969\-12\-31T19:00:00.000\-0500\fP
+\fB1969\-12\-31T19:00:00.000\-05:00\fP
 T}
 _
 .TE
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Starting in MongoDB 4.4, \fI\%\-\-timeStampFormat\fP no longer supports \fBctime\fP\&.
+An example of \fBctime\fP formatted date is: \fBWed Dec 31
+18:17:54.811\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-pidfilepath <path>
-Specifies a file location to hold the process ID of the \fBmongos\fP
-process where \fBmongos\fP will write its PID. This is useful for
-tracking the \fBmongos\fP process in combination with
-the \fI\%\-\-fork\fP option. Without a specified \fI\%\-\-pidfilepath\fP option, the
-process creates no PID file.
+Specifies a file location to store the process ID (PID) of the \fBmongos\fP
+process. The user running the \fBmongod\fP or \fBmongos\fP
+process must be able to write to this path. If the \fI\%\-\-pidfilepath\fP option is not
+specified, the process does not create a PID file. This option is generally
+only useful in combination with the \fI\%\-\-fork\fP option.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Linux"
+.sp
+On Linux, PID file management is generally the responsibility of
+your distro\(aqs init system: usually a service file in the \fB/etc/init.d\fP
+directory, or a systemd unit file registered with \fBsystemctl\fP\&. Only
+use the \fI\%\-\-pidfilepath\fP option if you are not using one of these init
+systems. For more information, please see the respective
+Installation Guide for your operating system.
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.INDENT 3.5
+.IP "macOS"
+.sp
+On macOS, PID file management is generally handled by \fBbrew\fP\&. Only use
+the \fI\%\-\-pidfilepath\fP option if you are not using \fBbrew\fP on your macOS system.
+For more information, please see the respective
+Installation Guide for your operating system.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -563,6 +588,19 @@ fields.
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-\-noscripting
+Disables the scripting engine.  When disabled, you cannot use
+operations that perform server\-side execution of JavaScript code,
+such as the \fB$where\fP query operator, \fBmapReduce\fP
+command, \fB$accumulator\fP, and \fB$function\fP\&.
+.sp
+If you do not use these operations, disable server\-side scripting.
+.sp
+New in version 4.4.
+
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-\-nounixsocket
 Disables listening on the UNIX domain socket. \fI\%\-\-nounixsocket\fP applies only
 to Unix\-based systems.
@@ -578,10 +616,9 @@ always listens on the UNIX socket unless one of the following is true:
 \fBnet.bindIp\fP does not specify \fBlocalhost\fP or its associated IP address
 .UNINDENT
 .sp
-New in version 2.6: \fBmongos\fP installed from official \&.deb and \&.rpm packages
+\fBmongos\fP installed from official \&.deb and \&.rpm packages
 have the \fBbind_ip\fP configuration set to \fB127.0.0.1\fP by
 default.
-
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -622,6 +659,8 @@ background. By default \fBmongos\fP does not run as a daemon:
 typically you will run \fBmongos\fP as a daemon, either by using
 \fI\%\-\-fork\fP or by using a controlling process that handles the
 daemonization process (e.g. as with \fBupstart\fP and \fBsystemd\fP).
+.sp
+The \fI\%\-\-fork\fP option is not supported on Windows.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1010,9 +1049,6 @@ For more information about TLS and MongoDB, see
 .B \-\-clusterAuthMode <option>
 \fIDefault\fP: keyFile
 .sp
-New in version 2.6.
-
-.sp
 The authentication mode used for cluster authentication. If you use
 internal x.509 authentication,
 specify so here. This option can have one of the following values:
@@ -1097,6 +1133,13 @@ the certificate returned by the \fI\%\-\-tlsCertificateSelector\fP\&.
 .sp
 If using x.509 authentication, \fB\-\-tlsCAFile\fP or \fBtls.CAFile\fP
 must be specified unless using \fB\-\-tlsCertificateSelector\fP\&.
+.sp
+Changed in version 4.4: \fBmongod\fP / \fI\%mongos\fP logs a warning on
+connection if the presented x.509 certificate expires within \fB30\fP
+days of the \fBmongod/mongos\fP host system time. See
+4.4\-rel\-notes\-certificate\-expiration\-warning for more
+information.
+
 .sp
 For more information about TLS and MongoDB, see
 /tutorial/configure\-ssl and
@@ -1280,21 +1323,43 @@ The \fBthumbprint\fP is sometimes referred to as a
 T}
 _
 .TE
+.sp
+Changed in version 4.4: \fBmongod\fP / \fI\%mongos\fP logs a warning on
+connection if the presented x.509 certificate expires within \fB30\fP
+days of the \fBmongod/mongos\fP host system time. See
+4.4\-rel\-notes\-certificate\-expiration\-warning for more
+information.
+
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-tlsCRLFile <filename>
-New in version 4.2.
+New in version 4.2: For MongoDB 4.0 and earlier, see \fI\%\-\-sslCRLFile\fP\&.
 
 .sp
-Specifies the the \fB\&.pem\fP file that contains the Certificate Revocation
+Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Starting in MongoDB 4.0, you cannot specify \fI\%\-\-tlsCRLFile\fP on macOS.  Use \fI\%\-\-tlsCertificateSelector\fP instead.
+.INDENT 0.0
+.IP \(bu 2
+Starting in MongoDB 4.0, you cannot specify a CRL file on
+macOS. Instead, you can use the system SSL certificate store,
+which uses OCSP (Online Certificate Status Protocol) to
+validate the revocation status of certificates. See
+\fI\%\-\-sslCertificateSelector\fP in MongoDB 4.0 and
+\fI\%\-\-tlsCertificateSelector\fP in MongoDB 4.2+ to use the
+system SSL certificate store.
+.IP \(bu 2
+Starting in version 4.4, to check for certificate revocation,
+MongoDB \fBenables\fP the use of OCSP
+(Online Certificate Status Protocol) by default as an
+alternative to specifying a CRL file or using the system SSL
+certificate store.
+.UNINDENT
 .UNINDENT
 .UNINDENT
 .sp
@@ -1469,9 +1534,6 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsMode\fP instead.
 
 .sp
-New in version 2.6.
-
-.sp
 Enables TLS/SSL or mixed TLS/SSL used for all network connections. The
 argument to the \fI\%\-\-sslMode\fP option can be one of the following:
 .TS
@@ -1625,9 +1687,6 @@ For more information about TLS/SSL and MongoDB, see
 .TP
 .B \-\-sslClusterPassword <value>
 Deprecated since version 4.2: Use \fI\%\-\-tlsClusterPassword\fP instead.
-
-.sp
-New in version 2.6.
 
 .sp
 Specifies the password to de\-crypt the x.509 certificate\-key file
@@ -1815,14 +1874,29 @@ _
 Deprecated since version 4.2: Use \fI\%\-\-tlsCRLFile\fP instead.
 
 .sp
-Specifies the the \fB\&.pem\fP file that contains the Certificate Revocation
+Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Starting in MongoDB 4.0, you cannot specify \fI\%\-\-sslCRLFile\fP on macOS.  Use \fI\%\-\-sslCertificateSelector\fP instead.
+.INDENT 0.0
+.IP \(bu 2
+Starting in MongoDB 4.0, you cannot specify a CRL file on
+macOS. Instead, you can use the system SSL certificate store,
+which uses OCSP (Online Certificate Status Protocol) to
+validate the revocation status of certificates. See
+\fI\%\-\-sslCertificateSelector\fP in MongoDB 4.0 and
+\fI\%\-\-tlsCertificateSelector\fP in MongoDB 4.2+ to use the
+system SSL certificate store.
+.IP \(bu 2
+Starting in version 4.4, to check for certificate revocation,
+MongoDB \fBenables\fP the use of OCSP
+(Online Certificate Status Protocol) by default as an
+alternative to specifying a CRL file or using the system SSL
+certificate store.
+.UNINDENT
 .UNINDENT
 .UNINDENT
 .sp
@@ -1888,9 +1962,6 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsAllowInvalidHostnames\fP instead.
 
 .sp
-New in version 3.0.
-
-.sp
 Disables the validation of the hostnames in TLS/SSL certificates,
 when connecting to other members of the replica set or sharded cluster
 for inter\-process authentication. This allows \fBmongos\fP to connect
@@ -1905,9 +1976,6 @@ For more information about TLS/SSL and MongoDB, see
 .TP
 .B \-\-sslDisabledProtocols <protocol(s)>
 Deprecated since version 4.2: Use \fI\%\-\-tlsDisabledProtocols\fP instead.
-
-.sp
-New in version 3.0.7.
 
 .sp
 Prevents a MongoDB server running with TLS/SSL from accepting
@@ -2022,9 +2090,6 @@ and \fI\%MongoDB Atlas\fP\&.
 .INDENT 0.0
 .TP
 .B \-\-auditFormat
-New in version 2.6.
-
-.sp
 Specifies the format of the output file for auditing if \fI\%\-\-auditDestination\fP is \fBfile\fP\&. The
 \fI\%\-\-auditFormat\fP option can have one of the following values:
 .TS
@@ -2067,9 +2132,6 @@ and \fI\%MongoDB Atlas\fP\&.
 .INDENT 0.0
 .TP
 .B \-\-auditPath
-New in version 2.6.
-
-.sp
 Specifies the output file for auditing if
 \fI\%\-\-auditDestination\fP has value of \fBfile\fP\&. The \fI\%\-\-auditPath\fP
 option can take either a full path name or a relative path name.
@@ -2085,9 +2147,6 @@ and \fI\%MongoDB Atlas\fP\&.
 .INDENT 0.0
 .TP
 .B \-\-auditFilter
-New in version 2.6.
-
-.sp
 Specifies the filter to limit the types of operations the audit system records. The option takes a string representation
 of a query document of the form:
 .INDENT 7.0
@@ -2167,14 +2226,14 @@ New in version 4.0.
 New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
-The LDAP server against which the \fBmongos\fP executes LDAP operations
-against to authenticate users or determine what actions a user is authorized
-to perform on a given database. If the LDAP server specified has any
-replicated instances, you may specify the host and port of each replicated
-server in a comma\-delimited list.
+The LDAP server against which the \fBmongos\fP authenticates users or
+determines what actions a user is authorized to perform on a given
+database. If the LDAP server specified has any replicated instances,
+you may specify the host and port of each replicated server in a
+comma\-delimited list.
 .sp
-If your LDAP infrastrucure partitions the LDAP directory over multiple LDAP
-servers, specify \fIone\fP LDAP server any of its replicated instances to
+If your LDAP infrastructure partitions the LDAP directory over multiple LDAP
+servers, specify \fIone\fP LDAP server or any of its replicated instances to
 \fI\%\-\-ldapServers\fP\&. MongoDB supports following LDAP referrals as defined in \fI\%RFC 4511
 4.1.10\fP\&. Do not use \fI\%\-\-ldapServers\fP
 for listing every LDAP server in your infrastructure.
@@ -2183,6 +2242,24 @@ This setting can be configured on a running \fBmongos\fP using
 \fBsetParameter\fP\&.
 .sp
 If unset, \fBmongos\fP cannot use LDAP authentication or authorization\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapValidateLDAPServerConfig <boolean>
+\fIAvailable in MongoDB Enterprise\fP
+.sp
+A flag that determines if the \fI\%mongos\fP instance checks
+the availability of the \fI\%LDAP server(s)\fP as part of its startup:
+.INDENT 7.0
+.IP \(bu 2
+If \fBtrue\fP, the \fI\%mongos\fP instance performs the
+availability check and only continues to start up if the LDAP
+server is available.
+.IP \(bu 2
+If \fBfalse\fP, the \fI\%mongos\fP instance skips the
+availability check; i.e. the instance starts up even if the LDAP
+server is unavailable.
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -2246,7 +2323,7 @@ both \fI\%\-\-ldapQueryPassword\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the
 .INDENT 0.0
 .TP
 .B \-\-ldapBindWithOSDefaults <bool>
-\fIDefault\fP: False
+\fIDefault\fP: false
 .sp
 New in version 3.4: Available in MongoDB Enterprise for the Windows platform only.
 
@@ -2288,12 +2365,12 @@ connect to the LDAP server.
 .UNINDENT
 .sp
 If you specify \fBsasl\fP, you can configure the available SASL mechanisms
-using \fI\%\-\-ldapBindSASLMechanisms\fP\&. \fBmongos\fP defaults to
+using \fI\%\-\-ldapBindSaslMechanisms\fP\&. \fBmongos\fP defaults to
 using \fBDIGEST\-MD5\fP mechanism.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapBindSASLMechanisms <string>
+.B \-\-ldapBindSaslMechanisms <string>
 \fIDefault\fP: DIGEST\-MD5
 .sp
 New in version 3.4: Available in MongoDB Enterprise only.
@@ -2538,10 +2615,17 @@ username against the \fBmatch\fP filter.  If a match is found,
 authenticating the user. \fBmongos\fP does not check the remaining documents
 in the array.
 .sp
-If the given document does not match the provided authentication name, or
-the transformation described by the document fails, \fBmongos\fP continues
-through the list of documents to find additional matches. If no matches are
-found in any document, \fBmongos\fP returns an error.
+If the given document does not match the provided authentication
+name, \fI\%mongos\fP continues through the list of documents
+to find additional matches. If no matches are found in any document,
+or the transformation the document describes fails,
+\fI\%mongos\fP returns an error.
+.sp
+Starting in MongoDB 4.4, \fI\%mongos\fP also returns an error
+if one of the transformations cannot be evaluated due to networking
+or authentication failures to the LDAP server. \fI\%mongos\fP
+rejects the connection request and does not check the remaining
+documents in the array.
 .INDENT 7.0
 .INDENT 3.5
 .SS Example
@@ -2620,6 +2704,6 @@ Set \fI\%\-\-bind_ip_all\fP to \fBtrue\fP\&.
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2008-2019
+2008-2020
 .\" Generated by docutils manpage writer.
 .

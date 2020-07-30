@@ -305,6 +305,7 @@ fi
 %{_bindir}/mongokerberos
 
 %{_mandir}/man1/mongoldap.1*
+%{_mandir}/man1/mongokerberos.1*
 
 %files cryptd
 %defattr(-,root,root,-)

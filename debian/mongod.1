@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGOD" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
+.TH "MONGOD" "1" "Jun 23, 2020" "4.4" "mongodb-manual"
 .SH NAME
 mongod \- MongoDB Server
 .
@@ -106,6 +106,16 @@ corresponding TLS options.
 MongoDB adds
 \fI\%\-\-tlsClusterCAFile\fP/\fBnet.tls.clusterCAFile\fP\&. (Also availalbe
 in 3.4.18+, 3.6.9+, 4.0.3+)
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.INDENT 3.5
+.IP "Starting in version 4.4"
+.INDENT 0.0
+.IP \(bu 2
+MongoDB removes the \fB\-\-noIndexBuildRetry\fP command\-line option
+and the corresponding \fBstorage.indexBuildRetry\fP option.
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -502,15 +512,6 @@ system\(aqs configured maximum connection tracking threshold.
 .sp
 Do not assign too low of a value to this option, or you will
 encounter errors during normal application operation.
-.sp
-\fBNOTE:\fP
-.INDENT 7.0
-.INDENT 3.5
-Changed in version 2.6: MongoDB removed the upward limit on the \fBmaxIncomingConnections\fP
-setting.
-
-.UNINDENT
-.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -575,9 +576,6 @@ existing log and create a new file.
 .B \-\-logRotate <string>
 \fIDefault\fP: rename
 .sp
-New in version 3.0.0.
-
-.sp
 Determines the behavior for the \fBlogRotate\fP command.
 Specify either \fBrename\fP or \fBreopen\fP:
 .INDENT 7.0
@@ -609,13 +607,6 @@ Description
 T}
 _
 T{
-\fBctime\fP
-T}	T{
-Displays timestamps as \fBWed Dec 31
-18:17:54.811\fP\&.
-T}
-_
-T{
 \fBiso8601\-utc\fP
 T}	T{
 Displays timestamps in Coordinated Universal Time (UTC) in the
@@ -628,10 +619,19 @@ T{
 T}	T{
 Displays timestamps in local time in the ISO\-8601
 format. For example, for New York at the start of the Epoch:
-\fB1969\-12\-31T19:00:00.000\-0500\fP
+\fB1969\-12\-31T19:00:00.000\-05:00\fP
 T}
 _
 .TE
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Starting in MongoDB 4.4, \fI\%\-\-timeStampFormat\fP no longer supports \fBctime\fP\&.
+An example of \fBctime\fP formatted date is: \fBWed Dec 31
+18:17:54.811\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -641,11 +641,33 @@ For internal diagnostic use only.
 .INDENT 0.0
 .TP
 .B \-\-pidfilepath <path>
-Specifies a file location to hold the process ID of the \fBmongod\fP
-process where \fBmongod\fP will write its PID. This is useful for
-tracking the \fBmongod\fP process in combination with
-the \fI\%\-\-fork\fP option. Without a specified \fI\%\-\-pidfilepath\fP option, the
-process creates no PID file.
+Specifies a file location to store the process ID (PID) of the \fBmongod\fP
+process. The user running the \fBmongod\fP or \fBmongos\fP
+process must be able to write to this path. If the \fI\%\-\-pidfilepath\fP option is not
+specified, the process does not create a PID file. This option is generally
+only useful in combination with the \fI\%\-\-fork\fP option.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Linux"
+.sp
+On Linux, PID file management is generally the responsibility of
+your distro\(aqs init system: usually a service file in the \fB/etc/init.d\fP
+directory, or a systemd unit file registered with \fBsystemctl\fP\&. Only
+use the \fI\%\-\-pidfilepath\fP option if you are not using one of these init
+systems. For more information, please see the respective
+Installation Guide for your operating system.
+.UNINDENT
+.UNINDENT
+.INDENT 7.0
+.INDENT 3.5
+.IP "macOS"
+.sp
+On macOS, PID file management is generally handled by \fBbrew\fP\&. Only use
+the \fI\%\-\-pidfilepath\fP option if you are not using \fBbrew\fP on your macOS system.
+For more information, please see the respective
+Installation Guide for your operating system.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -695,10 +717,9 @@ always listens on the UNIX socket unless one of the following is true:
 \fBnet.bindIp\fP does not specify \fBlocalhost\fP or its associated IP address
 .UNINDENT
 .sp
-New in version 2.6: \fBmongod\fP installed from official \&.deb and \&.rpm packages
+\fBmongod\fP installed from official \&.deb and \&.rpm packages
 have the \fBbind_ip\fP configuration set to \fB127.0.0.1\fP by
 default.
-
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -739,6 +760,8 @@ background. By default \fBmongod\fP does not run as a daemon:
 typically you will run \fBmongod\fP as a daemon, either by using
 \fI\%\-\-fork\fP or by using a controlling process that handles the
 daemonization process (e.g. as with \fBupstart\fP and \fBsystemd\fP).
+.sp
+The \fI\%\-\-fork\fP option is not supported on Windows.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -859,20 +882,8 @@ due to the lack of data related to a log event. See the
 process logging manual page for an
 example of the effect of \fI\%\-\-redactClientLogData\fP on log output.
 .sp
-You can enable or disable log redaction on a running \fBmongod\fP
-using the \fBsetParameter\fP database command.
-.INDENT 7.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-db.adminCommand(
-  { setParameter: 1, redactClientLogData : true | false }
-)
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
+On a running \fBmongod\fP, use \fBsetParameter\fP with the
+\fBredactClientLogData\fP parameter to configure this setting.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1114,14 +1125,14 @@ For the corresponding configuration file setting, see
 New in version 3.4: Available in MongoDB Enterprise only.
 
 .sp
-The LDAP server against which the \fBmongod\fP executes LDAP operations
-against to authenticate users or determine what actions a user is authorized
-to perform on a given database. If the LDAP server specified has any
-replicated instances, you may specify the host and port of each replicated
-server in a comma\-delimited list.
+The LDAP server against which the \fBmongod\fP authenticates users or
+determines what actions a user is authorized to perform on a given
+database. If the LDAP server specified has any replicated instances,
+you may specify the host and port of each replicated server in a
+comma\-delimited list.
 .sp
-If your LDAP infrastrucure partitions the LDAP directory over multiple LDAP
-servers, specify \fIone\fP LDAP server any of its replicated instances to
+If your LDAP infrastructure partitions the LDAP directory over multiple LDAP
+servers, specify \fIone\fP LDAP server or any of its replicated instances to
 \fI\%\-\-ldapServers\fP\&. MongoDB supports following LDAP referrals as defined in \fI\%RFC 4511
 4.1.10\fP\&. Do not use \fI\%\-\-ldapServers\fP
 for listing every LDAP server in your infrastructure.
@@ -1130,6 +1141,24 @@ This setting can be configured on a running \fBmongod\fP using
 \fBsetParameter\fP\&.
 .sp
 If unset, \fBmongod\fP cannot use LDAP authentication or authorization\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ldapValidateLDAPServerConfig <boolean>
+\fIAvailable in MongoDB Enterprise\fP
+.sp
+A flag that determines if the \fI\%mongod\fP instance checks
+the availability of the \fI\%LDAP server(s)\fP as part of its startup:
+.INDENT 7.0
+.IP \(bu 2
+If \fBtrue\fP, the \fI\%mongod\fP instance performs the
+availability check and only continues to start up if the LDAP
+server is available.
+.IP \(bu 2
+If \fBfalse\fP, the \fI\%mongod\fP instance skips the
+availability check; i.e. the instance starts up even if the LDAP
+server is unavailable.
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1193,7 +1222,7 @@ both \fI\%\-\-ldapQueryPassword\fP and \fI\%\-\-ldapBindWithOSDefaults\fP at the
 .INDENT 0.0
 .TP
 .B \-\-ldapBindWithOSDefaults <bool>
-\fIDefault\fP: False
+\fIDefault\fP: false
 .sp
 New in version 3.4: Available in MongoDB Enterprise for the Windows platform only.
 
@@ -1235,12 +1264,12 @@ connect to the LDAP server.
 .UNINDENT
 .sp
 If you specify \fBsasl\fP, you can configure the available SASL mechanisms
-using \fI\%\-\-ldapBindSASLMechanisms\fP\&. \fBmongod\fP defaults to
+using \fI\%\-\-ldapBindSaslMechanisms\fP\&. \fBmongod\fP defaults to
 using \fBDIGEST\-MD5\fP mechanism.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-ldapBindSASLMechanisms <string>
+.B \-\-ldapBindSaslMechanisms <string>
 \fIDefault\fP: DIGEST\-MD5
 .sp
 New in version 3.4: Available in MongoDB Enterprise only.
@@ -1485,10 +1514,17 @@ username against the \fBmatch\fP filter.  If a match is found,
 authenticating the user. \fBmongod\fP does not check the remaining documents
 in the array.
 .sp
-If the given document does not match the provided authentication name, or
-the transformation described by the document fails, \fBmongod\fP continues
-through the list of documents to find additional matches. If no matches are
-found in any document, \fBmongod\fP returns an error.
+If the given document does not match the provided authentication
+name, \fI\%mongod\fP continues through the list of documents
+to find additional matches. If no matches are found in any document,
+or the transformation the document describes fails,
+\fI\%mongod\fP returns an error.
+.sp
+Starting in MongoDB 4.4, \fI\%mongod\fP also returns an error
+if one of the transformations cannot be evaluated due to networking
+or authentication failures to the LDAP server. \fI\%mongod\fP
+rejects the connection request and does not check the remaining
+documents in the array.
 .INDENT 7.0
 .INDENT 3.5
 .SS Example
@@ -1704,16 +1740,16 @@ will refuse to start.
 .sp
 The directory where the \fBmongod\fP instance stores its data.
 .sp
-If you
-installed MongoDB using a package management system, check the
-\fB/etc/mongod.conf\fP file provided by your packages to see the
-directory is specified.
+If using the default
+configuration file
+included with a package manager installation of MongoDB, the
+corresponding \fBstorage.dbPath\fP setting uses a different
+default.
 .sp
-Changed in version 3.0: The files in \fI\%\-\-dbpath\fP must correspond to the storage engine
+The files in \fI\%\-\-dbpath\fP must correspond to the storage engine
 specified in \fI\%\-\-storageEngine\fP\&. If the data files do not
 correspond to \fI\%\-\-storageEngine\fP, \fBmongod\fP will refuse to
 start.
-
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1722,49 +1758,49 @@ Uses a separate directory to store data for each database. The
 directories are under the \fI\%\-\-dbpath\fP directory, and each subdirectory
 name corresponds to the database name.
 .sp
-Changed in version 3.0: To change the \fI\%\-\-directoryperdb\fP option for existing deployments, you must
-restart the \fI\%mongod\fP instances with the new \fI\%\-\-directoryperdb\fP
-value \fBand\fP a new data directory (\fI\%\-\-dbpath <new path>\fP), and then
-repopulate the data.
+Not available for \fI\%mongod\fP instances that use the
+in\-memory storage engine\&.
+.sp
+To change the \fI\%\-\-directoryperdb\fP option for existing
+deployments:
 .INDENT 7.0
 .IP \(bu 2
-For standalone instances, you can use \fBmongodump\fP on
-the existing instance, stop the instance, restart with the new
-\fI\%\-\-directoryperdb\fP value \fBand\fP a new data directory, and use
-\fBmongorestore\fP to populate the new data directory.
+For standalone instances:
+.INDENT 2.0
+.IP 1. 3
+Use \fI\%mongodump\fP on the existing
+\fI\%mongod\fP instance to generate a backup.
+.IP 2. 3
+Stop the \fI\%mongod\fP instance.
+.IP 3. 3
+Add the \fI\%\-\-directoryperdb\fP value \fBand\fP
+configure a new data directory
+.IP 4. 3
+Restart the \fI\%mongod\fP instance.
+.IP 5. 3
+Use \fI\%mongorestore\fP to populate the new data
+directory.
+.UNINDENT
 .IP \(bu 2
-For replica sets, you can update in a rolling manner by stopping
-a secondary member, restart with the new \fI\%\-\-directoryperdb\fP value \fBand\fP
-a new data directory, and use initial sync to populate the new data directory.
-To update all members, start with the secondary members first.
-Then step down the primary, and update the stepped\-down member.
+For replica sets:
+.INDENT 2.0
+.IP 1. 3
+Stop a secondary member.
+.IP 2. 3
+Add the \fI\%\-\-directoryperdb\fP value \fBand\fP
+configure a new data directory to that secondary member.
+.IP 3. 3
+Restart that secondary.
+.IP 4. 3
+Use initial sync to populate
+the new data directory.
+.IP 5. 3
+Update remaining secondaries in the same fashion.
+.IP 6. 3
+Step down the primary, and update the stepped\-down member in the
+same fashion.
 .UNINDENT
-
-.sp
-Not available for \fI\%mongod\fP instances that use the
-in\-memory storage engine\&.
 .UNINDENT
-.INDENT 0.0
-.TP
-.B \-\-noIndexBuildRetry
-Changed in version 4.0: \fI\%\-\-noIndexBuildRetry\fP cannot be used in
-conjunction with \fI\%\-\-replSet\fP; i.e., you cannot
-use \fI\%\-\-noIndexBuildRetry\fP for a \fI\%mongod\fP instance that is part of
-a replica set.
-
-.sp
-Stops the \fBmongod\fP \fBstandalone\fP instance from rebuilding incomplete indexes on the next
-start up. This applies in cases where the \fBmongod\fP restarts after it
-has shut down or stopped in the middle of an index build. In such cases,
-the \fBmongod\fP always removes any incomplete indexes, and then also, by
-default, attempts to rebuild them. To stop the \fBmongod\fP from
-rebuilding incomplete indexes on start up, include this option on the
-command\-line.
-.sp
-The \fI\%\-\-noIndexBuildRetry\fP only applies to standalones.
-.sp
-Not available for \fI\%mongod\fP instances that use the
-in\-memory storage engine\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1882,11 +1918,11 @@ If any voting member of a replica set uses the in\-memory
 storage engine, you must set
 \fBwriteConcernMajorityJournalDefault\fP to \fBfalse\fP\&.
 .sp
-Starting in version 4.2, if a replica set member uses the
-in\-memory storage engine (voting or
-non\-voting) but the replica set has
-\fBwriteConcernMajorityJournalDefault\fP set to true, the replica set member
-logs a startup warning.
+Starting in version 4.2 (and 4.0.13 and 3.6.14 ), if a replica set
+member uses the in\-memory storage engine
+(voting or non\-voting) but the replica set has
+\fBwriteConcernMajorityJournalDefault\fP set to true, the
+replica set member logs a startup warning.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -1904,22 +1940,29 @@ WiredTiger storage engine.
 .INDENT 0.0
 .TP
 .B \-\-journalCommitInterval <value>
-\fIDefault\fP: 100 or 30
-.sp
-Changed in version 3.2.
-
+\fIDefault\fP: 100
 .sp
 The maximum amount of time in milliseconds that
 the \fBmongod\fP process allows between
 journal operations. Values can range from 1 to 500 milliseconds. Lower
 values increase the durability of the journal, at the expense of disk
-performance. The default journal commit interval is 100 milliseconds.
+performance.
 .sp
-On WiredTiger, the default journal commit interval is 100 milliseconds. Additionally,
-a write with \fBj:true\fP will cause an immediate sync of the journal.
+On WiredTiger, the default journal commit interval is 100
+milliseconds. Additionally, a write that includes or implies
+\fBj:true\fP will cause an immediate sync of the journal. For details
+or additional conditions that affect the frequency of the sync, see
+journal\-process\&.
 .sp
 Not available for \fI\%mongod\fP instances that use the
 in\-memory storage engine\&.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Known Issue in 4.2.0: The \fI\%\-\-journalCommitInterval\fP is missing in 4.2.0.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .SS WiredTiger Options
 .INDENT 0.0
@@ -1928,8 +1971,9 @@ in\-memory storage engine\&.
 Defines the maximum size of the internal cache that WiredTiger will
 use for all data. The memory consumed by an index build (see
 \fBmaxIndexBuildMemoryUsageMegabytes\fP) is separate from the
-WiredTiger cache memory. Starting in MongoDB 3.4, the values can range
-from 0.25 GB  to 10000 GB and can be a float.
+WiredTiger cache memory.
+.sp
+Values can range from \fB0.25\fP GB to \fB10000\fP GB.
 .sp
 Starting in MongoDB 3.4, the default WiredTiger internal cache size is
 the larger of either:
@@ -1997,11 +2041,59 @@ amount depends on the other processes running in the container. See
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-\-wiredTigerMaxCacheOverflowFileSizeGB <float>
+.INDENT 7.0
+.INDENT 3.5
+.IP "Deprecated in MongoDB 4.4"
+.sp
+MongoDB deprecates the \fB\-\-wiredTigerMaxCacheOverflowFileSizeGB\fP
+option. The option has no effect starting in MongoDB 4.4.
+.UNINDENT
+.UNINDENT
+.sp
+Specifies the maximum size (in GB) for the "lookaside (or cache
+overflow) table" file \fBWiredTigerLAS.wt\fP for MongoDB
+4.2.1\-4.2.x and 4.0.12\-4.0.x. The file no longer exists starting in
+version 4.4.
+.sp
+The setting can accept the following values:
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+\fB0\fP
+T}	T{
+The default value. If set to \fB0\fP, the file size is
+unbounded.
+T}
+_
+T{
+number >= 0.1
+T}	T{
+The maximum size (in GB). If the \fBWiredTigerLAS.wt\fP
+file exceeds this size, \fI\%mongod\fP exits with a
+fatal assertion. You can clear the \fBWiredTigerLAS.wt\fP
+file and restart \fI\%mongod\fP\&.
+T}
+_
+.TE
+.sp
+To change the maximum size during runtime, use the
+\fBwiredTigerMaxCacheOverflowSizeGB\fP parameter.
+.sp
+\fIAvailable starting in MongoDB 4.2.1 (and 4.0.12)\fP
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-\-wiredTigerJournalCompressor <compressor>
 \fIDefault\fP: snappy
-.sp
-New in version 3.0.0.
-
 .sp
 Specifies the type of compression to use to compress WiredTiger
 journal data.
@@ -2021,9 +2113,6 @@ zstd (Available starting in MongoDB 4.2)
 .INDENT 0.0
 .TP
 .B \-\-wiredTigerDirectoryForIndexes
-New in version 3.0.0.
-
-.sp
 When you start \fBmongod\fP with \fI\%\-\-wiredTigerDirectoryForIndexes\fP, \fBmongod\fP stores indexes and collections in separate
 subdirectories under the data (i.e. \fI\%\-\-dbpath\fP) directory.
 Specifically, \fBmongod\fP stores the indexes in a subdirectory named
@@ -2040,9 +2129,6 @@ the new destination.
 .TP
 .B \-\-wiredTigerCollectionBlockCompressor <compressor>
 \fIDefault\fP: snappy
-.sp
-New in version 3.0.0.
-
 .sp
 Specifies the default compression for collection data. You can
 override this on a per\-collection basis when creating collections.
@@ -2070,9 +2156,6 @@ created, or the default compressor at that time.
 .B \-\-wiredTigerIndexPrefixCompression <boolean>
 \fIDefault\fP: true
 .sp
-New in version 3.0.0.
-
-.sp
 Enables or disables prefix compression for index data.
 .sp
 Specify \fBtrue\fP for \fI\%\-\-wiredTigerIndexPrefixCompression\fP to enable prefix compression for
@@ -2092,9 +2175,6 @@ this set. All hosts in the replica set must have the same set name.
 .sp
 Starting in MongoDB 4.0,
 .INDENT 7.0
-.IP \(bu 2
-\fI\%\-\-replSet\fP cannot be used in conjunction with
-\fI\%\-\-noIndexBuildRetry\fP\&.
 .IP \(bu 2
 For the WiredTiger storage engine, \fI\%\-\-replSet\fP cannot be used in
 conjunction with \fI\%\-\-nojournal\fP\&.
@@ -2123,19 +2203,77 @@ the maximum amount of space available. For 64\-bit systems, the oplog
 is typically 5% of available disk space.
 .sp
 Once the \fBmongod\fP has created the oplog for the first time,
-changing the \fI\%\-\-oplogSize\fP option will not affect the size of the oplog.
-.sp
-To change the oplog size of a running replica set member, use the
-\fBreplSetResizeOplog\fP administrative command.
-\fBreplSetResizeOplog\fP enables you to resize the oplog
-dynamically without restarting the \fI\%mongod\fP process.
+changing the \fI\%\-\-oplogSize\fP option will not affect the size of
+the oplog. To change the minimum oplog retention period after
+starting the \fI\%mongod\fP, use
+\fBreplSetResizeOplog\fP\&. \fBreplSetResizeOplog\fP
+enables you to resize the oplog dynamically without restarting the
+\fI\%mongod\fP process. To persist the changes made using
+\fBreplSetResizeOplog\fP through a restart, update the value
+of \fI\%\-\-oplogSize\fP\&.
 .sp
 See replica\-set\-oplog\-sizing for more information.
 .UNINDENT
 .INDENT 0.0
 .TP
+.B \-\-oplogMinRetentionHours <value>
+New in version 4.4: Specifies the minimum number of hours to preserve an oplog entry,
+where the decimal values represent the fractions of an hour. For
+example, a value of \fB1.5\fP represents one hour and thirty
+minutes.
+.sp
+The value must be greater than or equal to \fB0\fP\&. A value of \fB0\fP
+indicates that the \fI\%mongod\fP should truncate the oplog
+starting with the oldest entries to maintain the configured
+maximum oplog size.
+
+.sp
+Defaults to \fB0\fP\&.
+.sp
+A \fI\%mongod\fP started with \fB\-\-oplogMinRetentionHours\fP
+only removes an oplog entry \fIif\fP:
+.INDENT 7.0
+.IP \(bu 2
+The oplog has reached the maximum configured oplog size \fIand\fP
+.IP \(bu 2
+The oplog entry is older than the configured number of hours based
+on the host system clock.
+.UNINDENT
+.sp
+The \fI\%mongod\fP has the following behavior when configured
+with a minimum oplog retention period:
+.INDENT 7.0
+.IP \(bu 2
+The oplog can grow without constraint so as to retain oplog entries
+for the configured number of hours. This may result in reduction or
+exhaustion of system disk space due to a combination of high write
+volume and large retention period.
+.IP \(bu 2
+If the oplog grows beyond its maximum size, the
+\fI\%mongod\fP may continue to hold that disk space even if
+the oplog returns to its maximum size \fIor\fP is configured for a
+smaller maximum size. See replSetResizeOplog\-cmd\-compact\&.
+.IP \(bu 2
+The \fI\%mongod\fP compares the system wall clock to an
+oplog entries creation wall clock time when enforcing oplog entry
+retention. Clock drift between cluster components may result in
+unexpected oplog retention behavior. See
+production\-notes\-clock\-synchronization for more information on
+clock synchronization across cluster members.
+.UNINDENT
+.sp
+To change the minimum oplog retention period after starting the
+\fI\%mongod\fP, use \fBreplSetResizeOplog\fP\&.
+\fBreplSetResizeOplog\fP enables you to resize the oplog
+dynamically without restarting the \fI\%mongod\fP process. To
+persist the changes made using \fBreplSetResizeOplog\fP
+through a restart, update the value of
+\fI\%\-\-oplogMinRetentionHours\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
 .B \-\-enableMajorityReadConcern
-\fIDefault\fP: True
+\fIDefault\fP: true
 .sp
 Starting in MongoDB 3.6, MongoDB enables support for
 \fB"majority"\fP read concern by default.
@@ -2353,26 +2491,35 @@ For more information about TLS and MongoDB, see
 .INDENT 0.0
 .TP
 .B \-\-tlsCertificateKeyFile <filename>
-New in version 4.2.
+New in version 4.2: Specifies the \fB\&.pem\fP file that contains both the TLS
+certificate and key.
 
 .sp
-\fBNOTE:\fP
+Starting with MongoDB 4.0 on macOS or Windows, you can use the
+\fI\%\-\-tlsCertificateSelector\fP option to specify a
+certificate from the operating system\(aqs secure certificate store
+instead of a PEM key file. \fI\%\-\-tlsCertificateKeyFile\fP and
+\fI\%\-\-tlsCertificateSelector\fP options are mutually exclusive.
+You can only specify one.
 .INDENT 7.0
-.INDENT 3.5
-Starting in 4.0, on macOS or Windows, you can use a certificate from
-the operating system\(aqs secure store instead of specifying a PEM file. See
-\fI\%\-\-tlsCertificateSelector\fP\&.
-.UNINDENT
-.UNINDENT
+.IP \(bu 2
+On Linux/BSD, you must specify \fI\%\-\-tlsCertificateKeyFile\fP
+when TLS/SSL is enabled.
+.IP \(bu 2
+On Windows or macOS, you must specify either
+\fI\%\-\-tlsCertificateKeyFile\fP or
+\fI\%\-\-tlsCertificateSelector\fP when TLS/SSL is enabled.
 .sp
-Specifies the \fB\&.pem\fP file that contains both the TLS certificate
-and key.
-.INDENT 7.0
-.IP \(bu 2
-On Linux/BSD, you must specify \fI\%\-\-tlsCertificateKeyFile\fP when TLS is enabled.
-.IP \(bu 2
-On Windows or macOS, you must specify either \fI\%\-\-tlsCertificateKeyFile\fP or
-\fI\%\-\-tlsCertificateSelector\fP when TLS is enabled.
+\fBIMPORTANT:\fP
+.INDENT 2.0
+.INDENT 3.5
+For Windows \fBonly\fP, MongoDB 4.0 and later do not support
+encrypted PEM files. The \fI\%mongod\fP fails to start if
+it encounters an encrypted PEM file. To securely store and
+access a certificate for use with TLS on Windows,
+use \fI\%\-\-tlsCertificateSelector\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .sp
 For more information about TLS and MongoDB, see
@@ -2386,9 +2533,11 @@ New in version 4.2.
 
 .sp
 Specifies the password to de\-crypt the certificate\-key file (i.e.
-\fI\%\-\-tlsCertificateKeyFile\fP). Use the \fI\%\-\-tlsCertificateKeyFilePassword\fP option only if the
-certificate\-key file is encrypted. In all cases, the \fBmongod\fP will
-redact the password from all logging and reporting output.
+\fI\%\-\-tlsCertificateKeyFile\fP). Use the
+\fI\%\-\-tlsCertificateKeyFilePassword\fP option only if the
+certificate\-key file is encrypted. In all cases, the
+\fBmongod\fP will redact the password from all logging and
+reporting output.
 .sp
 Starting in MongoDB 4.0:
 .INDENT 7.0
@@ -2397,11 +2546,16 @@ On Linux/BSD, if the private key in the PEM file is encrypted and
 you do not specify the \fI\%\-\-tlsCertificateKeyFilePassword\fP option, MongoDB will prompt for a
 passphrase. See ssl\-certificate\-password\&.
 .IP \(bu 2
-On macOS or Windows, if the private key in the PEM file is
-encrypted, you must explicitly specify the \fI\%\-\-tlsCertificateKeyFilePassword\fP option.
-Alternatively, you can use a certificate from the secure system
-store (see \fI\%\-\-tlsCertificateSelector\fP) instead of a PEM file or use an
+On macOS, if the private key in the PEM file is
+encrypted, you must explicitly specify the
+\fI\%\-\-tlsCertificateKeyFilePassword\fP option. Alternatively,
+you can use a certificate from the secure system store (see
+\fI\%\-\-tlsCertificateSelector\fP) instead of a PEM file or use an
 unencrypted PEM file.
+.IP \(bu 2
+On Windows, MongoDB does not support encrypted certificates.
+The \fI\%mongod\fP fails if it encounters an encrypted
+PEM file. Use \fI\%\-\-tlsCertificateSelector\fP instead.
 .UNINDENT
 .sp
 For more information about TLS and MongoDB, see
@@ -2412,9 +2566,6 @@ For more information about TLS and MongoDB, see
 .TP
 .B \-\-clusterAuthMode <option>
 \fIDefault\fP: keyFile
-.sp
-New in version 2.6.
-
 .sp
 The authentication mode used for cluster authentication. If you use
 internal x.509 authentication,
@@ -2476,49 +2627,68 @@ For more information about TLS and MongoDB, see
 .INDENT 0.0
 .TP
 .B \-\-tlsClusterFile <filename>
-New in version 4.2.
+New in version 4.2: Specifies the \fB\&.pem\fP file that contains the x.509
+certificate\-key file for membership authentication for the cluster or replica set.
 
 .sp
-\fBNOTE:\fP
-.INDENT 7.0
-.INDENT 3.5
-Starting in 4.0, on macOS or Windows, you can use a certificate
-from the operating system\(aqs secure store instead of a PEM
-file. See \fI\%\-\-tlsClusterCertificateSelector\fP\&.
-.UNINDENT
-.UNINDENT
+Starting with MongoDB 4.0 on macOS or Windows, you can use the
+\fI\%\-\-tlsClusterCertificateSelector\fP option to specify a
+certificate from the operating system\(aqs secure certificate store
+instead of a PEM key file. \fI\%\-\-tlsClusterFile\fP and
+\fI\%\-\-tlsClusterCertificateSelector\fP options are mutually
+exclusive. You can only specify one.
 .sp
-Specifies the \fB\&.pem\fP file that contains the x.509 certificate\-key
-file for membership authentication
-for the cluster or replica set.
-.sp
-If \fI\%\-\-tlsClusterFile\fP does not specify the \fB\&.pem\fP file for internal cluster
-authentication or the alternative
+If \fI\%\-\-tlsClusterFile\fP does not specify the \fB\&.pem\fP file for
+internal cluster authentication or the alternative
 \fI\%\-\-tlsClusterCertificateSelector\fP, the cluster uses the
-\fB\&.pem\fP file specified in the \fI\%\-\-tlsCertificateKeyFile\fP option or
-the certificate returned by the \fI\%\-\-tlsCertificateSelector\fP\&.
+\fB\&.pem\fP file specified in the \fI\%\-\-tlsCertificateKeyFile\fP
+option or the certificate returned by the
+\fI\%\-\-tlsCertificateSelector\fP\&.
 .sp
 If using x.509 authentication, \fB\-\-tlsCAFile\fP or \fBtls.CAFile\fP
 must be specified unless using \fI\%\-\-tlsCertificateSelector\fP\&.
 .sp
+Changed in version 4.4: \fI\%mongod\fP / \fBmongos\fP logs a warning on
+connection if the presented x.509 certificate expires within \fB30\fP
+days of the \fBmongod/mongos\fP host system time. See
+4.4\-rel\-notes\-certificate\-expiration\-warning for more
+information.
+
+.sp
 For more information about TLS and MongoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+For Windows \fBonly\fP, MongoDB 4.0 and later do not support
+encrypted PEM files. The \fI\%mongod\fP fails to start if
+it encounters an encrypted PEM file. To securely store and
+access a certificate for use with membership authentication on
+Windows, use \fI\%\-\-tlsClusterCertificateSelector\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-tlsCertificateSelector <parameter>=<value>
-New in version 4.2: Available on Windows and macOS as an alternative to \fI\%\-\-tlsCertificateKeyFile\fP\&.
-.sp
-The \fI\%\-\-tlsCertificateKeyFile\fP and \fI\%\-\-tlsCertificateSelector\fP options are mutually exclusive. You can only
-specify one.
+New in version 4.2: Available on Windows and macOS as an alternative to
+\fI\%\-\-tlsCertificateKeyFile\fP\&. In version 4.0, see
+\fI\%\-\-sslCertificateSelector\fP\&.
 
 .sp
 Specifies a certificate property in order to select a matching
-certificate from the operating system\(aqs certificate store.
+certificate from the operating system\(aqs certificate store to use for
+TLS.
 .sp
-\fI\%\-\-tlsCertificateSelector\fP accepts an argument of the format \fB<property>=<value>\fP
-where the property can be one of the following:
+The \fI\%\-\-tlsCertificateKeyFile\fP and
+\fI\%\-\-tlsCertificateSelector\fP options are mutually exclusive.
+You can only specify one.
+.sp
+\fI\%\-\-tlsCertificateSelector\fP accepts an argument of the format
+\fB<property>=<value>\fP where the property can be one of the
+following:
 .TS
 center;
 |l|l|l|.
@@ -2556,6 +2726,21 @@ _
 When using the system SSL certificate store, OCSP (Online
 Certificate Status Protocol) is used to validate the revocation
 status of certificates.
+.sp
+The \fI\%mongod\fP searches the operating system\(aqs secure
+certificate store for the CA certificates required to validate the
+full certificate chain of the specified TLS certificate.
+Specifically, the secure certificate store must contain the root CA
+and any intermediate CA certificates required to build the full
+certificate chain to the TLS certificate. Do \fBnot\fP use
+\fI\%\-\-tlsCAFile\fP or \fI\%\-\-tlsClusterCAFile\fP to specify the
+root and intermediate CA certificate
+.sp
+For example, if the TLS/SSL certificate was signed with a single root
+CA certificate, the secure certificate store must contain that root
+CA certificate. If the TLS/SSL certificate was signed with an
+intermediate CA certificate, the secure certificate store must
+contain the intermedia CA certificate \fIand\fP the root CA certificate.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -2563,16 +2748,18 @@ status of certificates.
 New in version 4.2: Available on Windows and macOS as an alternative to
 \fI\%\-\-tlsClusterFile\fP\&.
 .sp
-\fI\%\-\-tlsClusterFile\fP and \fI\%\-\-tlsClusterCertificateSelector\fP options are mutually exclusive. You can only
-specify one.
+Specifies a certificate property in order to select a matching
+certificate from the operating system\(aqs certificate store to use
+for internal x.509 membership authentication\&.
+.sp
+\fI\%\-\-tlsClusterFile\fP and
+\fI\%\-\-tlsClusterCertificateSelector\fP options are mutually
+exclusive. You can only specify one.
 
 .sp
-Specifies a certificate property in order to select a matching
-certificate from the operating system\(aqs certificate store to use for
-internal authentication.
-.sp
-\fI\%\-\-tlsClusterCertificateSelector\fP accepts an argument of the format \fB<property>=<value>\fP
-where the property can be one of the following:
+\fI\%\-\-tlsClusterCertificateSelector\fP accepts an argument of the
+format \fB<property>=<value>\fP where the property can be one of the
+following:
 .TS
 center;
 |l|l|l|.
@@ -2606,30 +2793,57 @@ The \fBthumbprint\fP is sometimes referred to as a
 T}
 _
 .TE
+.sp
+The \fI\%mongod\fP searches the operating system\(aqs secure
+certificate store for the CA certificates required to validate the
+full certificate chain of the specified cluster certificate.
+Specifically, the secure certificate store must contain the root CA
+and any intermediate CA certificates required to build the full
+certificate chain to the cluster certificate. Do \fBnot\fP use
+\fI\%\-\-tlsCAFile\fP or \fI\%\-\-tlsClusterCAFile\fP to specify the
+root and intermediate CA certificate.
+.sp
+For example, if the cluster certificate was signed with a single root
+CA certificate, the secure certificate store must contain that root
+CA certificate. If the cluster certificate was signed with an
+intermediate CA certificate, the secure certificate store must
+contain the intermedia CA certificate \fIand\fP the root CA certificate.
+.sp
+Changed in version 4.4: \fI\%mongod\fP / \fBmongos\fP logs a warning on
+connection if the presented x.509 certificate expires within \fB30\fP
+days of the \fBmongod/mongos\fP host system time. See
+4.4\-rel\-notes\-certificate\-expiration\-warning for more
+information.
+
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-tlsClusterPassword <value>
-New in version 4.2.
+New in version 4.2: Specifies the password to de\-crypt the x.509 certificate\-key file
+specified with \fI\%\-\-tlsClusterFile\fP\&. Use the
+\fI\%\-\-tlsClusterPassword\fP option only if the certificate\-key
+file is encrypted. In all cases, the \fBmongod\fP will redact
+the password from all logging and reporting output.
 
-.sp
-Specifies the password to de\-crypt the x.509 certificate\-key file
-specified with \fB\-\-tlsClusterFile\fP\&. Use the \fI\%\-\-tlsClusterPassword\fP option only
-if the certificate\-key file is encrypted. In all cases, the \fBmongod\fP
-will redact the password from all logging and reporting output.
 .sp
 Starting in MongoDB 4.0:
 .INDENT 7.0
 .IP \(bu 2
 On Linux/BSD, if the private key in the x.509 file is encrypted and
-you do not specify the \fI\%\-\-tlsClusterPassword\fP option, MongoDB will prompt for a
-passphrase. See ssl\-certificate\-password\&.
+you do not specify the \fI\%\-\-tlsClusterPassword\fP option,
+MongoDB will prompt for a passphrase. See
+ssl\-certificate\-password\&.
 .IP \(bu 2
-On macOS or Windows, if the private key in the x.509 file is
-encrypted, you must explicitly specify the \fI\%\-\-tlsClusterPassword\fP option.
-Alternatively, you can either use a certificate from the secure
-system store (see \fI\%\-\-tlsClusterCertificateSelector\fP) instead of a cluster PEM file or
-use an unencrypted PEM file.
+On macOS, if the private key in the x.509 file is
+encrypted, you must explicitly specify the
+\fI\%\-\-tlsClusterPassword\fP option. Alternatively, you can
+either use a certificate from the secure system store (see
+\fI\%\-\-tlsClusterCertificateSelector\fP) instead of a cluster PEM
+file or use an unencrypted PEM file.
+.IP \(bu 2
+On Windows, MongoDB does not support encrypted certificates.
+The \fI\%mongod\fP fails if it encounters an encrypted
+PEM file. Use \fI\%\-\-tlsClusterCertificateSelector\fP instead.
 .UNINDENT
 .sp
 For more information about TLS and MongoDB, see
@@ -2642,14 +2856,20 @@ For more information about TLS and MongoDB, see
 New in version 4.2.
 
 .sp
-Specifies the \fB\&.pem\fP file that contains the root certificate chain
-from the Certificate Authority. Specify the file name of the
+Specifies the \fB\&.pem\fP file that contains the root certificate
+chain from the Certificate Authority. Specify the file name of the
 \fB\&.pem\fP file using relative or absolute paths.
-.sp
-Starting in 4.0, on macOS or Windows, you can use a certificate from
-the operating system\(aqs secure store instead of a PEM key file. See
-\fI\%\-\-tlsCertificateSelector\fP\&. When using the secure store, you
-do not need to, but can, also specify the \fI\%\-\-tlsCAFile\fP\&.
+.INDENT 7.0
+.TP
+.B Windows/macOS Only
+If using \fI\%\-\-tlsCertificateSelector\fP and/or
+\fI\%\-\-tlsClusterCertificateSelector\fP, do \fBnot\fP use
+\fI\%\-\-tlsCAFile\fP to specify the root and intermediate CA
+certificates. Store all CA certificates required to validate the
+full trust chain of the \fI\%\-\-tlsCertificateSelector\fP and/or
+\fI\%\-\-tlsClusterCertificateSelector\fP certificates in the
+secure certificate store.
+.UNINDENT
 .sp
 For more information about TLS and MongoDB, see
 /tutorial/configure\-ssl and
@@ -2661,24 +2881,33 @@ For more information about TLS and MongoDB, see
 New in version 4.2.
 
 .sp
-Specifies the \fB\&.pem\fP file that contains the root certificate chain
-from the Certificate Authority used to validate the certificate
+Specifies the \fB\&.pem\fP file that contains the root certificate
+chain from the Certificate Authority used to validate the certificate
 presented by a client establishing a connection. Specify the file
 name of the \fB\&.pem\fP file using relative or absolute paths.
+\fI\%\-\-tlsClusterCAFile\fP requires that
+\fI\%\-\-tlsCAFile\fP is set.
 .sp
-If \fI\%\-\-tlsClusterCAFile\fP does not specify the \fB\&.pem\fP file for validating the
-certificate from a client establishing a connection, the cluster uses
-the \fB\&.pem\fP file specified in the \fI\%\-\-tlsCAFile\fP option.
+If \fI\%\-\-tlsClusterCAFile\fP does not specify the \fB\&.pem\fP
+file for validating the certificate from a client establishing a
+connection, the cluster uses the \fB\&.pem\fP file specified in the
+\fI\%\-\-tlsCAFile\fP option.
 .sp
-\fI\%\-\-tlsClusterCAFile\fP lets you use separate Certificate Authorities to verify the
-client to server and server to client portions of the TLS handshake.
-.sp
-Starting in 4.0, on macOS or Windows, you can use a certificate from
-the operating system\(aqs secure store instead of a PEM key file. See
-\fI\%\-\-tlsClusterCertificateSelector\fP\&. When using the secure store, you
-do not need to, but can, also specify the \fI\%\-\-tlsClusterCAFile\fP\&.
-.sp
-Requires that \fI\%\-\-tlsCAFile\fP is set.
+\fI\%\-\-tlsClusterCAFile\fP lets you use separate Certificate
+Authorities to verify the client to server and server to client
+portions of the TLS handshake.
+.INDENT 7.0
+.TP
+.B Windows/macOS Only
+If using \fI\%\-\-tlsCertificateSelector\fP and/or
+\fI\%\-\-tlsClusterCertificateSelector\fP, do \fBnot\fP use
+\fI\%\-\-tlsClusterCAFile\fP to specify the root and
+intermediate CA certificates. Store all CA certificates required to
+validate the full trust chain of the
+\fI\%\-\-tlsCertificateSelector\fP and/or
+\fI\%\-\-tlsClusterCertificateSelector\fP certificates in the
+secure certificate store.
+.UNINDENT
 .sp
 For more information about TLS and MongoDB, see
 /tutorial/configure\-ssl and
@@ -2687,17 +2916,32 @@ For more information about TLS and MongoDB, see
 .INDENT 0.0
 .TP
 .B \-\-tlsCRLFile <filename>
-New in version 4.2.
+New in version 4.2: For MongoDB 4.0 and earlier, see \fI\%\-\-sslCRLFile\fP\&.
 
 .sp
-Specifies the the \fB\&.pem\fP file that contains the Certificate Revocation
+Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Starting in MongoDB 4.0, you cannot specify \fI\%\-\-tlsCRLFile\fP on macOS.  Use \fI\%\-\-tlsCertificateSelector\fP instead.
+.INDENT 0.0
+.IP \(bu 2
+Starting in MongoDB 4.0, you cannot specify a CRL file on
+macOS. Instead, you can use the system SSL certificate store,
+which uses OCSP (Online Certificate Status Protocol) to
+validate the revocation status of certificates. See
+\fI\%\-\-sslCertificateSelector\fP in MongoDB 4.0 and
+\fI\%\-\-tlsCertificateSelector\fP in MongoDB 4.2+ to use the
+system SSL certificate store.
+.IP \(bu 2
+Starting in version 4.4, to check for certificate revocation,
+MongoDB \fBenables\fP the use of OCSP
+(Online Certificate Status Protocol) by default as an
+alternative to specifying a CRL file or using the system SSL
+certificate store.
+.UNINDENT
 .UNINDENT
 .UNINDENT
 .sp
@@ -2781,7 +3025,7 @@ incoming connections that use a specific protocol or protocols. To
 specify multiple protocols, use a comma separated list of protocols.
 .sp
 \fI\%\-\-tlsDisabledProtocols\fP recognizes the following protocols: \fBTLS1_0\fP, \fBTLS1_1\fP,
-\fBTLS1_2\fP, and starting in version 4.0.4 (and 3.6.9), \fBTLS1_3\fP\&.
+\fBTLS1_2\fP, and \fBTLS1_3\fP\&.
 .INDENT 7.0
 .IP \(bu 2
 On macOS, you cannot disable \fBTLS1_1\fP and leave both \fBTLS1_0\fP and
@@ -2872,9 +3116,6 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsMode\fP instead.
 
 .sp
-New in version 2.6.
-
-.sp
 Enables TLS/SSL or mixed TLS/SSL used for all network connections. The
 argument to the \fI\%\-\-sslMode\fP option can be one of the following:
 .TS
@@ -2937,23 +3178,34 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsCertificateKeyFile\fP instead.
 
 .sp
-\fBNOTE:\fP
-.INDENT 7.0
-.INDENT 3.5
-Starting in 4.0, on macOS or Windows, you can use a certificate from
-the operating system\(aqs secure store instead of a PEM file. See
-\fI\%\-\-sslCertificateSelector\fP\&.
-.UNINDENT
-.UNINDENT
+Specifies the \fB\&.pem\fP file that contains both the TLS/SSL
+certificate and key.
 .sp
-Specifies the \fB\&.pem\fP file that contains both the TLS/SSL certificate
-and key.
+Starting with MongoDB 4.0 on macOS or Windows, you can use the
+\fI\%\-\-sslCertificateSelector\fP option to specify a
+certificate from the operating system\(aqs secure certificate store
+instead of a PEM key file. \fI\%\-\-sslPEMKeyFile\fP and
+\fI\%\-\-sslCertificateSelector\fP options are mutually exclusive.
+You can only specify one.
 .INDENT 7.0
 .IP \(bu 2
-On Linux/BSD, you must specify \fI\%\-\-sslPEMKeyFile\fP when TLS/SSL is enabled.
+On Linux/BSD, you must specify \fI\%\-\-sslPEMKeyFile\fP when
+TLS/SSL is enabled.
 .IP \(bu 2
-On Windows or macOS, you must specify either \fI\%\-\-sslPEMKeyFile\fP or
-\fI\%\-\-sslCertificateSelector\fP when TLS/SSL is enabled.
+On Windows or macOS, you must specify either
+\fI\%\-\-sslPEMKeyFile\fP or \fI\%\-\-sslCertificateSelector\fP
+when TLS/SSL is enabled.
+.sp
+\fBIMPORTANT:\fP
+.INDENT 2.0
+.INDENT 3.5
+For Windows \fBonly\fP, MongoDB 4.0 and later do not support
+encrypted PEM files. The \fI\%mongod\fP fails to start if
+it encounters an encrypted PEM file. To securely store and
+access a certificate for use with TLS/SSL on Windows,
+use \fI\%\-\-sslCertificateSelector\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .sp
 For more information about TLS/SSL and MongoDB, see
@@ -2978,11 +3230,16 @@ On Linux/BSD, if the private key in the PEM file is encrypted and
 you do not specify the \fI\%\-\-sslPEMKeyPassword\fP option, MongoDB will prompt for a
 passphrase. See ssl\-certificate\-password\&.
 .IP \(bu 2
-On macOS or Windows, if the private key in the PEM file is
-encrypted, you must explicitly specify the \fI\%\-\-sslPEMKeyPassword\fP option.
-Alternatively, you can use a certificate from the secure system
-store (see \fI\%\-\-sslCertificateSelector\fP) instead of a PEM key file or use an
-unencrypted PEM file.
+On macOS, if the private key in the PEM file is
+encrypted, you must explicitly specify the
+\fI\%\-\-sslPEMKeyPassword\fP option. Alternatively, you can use a
+certificate from the secure system store (see
+\fI\%\-\-sslCertificateSelector\fP) instead of a PEM key file or
+use an unencrypted PEM file.
+.IP \(bu 2
+On Windows, MongoDB does not support encrypted certificates.
+The \fI\%mongod\fP fails if it encounters an encrypted
+PEM file. Use \fI\%\-\-sslCertificateSelector\fP instead.
 .UNINDENT
 .sp
 For more information about TLS/SSL and MongoDB, see
@@ -2995,21 +3252,18 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsClusterFile\fP instead.
 
 .sp
-\fBNOTE:\fP
-.INDENT 7.0
-.INDENT 3.5
-Starting in 4.0, on macOS or Windows, you can use a certificate
-from the operating system\(aqs secure store instead of a PEM key
-file. See \fI\%\-\-sslClusterCertificateSelector\fP\&.
-.UNINDENT
-.UNINDENT
+Specifies the \fB\&.pem\fP file that contains the x.509
+certificate\-key file for membership authentication for the cluster or replica set.
 .sp
-Specifies the \fB\&.pem\fP file that contains the x.509 certificate\-key
-file for membership authentication
-for the cluster or replica set.
+Starting with MongoDB 4.0 on macOS or Windows, you can use the
+\fI\%\-\-sslClusterCertificateSelector\fP option to specify a
+certificate from the operating system\(aqs secure certificate store
+instead of a PEM key file. \fI\%\-\-sslClusterFile\fP and
+\fI\%\-\-sslClusterCertificateSelector\fP options are mutually
+exclusive. You can only specify one.
 .sp
-If \fI\%\-\-sslClusterFile\fP does not specify the \fB\&.pem\fP file for internal cluster
-authentication or the alternative
+If \fI\%\-\-sslClusterFile\fP does not specify the \fB\&.pem\fP file for
+internal cluster authentication or the alternative
 \fI\%\-\-sslClusterCertificateSelector\fP, the cluster uses the
 \fB\&.pem\fP file specified in the \fI\%\-\-sslPEMKeyFile\fP option or
 the certificate returned by the \fI\%\-\-sslCertificateSelector\fP\&.
@@ -3023,6 +3277,17 @@ must be specified unless using \fB\-\-tlsCertificateSelector\fP or
 For more information about TLS/SSL and MongoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+For Windows \fBonly\fP, MongoDB 4.0 and later do not support
+encrypted PEM files. The \fI\%mongod\fP fails to start if
+it encounters an encrypted PEM file. To securely store and
+access a certificate for use with membership authentication on
+Windows, use \fI\%\-\-sslClusterCertificateSelector\fP\&.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -3030,17 +3295,20 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsCertificateSelector\fP instead.
 
 .sp
-New in version 4.0: Available on Windows and macOS as an alternative to \fI\%\-\-tlsCertificateKeyFile\fP\&.
+New in version 4.0: Available on Windows and macOS as an alternative to
+\fI\%\-\-tlsCertificateKeyFile\fP\&.
 .sp
-\fI\%\-\-tlsCertificateKeyFile\fP and \fI\%\-\-sslCertificateSelector\fP options are mutually exclusive. You can only
-specify one.
+Specifies a certificate property to select a matching certificate
+from the operating system\(aqs secure certificate store to use for
+TLS/SSL.
+.sp
+\fI\%\-\-sslPEMKeyFile\fP and \fI\%\-\-sslCertificateSelector\fP
+options are mutually exclusive. You can only specify one.
 
 .sp
-Specifies a certificate property in order to select a matching
-certificate from the operating system\(aqs certificate store.
-.sp
-\fI\%\-\-sslCertificateSelector\fP accepts an argument of the format \fB<property>=<value>\fP
-where the property can be one of the following:
+\fI\%\-\-sslCertificateSelector\fP accepts an argument of the format
+\fB<property>=<value>\fP where the property can be one of the
+following:
 .TS
 center;
 |l|l|l|.
@@ -3078,6 +3346,21 @@ _
 When using the system SSL certificate store, OCSP (Online
 Certificate Status Protocol) is used to validate the revocation
 status of certificates.
+.sp
+The \fI\%mongod\fP searches the operating system\(aqs secure
+certificate store for the CA certificates required to validate the
+full certificate chain of the specified TLS/SSL certificate.
+Specifically, the secure certificate store must contain the root CA
+and any intermediate CA certificates required to build the full
+certificate chain to the TLS/SSL certificate. Do \fBnot\fP use
+\fI\%\-\-sslCAFile\fP or \fI\%\-\-sslClusterCAFile\fP to specify the
+root and intermediate CA certificate
+.sp
+For example, if the TLS/SSL certificate was signed with a single root
+CA certificate, the secure certificate store must contain that root
+CA certificate. If the TLS/SSL certificate was signed with an
+intermediate CA certificate, the secure certificate store must
+contain the intermedia CA certificate \fIand\fP the root CA certificate.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -3088,16 +3371,18 @@ Deprecated since version 4.2: Use \fI\%\-\-tlsClusterCertificateSelector\fP inst
 New in version 4.0: Available on Windows and macOS as an alternative to
 \fI\%\-\-sslClusterFile\fP\&.
 .sp
-\fI\%\-\-sslClusterFile\fP and \fI\%\-\-sslClusterCertificateSelector\fP options are mutually exclusive. You can only
-specify one.
+Specifies a certificate property to select a matching certificate
+from the operating system\(aqs secure certificate store to use for
+internal x.509 membership authentication\&.
+.sp
+\fI\%\-\-sslClusterFile\fP and
+\fI\%\-\-sslClusterCertificateSelector\fP options are mutually
+exclusive. You can only specify one.
 
 .sp
-Specifies a certificate property in order to select a matching
-certificate from the operating system\(aqs certificate store to use for
-internal authentication.
-.sp
-\fI\%\-\-sslClusterCertificateSelector\fP accepts an argument of the format \fB<property>=<value>\fP
-where the property can be one of the following:
+\fI\%\-\-sslClusterCertificateSelector\fP accepts an argument of the
+format \fB<property>=<value>\fP where the property can be one of the
+following:
 .TS
 center;
 |l|l|l|.
@@ -3131,14 +3416,26 @@ The \fBthumbprint\fP is sometimes referred to as a
 T}
 _
 .TE
+.sp
+The \fI\%mongod\fP searches the operating system\(aqs secure
+certificate store for the CA certificates required to validate the
+full certificate chain of the specified cluster certificate.
+Specifically, the secure certificate store must contain the root CA
+and any intermediate CA certificates required to build the full
+certificate chain to the cluster certificate. Do \fBnot\fP use
+\fI\%\-\-sslCAFile\fP or \fI\%\-\-sslClusterCAFile\fP to specify the
+root and intermediate CA certificate.
+.sp
+For example, if the cluster certificate was signed with a single root
+CA certificate, the secure certificate store must contain that root
+CA certificate. If the cluster certificate was signed with an
+intermediate CA certificate, the secure certificate store must
+contain the intermedia CA certificate \fIand\fP the root CA certificate.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-sslClusterPassword <value>
 Deprecated since version 4.2: Use \fI\%\-\-tlsClusterPassword\fP instead.
-
-.sp
-New in version 2.6.
 
 .sp
 Specifies the password to de\-crypt the x.509 certificate\-key file
@@ -3153,11 +3450,15 @@ On Linux/BSD, if the private key in the x.509 file is encrypted and
 you do not specify the \fI\%\-\-sslClusterPassword\fP option, MongoDB will prompt for a
 passphrase. See ssl\-certificate\-password\&.
 .IP \(bu 2
-On macOS or Windows, if the private key in the x.509 file is
-encrypted, you must explicitly specify the \fI\%\-\-sslClusterPassword\fP option.
+On macOS, if the private key in the x.509 file is encrypted, you
+must explicitly specify the \fI\%\-\-sslClusterPassword\fP option.
 Alternatively, you can either use a certificate from the secure
-system store (see \fI\%\-\-sslClusterCertificateSelector\fP) instead of a cluster PEM file or
-use an unencrypted PEM file.
+system store (see \fI\%\-\-sslClusterCertificateSelector\fP)
+instead of a cluster PEM file or use an unencrypted PEM file.
+.IP \(bu 2
+On Windows, MongoDB does not support encrypted certificates.
+The \fI\%mongod\fP fails if it encounters an encrypted
+PEM file. Use \fI\%\-\-sslClusterCertificateSelector\fP instead.
 .UNINDENT
 .sp
 For more information about TLS/SSL and MongoDB, see
@@ -3170,14 +3471,20 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsCAFile\fP instead.
 
 .sp
-Specifies the \fB\&.pem\fP file that contains the root certificate chain
-from the Certificate Authority. Specify the file name of the
+Specifies the \fB\&.pem\fP file that contains the root certificate
+chain from the Certificate Authority. Specify the file name of the
 \fB\&.pem\fP file using relative or absolute paths.
-.sp
-Starting in 4.0, on macOS or Windows, you can use a certificate from
-the operating system\(aqs secure store instead of a PEM key file. See
-\fI\%\-\-sslCertificateSelector\fP\&. When using the secure store, you
-do not need to, but can, also specify the \fI\%\-\-sslCAFile\fP\&.
+.INDENT 7.0
+.TP
+.B Windows/macOS Only
+If using \fI\%\-\-sslCertificateSelector\fP and/or
+\fI\%\-\-sslClusterCertificateSelector\fP, do \fBnot\fP use
+\fI\%\-\-sslCAFile\fP to specify the root and intermediate CA
+certificates. Store all CA certificates required to validate the
+full trust chain of the \fI\%\-\-sslCertificateSelector\fP and/or
+\fI\%\-\-sslClusterCertificateSelector\fP certificates in the
+secure certificate store.
+.UNINDENT
 .sp
 For more information about TLS/SSL and MongoDB, see
 /tutorial/configure\-ssl and
@@ -3189,24 +3496,33 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsClusterCAFile\fP instead.
 
 .sp
-Specifies the \fB\&.pem\fP file that contains the root certificate chain
-from the Certificate Authority used to validate the certificate
+Specifies the \fB\&.pem\fP file that contains the root certificate
+chain from the Certificate Authority used to validate the certificate
 presented by a client establishing a connection. Specify the file
 name of the \fB\&.pem\fP file using relative or absolute paths.
+\fI\%\-\-sslClusterCAFile\fP requires that
+\fI\%\-\-sslCAFile\fP is set.
 .sp
-If \fI\%\-\-sslClusterCAFile\fP does not specify the \fB\&.pem\fP file for validating the
-certificate from a client establishing a connection, the cluster uses
-the \fB\&.pem\fP file specified in the \fI\%\-\-sslCAFile\fP option.
+If \fI\%\-\-sslClusterCAFile\fP does not specify the \fB\&.pem\fP
+file for validating the certificate from a client establishing a
+connection, the cluster uses the \fB\&.pem\fP file specified in the
+\fI\%\-\-sslCAFile\fP option.
 .sp
-\fI\%\-\-sslClusterCAFile\fP lets you use separate Certificate Authorities to verify the
-client to server and server to client portions of the TLS handshake.
-.sp
-Starting in 4.0, on macOS or Windows, you can use a certificate from
-the operating system\(aqs secure store instead of a PEM key file. See
-\fI\%\-\-sslClusterCertificateSelector\fP\&. When using the secure store, you
-do not need to, but can, also specify the \fI\%\-\-sslClusterCAFile\fP\&.
-.sp
-Requires that \fI\%\-\-sslCAFile\fP is set.
+\fI\%\-\-sslClusterCAFile\fP lets you use separate Certificate
+Authorities to verify the client to server and server to client
+portions of the TLS handshake.
+.INDENT 7.0
+.TP
+.B Windows/macOS Only
+If using \fI\%\-\-sslCertificateSelector\fP and/or
+\fI\%\-\-sslClusterCertificateSelector\fP, do \fBnot\fP use
+\fI\%\-\-sslClusterCAFile\fP to specify the root and
+intermediate CA certificates. Store all CA certificates required to
+validate the full trust chain of the
+\fI\%\-\-sslCertificateSelector\fP and/or
+\fI\%\-\-sslClusterCertificateSelector\fP certificates in the
+secure certificate store.
+.UNINDENT
 .sp
 For more information about TLS/SSL and MongoDB, see
 /tutorial/configure\-ssl and
@@ -3218,14 +3534,29 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsCRLFile\fP instead.
 
 .sp
-Specifies the the \fB\&.pem\fP file that contains the Certificate Revocation
+Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
 \fBNOTE:\fP
 .INDENT 7.0
 .INDENT 3.5
-Starting in MongoDB 4.0, you cannot specify \fI\%\-\-sslCRLFile\fP on macOS.  Use \fI\%\-\-sslCertificateSelector\fP instead.
+.INDENT 0.0
+.IP \(bu 2
+Starting in MongoDB 4.0, you cannot specify a CRL file on
+macOS. Instead, you can use the system SSL certificate store,
+which uses OCSP (Online Certificate Status Protocol) to
+validate the revocation status of certificates. See
+\fI\%\-\-sslCertificateSelector\fP in MongoDB 4.0 and
+\fI\%\-\-tlsCertificateSelector\fP in MongoDB 4.2+ to use the
+system SSL certificate store.
+.IP \(bu 2
+Starting in version 4.4, to check for certificate revocation,
+MongoDB \fBenables\fP the use of OCSP
+(Online Certificate Status Protocol) by default as an
+alternative to specifying a CRL file or using the system SSL
+certificate store.
+.UNINDENT
 .UNINDENT
 .UNINDENT
 .sp
@@ -3271,9 +3602,6 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsAllowInvalidHostnames\fP instead.
 
 .sp
-New in version 3.0.
-
-.sp
 Disables the validation of the hostnames in TLS/SSL certificates,
 when connecting to other members of the replica set or sharded cluster
 for inter\-process authentication. This allows \fBmongod\fP to connect
@@ -3310,15 +3638,12 @@ For more information about TLS/SSL and MongoDB, see
 Deprecated since version 4.2: Use \fI\%\-\-tlsDisabledProtocols\fP instead.
 
 .sp
-New in version 3.0.7.
-
-.sp
 Prevents a MongoDB server running with TLS/SSL from accepting
 incoming connections that use a specific protocol or protocols. To
 specify multiple protocols, use a comma separated list of protocols.
 .sp
 \fI\%\-\-sslDisabledProtocols\fP recognizes the following protocols: \fBTLS1_0\fP, \fBTLS1_1\fP,
-\fBTLS1_2\fP, and starting in version 4.0.4 (and 3.6.9), \fBTLS1_3\fP\&.
+\fBTLS1_2\fP, and starting in version 4.0.4 (and 3.6.9 and 3.4.24), \fBTLS1_3\fP\&.
 .INDENT 7.0
 .IP \(bu 2
 On macOS, you cannot disable \fBTLS1_1\fP and leave both \fBTLS1_0\fP and
@@ -3524,9 +3849,6 @@ and \fI\%MongoDB Atlas\fP\&.
 .INDENT 0.0
 .TP
 .B \-\-auditFormat
-New in version 2.6.
-
-.sp
 Specifies the format of the output file for auditing if \fI\%\-\-auditDestination\fP is \fBfile\fP\&. The
 \fI\%\-\-auditFormat\fP option can have one of the following values:
 .TS
@@ -3569,9 +3891,6 @@ and \fI\%MongoDB Atlas\fP\&.
 .INDENT 0.0
 .TP
 .B \-\-auditPath
-New in version 2.6.
-
-.sp
 Specifies the output file for auditing if
 \fI\%\-\-auditDestination\fP has value of \fBfile\fP\&. The \fI\%\-\-auditPath\fP
 option can take either a full path name or a relative path name.
@@ -3587,9 +3906,6 @@ and \fI\%MongoDB Atlas\fP\&.
 .INDENT 0.0
 .TP
 .B \-\-auditFilter
-New in version 2.6.
-
-.sp
 Specifies the filter to limit the types of operations the audit system records. The option takes a string representation
 of a query document of the form:
 .INDENT 7.0
@@ -3691,7 +4007,7 @@ Available in MongoDB Enterprise only.
 .INDENT 0.0
 .TP
 .B \-\-enableEncryption <boolean>
-\fIDefault\fP: False
+\fIDefault\fP: false
 .sp
 New in version 3.2.
 
@@ -3801,7 +4117,7 @@ Available in MongoDB Enterprise only.
 .INDENT 0.0
 .TP
 .B \-\-kmipRotateMasterKey <boolean>
-\fIDefault\fP: False
+\fIDefault\fP: false
 .sp
 New in version 3.2.
 
@@ -3829,16 +4145,24 @@ kmip\-master\-key\-rotation
 New in version 3.2.
 
 .sp
-Hostname or IP address of key management solution running a KMIP
-server. Requires \fBenableEncryption\fP to be true.
+Hostname or IP address of the KMIP server to connect to. Requires
+\fI\%\-\-enableEncryption\fP to be true.
 .sp
-When connecting to the KMIP server, the \fI\%mongod\fP
-verifies that the specified \fI\%\-\-kmipServerName\fP matches the Subject Alternative
-Name \fBSAN\fP (or, if \fBSAN\fP is not present, the Common Name \fBCN\fP)
-in the certificate presented by the KMIP server. If \fBSAN\fP is
-present, \fI\%mongod\fP does not match against the \fBCN\fP\&. If
-the hostname does not match the \fBSAN\fP (or \fBCN\fP), the
-\fI\%mongod\fP will fail to connect.
+Starting in MongoDB 4.2.1 (and 4.0.14), you can specify multiple KMIP
+servers as a comma\-separated list, e.g.
+\fBserver1.example.com,server2.example.com\fP\&. On startup, the
+\fI\%mongod\fP will attempt to establish a connection to each
+server in the order listed, and will select the first server to
+which it can successfully establish a connection. KMIP server
+selection occurs only at startup.
+.sp
+When connecting to a KMIP server, the \fI\%mongod\fP
+verifies that the specified \fI\%\-\-kmipServerName\fP matches the
+Subject Alternative Name \fBSAN\fP (or, if \fBSAN\fP is not present, the
+Common Name \fBCN\fP) in the certificate presented by the KMIP server.
+If \fBSAN\fP is present, \fI\%mongod\fP does not match against
+the \fBCN\fP\&. If the hostname does not match the \fBSAN\fP (or \fBCN\fP),
+the \fI\%mongod\fP will fail to connect.
 .sp
 Starting in MongoDB 4.2, when performing comparison of SAN, MongoDB
 supports comparison of DNS names or IP addresses. In previous versions,
@@ -3859,9 +4183,55 @@ Available in MongoDB Enterprise only.
 New in version 3.2.
 
 .sp
-Port number the KMIP server is listening on. Requires that a
-\fBkmipServerName\fP be provided. Requires
-\fBenableEncryption\fP to be true.
+Port number to use to communicate with the KMIP server.
+Requires \fI\%\-\-kmipServerName\fP\&. Requires
+\fI\%\-\-enableEncryption\fP to be true.
+.sp
+If specifying multiple KMIP servers with \fI\%\-\-kmipServerName\fP,
+the \fI\%mongod\fP will use the port specified with
+\fI\%\-\-kmipPort\fP for all provided KMIP servers.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-kmipConnectRetries <number>
+\fIDefault\fP: 0
+.sp
+New in version 4.4.
+
+.sp
+How many times to retry the initial connection to the KMIP server.
+Use together with \fI\%\-\-kmipConnectTimeoutMS\fP to
+control how long the \fI\%mongod\fP waits for a response
+between each retry.
+.INDENT 7.0
+.INDENT 3.5
+.IP "Enterprise Feature"
+.sp
+Available in MongoDB Enterprise only.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-kmipConnectTimeoutMS <number>
+\fIDefault\fP: 5000
+.sp
+New in version 4.4.
+
+.sp
+Timeout in milliseconds to wait for a response from the KMIP server.
+If the \fI\%\-\-kmipConnectRetries\fP setting is specified,
+the \fI\%mongod\fP will wait up to the value specified with
+\fI\%\-\-kmipConnectTimeoutMS\fP for each retry.
+.sp
+Value must be \fB1000\fP or greater.
 .INDENT 7.0
 .INDENT 3.5
 .IP "Enterprise Feature"
@@ -4012,6 +4382,6 @@ Available in MongoDB Enterprise only.
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2008-2019
+2008-2020
 .\" Generated by docutils manpage writer.
 .

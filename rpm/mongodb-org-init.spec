@@ -200,7 +200,7 @@ This package provides the MongoDB static library and header files needed to deve
 mkdir -p $RPM_BUILD_ROOT/usr
 cp -rv bin $RPM_BUILD_ROOT/usr
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
-cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
+cp debian/mongo{,d,s,ldap}.1 $RPM_BUILD_ROOT/usr/share/man/man1/
 mkdir -p $RPM_BUILD_ROOT/etc/init.d
 cp -v rpm/init.d-mongod $RPM_BUILD_ROOT/etc/init.d/mongod
 chmod a+x $RPM_BUILD_ROOT/etc/init.d/mongod

@@ -1,6 +1,6 @@
 .\" Man page generated from reStructuredText.
 .
-.TH "MONGO" "1" "Aug 16, 2019" "4.2" "mongodb-manual"
+.TH "MONGO" "1" "Jun 23, 2020" "4.4" "mongodb-manual"
 .SH NAME
 mongo \- MongoDB Shell
 .
@@ -54,14 +54,65 @@ MongoDB, which provides a powerful interface for system
 administrators as well as a way for developers to test queries and
 operations directly with the database. \fI\%mongo\fP also provides
 a fully functional JavaScript environment for use with a MongoDB.
-The \fI\%mongo\fP shell is part of the \fI\%MongoDB distributions\fP\&.
+.sp
+The \fI\%mongo\fP shell is included as part of the MongoDB Server installation. MongoDB also provides the \fI\%mongo\fP
+shell as a standalone package. To download the standalone \fI\%mongo\fP
+shell package:
+.INDENT 0.0
+.IP 1. 3
+Access the Download Center for your Edition of MongoDB:
+.INDENT 3.0
+.IP \(bu 2
+\fI\%MongoDB Community Download Center\fP
+.IP \(bu 2
+\fI\%MongoDB Enterprise Download Center\fP
+.UNINDENT
+.IP 2. 3
+Select your preferred Version and Platform
+from the dropdowns.
+.IP 3. 3
+Select the Package to download according to your
+platform:
+.TS
+center;
+|l|l|.
+_
+T{
+Platform
+T}	T{
+Download Package
+T}
+_
+T{
+\fIWindows\fP
+T}	T{
+Select the \fBzip\fP package to download an archive which
+includes the \fI\%mongo\fP shell.
+T}
+_
+T{
+\fImacOS\fP
+T}	T{
+Select the \fBtgz\fP package to download an archive which
+includes the \fI\%mongo\fP shell.
+T}
+_
+T{
+\fILinux\fP
+T}	T{
+Select the \fBshell\fP package to download the
+\fI\%mongo\fP shell.
+T}
+_
+.TE
+.UNINDENT
 .sp
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
 .INDENT 0.0
 .IP \(bu 2
-Starting in MongoDB 4.2, the \fI\%mongo\fP shell displays a
+Starting in MongoDB 4.2 (and 4.0.13), the \fI\%mongo\fP shell displays a
 warning message when connected to non\-genuine MongoDB instances as
 these instances may behave differently from the official MongoDB
 instances; e.g. missing or incomplete features, different feature
@@ -260,6 +311,12 @@ As a result many options of the shell environment are not available.
 Specifies a username with which to authenticate to a MongoDB database
 that uses authentication. Use in conjunction with the \fI\%\-\-password\fP and
 \fI\%\-\-authenticationDatabase\fP options.
+.sp
+If connecting to a \fI\%MongoDB Atlas\fP cluster
+using the \fBMONGODB\-AWS\fP \fI\%authentication mechanism\fP, specify your AWS access key ID in this
+field, or in the connection string\&. Alternatively, this value may
+also be supplied as the environment variable \fBAWS_ACCESS_KEY_ID\fP\&.
+See \fI\%Connect to a MongoDB Atlas Cluster using AWS IAM Credentials\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -269,6 +326,27 @@ that uses authentication. Use in conjunction with the \fI\%\-\-username\fP
 and \fI\%\-\-authenticationDatabase\fP options. To force \fBmongo\fP to
 prompt for a password, enter the \fI\%\-\-password\fP option as the
 last option and leave out the argument.
+.sp
+If connecting to a \fI\%MongoDB Atlas\fP cluster
+using the \fBMONGODB\-AWS\fP \fI\%authentication mechanism\fP, specify your AWS secret access key in
+this field, or in the connection string\&.  Alternatively, this value may
+also be supplied as the environment variable
+\fBAWS_SECRET_ACCESS_KEY\fP\&. See
+\fI\%Connect to a MongoDB Atlas Cluster using AWS IAM Credentials\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-awsIamSessionToken <aws session token>
+If connecting to a \fI\%MongoDB Atlas\fP cluster
+using the \fBMONGODB\-AWS\fP \fI\%authentication mechanism\fP and using session tokens in addition to
+your AWS access key ID and secret access key, specify your AWS
+session token in this field, or in the connection string\&.  Alternatively, this value may
+also be supplied as the environment variable
+\fBAWS_SESSION_TOKEN\fP\&. See
+\fI\%Connect to a MongoDB Atlas Cluster using AWS IAM Credentials\fP\&.
+.sp
+Only valid when using the \fBMONGODB\-AWS\fP
+\fI\%authentication mechanism\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -411,7 +489,7 @@ New in version 3.4.
 
 .sp
 Allows fields of type javascript and
-javascriptWithScope to be automatically
+javascriptWithScope (*Deprecated*) to be automatically
 marshalled to JavaScript functions in the \fI\%mongo\fP
 shell.
 .sp
@@ -457,7 +535,7 @@ object
 > doc.func instanceof Code
 true
 > doc.jsFunc()
-2016\-11\-09T12:30:36.808\-0800 E QUERY    [thread1] TypeError: doc.jsFunc is
+2016\-11\-09T12:30:36.808\-08:00 E QUERY    [thread1] TypeError: doc.jsFunc is
 not a function :
 @(shell):1:1
 .ft P
@@ -504,6 +582,11 @@ See user\-authentication\-database\&.
 .sp
 If you do not specify a value for \fI\%\-\-authenticationDatabase\fP, \fBmongo\fP uses the database
 specified in the connection string.
+.sp
+If using the GSSAPI (Kerberos),
+PLAIN (LDAP SASL), or \fBMONGODB\-AWS\fP
+\fI\%authentication mechanisms\fP, you
+must set \fI\%\-\-authenticationDatabase\fP to \fB$external\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -513,11 +596,9 @@ specified in the connection string.
 Specifies the authentication mechanism the \fBmongo\fP instance uses to
 authenticate to the \fBmongod\fP or \fBmongos\fP\&.
 .sp
-Changed in version 4.0: MongoDB removes support for the deprecated MongoDB
-Challenge\-Response (\fBMONGODB\-CR\fP) authentication mechanism.
-.sp
-MongoDB adds support for SCRAM mechanism using the SHA\-256 hash
-function (\fBSCRAM\-SHA\-256\fP).
+Changed in version 4.4: With MongoDB 4.4, the \fBmongo\fP shell adds support for the
+new \fBMONGODB\-AWS\fP authentication mechanism when connecting to a
+\fI\%MongoDB Atlas\fP cluster.
 
 .TS
 center;
@@ -556,6 +637,17 @@ MongoDB TLS/SSL certificate authentication.
 T}
 _
 T{
+\fBMONGODB\-AWS\fP
+T}	T{
+External authentication using AWS IAM credentials for use in
+connecting to a
+\fI\%MongoDB Atlas\fP
+cluster. See \fI\%Connect to a MongoDB Atlas Cluster using AWS IAM Credentials\fP\&.
+.sp
+New in version 4.4.
+T}
+_
+T{
 GSSAPI (Kerberos)
 T}	T{
 External authentication using Kerberos. This mechanism is
@@ -576,9 +668,6 @@ _
 .INDENT 0.0
 .TP
 .B \-\-gssapiHostName
-New in version 2.6.
-
-.sp
 Specify the hostname of a service using GSSAPI/Kerberos\&. \fIOnly\fP required if the hostname of a machine does
 not match the hostname resolved by DNS.
 .sp
@@ -587,9 +676,6 @@ This option is available only in MongoDB Enterprise.
 .INDENT 0.0
 .TP
 .B \-\-gssapiServiceName
-New in version 2.6.
-
-.sp
 Specify the name of the service using GSSAPI/Kerberos\&. Only required if the service does not use the
 default name of \fBmongodb\fP\&.
 .sp
@@ -654,6 +740,13 @@ option to connect to a \fBmongod\fP or \fBmongos\fP
 instance that requires client certificates\&. That is, the
 \fI\%mongo\fP shell present this certificate to the server.
 .sp
+Changed in version 4.4: \fBmongod\fP / \fBmongos\fP logs a warning on
+connection if the presented x.509 certificate expires within \fB30\fP
+days of the \fBmongod/mongos\fP host system time. See
+4.4\-rel\-notes\-certificate\-expiration\-warning for more
+information.
+
+.sp
 For more information about TLS/SSL and MongoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
@@ -713,7 +806,7 @@ For more information about TLS/SSL and MongoDB, see
 .INDENT 0.0
 .TP
 .B \-\-tlsCRLFile <filename>
-New in version 4.2.
+New in version 4.2: In MongoDB 4.0 and earlier, see \fI\%\-\-sslCRLFile\fP\&.
 
 .sp
 Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
@@ -723,6 +816,17 @@ absolute paths.
 For more information about TLS/SSL and MongoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Starting in version 4.4, to check for certificate revocation,
+MongoDB \fBenables\fP the use of OCSP
+(Online Certificate Status Protocol) by default as an alternative
+to specifying a CRL file or using the system SSL certificate
+store.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -762,8 +866,6 @@ establish a TLS/SSL connection but is \fIinsufficient\fP for
 authentication.
 .UNINDENT
 .UNINDENT
-.sp
-# We created a separate blurb for tls in the ssl\-clients page.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -864,6 +966,13 @@ _
 When using the system SSL certificate store, OCSP (Online
 Certificate Status Protocol) is used to validate the revocation
 status of certificates.
+.sp
+Changed in version 4.4: \fBmongod\fP / \fBmongos\fP logs a warning on
+connection if the presented x.509 certificate expires within \fB30\fP
+days of the \fBmongod/mongos\fP host system time. See
+4.4\-rel\-notes\-certificate\-expiration\-warning for more
+information.
+
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -873,7 +982,7 @@ New in version 4.2.
 .sp
 Disables the specified TLS protocols. The option recognizes the
 following protocols: \fBTLS1_0\fP, \fBTLS1_1\fP, \fBTLS1_2\fP, and
-starting in version 4.0.4 (and 3.6.9), \fBTLS1_3\fP\&.
+starting in version 4.0.4 (and 3.6.9 and 3.4.24), \fBTLS1_3\fP\&.
 .INDENT 7.0
 .IP \(bu 2
 On macOS, you cannot disable \fBTLS1_1\fP and leave both \fBTLS1_0\fP and
@@ -1066,6 +1175,17 @@ Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
 List. Specify the file name of the \fB\&.pem\fP file using relative or
 absolute paths.
 .sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+Starting in version 4.4, to check for certificate revocation,
+MongoDB \fBenables\fP the use of OCSP
+(Online Certificate Status Protocol) by default as an alternative
+to specifying a CRL file or using the system SSL certificate
+store.
+.UNINDENT
+.UNINDENT
+.sp
 For more information about TLS/SSL and MongoDB, see
 /tutorial/configure\-ssl and
 /tutorial/configure\-ssl\-clients .
@@ -1111,8 +1231,6 @@ establish a TLS/SSL connection but is \fIinsufficient\fP for
 authentication.
 .UNINDENT
 .UNINDENT
-.sp
-# We created a separate blurb for tls in the ssl\-clients page.
 .sp
 \fBWARNING:\fP
 .INDENT 7.0
@@ -1197,6 +1315,98 @@ Enables retryable writes as the default for sessions in the
 \fI\%mongo\fP shell.
 .sp
 For more information on sessions, see sessions\&.
+.UNINDENT
+.SS Client\-Side Field Level Encryption Options
+.INDENT 0.0
+.TP
+.B \-\-awsAccessKeyId <string>
+An AWS \fI\%Access Key\fP
+associated to an IAM user with \fBList\fP and \fBRead\fP permissions for the
+AWS Key Management Service (KMS). The \fBmongo\fP shell uses the specified
+\fI\%\-\-awsAccessKeyId\fP to access the KMS.
+.sp
+\fI\%\-\-awsAccessKeyId\fP is required for enabling /core/security\-client\-side\-encryption
+for the \fBmongo\fP shell session. \fI\%\-\-awsAccessKeyId\fP requires \fIall\fP of the following
+command line options:
+.INDENT 7.0
+.IP \(bu 2
+\fI\%\-\-awsSecretAccessKey\fP
+.IP \(bu 2
+\fI\%\-\-keyVaultNamespace\fP
+.UNINDENT
+.sp
+If \fI\%\-\-awsAccessKeyId\fP is omitted, use the \fBMongo()\fP constructor within the shell
+session to enable client\-side field level encryption.
+.sp
+To mitigate the risk of leaking access keys into logs, consider specifying
+an environmental variable to \fI\%\-\-awsAccessKeyId\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-awsSecretAccessKey <string>
+An AWS \fI\%Secret Key\fP
+associated to the specified \fI\%\-\-awsAccessKeyId\fP\&.
+.sp
+\fI\%\-\-awsSecretAccessKey\fP is required for enabling /core/security\-client\-side\-encryption
+for the \fBmongo\fP shell session. \fI\%\-\-awsSecretAccessKey\fP requires \fIall\fP of the following
+command line options:
+.INDENT 7.0
+.IP \(bu 2
+\fI\%\-\-awsAccessKeyId\fP
+.IP \(bu 2
+\fI\%\-\-keyVaultNamespace\fP
+.UNINDENT
+.sp
+If \fI\%\-\-awsSecretAccessKey\fP and its supporting options are omitted, use \fBMongo()\fP
+within the shell session to enable client\-side field level encryption.
+.sp
+To mitigate the risk of leaking access keys into logs, consider specifying
+an environmental variable to \fI\%\-\-awsSecretAccessKey\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-awsSessionToken <string>
+An AWS \fI\%Session Token\fP
+associated to the specified \fI\%\-\-awsAccessKeyId\fP\&.
+.sp
+\fI\%\-\-awsSessionToken\fP is required for enabling /core/security\-client\-side\-encryption
+for the \fBmongo\fP shell session. \fI\%\-\-awsSessionToken\fP requires \fIall\fP of the following
+command line options:
+.INDENT 7.0
+.IP \(bu 2
+\fI\%\-\-awsAccessKeyId\fP
+.IP \(bu 2
+\fI\%\-\-awsSecretAccessKey\fP
+.IP \(bu 2
+\fI\%\-\-keyVaultNamespace\fP
+.UNINDENT
+.sp
+If \fI\%\-\-awsSessionToken\fP and its supporting options are omitted, use \fBMongo()\fP
+within the shell session to enable client\-side field level encryption.
+.sp
+To mitigate the risk of leaking access keys into logs, consider specifying
+an environmental variable to \fI\%\-\-awsSessionToken\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-keyVaultNamespace <string>
+The full namespace (\fB<database>.<collection>\fP) of the collection used as a
+key vault for /core/security\-client\-side\-encryption\&. \fI\%\-\-keyVaultNamespace\fP is
+required for enabling client\-side field level encryption. for the \fBmongo\fP
+shell session. \fBmongo\fP creates the specified namespace if it does not
+exist.
+.sp
+\fI\%\-\-keyVaultNamespace\fP requires \fIall\fP of the following command line options:
+.INDENT 7.0
+.IP \(bu 2
+\fI\%\-\-awsAccessKeyId\fP
+.IP \(bu 2
+\fI\%\-\-awsSecretAccessKey\fP
+.UNINDENT
+.sp
+If \fI\%\-\-keyVaultNamespace\fP and its supporting options are omitted, use the \fBMongo()\fP
+constructor within the shell session to enable client\-side field level
+encryption.
 .UNINDENT
 .SH FILES
 .INDENT 0.0
@@ -1650,6 +1860,129 @@ mongo \-\-host "mongodb+srv://server.example.com/?username=allison"
 .sp
 The \fI\%mongo\fP shell will automatically prompt you to provide
 the password for the user specified in the \fBusername\fP option.
+.SS Connect to a MongoDB Atlas Cluster using AWS IAM Credentials
+.sp
+New in version 4.4.
+
+.sp
+To connect to a \fI\%MongoDB Atlas\fP cluster which
+has been configured to support authentication via \fI\%AWS IAM credentials\fP,
+provide a connection string to
+the \fI\%mongo\fP shell similar to the following:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo \(aqmongodb+srv://<aws access key id>:<aws secret access key>@cluster0.example.com/testdb?authSource=$external&authMechanism=MONGODB\-AWS\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Connecting to Atlas using AWS IAM credentials in this manner uses the
+\fBMONGODB\-AWS\fP \fBauthentication mechanism\fP
+and the \fB$external\fP \fBauthSource\fP, as shown in this example.
+.sp
+If using an \fI\%AWS session token\fP
+as well, provide it with the \fBAWS_SESSION_TOKEN\fP
+\fBauthMechanismProperties\fP value in your
+connection string, as follows:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo \(aqmongodb+srv://<aws access key id>:<aws secret access key>@cluster0.example.com/testdb?authSource=$external&authMechanism=MONGODB\-AWS&authMechanismProperties=AWS_SESSION_TOKEN:<aws session token>\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+If the AWS access key ID, secret access key, or session token include
+the \(aqat\(aq sign \fB@\fP, colon \fB:\fP, slash \fB/\fP, or the percent sign \fB%\fP
+characters, those characters must be converted using \fI\%percent encoding\fP\&.
+.sp
+Alternatively, the AWS access key ID, and secret access key, and
+optionally session token can each be provided outside of the connection
+string using the \fI\%\-\-username\fP, \fI\%\-\-password\fP, and
+\fI\%\-\-awsIamSessionToken\fP options instead, like so:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo \(aqmongodb+srv://cluster0.example.com/testdb?authSource=$external&authMechanism=MONGODB\-AWS\(aq \-\-username <aws access key id> \-\-password <aws secret access key> \-\-awsIamSessionToken <aws session token>
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+When provided as command line parameters, these three options do not
+require percent encoding.
+.sp
+You may also set these credentials on your platform using standard
+\fI\%AWS IAM environment variables\fP\&.
+The \fI\%mongo\fP shell checks for the following environment
+variables when you use the \fBMONGODB\-AWS\fP
+\fBauthentication mechanism\fP:
+.INDENT 0.0
+.IP \(bu 2
+\fBAWS_ACCESS_KEY_ID\fP
+.IP \(bu 2
+\fBAWS_SECRET_ACCESS_KEY\fP
+.IP \(bu 2
+\fBAWS_SESSION_TOKEN\fP
+.UNINDENT
+.sp
+If set, these credentials do not need to be specified in the connection
+string or via the explicit options to the \fI\%mongo\fP shell
+(i.e. \fI\%\-\-username\fP and \fI\%\-\-password\fP).
+.sp
+The following example sets these environment variables in the \fBbash\fP
+shell:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+export AWS_ACCESS_KEY_ID=\(aq<aws access key id>\(aq
+export AWS_SECRET_ACCESS_KEY=\(aq<aws secret access key>\(aq
+export AWS_SESSION_TOKEN=\(aq<aws session token>\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Syntax for setting environment variables in other shells will be
+different. Consult the documentation for your platform for more
+information.
+.sp
+You can verify that these environment variables have been set with the
+following command:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+env | grep AWS
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Once set, the following example connects to a MongoDB Atlas cluster
+using these environment variables:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo \(aqmongodb+srv://cluster0.example.com/testdb?authSource=$external&authMechanism=MONGODB\-AWS\(aq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .SS Execute JavaScript Against the \fI\%mongo\fP Shell
 .sp
 To execute a JavaScript file without evaluating the \fB~/.mongorc.js\fP
@@ -1684,10 +2017,16 @@ mongo script\-file.js \-u <user> \-p
 \fBisInteractive()\fP
 .UNINDENT
 .UNINDENT
-.SS Use \fI\%\-\-eval\fP to Print Query Results as JSON
+.SS Use \fI\%\-\-eval\fP to Execute JavaScript Code
 .sp
-To print return a query as JSON, from the system prompt using
-the \fI\%\-\-eval\fP option, use the following form:
+You may use the \fI\%\-\-eval\fP option to execute
+JavaScript directly from the command line.
+.sp
+For example, the following operation evaluates a JavaScript string
+which queries a collection and prints the results as JSON.
+.sp
+On Linux and macOS, you will need to use single quotes (e.g. \fB\(aq\fP)
+to enclose the JavaScript, using the following form:
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -1699,8 +2038,18 @@ mongo \-\-eval \(aqdb.collection.find().forEach(printjson)\(aq
 .UNINDENT
 .UNINDENT
 .sp
-Use single quotes (e.g. \fB\(aq\fP) to enclose the JavaScript, as well as
-the additional JavaScript required to generate this output.
+On Windows, you will need to use double quotes (e.g. \fB"\fP)
+to enclose the JavaScript, using the following form:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongo \-\-eval "db.collection.find().forEach(printjson)"
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .sp
 \fBSEE ALSO:\fP
 .INDENT 0.0
@@ -1720,6 +2069,6 @@ the additional JavaScript required to generate this output.
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2008-2019
+2008-2020
 .\" Generated by docutils manpage writer.
 .
