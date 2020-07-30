@@ -159,7 +159,6 @@ kmsEnv.Library(
         '$BUILD_DIR/mongo/crypto/aead_encryption',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/net/socket',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         '$BUILD_DIR/mongo/util/net/ssl_options',
         '$BUILD_DIR/third_party/shim_kms_message',

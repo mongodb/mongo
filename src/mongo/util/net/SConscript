@@ -74,20 +74,6 @@ env.Library(
 )
 
 env.Library(
-    target='socket',
-    source=[
-        "sock.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/fail_point',
-        'network',
-    ]
-)
-
-env.Library(
     target='ssl_types',
     source=[
         "ssl_types.cpp",
@@ -116,6 +102,7 @@ if not get_option('ssl') == 'off':
     env.Library(
         target='ssl_manager',
         source=[
+            "sock.cpp",
             "private/ssl_expiration.cpp",
             "ssl_manager.cpp",
             "ssl_parameters.cpp",
@@ -134,7 +121,6 @@ if not get_option('ssl') == 'off':
             '$BUILD_DIR/third_party/shim_asio',
             'network',
             'openssl_init' if ssl_provider == 'openssl' else '',
-            'socket',
             'ssl_options',
             'ssl_types',
         ],
@@ -168,6 +154,7 @@ else:
     env.Library(
         target='ssl_manager',
         source=[
+            "sock.cpp",
             "ssl_manager_none.cpp",
         ],
         LIBDEPS=[
@@ -242,7 +229,6 @@ if get_option('ssl') == 'on':
         ],
         LIBDEPS=[
             'network',
-            'socket',
             'ssl_manager',
             'ssl_options_server',
             '$BUILD_DIR/mongo/db/server_options_servers',
