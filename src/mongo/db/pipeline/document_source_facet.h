@@ -109,7 +109,9 @@ public:
 
     static boost::intrusive_ptr<DocumentSourceFacet> create(
         std::vector<FacetPipeline> facetPipelines,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        size_t bufferSizeBytes = internalQueryFacetBufferSizeBytes.load(),
+        size_t maxOutputDocBytes = internalQueryFacetMaxOutputDocSizeBytes.load());
 
     /**
      * Blocking call. Will consume all input and produces one output document.
@@ -166,12 +168,16 @@ protected:
 
 private:
     DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
-                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        size_t bufferSizeBytes,
+                        size_t maxOutputDocBytes);
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     boost::intrusive_ptr<TeeBuffer> _teeBuffer;
     std::vector<FacetPipeline> _facets;
+
+    const size_t _maxOutputDocSizeBytes;
 
     bool _done = false;
 };

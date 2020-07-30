@@ -57,10 +57,13 @@ using std::string;
 using std::vector;
 
 DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
-                                         const intrusive_ptr<ExpressionContext>& expCtx)
+                                         const intrusive_ptr<ExpressionContext>& expCtx,
+                                         size_t bufferSizeBytes,
+                                         size_t maxOutputDocBytes)
     : DocumentSource(expCtx),
-      _teeBuffer(TeeBuffer::create(facetPipelines.size())),
-      _facets(std::move(facetPipelines)) {
+      _teeBuffer(TeeBuffer::create(facetPipelines.size(), bufferSizeBytes)),
+      _facets(std::move(facetPipelines)),
+      _maxOutputDocSizeBytes(maxOutputDocBytes) {
     for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
         auto& facet = _facets[facetId];
         facet.pipeline->addInitialSource(
@@ -165,8 +168,12 @@ REGISTER_DOCUMENT_SOURCE(facet,
                          DocumentSourceFacet::createFromBson);
 
 intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
-    std::vector<FacetPipeline> facetPipelines, const intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceFacet(std::move(facetPipelines), expCtx);
+    std::vector<FacetPipeline> facetPipelines,
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    size_t bufferSizeBytes,
+    size_t maxOutputDocBytes) {
+    return new DocumentSourceFacet(
+        std::move(facetPipelines), expCtx, bufferSizeBytes, maxOutputDocBytes);
 }
 
 void DocumentSourceFacet::setSource(DocumentSource* source) {
@@ -187,6 +194,15 @@ DocumentSource::GetNextResult DocumentSourceFacet::getNext() {
         return GetNextResult::makeEOF();
     }
 
+    const size_t maxBytes = _maxOutputDocSizeBytes;
+    auto ensureUnderMemoryLimit = [usedBytes = 0ul, &maxBytes](long long additional) mutable {
+        usedBytes += additional;
+        uassert(4031700,
+                str::stream() << "document constructed by $facet is " << usedBytes
+                              << " bytes, which exceeds the limit of " << maxBytes << " bytes",
+                usedBytes <= maxBytes);
+    };
+
     vector<vector<Value>> results(_facets.size());
     bool allPipelinesEOF = false;
     while (!allPipelinesEOF) {
@@ -195,6 +211,7 @@ DocumentSource::GetNextResult DocumentSourceFacet::getNext() {
             const auto& pipeline = _facets[facetId].pipeline;
             auto next = pipeline->getSources().back()->getNext();
             for (; next.isAdvanced(); next = pipeline->getSources().back()->getNext()) {
+                ensureUnderMemoryLimit(next.getDocument().getApproximateSize());
                 results[facetId].emplace_back(next.releaseDocument());
             }
             allPipelinesEOF = allPipelinesEOF && next.isEOF();
@@ -355,6 +372,6 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
         facetPipelines.emplace_back(facetName, std::move(pipeline));
     }
 
-    return new DocumentSourceFacet(std::move(facetPipelines), expCtx);
+    return DocumentSourceFacet::create(std::move(facetPipelines), expCtx);
 }
 }  // namespace mongo
