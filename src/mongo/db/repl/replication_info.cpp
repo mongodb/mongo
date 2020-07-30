@@ -33,6 +33,7 @@
 #include <list>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
@@ -73,6 +74,12 @@ using std::unique_ptr;
 
 namespace repl {
 namespace {
+
+constexpr auto kHelloString = "hello"_sd;
+// Aliases for the hello command in order to provide backwards compatibility.
+constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
+constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
+
 void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int level) {
     ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().usingReplSets()) {
@@ -210,9 +217,9 @@ public:
     }
 } oplogInfoServerStatus;
 
-class CmdIsMaster final : public BasicCommand {
+class CmdHello final : public BasicCommand {
 public:
-    CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
+    CmdHello() : BasicCommand(kHelloString, {kCamelCaseIsMasterString, kLowerCaseIsMasterString}) {}
 
     bool requiresAuth() const final {
         return false;
@@ -401,7 +408,7 @@ public:
 
         return true;
     }
-} cmdismaster;
+} cmdhello;
 
 OpCounterServerStatusSection replOpCounterServerStatusSection("opcountersRepl", &replOpCounters);
 

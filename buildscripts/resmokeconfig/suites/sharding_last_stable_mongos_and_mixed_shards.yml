@@ -167,6 +167,9 @@ selector:
   - jstests/sharding/safe_secondary_reads_causal_consistency.js
   # Tests a feature added in SERVER-31368 which is not planned to be backported to 4.0.
   - jstests/sharding/log_remote_op_wait.js
+  # Enable the following two tests once SERVER-49986 and SERVER-49988 are backported to 4.0.
+  - jstests/sharding/database_and_shard_versioning_all_commands.js
+  - jstests/sharding/ismaster.js
 executor:
   config:
     shell_options:

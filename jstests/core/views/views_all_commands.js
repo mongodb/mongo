@@ -308,12 +308,12 @@ let viewsCommandTests = {
     grantRolesToRole: {skip: isUnrelated},
     grantRolesToUser: {skip: isUnrelated},
     handshake: {skip: isUnrelated},
+    hello: {skip: isUnrelated},
     hostInfo: {skip: isUnrelated},
     httpClientRequest: {skip: isAnInternalCommand},
     insert: {command: {insert: "view", documents: [{x: 1}]}, expectFailure: true},
     invalidateUserCache: {skip: isUnrelated},
     isdbgrid: {skip: isUnrelated},
-    isMaster: {skip: isUnrelated},
     killCursors: {
         setup: function(conn) {
             assert.writeOK(conn.collection.remove({}));

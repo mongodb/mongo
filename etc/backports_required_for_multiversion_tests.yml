@@ -66,6 +66,10 @@ all:
     test_file: jstests/replsets/secondaryOk_slaveOk_aliases.js
   - ticket: SERVER-31368
     test_file: jstests/sharding/log_remote_op_wait.js
+  - ticket: SERVER-49987
+    test_file: jstests/core/ismaster.js
+  - ticket: SERVER-49988
+    test_file: jstests/sharding/ismaster.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
