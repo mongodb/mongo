@@ -332,8 +332,10 @@ void assertCappedOplog(OperationContext* opCtx, Database* db) {
     }
 }
 
-void reconcileCatalogAndRebuildUnfinishedIndexes(OperationContext* opCtx,
-                                                 StorageEngine* storageEngine) {
+void reconcileCatalogAndRebuildUnfinishedIndexes(
+    OperationContext* opCtx,
+    StorageEngine* storageEngine,
+    LastStorageEngineShutdownState lastStorageEngineShutdownState) {
     auto reconcileResult = fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx));
 
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
@@ -511,7 +513,9 @@ void startupRecoveryReadOnly(OperationContext* opCtx, StorageEngine* storageEngi
 }
 
 // Perform routine startup recovery procedure.
-void startupRecovery(OperationContext* opCtx, StorageEngine* storageEngine) {
+void startupRecovery(OperationContext* opCtx,
+                     StorageEngine* storageEngine,
+                     LastStorageEngineShutdownState lastStorageEngineShutdownState) {
     invariant(!storageGlobalParams.readOnly && !storageGlobalParams.repair);
 
     // Determine whether this is a replica set node running in standalone mode. This must be set
@@ -523,7 +527,8 @@ void startupRecovery(OperationContext* opCtx, StorageEngine* storageEngine) {
 
     // Drops abandoned idents. Rebuilds unfinished indexes and restarts incomplete two-phase
     // index builds.
-    reconcileCatalogAndRebuildUnfinishedIndexes(opCtx, storageEngine);
+    reconcileCatalogAndRebuildUnfinishedIndexes(
+        opCtx, storageEngine, lastStorageEngineShutdownState);
 
     const auto& replSettings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
 
@@ -563,7 +568,8 @@ namespace startup_recovery {
  * Recovers or repairs all databases from a previous shutdown. May throw a MustDowngrade error
  * if data files are incompatible with the current binary version.
  */
-void repairAndRecoverDatabases(OperationContext* opCtx) {
+void repairAndRecoverDatabases(OperationContext* opCtx,
+                               LastStorageEngineShutdownState lastStorageEngineShutdownState) {
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Lock::GlobalWrite lk(opCtx);
 
@@ -579,7 +585,7 @@ void repairAndRecoverDatabases(OperationContext* opCtx) {
     } else if (storageGlobalParams.readOnly) {
         startupRecoveryReadOnly(opCtx, storageEngine);
     } else {
-        startupRecovery(opCtx, storageEngine);
+        startupRecovery(opCtx, storageEngine, lastStorageEngineShutdownState);
     }
 
     assertFilesCompatible(opCtx, storageEngine);

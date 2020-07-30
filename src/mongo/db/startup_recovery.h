@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/storage/storage_engine_init.h"  // for LastStorageEngineShutdownState
+
 namespace mongo {
 class OperationContext;
 
@@ -38,7 +40,8 @@ namespace startup_recovery {
  * Recovers or repairs all databases from a previous shutdown. May throw a MustDowngrade error
  * if data files are incompatible with the current binary version.
  */
-void repairAndRecoverDatabases(OperationContext* opCtx);
+void repairAndRecoverDatabases(OperationContext* opCtx,
+                               LastStorageEngineShutdownState lastStorageEngineShutdownState);
 }  // namespace startup_recovery
 
 }  // namespace mongo

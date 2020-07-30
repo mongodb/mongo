@@ -445,7 +445,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
     try {
-        startup_recovery::repairAndRecoverDatabases(startupOpCtx.get());
+        startup_recovery::repairAndRecoverDatabases(startupOpCtx.get(),
+                                                    lastStorageEngineShutdownState);
     } catch (const ExceptionFor<ErrorCodes::MustDowngrade>& error) {
         LOGV2_FATAL_OPTIONS(
             20573,

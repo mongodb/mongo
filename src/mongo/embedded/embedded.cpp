@@ -291,7 +291,8 @@ ServiceContext* initialize(const char* yaml_config) {
     }
 
     try {
-        startup_recovery::repairAndRecoverDatabases(startupOpCtx.get());
+        startup_recovery::repairAndRecoverDatabases(startupOpCtx.get(),
+                                                    lastStorageEngineShutdownState);
     } catch (const ExceptionFor<ErrorCodes::MustDowngrade>& error) {
         LOGV2_FATAL_OPTIONS(22555,
                             logv2::LogOptions(LogComponent::kControl, logv2::FatalMode::kContinue),
