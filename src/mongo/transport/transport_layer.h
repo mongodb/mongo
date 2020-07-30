@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -80,6 +81,8 @@ public:
 
     friend class Session;
 
+    explicit TransportLayer(const WireSpec& wireSpec) : _wireSpec(wireSpec) {}
+
     virtual ~TransportLayer() = default;
 
     virtual StatusWith<SessionHandle> connect(HostAndPort peer,
@@ -119,13 +122,17 @@ public:
         return opCtx->getServiceContext()->makeBaton(opCtx);
     }
 
+    std::shared_ptr<const WireSpec::Specification> getWireSpec() const {
+        return _wireSpec.get();
+    }
+
 #ifdef MONGO_CONFIG_SSL
     /** Rotate the in-use certificates for new connections. */
     virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager) = 0;
 #endif
 
-protected:
-    TransportLayer() = default;
+private:
+    const WireSpec& _wireSpec;
 };
 
 class ReactorTimer {

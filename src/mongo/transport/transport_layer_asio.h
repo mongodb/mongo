@@ -114,7 +114,9 @@ public:
         size_t maxConns = DEFAULT_MAX_CONN;       // maximum number of active connections
     };
 
-    TransportLayerASIO(const Options& opts, ServiceEntryPoint* sep);
+    TransportLayerASIO(const Options& opts,
+                       ServiceEntryPoint* sep,
+                       const WireSpec& wireSpec = WireSpec::instance());
 
     virtual ~TransportLayerASIO();
 

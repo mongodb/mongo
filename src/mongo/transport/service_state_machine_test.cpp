@@ -198,7 +198,8 @@ public:
         }
     };
 
-    MockTL() {
+    explicit MockTL(const WireSpec& wireSpec = WireSpec::instance())
+        : TransportLayerMock(wireSpec) {
         createSessionHook = [](TransportLayer* tl) { return std::make_unique<Session>(tl); };
     }
 

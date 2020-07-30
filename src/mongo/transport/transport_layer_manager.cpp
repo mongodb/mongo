@@ -51,8 +51,6 @@
 namespace mongo {
 namespace transport {
 
-TransportLayerManager::TransportLayerManager() = default;
-
 template <typename Callable>
 void TransportLayerManager::_foreach(Callable&& cb) const {
     {

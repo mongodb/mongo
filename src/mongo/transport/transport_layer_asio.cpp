@@ -258,8 +258,10 @@ TransportLayerASIO::Options::Options(const ServerGlobalParams* params)
 }
 
 TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
-                                       ServiceEntryPoint* sep)
-    : _ingressReactor(std::make_shared<ASIOReactor>()),
+                                       ServiceEntryPoint* sep,
+                                       const WireSpec& wireSpec)
+    : TransportLayer(wireSpec),
+      _ingressReactor(std::make_shared<ASIOReactor>()),
       _egressReactor(std::make_shared<ASIOReactor>()),
       _acceptorReactor(std::make_shared<ASIOReactor>()),
       _sep(sep),

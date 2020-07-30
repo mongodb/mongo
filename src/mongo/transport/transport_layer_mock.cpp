@@ -41,8 +41,6 @@
 namespace mongo {
 namespace transport {
 
-TransportLayerMock::TransportLayerMock() : _shutdown(false) {}
-
 SessionHandle TransportLayerMock::createSession() {
     auto session = createSessionHook ? createSessionHook(this) : MockSession::create(this);
     Session::Id sessionId = session->id();

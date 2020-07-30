@@ -49,7 +49,8 @@ class TransportLayerMock : public TransportLayer {
     TransportLayerMock& operator=(const TransportLayerMock&) = delete;
 
 public:
-    TransportLayerMock();
+    explicit TransportLayerMock(const WireSpec& wireSpec = WireSpec::instance())
+        : TransportLayer(wireSpec), _shutdown(false) {}
     ~TransportLayerMock();
 
     SessionHandle createSession();
