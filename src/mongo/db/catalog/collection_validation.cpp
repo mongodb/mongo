@@ -46,6 +46,7 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -438,6 +439,25 @@ Status validate(OperationContext* opCtx,
     uassertStatusOK(replCoord->checkCanServeReadsFor(
         opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
+    output->append("ns", validateState.nss().ns());
+
+    // Foreground validation needs to ignore prepare conflicts, or else it would deadlock.
+    // Repair mode cannot use ignore-prepare because it needs to be able to do writes, and there is
+    // no danger of deadlock for this mode anyway since it is only used at startup (or in standalone
+    // mode where prepared transactions are prohibited.)
+    auto oldPrepareConflictBehavior = opCtx->recoveryUnit()->getPrepareConflictBehavior();
+    ON_BLOCK_EXIT([&] {
+        opCtx->recoveryUnit()->abandonSnapshot();
+        opCtx->recoveryUnit()->setPrepareConflictBehavior(oldPrepareConflictBehavior);
+    });
+    if (!validateState.isBackground() && !storageGlobalParams.repair) {
+        opCtx->recoveryUnit()->setPrepareConflictBehavior(
+            PrepareConflictBehavior::kIgnoreConflicts);
+    } else {
+        // isBackground().
+        invariant(oldPrepareConflictBehavior == PrepareConflictBehavior::kEnforce);
+    }
+
     try {
         std::map<std::string, int64_t> numIndexKeysPerIndex;
         ValidateResultsMap indexNsResultsMap;
@@ -585,7 +605,6 @@ Status validate(OperationContext* opCtx,
                       "namespace"_attr = validateState.nss(),
                       "uuid"_attr = uuidString);
 
-        output->append("ns", validateState.nss().ns());
     } catch (ExceptionFor<ErrorCodes::CursorNotFound>&) {
         invariant(background);
         string warning = str::stream()

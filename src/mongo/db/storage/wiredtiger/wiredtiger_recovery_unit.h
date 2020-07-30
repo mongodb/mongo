@@ -162,6 +162,8 @@ public:
 
     std::shared_ptr<StorageStats> getOperationStatistics() const override;
 
+    void refreshSnapshot() override;
+
     // ---- WT STUFF
 
     WiredTigerSession* getSession();

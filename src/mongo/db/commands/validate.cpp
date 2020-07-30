@@ -97,7 +97,7 @@ public:
     }
 
     bool canIgnorePrepareConflicts() const override {
-        return true;
+        return false;
     }
 
     bool maintenanceOk() const override {
