@@ -26,3 +26,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        # This passthrough wraps entire query result sets in $facet. Allow a larger-than-normal
+        # intermediate document size of 500MB in order to accommodate tests that have a large result
+        # set.
+        internalQueryFacetMaxOutputDocSizeBytes: 500000000

@@ -1,4 +1,10 @@
 // server-5932 Cursor-based aggregation
+//
+// @tags: [
+//   # The result set produced by this test is large, so when wrapped in a $facet, the maximum
+//   # intermediate document size would be exceeded.
+//   do_not_wrap_aggregations_in_facets,
+// ]
 
 var t = db.server5932;
 t.drop();
