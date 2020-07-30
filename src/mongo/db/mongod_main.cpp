@@ -359,7 +359,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                      std::make_unique<FlowControl>(
                          serviceContext, repl::ReplicationCoordinator::get(serviceContext)));
 
-    initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
+    auto lastStorageEngineShutdownState =
+        initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
     StorageControl::startStorageControls(serviceContext);
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
@@ -432,7 +433,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     // When starting up after an unclean shutdown, we do not attempt to use any of the temporary
     // files left from the previous run. Thus, we remove them in this case.
-    if (!storageGlobalParams.readOnly && startingAfterUncleanShutdown(serviceContext)) {
+    if (!storageGlobalParams.readOnly &&
+        LastStorageEngineShutdownState::kUnclean == lastStorageEngineShutdownState) {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
     }
 

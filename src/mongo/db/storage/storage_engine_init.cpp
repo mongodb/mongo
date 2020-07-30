@@ -62,7 +62,8 @@ void createLockFile(ServiceContext* service);
 
 extern bool _supportsDocLocking;
 
-void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFlags initFlags) {
+LastStorageEngineShutdownState initializeStorageEngine(ServiceContext* service,
+                                                       const StorageEngineInitFlags initFlags) {
     // This should be set once.
     invariant(!service->getStorageEngine());
 
@@ -174,6 +175,12 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
     guard.dismiss();
 
     _supportsDocLocking = service->getStorageEngine()->supportsDocLocking();
+
+    if (lockFile && lockFile->createdByUncleanShutdown()) {
+        return LastStorageEngineShutdownState::kUnclean;
+    } else {
+        return LastStorageEngineShutdownState::kClean;
+    }
 }
 
 void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
