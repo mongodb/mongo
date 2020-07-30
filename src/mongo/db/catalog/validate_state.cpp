@@ -64,9 +64,10 @@ ValidateState::ValidateState(OperationContext* opCtx,
 
     // Subsequent re-locks will use the UUID when 'background' is true.
     if (isBackground()) {
-        // We need to hold the global lock throughout the entire validation to avoid having to save
-        // and restore our cursors used throughout. This is done in order to avoid abandoning the
-        // snapshot and invalidating our cursors.
+        // Avoid taking the PBWM lock, which will stall replication if this is a secondary node
+        // being validated.
+        _noPBWM.emplace(opCtx->lockState());
+
         _globalLock.emplace(opCtx, MODE_IS);
         _databaseLock.emplace(opCtx, _nss.db(), MODE_IS);
         _collectionLock.emplace(opCtx, _nss, MODE_IS);
@@ -102,9 +103,8 @@ ValidateState::ValidateState(OperationContext* opCtx,
 void ValidateState::yield(OperationContext* opCtx) {
     if (isBackground()) {
         _yieldLocks(opCtx);
-    } else {
-        _yieldCursors(opCtx);
     }
+    _yieldCursors(opCtx);
 }
 
 void ValidateState::_yieldLocks(OperationContext* opCtx) {
@@ -130,8 +130,6 @@ void ValidateState::_yieldLocks(OperationContext* opCtx) {
 };
 
 void ValidateState::_yieldCursors(OperationContext* opCtx) {
-    invariant(!isBackground());
-
     // Save all the cursors.
     for (const auto& indexCursor : _indexCursors) {
         indexCursor.second->save();
@@ -140,32 +138,60 @@ void ValidateState::_yieldCursors(OperationContext* opCtx) {
     _traverseRecordStoreCursor->save();
     _seekRecordStoreCursor->save();
 
+    if (isBackground()) {
+        // End current transaction and begin a new one, to help ameliorate WiredTiger cache
+        // pressure.
+
+        // First, move all cursor objects off our operation context, which has the effect of closing
+        // all storage engine cursors in the active transaction.
+        for (const auto& indexCursor : _indexCursors) {
+            indexCursor.second->detachFromOperationContext();
+        }
+        _traverseRecordStoreCursor->detachFromOperationContext();
+        _seekRecordStoreCursor->detachFromOperationContext();
+
+        // This begins a new transaction and then ends the current transaction, in order to preserve
+        // the history required to construct the same snapshot as before.
+        opCtx->recoveryUnit()->refreshSnapshot();
+
+        // Move the cursor objects back in preparation for restoring.
+        for (const auto& indexCursor : _indexCursors) {
+            indexCursor.second->reattachToOperationContext(opCtx);
+        }
+        _traverseRecordStoreCursor->reattachToOperationContext(opCtx);
+        _seekRecordStoreCursor->reattachToOperationContext(opCtx);
+    }
+
     // Restore all the cursors.
     for (const auto& indexCursor : _indexCursors) {
         indexCursor.second->restore();
     }
 
-    // Restore cannot fail while holding an exclusive collection lock.
-    invariant(_traverseRecordStoreCursor->restore());
-    invariant(_seekRecordStoreCursor->restore());
+    uassert(ErrorCodes::Interrupted,
+            "Interrupted due to: failure to restore yielded traverse cursor",
+            _traverseRecordStoreCursor->restore());
+    uassert(ErrorCodes::Interrupted,
+            "Interrupted due to: failure to restore yielded seek cursor",
+            _seekRecordStoreCursor->restore());
 }
 
 void ValidateState::initializeCursors(OperationContext* opCtx) {
     invariant(!_traverseRecordStoreCursor && !_seekRecordStoreCursor && _indexCursors.size() == 0 &&
               _indexes.size() == 0);
 
-    // Background validation will read from a snapshot opened on the all durable timestamp instead
-    // of the latest data. This allows concurrent writes to go ahead without interfering with
-    // validation's view of the data.
+    // Background validation will read from a snapshot opened on the kNoOverlap read source, which
+    // is the minimum of the last applied and all durable timestamps, instead of the latest data.
+    // Using the kNoOverlap read source prevents us from having to take the PBWM lock, which blocks
+    // replication. We cannot solely rely on the all durable timestamp as it can be set while we're
+    // in the middle of applying a batch on secondary nodes.
     if (isBackground()) {
-        invariant(!opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
         opCtx->recoveryUnit()->abandonSnapshot();
-        // Background validation is expecting to read from the all durable timestamp, but
+        // Background validation is expecting to read from the no overlap timestamp, but
         // standalones do not support timestamps. Therefore, if this process is currently running as
         // a standalone, don't use a timestamp.
         RecoveryUnit::ReadSource rs;
         if (repl::ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
-            rs = RecoveryUnit::ReadSource::kAllDurableSnapshot;
+            rs = RecoveryUnit::ReadSource::kNoOverlap;
         } else {
             rs = RecoveryUnit::ReadSource::kNoTimestamp;
         }

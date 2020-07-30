@@ -46,6 +46,7 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -435,6 +436,29 @@ Status validate(OperationContext* opCtx,
         opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
     output->append("ns", validateState.nss().ns());
+
+    // Foreground validation needs to ignore prepare conflicts, or else it would deadlock.
+    // Repair mode cannot use ignore-prepare because it needs to be able to do writes, and there is
+    // no danger of deadlock for this mode anyway since it is only used at startup (or in standalone
+    // mode where prepared transactions are prohibited.)
+    auto oldPrepareConflictBehavior = opCtx->recoveryUnit()->getPrepareConflictBehavior();
+    ON_BLOCK_EXIT([&] {
+        opCtx->recoveryUnit()->abandonSnapshot();
+        opCtx->recoveryUnit()->setPrepareConflictBehavior(oldPrepareConflictBehavior);
+    });
+    if (validateState.shouldRunRepair()) {
+        // Note: cannot set PrepareConflictBehavior here, since the validate command with repair
+        // needs kIngnoreConflictsAllowWrites, but validate repair at startup cannot set that here
+        // due to an already active WriteUnitOfWork.  The prepare conflict behavior for validate
+        // command with repair is set in the command code prior to this point.
+        invariant(!validateState.isBackground());
+    } else if (!validateState.isBackground()) {
+        opCtx->recoveryUnit()->setPrepareConflictBehavior(
+            PrepareConflictBehavior::kIgnoreConflicts);
+    } else {
+        // isBackground().
+        invariant(oldPrepareConflictBehavior == PrepareConflictBehavior::kEnforce);
+    }
 
     try {
         // Full record store validation code is executed before we open cursors because it may close

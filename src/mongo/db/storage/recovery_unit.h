@@ -387,6 +387,12 @@ public:
     }
 
     /**
+     * Refreshes a read transaction by starting a new one at the same read timestamp and then ending
+     * the current one.
+     */
+    virtual void refreshSnapshot() {}
+
+    /**
      * The ReadSource indicates which external or provided timestamp to read from for future
      * transactions.
      */

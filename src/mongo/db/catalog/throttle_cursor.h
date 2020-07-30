@@ -65,6 +65,14 @@ public:
         return _cursor->restore();
     }
 
+    void detachFromOperationContext() {
+        _cursor->detachFromOperationContext();
+    }
+
+    void reattachToOperationContext(OperationContext* opCtx) {
+        _cursor->reattachToOperationContext(opCtx);
+    }
+
 private:
     std::unique_ptr<SeekableRecordCursor> _cursor;
     DataThrottle* _dataThrottle;
@@ -93,6 +101,14 @@ public:
 
     void restore() {
         _cursor->restore();
+    }
+
+    void detachFromOperationContext() {
+        _cursor->detachFromOperationContext();
+    }
+
+    void reattachToOperationContext(OperationContext* opCtx) {
+        _cursor->reattachToOperationContext(opCtx);
     }
 
 private:
