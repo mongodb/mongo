@@ -599,8 +599,10 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
 
 BitTestMatchExpression::BitTestMatchExpression(MatchType type,
                                                StringData path,
-                                               std::vector<uint32_t> bitPositions)
-    : LeafMatchExpression(type, path), _bitPositions(std::move(bitPositions)) {
+                                               std::vector<uint32_t> bitPositions,
+                                               clonable_ptr<ErrorAnnotation> annotation)
+    : LeafMatchExpression(type, path, std::move(annotation)),
+      _bitPositions(std::move(bitPositions)) {
     // Process bit positions into bitmask.
     for (auto bitPosition : _bitPositions) {
         // Checking bits > 63 is just checking the sign bit, since we sign-extend numbers. For
@@ -611,8 +613,11 @@ BitTestMatchExpression::BitTestMatchExpression(MatchType type,
     }
 }
 
-BitTestMatchExpression::BitTestMatchExpression(MatchType type, StringData path, uint64_t bitMask)
-    : LeafMatchExpression(type, path), _bitMask(bitMask) {
+BitTestMatchExpression::BitTestMatchExpression(MatchType type,
+                                               StringData path,
+                                               uint64_t bitMask,
+                                               clonable_ptr<ErrorAnnotation> annotation)
+    : LeafMatchExpression(type, path, std::move(annotation)), _bitMask(bitMask) {
     // Process bitmask into bit positions.
     for (int bit = 0; bit < 64; bit++) {
         if (_bitMask & (1ULL << bit)) {
@@ -624,8 +629,9 @@ BitTestMatchExpression::BitTestMatchExpression(MatchType type, StringData path, 
 BitTestMatchExpression::BitTestMatchExpression(MatchType type,
                                                StringData path,
                                                const char* bitMaskBinary,
-                                               uint32_t bitMaskLen)
-    : LeafMatchExpression(type, path) {
+                                               uint32_t bitMaskLen,
+                                               clonable_ptr<ErrorAnnotation> annotation)
+    : LeafMatchExpression(type, path, std::move(annotation)) {
     for (uint32_t byte = 0; byte < bitMaskLen; byte++) {
         char byteAt = bitMaskBinary[byte];
         if (!byteAt) {

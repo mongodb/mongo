@@ -36,6 +36,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/expression_expr.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
@@ -234,10 +235,18 @@ public:
             _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
         }
     }
-    void visit(const BitsAllClearMatchExpression* expr) final {}
-    void visit(const BitsAllSetMatchExpression* expr) final {}
-    void visit(const BitsAnyClearMatchExpression* expr) final {}
-    void visit(const BitsAnySetMatchExpression* expr) final {}
+    void visit(const BitsAllClearMatchExpression* expr) final {
+        generateError(expr);
+    }
+    void visit(const BitsAllSetMatchExpression* expr) final {
+        generateError(expr);
+    }
+    void visit(const BitsAnyClearMatchExpression* expr) final {
+        generateError(expr);
+    }
+    void visit(const BitsAnySetMatchExpression* expr) final {
+        generateError(expr);
+    }
     void visit(const ElemMatchObjectMatchExpression* expr) final {}
     void visit(const ElemMatchValueMatchExpression* expr) final {}
     void visit(const EqualityMatchExpression* expr) final {
@@ -271,7 +280,28 @@ public:
     void visit(const GTMatchExpression* expr) final {
         generateComparisonError(expr);
     }
-    void visit(const GeoMatchExpression* expr) final {}
+    void visit(const GeoMatchExpression* expr) final {
+        static const std::set<BSONType> kExpectedTypes{BSONType::Array, BSONType::Object};
+        switch (expr->getGeoExpression().getPred()) {
+            case GeoExpression::Predicate::WITHIN: {
+                static constexpr auto kNormalReason =
+                    "none of considered geometries was contained within the expression’s geometry";
+                static constexpr auto kInvertedReason =
+                    "at least one of considered geometries was contained within the expression’s "
+                    "geometry";
+                generateLeafError(expr, kNormalReason, kInvertedReason, &kExpectedTypes);
+            } break;
+            case GeoExpression::Predicate::INTERSECT: {
+                static constexpr auto kNormalReason =
+                    "none of considered geometries intersected the expression’s geometry";
+                static constexpr auto kInvertedReason =
+                    "at least one of considered geometries intersected the expression’s geometry";
+                generateLeafError(expr, kNormalReason, kInvertedReason, &kExpectedTypes);
+            } break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
     void visit(const GeoNearMatchExpression* expr) final {
         MONGO_UNREACHABLE;
     }
@@ -354,11 +384,11 @@ public:
         _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             appendErrorDetails(*expr);
-            BSONArray arr = createValuesArray(expr->path());
-            appendMissingField(arr);
+            BSONArray attributeValues = createValuesArray(expr->path());
+            appendMissingField(attributeValues);
             appendErrorReason(*expr, normalReason, invertedReason);
-            appendConsideredValues(arr);
-            appendConsideredTypes(arr);
+            appendConsideredValues(attributeValues);
+            appendConsideredTypes(attributeValues);
         }
     }
     void visit(const WhereMatchExpression* expr) final {
@@ -480,11 +510,11 @@ private:
         _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             appendErrorDetails(*expr);
-            BSONArray arr = createValuesArray(expr->path());
-            appendMissingField(arr);
-            appendTypeMismatch(arr, expectedTypes);
+            BSONArray attributeValues = createValuesArray(expr->path());
+            appendMissingField(attributeValues);
+            appendTypeMismatch(attributeValues, expectedTypes);
             appendErrorReason(*expr, normalReason, invertedReason);
-            appendConsideredValues(arr);
+            appendConsideredValues(attributeValues);
         }
     }
 
@@ -492,6 +522,20 @@ private:
         static constexpr auto normalReason = "comparison failed";
         static constexpr auto invertedReason = "comparison succeeded";
         generateLeafError(expr, normalReason, invertedReason);
+    }
+
+    /**
+     * Generates a document validation error for a bit test expression 'expr'.
+     */
+    void generateError(const BitTestMatchExpression* expr) {
+        static constexpr auto kNormalReason = "bitwise operator failed to match";
+        static constexpr auto kInvertedReason = "bitwise operator matched successfully";
+        static const std::set<BSONType> kExpectedTypes{BSONType::NumberInt,
+                                                       BSONType::NumberLong,
+                                                       BSONType::NumberDouble,
+                                                       BSONType::NumberDecimal,
+                                                       BSONType::BinData};
+        generateLeafError(expr, kNormalReason, kInvertedReason, &kExpectedTypes);
     }
 
     /**
@@ -601,10 +645,18 @@ public:
     void visit(const AndMatchExpression* expr) final {
         postVisitTreeOperator(expr);
     }
-    void visit(const BitsAllClearMatchExpression* expr) final {}
-    void visit(const BitsAllSetMatchExpression* expr) final {}
-    void visit(const BitsAnyClearMatchExpression* expr) final {}
-    void visit(const BitsAnySetMatchExpression* expr) final {}
+    void visit(const BitsAllClearMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
+    void visit(const BitsAllSetMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
+    void visit(const BitsAnyClearMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
+    void visit(const BitsAnySetMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const ElemMatchObjectMatchExpression* expr) final {}
     void visit(const ElemMatchValueMatchExpression* expr) final {}
     void visit(const EqualityMatchExpression* expr) final {
@@ -622,7 +674,9 @@ public:
     void visit(const GTMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
-    void visit(const GeoMatchExpression* expr) final {}
+    void visit(const GeoMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const GeoNearMatchExpression* expr) final {
         MONGO_UNREACHABLE;
     }

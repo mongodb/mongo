@@ -79,10 +79,14 @@ private:
 
 class GeoMatchExpression : public LeafMatchExpression {
 public:
-    GeoMatchExpression(StringData path, const GeoExpression* query, const BSONObj& rawObj);
+    GeoMatchExpression(StringData path,
+                       const GeoExpression* query,
+                       const BSONObj& rawObj,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr);
     GeoMatchExpression(StringData path,
                        std::shared_ptr<const GeoExpression> query,
-                       const BSONObj& rawObj);
+                       const BSONObj& rawObj,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual ~GeoMatchExpression() {}
 

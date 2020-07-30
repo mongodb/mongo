@@ -702,8 +702,12 @@ StatusWith<std::vector<uint32_t>> parseBitPositionsArray(const BSONObj& theArray
  * Parses 'e' into a BitTestMatchExpression.
  */
 template <class T>
-StatusWithMatchExpression parseBitTest(StringData name, BSONElement e) {
+StatusWithMatchExpression parseBitTest(StringData name,
+                                       BSONElement e,
+                                       const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression;
+    auto annotation =
+        createAnnotation(expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap()));
 
     if (e.type() == BSONType::Array) {
         // Array of bit positions provided as value.
@@ -711,19 +715,22 @@ StatusWithMatchExpression parseBitTest(StringData name, BSONElement e) {
         if (!bitPositions.isOK()) {
             return bitPositions.getStatus();
         }
-        bitTestMatchExpression = std::make_unique<T>(name, std::move(bitPositions.getValue()));
+        bitTestMatchExpression =
+            std::make_unique<T>(name, std::move(bitPositions.getValue()), std::move(annotation));
     } else if (e.isNumber()) {
         // Integer bitmask provided as value.
         auto bitMask = e.parseIntegerElementToNonNegativeLong();
         if (!bitMask.isOK()) {
             return bitMask.getStatus();
         }
-        bitTestMatchExpression = std::make_unique<T>(name, bitMask.getValue());
+        bitTestMatchExpression =
+            std::make_unique<T>(name, bitMask.getValue(), std::move(annotation));
     } else if (e.type() == BSONType::BinData) {
         // Binary bitmask provided as value.
         int eBinaryLen;
         auto eBinary = e.binData(eBinaryLen);
-        bitTestMatchExpression = std::make_unique<T>(name, eBinary, eBinaryLen);
+        bitTestMatchExpression =
+            std::make_unique<T>(name, eBinary, eBinaryLen, std::move(annotation));
     } else {
         return Status(ErrorCodes::BadValue,
                       str::stream()
@@ -1116,6 +1123,7 @@ StatusWithMatchExpression parseInternalSchemaMatchArrayIndex(
 StatusWithMatchExpression parseGeo(StringData name,
                                    PathAcceptingKeyword type,
                                    const BSONObj& section,
+                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
     if (PathAcceptingKeyword::WITHIN == type || PathAcceptingKeyword::GEO_INTERSECTS == type) {
         auto gq = std::make_unique<GeoExpression>(name.toString());
@@ -1123,7 +1131,12 @@ StatusWithMatchExpression parseGeo(StringData name,
         if (!parseStatus.isOK()) {
             return parseStatus;
         }
-        return {std::make_unique<GeoMatchExpression>(name, gq.release(), section)};
+        auto operatorName = section.firstElementFieldName();
+        return {std::make_unique<GeoMatchExpression>(
+            name,
+            gq.release(),
+            section,
+            createAnnotation(expCtx, operatorName, BSON(name << section)))};
     } else {
         invariant(PathAcceptingKeyword::GEO_NEAR == type);
 
@@ -1653,7 +1666,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
 
         case PathAcceptingKeyword::WITHIN:
         case PathAcceptingKeyword::GEO_INTERSECTS:
-            return parseGeo(name, *parseExpMatchType, context, allowedFeatures);
+            return parseGeo(name, *parseExpMatchType, context, expCtx, allowedFeatures);
 
         case PathAcceptingKeyword::GEO_NEAR:
             return {Status(ErrorCodes::BadValue,
@@ -1674,19 +1687,19 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
 
         // Handles bitwise query operators.
         case PathAcceptingKeyword::BITS_ALL_SET: {
-            return parseBitTest<BitsAllSetMatchExpression>(name, e);
+            return parseBitTest<BitsAllSetMatchExpression>(name, e, expCtx);
         }
 
         case PathAcceptingKeyword::BITS_ALL_CLEAR: {
-            return parseBitTest<BitsAllClearMatchExpression>(name, e);
+            return parseBitTest<BitsAllClearMatchExpression>(name, e, expCtx);
         }
 
         case PathAcceptingKeyword::BITS_ANY_SET: {
-            return parseBitTest<BitsAnySetMatchExpression>(name, e);
+            return parseBitTest<BitsAnySetMatchExpression>(name, e, expCtx);
         }
 
         case PathAcceptingKeyword::BITS_ANY_CLEAR: {
-            return parseBitTest<BitsAnyClearMatchExpression>(name, e);
+            return parseBitTest<BitsAnyClearMatchExpression>(name, e, expCtx);
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD:
@@ -1857,7 +1870,8 @@ Status parseSub(StringData name,
         if (firstElt.isABSONObj()) {
             if (MatchExpressionParser::parsePathAcceptingKeyword(firstElt) ==
                 PathAcceptingKeyword::GEO_NEAR) {
-                auto s = parseGeo(name, PathAcceptingKeyword::GEO_NEAR, sub, allowedFeatures);
+                auto s =
+                    parseGeo(name, PathAcceptingKeyword::GEO_NEAR, sub, expCtx, allowedFeatures);
                 if (s.isOK()) {
                     root->add(s.getValue().release());
                 }
