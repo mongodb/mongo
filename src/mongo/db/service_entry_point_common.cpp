@@ -1379,7 +1379,7 @@ DbResponse receivedCommands(OperationContext* opCtx,
 
             const auto session = opCtx->getClient()->session();
             if (session) {
-                if (!opCtx->isExhaust() || c->getName() != "isMaster"_sd) {
+                if (!opCtx->isExhaust() || c->getName() != "hello"_sd) {
                     InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false);
                 }
             }
@@ -1716,8 +1716,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     if (op == dbMsg || (op == dbQuery && isCommand)) {
         dbresponse = receivedCommands(opCtx, m, behaviors);
         // Hello should take kMaxAwaitTimeMs at most, log if it takes twice that.
-        if (auto command = currentOp.getCommand();
-            command && (command->getName() == "ismaster" || command->getName() == "isMaster")) {
+        if (auto command = currentOp.getCommand(); command && (command->getName() == "hello")) {
             slowMsOverride =
                 2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTime);
         }

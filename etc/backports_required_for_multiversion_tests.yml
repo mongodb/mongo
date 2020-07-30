@@ -79,6 +79,10 @@ all:
     test_file: jstests/replsets/step_down_chaining_disabled.js
   - ticket: SERVER-49990
     test_file: jstests/replsets/secondaryOk_slaveOk_aliases.js
+  - ticket: SERVER-49987
+    test_file: jstests/core/ismaster.js
+  - ticket: SERVER-49988
+    test_file: jstests/sharding/ismaster.js
 
 suites:
 
