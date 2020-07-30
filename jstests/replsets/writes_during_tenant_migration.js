@@ -663,6 +663,7 @@ const testCases = {
     grantPrivilegesToRole: {skip: isAuthCommand},
     grantRolesToRole: {skip: isAuthCommand},
     grantRolesToUser: {skip: isAuthCommand},
+    hello: {skip: isNotRunOnUserDatabase},
     hostInfo: {skip: isNotRunOnUserDatabase},
     httpClientRequest: {skip: isNotRunOnUserDatabase},
     insert: {
@@ -681,7 +682,6 @@ const testCases = {
     },
     internalRenameIfOptionsAndIndexesMatch: {skip: isNotRunOnUserDatabase},
     invalidateUserCache: {skip: isNotRunOnUserDatabase},
-    isMaster: {skip: isNotRunOnUserDatabase},
     killAllSessions: {skip: isNotRunOnUserDatabase},
     killAllSessionsByPattern: {skip: isNotRunOnUserDatabase},
     killCursors: {skip: isNotWriteCommand},

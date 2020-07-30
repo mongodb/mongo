@@ -33,6 +33,7 @@
 #include <list>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
@@ -79,6 +80,12 @@ using std::unique_ptr;
 
 namespace repl {
 namespace {
+
+constexpr auto kHelloString = "hello"_sd;
+// Aliases for the hello command in order to provide backwards compatibility.
+constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
+constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
+
 /**
  * Appends replication-related fields to the isMaster response. Returns the topology version that
  * was included in the response.
@@ -221,9 +228,11 @@ public:
     }
 } oplogInfoServerStatus;
 
-class CmdIsMaster final : public BasicCommandWithReplyBuilderInterface {
+class CmdHello final : public BasicCommandWithReplyBuilderInterface {
 public:
-    CmdIsMaster() : BasicCommandWithReplyBuilderInterface("isMaster", "ismaster") {}
+    CmdHello()
+        : BasicCommandWithReplyBuilderInterface(
+              kHelloString, {kCamelCaseIsMasterString, kLowerCaseIsMasterString}) {}
 
     const std::set<std::string>& apiVersions() const {
         return kApiVersions1;
@@ -480,7 +489,7 @@ public:
 
         return true;
     }
-} cmdismaster;
+} cmdhello;
 
 OpCounterServerStatusSection replOpCounterServerStatusSection("opcountersRepl", &replOpCounters);
 

@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/client.h"
@@ -55,9 +56,17 @@ MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
 
 namespace {
 
-class CmdIsMaster : public BasicCommandWithReplyBuilderInterface {
+constexpr auto kHelloString = "hello"_sd;
+// Aliases for the hello command in order to provide backwards compatibility.
+constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
+constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
+
+
+class CmdHello : public BasicCommandWithReplyBuilderInterface {
 public:
-    CmdIsMaster() : BasicCommandWithReplyBuilderInterface("isMaster", "ismaster") {}
+    CmdHello()
+        : BasicCommandWithReplyBuilderInterface(
+              kHelloString, {kCamelCaseIsMasterString, kLowerCaseIsMasterString}) {}
 
     const std::set<std::string>& apiVersions() const {
         return kApiVersions1;
@@ -228,7 +237,7 @@ public:
         return true;
     }
 
-} isMaster;
+} hello;
 
 }  // namespace
 }  // namespace mongo

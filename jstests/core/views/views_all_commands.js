@@ -7,6 +7,7 @@
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
 //   uses_map_reduce_with_temp_collections,
+//   requires_fcv_47,
 // ]
 
 /*
@@ -333,13 +334,13 @@ let viewsCommandTests = {
     grantRolesToRole: {skip: isUnrelated},
     grantRolesToUser: {skip: isUnrelated},
     handshake: {skip: isUnrelated},
+    hello: {skip: isUnrelated},
     hostInfo: {skip: isUnrelated},
     httpClientRequest: {skip: isAnInternalCommand},
     insert: {command: {insert: "view", documents: [{x: 1}]}, expectFailure: true},
     internalRenameIfOptionsAndIndexesMatch: {skip: isAnInternalCommand},
     invalidateUserCache: {skip: isUnrelated},
     isdbgrid: {skip: isUnrelated},
-    isMaster: {skip: isUnrelated},
     killCursors: {
         setup: function(conn) {
             assert.commandWorked(conn.collection.remove({}));
