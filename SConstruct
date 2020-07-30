@@ -288,11 +288,6 @@ add_option('sanitize-coverage',
     metavar='cov1,cov2,...covN',
 )
 
-add_option('llvm-symbolizer',
-    default='llvm-symbolizer',
-    help='name of (or path to) the LLVM symbolizer',
-)
-
 add_option('durableDefaultOn',
     help='have durable default to on',
     nargs=0,
@@ -825,6 +820,9 @@ env_vars.Add('LIBS',
 env_vars.Add('LINKFLAGS',
     help='Sets flags for the linker',
     converter=variable_shlex_converter)
+
+env_vars.Add('LLVM_SYMBOLIZER',
+    help='Name of or path to the LLVM symbolizer')
 
 env_vars.Add('MAXLINELENGTH',
     help='Maximum line length before using temp files',
@@ -3001,21 +2999,20 @@ def doConfigure(myenv):
                 LINKFLAGS="${SANITIZER_BLACKLIST_GENERATOR}",
             )
 
-        llvm_symbolizer = get_option('llvm-symbolizer')
-        if os.path.isabs(llvm_symbolizer):
-            if not myenv.File(llvm_symbolizer).exists():
-                print("WARNING: Specified symbolizer '%s' not found" % llvm_symbolizer)
-                llvm_symbolizer = None
-        else:
-            llvm_symbolizer = myenv.WhereIs(llvm_symbolizer)
+        symbolizer_option = ""
+        if env['LLVM_SYMBOLIZER']:
+            llvm_symbolizer = env['LLVM_SYMBOLIZER']
 
-        tsan_options = ""
-        if llvm_symbolizer:
-            myenv['ENV']['ASAN_SYMBOLIZER_PATH'] = llvm_symbolizer
-            myenv['ENV']['LSAN_SYMBOLIZER_PATH'] = llvm_symbolizer
-            tsan_options = "external_symbolizer_path=\"%s\" " % llvm_symbolizer
-        elif using_lsan:
-            myenv.FatalError("Using the leak sanitizer requires a valid symbolizer")
+            if not os.path.isabs(llvm_symbolizer):
+                llvm_symbolizer = myenv.WhereIs(llvm_symbolizer)
+
+            if not myenv.File(llvm_symbolizer).exists():
+                myenv.FatalError(f"Symbolizer binary at path {llvm_symbolizer} does not exist")
+
+            symbolizer_option = f":external_symbolizer_path=\"{llvm_symbolizer}\""
+
+        elif using_asan or using_tsan or using_ubsan:
+            myenv.FatalError("The address, thread, and undefined behavior sanitizers require llvm-symbolizer for meaningful reports")
 
         if using_asan:
             # Unfortunately, abseil requires that we make these macros
@@ -3024,10 +3021,43 @@ def doConfigure(myenv):
             # compiler. We do this unconditionally because abseil is
             # basically pervasive via the 'base' library.
             myenv.AppendUnique(CPPDEFINES=['ADDRESS_SANITIZER'])
+            # If anything is changed, added, or removed in either asan_options or
+            # lsan_options, be sure to make the corresponding changes to the
+            # appropriate build variants in etc/evergreen.yml
+            asan_options = "detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1"
+            lsan_options = f"report_objects=1:suppressions={myenv.File('#etc/lsan.suppressions').abspath}"
+            env['ENV']['ASAN_OPTIONS'] = asan_options + symbolizer_option
+            env['ENV']['LSAN_OPTIONS'] = lsan_options + symbolizer_option
 
         if using_tsan:
-            tsan_options += "suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
-            myenv['ENV']['TSAN_OPTIONS'] = tsan_options
+
+            if use_libunwind:
+                # TODO: SERVER-48622
+                #
+                # See https://github.com/google/sanitizers/issues/943
+                # for why we disallow combining TSAN with
+                # libunwind. We could, atlernatively, have added logic
+                # to automate the decision about whether to enable
+                # libunwind based on whether TSAN is enabled, but that
+                # logic is already complex, and it feels better to
+                # make it explicit that using TSAN means you won't get
+                # the benefits of libunwind. Fixing this is:
+                env.FatalError("Cannot use libunwind with TSAN, please add --use-libunwind=off to your compile flags")
+
+            # If anything is changed, added, or removed in
+            # tsan_options, be sure to make the corresponding changes
+            # to the appropriate build variants in etc/evergreen.yml
+            #
+            # TODO SERVER-49121: die_after_fork=0 is a temporary
+            # setting to allow tests to continue while we figure out
+            # why we're running afoul of it.
+            #
+            # TODO SERVER-48490: report_thread_leaks=0 suppresses
+            # reporting thread leaks, which we have because we don't
+            # do a clean shutdown of the ServiceContext.
+            #
+            tsan_options = f"halt_on_error=1:report_thread_leaks=0:die_after_fork=0:suppressions={myenv.File('#etc/tsan.suppressions').abspath}"
+            myenv['ENV']['TSAN_OPTIONS'] = tsan_options + symbolizer_option
             myenv.AppendUnique(CPPDEFINES=['THREAD_SANITIZER'])
 
         if using_ubsan:
@@ -3039,6 +3069,11 @@ def doConfigure(myenv):
             if not using_fsan and not AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover"):
                 AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover=undefined")
             myenv.AppendUnique(CPPDEFINES=['UNDEFINED_BEHAVIOR_SANITIZER'])
+            # If anything is changed, added, or removed in ubsan_options, be
+            # sure to make the corresponding changes to the appropriate build
+            # variants in etc/evergreen.yml
+            ubsan_options = "print_stacktrace=1"
+            myenv['ENV']['UBSAN_OPTIONS'] = ubsan_options + symbolizer_option
 
     if myenv.ToolchainIs('msvc') and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
