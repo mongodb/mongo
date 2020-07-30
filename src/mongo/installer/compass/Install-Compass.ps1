@@ -24,7 +24,7 @@
 param()
 $ErrorActionPreference = 'Stop'
 
-$CompassUrl = 'https://compass.mongodb.com/api/v2/download/latest/@compass_type@/stable/windows'
+$CompassUrl = 'https://compass.mongodb.com/api/v2/download/latest/compass/stable/windows'
 
 $TemporaryDir = [System.IO.Path]::GetTempPath()
 $CompassExe = "$TemporaryDir" + "compass-install.exe"
