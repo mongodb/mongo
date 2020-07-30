@@ -224,6 +224,16 @@ server_parameters:
     validator:
       gt: 0
 
+  internalQueryFacetMaxOutputDocSizeBytes:
+    description: "The number of bytes to buffer at once during a $facet stage."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryFacetMaxOutputDocSizeBytes"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 100 * 1024 * 1024
+    validator:
+      gt: 0
+
   internalLookupStageIntermediateDocumentMaxSizeBytes:
     description: "Maximum size of the result set that we cache from the foreign collection during a $lookup."
     set_at: [ startup, runtime ]
