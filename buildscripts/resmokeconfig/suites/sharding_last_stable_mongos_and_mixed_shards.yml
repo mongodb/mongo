@@ -122,6 +122,9 @@ selector:
   - jstests/sharding/mr_merge_to_existing.js
   # Disabled due to missing functionality
   - jstests/sharding/ssv_after_restart_of_shards_and_mongos_workarround.js
+  # Enable the following two tests once SERVER-49986 and SERVER-49988 are backported to 4.0.
+  - jstests/sharding/database_and_shard_versioning_all_commands.js
+  - jstests/sharding/ismaster.js
 executor:
   config:
     shell_options:

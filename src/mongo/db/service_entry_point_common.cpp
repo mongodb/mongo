@@ -134,8 +134,8 @@ const StringMap<int> sessionCheckoutWhitelist = {{"abortTransaction", 1},
 bool shouldActivateFailCommandFailPoint(const BSONObj& data,
                                         const CommandInvocation* invocation,
                                         Client* client) {
-    auto cmdName = invocation->definition()->getName();
-    if (cmdName == "configureFailPoint"_sd)  // Banned even if in failCommands.
+    const Command* cmd = invocation->definition();
+    if (cmd->getName() == "configureFailPoint"_sd)  // Banned even if in failCommands.
         return false;
 
     if (client->session() && (client->session()->getTags() & transport::Session::kInternalClient)) {
@@ -149,7 +149,7 @@ bool shouldActivateFailCommandFailPoint(const BSONObj& data,
     }
 
     for (auto&& failCommand : data.getObjectField("failCommands")) {
-        if (failCommand.type() == String && failCommand.valueStringData() == cmdName) {
+        if (failCommand.type() == String && cmd->hasAlias(failCommand.valueStringData())) {
             return true;
         }
     }

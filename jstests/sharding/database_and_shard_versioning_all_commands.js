@@ -264,6 +264,7 @@
                     {ns: collName, key: {x: 1}, $reduce: function(curr, result) {}, initial: {}}
             },
         },
+        hello: {skip: "executes locally on mongos (not sent to any remote node)"},
         hostInfo: {skip: "executes locally on mongos (not sent to any remote node)"},
         insert: {
             sendsDbVersion: false,
@@ -276,7 +277,6 @@
         },
         invalidateUserCache: {skip: "executes locally on mongos (not sent to any remote node)"},
         isdbgrid: {skip: "executes locally on mongos (not sent to any remote node)"},
-        isMaster: {skip: "executes locally on mongos (not sent to any remote node)"},
         killCursors: {skip: "requires a previously established cursor"},
         killAllSessions: {skip: "always broadcast to all hosts in the cluster"},
         killAllSessionsByPattern: {skip: "always broadcast to all hosts in the cluster"},

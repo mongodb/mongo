@@ -333,12 +333,12 @@
             command: {group: {ns: "test.view", key: "x", $reduce: function() {}, initial: {}}},
         },
         handshake: {skip: isUnrelated},
+        hello: {skip: isUnrelated},
         hostInfo: {skip: isUnrelated},
         insert: {command: {insert: "view", documents: [{x: 1}]}, expectFailure: true},
         invalidateUserCache: {skip: isUnrelated},
         invalidateViewCatalog: {command: {invalidateViewCatalog: 1}},
         isdbgrid: {skip: isUnrelated},
-        isMaster: {skip: isUnrelated},
         journalLatencyTest: {skip: isUnrelated},
         killCursors: {
             setup: function(conn) {
