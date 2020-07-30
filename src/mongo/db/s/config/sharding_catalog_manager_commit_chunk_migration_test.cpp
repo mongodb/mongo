@@ -104,6 +104,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
 
     // Verify that a collection version is returned
     auto cver = assertGet(ChunkVersion::parseWithField(versions, "collectionVersion"));
+    ASSERT_GTE(cver, mver);
 
     // Verify the chunks ended up in the right shards.
     auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), migratedChunk.getMin()));
