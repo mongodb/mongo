@@ -451,6 +451,7 @@ let testCases = {
         useLogs: true,
     },
     handshake: {skip: "does not accept read or write concern"},
+    hello: {skip: "does not accept read or write concern"},
     hostInfo: {skip: "does not accept read or write concern"},
     httpClientRequest: {skip: "does not accept read or write concern"},
     insert: {
@@ -463,7 +464,6 @@ let testCases = {
     },
     internalRenameIfOptionsAndIndexesMatch: {skip: "internal command"},
     invalidateUserCache: {skip: "does not accept read or write concern"},
-    isMaster: {skip: "does not accept read or write concern"},
     isdbgrid: {skip: "does not accept read or write concern"},
     killAllSessions: {skip: "does not accept read or write concern"},
     killAllSessionsByPattern: {skip: "does not accept read or write concern"},
