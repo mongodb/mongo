@@ -282,8 +282,6 @@ public:
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 
-    virtual OpTimeAndWallTime getCurrentCommittedSnapshotOpTimeAndWallTime() const override;
-
     virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
                                             const Timestamp& untilSnapshot) override;
 

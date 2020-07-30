@@ -147,9 +147,6 @@ OpTime ReplicationCoordinatorNoOp::getCurrentCommittedSnapshotOpTime() const {
     MONGO_UNREACHABLE;
 }
 
-OpTimeAndWallTime ReplicationCoordinatorNoOp::getCurrentCommittedSnapshotOpTimeAndWallTime() const {
-    MONGO_UNREACHABLE;
-}
 void ReplicationCoordinatorNoOp::appendDiagnosticBSON(mongo::BSONObjBuilder*) {
     MONGO_UNREACHABLE;
 }

@@ -241,8 +241,6 @@ public:
 
     OpTime getCurrentCommittedSnapshotOpTime() const final;
 
-    OpTimeAndWallTime getCurrentCommittedSnapshotOpTimeAndWallTime() const final;
-
     void waitUntilSnapshotCommitted(OperationContext*, const Timestamp&) final;
 
     void appendDiagnosticBSON(BSONObjBuilder*) final;

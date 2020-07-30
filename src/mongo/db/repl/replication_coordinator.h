@@ -860,11 +860,6 @@ public:
     virtual OpTime getCurrentCommittedSnapshotOpTime() const = 0;
 
     /**
-     * Gets the latest OpTime of the currentCommittedSnapshot and its corresponding wall clock time.
-     */
-    virtual OpTimeAndWallTime getCurrentCommittedSnapshotOpTimeAndWallTime() const = 0;
-
-    /**
      * Appends diagnostics about the replication subsystem.
      */
     virtual void appendDiagnosticBSON(BSONObjBuilder* bob) = 0;

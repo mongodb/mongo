@@ -1775,7 +1775,7 @@ std::string TopologyCoordinator::_getReplSetStatusString() {
     // Construct a ReplSetStatusArgs using default parameters. Missing parameters will not be
     // included in the status string.
     ReplSetStatusArgs rsStatusArgs{
-        Date_t::now(), 0U, OpTimeAndWallTime(), BSONObj(), BSONObj(), BSONObj(), boost::none};
+        Date_t::now(), 0U, OpTime(), BSONObj(), BSONObj(), BSONObj(), boost::none};
     BSONObjBuilder builder;
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
     prepareStatusResponse(rsStatusArgs, &builder, &result);
@@ -1972,10 +1972,8 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
     optimes.appendDate("lastCommittedWallTime", _lastCommittedOpTimeAndWallTime.wallTime);
 
-    if (!rsStatusArgs.readConcernMajorityOpTime.opTime.isNull()) {
-        rsStatusArgs.readConcernMajorityOpTime.opTime.append(&optimes, "readConcernMajorityOpTime");
-        optimes.appendDate("readConcernMajorityWallTime",
-                           rsStatusArgs.readConcernMajorityOpTime.wallTime);
+    if (!rsStatusArgs.readConcernMajorityOpTime.isNull()) {
+        rsStatusArgs.readConcernMajorityOpTime.append(&optimes, "readConcernMajorityOpTime");
     }
 
     appendOpTime(&optimes, "appliedOpTime", lastOpApplied);

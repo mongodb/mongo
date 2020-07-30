@@ -359,7 +359,7 @@ public:
     struct ReplSetStatusArgs {
         const Date_t now;
         const unsigned selfUptime;
-        const OpTimeAndWallTime readConcernMajorityOpTime;
+        const OpTime readConcernMajorityOpTime;
         const BSONObj initialSyncStatus;
         const BSONObj electionCandidateMetrics;
         const BSONObj electionParticipantMetrics;

@@ -399,24 +399,8 @@ OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() const {
     return _getCurrentCommittedSnapshotOpTime_inlock();
 }
 
-OpTimeAndWallTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTimeAndWallTime() const {
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _getCurrentCommittedSnapshotOpTimeAndWallTime_inlock();
-}
-
 OpTime ReplicationCoordinatorImpl::_getCurrentCommittedSnapshotOpTime_inlock() const {
-    if (_currentCommittedSnapshot) {
-        return _currentCommittedSnapshot->opTime;
-    }
-    return OpTime();
-}
-
-OpTimeAndWallTime ReplicationCoordinatorImpl::_getCurrentCommittedSnapshotOpTimeAndWallTime_inlock()
-    const {
-    if (_currentCommittedSnapshot) {
-        return _currentCommittedSnapshot.get();
-    }
-    return OpTimeAndWallTime();
+    return _currentCommittedSnapshot.value_or(OpTime());
 }
 
 void ReplicationCoordinatorImpl::appendDiagnosticBSON(mongo::BSONObjBuilder* bob) {
@@ -1861,7 +1845,7 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
             }
 
             // Wait for the "current" snapshot to advance to/past the opTime.
-            const auto haveSnapshot = _currentCommittedSnapshot->opTime >= opTime;
+            const auto haveSnapshot = _currentCommittedSnapshot >= opTime;
             if (!haveSnapshot) {
                 LOGV2_DEBUG(
                     21337,
@@ -1870,7 +1854,7 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
                     "'committed' snapshot: {currentCommittedSnapshotOpTime}",
                     "Required snapshot optime is not yet part of the current 'committed' snapshot",
                     "opTime"_attr = opTime,
-                    "currentCommittedSnapshotOpTime"_attr = _currentCommittedSnapshot->opTime);
+                    "currentCommittedSnapshotOpTime"_attr = _currentCommittedSnapshot);
                 return false;
             }
 
@@ -2150,8 +2134,8 @@ std::shared_ptr<IsMasterResponse> ReplicationCoordinatorImpl::_makeIsMasterRespo
 
     response->setLastWrite(lastOpTime, lastOpTime.getTimestamp().getSecs());
     if (_currentCommittedSnapshot) {
-        response->setLastMajorityWrite(_currentCommittedSnapshot->opTime,
-                                       _currentCommittedSnapshot->opTime.getTimestamp().getSecs());
+        response->setLastMajorityWrite(*_currentCommittedSnapshot,
+                                       _currentCommittedSnapshot->getTimestamp().getSecs());
     }
 
     if (response->isMaster() && !_readWriteAbility->canAcceptNonLocalWrites(lock)) {
@@ -2990,7 +2974,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
         TopologyCoordinator::ReplSetStatusArgs{
             _replExecutor->now(),
             static_cast<unsigned>(time(nullptr) - serverGlobalParams.started),
-            _getCurrentCommittedSnapshotOpTimeAndWallTime_inlock(),
+            _getCurrentCommittedSnapshotOpTime_inlock(),
             initialSyncProgress,
             electionCandidateMetrics,
             electionParticipantMetrics,
@@ -4813,9 +4797,8 @@ OpTime ReplicationCoordinatorImpl::_recalculateStableOpTime(WithLock lk) {
     auto commitPoint = _topCoord->getLastCommittedOpTime();
     auto lastApplied = _topCoord->getMyLastAppliedOpTime();
     if (_currentCommittedSnapshot) {
-        auto snapshotOpTime = _currentCommittedSnapshot->opTime;
-        invariant(snapshotOpTime.getTimestamp() <= commitPoint.getTimestamp());
-        invariant(snapshotOpTime <= commitPoint);
+        invariant(_currentCommittedSnapshot->getTimestamp() <= commitPoint.getTimestamp());
+        invariant(*_currentCommittedSnapshot <= commitPoint);
     }
 
     //
@@ -4930,7 +4913,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
         // When majority read concern is enabled, the committed snapshot is set to the new
         // stable optime. The wall time of the committed snapshot is not used for anything so we can
         // create a fake one.
-        if (_updateCommittedSnapshot(lk, OpTimeAndWallTime(stableOpTime, Date_t()))) {
+        if (_updateCommittedSnapshot(lk, stableOpTime)) {
             // Update the stable timestamp for the storage engine.
             _storage->setStableTimestamp(getServiceContext(), stableOpTime.getTimestamp());
         }
@@ -4946,7 +4929,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
             OpTime newCommittedSnapshot = std::min(lastCommittedOpTime, stableOpTime);
             // The wall clock time of the committed snapshot is not used for anything so we can
             // create a fake one.
-            _updateCommittedSnapshot(lk, OpTimeAndWallTime(newCommittedSnapshot, Date_t()));
+            _updateCommittedSnapshot(lk, newCommittedSnapshot);
         }
         // Set the stable timestamp regardless of whether the majority commit point moved
         // forward. If we are in rollback state, however, do not alter the stable timestamp,
@@ -5350,7 +5333,7 @@ void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* op
 
     opCtx->waitForConditionOrInterrupt(_currentCommittedSnapshotCond, lock, [&] {
         return _currentCommittedSnapshot &&
-            _currentCommittedSnapshot->opTime.getTimestamp() >= untilSnapshot;
+            _currentCommittedSnapshot->getTimestamp() >= untilSnapshot;
     });
 }
 
@@ -5383,8 +5366,8 @@ void ReplicationCoordinatorImpl::createWMajorityWriteAvailabilityDateWaiter(OpTi
     _replicationWaiterList.add_inlock(opTime, waiter);
 }
 
-bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(
-    WithLock lk, const OpTimeAndWallTime& newCommittedSnapshot) {
+bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(WithLock lk,
+                                                          const OpTime& newCommittedSnapshot) {
     if (gTestingSnapshotBehaviorInIsolation) {
         return false;
     }
@@ -5395,29 +5378,28 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(
         LOGV2(21404, "Not updating committed snapshot because we are in rollback");
         return false;
     }
-    invariant(!newCommittedSnapshot.opTime.isNull());
+    invariant(!newCommittedSnapshot.isNull());
 
     // The new committed snapshot should be <= the current replication commit point.
     OpTime lastCommittedOpTime = _topCoord->getLastCommittedOpTime();
-    invariant(newCommittedSnapshot.opTime.getTimestamp() <= lastCommittedOpTime.getTimestamp());
-    invariant(newCommittedSnapshot.opTime <= lastCommittedOpTime);
+    invariant(newCommittedSnapshot.getTimestamp() <= lastCommittedOpTime.getTimestamp());
+    invariant(newCommittedSnapshot <= lastCommittedOpTime);
 
     // The new committed snapshot should be >= the current snapshot.
     if (_currentCommittedSnapshot) {
-        invariant(newCommittedSnapshot.opTime.getTimestamp() >=
-                  _currentCommittedSnapshot->opTime.getTimestamp());
-        invariant(newCommittedSnapshot.opTime >= _currentCommittedSnapshot->opTime);
+        invariant(newCommittedSnapshot.getTimestamp() >= _currentCommittedSnapshot->getTimestamp());
+        invariant(newCommittedSnapshot >= *_currentCommittedSnapshot);
     }
     if (MONGO_unlikely(disableSnapshotting.shouldFail()))
         return false;
     _currentCommittedSnapshot = newCommittedSnapshot;
     _currentCommittedSnapshotCond.notify_all();
 
-    _externalState->updateCommittedSnapshot(newCommittedSnapshot.opTime);
+    _externalState->updateCommittedSnapshot(newCommittedSnapshot);
 
     // Wake up any threads waiting for read concern or write concern.
     if (_externalState->snapshotsEnabled() && _currentCommittedSnapshot) {
-        _wakeReadyWaiters(lk, _currentCommittedSnapshot->opTime);
+        _wakeReadyWaiters(lk, _currentCommittedSnapshot);
     }
     return true;
 }
