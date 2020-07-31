@@ -336,7 +336,15 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
     OperationContext* opCtx,
     StorageEngine* storageEngine,
     LastStorageEngineShutdownState lastStorageEngineShutdownState) {
-    auto reconcileResult = fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx));
+
+    // When starting up after an unclean shutdown, we do not attempt to recover any state from the
+    // internal idents. Thus, we drop them in this case.
+    auto reconcilePolicy =
+        LastStorageEngineShutdownState::kUnclean == lastStorageEngineShutdownState
+        ? StorageEngine::InternalIdentReconcilePolicy::kDrop
+        : StorageEngine::InternalIdentReconcilePolicy::kRetain;
+    auto reconcileResult =
+        fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx, reconcilePolicy));
 
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.

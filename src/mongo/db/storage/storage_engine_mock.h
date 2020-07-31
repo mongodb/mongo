@@ -143,7 +143,7 @@ public:
         OldestActiveTransactionTimestampCallback callback) final {}
 
     StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
-        OperationContext* opCtx) final {
+        OperationContext* opCtx, InternalIdentReconcilePolicy internalIdentReconcilePolicy) final {
         return ReconcileResult{};
     }
     Timestamp getAllDurableTimestamp() const final {

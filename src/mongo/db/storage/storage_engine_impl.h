@@ -317,7 +317,9 @@ public:
         return _catalog.get();
     }
 
-    StatusWith<ReconcileResult> reconcileCatalogAndIdents(OperationContext* opCtx) override;
+    StatusWith<ReconcileResult> reconcileCatalogAndIdents(
+        OperationContext* opCtx,
+        InternalIdentReconcilePolicy internalIdentReconcilePolicy) override;
 
     std::string getFilesystemPathForDb(const std::string& dbName) const override;
 
@@ -384,6 +386,7 @@ private:
      */
     bool _handleInternalIdents(OperationContext* opCtx,
                                const std::string& ident,
+                               InternalIdentReconcilePolicy internalIdentReconcilePolicy,
                                ReconcileResult* reconcileResult,
                                std::set<std::string>* internalIdentsToDrop);
 

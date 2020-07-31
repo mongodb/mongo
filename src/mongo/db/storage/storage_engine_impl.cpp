@@ -320,16 +320,17 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     return Status::OK();
 }
 
-bool StorageEngineImpl::_handleInternalIdents(OperationContext* opCtx,
-                                              const std::string& ident,
-                                              ReconcileResult* reconcileResult,
-                                              std::set<std::string>* internalIdentsToDrop) {
+bool StorageEngineImpl::_handleInternalIdents(
+    OperationContext* opCtx,
+    const std::string& ident,
+    InternalIdentReconcilePolicy internalIdentReconcilePolicy,
+    ReconcileResult* reconcileResult,
+    std::set<std::string>* internalIdentsToDrop) {
     if (!_catalog->isInternalIdent(ident)) {
         return false;
     }
-    // When starting up after an unclean shutdown, we do not attempt to recover any state from the
-    // internal idents. Thus, we drop them in this case.
-    if (startingAfterUncleanShutdown(opCtx->getServiceContext()) ||
+
+    if (InternalIdentReconcilePolicy::kDrop == internalIdentReconcilePolicy ||
         !supportsResumableIndexBuilds()) {
         internalIdentsToDrop->insert(ident);
         return true;
@@ -391,7 +392,7 @@ bool StorageEngineImpl::_handleInternalIdents(OperationContext* opCtx,
  * rebuild the index.
  */
 StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAndIdents(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, InternalIdentReconcilePolicy internalIdentReconcilePolicy) {
     // Gather all tables known to the storage engine and drop those that aren't cross-referenced
     // in the _mdb_catalog. This can happen for two reasons.
     //
@@ -429,7 +430,8 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             continue;
         }
 
-        if (_handleInternalIdents(opCtx, it, &reconcileResult, &internalIdentsToDrop)) {
+        if (_handleInternalIdents(
+                opCtx, it, internalIdentReconcilePolicy, &reconcileResult, &internalIdentsToDrop)) {
             continue;
         }
 

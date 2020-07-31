@@ -548,8 +548,15 @@ public:
     /**
      * Drop abandoned idents. If successful, returns a ReconcileResult with indexes that need to be
      * rebuilt or builds that need to be restarted.
-     * */
-    virtual StatusWith<ReconcileResult> reconcileCatalogAndIdents(OperationContext* opCtx) = 0;
+     *
+     * Abandoned internal idents require special handling based on the context known only to the
+     * caller. For example, on starting from a previous unclean shutdown, we would always drop all
+     * unknown internal idents. If we started from a clean shutdown, the internal idents may contain
+     * information for resuming index builds.
+     */
+    enum class InternalIdentReconcilePolicy { kDrop, kRetain };
+    virtual StatusWith<ReconcileResult> reconcileCatalogAndIdents(
+        OperationContext* opCtx, InternalIdentReconcilePolicy internalIdentReconcilePolicy) = 0;
 
     /**
      * Returns the all_durable timestamp. All transactions with timestamps earlier than the

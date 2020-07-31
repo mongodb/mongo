@@ -113,7 +113,11 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     storageEngine->loadCatalog(opCtx);
 
     LOGV2(20274, "openCatalog: reconciling catalog and idents");
-    auto reconcileResult = fassert(40688, storageEngine->reconcileCatalogAndIdents(opCtx));
+    // Retain unknown internal idents because this function is used during rollback and not at
+    // startup recovery, when we may drop unknown internal idents.
+    auto internalIdentReconcilePolicy = StorageEngine::InternalIdentReconcilePolicy::kRetain;
+    auto reconcileResult = fassert(
+        40688, storageEngine->reconcileCatalogAndIdents(opCtx, internalIdentReconcilePolicy));
 
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.

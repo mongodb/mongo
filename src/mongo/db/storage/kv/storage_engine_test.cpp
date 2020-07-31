@@ -144,9 +144,7 @@ TEST_F(StorageEngineTest, ReconcileDropsTemporary) {
     ASSERT(identExists(opCtx.get(), ident));
 
     // Reconcile will only drop temporary idents when starting up after an unclean shutdown.
-    startingAfterUncleanShutdown(opCtx->getServiceContext()) = true;
-
-    auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
+    auto reconcileResult = unittest::assertGet(reconcileAfterUncleanShutdown(opCtx.get()));
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
