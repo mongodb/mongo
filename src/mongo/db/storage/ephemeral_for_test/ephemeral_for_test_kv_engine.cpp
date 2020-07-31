@@ -45,11 +45,7 @@ namespace mongo {
 namespace ephemeral_for_test {
 
 KVEngine::KVEngine()
-    : mongo::KVEngine(), _visibilityManager(std::make_unique<VisibilityManager>()) {
-    _master = std::make_shared<StringStore>();
-    _availableHistory[Timestamp(_masterVersion++)] = _master;
-}
-
+    : mongo::KVEngine(), _visibilityManager(std::make_unique<VisibilityManager>()) {}
 KVEngine::~KVEngine() {}
 
 mongo::RecoveryUnit* KVEngine::newRecoveryUnit() {
@@ -99,15 +95,11 @@ std::unique_ptr<mongo::RecordStore> KVEngine::getRecordStore(OperationContext* o
 
 bool KVEngine::trySwapMaster(StringStore& newMaster, uint64_t version) {
     stdx::lock_guard<Latch> lock(_masterLock);
-    invariant(!newMaster.hasBranch() && !_master->hasBranch());
+    invariant(!newMaster.hasBranch() && !_master.hasBranch());
     if (_masterVersion != version)
         return false;
-    // TODO SERVER-48314: replace _masterVersion with a Timestamp of transaction.
-    Timestamp commitTimestamp(_masterVersion++);
-    auto newMasterPtr = std::make_shared<StringStore>(newMaster);
-    _availableHistory[commitTimestamp] = newMasterPtr;
-    _master = newMasterPtr;
-    _cleanHistory(lock);
+    _master = newMaster;
+    _masterVersion++;
     return true;
 }
 
@@ -155,55 +147,6 @@ Status KVEngine::dropIdent(OperationContext* opCtx, mongo::RecoveryUnit* ru, Str
         _idents.erase(ident.toString());
     }
     return dropStatus;
-}
-
-void KVEngine::cleanHistory() {
-    stdx::lock_guard<Latch> lock(_masterLock);
-    _cleanHistory(lock);
-}
-
-void KVEngine::_cleanHistory(WithLock) {
-    for (auto it = _availableHistory.cbegin(); it != _availableHistory.cend();) {
-        if (it->second.use_count() == 1) {
-            invariant(it->second.get() != _master.get());
-            it = _availableHistory.erase(it);
-        } else {
-            break;
-        }
-    }
-
-    // Check that pointer to master is not deleted.
-    invariant(_availableHistory.size() >= 1);
-}
-
-Timestamp KVEngine::getOldestTimestamp() const {
-    stdx::lock_guard<Latch> lock(_masterLock);
-    return _availableHistory.begin()->first;
-}
-
-void KVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {
-    stdx::lock_guard<Latch> lock(_masterLock);
-    if (newOldestTimestamp > _availableHistory.rbegin()->first) {
-        _availableHistory[newOldestTimestamp] = _master;
-        // TODO SERVER-48314: Remove when _masterVersion is no longer being used to mock commit
-        // timestamps.
-        _masterVersion = newOldestTimestamp.asULL();
-    }
-    for (auto it = _availableHistory.cbegin(); it != _availableHistory.cend();) {
-        if (it->first < newOldestTimestamp) {
-            it = _availableHistory.erase(it);
-        } else {
-            break;
-        }
-    }
-
-    // Check that pointer to master is not deleted.
-    invariant(_availableHistory.size() >= 1);
-}
-
-std::map<Timestamp, std::shared_ptr<StringStore>> KVEngine::getHistory_forTest() {
-    stdx::lock_guard<Latch> lock(_masterLock);
-    return _availableHistory;
 }
 
 class EmptyRecordCursor final : public SeekableRecordCursor {
