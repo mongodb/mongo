@@ -308,8 +308,10 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
 namespace {
 std::string lastHaystackIndexLogged = "";
 }
-StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opCtx,
-                                                           const BSONObj& original) const {
+StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
+    OperationContext* opCtx,
+    const BSONObj& original,
+    const boost::optional<ResumeIndexInfo>& resumeInfo) const {
     auto swValidatedAndFixed = _validateAndFixIndexSpec(opCtx, original);
     if (!swValidatedAndFixed.isOK()) {
         return swValidatedAndFixed.getStatus().withContext(
@@ -341,6 +343,12 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opC
     status = _doesSpecConflictWithExisting(opCtx, validatedSpec, false);
     if (!status.isOK()) {
         return status;
+    }
+
+    if (resumeInfo) {
+        // Don't check against unfinished indexes if this index is being resumed, since it will
+        // conflict with itself.
+        return validatedSpec;
     }
 
     // Now we will check against all indexes, in-progress included.

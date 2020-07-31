@@ -55,6 +55,20 @@ DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx, const IndexCat
     invariant(_indexCatalogEntry->descriptor()->unique());
 }
 
+DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
+                                         const IndexCatalogEntry* entry,
+                                         StringData ident)
+    : _indexCatalogEntry(entry) {
+    _keyConstraintsTable =
+        opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
+            opCtx, ident);
+
+    invariant(_indexCatalogEntry->descriptor()->unique(),
+              str::stream() << "Duplicate key tracker table exists on disk with ident: " << ident
+                            << " but the index is not unique: "
+                            << _indexCatalogEntry->descriptor());
+}
+
 void DuplicateKeyTracker::finalizeTemporaryTable(OperationContext* opCtx,
                                                  TemporaryRecordStore::FinalizationAction action) {
     _keyConstraintsTable->finalizeTemporaryTable(opCtx, action);

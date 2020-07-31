@@ -70,6 +70,13 @@ public:
     Status init(OperationContext* opCtx, Collection* collection);
 
     /**
+     * Makes sure that an entry for the index was created at startup in the IndexCatalog.
+     */
+    void initForResume(OperationContext* opCtx,
+                       Collection* collection,
+                       const IndexSorterInfo& resumeInfo);
+
+    /**
      * Marks the state of the index as 'ready' and commits the index to disk.
      *
      * Must be called from within a `WriteUnitOfWork`
@@ -107,6 +114,8 @@ public:
     }
 
 private:
+    void _completeInit(OperationContext* opCtx, Collection* collection);
+
     IndexCatalog* const _indexCatalog;
     const NamespaceString _nss;
 

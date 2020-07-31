@@ -78,6 +78,19 @@ public:
         IndexBuildProtocol protocol,
         IndexBuildOptions indexBuildOptions) override;
 
+    /**
+     * Reconstructs the in-memory state of the index build, then passes the build off to an
+     * asynchronous thread to run. A Future is returned so that the user can await the asynchronous
+     * build result.
+     */
+    StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> resumeIndexBuild(
+        OperationContext* opCtx,
+        std::string dbName,
+        CollectionUUID collectionUUID,
+        const std::vector<BSONObj>& specs,
+        const UUID& buildUUID,
+        const ResumeIndexInfo& resumeInfo) override;
+
     Status voteCommitIndexBuild(OperationContext* opCtx,
                                 const UUID& buildUUID,
                                 const HostAndPort& hostAndPort) override;
@@ -158,6 +171,16 @@ private:
     void _waitForNextIndexBuildActionAndCommit(OperationContext* opCtx,
                                                std::shared_ptr<ReplIndexBuildState> replState,
                                                const IndexBuildOptions& indexBuildOptions) override;
+
+    StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> _startIndexBuild(
+        OperationContext* opCtx,
+        std::string dbName,
+        CollectionUUID collectionUUID,
+        const std::vector<BSONObj>& specs,
+        const UUID& buildUUID,
+        IndexBuildProtocol protocol,
+        IndexBuildOptions indexBuildOptions,
+        const boost::optional<ResumeIndexInfo>& resumeInfo);
 
     // Thread pool on which index builds are run.
     ThreadPool _threadPool;

@@ -684,6 +684,29 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
     fassert(28521, status);
 }
 
+Status DurableCatalogImpl::checkMetaDataForIndex(OperationContext* opCtx,
+                                                 RecordId catalogId,
+                                                 const std::string& indexName,
+                                                 const BSONObj& spec) {
+    auto md = getMetaData(opCtx, catalogId);
+    int offset = md.findIndexOffset(indexName);
+    if (offset < 0) {
+        return {ErrorCodes::IndexNotFound,
+                str::stream() << "Index [" << indexName
+                              << "] not found in metadata for recordId: " << catalogId};
+    }
+
+    if (spec.woCompare(md.indexes[offset].spec)) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Spec for index [" << indexName
+                              << "] does not match spec in the metadata for recordId: " << catalogId
+                              << ". Spec: " << spec
+                              << " metadata's spec: " << md.indexes[offset].spec};
+    }
+
+    return Status::OK();
+}
+
 Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
                                          RecordId catalogId,
                                          const NamespaceString& toNss,

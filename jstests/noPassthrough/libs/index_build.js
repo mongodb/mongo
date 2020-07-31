@@ -328,8 +328,14 @@ const ResumableIndexBuildTest = class {
      * insertIntoSideWritesTable will be inserted after the bulk load phase so that they are
      * inserted into the side writes table and processed during the drain writes phase.
      */
-    static run(
-        rst, dbName, collName, indexSpec, failPointName, failPointData, insertIntoSideWritesTable) {
+    static run(rst,
+               dbName,
+               collName,
+               indexSpec,
+               failPointName,
+               failPointData,
+               insertIntoSideWritesTable,
+               postIndexBuildInserts = {}) {
         const primary = rst.getPrimary();
         const coll = primary.getDB(dbName).getCollection(collName);
         const indexName = "resumable_index_build";
@@ -348,6 +354,12 @@ const ResumableIndexBuildTest = class {
 
         awaitInsertIntoSideWritesTable();
         awaitCreateIndex();
+
+        if (postIndexBuildInserts) {
+            assert.commandWorked(coll.insert(postIndexBuildInserts));
+        }
+
+        assert(coll.validate(), "Index validation failed");
 
         assert.commandWorked(coll.dropIndex(indexName));
     }

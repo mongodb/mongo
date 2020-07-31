@@ -65,6 +65,14 @@ public:
         IndexBuildProtocol protocol,
         IndexBuildOptions indexBuildOptions) override;
 
+    StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> resumeIndexBuild(
+        OperationContext* opCtx,
+        std::string dbName,
+        CollectionUUID collectionUUID,
+        const std::vector<BSONObj>& specs,
+        const UUID& buildUUID,
+        const ResumeIndexInfo& resumeInfo) override;
+
     void setSignalAndCancelVoteRequestCbkIfActive(WithLock ReplIndexBuildStateLk,
                                                   OperationContext* opCtx,
                                                   std::shared_ptr<ReplIndexBuildState> replState,

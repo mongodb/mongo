@@ -93,6 +93,10 @@ public:
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx) final {
         return {};
     }
+    std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
+        OperationContext* opCtx, StringData ident) final {
+        return {};
+    }
     void cleanShutdown() final {}
     SnapshotManager* getSnapshotManager() const final {
         return nullptr;

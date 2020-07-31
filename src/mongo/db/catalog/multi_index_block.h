@@ -109,14 +109,20 @@ public:
      * Requires holding an exclusive lock on the collection.
      */
     using OnInitFn = std::function<Status(std::vector<BSONObj>& specs)>;
-    StatusWith<std::vector<BSONObj>> init(OperationContext* opCtx,
-                                          Collection* collection,
-                                          const std::vector<BSONObj>& specs,
-                                          OnInitFn onInit);
+    StatusWith<std::vector<BSONObj>> init(
+        OperationContext* opCtx,
+        Collection* collection,
+        const std::vector<BSONObj>& specs,
+        OnInitFn onInit,
+        const boost::optional<ResumeIndexInfo>& resumeInfo = boost::none);
     StatusWith<std::vector<BSONObj>> init(OperationContext* opCtx,
                                           Collection* collection,
                                           const BSONObj& spec,
                                           OnInitFn onInit);
+    StatusWith<std::vector<BSONObj>> initForResume(OperationContext* opCtx,
+                                                   Collection* collection,
+                                                   const std::vector<BSONObj>& specs,
+                                                   const ResumeIndexInfo& resumeInfo);
 
     /**
      * Not all index initializations need an OnInitFn, in particular index builds that do not need

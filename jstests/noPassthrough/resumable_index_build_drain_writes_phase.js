@@ -41,7 +41,8 @@ ResumableIndexBuildTest.run(rst,
                             {a: 1},
                             "hangIndexBuildDuringDrainWritesPhase",
                             {iteration: 1},
-                            [{a: 4}, {a: 5}]);
+                            [{a: 4}, {a: 5}],
+                            [{a: 6}, {a: 7}]);
 
 rst.stopSet();
 })();

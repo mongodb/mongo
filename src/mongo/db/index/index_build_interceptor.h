@@ -74,6 +74,20 @@ public:
     IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry);
 
     /**
+     * Finds the temporary table associated with storing writes during this index build. Only used
+     * Only used when resuming an index build and the temporary table already exists on disk.
+     * Additionally will find the tmeporary table associated with storing duplicate key constraint
+     * violations found during the build, if the index being built has uniqueness constraints.
+     *
+     * finalizeTemporaryTable() must be called before destruction.
+     */
+    IndexBuildInterceptor(OperationContext* opCtx,
+                          IndexCatalogEntry* entry,
+                          StringData sideWritesIdent,
+                          boost::optional<StringData> duplicateKeyTrackerIdent,
+                          boost::optional<StringData> skippedRecordTrackerIdent);
+
+    /**
      * Deletes or keeps the temporary side writes and duplicate key constraint violations tables.
      * Must be called before object destruction.
      */
@@ -162,6 +176,8 @@ public:
 private:
     using SideWriteRecord = std::pair<RecordId, BSONObj>;
 
+
+    void _initializeMultiKeyPaths(IndexCatalogEntry* entry);
     Status _applyWrite(OperationContext* opCtx,
                        const Collection* coll,
                        const BSONObj& doc,

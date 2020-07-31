@@ -84,7 +84,8 @@ public:
                            const std::vector<BSONObj>& specs,
                            const UUID& buildUUID,
                            OnInitFn onInit,
-                           SetupOptions options = {});
+                           SetupOptions options = {},
+                           const boost::optional<ResumeIndexInfo>& resumeInfo = boost::none);
 
     /**
      * Unregisters the builder associated with the given buildUUID from the _builders map.

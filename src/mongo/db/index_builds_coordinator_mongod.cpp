@@ -122,6 +122,38 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
                                               const UUID& buildUUID,
                                               IndexBuildProtocol protocol,
                                               IndexBuildOptions indexBuildOptions) {
+    return _startIndexBuild(
+        opCtx, dbName, collectionUUID, specs, buildUUID, protocol, indexBuildOptions, boost::none);
+}
+
+StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
+IndexBuildsCoordinatorMongod::resumeIndexBuild(OperationContext* opCtx,
+                                               std::string dbName,
+                                               CollectionUUID collectionUUID,
+                                               const std::vector<BSONObj>& specs,
+                                               const UUID& buildUUID,
+                                               const ResumeIndexInfo& resumeInfo) {
+    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
+    indexBuildOptions.applicationMode = ApplicationMode::kStartupRepair;
+    return _startIndexBuild(opCtx,
+                            dbName,
+                            collectionUUID,
+                            specs,
+                            buildUUID,
+                            IndexBuildProtocol::kTwoPhase,
+                            indexBuildOptions,
+                            resumeInfo);
+}
+
+StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
+IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
+                                               std::string dbName,
+                                               CollectionUUID collectionUUID,
+                                               const std::vector<BSONObj>& specs,
+                                               const UUID& buildUUID,
+                                               IndexBuildProtocol protocol,
+                                               IndexBuildOptions indexBuildOptions,
+                                               const boost::optional<ResumeIndexInfo>& resumeInfo) {
     const NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
 
     {
@@ -178,11 +210,17 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
     });
 
     if (indexBuildOptions.applicationMode == ApplicationMode::kStartupRepair) {
-        // Two phase index build recovery goes though a different set-up procedure because the
-        // original index will be dropped first.
+        // Two phase index build recovery goes though a different set-up procedure because we will
+        // either resume the index build or the original index will be dropped first.
         invariant(protocol == IndexBuildProtocol::kTwoPhase);
-        auto status =
-            _setUpIndexBuildForTwoPhaseRecovery(opCtx, dbName, collectionUUID, specs, buildUUID);
+        auto status = Status::OK();
+        if (resumeInfo) {
+            status = _setUpResumeIndexBuild(
+                opCtx, dbName, collectionUUID, specs, buildUUID, resumeInfo.get());
+        } else {
+            status = _setUpIndexBuildForTwoPhaseRecovery(
+                opCtx, dbName, collectionUUID, specs, buildUUID);
+        }
         if (!status.isOK()) {
             return status;
         }
@@ -247,7 +285,8 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
         startPromise = std::move(startPromise),
         startTimestamp,
         shardVersion,
-        dbVersion
+        dbVersion,
+        resumeInfo
     ](auto status) mutable noexcept {
         auto onScopeExitGuard = makeGuard([&] {
             stdx::unique_lock<Latch> lk(_mutex);
@@ -297,7 +336,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
         // Runs the remainder of the index build. Sets the promise result and cleans up the index
         // build.
-        _runIndexBuild(opCtx.get(), buildUUID, indexBuildOptions);
+        _runIndexBuild(opCtx.get(), buildUUID, indexBuildOptions, resumeInfo);
 
         // Do not exit with an incomplete future.
         invariant(replState->sharedPromise.getFuture().isReady());

@@ -96,7 +96,7 @@ structs:
                 optional: true
             spec:
                 description: "The index specification"
-                type: object
+                type: object_owned
 
     ResumeIndexInfo:
         description: "Information needed to resume index builds"

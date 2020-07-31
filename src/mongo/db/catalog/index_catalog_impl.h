@@ -179,8 +179,10 @@ public:
     StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* opCtx,
                                                      BSONObj spec) override;
 
-    StatusWith<BSONObj> prepareSpecForCreate(OperationContext* opCtx,
-                                             const BSONObj& original) const override;
+    StatusWith<BSONObj> prepareSpecForCreate(
+        OperationContext* opCtx,
+        const BSONObj& original,
+        const boost::optional<ResumeIndexInfo>& resumeInfo = boost::none) const override;
 
     std::vector<BSONObj> removeExistingIndexes(OperationContext* const opCtx,
                                                const std::vector<BSONObj>& indexSpecsToBuild,

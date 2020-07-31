@@ -132,7 +132,7 @@ public:
      *
      * A Future is returned that will complete when the index build commits or aborts.
      *
-     * On a successful index build, calling Future::get(), or Future::getNoThrows(), returns index
+     * On a successful index build, calling Future::get(), or Future::getNoThrow(), returns index
      * catalog statistics.
      *
      * Returns an error status if there are any errors setting up the index build.
@@ -147,9 +147,28 @@ public:
         IndexBuildOptions indexBuildOptions) = 0;
 
     /**
-     * Resumes and restarts index builds for recovery. Anything that fails to resume will be
-     * started in a background thread. Each index build will wait for a replicated commit or abort,
-     * as in steady-state.
+     * Reconstructs the in-memory state of the index build. When successful, returns after the index
+     * build has been resumed from the phase it left off in.
+     *
+     * A Future is returned that will complete when the index build commits or aborts.
+     *
+     * On a successful index build, calling Future::get(), or Future::getNoThrow(), returns index
+     * catalog statistics.
+     *
+     * Returns an error status if there are any errors setting up the index build.
+     */
+    virtual StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> resumeIndexBuild(
+        OperationContext* opCtx,
+        std::string dbName,
+        CollectionUUID collectionUUID,
+        const std::vector<BSONObj>& specs,
+        const UUID& buildUUID,
+        const ResumeIndexInfo& resumeInfo) = 0;
+
+    /**
+     * Resumes and restarts index builds for recovery. Anything that fails to resume will be started
+     * in a background thread. Each index build will wait for a replicated commit or abort, as in
+     * steady-state.
      */
     void restartIndexBuildsForRecovery(OperationContext* opCtx,
                                        const IndexBuilds& buildsToRestart,
@@ -535,13 +554,25 @@ protected:
                                                const std::vector<BSONObj>& specs,
                                                const UUID& buildUUID);
     /**
+     * Reconstructs the in-memory state of the index build so that it can be resumed from the phase
+     * it was in when the node cleanly shut down.
+     */
+    Status _setUpResumeIndexBuild(OperationContext* opCtx,
+                                  std::string dbName,
+                                  CollectionUUID collectionUUID,
+                                  const std::vector<BSONObj>& specs,
+                                  const UUID& buildUUID,
+                                  const ResumeIndexInfo& resumeInfo);
+
+    /**
      * Runs the index build on the caller thread. Handles unregistering the index build and setting
      * the index build's Promise with the outcome of the index build.
      * 'IndexBuildOptios::replSetAndNotPrimary' is determined at the start of the index build.
      */
     void _runIndexBuild(OperationContext* opCtx,
                         const UUID& buildUUID,
-                        const IndexBuildOptions& indexBuildOptions) noexcept;
+                        const IndexBuildOptions& indexBuildOptions,
+                        const boost::optional<ResumeIndexInfo>& resumeInfo) noexcept;
 
     /**
      * Acquires locks and runs index build. Throws on error.
@@ -549,7 +580,18 @@ protected:
      */
     void _runIndexBuildInner(OperationContext* opCtx,
                              std::shared_ptr<ReplIndexBuildState> replState,
-                             const IndexBuildOptions& indexBuildOptions);
+                             const IndexBuildOptions& indexBuildOptions,
+                             const boost::optional<ResumeIndexInfo>& resumeInfo);
+
+    /**
+     * Resumes the index build from the phase that it was in when the node cleanly shut down. By the
+     * time this function is called, the in-memory state of the index build should already have been
+     * reconstructed.
+     */
+    void _resumeIndexBuildFromPhase(OperationContext* opCtx,
+                                    std::shared_ptr<ReplIndexBuildState> replState,
+                                    const IndexBuildOptions& indexBuildOptions,
+                                    const ResumeIndexInfo& resumeInfo);
 
     /**
      * Cleans up a single-phase index build after a failure.

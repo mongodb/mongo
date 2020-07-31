@@ -58,6 +58,15 @@ public:
     DuplicateKeyTracker(OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry);
 
     /**
+     * Finds the temporary table associated with storing any duplicate key constraint violations for
+     * this index build. Only used when resuming an index build and the temporary table already
+     * exists on disk. finalizeTemporaryTable() must be called before destruction.
+     */
+    DuplicateKeyTracker(OperationContext* opCtx,
+                        const IndexCatalogEntry* indexCatalogEntry,
+                        StringData ident);
+
+    /**
      * Deletes or keeps the temporary table for the duplicate key constraint violations. Must be
      * called before object destruction.
      */

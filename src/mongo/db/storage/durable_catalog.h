@@ -93,6 +93,14 @@ public:
                              RecordId id,
                              BSONCollectionCatalogEntry::MetaData& md) = 0;
 
+    /**
+     * Checks that the metadata for the index exists and matches the given spec.
+     */
+    virtual Status checkMetaDataForIndex(OperationContext* opCtx,
+                                         RecordId catalogId,
+                                         const std::string& indexName,
+                                         const BSONObj& spec) = 0;
+
     virtual std::vector<std::string> getAllIdents(OperationContext* opCtx) const = 0;
 
     virtual bool isUserDataIdent(StringData ident) const = 0;

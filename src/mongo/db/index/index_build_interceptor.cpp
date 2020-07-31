@@ -83,16 +83,7 @@ bool IndexBuildInterceptor::typeCanFastpathMultikeyUpdates(IndexType indexType) 
     return (indexType == INDEX_BTREE);
 }
 
-IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry)
-    : _indexCatalogEntry(entry),
-      _sideWritesTable(
-          opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx)),
-      _skippedRecordTracker(entry),
-      _sideWritesCounter(std::make_shared<AtomicWord<long long>>()) {
-
-    if (entry->descriptor()->unique()) {
-        _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(opCtx, entry);
-    }
+void IndexBuildInterceptor::_initializeMultiKeyPaths(IndexCatalogEntry* entry) {
     // `mergeMultikeyPaths` is sensitive to the two inputs having the same multikey
     // "shape". Initialize `_multikeyPaths` with the right shape from the IndexCatalogEntry.
     auto indexType = entry->descriptor()->getIndexType();
@@ -102,6 +93,52 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatal
         auto it = _multikeyPaths->begin();
         _multikeyPaths->insert(it, numFields, {});
     }
+}
+
+IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry)
+    : _indexCatalogEntry(entry),
+      _sideWritesTable(
+          opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx)),
+      _skippedRecordTracker(opCtx, entry, boost::none),
+      _sideWritesCounter(std::make_shared<AtomicWord<long long>>()) {
+
+    if (entry->descriptor()->unique()) {
+        _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(opCtx, entry);
+    }
+
+    _initializeMultiKeyPaths(entry);
+}
+
+IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
+                                             IndexCatalogEntry* entry,
+                                             StringData sideWritesIdent,
+                                             boost::optional<StringData> duplicateKeyTrackerIdent,
+                                             boost::optional<StringData> skippedRecordTrackerIdent)
+    : _indexCatalogEntry(entry),
+      _skippedRecordTracker(opCtx, entry, skippedRecordTrackerIdent),
+      _sideWritesCounter(std::make_shared<AtomicWord<long long>>()) {
+
+    _sideWritesTable =
+        opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
+            opCtx, sideWritesIdent);
+    auto finalizeTableOnFailure = makeGuard([&] {
+        _sideWritesTable->finalizeTemporaryTable(opCtx,
+                                                 TemporaryRecordStore::FinalizationAction::kDelete);
+    });
+
+    auto dupKeyTrackerIdentExists = duplicateKeyTrackerIdent ? true : false;
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Resume info must contain the duplicate key tracker ident ["
+                          << duplicateKeyTrackerIdent
+                          << "] if and only if the index is unique: " << entry->descriptor(),
+            entry->descriptor()->unique() == dupKeyTrackerIdentExists);
+    if (duplicateKeyTrackerIdent) {
+        _duplicateKeyTracker =
+            std::make_unique<DuplicateKeyTracker>(opCtx, entry, duplicateKeyTrackerIdent.get());
+    }
+
+    _initializeMultiKeyPaths(entry);
+    finalizeTableOnFailure.dismiss();
 }
 
 void IndexBuildInterceptor::finalizeTemporaryTables(

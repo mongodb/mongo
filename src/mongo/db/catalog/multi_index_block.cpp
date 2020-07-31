@@ -152,13 +152,15 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                                                        const BSONObj& spec,
                                                        OnInitFn onInit) {
     const auto indexes = std::vector<BSONObj>(1, spec);
-    return init(opCtx, collection, indexes, onInit);
+    return init(opCtx, collection, indexes, onInit, boost::none);
 }
 
-StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
-                                                       Collection* collection,
-                                                       const std::vector<BSONObj>& indexSpecs,
-                                                       OnInitFn onInit) {
+StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
+    OperationContext* opCtx,
+    Collection* collection,
+    const std::vector<BSONObj>& indexSpecs,
+    OnInitFn onInit,
+    const boost::optional<ResumeIndexInfo>& resumeInfo) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X),
               str::stream() << "Collection " << collection->ns() << " with UUID "
                             << collection->uuid() << " is holding the incorrect lock");
@@ -169,6 +171,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
     WriteUnitOfWork wunit(opCtx);
 
     invariant(_indexes.empty());
+
+    if (resumeInfo) {
+        _phase = resumeInfo->getPhase();
+    }
 
     // Guarantees that exceptions cannot be returned from index builder initialization except for
     // WriteConflictExceptions, which should be dealt with by the caller.
@@ -209,7 +215,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
         for (size_t i = 0; i < indexSpecs.size(); i++) {
             BSONObj info = indexSpecs[i];
             StatusWith<BSONObj> statusWithInfo =
-                collection->getIndexCatalog()->prepareSpecForCreate(opCtx, info);
+                collection->getIndexCatalog()->prepareSpecForCreate(opCtx, info, resumeInfo);
             Status status = statusWithInfo.getStatus();
             if (!status.isOK()) {
                 // If we were given two identical indexes to build, we will run into an error trying
@@ -232,9 +238,22 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
             IndexToBuild index;
             index.block = std::make_unique<IndexBuildBlock>(
                 collection->getIndexCatalog(), collection->ns(), info, _method, _buildUUID);
-            status = index.block->init(opCtx, collection);
-            if (!status.isOK())
-                return status;
+            if (resumeInfo) {
+                auto resumeInfoIndexes = resumeInfo->getIndexes();
+                // Find the resume information that corresponds to this spec.
+                auto indexResumeInfo =
+                    std::find_if(resumeInfoIndexes.begin(),
+                                 resumeInfoIndexes.end(),
+                                 [&info](const IndexSorterInfo& indexInfo) {
+                                     return info.woCompare(indexInfo.getSpec()) == 0;
+                                 });
+
+                index.block->initForResume(opCtx, collection, *indexResumeInfo);
+            } else {
+                status = index.block->init(opCtx, collection);
+                if (!status.isOK())
+                    return status;
+            }
 
             auto indexCleanupGuard = makeGuard([opCtx, &index] {
                 index.block->finalizeTemporaryTables(
@@ -271,8 +290,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 
             index.filterExpression = index.block->getEntry()->getFilterExpression();
 
-            // TODO SERVER-14888 Suppress this in cases we don't want to audit.
-            audit::logCreateIndex(opCtx->getClient(), &info, descriptor->indexName(), ns);
+            if (!resumeInfo) {
+                // TODO SERVER-14888 Suppress this in cases we don't want to audit.
+                audit::logCreateIndex(opCtx->getClient(), &info, descriptor->indexName(), ns);
+            }
 
             indexCleanupGuard.dismiss();
             _indexes.push_back(std::move(index));

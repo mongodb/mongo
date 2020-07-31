@@ -111,6 +111,9 @@ public:
     virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(
         OperationContext* opCtx) override;
 
+    virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
+        OperationContext* opCtx, StringData ident) override;
+
     virtual void cleanShutdown() override;
 
     virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override;

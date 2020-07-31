@@ -355,13 +355,19 @@ public:
                                      const NamespaceString& nss) = 0;
 
     /**
-     * Creates a temporary RecordStore on the storage engine. This record store will drop itself
-     * automatically when it goes out of scope. This means the TemporaryRecordStore should not exist
-     * any longer than the OperationContext used to create it. On startup, the storage engine will
-     * drop any un-dropped temporary record stores.
+     * Creates a temporary RecordStore on the storage engine. On startup after an unclean shutdown,
+     * the storage engine will drop any un-dropped temporary record stores.
      */
     virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(
         OperationContext* opCtx) = 0;
+
+    /**
+     * Creates a temporary RecordStore on the storage engine from an existing ident on disk. On
+     * startup after an unclean shutdown, the storage engine will drop any un-dropped temporary
+     * record stores.
+     */
+    virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
+        OperationContext* opCtx, StringData ident) = 0;
 
     /**
      * This method will be called before there is a clean shutdown.  Storage engines should

@@ -71,6 +71,37 @@ void IndexBuildBlock::finalizeTemporaryTables(OperationContext* opCtx,
     }
 }
 
+void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collection) {
+    // Register this index with the CollectionQueryInfo to regenerate the cache. This way, updates
+    // occurring while an index is being build in the background will be aware of whether or not
+    // they need to modify any indexes.
+    CollectionQueryInfo::get(collection)
+        .addedIndex(opCtx, collection, _indexCatalogEntry->descriptor());
+}
+
+void IndexBuildBlock::initForResume(OperationContext* opCtx,
+                                    Collection* collection,
+                                    const IndexSorterInfo& resumeInfo) {
+
+    _indexName = _spec.getStringField("name");
+    auto descriptor =
+        _indexCatalog->findIndexByName(opCtx, _indexName, true /* includeUnfinishedIndexes */);
+
+    _indexCatalogEntry = descriptor->getEntry();
+    invariant(_indexCatalogEntry);
+    invariant(_method == IndexBuildMethod::kHybrid);
+
+    _indexBuildInterceptor =
+        std::make_unique<IndexBuildInterceptor>(opCtx,
+                                                _indexCatalogEntry,
+                                                resumeInfo.getSideWritesTable(),
+                                                resumeInfo.getDuplicateKeyTrackerTable(),
+                                                resumeInfo.getSkippedRecordTrackerTable());
+    _indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
+
+    _completeInit(opCtx, collection);
+}
+
 Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
@@ -118,11 +149,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
             });
     }
 
-    // Register this index with the CollectionQueryInfo to regenerate the cache. This way, updates
-    // occurring while an index is being build in the background will be aware of whether or not
-    // they need to modify any indexes.
-    CollectionQueryInfo::get(collection)
-        .addedIndex(opCtx, collection, _indexCatalogEntry->descriptor());
+    _completeInit(opCtx, collection);
 
     return Status::OK();
 }

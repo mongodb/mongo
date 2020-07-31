@@ -84,7 +84,8 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                                            const std::vector<BSONObj>& specs,
                                            const UUID& buildUUID,
                                            OnInitFn onInit,
-                                           SetupOptions options) {
+                                           SetupOptions options,
+                                           const boost::optional<ResumeIndexInfo>& resumeInfo) {
     _registerIndexBuild(buildUUID);
 
     const auto& nss = collection->ns();
@@ -110,7 +111,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     std::vector<BSONObj> indexes;
     try {
         indexes = writeConflictRetry(opCtx, "IndexBuildsManager::setUpIndexBuild", nss.ns(), [&]() {
-            return uassertStatusOK(builder->init(opCtx, collection, specs, onInit));
+            return uassertStatusOK(builder->init(opCtx, collection, specs, onInit, resumeInfo));
         });
     } catch (const DBException& ex) {
         return ex.toStatus();

@@ -46,8 +46,10 @@ class SkippedRecordTracker {
     SkippedRecordTracker(const SkippedRecordTracker&) = delete;
 
 public:
-    SkippedRecordTracker(IndexCatalogEntry* indexCatalogEntry)
-        : _indexCatalogEntry(indexCatalogEntry) {}
+    explicit SkippedRecordTracker(IndexCatalogEntry* indexCatalogEntry);
+    SkippedRecordTracker(OperationContext* opCtx,
+                         IndexCatalogEntry* indexCatalogEntry,
+                         boost::optional<StringData> ident);
 
     /**
      * Records a RecordId that was unable to be indexed due to a key generation error. At the

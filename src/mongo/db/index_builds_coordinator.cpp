@@ -75,6 +75,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeCompletingAbort);
 MONGO_FAIL_POINT_DEFINE(failIndexBuildOnCommit);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeAbortCleanUp);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnStepUp);
+MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpResumableIndexBuild);
 
 namespace {
 
@@ -540,6 +541,89 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
     }
 
     return Status::OK();
+}
+
+Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
+                                                      std::string dbName,
+                                                      CollectionUUID collectionUUID,
+                                                      const std::vector<BSONObj>& specs,
+                                                      const UUID& buildUUID,
+                                                      const ResumeIndexInfo& resumeInfo) {
+    NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
+
+    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+    Lock::CollectionLock collLock(opCtx, nssOrUuid, MODE_X);
+
+    auto& collectionCatalog = CollectionCatalog::get(opCtx->getServiceContext());
+    auto collection =
+        collectionCatalog.lookupCollectionByUUID(opCtx, resumeInfo.getCollectionUUID());
+    invariant(collection);
+    auto durableCatalog = DurableCatalog::get(opCtx);
+
+    for (auto spec : specs) {
+        std::string indexName = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+        if (indexName.empty()) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          str::stream()
+                              << "Cannot create an index for a spec '" << spec
+                              << "' without a non-empty string value for the 'name' field");
+        }
+
+        // Check that the information in the durable catalog matches the resume info.
+        uassert(4841702,
+                "Index not found in durable catalog while attempting to resume index build",
+                durableCatalog->isIndexPresent(opCtx, collection->getCatalogId(), indexName));
+
+        const auto durableBuildUUID =
+            durableCatalog->getIndexBuildUUID(opCtx, collection->getCatalogId(), indexName);
+        uassert(ErrorCodes::IndexNotFound,
+                str::stream() << "Cannot resume index build with a buildUUID: " << buildUUID
+                              << " that did not match the buildUUID in the durable catalog: "
+                              << durableBuildUUID,
+                durableBuildUUID == buildUUID);
+
+        auto indexIdent =
+            durableCatalog->getIndexIdent(opCtx, collection->getCatalogId(), indexName);
+        uassert(
+            4841703,
+            str::stream() << "No index ident found on disk that matches the index build to resume: "
+                          << indexName,
+            indexIdent.size() > 0);
+
+        uassertStatusOK(durableCatalog->checkMetaDataForIndex(
+            opCtx, collection->getCatalogId(), indexName, spec));
+    }
+
+    if (!collection->isInitialized()) {
+        collection->init(opCtx);
+    }
+
+    auto protocol = IndexBuildProtocol::kTwoPhase;
+    auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
+        buildUUID, collection->uuid(), dbName, specs, protocol);
+
+    Status status = [&]() {
+        stdx::unique_lock<Latch> lk(_mutex);
+        return _registerIndexBuild(lk, replIndexBuildState);
+    }();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    IndexBuildsManager::SetupOptions options;
+    options.protocol = protocol;
+    status = _indexBuildsManager.setUpIndexBuild(
+        opCtx, collection, specs, buildUUID, MultiIndexBlock::kNoopOnInitFn, options, resumeInfo);
+    if (!status.isOK()) {
+        LOGV2(4841705,
+              "Failed to resume index build",
+              "buildUUID"_attr = buildUUID,
+              logAttrs(collection->ns()),
+              "collectionUUID"_attr = collectionUUID,
+              "error"_attr = status);
+    }
+
+    return status;
 }
 
 std::string IndexBuildsCoordinator::_indexBuildActionToString(IndexBuildAction action) {
@@ -1325,14 +1409,58 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
     OperationContext* opCtx,
     const IndexBuilds& buildsToRestart,
     const std::vector<ResumeIndexInfo>& buildsToResume) {
+
+    stdx::unordered_set<UUID, UUID::Hash> successfullyResumed;
+
+    for (const auto& resumeInfo : buildsToResume) {
+        auto buildUUID = resumeInfo.getBuildUUID();
+        auto collUUID = resumeInfo.getCollectionUUID();
+
+        boost::optional<NamespaceString> nss =
+            CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, resumeInfo.getCollectionUUID());
+        invariant(nss);
+
+        std::vector<BSONObj> indexSpecs;
+        indexSpecs.reserve(resumeInfo.getIndexes().size());
+
+        for (const auto& index : resumeInfo.getIndexes()) {
+            indexSpecs.push_back(index.getSpec());
+        }
+
+        LOGV2(4841700,
+              "Index build: resuming",
+              logAttrs(nss.get()),
+              "collectionUUID"_attr = collUUID,
+              "buildUUID"_attr = buildUUID,
+              "specs"_attr = indexSpecs);
+
+        try {
+            // This spawns a new thread and returns immediately. These index builds will resume and
+            // wait for a commit or abort to be replicated.
+            MONGO_COMPILER_VARIABLE_UNUSED auto fut = uassertStatusOK(resumeIndexBuild(
+                opCtx, nss->db().toString(), collUUID, indexSpecs, buildUUID, resumeInfo));
+            successfullyResumed.insert(buildUUID);
+        } catch (const DBException& e) {
+            LOGV2(4841701,
+                  "Failed to resume index build, restarting instead",
+                  "buildUUID"_attr = buildUUID,
+                  "error"_attr = e);
+        }
+    }
+
     for (auto& [buildUUID, build] : buildsToRestart) {
+        // Don't restart an index build that was already resumed.
+        if (successfullyResumed.contains(buildUUID)) {
+            continue;
+        }
+
         boost::optional<NamespaceString> nss =
             CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, build.collUUID);
         invariant(nss);
 
         LOGV2(20660,
-              "Restarting index build",
-              "collection"_attr = nss,
+              "Index build: restarting",
+              logAttrs(nss.get()),
               "collectionUUID"_attr = build.collUUID,
               "buildUUID"_attr = buildUUID);
         IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
@@ -1944,9 +2072,11 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     return Status::OK();
 }
 
-void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
-                                            const UUID& buildUUID,
-                                            const IndexBuildOptions& indexBuildOptions) noexcept {
+void IndexBuildsCoordinator::_runIndexBuild(
+    OperationContext* opCtx,
+    const UUID& buildUUID,
+    const IndexBuildOptions& indexBuildOptions,
+    const boost::optional<ResumeIndexInfo>& resumeInfo) noexcept {
     {
         stdx::unique_lock<Latch> lk(_mutex);
         while (_sleepForTest) {
@@ -1987,7 +2117,7 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
 
     auto status = [&]() {
         try {
-            _runIndexBuildInner(opCtx, replState, indexBuildOptions);
+            _runIndexBuildInner(opCtx, replState, indexBuildOptions, resumeInfo);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
@@ -2089,9 +2219,11 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
         });
 }
 
-void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
-                                                 std::shared_ptr<ReplIndexBuildState> replState,
-                                                 const IndexBuildOptions& indexBuildOptions) {
+void IndexBuildsCoordinator::_runIndexBuildInner(
+    OperationContext* opCtx,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    const IndexBuildOptions& indexBuildOptions,
+    const boost::optional<ResumeIndexInfo>& resumeInfo) {
     // This Status stays unchanged unless we catch an exception in the following try-catch block.
     auto status = Status::OK();
     try {
@@ -2099,7 +2231,12 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
             hangAfterInitializingIndexBuild.pauseWhileSet(opCtx);
         }
 
-        _buildIndex(opCtx, replState, indexBuildOptions);
+        if (resumeInfo) {
+            _resumeIndexBuildFromPhase(opCtx, replState, indexBuildOptions, resumeInfo.get());
+        } else {
+            _buildIndex(opCtx, replState, indexBuildOptions);
+        }
+
     } catch (const DBException& ex) {
         status = ex.toStatus();
     }
@@ -2155,6 +2292,22 @@ void IndexBuildsCoordinator::_runIndexBuildInner(OperationContext* opCtx,
 
     // Any error that escapes at this point is not fatal and can be handled by the caller.
     uassertStatusOK(status);
+}
+
+void IndexBuildsCoordinator::_resumeIndexBuildFromPhase(
+    OperationContext* opCtx,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    const IndexBuildOptions& indexBuildOptions,
+    const ResumeIndexInfo& resumeInfo) {
+    if (MONGO_unlikely(hangAfterSettingUpResumableIndexBuild.shouldFail())) {
+        LOGV2(4841704,
+              "Hanging index build due to failpoint 'hangAfterSettingUpResumableIndexBuild'");
+        hangAfterSettingUpResumableIndexBuild.pauseWhileSet();
+    }
+    _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+    _signalPrimaryForCommitReadiness(opCtx, replState);
+    _insertKeysFromSideTablesBlockingWrites(opCtx, replState, indexBuildOptions);
+    _waitForNextIndexBuildActionAndCommit(opCtx, replState, indexBuildOptions);
 }
 
 void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted(

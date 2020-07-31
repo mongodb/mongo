@@ -69,10 +69,20 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
-    _runIndexBuild(opCtx, buildUUID, indexBuildOptions);
+    _runIndexBuild(opCtx, buildUUID, indexBuildOptions, boost::none /* resumeInfo */);
 
     auto replState = invariant(_getIndexBuild(buildUUID));
     return replState->sharedPromise.getFuture();
+}
+
+StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
+IndexBuildsCoordinatorEmbedded::resumeIndexBuild(OperationContext* opCtx,
+                                                 std::string dbName,
+                                                 CollectionUUID collectionUUID,
+                                                 const std::vector<BSONObj>& specs,
+                                                 const UUID& buildUUID,
+                                                 const ResumeIndexInfo& resumeInfo) {
+    MONGO_UNREACHABLE;
 }
 
 void IndexBuildsCoordinatorEmbedded::_signalPrimaryForCommitReadiness(

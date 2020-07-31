@@ -368,6 +368,11 @@ bool StorageEngineImpl::_handleInternalIdents(
 
             reconcileResult->indexBuildsToResume.push_back(resumeInfo);
 
+            // Once we have parsed the resume info, we can safely drop the internal ident.
+            // TODO SERVER-49846: revisit this logic since this could cause the side tables
+            // associated with the index build to be orphaned if resuming fails.
+            internalIdentsToDrop->insert(ident);
+
             LOGV2(4916301,
                   "Found unfinished index build to resume",
                   "buildUUID"_attr = resumeInfo.getBuildUUID(),
@@ -839,6 +844,12 @@ std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStor
                 1,
                 "created temporary record store: {rs_getIdent}",
                 "rs_getIdent"_attr = rs->getIdent());
+    return std::make_unique<TemporaryKVRecordStore>(getEngine(), std::move(rs));
+}
+
+std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStoreFromExistingIdent(
+    OperationContext* opCtx, StringData ident) {
+    auto rs = _engine->getRecordStore(opCtx, "", ident, CollectionOptions());
     return std::make_unique<TemporaryKVRecordStore>(getEngine(), std::move(rs));
 }
 

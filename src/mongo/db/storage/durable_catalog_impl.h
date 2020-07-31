@@ -81,6 +81,11 @@ public:
                      RecordId catalogId,
                      BSONCollectionCatalogEntry::MetaData& md);
 
+    Status checkMetaDataForIndex(OperationContext* opCtx,
+                                 RecordId catalogId,
+                                 const std::string& indexName,
+                                 const BSONObj& spec);
+
     std::vector<std::string> getAllIdents(OperationContext* opCtx) const;
 
     bool isUserDataIdent(StringData ident) const;
