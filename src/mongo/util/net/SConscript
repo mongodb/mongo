@@ -159,6 +159,8 @@ else:
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/util/fail_point',
+            'network',
             'ssl_options',
         ],
     )
