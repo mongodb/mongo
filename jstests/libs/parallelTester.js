@@ -227,6 +227,9 @@ if (typeof _threadInject != "undefined") {
             "remove8.js",
             "rename4.js",
             "storefunc.js",
+
+            // Can fail if isMaster takes too long on a loaded machine.
+            "dbadmin.js",
         ]);
 
         // The following tests cannot run when shell readMode is legacy.
