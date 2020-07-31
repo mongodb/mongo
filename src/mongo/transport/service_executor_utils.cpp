@@ -85,7 +85,7 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
         invariant(getrlimit(RLIMIT_STACK, &limits) == 0);
         if (limits.rlim_cur > kStackSize) {
             size_t stackSizeToSet = kStackSize;
-#if !__has_feature(address_sanitizer)
+#if !__has_feature(address_sanitizer) && !__has_feature(thread_sanitizer)
             if (kDebugBuild)
                 stackSizeToSet /= 2;
 #endif
