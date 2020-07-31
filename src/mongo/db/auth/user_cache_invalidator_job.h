@@ -30,8 +30,8 @@
 
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/stdx/variant.h"
-#include "mongo/util/background.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/periodic_runner.h"
 
 namespace mongo {
 
@@ -44,22 +44,31 @@ class OperationContext;
  * AuthorizationManager to throw out its in-memory cache of User objects (which contains the
  * users' credentials, roles, privileges, etc).
  */
-class UserCacheInvalidator : public BackgroundJob {
+class UserCacheInvalidator {
 public:
     using OIDorTimestamp = stdx::variant<OID, Timestamp>;
 
     UserCacheInvalidator(AuthorizationManager* authzManager);
-    ~UserCacheInvalidator();
 
-    void initialize(OperationContext* opCtx);
+    /**
+     * Create a new UserCacheInvalidator as a decorator on the service context
+     * and start the background job.
+     */
+    static void start(ServiceContext* serviceCtx, OperationContext* opCtx);
 
-protected:
-    std::string name() const override;
-    void run() override;
+    /**
+     * Set the period of the background job. This should only be used internally (by the
+     * setParameter).
+     */
+    void setPeriod(Milliseconds period);
 
 private:
-    AuthorizationManager* const _authzManager;
+    void initialize(OperationContext* opCtx);
+    void run();
 
+    std::unique_ptr<PeriodicJobAnchor> _job;
+
+    AuthorizationManager* const _authzManager;
     OIDorTimestamp _previousGeneration;
 };
 

@@ -776,9 +776,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     clusterCursorCleanupJob.go();
 
-    UserCacheInvalidator cacheInvalidatorThread(AuthorizationManager::get(serviceContext));
-    cacheInvalidatorThread.initialize(opCtx);
-    cacheInvalidatorThread.go();
+    UserCacheInvalidator::start(serviceContext, opCtx);
 
     PeriodicTask::startRunningPeriodicTasks();
 
