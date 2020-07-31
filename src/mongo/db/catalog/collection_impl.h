@@ -52,7 +52,7 @@ public:
 
     class FactoryImpl : public Factory {
     public:
-        std::unique_ptr<Collection> make(OperationContext* opCtx,
+        std::shared_ptr<Collection> make(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          RecordId catalogId,
                                          CollectionUUID uuid,
@@ -284,6 +284,7 @@ public:
     bool isCapped() const final;
 
     CappedCallback* getCappedCallback() final;
+    const CappedCallback* getCappedCallback() const final;
 
     /**
      * Get a pointer to a capped insert notifier object. The caller can wait on this object
@@ -323,7 +324,7 @@ public:
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must error.
      */
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() final {
+    boost::optional<Timestamp> getMinimumVisibleSnapshot() const final {
         return _minVisibleSnapshot;
     }
 
@@ -333,12 +334,12 @@ public:
      */
     void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
 
-    bool haveCappedWaiters() final;
+    bool haveCappedWaiters() const final;
 
     /**
      * Notify (capped collection) waiters of data changes, like an insert.
      */
-    void notifyCappedWaitersIfNeeded() final;
+    void notifyCappedWaitersIfNeeded() const final;
 
     /**
      * Get a pointer to the collection's default collator. The pointer must not be used after this
@@ -352,11 +353,12 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
         OperationContext* opCtx,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
-        ScanDirection scanDirection) final;
+        ScanDirection scanDirection) const final;
 
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;
 
     void establishOplogCollectionForLogging(OperationContext* opCtx) final;
+    void onDeregisterFromCatalog() final;
 
 private:
     /**

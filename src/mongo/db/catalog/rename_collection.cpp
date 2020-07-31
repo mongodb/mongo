@@ -897,7 +897,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     }
 
     const Collection* const sourceColl =
-        AutoGetCollectionForRead(opCtx, sourceNss, AutoGetCollection::ViewMode::kViewsPermitted)
+        AutoGetCollectionForRead(opCtx, sourceNss, AutoGetCollectionViewMode::kViewsPermitted)
             .getCollection();
 
     if (sourceNss.isDropPendingNamespace() || sourceColl == nullptr) {

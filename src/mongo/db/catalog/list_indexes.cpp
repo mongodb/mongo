@@ -53,7 +53,7 @@ StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& ns,
                                            bool includeBuildUUIDs) {
     AutoGetCollectionForReadCommand ctx(opCtx, ns);
-    Collection* collection = ctx.getCollection();
+    const Collection* collection = ctx.getCollection();
     auto nss = ctx.getNss();
     if (!collection) {
         return StatusWith<std::list<BSONObj>>(ErrorCodes::NamespaceNotFound,
@@ -65,7 +65,7 @@ StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
 }
 
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
-                                     Collection* collection,
+                                     const Collection* collection,
                                      const NamespaceString& nss,
                                      bool includeBuildUUIDs) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));

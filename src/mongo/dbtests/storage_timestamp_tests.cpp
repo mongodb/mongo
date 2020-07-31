@@ -303,7 +303,7 @@ public:
         abortOnExit.dismiss();
     }
 
-    std::int32_t itCount(Collection* coll) {
+    std::int32_t itCount(const Collection* coll) {
         std::uint64_t ret = 0;
         auto cursor = coll->getRecordStore()->getCursor(_opCtx);
         while (cursor->next() != boost::none) {
@@ -313,7 +313,7 @@ public:
         return ret;
     }
 
-    BSONObj findOne(Collection* coll) {
+    BSONObj findOne(const Collection* coll) {
         auto optRecord = coll->getRecordStore()->getCursor(_opCtx)->next();
         if (optRecord == boost::none) {
             // Print a stack trace to help disambiguate which `findOne` failed.
@@ -402,7 +402,7 @@ public:
             << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
     }
 
-    void assertDocumentAtTimestamp(Collection* coll,
+    void assertDocumentAtTimestamp(const Collection* coll,
                                    const Timestamp& ts,
                                    const BSONObj& expectedDoc) {
         OneOffRead oor(_opCtx, ts);
@@ -418,7 +418,7 @@ public:
         }
     }
 
-    void assertFilteredDocumentAtTimestamp(Collection* coll,
+    void assertFilteredDocumentAtTimestamp(const Collection* coll,
                                            const BSONObj& query,
                                            const Timestamp& ts,
                                            boost::optional<const BSONObj&> expectedDoc) {

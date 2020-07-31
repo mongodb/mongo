@@ -59,18 +59,18 @@ struct Helpers {
        @return true if object found
     */
     static bool findOne(OperationContext* opCtx,
-                        Collection* collection,
+                        const Collection* collection,
                         const BSONObj& query,
                         BSONObj& result,
                         bool requireIndex = false);
 
     static RecordId findOne(OperationContext* opCtx,
-                            Collection* collection,
+                            const Collection* collection,
                             const BSONObj& query,
                             bool requireIndex);
 
     static RecordId findOne(OperationContext* opCtx,
-                            Collection* collection,
+                            const Collection* collection,
                             std::unique_ptr<QueryRequest> qr,
                             bool requireIndex);
 
@@ -89,7 +89,9 @@ struct Helpers {
     /* TODO: should this move into Collection?
      * uasserts if no _id index.
      * @return null loc if not found */
-    static RecordId findById(OperationContext* opCtx, Collection* collection, const BSONObj& query);
+    static RecordId findById(OperationContext* opCtx,
+                             const Collection* collection,
+                             const BSONObj& query);
 
     /**
      * Get the first object generated from a forward natural-order scan on "ns".  Callers do not

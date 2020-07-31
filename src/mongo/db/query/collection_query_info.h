@@ -87,8 +87,8 @@ public:
     void clearQueryCache(const Collection* coll);
 
     void notifyOfQuery(OperationContext* opCtx,
-                       Collection* coll,
-                       const PlanSummaryStats& summaryStats);
+                       const Collection* coll,
+                       const PlanSummaryStats& summaryStats) const;
 
 private:
     void computeIndexKeys(OperationContext* opCtx, Collection* coll);

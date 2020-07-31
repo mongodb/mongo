@@ -246,7 +246,7 @@ Status MigrationSourceManager::startClone() {
         AutoGetCollection autoColl(_opCtx,
                                    getNss(),
                                    replEnabled ? MODE_IX : MODE_X,
-                                   AutoGetCollection::ViewMode::kViewsForbidden,
+                                   AutoGetCollectionViewMode::kViewsForbidden,
                                    _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                        Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
 

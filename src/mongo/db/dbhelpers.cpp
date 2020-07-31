@@ -61,7 +61,7 @@ using std::unique_ptr;
    set your db SavedContext first
 */
 bool Helpers::findOne(OperationContext* opCtx,
-                      Collection* collection,
+                      const Collection* collection,
                       const BSONObj& query,
                       BSONObj& result,
                       bool requireIndex) {
@@ -76,7 +76,7 @@ bool Helpers::findOne(OperationContext* opCtx,
    set your db SavedContext first
 */
 RecordId Helpers::findOne(OperationContext* opCtx,
-                          Collection* collection,
+                          const Collection* collection,
                           const BSONObj& query,
                           bool requireIndex) {
     if (!collection)
@@ -88,7 +88,7 @@ RecordId Helpers::findOne(OperationContext* opCtx,
 }
 
 RecordId Helpers::findOne(OperationContext* opCtx,
-                          Collection* collection,
+                          const Collection* collection,
                           std::unique_ptr<QueryRequest> qr,
                           bool requireIndex) {
     if (!collection)
@@ -129,6 +129,7 @@ bool Helpers::findById(OperationContext* opCtx,
                        bool* indexFound) {
     invariant(database);
 
+    // TODO ForRead?
     Collection* collection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, NamespaceString(ns));
     if (!collection) {
@@ -155,10 +156,10 @@ bool Helpers::findById(OperationContext* opCtx,
 }
 
 RecordId Helpers::findById(OperationContext* opCtx,
-                           Collection* collection,
+                           const Collection* collection,
                            const BSONObj& idquery) {
     verify(collection);
-    IndexCatalog* catalog = collection->getIndexCatalog();
+    const IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
     uassert(13430, "no _id index", desc);
     return catalog->getEntry(desc)->accessMethod()->findSingle(opCtx, idquery["_id"].wrap());
@@ -166,10 +167,10 @@ RecordId Helpers::findById(OperationContext* opCtx,
 
 // Acquires necessary locks to read the collection with the given namespace. If this is an oplog
 // read, use AutoGetOplog for simplified locking.
-Collection* getCollectionForRead(OperationContext* opCtx,
-                                 const NamespaceString& ns,
-                                 boost::optional<AutoGetCollectionForReadCommand>& autoColl,
-                                 boost::optional<AutoGetOplog>& autoOplog) {
+const Collection* getCollectionForRead(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       boost::optional<AutoGetCollectionForReadCommand>& autoColl,
+                                       boost::optional<AutoGetOplog>& autoOplog) {
     if (ns.isOplog()) {
         // Simplify locking rules for oplog collection.
         autoOplog.emplace(opCtx, OplogAccessMode::kRead);

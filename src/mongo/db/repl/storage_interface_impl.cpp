@@ -303,9 +303,10 @@ namespace {
  * Returns NamespaceNotFound if the database or collection does not exist.
  */
 template <typename AutoGetCollectionType>
-StatusWith<Collection*> getCollection(const AutoGetCollectionType& autoGetCollection,
-                                      const NamespaceStringOrUUID& nsOrUUID,
-                                      const std::string& message) {
+StatusWith<decltype(std::declval<AutoGetCollectionType>().getCollection())> getCollection(
+    const AutoGetCollectionType& autoGetCollection,
+    const NamespaceStringOrUUID& nsOrUUID,
+    const std::string& message) {
     if (!autoGetCollection.getDb()) {
         StringData dbName = nsOrUUID.nss() ? nsOrUUID.nss()->db() : nsOrUUID.dbname();
         return {ErrorCodes::NamespaceNotFound,

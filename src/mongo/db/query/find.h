@@ -79,7 +79,7 @@ void beginQueryOp(OperationContext* opCtx,
  * Uses explain functionality to extract stats from 'exec'.
  */
 void endQueryOp(OperationContext* opCtx,
-                Collection* collection,
+                const Collection* collection,
                 const PlanExecutor& exec,
                 long long numResults,
                 CursorId cursorId);

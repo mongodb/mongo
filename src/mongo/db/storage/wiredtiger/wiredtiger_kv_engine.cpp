@@ -96,6 +96,7 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
@@ -2388,17 +2389,21 @@ bool WiredTigerKVEngine::supportsOplogStones() const {
 void WiredTigerKVEngine::startOplogManager(OperationContext* opCtx,
                                            WiredTigerRecordStore* oplogRecordStore) {
     stdx::lock_guard<Latch> lock(_oplogManagerMutex);
-    if (_oplogManagerCount == 0)
-        _oplogManager->startVisibilityThread(opCtx, oplogRecordStore);
-    _oplogManagerCount++;
+    // Halt visibility thread if running on previous record store
+    if (_oplogRecordStore) {
+        _oplogManager->haltVisibilityThread();
+    }
+
+    _oplogManager->startVisibilityThread(opCtx, oplogRecordStore);
+    _oplogRecordStore = oplogRecordStore;
 }
 
-void WiredTigerKVEngine::haltOplogManager() {
+void WiredTigerKVEngine::haltOplogManager(WiredTigerRecordStore* oplogRecordStore) {
     stdx::unique_lock<Latch> lock(_oplogManagerMutex);
-    invariant(_oplogManagerCount > 0);
-    _oplogManagerCount--;
-    if (_oplogManagerCount == 0) {
+    // Halt visibility thread if the request match current
+    if (_oplogRecordStore == oplogRecordStore) {
         _oplogManager->haltVisibilityThread();
+        _oplogRecordStore = nullptr;
     }
 }
 

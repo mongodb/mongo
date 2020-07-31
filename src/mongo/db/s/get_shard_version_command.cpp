@@ -97,8 +97,7 @@ public:
         result.appendBool("inShardedMode", false);
         result.appendTimestamp("mine", 0);
 
-        AutoGetCollection autoColl(
-            opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsPermitted);
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsPermitted);
         auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
         const auto optMetadata = csr->getCurrentMetadataIfKnown();

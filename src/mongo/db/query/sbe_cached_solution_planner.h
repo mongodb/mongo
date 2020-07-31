@@ -43,7 +43,7 @@ namespace mongo::sbe {
 class CachedSolutionPlanner final : public BaseRuntimePlanner {
 public:
     CachedSolutionPlanner(OperationContext* opCtx,
-                          Collection* collection,
+                          const Collection* collection,
                           const CanonicalQuery& cq,
                           const QueryPlannerParams& queryParams,
                           size_t decisionReads,

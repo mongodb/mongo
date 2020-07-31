@@ -88,7 +88,7 @@ AutoStatsTracker::~AutoStatsTracker() {
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    const NamespaceStringOrUUID& nsOrUUID,
-                                                   AutoGetCollection::ViewMode viewMode,
+                                                   AutoGetCollectionViewMode viewMode,
                                                    Date_t deadline) {
     // Don't take the ParallelBatchWriterMode lock when the server parameter is set and our
     // storage engine supports snapshot reads.
@@ -240,7 +240,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollection::ViewMode viewMode,
+    AutoGetCollectionViewMode viewMode,
     Date_t deadline,
     AutoStatsTracker::LogMode logMode)
     : _autoCollForRead(opCtx, nsOrUUID, viewMode, deadline),

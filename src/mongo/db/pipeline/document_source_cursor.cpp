@@ -285,7 +285,7 @@ DocumentSourceCursor::~DocumentSourceCursor() {
 }
 
 DocumentSourceCursor::DocumentSourceCursor(
-    Collection* collection,
+    const Collection* collection,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const intrusive_ptr<ExpressionContext>& pCtx,
     CursorType cursorType,
@@ -316,7 +316,7 @@ DocumentSourceCursor::DocumentSourceCursor(
 }
 
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-    Collection* collection,
+    const Collection* collection,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     CursorType cursorType,

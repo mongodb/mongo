@@ -533,7 +533,7 @@ Status runAggregate(OperationContext* opCtx,
                 PipelineD::resolveCollator(opCtx, request.getCollation(), nullptr));
 
             // Obtain collection locks on the execution namespace; that is, the oplog.
-            ctx.emplace(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden);
+            ctx.emplace(opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
         } else if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
             // If this is a collectionless agg with no foreign namespaces, don't acquire any locks.
             statsTracker.emplace(opCtx,
@@ -545,7 +545,7 @@ Status runAggregate(OperationContext* opCtx,
                 PipelineD::resolveCollator(opCtx, request.getCollation(), nullptr));
         } else {
             // This is a regular aggregation. Lock the collection or view.
-            ctx.emplace(opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted);
+            ctx.emplace(opCtx, nss, AutoGetCollectionViewMode::kViewsPermitted);
             collatorToUse.emplace(
                 PipelineD::resolveCollator(opCtx, request.getCollation(), ctx->getCollection()));
             if (ctx->getCollection()) {
@@ -553,7 +553,7 @@ Status runAggregate(OperationContext* opCtx,
             }
         }
 
-        Collection* collection = ctx ? ctx->getCollection() : nullptr;
+        const Collection* collection = ctx ? ctx->getCollection() : nullptr;
 
         // If this is a view, resolve it by finding the underlying collection and stitching view
         // pipelines and this request's pipeline together. We then release our locks before
@@ -759,7 +759,7 @@ Status runAggregate(OperationContext* opCtx,
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
         if (ctx && ctx->getCollection()) {
-            Collection* coll = ctx->getCollection();
+            const Collection* coll = ctx->getCollection();
             CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, stats);
         }
     }

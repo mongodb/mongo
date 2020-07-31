@@ -50,7 +50,7 @@ const ServiceContext::Decoration<CollectionCatalog> getCatalog =
 class FinishDropCollectionChange : public RecoveryUnit::Change {
 public:
     FinishDropCollectionChange(CollectionCatalog* catalog,
-                               std::unique_ptr<Collection> coll,
+                               std::shared_ptr<Collection> coll,
                                CollectionUUID uuid)
         : _catalog(catalog), _coll(std::move(coll)), _uuid(uuid) {}
 
@@ -59,12 +59,12 @@ public:
     }
 
     void rollback() override {
-        _catalog->registerCollection(_uuid, std::move(&_coll));
+        _catalog->registerCollection(_uuid, std::move(_coll));
     }
 
 private:
     CollectionCatalog* _catalog;
-    std::unique_ptr<Collection> _coll;
+    std::shared_ptr<Collection> _coll;
     CollectionUUID _uuid;
 };
 
@@ -89,8 +89,8 @@ CollectionCatalog::iterator::iterator(StringData dbName,
     }
 }
 
-CollectionCatalog::iterator::iterator(
-    std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator mapIter)
+CollectionCatalog::iterator::iterator(std::map<std::pair<std::string, CollectionUUID>,
+                                               std::shared_ptr<Collection>>::const_iterator mapIter)
     : _mapIter(mapIter) {}
 
 CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*() {
@@ -100,7 +100,7 @@ CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*()
         return _nullCollection;
     }
 
-    return _mapIter->second;
+    return _mapIter->second.get();
 }
 
 boost::optional<CollectionUUID> CollectionCatalog::iterator::uuid() {
@@ -257,8 +257,8 @@ uint64_t CollectionCatalog::getEpoch() const {
     return _epoch;
 }
 
-Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
-                                                      CollectionUUID uuid) const {
+std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByUUIDForRead(
+    OperationContext* opCtx, CollectionUUID uuid) const {
     if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
         return coll;
     }
@@ -266,6 +266,17 @@ Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
     stdx::lock_guard<Latch> lock(_catalogLock);
     auto coll = _lookupCollectionByUUID(lock, uuid);
     return (coll && coll->isCommitted()) ? coll : nullptr;
+}
+
+Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
+                                                      CollectionUUID uuid) const {
+    if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
+        return coll.get();
+    }
+
+    stdx::lock_guard<Latch> lock(_catalogLock);
+    auto coll = _lookupCollectionByUUID(lock, uuid);
+    return (coll && coll->isCommitted()) ? coll.get() : nullptr;
 }
 
 void CollectionCatalog::makeCollectionVisible(CollectionUUID uuid) {
@@ -280,13 +291,14 @@ bool CollectionCatalog::isCollectionAwaitingVisibility(CollectionUUID uuid) cons
     return coll && !coll->isCommitted();
 }
 
-Collection* CollectionCatalog::_lookupCollectionByUUID(WithLock, CollectionUUID uuid) const {
+std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUID(WithLock,
+                                                                       CollectionUUID uuid) const {
     auto foundIt = _catalog.find(uuid);
-    return foundIt == _catalog.end() ? nullptr : foundIt->second.get();
+    return foundIt == _catalog.end() ? nullptr : foundIt->second;
 }
 
-Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
-                                                           const NamespaceString& nss) const {
+std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByNamespaceForRead(
+    OperationContext* opCtx, const NamespaceString& nss) const {
     if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
         return coll;
     }
@@ -295,6 +307,18 @@ Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContext* opC
     auto it = _collections.find(nss);
     auto coll = (it == _collections.end() ? nullptr : it->second);
     return (coll && coll->isCommitted()) ? coll : nullptr;
+}
+
+Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
+                                                           const NamespaceString& nss) const {
+    if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
+        return coll.get();
+    }
+
+    stdx::lock_guard<Latch> lock(_catalogLock);
+    auto it = _collections.find(nss);
+    auto coll = (it == _collections.end() ? nullptr : it->second);
+    return (coll && coll->isCommitted()) ? coll.get() : nullptr;
 }
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
@@ -371,7 +395,7 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(CollectionUUID uuid,
         return false;
     }
 
-    return predicate(collection);
+    return predicate(collection.get());
 }
 
 std::vector<CollectionUUID> CollectionCatalog::getAllCollectionUUIDsFromDb(
@@ -449,15 +473,14 @@ void CollectionCatalog::clearDatabaseProfileLevel(StringData dbName) {
     _databaseProfileLevels.erase(dbName);
 }
 
-void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<Collection>* coll) {
-    auto ns = (*coll)->ns();
+void CollectionCatalog::registerCollection(CollectionUUID uuid, std::shared_ptr<Collection> coll) {
+    auto ns = coll->ns();
     stdx::lock_guard<Latch> lock(_catalogLock);
     if (_collections.find(ns) != _collections.end()) {
         LOGV2(20279,
               "Conflicted creating a collection. ns: {coll_ns} ({coll_uuid}).",
               "Conflicted creating a collection",
-              "namespace"_attr = (*coll)->ns(),
-              "uuid"_attr = (*coll)->uuid());
+              logAttrs(*coll));
         throw WriteConflictException();
     }
 
@@ -475,9 +498,9 @@ void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<
     invariant(_catalog.find(uuid) == _catalog.end());
     invariant(_orderedCollections.find(dbIdPair) == _orderedCollections.end());
 
-    _catalog[uuid] = std::move(*coll);
-    _collections[ns] = _catalog[uuid].get();
-    _orderedCollections[dbIdPair] = _catalog[uuid].get();
+    _catalog[uuid] = coll;
+    _collections[ns] = coll;
+    _orderedCollections[dbIdPair] = coll;
 
     auto dbRid = ResourceId(RESOURCE_DATABASE, dbName);
     addResource(dbRid, dbName);
@@ -486,7 +509,7 @@ void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<
     addResource(collRid, ns.ns());
 }
 
-std::unique_ptr<Collection> CollectionCatalog::deregisterCollection(CollectionUUID uuid) {
+std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(CollectionUUID uuid) {
     stdx::lock_guard<Latch> lock(_catalogLock);
 
     invariant(_catalog.find(uuid) != _catalog.end());
@@ -506,6 +529,8 @@ std::unique_ptr<Collection> CollectionCatalog::deregisterCollection(CollectionUU
     _collections.erase(ns);
     _catalog.erase(uuid);
 
+    coll->onDeregisterFromCatalog();
+
     auto collRid = ResourceId(RESOURCE_COLLECTION, ns.ns());
     removeResource(collRid, ns.ns());
 
@@ -517,7 +542,7 @@ std::unique_ptr<Collection> CollectionCatalog::deregisterCollection(CollectionUU
 }
 
 std::unique_ptr<RecoveryUnit::Change> CollectionCatalog::makeFinishDropCollectionChange(
-    std::unique_ptr<Collection> coll, CollectionUUID uuid) {
+    std::shared_ptr<Collection> coll, CollectionUUID uuid) {
     return std::make_unique<FinishDropCollectionChange>(this, std::move(coll), uuid);
 }
 

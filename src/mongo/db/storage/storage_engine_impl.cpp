@@ -274,7 +274,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     auto collection = collectionFactory->make(opCtx, nss, catalogId, uuid, std::move(rs));
 
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
-    collectionCatalog.registerCollection(uuid, &collection);
+    collectionCatalog.registerCollection(uuid, std::move(collection));
 }
 
 void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {

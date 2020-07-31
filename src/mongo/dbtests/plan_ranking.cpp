@@ -115,7 +115,7 @@ public:
      */
     const QuerySolution* pickBestPlan(CanonicalQuery* cq) {
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        Collection* collection = ctx.getCollection();
+        const Collection* collection = ctx.getCollection();
 
         QueryPlannerParams plannerParams;
         fillOutPlannerParams(&_opCtx, collection, cq, &plannerParams);
@@ -246,7 +246,7 @@ public:
                                                  soln->root.get()));
 
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        Collection* collection = ctx.getCollection();
+        const Collection* collection = ctx.getCollection();
 
         StatusWith<std::unique_ptr<PlanCacheEntry>> planCacheEntryWithStatus =
             CollectionQueryInfo::get(collection).getPlanCache()->getEntry(*(cq.get()));

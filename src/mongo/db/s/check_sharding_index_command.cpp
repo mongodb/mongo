@@ -88,7 +88,7 @@ public:
         }
 
         AutoGetCollectionForReadCommand autoColl(opCtx, nss);
-        Collection* const collection = autoColl.getCollection();
+        auto collection = autoColl.getCollection();
         if (!collection) {
             errmsg = "ns not found";
             return false;

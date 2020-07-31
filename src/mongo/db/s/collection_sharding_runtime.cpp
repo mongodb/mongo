@@ -408,7 +408,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx, Na
     AutoGetCollection autoColl(_opCtx,
                                _nss,
                                MODE_S,
-                               AutoGetCollection::ViewMode::kViewsForbidden,
+                               AutoGetCollectionViewMode::kViewsForbidden,
                                _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
@@ -428,7 +428,7 @@ void CollectionCriticalSection::enterCommitPhase() {
     AutoGetCollection autoColl(_opCtx,
                                _nss,
                                MODE_X,
-                               AutoGetCollection::ViewMode::kViewsForbidden,
+                               AutoGetCollectionViewMode::kViewsForbidden,
                                _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);

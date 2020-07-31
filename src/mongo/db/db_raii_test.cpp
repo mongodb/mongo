@@ -67,8 +67,8 @@ public:
     const ClientAndCtx client2 = makeClientWithLocker("client2");
 };
 
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(OperationContext* opCtx,
-                                                                           Collection* collection) {
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(
+    OperationContext* opCtx, const Collection* collection) {
     auto qr = std::make_unique<QueryRequest>(collection->ns());
     qr->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
 
@@ -114,7 +114,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadCollLockDeadline) {
         [&] {
             AutoGetCollectionForRead acfr(client2.second.get(),
                                           nss,
-                                          AutoGetCollection::ViewMode::kViewsForbidden,
+                                          AutoGetCollectionViewMode::kViewsForbidden,
                                           Date_t::now() + timeoutMs);
         },
         timeoutMs);
@@ -127,7 +127,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockDeadline) {
         [&] {
             AutoGetCollectionForRead coll(client2.second.get(),
                                           nss,
-                                          AutoGetCollection::ViewMode::kViewsForbidden,
+                                          AutoGetCollectionViewMode::kViewsForbidden,
                                           Date_t::now() + timeoutMs);
         },
         timeoutMs);
@@ -140,7 +140,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadGlobalLockDeadline) {
         [&] {
             AutoGetCollectionForRead coll(client2.second.get(),
                                           nss,
-                                          AutoGetCollection::ViewMode::kViewsForbidden,
+                                          AutoGetCollectionViewMode::kViewsForbidden,
                                           Date_t::now() + timeoutMs);
         },
         timeoutMs);
@@ -156,7 +156,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDeadlineNow) {
         [&] {
             AutoGetCollectionForRead coll(client2.second.get(),
                                           nss,
-                                          AutoGetCollection::ViewMode::kViewsForbidden,
+                                          AutoGetCollectionViewMode::kViewsForbidden,
                                           Date_t::now());
         },
         Milliseconds(0));
@@ -171,7 +171,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDeadlineMin) {
     failsWithLockTimeout(
         [&] {
             AutoGetCollectionForRead coll(
-                client2.second.get(), nss, AutoGetCollection::ViewMode::kViewsForbidden, Date_t());
+                client2.second.get(), nss, AutoGetCollectionViewMode::kViewsForbidden, Date_t());
         },
         Milliseconds(0));
 }

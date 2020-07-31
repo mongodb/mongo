@@ -61,8 +61,8 @@ public:
         using value_type = Collection*;
 
         iterator(StringData dbName, uint64_t genNum, const CollectionCatalog& catalog);
-        iterator(
-            std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator mapIter);
+        iterator(std::map<std::pair<std::string, CollectionUUID>,
+                          std::shared_ptr<Collection>>::const_iterator mapIter);
         value_type operator*();
         iterator operator++();
         iterator operator++(int);
@@ -90,7 +90,8 @@ public:
         std::string _dbName;
         boost::optional<CollectionUUID> _uuid;
         uint64_t _genNum;
-        std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator _mapIter;
+        std::map<std::pair<std::string, CollectionUUID>,
+                 std::shared_ptr<Collection>>::const_iterator _mapIter;
         const CollectionCatalog* _catalog;
         static constexpr Collection* _nullCollection = nullptr;
     };
@@ -116,18 +117,18 @@ public:
     /**
      * Register the collection with `uuid`.
      */
-    void registerCollection(CollectionUUID uuid, std::unique_ptr<Collection>* collection);
+    void registerCollection(CollectionUUID uuid, std::shared_ptr<Collection> collection);
 
     /**
      * Deregister the collection.
      */
-    std::unique_ptr<Collection> deregisterCollection(CollectionUUID uuid);
+    std::shared_ptr<Collection> deregisterCollection(CollectionUUID uuid);
 
     /**
      * Returns the RecoveryUnit's Change for dropping the collection
      */
     std::unique_ptr<RecoveryUnit::Change> makeFinishDropCollectionChange(
-        std::unique_ptr<Collection>, CollectionUUID uuid);
+        std::shared_ptr<Collection>, CollectionUUID uuid);
 
     /**
      * Deregister all the collection objects.
@@ -142,6 +143,9 @@ public:
      * Returns nullptr if the 'uuid' is not known.
      */
     Collection* lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
+    std::shared_ptr<const Collection> lookupCollectionByUUIDForRead(OperationContext* opCtx,
+                                                                    CollectionUUID uuid) const;
+
 
     void makeCollectionVisible(CollectionUUID uuid);
 
@@ -160,6 +164,8 @@ public:
      */
     Collection* lookupCollectionByNamespace(OperationContext* opCtx,
                                             const NamespaceString& nss) const;
+    std::shared_ptr<const Collection> lookupCollectionByNamespaceForRead(
+        OperationContext* opCtx, const NamespaceString& nss) const;
 
     /**
      * This function gets the NamespaceString from the collection catalog entry that
@@ -286,7 +292,7 @@ public:
 private:
     friend class CollectionCatalog::iterator;
 
-    Collection* _lookupCollectionByUUID(WithLock, CollectionUUID uuid) const;
+    std::shared_ptr<Collection> _lookupCollectionByUUID(WithLock, CollectionUUID uuid) const;
 
     const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
                                                            const stdx::lock_guard<Latch>&);
@@ -301,9 +307,11 @@ private:
         _shadowCatalog;
 
     using CollectionCatalogMap =
-        stdx::unordered_map<CollectionUUID, std::unique_ptr<Collection>, CollectionUUID::Hash>;
-    using OrderedCollectionMap = std::map<std::pair<std::string, CollectionUUID>, Collection*>;
-    using NamespaceCollectionMap = stdx::unordered_map<NamespaceString, Collection*>;
+        stdx::unordered_map<CollectionUUID, std::shared_ptr<Collection>, CollectionUUID::Hash>;
+    using OrderedCollectionMap =
+        std::map<std::pair<std::string, CollectionUUID>, std::shared_ptr<Collection>>;
+    using NamespaceCollectionMap =
+        stdx::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using DatabaseProfileLevelMap = StringMap<int>;
 
     CollectionCatalogMap _catalog;

@@ -125,7 +125,7 @@ public:
      * Uses a forward collection scan stage to get the docs, and populates 'out' with
      * the results.
      */
-    void getCollContents(Collection* collection, vector<BSONObj>* out) {
+    void getCollContents(const Collection* collection, vector<BSONObj>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
@@ -145,7 +145,7 @@ public:
         }
     }
 
-    void getRecordIds(Collection* collection,
+    void getRecordIds(const Collection* collection,
                       CollectionScanParams::Direction direction,
                       vector<RecordId>* out) {
         WorkingSet ws;
@@ -244,7 +244,7 @@ public:
         // Verify the contents of the resulting collection.
         {
             AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-            Collection* collection = ctx.getCollection();
+            const Collection* collection = ctx.getCollection();
 
             vector<BSONObj> objs;
             getCollContents(collection, &objs);
@@ -351,7 +351,7 @@ public:
         // Check the contents of the collection.
         {
             AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-            Collection* collection = ctx.getCollection();
+            const Collection* collection = ctx.getCollection();
 
             vector<BSONObj> objs;
             getCollContents(collection, &objs);

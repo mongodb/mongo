@@ -138,7 +138,7 @@ public:
         boost::optional<AutoGetCollectionForReadCommand> ctx;
         ctx.emplace(opCtx,
                     CommandHelpers::parseNsCollectionRequired(dbname, cmdObj),
-                    AutoGetCollection::ViewMode::kViewsPermitted);
+                    AutoGetCollectionViewMode::kViewsPermitted);
         const auto nss = ctx->getNss();
 
         CountCommand request(NamespaceStringOrUUID(NamespaceString{}));
@@ -173,7 +173,7 @@ public:
                                 result);
         }
 
-        Collection* const collection = ctx->getCollection();
+        const Collection* const collection = ctx->getCollection();
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
@@ -208,7 +208,7 @@ public:
         boost::optional<AutoGetCollectionForReadCommand> ctx;
         ctx.emplace(opCtx,
                     CommandHelpers::parseNsOrUUID(dbname, cmdObj),
-                    AutoGetCollection::ViewMode::kViewsPermitted);
+                    AutoGetCollectionViewMode::kViewsPermitted);
         const auto& nss = ctx->getNss();
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -236,7 +236,7 @@ public:
             return true;
         }
 
-        Collection* const collection = ctx->getCollection();
+        const Collection* const collection = ctx->getCollection();
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.

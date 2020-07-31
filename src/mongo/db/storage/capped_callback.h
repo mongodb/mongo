@@ -56,11 +56,11 @@ public:
     /**
      * Returns true if there may be waiters.
      */
-    virtual bool haveCappedWaiters() = 0;
+    virtual bool haveCappedWaiters() const = 0;
 
     /**
      * Used to notify any waiters when new documents may be visible in the capped collection.
      */
-    virtual void notifyCappedWaitersIfNeeded() = 0;
+    virtual void notifyCappedWaitersIfNeeded() const = 0;
 };
 }  // namespace mongo

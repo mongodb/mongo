@@ -190,7 +190,7 @@ void checkCollation(OperationContext* opCtx, const ShardsvrShardCollectionReques
     AutoGetCollection autoColl(opCtx,
                                *request.get_shardsvrShardCollection(),
                                MODE_IS,
-                               AutoGetCollection::ViewMode::kViewsForbidden);
+                               AutoGetCollectionViewMode::kViewsForbidden);
 
     const auto actualCollator = [&]() -> const CollatorInterface* {
         const auto* const coll = autoColl.getCollection();

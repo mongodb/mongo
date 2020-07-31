@@ -1644,9 +1644,9 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
     // Register a UUID/Collection pair in the CollectionCatalog.
     const CollectionUUID uuid = UUID::gen();
     const NamespaceString nss("test.testns");
-    std::unique_ptr<Collection> collection = std::make_unique<CollectionMock>(nss);
+    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
     CollectionCatalog& catalog = CollectionCatalog::get(opCtx.get());
-    catalog.registerCollection(uuid, &collection);
+    catalog.registerCollection(uuid, std::move(collection));
     QueryRequest qr(NamespaceStringOrUUID("test", uuid));
     // Ensure a call to refreshNSS succeeds.
     qr.refreshNSS(opCtx.get());

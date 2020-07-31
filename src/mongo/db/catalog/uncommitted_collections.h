@@ -56,7 +56,7 @@ public:
             _nssIndex.erase(nss);
         }
 
-        std::map<UUID, std::unique_ptr<Collection>> _collections;
+        std::map<UUID, std::shared_ptr<Collection>> _collections;
         std::map<NamespaceString, UUID> _nssIndex;
     };
 
@@ -80,11 +80,13 @@ public:
 
     static UncommittedCollections& get(OperationContext* opCtx);
 
-    static void addToTxn(OperationContext* opCtx, std::unique_ptr<Collection> coll);
+    static void addToTxn(OperationContext* opCtx, std::shared_ptr<Collection> coll);
 
-    static Collection* getForTxn(OperationContext* opCtx, const NamespaceStringOrUUID& nss);
-    static Collection* getForTxn(OperationContext* opCtx, const NamespaceString& nss);
-    static Collection* getForTxn(OperationContext* opCtx, const UUID& uuid);
+    static std::shared_ptr<Collection> getForTxn(OperationContext* opCtx,
+                                                 const NamespaceStringOrUUID& nss);
+    static std::shared_ptr<Collection> getForTxn(OperationContext* opCtx,
+                                                 const NamespaceString& nss);
+    static std::shared_ptr<Collection> getForTxn(OperationContext* opCtx, const UUID& uuid);
 
     /**
      * Registers any uncommitted collections with the CollectionCatalog. If registering a collection

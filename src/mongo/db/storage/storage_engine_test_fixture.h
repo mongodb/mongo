@@ -69,8 +69,8 @@ public:
                 _storageEngine->getCatalog()->createCollection(opCtx, ns, options, true));
             wuow.commit();
         }
-        std::unique_ptr<Collection> coll = std::make_unique<CollectionMock>(ns, catalogId);
-        CollectionCatalog::get(opCtx).registerCollection(options.uuid.get(), &coll);
+        std::shared_ptr<Collection> coll = std::make_shared<CollectionMock>(ns, catalogId);
+        CollectionCatalog::get(opCtx).registerCollection(options.uuid.get(), std::move(coll));
 
         return {{_storageEngine->getCatalog()->getEntry(catalogId)}};
     }

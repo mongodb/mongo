@@ -155,7 +155,9 @@ TimestampedBSONObj makeOplogEntry(OpTime opTime) {
 /**
  * Counts the number of keys in an index using an IndexAccessMethod::validate call.
  */
-int64_t getIndexKeyCount(OperationContext* opCtx, IndexCatalog* cat, const IndexDescriptor* desc) {
+int64_t getIndexKeyCount(OperationContext* opCtx,
+                         const IndexCatalog* cat,
+                         const IndexDescriptor* desc) {
     auto idx = cat->getEntry(desc)->accessMethod();
     int64_t numKeys;
     ValidateResults fullRes;

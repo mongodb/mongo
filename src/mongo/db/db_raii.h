@@ -104,14 +104,14 @@ public:
     AutoGetCollectionForRead(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollection::ViewMode viewMode = AutoGetCollection::ViewMode::kViewsForbidden,
+        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
         Date_t deadline = Date_t::max());
 
     Database* getDb() const {
         return _autoColl->getDb();
     }
 
-    Collection* getCollection() const {
+    const Collection* getCollection() const {
         return _autoColl->getCollection();
     }
 
@@ -132,7 +132,7 @@ private:
 
     // This field is optional, because the code to wait for majority committed snapshot needs to
     // release locks in order to block waiting
-    boost::optional<AutoGetCollection> _autoColl;
+    boost::optional<AutoGetCollectionBase<CatalogCollectionLookupForRead>> _autoColl;
 };
 
 /**
@@ -147,7 +147,7 @@ public:
     AutoGetCollectionForReadCommand(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollection::ViewMode viewMode = AutoGetCollection::ViewMode::kViewsForbidden,
+        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
         Date_t deadline = Date_t::max(),
         AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
 
@@ -155,7 +155,7 @@ public:
         return _autoCollForRead.getDb();
     }
 
-    Collection* getCollection() const {
+    const Collection* getCollection() const {
         return _autoCollForRead.getCollection();
     }
 

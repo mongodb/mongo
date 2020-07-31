@@ -51,7 +51,7 @@ namespace mongo {
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
     OperationContext* opCtx,
     StringData ns,
-    Collection* collection,
+    const Collection* collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const Direction direction) {
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();

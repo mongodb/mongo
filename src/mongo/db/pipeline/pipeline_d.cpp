@@ -105,7 +105,7 @@ namespace {
  * percentage of the collection.
  */
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorExecutor(
-    Collection* coll,
+    const Collection* coll,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     long long sampleSize,
     long long numRecords) {
@@ -176,7 +176,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
     const intrusive_ptr<ExpressionContext>& expCtx,
-    Collection* collection,
+    const Collection* collection,
     const NamespaceString& nss,
     BSONObj queryObj,
     BSONObj projectionObj,
@@ -262,7 +262,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
  *
  * The 'collection' is required to exist. Throws if no usable 2d or 2dsphere index could be found.
  */
-StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx, Collection* collection) {
+StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx, const Collection* collection) {
     invariant(collection);
 
     std::vector<const IndexDescriptor*> idxs;
@@ -302,7 +302,7 @@ StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx, Collection* c
 }  // namespace
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutor(Collection* collection,
+PipelineD::buildInnerQueryExecutor(const Collection* collection,
                                    const NamespaceString& nss,
                                    const AggregationRequest* aggRequest,
                                    Pipeline* pipeline) {
@@ -352,7 +352,7 @@ PipelineD::buildInnerQueryExecutor(Collection* collection,
                     ? DocumentSourceCursor::CursorType::kEmptyDocuments
                     : DocumentSourceCursor::CursorType::kRegular;
                 auto attachExecutorCallback =
-                    [cursorType](Collection* collection,
+                    [cursorType](const Collection* collection,
                                  std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                                  Pipeline* pipeline) {
                         auto cursor = DocumentSourceCursor::create(
@@ -376,7 +376,7 @@ PipelineD::buildInnerQueryExecutor(Collection* collection,
 }
 
 void PipelineD::attachInnerQueryExecutorToPipeline(
-    Collection* collection,
+    const Collection* collection,
     PipelineD::AttachExecutorCallback attachExecutorCallback,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     Pipeline* pipeline) {
@@ -388,7 +388,7 @@ void PipelineD::attachInnerQueryExecutorToPipeline(
     }
 }
 
-void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(Collection* collection,
+void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(const Collection* collection,
                                                            const NamespaceString& nss,
                                                            const AggregationRequest* aggRequest,
                                                            Pipeline* pipeline) {
@@ -487,7 +487,7 @@ auto buildProjectionForPushdown(const DepsTracker& deps, Pipeline* pipeline) {
 }  // namespace
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
+PipelineD::buildInnerQueryExecutorGeneric(const Collection* collection,
                                           const NamespaceString& nss,
                                           const AggregationRequest* aggRequest,
                                           Pipeline* pipeline) {
@@ -565,7 +565,7 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
         (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage());
 
     auto attachExecutorCallback =
-        [cursorType, trackOplogTS](Collection* collection,
+        [cursorType, trackOplogTS](const Collection* collection,
                                    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                                    Pipeline* pipeline) {
             auto cursor = DocumentSourceCursor::create(
@@ -576,7 +576,7 @@ PipelineD::buildInnerQueryExecutorGeneric(Collection* collection,
 }
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutorGeoNear(Collection* collection,
+PipelineD::buildInnerQueryExecutorGeoNear(const Collection* collection,
                                           const NamespaceString& nss,
                                           const AggregationRequest* aggRequest,
                                           Pipeline* pipeline) {
@@ -620,7 +620,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(Collection* collection,
                                    locationField = geoNearStage->getLocationField(),
                                    distanceMultiplier =
                                        geoNearStage->getDistanceMultiplier().value_or(1.0)](
-                                      Collection* collection,
+                                      const Collection* collection,
                                       std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                                       Pipeline* pipeline) {
         auto cursor = DocumentSourceGeoNearCursor::create(collection,
@@ -638,7 +638,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(Collection* collection,
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prepareExecutor(
     const intrusive_ptr<ExpressionContext>& expCtx,
-    Collection* collection,
+    const Collection* collection,
     const NamespaceString& nss,
     Pipeline* pipeline,
     const boost::intrusive_ptr<DocumentSourceSort>& sortStage,

@@ -157,7 +157,7 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
                                                                   bool addShardName) {
     AutoGetCollectionForReadCommand autoColl(opCtx, ns);
 
-    Collection* collection = autoColl.getCollection();
+    const Collection* collection = autoColl.getCollection();
     std::vector<Document> indexStats;
     if (!collection) {
         LOGV2_DEBUG(23881,
@@ -233,7 +233,7 @@ Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCt
                 str::stream() << "Database [" << nss.db().toString() << "] not found."};
     }
 
-    Collection* collection = autoColl.getCollection();
+    const Collection* collection = autoColl.getCollection();
 
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,
@@ -265,7 +265,7 @@ BSONObj CommonMongodProcessInterface::getCollectionOptions(OperationContext* opC
     if (!autoColl.getDb()) {
         return collectionOptions;
     }
-    Collection* collection = autoColl.getCollection();
+    const Collection* collection = autoColl.getCollection();
     if (!collection) {
         return collectionOptions;
     }
@@ -291,7 +291,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
         : expCtx->ns;
     autoColl.emplace(expCtx->opCtx,
                      nsOrUUID,
-                     AutoGetCollection::ViewMode::kViewsForbidden,
+                     AutoGetCollectionViewMode::kViewsForbidden,
                      Date_t::max(),
                      AutoStatsTracker::LogMode::kUpdateTop);
 

@@ -120,7 +120,7 @@ void beginQueryOp(OperationContext* opCtx,
 }
 
 void endQueryOp(OperationContext* opCtx,
-                Collection* collection,
+                const Collection* collection,
                 const PlanExecutor& exec,
                 long long numResults,
                 CursorId cursorId) {
@@ -613,8 +613,8 @@ bool runQuery(OperationContext* opCtx,
                 "query"_attr = redact(cq->toStringShort()));
 
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
-    AutoGetCollectionForReadCommand ctx(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden);
-    Collection* const collection = ctx.getCollection();
+    AutoGetCollectionForReadCommand ctx(opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
+    const Collection* const collection = ctx.getCollection();
     const QueryRequest& qr = cq->getQueryRequest();
 
     opCtx->setExhaust(qr.isExhaust());

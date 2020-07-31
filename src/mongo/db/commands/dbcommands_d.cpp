@@ -276,7 +276,7 @@ public:
             // We drop and re-acquire these locks every document because md5'ing is expensive
             unique_ptr<AutoGetCollectionForReadCommand> ctx(
                 new AutoGetCollectionForReadCommand(opCtx, nss));
-            Collection* coll = ctx->getCollection();
+            const Collection* coll = ctx->getCollection();
 
             auto exec = uassertStatusOK(getExecutor(opCtx,
                                                     coll,

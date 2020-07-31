@@ -142,7 +142,7 @@ public:
         return numResults;
     }
 
-    void forceReplanning(Collection* collection, CanonicalQuery* cq) {
+    void forceReplanning(const Collection* collection, CanonicalQuery* cq) {
         // Get planner params.
         QueryPlannerParams plannerParams;
         fillOutPlannerParams(&_opCtx, collection, cq, &plannerParams);
@@ -184,7 +184,7 @@ protected:
  */
 TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
     AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-    Collection* collection = ctx.getCollection();
+    const Collection* collection = ctx.getCollection();
     ASSERT(collection);
 
     // Query can be answered by either index on "a" or index on "b".
@@ -235,7 +235,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
  */
 TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-    Collection* collection = ctx.getCollection();
+    const Collection* collection = ctx.getCollection();
     ASSERT(collection);
 
     // Query can be answered by either index on "a" or index on "b".
@@ -288,7 +288,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
  */
 TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
     AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-    Collection* collection = ctx.getCollection();
+    const Collection* collection = ctx.getCollection();
     ASSERT(collection);
 
     // Never run - just used as a key for the cache's get() functions, since all of the other
@@ -347,7 +347,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
 
 TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
     AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-    Collection* collection = ctx.getCollection();
+    const Collection* collection = ctx.getCollection();
     ASSERT(collection);
 
     // Never run - just used as a key for the cache's get() functions, since all of the other
@@ -406,7 +406,7 @@ TEST_F(QueryStageCachedPlan, EntriesAreNotDeactivatedWhenInactiveEntriesDisabled
     ON_BLOCK_EXIT([] { internalQueryCacheDisableInactiveEntries.store(false); });
 
     AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-    Collection* collection = ctx.getCollection();
+    const Collection* collection = ctx.getCollection();
     ASSERT(collection);
 
     // Never run - just used as a key for the cache's get() functions, since all of the other
@@ -449,7 +449,7 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
 
     boost::optional<AutoGetCollectionForReadCommand> readLock;
     readLock.emplace(&_opCtx, nss);
-    Collection* collection = readLock->getCollection();
+    const Collection* collection = readLock->getCollection();
     ASSERT(collection);
 
     // Query can be answered by either index on "a" or index on "b".
@@ -491,7 +491,7 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
 
     boost::optional<AutoGetCollectionForReadCommand> readLock;
     readLock.emplace(&_opCtx, nss);
-    Collection* collection = readLock->getCollection();
+    const Collection* collection = readLock->getCollection();
     ASSERT(collection);
 
     // Query can be answered by either index on "a" or index on "b".

@@ -103,7 +103,7 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             ON_BLOCK_EXIT([&] {
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                 AutoGetCollection autoColl(
-                    opCtx.get(), nss, MODE_IX, AutoGetCollection::ViewMode::kViewsForbidden);
+                    opCtx.get(), nss, MODE_IX, AutoGetCollectionViewMode::kViewsForbidden);
 
                 auto* const csr = CollectionShardingRuntime::get(opCtx.get(), nss);
                 auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx.get(), csr);
@@ -161,7 +161,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
         {
             AutoGetCollection autoColl(
-                opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsForbidden);
+                opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
 
             auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
@@ -235,7 +235,7 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
             AutoGetCollection autoColl(_opCtx,
                                        _nss,
                                        MODE_S,
-                                       AutoGetCollection::ViewMode::kViewsForbidden,
+                                       AutoGetCollectionViewMode::kViewsForbidden,
                                        _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                            Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
 
@@ -285,7 +285,7 @@ void ScopedShardVersionCriticalSection::enterCommitPhase() {
     AutoGetCollection autoColl(_opCtx,
                                _nss,
                                MODE_IS,
-                               AutoGetCollection::ViewMode::kViewsForbidden,
+                               AutoGetCollectionViewMode::kViewsForbidden,
                                _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);

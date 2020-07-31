@@ -123,7 +123,7 @@ public:
         return count;
     }
 
-    void getRecordIds(Collection* collection,
+    void getRecordIds(const Collection* collection,
                       CollectionScanParams::Direction direction,
                       vector<RecordId>* out) {
         WorkingSet ws;

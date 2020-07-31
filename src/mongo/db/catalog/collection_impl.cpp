@@ -259,19 +259,21 @@ CollectionImpl::~CollectionImpl() {
         _recordStore->setCappedCallback(nullptr);
         _cappedNotifier->kill();
     }
+}
 
+void CollectionImpl::onDeregisterFromCatalog() {
     if (ns().isOplog()) {
         repl::clearLocalOplogPtr();
     }
 }
 
-std::unique_ptr<Collection> CollectionImpl::FactoryImpl::make(
+std::shared_ptr<Collection> CollectionImpl::FactoryImpl::make(
     OperationContext* opCtx,
     const NamespaceString& nss,
     RecordId catalogId,
     CollectionUUID uuid,
     std::unique_ptr<RecordStore> rs) const {
-    return std::make_unique<CollectionImpl>(opCtx, nss, catalogId, uuid, std::move(rs));
+    return std::make_shared<CollectionImpl>(opCtx, nss, catalogId, uuid, std::move(rs));
 }
 
 SharedCollectionDecorations* CollectionImpl::getSharedDecorations() const {
@@ -665,13 +667,13 @@ void CollectionImpl::setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapsh
     }
 }
 
-bool CollectionImpl::haveCappedWaiters() {
+bool CollectionImpl::haveCappedWaiters() const {
     // Waiters keep a shared_ptr to '_cappedNotifier', so there are waiters if this CollectionImpl's
     // shared_ptr is not unique (use_count > 1).
     return _cappedNotifier.use_count() > 1;
 }
 
-void CollectionImpl::notifyCappedWaitersIfNeeded() {
+void CollectionImpl::notifyCappedWaitersIfNeeded() const {
     // If there is a notifier object and another thread is waiting on it, then we notify
     // waiters of this document insert.
     if (haveCappedWaiters())
@@ -878,6 +880,10 @@ bool CollectionImpl::isCapped() const {
 }
 
 CappedCallback* CollectionImpl::getCappedCallback() {
+    return this;
+}
+
+const CappedCallback* CollectionImpl::getCappedCallback() const {
     return this;
 }
 
@@ -1189,7 +1195,7 @@ StatusWith<std::vector<BSONObj>> CollectionImpl::addCollationDefaultsToIndexSpec
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExecutor(
     OperationContext* opCtx,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    ScanDirection scanDirection) {
+    ScanDirection scanDirection) const {
     auto isForward = scanDirection == ScanDirection::kForward;
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
     return InternalPlanner::collectionScan(opCtx, _ns.ns(), this, yieldPolicy, direction);

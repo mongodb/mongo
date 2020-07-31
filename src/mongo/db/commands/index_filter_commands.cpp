@@ -65,7 +65,7 @@ using namespace mongo;
  * Retrieves a collection's query settings and plan cache from the database.
  */
 static Status getQuerySettingsAndPlanCache(OperationContext* opCtx,
-                                           Collection* collection,
+                                           const Collection* collection,
                                            const string& ns,
                                            QuerySettings** querySettingsOut,
                                            PlanCache** planCacheOut) {

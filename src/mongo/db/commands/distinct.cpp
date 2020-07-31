@@ -136,7 +136,7 @@ public:
         boost::optional<AutoGetCollectionForReadCommand> ctx;
         ctx.emplace(opCtx,
                     CommandHelpers::parseNsCollectionRequired(dbname, cmdObj),
-                    AutoGetCollection::ViewMode::kViewsPermitted);
+                    AutoGetCollectionViewMode::kViewsPermitted);
         const auto nss = ctx->getNss();
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
@@ -170,7 +170,7 @@ public:
                                 result);
         }
 
-        Collection* const collection = ctx->getCollection();
+        const Collection* const collection = ctx->getCollection();
 
         auto executor = uassertStatusOK(
             getExecutorDistinct(collection, QueryPlannerParams::DEFAULT, &parsedDistinct));
@@ -190,7 +190,7 @@ public:
         boost::optional<AutoGetCollectionForReadCommand> ctx;
         ctx.emplace(opCtx,
                     CommandHelpers::parseNsOrUUID(dbname, cmdObj),
-                    AutoGetCollection::ViewMode::kViewsPermitted);
+                    AutoGetCollectionViewMode::kViewsPermitted);
         const auto& nss = ctx->getNss();
 
         if (!ctx->getView()) {
@@ -231,7 +231,7 @@ public:
             return true;
         }
 
-        Collection* const collection = ctx->getCollection();
+        const Collection* const collection = ctx->getCollection();
 
         auto executor =
             getExecutorDistinct(collection, QueryPlannerParams::DEFAULT, &parsedDistinct);

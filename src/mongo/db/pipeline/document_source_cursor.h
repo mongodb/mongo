@@ -63,7 +63,7 @@ public:
      * $cursor stage can return a sequence of empty documents for the caller to count.
      */
     static boost::intrusive_ptr<DocumentSourceCursor> create(
-        Collection* collection,
+        const Collection* collection,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         CursorType cursorType,
@@ -112,7 +112,7 @@ public:
     }
 
 protected:
-    DocumentSourceCursor(Collection* collection,
+    DocumentSourceCursor(const Collection* collection,
                          std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          CursorType cursorType,

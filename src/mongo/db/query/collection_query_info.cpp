@@ -160,8 +160,8 @@ void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, Collection* 
 }
 
 void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
-                                        Collection* coll,
-                                        const PlanSummaryStats& summaryStats) {
+                                        const Collection* coll,
+                                        const PlanSummaryStats& summaryStats) const {
     auto& collectionIndexUsageTracker =
         CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations());
 

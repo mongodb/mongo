@@ -256,7 +256,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     // Read the most up to date data.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
     AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
-    Collection* collection = autoCollection.getCollection();
+    const Collection* collection = autoCollection.getCollection();
 
     // Must not be interruptible. This fail point is used to test the scenario where the index
     // build's OperationContext is interrupted by an abort, which will subsequently remove index

@@ -69,11 +69,13 @@ Database* AutoGetDb::ensureDbExists() {
     return _db;
 }
 
-AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
-                                     const NamespaceStringOrUUID& nsOrUUID,
-                                     LockMode modeColl,
-                                     ViewMode viewMode,
-                                     Date_t deadline)
+template <typename CatalogCollectionLookupT>
+AutoGetCollectionBase<CatalogCollectionLookupT>::AutoGetCollectionBase(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    LockMode modeColl,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline)
     : _autoDb(opCtx,
               !nsOrUUID.dbname().empty() ? nsOrUUID.dbname() : nsOrUUID.nss()->db(),
               isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
@@ -110,7 +112,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     if (!db)
         return;
 
-    _coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, _resolvedNss);
+    _coll = CatalogCollectionLookupT::lookupCollection(opCtx, _resolvedNss);
     invariant(!nsOrUUID.uuid() || _coll,
               str::stream() << "Collection for " << _resolvedNss.ns()
                             << " disappeared after successufully resolving "
@@ -144,7 +146,17 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     _view = ViewCatalog::get(db)->lookup(opCtx, _resolvedNss.ns());
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
-            !_view || viewMode == kViewsPermitted);
+            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
+}
+
+CatalogCollectionLookup::CollectionStorage CatalogCollectionLookup::lookupCollection(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    return CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+}
+
+CatalogCollectionLookupForRead::CollectionStorage CatalogCollectionLookupForRead::lookupCollection(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    return CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForRead(opCtx, nss);
 }
 
 LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
@@ -204,5 +216,8 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
     _oplogInfo = repl::LocalOplogInfo::get(opCtx);
     _oplog = _oplogInfo->getCollection();
 }
+
+template class AutoGetCollectionBase<CatalogCollectionLookup>;
+template class AutoGetCollectionBase<CatalogCollectionLookupForRead>;
 
 }  // namespace mongo

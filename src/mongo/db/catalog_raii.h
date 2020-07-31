@@ -97,18 +97,24 @@ private:
  * Any acquired locks may be released when this object goes out of scope, therefore the database
  * and the collection references returned by this class should not be retained.
  */
-class AutoGetCollection {
-    AutoGetCollection(const AutoGetCollection&) = delete;
-    AutoGetCollection& operator=(const AutoGetCollection&) = delete;
+
+enum class AutoGetCollectionViewMode { kViewsPermitted, kViewsForbidden };
+
+template <typename CatalogCollectionLookupT>
+class AutoGetCollectionBase {
+    AutoGetCollectionBase(const AutoGetCollectionBase&) = delete;
+    AutoGetCollectionBase& operator=(const AutoGetCollectionBase&) = delete;
+
+    using CollectionStorage = typename CatalogCollectionLookupT::CollectionStorage;
+    using CollectionPtr = typename CatalogCollectionLookupT::CollectionPtr;
 
 public:
-    enum ViewMode { kViewsPermitted, kViewsForbidden };
-
-    AutoGetCollection(OperationContext* opCtx,
-                      const NamespaceStringOrUUID& nsOrUUID,
-                      LockMode modeColl,
-                      ViewMode viewMode = kViewsForbidden,
-                      Date_t deadline = Date_t::max());
+    AutoGetCollectionBase(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nsOrUUID,
+        LockMode modeColl,
+        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        Date_t deadline = Date_t::max());
 
     /**
      * Returns the database, or nullptr if it didn't exist.
@@ -127,8 +133,8 @@ public:
     /**
      * Returns nullptr if the collection didn't exist.
      */
-    Collection* getCollection() const {
-        return _coll;
+    CollectionPtr getCollection() const {
+        return CatalogCollectionLookupT::toCollectionPtr(_coll);
     }
 
     /**
@@ -156,8 +162,32 @@ private:
     // might need to be relocked for the correct namespace
     boost::optional<Lock::CollectionLock> _collLock;
 
-    Collection* _coll = nullptr;
+    CollectionStorage _coll = nullptr;
     std::shared_ptr<ViewDefinition> _view;
+};
+
+struct CatalogCollectionLookup {
+    using CollectionStorage = Collection*;
+    using CollectionPtr = Collection*;
+
+    static CollectionStorage lookupCollection(OperationContext* opCtx, const NamespaceString& nss);
+    static CollectionPtr toCollectionPtr(CollectionStorage collection) {
+        return collection;
+    }
+};
+struct CatalogCollectionLookupForRead {
+    using CollectionStorage = std::shared_ptr<const Collection>;
+    using CollectionPtr = const Collection*;
+
+    static CollectionStorage lookupCollection(OperationContext* opCtx, const NamespaceString& nss);
+    static CollectionPtr toCollectionPtr(const CollectionStorage& collection) {
+        return collection.get();
+    }
+};
+
+class AutoGetCollection : public AutoGetCollectionBase<CatalogCollectionLookup> {
+public:
+    using AutoGetCollectionBase::AutoGetCollectionBase;
 };
 
 /**

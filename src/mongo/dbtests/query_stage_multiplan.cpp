@@ -370,7 +370,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     addIndex(BSON("b" << 1));
 
     AutoGetCollectionForReadCommand ctx(_opCtx.get(), nss);
-    Collection* collection = ctx.getCollection();
+    const Collection* collection = ctx.getCollection();
 
     // Query for both 'a' and 'b' and sort on 'b'.
     auto qr = std::make_unique<QueryRequest>(nss);
@@ -543,7 +543,7 @@ TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
     addIndex(BSON("foo" << -1 << "bar" << 1));
 
     AutoGetCollectionForReadCommand ctx(_opCtx.get(), nss);
-    Collection* coll = ctx.getCollection();
+    const Collection* coll = ctx.getCollection();
 
     // Create the executor (Matching all documents).
     auto qr = std::make_unique<QueryRequest>(nss);

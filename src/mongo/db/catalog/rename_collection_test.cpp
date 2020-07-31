@@ -1203,7 +1203,8 @@ TEST_F(RenameCollectionTest, CollectionPointerRemainsValidThroughRename) {
 
 TEST_F(RenameCollectionTest, CatalogPointersRenameValidThroughRenameForApplyOps) {
     _createCollection(_opCtx.get(), _sourceNss);
-    Collection* sourceColl = AutoGetCollectionForRead(_opCtx.get(), _sourceNss).getCollection();
+    const Collection* sourceColl =
+        AutoGetCollectionForRead(_opCtx.get(), _sourceNss).getCollection();
     ASSERT(sourceColl);
 
     auto uuid = UUID::gen();
@@ -1211,7 +1212,8 @@ TEST_F(RenameCollectionTest, CatalogPointersRenameValidThroughRenameForApplyOps)
     ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), _sourceNss.db().toString(), uuid, cmd, {}));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
 
-    Collection* targetColl = AutoGetCollectionForRead(_opCtx.get(), _targetNss).getCollection();
+    const Collection* targetColl =
+        AutoGetCollectionForRead(_opCtx.get(), _targetNss).getCollection();
     ASSERT(targetColl);
     ASSERT_EQ(targetColl, sourceColl);
     ASSERT_EQ(targetColl->ns(), _targetNss);

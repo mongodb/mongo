@@ -63,14 +63,14 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     try {
         autoColl.emplace(opCtx,
                          nss,
-                         AutoGetCollection::ViewMode::kViewsForbidden,
+                         AutoGetCollectionViewMode::kViewsForbidden,
                          waitForLock ? Date_t::max() : Date_t::now());
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         LOGV2_DEBUG(3088801, 2, "Failed to retrieve storage statistics", logAttrs(nss));
         return Status::OK();
     }
 
-    Collection* collection = autoColl->getCollection();  // Will be set if present
+    const Collection* collection = autoColl->getCollection();  // Will be set if present
     if (!autoColl->getDb() || !collection) {
         result->appendNumber("size", 0);
         result->appendNumber("count", 0);
@@ -95,7 +95,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     if (numRecords)
         result->append("avgObjSize", collection->averageObjectSize(opCtx));
 
-    RecordStore* recordStore = collection->getRecordStore();
+    const RecordStore* recordStore = collection->getRecordStore();
     auto storageSize =
         static_cast<long long>(recordStore->storageSize(opCtx, result, verbose ? 1 : 0));
     result->appendNumber("storageSize", storageSize / scale);
@@ -107,7 +107,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 
     recordStore->appendCustomStats(opCtx, result, scale);
 
-    IndexCatalog* indexCatalog = collection->getIndexCatalog();
+    const IndexCatalog* indexCatalog = collection->getIndexCatalog();
     result->append("nindexes", indexCatalog->numIndexesTotal(opCtx));
 
     BSONObjBuilder indexDetails;
@@ -154,7 +154,7 @@ Status appendCollectionRecordCount(OperationContext* opCtx,
                 str::stream() << "Database [" << nss.db().toString() << "] not found."};
     }
 
-    Collection* collection = ctx.getCollection();
+    const Collection* collection = ctx.getCollection();
     if (!collection) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Collection [" << nss.toString() << "] not found."};

@@ -236,7 +236,7 @@ public:
             boost::optional<AutoGetCollectionForReadCommand> ctx;
             ctx.emplace(opCtx,
                         CommandHelpers::parseNsCollectionRequired(_dbName, _request.body),
-                        AutoGetCollection::ViewMode::kViewsPermitted);
+                        AutoGetCollectionViewMode::kViewsPermitted);
             const auto nss = ctx->getNss();
 
             // Parse the command BSON to a QueryRequest.
@@ -285,7 +285,7 @@ public:
 
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
-            Collection* const collection = ctx->getCollection();
+            const Collection* const collection = ctx->getCollection();
 
             // Get the execution plan for the query.
             bool permitYield = true;
@@ -359,7 +359,7 @@ public:
             boost::optional<AutoGetCollectionForReadCommand> ctx;
             ctx.emplace(opCtx,
                         CommandHelpers::parseNsOrUUID(_dbName, _request.body),
-                        AutoGetCollection::ViewMode::kViewsPermitted);
+                        AutoGetCollectionViewMode::kViewsPermitted);
             const auto& nss = ctx->getNss();
 
             qr->refreshNSS(opCtx);
@@ -408,7 +408,7 @@ public:
                 return;
             }
 
-            Collection* const collection = ctx->getCollection();
+            const Collection* const collection = ctx->getCollection();
 
             if (cq->getQueryRequest().isReadOnce()) {
                 // The readOnce option causes any storage-layer cursors created during plan

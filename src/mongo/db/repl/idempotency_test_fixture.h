@@ -151,7 +151,7 @@ protected:
         return obj;
     };
 
-    std::string computeDataHash(Collection* collection);
+    std::string computeDataHash(const Collection* collection);
     virtual std::string getStatesString(const std::vector<CollectionState>& state1,
                                         const std::vector<CollectionState>& state2,
                                         const std::vector<OplogEntry>& ops);

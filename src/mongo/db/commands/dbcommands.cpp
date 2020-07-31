@@ -468,7 +468,7 @@ public:
 
         const NamespaceString nss(ns);
         AutoGetCollectionForReadCommand ctx(opCtx, nss);
-        Collection* collection = ctx.getCollection();
+        const Collection* collection = ctx.getCollection();
 
         const auto collDesc =
             CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);

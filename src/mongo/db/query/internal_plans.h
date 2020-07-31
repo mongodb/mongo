@@ -72,7 +72,7 @@ public:
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScan(
         OperationContext* opCtx,
         StringData ns,
-        Collection* collection,
+        const Collection* collection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         const Direction direction = FORWARD);
 

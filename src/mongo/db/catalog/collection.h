@@ -109,7 +109,7 @@ public:
     /**
      * Wakes up all threads waiting.
      */
-    void notifyAll();
+    void notifyAll() const;
 
     /**
      * Waits until 'deadline', or until notifyAll() is called to indicate that new
@@ -147,7 +147,7 @@ private:
     //
     // The condition which '_cappedNewDataNotifier' is being notified of is an increment of this
     // counter. Access to this counter is synchronized with '_mutex'.
-    uint64_t _version = 0;
+    mutable uint64_t _version = 0;
 
     // True once the notifier is dead.
     bool _dead = false;
@@ -190,7 +190,7 @@ public:
          * Constructs a Collection object. This does not persist any state to the storage engine,
          * only constructs an in-memory representation of what already exists on disk.
          */
-        virtual std::unique_ptr<Collection> make(OperationContext* opCtx,
+        virtual std::shared_ptr<Collection> make(OperationContext* opCtx,
                                                  const NamespaceString& nss,
                                                  RecordId catalogId,
                                                  CollectionUUID uuid,
@@ -490,6 +490,7 @@ public:
      * The storage engine interacts with capped collections through a CappedCallback interface.
      */
     virtual CappedCallback* getCappedCallback() = 0;
+    virtual const CappedCallback* getCappedCallback() const = 0;
 
     /**
      * Get a pointer to a capped insert notifier object. The caller can wait on this object
@@ -519,7 +520,7 @@ public:
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must error.
      */
-    virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() = 0;
+    virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() const = 0;
 
     virtual void setMinimumVisibleSnapshot(const Timestamp name) = 0;
 
@@ -547,7 +548,7 @@ public:
     virtual std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
         OperationContext* opCtx,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
-        ScanDirection scanDirection) = 0;
+        ScanDirection scanDirection) const = 0;
 
     virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
 
@@ -558,6 +559,11 @@ public:
      * onto the global lock in exclusive mode.
      */
     virtual void establishOplogCollectionForLogging(OperationContext* opCtx) = 0;
+
+    /**
+     * Called when this Collection is deregistered from the catalog
+     */
+    virtual void onDeregisterFromCatalog() = 0;
 
     friend auto logAttrs(const Collection& col) {
         return logv2::multipleAttrs(col.ns(), col.uuid());

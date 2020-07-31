@@ -59,7 +59,7 @@ namespace mongo {
 const char* CachedPlanStage::kStageType = "CACHED_PLAN";
 
 CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
-                                 Collection* collection,
+                                 const Collection* collection,
                                  WorkingSet* ws,
                                  CanonicalQuery* cq,
                                  const QueryPlannerParams& params,

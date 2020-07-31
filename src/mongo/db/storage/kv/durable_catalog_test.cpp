@@ -93,9 +93,10 @@ public:
             ASSERT_OK(swColl.getStatus());
             std::pair<RecordId, std::unique_ptr<RecordStore>> coll = std::move(swColl.getValue());
             _catalogId = coll.first;
-            std::unique_ptr<Collection> collection =
-                std::make_unique<CollectionMock>(_nss, _catalogId);
-            CollectionCatalog::get(opCtx.get()).registerCollection(options.uuid.get(), &collection);
+            std::shared_ptr<Collection> collection =
+                std::make_shared<CollectionMock>(_nss, _catalogId);
+            CollectionCatalog::get(opCtx.get())
+                .registerCollection(options.uuid.get(), std::move(collection));
             wuow.commit();
         }
     }

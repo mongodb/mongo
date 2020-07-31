@@ -678,7 +678,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         uassertStatusOK(storageEngine->getCatalog()->createCollection(
             opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
     auto catalogId = catalogIdRecordStorePair.first;
-    std::unique_ptr<Collection> ownedCollection =
+    std::shared_ptr<Collection> ownedCollection =
         Collection::Factory::get(opCtx)->make(opCtx,
                                               nss,
                                               catalogId,

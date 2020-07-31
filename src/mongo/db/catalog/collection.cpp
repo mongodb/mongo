@@ -41,7 +41,7 @@ namespace mongo {
 // CappedInsertNotifier
 //
 
-void CappedInsertNotifier::notifyAll() {
+void CappedInsertNotifier::notifyAll() const {
     stdx::lock_guard<Latch> lk(_mutex);
     ++_version;
     _notifier.notify_all();

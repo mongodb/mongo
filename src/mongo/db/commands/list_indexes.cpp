@@ -155,7 +155,7 @@ public:
         {
             AutoGetCollectionForReadCommand ctx(opCtx,
                                                 CommandHelpers::parseNsOrUUID(dbname, cmdObj));
-            Collection* collection = ctx.getCollection();
+            const Collection* collection = ctx.getCollection();
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "ns does not exist: " << ctx.getNss().ns(),
                     collection);

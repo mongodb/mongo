@@ -324,7 +324,7 @@ OplogEntry IdempotencyTest::partialTxn(LogicalSessionId lsid,
                           prevOpTime);
 }
 
-std::string IdempotencyTest::computeDataHash(Collection* collection) {
+std::string IdempotencyTest::computeDataHash(const Collection* collection) {
     auto desc = collection->getIndexCatalog()->findIdIndex(_opCtx.get());
     ASSERT_TRUE(desc);
     auto exec = InternalPlanner::indexScan(_opCtx.get(),
