@@ -126,15 +126,71 @@ Maybe include a discussion of how MongoDB read concerns translate into particula
 ## MongoDB Point-in-Time Read
 
 # Read Operations
-How does a read work?
 
-## Collection Read
-how it works, what tables
+All read operations on collections and indexes are required to take collection locks. Storage
+engines that provide document-level concurrency require all operations to hold at least a collection
+IS lock. With the WiredTiger storage engine, the MongoDB integration layer implicitly starts a
+storage transaction on the first attempt to read from a collection or index. Unless a read operation
+is part of a larger write operation, the transaction is rolled-back automatically when the last
+GlobalLock is released, explicitly during query yielding, or from a call to abandonSnapshot();
 
-## Index Read
-_could pull out index reads and writes into its own section, if preferable_
+See
+[WiredTigerCursor](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/wiredtiger/wiredtiger_cursor.cpp#L48),
+[WiredTigerRecoveryUnit::getSession](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.cpp#L303-L305),
+[GlobalLock dtor](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/concurrency/d_concurrency.h#L228-L239),
+[PlanYieldPolicy::_yieldAllLocks](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/query/plan_yield_policy.cpp#L182),
+[RecoveryUnit::abandonSnapshot](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/recovery_unit.h#L217).
 
-how it works, goes from index table to collection table -- two lookups
+## Collection Reads
+
+Collection reads act directly on a
+[RecordStore](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/record_store.h#L202)
+or
+[RecordCursor](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/record_store.h#L102).
+The Collection object also provides [higher-level
+accessors](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/catalog/collection.h#L279)
+to the RecordStore.
+
+## Index Reads
+
+Index reads act directly on a
+[SortedDataInterface::Cursor](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/storage/sorted_data_interface.h#L214).
+Most readers create cursors rather than interacting with indexes through the
+[IndexAccessMethod](https://github.com/mongodb/mongo/blob/r4.4.0-rc13/src/mongo/db/index/index_access_method.h#L142).
+
+## AutoGetCollectionForRead 
+
+The
+[AutoGetCollectionForRead](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/db_raii.cpp#L89)
+(AGCFR) RAII type is used by most client read operations. In addition to acquiring all necessary
+locks in the hierarchy, it ensures that operations reading at points in time are respecting the
+visibility rules of collection data and metadata.
+
+AGCFR ensures that operations reading at a timestamp do not read at times later than metadata
+changes on the collection (see
+[here](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/db_raii.cpp#L158)).
+
+## Secondary Reads
+
+The oplog applier applies entries out-of-order to provide parallelism for data replication. This
+exposes readers with no set read timetsamp to the possibility of seeing inconsistent states of data.
+To solve this problem, the oplog applier takes the ParallelBatchWriterMode (PBWM) lock in X mode,
+and readers using no read timestamp are expected to take the PBWM lock in IS mode to avoid observing
+inconsistent data mid-batch.
+
+Reads on secondaries are able to opt-out of taking the PBWM lock and read at replication's
+[lastApplied](../repl/README.md#replication-timestamp-glossary) optime instead (see
+[SERVER-34192](https://jira.mongodb.org/browse/SERVER-34192)). LastApplied is used because on
+secondaries it is only updated after each oplog batch, which is a known consistent state of data.
+This allows operations to avoid taking the PBWM lock, and thus not conflict with oplog application.
+
+AGCFR provides the mechanism for secondary reads. This is implemented by [opting-out of the
+ParallelBatchWriterMode
+lock](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/db_raii.cpp#L98)
+and switching the ReadSource of [eligible
+readers](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/storage/snapshot_helper.cpp#L106)
+to read at
+[kLastApplied](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/storage/recovery_unit.h#L411).
 
 # Write Operations
 an overview of how writes (insert, update, delete) are processed

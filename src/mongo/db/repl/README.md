@@ -1814,9 +1814,10 @@ Unstable checkpoints simply open a transaction and read all data that is current
 time the transaction is opened. They read a consistent snapshot of data, but the snapshot they read
 from is not associated with any particular timestamp.
 
-**`lastApplied`**: In-memory record of the latest applied oplog entry optime. It may lag behind the
-optime of the newest oplog entry that is visible in the storage engine because it is updated after
-a storage transaction commits.
+**`lastApplied`**: In-memory record of the latest applied oplog entry optime. On primaries, it may
+lag behind the optime of the newest oplog entry that is visible in the storage engine because it is
+updated after a storage transaction commits. On secondaries, lastApplied is only updated at the
+completion of an oplog batch.
 
 **`lastCommittedOpTime`**: A node’s local view of the latest majority committed optime. Every time
 we update this optime, we also recalculate the `stable_timestamp`. Note that the
