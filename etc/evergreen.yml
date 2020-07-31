@@ -3684,44 +3684,6 @@ tasks:
           mkdir -p $BUILD_PREFIX/share/doc/mongo-c-driver
           cp COPYING $BUILD_PREFIX/share/doc/mongo-c-driver
           cp THIRD_PARTY_NOTICES $BUILD_PREFIX/share/doc/mongo-c-driver
-          if [ -d $BUILD_PREFIX/Frameworks ]; then
-
-              # We need to account for the fact that on the Darwin
-              # mobile platforms, things shouldn't go to the Resources
-              # directory but on macOS they should. If the Resources
-              # directory is there (it should be for the plist file),
-              # then use it, otherwise just use the framework root.
-              if [ -e $BUILD_PREFIX/Frameworks/mongoc.framework/Resources ]; then
-                  cp COPYING $BUILD_PREFIX/Frameworks/mongoc.framework/Resources
-                  cp THIRD_PARTY_NOTICES $BUILD_PREFIX/Frameworks/mongoc.framework/Resources
-                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $BUILD_PREFIX/Frameworks/mongoc.framework/Resources/Info.plist
-              else
-                  cp COPYING $BUILD_PREFIX/Frameworks/mongoc.framework
-                  cp THIRD_PARTY_NOTICES $BUILD_PREFIX/Frameworks/mongoc.framework
-                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $BUILD_PREFIX/Frameworks/mongoc.framework/Info.plist
-              fi
-
-              if [ -e $BUILD_PREFIX/Frameworks/bson.framework/Resources ]; then
-                  cp COPYING $BUILD_PREFIX/Frameworks/bson.framework/Resources
-                  cp THIRD_PARTY_NOTICES $BUILD_PREFIX/Frameworks/bson.framework/Resources
-                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $BUILD_PREFIX/Frameworks/bson.framework/Resources/Info.plist
-              else
-                  cp COPYING $BUILD_PREFIX/Frameworks/bson.framework
-                  cp THIRD_PARTY_NOTICES $BUILD_PREFIX/Frameworks/bson.framework
-                  plutil -insert MinimumOSVersion -string ${cdriver_cmake_osx_deployment_target} $BUILD_PREFIX/Frameworks/bson.framework/Info.plist
-              fi
-
-          fi
-
-          # CMake doesn't seem to do the dSYM for us for the framework
-          if [ -e $BUILD_PREFIX/Frameworks ]; then
-              pushd $BUILD_PREFIX/Frameworks
-              xcrun dsymutil -num-threads=1 -o bson.framework.dSYM bson.framework/bson
-              xcrun strip -Sx bson.framework/bson
-              xcrun dsymutil -num-threads=1 -o mongoc.framework.dSYM mongoc.framework/mongoc
-              xcrun strip -Sx mongoc.framework/mongoc
-              popd
-          fi
 
           mv $BUILD_PREFIX $FINAL_PREFIX
 
@@ -9803,17 +9765,16 @@ buildvariants:
       --lto
       --variables-files=etc/scons/xcode_macosx.vars
       -j$(sysctl -n hw.logicalcpu)
-      FRAMEWORKPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/Frameworks'
+      LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_osx_deployment_target: "10.12"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
         -DCMAKE_OSX_ARCHITECTURES=x86_64
-        -DENABLE_APPLE_FRAMEWORK=ON
-        -DCMAKE_INSTALL_BINDIR=Frameworks
         -DENABLE_SSL=DARWIN
         -DENABLE_ZLIB=BUNDLED
         -DCMAKE_C_FLAGS="-Wunguarded-availability"
+        -DCMAKE_INSTALL_RPATH=@loader_path/../lib
     disable_unit_tests: true
   tasks:
   - name: embedded_sdk_build_and_test

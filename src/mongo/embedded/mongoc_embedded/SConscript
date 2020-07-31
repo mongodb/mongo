@@ -22,10 +22,7 @@ env.AutoInstall(
 
 def create_mongoc_env(env):
     mongocEnv = env.Clone()
-    if mongocEnv['MONGO_HAVE_LIBMONGOC'] == "framework":
-        mongocEnv.AppendUnique(FRAMEWORKS=['bson', 'mongoc'])
-    else:
-        mongocEnv.AppendUnique(LIBS=['bson-1.0', 'mongoc-1.0'])
+    mongocEnv.AppendUnique(LIBS=['bson-1.0', 'mongoc-1.0'])
     return mongocEnv
 
 mongocEmbeddedEnv = create_mongoc_env(env)

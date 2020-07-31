@@ -12,10 +12,10 @@ env.AppendUnique(
     CPPPATH=["$BUILD_DIR/mongo/embedded"],
 )
 
-# Inject this before we call the framework directory SConscripts so that
+# Inject this before we call the SDK directory SConscripts so that
 # they can both use it.
 
-frameworksEnv = env.Clone()
+sdkEnv = env.Clone()
 
 def mongo_export_file_generator(target, source, env, for_signature):
     if env.ToolchainIs('msvc'):
@@ -35,23 +35,7 @@ def mongo_export_file_generator(target, source, env, for_signature):
 # but many of its symbols should in fact be coming from other libraries, and we
 # get odd ODR-esque violations. UBSAN caught this. Thanks UBSAN!
 if get_option('link-model') == 'dynamic-sdk':
-    frameworksEnv['MONGO_EXPORT_FILE_SHLINKFLAGS'] = mongo_export_file_generator
-
-# We need to set our bundle version in the plist file, but the format
-# is contrained to major.minor.patch. So trim off any '-pre' or '-rc'
-# information from the MONGO_VERSION and rename it to
-# MONGO_BUNDLE_VERSION.
-frameworksEnv['PLIST_MONGO_BUNDLE_VERSION'] = env['MONGO_VERSION'].split('-')[0]
-
-# Similarly, we need to derive a MinimumOSVersion based on the
-# -mXXX-version-minimum flag. Really, we should pull this out into an
-# SCons flag like OSX_DEPLOYMENT_TARGET so we don't need to grub
-# around in the flags.
-frameworksEnv['PLIST_MINIMUM_OS_VERSION'] = "0.0"
-for flag in frameworksEnv['CCFLAGS']:
-    if re.search('-m[a-z]+-version-min', flag):
-        frameworksEnv['PLIST_MINIMUM_OS_VERSION'] = flag.split('=')[1]
-        break
+    sdkEnv['MONGO_EXPORT_FILE_SHLINKFLAGS'] = mongo_export_file_generator
 
 env.SConscript(
     dirs=[
@@ -60,7 +44,7 @@ env.SConscript(
         'stitch_support',
     ],
     exports={
-        'env' : frameworksEnv,
+        'env' : sdkEnv,
     },
 )
 
