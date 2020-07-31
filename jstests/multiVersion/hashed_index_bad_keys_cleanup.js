@@ -14,6 +14,7 @@
 
 load("jstests/multiVersion/libs/multi_rs.js");         // For upgradeSet.
 load("jstests/multiVersion/libs/verify_versions.js");  // For binVersion.
+load("jstests/noPassthrough/libs/index_build.js");     // For waitForIndexBuildToStop.
 
 const preBackportVersion = "4.2.1";
 const preBackportNodeOptions = {
@@ -29,14 +30,16 @@ rst.startSet();
 rst.initiate();
 
 let testDB = rst.getPrimary().getDB(jsTestName());
-let coll = testDB.coll;
+const collName = "coll";
+let coll = testDB[collName];
 coll.drop();
 
 // Verify that the replset is on binary version specified in 'preBackportVersion'.
 assert.binVersion(testDB.getMongo(), preBackportVersion);
 
 // Insert bad documents using older version.
-assert.commandWorked(coll.createIndex({"p.q.r": "hashed"}));
+const indexName = "pqr_hashed";
+assert.commandWorked(coll.createIndex({"p.q.r": "hashed"}, {"name": indexName}));
 assert.commandWorked(coll.insert({_id: 1, p: []}));
 assert.commandWorked(coll.insert({_id: 2, p: {q: [1]}}));
 assert.commandWorked(coll.insert({_id: 3, p: [{q: 1}]}));
@@ -44,17 +47,31 @@ assert.commandWorked(coll.insert({_id: 4, a: 1, p: [{q: 1}]}));
 assert.commandWorked(coll.insert({_id: 5, a: 1, p: [{q: 1}]}));
 
 // Assert that the collection has expected number of documents and index keys.
-function assertCollectionHasExpectedDocs(expectedNumDocs) {
+function assertCollectionHasExpectedDocs(targetColl, expectedNumDocs) {
     const collState = {
-        documents: coll.find().toArray(),
-        indexKeys: coll.find().hint({"p.q.r": "hashed"}).returnKey().toArray()
+        documents: targetColl.find().toArray(),
+        indexKeys: targetColl.find().hint({"p.q.r": "hashed"}).returnKey().toArray()
     };
     assert.eq(collState.documents.length, expectedNumDocs, collState);
     assert.eq(collState.indexKeys.length, expectedNumDocs, collState);
 }
 
+// Assert that both nodes in the replica set have the expected number of documents/index keys.
+function assertBothNodesHaveExpectedDocs(expectedNumDocs) {
+    // Wait for the index build to stop on the primary.
+    IndexBuildTest.waitForIndexBuildToStop(testDB, collName, indexName);
+    assertCollectionHasExpectedDocs(coll, expectedNumDocs);
+
+    rst.awaitReplication();
+    const secondaryDB = rst.getSecondary().getDB(jsTestName());
+    const secondaryColl = secondaryDB[collName];
+    // Wait for the index build to stop on the secondary.
+    IndexBuildTest.waitForIndexBuildToStop(secondaryDB, collName, indexName);
+    assertCollectionHasExpectedDocs(secondaryColl, expectedNumDocs);
+}
+
 // Verify that the documents inserted have the corresponding index keys.
-assertCollectionHasExpectedDocs(5);
+assertBothNodesHaveExpectedDocs(5);
 
 // Helper function which runs validate() on primary and secondary nodes, then verifies that the
 // command returned the expected result.
@@ -74,10 +91,10 @@ assertValidateCmdReturned(true);
 // Upgrade the set to the new binary version.
 rst.upgradeSet(nodeOptionsOfLatestVersion);
 testDB = rst.getPrimary().getDB(jsTestName());
-coll = testDB.coll;
+coll = testDB[collName];
 
 // Verify that the five documents inserted earlier have their index keys after upgrade.
-assertCollectionHasExpectedDocs(5);
+assertCollectionHasExpectedDocs(coll, 5);
 
 // Verify that after upgrade, inserting bad documents is not allowed.
 const arrayAlongPathFailCode = 16766;
