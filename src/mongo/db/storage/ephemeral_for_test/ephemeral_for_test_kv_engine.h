@@ -146,12 +146,12 @@ public:
     // Ephemeral for test Specific
 
     /**
-     * Returns a pair of the current version and a shared_ptr of tree of the master.
+     * Returns a pair of the current version and a shared_ptr of tree of the master at the provided
+     * timestamp. Null timestamps will return the latest master and timestamps before oldest
+     * timestamp will throw SnapshotTooOld exception.
      */
-    std::pair<uint64_t, std::shared_ptr<StringStore>> getMasterInfo() {
-        stdx::lock_guard<Latch> lock(_masterLock);
-        return std::make_pair(_masterVersion, _master);
-    }
+    std::pair<uint64_t, std::shared_ptr<StringStore>> getMasterInfo(
+        boost::optional<Timestamp> timestamp = boost::none);
 
     /**
      * Returns true and swaps _master to newMaster if the version passed in is the same as the
@@ -180,6 +180,12 @@ public:
     static bool instanceExists();
 
 private:
+    void _cleanHistory(WithLock);
+
+    Timestamp _getOldestTimestamp(WithLock) const {
+        return _availableHistory.begin()->first;
+    }
+
     std::shared_ptr<void> _catalogInfo;
     int _cachePressureForTest = 0;
     mutable Mutex _identsLock = MONGO_MAKE_LATCH("KVEngine::_identsLock");
@@ -188,9 +194,9 @@ private:
 
     mutable Mutex _masterLock = MONGO_MAKE_LATCH("KVEngine::_masterLock");
     std::shared_ptr<StringStore> _master;
-    uint64_t _masterVersion = 0;
-
-    void _cleanHistory(WithLock);
+    // While write transactions aren't implemented, we use the _masterVersion to generate mock
+    // commit timestamps. We need to start at 1 to avoid the null timestamp.
+    uint64_t _masterVersion = 1;
 
     // This map contains the different versions of the StringStore's referenced by their commit
     // timestamps.

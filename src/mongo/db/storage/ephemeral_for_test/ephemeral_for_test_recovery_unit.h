@@ -81,6 +81,11 @@ public:
 
     Status setTimestamp(Timestamp timestamp) override;
 
+    void setTimestampReadSource(ReadSource readSource,
+                                boost::optional<Timestamp> provided) override;
+
+    ReadSource getTimestampReadSource() const override;
+
     // Ephemeral for test specific function declarations below.
     StringStore* getHead() {
         forkIfNeeded();
@@ -124,6 +129,10 @@ private:
 
     Timestamp _prepareTimestamp = Timestamp::min();
     Timestamp _commitTimestamp = Timestamp::min();
+
+    // Specifies which external source to use when setting read timestamps on transactions.
+    ReadSource _timestampReadSource = ReadSource::kUnset;
+    boost::optional<Timestamp> _readAtTimestamp = boost::none;
 };
 
 }  // namespace ephemeral_for_test

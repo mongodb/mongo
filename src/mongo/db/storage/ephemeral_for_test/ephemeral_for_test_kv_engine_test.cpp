@@ -144,7 +144,7 @@ TEST_F(EphemeralForTestKVEngineTest, PinningOldestTimestampWithReadTransaction) 
         ASSERT(rs);
     }
 
-    // _availableHistory starts off with master at Timestamp(0, 0).
+    // _availableHistory starts off with master.
     ASSERT_EQ(1, _engine->getHistory_forTest().size());
 
     RecordId loc;
@@ -190,7 +190,7 @@ TEST_F(EphemeralForTestKVEngineTest, SettingOldestTimestampClearsHistory) {
         ASSERT(rs);
     }
 
-    // _availableHistory starts off with master at Timestamp(0, 0).
+    // _availableHistory starts off with master.
     ASSERT_EQ(1, _engine->getHistory_forTest().size());
 
     RecordId loc;
@@ -267,7 +267,7 @@ TEST_F(EphemeralForTestKVEngineTest, CleanHistoryWithOpenTransaction) {
         ASSERT(rs);
     }
 
-    // _availableHistory starts off with master at Timestamp(0, 0).
+    // _availableHistory starts off with master.
     ASSERT_EQ(1, _engine->getHistory_forTest().size());
 
     RecordId loc;
@@ -314,6 +314,147 @@ TEST_F(EphemeralForTestKVEngineTest, CleanHistoryWithOpenTransaction) {
     ASSERT_EQ(3, _engine->getHistory_forTest().at(readTime1).use_count());
     ASSERT_EQ(2, _engine->getHistory_forTest().at(readTime2).use_count());
     ASSERT_EQ(3, _engine->getHistory_forTest().at(readTime3).use_count());
+}
+
+TEST_F(EphemeralForTestKVEngineTest, ReadOlderSnapshotsSimple) {
+    NamespaceString nss("a.b");
+    std::string ident = "collection-1234";
+    std::string record = "abcd";
+    CollectionOptions defaultCollectionOptions;
+
+    std::unique_ptr<mongo::RecordStore> rs;
+    {
+        OperationContextFromKVEngine opCtx(_engine);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
+        ASSERT(rs);
+    }
+
+    // Pin oldest timestamp with a read transaction.
+    OperationContextFromKVEngine pinningOldest(_engine);
+    ASSERT(!rs->findRecord(&pinningOldest, RecordId(), nullptr));
+
+    // Set readFrom to timestamp with no committed transactions.
+    Timestamp readFrom = _engine->getHistory_forTest().rbegin()->first;
+
+    OperationContextFromKVEngine opCtx(_engine);
+    WriteUnitOfWork uow1(&opCtx);
+    StatusWith<RecordId> res1 =
+        rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+    ASSERT_OK(res1.getStatus());
+    RecordId loc1 = res1.getValue();
+    uow1.commit();
+
+    WriteUnitOfWork uow2(&opCtx);
+    StatusWith<RecordId> res2 =
+        rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+    ASSERT_OK(res2.getStatus());
+    RecordId loc2 = res2.getValue();
+    uow2.commit();
+
+    RecordData rd;
+    opCtx.recoveryUnit()->abandonSnapshot();
+    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, readFrom);
+    ASSERT(!rs->findRecord(&opCtx, loc1, &rd));
+    ASSERT(!rs->findRecord(&opCtx, loc2, &rd));
+
+    opCtx.recoveryUnit()->abandonSnapshot();
+    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+    ASSERT(rs->findRecord(&opCtx, loc1, &rd));
+    ASSERT(rs->findRecord(&opCtx, loc2, &rd));
+}
+
+TEST_F(EphemeralForTestKVEngineTest, ReadOutdatedSnapshot) {
+    NamespaceString nss("a.b");
+    std::string ident = "collection-1234";
+    std::string record = "abcd";
+    CollectionOptions defaultCollectionOptions;
+
+    std::unique_ptr<mongo::RecordStore> rs;
+    {
+        OperationContextFromKVEngine opCtx(_engine);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
+        ASSERT(rs);
+    }
+
+    RecordId loc1;
+    {
+        OperationContextFromKVEngine opCtx(_engine);
+        WriteUnitOfWork uow(&opCtx);
+        StatusWith<RecordId> res =
+            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+        ASSERT_OK(res.getStatus());
+        loc1 = res.getValue();
+        uow.commit();
+    }
+
+    OperationContextFromKVEngine opCtxRead(_engine);
+    RecordData rd;
+    ASSERT(rs->findRecord(&opCtxRead, loc1, &rd));
+    Timestamp readFrom = _engine->getHistory_forTest().rbegin()->first;
+
+    RecordId loc2;
+    {
+        OperationContextFromKVEngine opCtx(_engine);
+        WriteUnitOfWork uow(&opCtx);
+        StatusWith<RecordId> res =
+            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+        ASSERT_OK(res.getStatus());
+        loc2 = res.getValue();
+        uow.commit();
+    }
+
+    ASSERT(rs->findRecord(&opCtxRead, loc1, &rd));
+    opCtxRead.recoveryUnit()->abandonSnapshot();
+    opCtxRead.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, readFrom);
+    ASSERT_THROWS_CODE(
+        rs->findRecord(&opCtxRead, loc1, &rd), DBException, ErrorCodes::SnapshotTooOld);
+}
+
+TEST_F(EphemeralForTestKVEngineTest, SetReadTimestampBehindOldestTimestamp) {
+    NamespaceString nss("a.b");
+    std::string ident = "collection-1234";
+    std::string record = "abcd";
+    CollectionOptions defaultCollectionOptions;
+
+    std::unique_ptr<mongo::RecordStore> rs;
+    {
+        OperationContextFromKVEngine opCtx(_engine);
+        ASSERT_OK(_engine->createRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions));
+        rs = _engine->getRecordStore(&opCtx, nss.ns(), ident, defaultCollectionOptions);
+        ASSERT(rs);
+    }
+
+    RecordId loc1;
+    {
+        OperationContextFromKVEngine opCtx(_engine);
+        WriteUnitOfWork uow(&opCtx);
+        StatusWith<RecordId> res =
+            rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+        ASSERT_OK(res.getStatus());
+        loc1 = res.getValue();
+        uow.commit();
+    }
+
+    RecordData rd;
+    Timestamp readFrom = _engine->getHistory_forTest().begin()->first;
+    OperationContextFromKVEngine opCtx(_engine);
+    WriteUnitOfWork uow(&opCtx);
+    StatusWith<RecordId> res =
+        rs->insertRecord(&opCtx, record.c_str(), record.length() + 1, Timestamp());
+    ASSERT_OK(res.getStatus());
+    RecordId loc2 = res.getValue();
+    uow.commit();
+
+    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, readFrom);
+    _engine->setOldestTimestamp(Timestamp::max(), true);
+    ASSERT_THROWS_CODE(rs->findRecord(&opCtx, loc2, &rd), DBException, ErrorCodes::SnapshotTooOld);
+
+    opCtx.recoveryUnit()->abandonSnapshot();
+    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+    ASSERT(rs->findRecord(&opCtx, loc1, &rd));
+    ASSERT(rs->findRecord(&opCtx, loc2, &rd));
 }
 
 }  // namespace ephemeral_for_test

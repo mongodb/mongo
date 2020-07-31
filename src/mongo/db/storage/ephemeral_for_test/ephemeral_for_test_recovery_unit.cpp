@@ -59,7 +59,7 @@ void RecoveryUnit::doCommitUnitOfWork() {
     if (_dirty) {
         invariant(_forked);
         while (true) {
-            auto masterInfo = _KVEngine->getMasterInfo();
+            auto masterInfo = _KVEngine->getMasterInfo(_readAtTimestamp);
             try {
                 invariant(_mergeBase);
                 _workingCopy.merge3(*_mergeBase, *masterInfo.second);
@@ -117,8 +117,23 @@ bool RecoveryUnit::forkIfNeeded() {
     if (_forked)
         return false;
 
+    boost::optional<Timestamp> readFrom = boost::none;
+    switch (_timestampReadSource) {
+        case ReadSource::kUnset:
+        case ReadSource::kNoTimestamp:
+        case ReadSource::kMajorityCommitted:
+        case ReadSource::kNoOverlap:
+        case ReadSource::kLastApplied:
+            break;
+        case ReadSource::kProvided:
+            readFrom = _readAtTimestamp;
+            break;
+        case ReadSource::kAllDurableSnapshot:
+            readFrom = _KVEngine->getAllDurableTimestamp();
+            break;
+    }
     // Update the copies of the trees when not in a WUOW so cursors can retrieve the latest data.
-    auto masterInfo = _KVEngine->getMasterInfo();
+    auto masterInfo = _KVEngine->getMasterInfo(readFrom);
     _mergeBase = masterInfo.second;
     _workingCopy = *masterInfo.second;
     invariant(_mergeBase);
@@ -137,6 +152,7 @@ Status RecoveryUnit::setTimestamp(Timestamp timestamp) {
     _KVEngine->visibilityManager()->reserveRecord(this, key.getValue());
     return Status::OK();
 }
+
 void RecoveryUnit::setOrderedCommit(bool orderedCommit) {}
 
 void RecoveryUnit::_abort() {
@@ -153,6 +169,19 @@ void RecoveryUnit::_setMergeNull() {
     if (!KVEngine::instanceExists()) {
         _KVEngine->cleanHistory();
     }
+}
+
+void RecoveryUnit::setTimestampReadSource(ReadSource readSource,
+                                          boost::optional<Timestamp> provided) {
+    invariant(!provided == (readSource != ReadSource::kProvided));
+    invariant(!(provided && provided->isNull()));
+
+    _timestampReadSource = readSource;
+    _readAtTimestamp = (provided) ? *provided : Timestamp();
+}
+
+RecoveryUnit::ReadSource RecoveryUnit::getTimestampReadSource() const {
+    return _timestampReadSource;
 }
 
 RecoveryUnit* RecoveryUnit::get(OperationContext* opCtx) {
