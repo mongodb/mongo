@@ -165,6 +165,8 @@ main(int argc, char *argv[])
 
     format_process_env();
 
+    __wt_random_init_seed(NULL, &g.rnd); /* Initialize the RNG. */
+
     /* Set values from the command line. */
     home = NULL;
     one_flag = quiet_flag = false;
@@ -255,8 +257,6 @@ main(int argc, char *argv[])
      * operations loop completes.
      */
     ops_seconds = g.c_timer == 0 ? 0 : ((g.c_timer * 60) - 15) / FORMAT_OPERATION_REPS;
-
-    __wt_random_init_seed(NULL, &g.rnd); /* Initialize the RNG. */
 
     testutil_check(__wt_thread_str(g.tidbuf, sizeof(g.tidbuf)));
 

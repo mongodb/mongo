@@ -388,7 +388,7 @@ variables:
           posix_configure_flags: --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
       - func: "recovery stress test script"
         vars:
-          times: 40
+          times: 25
 
 pre:
   - func: "cleanup"
@@ -2313,6 +2313,9 @@ tasks:
   - <<: *recovery-stress-test
     name: recovery-stress-test-2
     tags: ["stress-test-2", "stress-test-zseries-2"]
+  - <<: *recovery-stress-test
+    name: recovery-stress-test-3
+    tags: ["stress-test-3", "stress-test-zseries-3"]
 
 buildvariants:
 
@@ -2568,3 +2571,4 @@ buildvariants:
   - name: unit-test
   - name: ".stress-test-zseries-1"
   - name: ".stress-test-zseries-2"
+  - name: ".stress-test-zseries-3"
