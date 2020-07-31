@@ -207,6 +207,9 @@ if (typeof _threadInject != "undefined") {
 
             // Destroys and recreates the catalog, which will interfere with other tests.
             "restart_catalog.js",
+
+            // Can fail if isMaster takes too long on a loaded machine.
+            "dbadmin.js",
         ]);
 
         // The following tests cannot run when shell readMode is legacy.
