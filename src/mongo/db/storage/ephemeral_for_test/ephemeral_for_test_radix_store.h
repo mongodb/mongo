@@ -191,7 +191,7 @@ public:
             }
 
             // Get path from root to '_current' since it is required to traverse up the tree.
-            Key key = _current->_data->first;
+            const Key& key = _current->_data->first;
 
             std::vector<Node*> context = RadixStore::_buildContext(key, _root.get());
 
@@ -394,7 +394,7 @@ public:
             if (_current == nullptr)
                 return;
 
-            Key key = _current->_data->first;
+            const Key& key = _current->_data->first;
 
             std::vector<Node*> context = RadixStore::_buildContext(key, _root.get());
             Node* node = context.back();
@@ -547,7 +547,7 @@ public:
     }
 
     std::pair<const_iterator, bool> insert(value_type&& value) {
-        Key key = value.first;
+        const Key& key = std::move(value).first;
 
         Node* node = _findNode(key);
         if (node != nullptr || key.size() == 0)
@@ -557,7 +557,7 @@ public:
     }
 
     std::pair<const_iterator, bool> update(value_type&& value) {
-        Key key = value.first;
+        const Key& key = std::move(value).first;
 
         // Ensure that the item to be updated exists.
         auto item = RadixStore::find(key);
@@ -1646,7 +1646,7 @@ private:
      * equivalent to removing that data from the tree.
      */
     std::pair<const_iterator, bool> _upsertWithCopyOnSharedNodes(
-        Key key, boost::optional<value_type> value) {
+        const Key& key, boost::optional<value_type> value) {
 
         const uint8_t* charKey = reinterpret_cast<const uint8_t*>(key.data());
 
@@ -1972,7 +1972,7 @@ private:
      *
      * This assumes that the key is present in the tree.
      */
-    static std::vector<Node*> _buildContext(Key key, Node* node) {
+    static std::vector<Node*> _buildContext(const Key& key, Node* node) {
         std::vector<Node*> context;
         context.push_back(node);
 
