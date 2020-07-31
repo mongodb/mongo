@@ -1253,7 +1253,7 @@ var ReplSetTest = function(opts) {
             // awaitNodesAgreeOnPrimary() timeout as 1 minute to allow retry of replSetStepUp
             // command on failure of the replica set to agree on the primary.
             const timeout = 60 * 100;
-            this.awaitNodesAgreeOnPrimary(timeout, this.nodes, node);
+            this.awaitNodesAgreeOnPrimary(timeout, this.nodes, this.getNodeId(node));
 
             // getPrimary() guarantees that there will be only one writable primary for a replica
             // set.
