@@ -41,6 +41,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
         '$BUILD_DIR/mongo/db/commands/server_status',
     ],
 )

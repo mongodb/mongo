@@ -498,8 +498,10 @@ public:
      * Create an instance of the KV Storage Engine so that we have a timestamp monitor operating.
      */
     TimestampKVEngineTest() {
-        StorageEngineOptions options{
-            /*directoryPerDB=*/false, /*directoryForIndexes=*/false, /*forRepair=*/false};
+        StorageEngineOptions options{/*directoryPerDB=*/false,
+                                     /*directoryForIndexes=*/false,
+                                     /*forRepair=*/false,
+                                     /*lockFileCreatedByUncleanShutdown=*/false};
         _storageEngine =
             std::make_unique<StorageEngineImpl>(std::make_unique<TimestampMockKVEngine>(), options);
         _storageEngine->finishInit();

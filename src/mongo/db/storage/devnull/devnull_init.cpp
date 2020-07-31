@@ -34,6 +34,7 @@
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
@@ -46,6 +47,7 @@ public:
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
+        options.lockFileCreatedByUncleanShutdown = lockFile && lockFile->createdByUncleanShutdown();
         return std::make_unique<StorageEngineImpl>(std::make_unique<DevNullKVEngine>(), options);
     }
 

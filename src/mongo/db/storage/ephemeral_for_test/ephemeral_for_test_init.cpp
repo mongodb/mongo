@@ -36,6 +36,7 @@
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_server_status.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_options.h"
 
 #if __has_feature(address_sanitizer)
@@ -68,6 +69,7 @@ public:
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
+        options.lockFileCreatedByUncleanShutdown = lockFile && lockFile->createdByUncleanShutdown();
         return std::make_unique<StorageEngineImpl>(std::move(kv), options);
     }
 

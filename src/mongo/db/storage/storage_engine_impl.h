@@ -58,6 +58,7 @@ struct StorageEngineOptions {
     bool directoryPerDB = false;
     bool directoryForIndexes = false;
     bool forRepair = false;
+    bool lockFileCreatedByUncleanShutdown = false;
 };
 
 class StorageEngineImpl final : public StorageEngineInterface, public StorageEngine {

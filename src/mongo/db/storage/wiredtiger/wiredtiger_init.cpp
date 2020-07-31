@@ -133,6 +133,7 @@ public:
         options.directoryPerDB = params.directoryperdb;
         options.directoryForIndexes = wiredTigerGlobalOptions.directoryForIndexes;
         options.forRepair = params.repair;
+        options.lockFileCreatedByUncleanShutdown = lockFile && lockFile->createdByUncleanShutdown();
         return std::make_unique<StorageEngineImpl>(std::move(kv), options);
     }
 
