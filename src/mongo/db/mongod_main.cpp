@@ -183,6 +183,7 @@
 #include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/latch_analyzer.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
+#include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
@@ -339,6 +340,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     serviceContext->setPeriodicRunner(std::move(runner));
 
     OCSPManager::get()->startThreadPool();
+    CertificateExpirationMonitor::get()->start(serviceContext);
 
     if (!storageGlobalParams.repair) {
         auto tl =

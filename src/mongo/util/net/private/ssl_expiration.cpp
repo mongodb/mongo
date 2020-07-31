@@ -34,37 +34,41 @@
 #include <string>
 
 #include "mongo/logv2/log.h"
-#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 static const auto oneDay = Hours(24);
 
-std::unique_ptr<CertificateExpirationMonitor::CertificateExpirationMonitorTask>
-    CertificateExpirationMonitor::_task;
+CertificateExpirationMonitor* theCertificateExpirationMonitor;
 
 void CertificateExpirationMonitor::updateExpirationDeadline(Date_t date) {
-    if (!_task) {
-        _task = std::make_unique<CertificateExpirationMonitorTask>();
+    stdx::lock_guard<Mutex> lock(_mutex);
+    _certExpiration = date;
+}
+
+CertificateExpirationMonitor* CertificateExpirationMonitor::get() {
+    if (!theCertificateExpirationMonitor) {
+        theCertificateExpirationMonitor = new CertificateExpirationMonitor();
     }
-    stdx::lock_guard<Mutex> lock(_task->_mutex);
-    _task->_certExpiration = date;
+    return theCertificateExpirationMonitor;
 }
 
-std::string CertificateExpirationMonitor::CertificateExpirationMonitorTask::taskName() const {
-    return "CertificateExpirationMonitor";
+void CertificateExpirationMonitor::start(ServiceContext* service) {
+    stdx::lock_guard<Mutex> lock(_mutex);
+
+    auto periodicRunner = service->getPeriodicRunner();
+    invariant(periodicRunner);
+
+    PeriodicRunner::PeriodicJob job(
+        "CertificateExpirationMonitor", [this](Client* client) { return run(client); }, oneDay);
+
+    _job = std::make_unique<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
+    _job->start();
 }
 
-void CertificateExpirationMonitor::CertificateExpirationMonitorTask::taskDoWork() {
-    const Milliseconds timeSinceLastCheck = Date_t::now() - _lastCheckTime;
-
-    if (timeSinceLastCheck < oneDay)
-        return;
-
+void CertificateExpirationMonitor::run(Client* client) {
     const Date_t now = Date_t::now();
-    _lastCheckTime = now;
-
     stdx::lock_guard<Mutex> lock(_mutex);
     if (_certExpiration <= now) {
         // The certificate has expired.

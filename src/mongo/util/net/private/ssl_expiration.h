@@ -29,44 +29,36 @@
 
 #pragma once
 
-#include "mongo/util/background.h"
+#include "mongo/db/client.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class CertificateExpirationMonitor {
-private:
-    class CertificateExpirationMonitorTask : public PeriodicTask {
-        /**
-         * Gets the PeriodicTask's name.
-         * @return CertificateExpirationMonitorTask's name.
-         */
-        std::string taskName() const override;
-
-        /**
-         * Wakes up every minute as it is a PeriodicTask.
-         * Checks once a day if the server certificate has expired
-         * or will expire in the next 30 days and sends a warning
-         * to the log accordingly.
-         */
-        void taskDoWork() override;
-
-        Date_t _lastCheckTime{Date_t::now()};
-
-    public:
-        Mutex _mutex = MONGO_MAKE_LATCH("CertificateExpirationMonitorTask::_mutex");
-        Date_t _certExpiration;
-    };
-
 public:
     /**
-     * Updates the server certificate's expiration deadline.
-     * Instantiates a CertificateExpirationMonitorTask if needed.
+     * Get the singleton instance of the monitor.
      */
-    static void updateExpirationDeadline(Date_t date);
+    static CertificateExpirationMonitor* get();
+
+    /**
+     * Sets the server certificate's expiration deadline.
+     */
+    void updateExpirationDeadline(Date_t date);
+
+    /**
+     * Kick off the CertificateExpirationMonitor background job.
+     */
+    void start(ServiceContext* service);
 
 private:
-    static std::unique_ptr<CertificateExpirationMonitorTask> _task;
+    void run(Client* client);
+
+    std::unique_ptr<PeriodicJobAnchor> _job;
+
+    Mutex _mutex = MONGO_MAKE_LATCH("CertificateExpirationMonitor::_mutex");
+    Date_t _certExpiration;
 };
 
 }  // namespace mongo
