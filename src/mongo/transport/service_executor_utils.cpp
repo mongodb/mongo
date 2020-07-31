@@ -42,6 +42,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/thread_safety_context.h"
 
 #if !defined(_WIN32)
@@ -74,6 +75,7 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
 #else
         pthread_attr_t attrs;
         pthread_attr_init(&attrs);
+        auto attrsGuard = makeGuard([&attrs] { pthread_attr_destroy(&attrs); });
         pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_DETACHED);
 
         static const rlim_t kStackSize =
@@ -112,10 +114,25 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
         pthread_t thread;
         auto ctx = std::make_unique<unique_function<void()>>(std::move(task));
         ThreadSafetyContext::getThreadSafetyContext()->onThreadCreate();
-        int failed = pthread_create(&thread, &attrs, runFunc, ctx.get());
 
-        pthread_attr_destroy(&attrs);
-        uassert(4850900, "pthread_create failed: {}"_format(errnoWithDescription(failed)), !failed);
+        int failed = pthread_create(&thread, &attrs, runFunc, ctx.get());
+        if (failed > 0) {
+            LOGV2_ERROR_OPTIONS(4850900,
+                                {logv2::UserAssertAfterLog()},
+                                "pthread_create failed: error: {error}",
+                                "pthread_create failed",
+                                "error"_attr = errnoWithDescription(failed));
+        } else if (failed < 0) {
+            auto savedErrno = errno;
+            LOGV2_ERROR_OPTIONS(4850901,
+                                {logv2::UserAssertAfterLog()},
+                                "pthread_create failed with a negative return code: {code}, errno: "
+                                "{errno}, error: {error}",
+                                "pthread_create failed with a negative return code",
+                                "code"_attr = failed,
+                                "errno"_attr = savedErrno,
+                                "error"_attr = errnoWithDescription(savedErrno));
+        }
 
         ctx.release();
 #endif
