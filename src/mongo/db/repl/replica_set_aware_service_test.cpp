@@ -29,7 +29,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 
 namespace mongo {
@@ -167,12 +170,27 @@ ServiceContext* ServiceC::getServiceContext() {
 }
 
 
-using ReplicaSetAwareServiceTest = ServiceContextTest;
+class ReplicaSetAwareServiceTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+
+        auto serviceContext = getServiceContext();
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
+        replCoord->setMyLastAppliedOpTimeAndWallTime(
+            repl::OpTimeAndWallTime(repl::OpTime(Timestamp(1, 1), _term), Date_t()));
+        repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
+    }
+
+protected:
+    long long _term = 1;
+};
 
 
 TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     auto sc = getGlobalServiceContext();
-    auto opCtx = makeOperationContext().get();
+    auto opCtxHolder = makeOperationContext();
+    auto opCtx = opCtxHolder.get();
 
     auto a = ServiceA::get(sc);
     auto b = ServiceB::get(sc);
@@ -197,11 +215,11 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ASSERT_EQ(0, c->numCallsOnBecomeArbiter);
 
     ReplicaSetAwareServiceRegistry::get(sc).onStartup(opCtx);
-    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, 0);
-    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, 0);
-    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, 0);
-    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, 0);
-    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, 0);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
+    ReplicaSetAwareServiceRegistry::get(sc).onStepUpComplete(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepDown();
     ReplicaSetAwareServiceRegistry::get(sc).onBecomeArbiter();
 

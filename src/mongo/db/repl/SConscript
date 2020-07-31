@@ -1616,8 +1616,8 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_interface_tl',
         '$BUILD_DIR/mongo/executor/scoped_task_executor',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'repl_coordinator_interface',
         'wait_for_majority_service',
     ],
 )

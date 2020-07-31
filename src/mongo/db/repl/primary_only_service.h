@@ -51,7 +51,7 @@ class ServiceContext;
 
 namespace repl {
 
-extern FailPoint PrimaryOnlyServiceHangBeforeCreatingInstance;
+extern FailPoint PrimaryOnlyServiceHangBeforeRebuildingInstances;
 
 /**
  * A PrimaryOnlyService is a group of tasks (represented in memory as Instances) that should only
@@ -169,10 +169,11 @@ public:
 
     /**
      * Called on transition to primary. Resumes any running Instances of this service
-     * based on their persisted state documents. Also joins() any outstanding jobs from the previous
-     * term, thereby ensuring that two Instance objects with the same InstanceID cannot coexist.
+     * based on their persisted state documents (after waiting for the first write of the new term
+     * to be majority committed). Also joins() any outstanding jobs from the previous term, thereby
+     * ensuring that two Instance objects with the same InstanceID cannot coexist.
      */
-    void onStepUp(long long term);
+    void onStepUp(const OpTime& stepUpOpTime);
 
     /**
      * Called on stepDown. Releases all running Instances of this service from management by this
@@ -186,7 +187,7 @@ protected:
     /**
      * Constructs a new Instance object with the given initial state.
      */
-    virtual std::shared_ptr<Instance> constructInstance(const BSONObj& initialState) const = 0;
+    virtual std::shared_ptr<Instance> constructInstance(BSONObj initialState) const = 0;
 
     /**
      * Given an InstanceId returns the corresponding running Instance object, or boost::none if
@@ -205,9 +206,19 @@ protected:
     std::shared_ptr<Instance> getOrCreateInstance(BSONObj initialState);
 
 private:
+    /**
+     * Called as part of onStepUp.  Queries the state document collection for this
+     * PrimaryOnlyService, constructs Instance objects for each document found, and schedules work
+     * to run all the newly recreated Instances.
+     */
+    void _rebuildInstances() noexcept;
+
     ServiceContext* const _serviceContext;
 
     Mutex _mutex = MONGO_MAKE_LATCH("PrimaryOnlyService::_mutex");
+
+    // Condvar to receive notifications when _rebuildInstances has completed after stepUp.
+    stdx::condition_variable _rebuildCV;
 
     // A ScopedTaskExecutor that is used to perform all work run on behalf of an Instance.
     // This ScopedTaskExecutor wraps _executor and is created at stepUp and destroyed at
@@ -225,6 +236,7 @@ private:
     enum class State {
         kRunning,
         kPaused,
+        kRebuilding,
         kShutdown,
     };
 
