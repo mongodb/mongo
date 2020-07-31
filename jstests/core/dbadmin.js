@@ -23,7 +23,7 @@ var localTimeSkew = x.localTime - now;
 if (localTimeSkew >= 50) {
     print("Warning: localTimeSkew " + localTimeSkew + " > 50ms.");
 }
-assert.lt(localTimeSkew, 500, "isMaster.localTime");
+assert.lt(localTimeSkew, 60 * 60 * 1000 /* one minute */, "isMaster.localTime");
 
 var before = db.runCommand("serverStatus");
 print(before.uptimeEstimate);

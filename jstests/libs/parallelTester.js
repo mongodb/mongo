@@ -213,6 +213,9 @@ if (typeof _threadInject != "undefined") {
             // This test causes collMod commands to hang, which interferes with other tests running
             // collMod.
             "crud_ops_do_not_throw_locktimeout.js",
+
+            // Can fail if isMaster takes too long on a loaded machine.
+            "dbadmin.js",
         ]);
 
         // The following tests cannot run when shell readMode is legacy.
