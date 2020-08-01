@@ -774,8 +774,7 @@ auto createMatchExprAndProjection(const BSONObj& query, const BSONObj& projObj) 
     auto opCtx = serviceCtx.makeOperationContext();
     const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
         opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), NamespaceString("test.dummy")));
-    StatusWithMatchExpression queryMatchExpr =
-        MatchExpressionParser::parse(query, std::move(expCtx));
+    StatusWithMatchExpression queryMatchExpr = MatchExpressionParser::parse(query, expCtx);
     ASSERT(queryMatchExpr.isOK());
     projection_ast::Projection res = projection_ast::parse(
         expCtx, projObj, queryMatchExpr.getValue().get(), query, ProjectionPolicies{});

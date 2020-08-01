@@ -707,7 +707,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
         // expression would have been successfully parsed upstream during index creation.
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterElement.Obj(),
-                                         std::move(expCtx),
+                                         expCtx,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kBanAllSpecialFeatures);
         if (!statusWithMatcher.isOK()) {

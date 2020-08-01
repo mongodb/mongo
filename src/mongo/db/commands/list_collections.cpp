@@ -270,10 +270,7 @@ public:
                 uasserted(ErrorCodes::BadValue, "\"filter\" must be an object");
             }
 
-            StatusWithMatchExpression statusWithMatcher =
-                MatchExpressionParser::parse(filterElt.Obj(), std::move(expCtx));
-            uassertStatusOK(statusWithMatcher.getStatus());
-            matcher = std::move(statusWithMatcher.getValue());
+            matcher = uassertStatusOK(MatchExpressionParser::parse(filterElt.Obj(), expCtx));
         }
 
         const long long defaultBatchSize = std::numeric_limits<long long>::max();

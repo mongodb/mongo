@@ -217,7 +217,7 @@ void CollectionCatalog::setCollectionNamespace(OperationContext* opCtx,
 
     opCtx->recoveryUnit()->onRollback([this, coll, fromCollection, toCollection] {
         stdx::lock_guard<Latch> lock(_catalogLock);
-        coll->setNs(std::move(fromCollection));
+        coll->setNs(fromCollection);
 
         _collections[fromCollection] = _collections[toCollection];
         _collections.erase(toCollection);

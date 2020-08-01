@@ -40,7 +40,7 @@ parsedUpdateArrayFilters(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     for (auto rawArrayFilter : rawArrayFiltersIn) {
         auto parsedArrayFilter =
             MatchExpressionParser::parse(rawArrayFilter,
-                                         std::move(expCtx),
+                                         expCtx,
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kBanAllSpecialFeatures);
 
