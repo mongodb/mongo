@@ -44,7 +44,8 @@ void TaskExecutor::schedule(OutOfLineExecutor::Task func) {
         // The callback was not scheduled or moved from, it is still valid. Run it inline to inform
         // it of the error. Construct a CallbackArgs for it, only CallbackArgs::status matters here.
         CallbackArgs args(this, {}, statusWithCallback.getStatus(), nullptr);
-        cb(args);
+        invariant(cb);  // NOLINT(bugprone-use-after-move)
+        cb(args);       // NOLINT(bugprone-use-after-move)
     }
 }
 

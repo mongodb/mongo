@@ -1054,7 +1054,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientReplicaSet::runCommandWithTar
     }
 
     uasserted(ErrorCodes::HostNotFound,
-              str::stream() << "Could not satisfy $readPreference of '" << readPref.toString()
+              str::stream() << "Could not satisfy $readPreference of '" << rpShared->toString()
                             << "' while attempting to run command " << request.getCommandName());
 }
 

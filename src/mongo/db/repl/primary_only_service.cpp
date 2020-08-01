@@ -95,10 +95,11 @@ PrimaryOnlyServiceRegistry* PrimaryOnlyServiceRegistry::get(ServiceContext* serv
 }
 
 void PrimaryOnlyServiceRegistry::registerService(std::unique_ptr<PrimaryOnlyService> service) {
-    auto [_, inserted] = _services.emplace(service->getServiceName(), std::move(service));
+    auto name = service->getServiceName();
+    auto [_, inserted] = _services.emplace(name, std::move(service));
     invariant(inserted,
-              str::stream() << "Attempted to register PrimaryOnlyService ("
-                            << service->getServiceName() << ") that is already registered");
+              str::stream() << "Attempted to register PrimaryOnlyService (" << name
+                            << ") that is already registered");
 }
 
 PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupService(StringData serviceName) {
