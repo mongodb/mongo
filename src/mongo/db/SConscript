@@ -442,7 +442,6 @@ env.Library(
         'operation_key_manager.cpp',
         'service_context.cpp',
         'server_recovery.cpp',
-        'unclean_shutdown.cpp',
         'repl_set_member_in_standalone_mode.cpp',
     ],
     LIBDEPS=[

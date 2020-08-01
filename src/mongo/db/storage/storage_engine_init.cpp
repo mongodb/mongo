@@ -45,7 +45,6 @@
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/unclean_shutdown.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -223,7 +222,6 @@ void createLockFile(ServiceContext* service) {
         LOGV2_WARNING(22271,
                       "Detected unclean shutdown - Lock file is not empty",
                       "lockFile"_attr = lockFile->getFilespec());
-        startingAfterUncleanShutdown(service) = true;
     }
 }
 
