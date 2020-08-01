@@ -100,6 +100,9 @@ public:
         return false;
     }
     void clearDropPendingState() final {}
+    virtual Timestamp getInitialDataTimestamp() final {
+        return {};
+    }
     Timestamp getAllDurableTimestamp() const final {
         return {};
     }

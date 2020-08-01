@@ -77,6 +77,8 @@ suites:
   replica_sets_jscore_multiversion_passthrough:
 
   replica_sets_multiversion:
+  - ticket: SERVER-48518
+    test_file: jstests/replsets/rollback_via_refetch_anomaly.js
 
   sharding_multiversion:
 
