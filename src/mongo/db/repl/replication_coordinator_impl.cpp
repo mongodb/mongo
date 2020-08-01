@@ -4991,6 +4991,22 @@ void ReplicationCoordinatorImpl::finishRecoveryIfEligible(OperationContext* opCt
         return;
     }
 
+    // Rolling back with eMRC false, we set initialDataTimestamp to max(local oplog top, source's
+    // oplog top), then rollback via refetch. Data is inconsistent until lastApplied >=
+    // initialDataTimestamp.
+    auto initialTs = opCtx->getServiceContext()->getStorageEngine()->getInitialDataTimestamp();
+    if (lastApplied.getTimestamp() < initialTs) {
+        invariant(!serverGlobalParams.enableMajorityReadConcern);
+        LOGV2_DEBUG(4851800,
+                    2,
+                    "We cannot transition to SECONDARY state because our 'lastApplied' optime is "
+                    "less than the initial data timestamp and enableMajorityReadConcern = false",
+                    "minValid"_attr = minValid,
+                    "lastApplied"_attr = lastApplied,
+                    "initialDataTimestamp"_attr = initialTs);
+        return;
+    }
+
     // Execute the transition to SECONDARY.
     auto status = setFollowerMode(MemberState::RS_SECONDARY);
     if (!status.isOK()) {

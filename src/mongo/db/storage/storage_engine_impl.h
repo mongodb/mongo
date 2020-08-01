@@ -404,7 +404,6 @@ private:
 
     const bool _supportsDocLocking;
     const bool _supportsCappedCollections;
-    Timestamp _initialDataTimestamp = Timestamp::kAllowUnstableCheckpointsSentinel;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;
     std::unique_ptr<DurableCatalogImpl> _catalog;
