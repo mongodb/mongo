@@ -464,6 +464,10 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
      *         | A
      */
     this.transitionToSyncSourceOperationsBeforeRollback = function() {
+        assert(jsTest.options().enableMajorityReadConcern !== false,
+               "Copy _awaitPrimaryAppliedSurpassesRollbackApplied from RollbackTest, or ban this" +
+                   " test with enableMajorityReadConcern false");
+
         transitionIfAllowed(State.kSyncSourceOpsBeforeRollback);
 
         // Insert one document to ensure rollback will not be skipped.

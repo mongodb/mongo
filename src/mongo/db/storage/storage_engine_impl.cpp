@@ -781,7 +781,6 @@ void StorageEngineImpl::setStableTimestamp(Timestamp stableTimestamp, bool force
 }
 
 void StorageEngineImpl::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
-    _initialDataTimestamp = initialDataTimestamp;
     _engine->setInitialDataTimestamp(initialDataTimestamp);
 }
 

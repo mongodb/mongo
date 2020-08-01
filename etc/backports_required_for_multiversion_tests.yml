@@ -101,6 +101,8 @@ suites:
   replica_sets_multiversion:
   - ticket: SERVER-47645
     test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
+  - ticket: SERVER-48518
+    test_file: jstests/replsets/rollback_via_refetch_anomaly.js
 
   concurrency_sharded_replication_multiversion:
 
