@@ -219,8 +219,12 @@ public:
      * engines that support recoverToStableTimestamp().
      *
      * Must be called with the global lock acquired in exclusive mode.
+     *
+     * Unrecognized idents require special handling based on the context known only to the
+     * caller. For example, on starting from a previous unclean shutdown, we may try to recover
+     * orphaned idents, which are known to the storage engine but not referenced in the catalog.
      */
-    virtual void loadCatalog(OperationContext* opCtx) = 0;
+    virtual void loadCatalog(OperationContext* opCtx, bool loadingFromUncleanShutdown) = 0;
     virtual void closeCatalog(OperationContext* opCtx) = 0;
 
     /**

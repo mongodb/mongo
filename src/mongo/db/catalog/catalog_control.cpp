@@ -110,7 +110,10 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
     // Load the catalog in the storage engine.
     LOGV2(20273, "openCatalog: loading storage engine catalog");
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    storageEngine->loadCatalog(opCtx);
+    // Ignore orphaned idents because this function is used during rollback and not at
+    // startup recovery, when we may try to recover orphaned idents.
+    auto loadingFromUncleanShutdown = false;
+    storageEngine->loadCatalog(opCtx, loadingFromUncleanShutdown);
 
     LOGV2(20274, "openCatalog: reconciling catalog and idents");
     // Retain unknown internal idents because this function is used during rollback and not at

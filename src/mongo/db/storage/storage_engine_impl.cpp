@@ -47,7 +47,6 @@
 #include "mongo/db/storage/kv/temporary_kv_record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
-#include "mongo/db/unclean_shutdown.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -81,10 +80,13 @@ StorageEngineImpl::StorageEngineImpl(std::unique_ptr<KVEngine> engine, StorageEn
             !(_options.directoryPerDB && !_engine->supportsDirectoryPerDB()));
 
     OperationContextNoop opCtx(_engine->newRecoveryUnit());
-    loadCatalog(&opCtx);
+    // If we are loading the catalog after an unclean shutdown, it's possible that there are
+    // collections in the catalog that are unknown to the storage engine. We should attempt to
+    // recover these orphaned idents.
+    loadCatalog(&opCtx, _options.lockFileCreatedByUncleanShutdown);
 }
 
-void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
+void StorageEngineImpl::loadCatalog(OperationContext* opCtx, bool loadingFromUncleanShutdown) {
     bool catalogExists = _engine->hasIdent(opCtx, catalogInfo);
     if (_options.forRepair && catalogExists) {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
@@ -128,10 +130,11 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx) {
         _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes, this));
     _catalog->init(opCtx);
 
-    // We populate 'identsKnownToStorageEngine' only if we are loading after an unclean shutdown or
-    // doing repair.
-    const bool loadingFromUncleanShutdownOrRepair =
-        startingAfterUncleanShutdown(getGlobalServiceContext()) || _options.forRepair;
+    // We populate 'identsKnownToStorageEngine' only if:
+    // - doing repair; or
+    // - or asked to recover orphaned idents, which is the case when loading after an unclean
+    //   shutdown.
+    auto loadingFromUncleanShutdownOrRepair = loadingFromUncleanShutdown || _options.forRepair;
 
     std::vector<std::string> identsKnownToStorageEngine;
     if (loadingFromUncleanShutdownOrRepair) {

@@ -48,7 +48,6 @@
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/unclean_shutdown.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/periodic_runner_factory.h"
@@ -124,8 +123,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         _storageEngine->closeCatalog(opCtx.get());
-        startingAfterUncleanShutdown(getGlobalServiceContext()) = true;
-        _storageEngine->loadCatalog(opCtx.get());
+        auto loadingFromUncleanShutdown = true;
+        _storageEngine->loadCatalog(opCtx.get(), loadingFromUncleanShutdown);
     }
 
     ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
@@ -359,7 +358,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         _storageEngine->closeCatalog(opCtx.get());
-        _storageEngine->loadCatalog(opCtx.get());
+        auto loadingFromUncleanShutdown = false;
+        _storageEngine->loadCatalog(opCtx.get(), loadingFromUncleanShutdown);
     }
 
     ASSERT(identExists(opCtx.get(), swCollInfo.getValue().ident));
@@ -412,7 +412,8 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     ASSERT(!collectionExists(opCtx.get(), collNs));
 
     // When in a repair context, loadCatalog() recreates catalog entries for orphaned idents.
-    _storageEngine->loadCatalog(opCtx.get());
+    auto loadingFromUncleanShutdown = false;
+    _storageEngine->loadCatalog(opCtx.get(), loadingFromUncleanShutdown);
     auto identNs = swCollInfo.getValue().ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
     NamespaceString orphanNs = NamespaceString("local.orphan." + identNs);
@@ -445,7 +446,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
 
     // When in a normal startup context, loadCatalog() does not recreate catalog entries for
     // orphaned idents.
-    _storageEngine->loadCatalog(opCtx.get());
+    auto loadingFromUncleanShutdown = false;
+    _storageEngine->loadCatalog(opCtx.get(), loadingFromUncleanShutdown);
     // reconcileCatalogAndIdents() drops orphaned idents.
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());

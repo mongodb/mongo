@@ -60,7 +60,7 @@ public:
     bool isEphemeral() const final {
         return true;
     }
-    void loadCatalog(OperationContext* opCtx) final {}
+    void loadCatalog(OperationContext* opCtx, bool loadingFromUncleanShutdown) final {}
     void closeCatalog(OperationContext* opCtx) final {}
     Status closeDatabase(OperationContext* opCtx, StringData db) final {
         return Status::OK();

@@ -324,10 +324,9 @@ public:
     std::string getFilesystemPathForDb(const std::string& dbName) const override;
 
     /**
-     * When loading after an unclean shutdown, this performs cleanup on the DurableCatalogImpl and
-     * unsets the startingAfterUncleanShutdown decoration on the global ServiceContext.
+     * When loading after an unclean shutdown, this performs cleanup on the DurableCatalogImpl.
      */
-    void loadCatalog(OperationContext* opCtx) final;
+    void loadCatalog(OperationContext* opCtx, bool loadingFromUncleanShutdown) final;
 
     void closeCatalog(OperationContext* opCtx) final;
 
