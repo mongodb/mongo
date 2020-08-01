@@ -29,13 +29,19 @@ The source for the tools is now available at [mongodb/mongo-tools](https://githu
 Python Prerequisites
 ---------------
 
-In order to build MongoDB, Python 2.7.x is required, and several Python modules. To install
-the required Python modules, run:
+In order to build MongoDB, Python 2.7.x is required, along with several Python modules. To
+install the required Python modules, run:
 
-    $ pip2 install -r buildscripts/requirements.txt
+    $ python2.7 -m pip install -r buildscripts/requirements.txt
 
-Note: If the `pip2` command is not available, `pip` without a suffix may be the pip command
-associated with Python 2.7.x.
+Note: If the `python2.7` command is not available, `python2` may be the command
+associated with Python 2.7.x. To verify that, run:
+
+    $ python2 --version
+
+If `pip` is not installed for Python 2.7.x, you will need to install it first. For
+details, see:
+* https://pip.pypa.io/en/stable/installing/
 
 SCons
 ---------------
