@@ -319,7 +319,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(pushesWithTimeout, runTimeoutPermutations<false, fa
     {
         MoveOnly mo(1);
         pcq.push(std::move(mo));
-        ASSERT(mo.movedFrom());
+        ASSERT(mo.movedFrom());  // NOLINT(bugprone-use-after-move)
     }
 
     helper

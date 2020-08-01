@@ -112,7 +112,7 @@ TEST_F(ThreadPoolExecutorTest, OnEvent) {
     };
     ASSERT_OK(executor.onEvent(event, std::move(cb)).getStatus());
     // Callback was moved from.
-    ASSERT(!cb);
+    ASSERT(!cb);  // NOLINT(bugprone-use-after-move)
     executor.signalEvent(event);
     barrier.countDownAndWait();
     ASSERT_OK(status1);
@@ -133,7 +133,7 @@ TEST_F(ThreadPoolExecutorTest, OnEventAfterShutdown) {
                   executor.onEvent(event, std::move(cb)).getStatus());
 
     // Callback was not moved from, it is still valid and we can call it to set status1.
-    ASSERT(static_cast<bool>(cb));
+    ASSERT(cb);  // NOLINT(bugprone-use-after-move)
     TaskExecutor::CallbackArgs args(&executor, {}, Status::OK());
     cb(args);
     ASSERT_OK(status1);

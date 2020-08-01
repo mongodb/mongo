@@ -139,7 +139,7 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     ASSERT_VALUE_EQ(moveConstructed.getSearchHighlights(), Value{"foo"_sd});
     ASSERT_BSONOBJ_EQ(moveConstructed.getIndexKey(), BSON("b" << 1));
 
-    ASSERT_FALSE(metadata);
+    ASSERT_FALSE(metadata);  // NOLINT(bugprone-use-after-move)
 }
 
 TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
@@ -168,7 +168,7 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     ASSERT_VALUE_EQ(moveAssigned.getSearchHighlights(), Value{"foo"_sd});
     ASSERT_BSONOBJ_EQ(moveAssigned.getIndexKey(), BSON("b" << 1));
 
-    ASSERT_FALSE(metadata);
+    ASSERT_FALSE(metadata);  // NOLINT(bugprone-use-after-move)
 }
 
 TEST(DocumentMetadataFieldsTest, CopyConstructor) {

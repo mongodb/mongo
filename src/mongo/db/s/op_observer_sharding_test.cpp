@@ -43,11 +43,11 @@ const NamespaceString kTestNss("TestDB", "TestColl");
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
     AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
+    const auto version = metadata.getShardVersion();
     CollectionShardingRuntime::get(opCtx, kTestNss)
         ->setFilteringMetadata(opCtx, std::move(metadata));
 
     auto& oss = OperationShardingState::get(opCtx);
-    const auto version = metadata.getShardVersion();
     BSONObjBuilder builder;
     version.appendToCommand(&builder);
     oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());

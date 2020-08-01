@@ -175,9 +175,9 @@ TEST_F(WorkingSetFixture, MetadataCanBeCorrectlyTransferredBackAndForthFromDocum
     MutableDocument md{std::move(document)};
     md.setMetadata(std::move(releasedMetadata));
     document = md.freeze();
-    ASSERT_FALSE(releasedMetadata);
-    ASSERT_FALSE(releasedMetadata.hasTextScore());
-    ASSERT_FALSE(releasedMetadata.hasSearchScore());
+    ASSERT_FALSE(releasedMetadata);                   // NOLINT(bugprone-use-after-move)
+    ASSERT_FALSE(releasedMetadata.hasTextScore());    // NOLINT(bugprone-use-after-move)
+    ASSERT_FALSE(releasedMetadata.hasSearchScore());  // NOLINT(bugprone-use-after-move)
     ASSERT_TRUE(document.metadata());
     ASSERT_TRUE(document.metadata().hasTextScore());
     ASSERT_TRUE(document.metadata().hasSearchScore());

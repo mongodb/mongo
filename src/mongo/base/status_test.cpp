@@ -108,8 +108,8 @@ TEST(Cloning, MoveCopyOK) {
 
     Status dest(std::move(orig));
 
-    ASSERT_TRUE(orig.isOK());
-    ASSERT_EQUALS(orig.refCount(), 0U);
+    ASSERT_TRUE(orig.isOK());            // NOLINT(bugprone-use-after-move)
+    ASSERT_EQUALS(orig.refCount(), 0U);  // NOLINT(bugprone-use-after-move)
 
     ASSERT_TRUE(dest.isOK());
     ASSERT_EQUALS(dest.refCount(), 0U);
@@ -122,8 +122,8 @@ TEST(Cloning, MoveCopyError) {
 
     Status dest(std::move(orig));
 
-    ASSERT_TRUE(orig.isOK());
-    ASSERT_EQUALS(orig.refCount(), 0U);
+    ASSERT_TRUE(orig.isOK());            // NOLINT(bugprone-use-after-move)
+    ASSERT_EQUALS(orig.refCount(), 0U);  // NOLINT(bugprone-use-after-move)
 
     ASSERT_FALSE(dest.isOK());
     ASSERT_EQUALS(dest.refCount(), 1U);
@@ -142,8 +142,8 @@ TEST(Cloning, MoveAssignOKToOK) {
 
     dest = std::move(orig);
 
-    ASSERT_TRUE(orig.isOK());
-    ASSERT_EQUALS(orig.refCount(), 0U);
+    ASSERT_TRUE(orig.isOK());            // NOLINT(bugprone-use-after-move)
+    ASSERT_EQUALS(orig.refCount(), 0U);  // NOLINT(bugprone-use-after-move)
 
     ASSERT_TRUE(dest.isOK());
     ASSERT_EQUALS(dest.refCount(), 0U);
@@ -164,8 +164,8 @@ TEST(Cloning, MoveAssignErrorToError) {
 
     dest = std::move(orig);
 
-    ASSERT_TRUE(orig.isOK());
-    ASSERT_EQUALS(orig.refCount(), 0U);
+    ASSERT_TRUE(orig.isOK());            // NOLINT(bugprone-use-after-move)
+    ASSERT_EQUALS(orig.refCount(), 0U);  // NOLINT(bugprone-use-after-move)
 
     ASSERT_FALSE(dest.isOK());
     ASSERT_EQUALS(dest.refCount(), 1U);
@@ -186,8 +186,8 @@ TEST(Cloning, MoveAssignErrorToOK) {
 
     dest = std::move(orig);
 
-    ASSERT_TRUE(orig.isOK());
-    ASSERT_EQUALS(orig.refCount(), 0U);
+    ASSERT_TRUE(orig.isOK());            // NOLINT(bugprone-use-after-move)
+    ASSERT_EQUALS(orig.refCount(), 0U);  // NOLINT(bugprone-use-after-move)
 
     ASSERT_FALSE(dest.isOK());
     ASSERT_EQUALS(dest.refCount(), 1U);
@@ -213,8 +213,8 @@ TEST(Cloning, MoveAssignOKToError) {
     ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
     ASSERT_EQUALS(orig.reason(), "error");
 
-    ASSERT_TRUE(dest.isOK());
-    ASSERT_EQUALS(dest.refCount(), 0U);
+    ASSERT_TRUE(dest.isOK());            // NOLINT(bugprone-use-after-move)
+    ASSERT_EQUALS(dest.refCount(), 0U);  // NOLINT(bugprone-use-after-move)
 }
 
 TEST(Cloning, OKIsNotRefCounted) {

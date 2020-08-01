@@ -358,7 +358,7 @@ TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithRootedUnsharedOwnedBsonWorks) 
     BSONObjBuilder bob(std::move(origObj));  // moving.
     bob.append("b", 1);
     const auto obj = bob.obj();
-    ASSERT_BSONOBJ_EQ(origObj, BSONObj());
+    ASSERT_BSONOBJ_EQ(origObj, BSONObj());  // NOLINT(bugprone-use-after-move)
     ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
     ASSERT_EQ(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
 }
@@ -398,7 +398,7 @@ TEST(BSONObjBuilderTest, SeedingBSONObjBuilderWithNonrootedUnsharedOwnedBsonWork
     BSONObjBuilder bob(std::move(origObj));  // moving.
     bob.append("b", 1);
     const auto obj = bob.obj();
-    ASSERT_BSONOBJ_EQ(origObj, BSONObj());
+    ASSERT_BSONOBJ_EQ(origObj, BSONObj());  // NOLINT(bugprone-use-after-move)
     ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 1));
     ASSERT_EQ(static_cast<const void*>(obj.objdata()), static_cast<const void*>(origObjPtr));
 }

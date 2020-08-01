@@ -49,8 +49,7 @@ TEST(KeysCollectionDocument, Roundtrip) {
 
     const auto expiresAt = LogicalTime(Timestamp(100, 200));
 
-    KeysCollectionDocument keysCollectionDoc(
-        keyId, std::move(purpose), std::move(key), std::move(expiresAt));
+    KeysCollectionDocument keysCollectionDoc(keyId, purpose, key, expiresAt);
 
     auto serializedObj = keysCollectionDoc.toBSON();
 

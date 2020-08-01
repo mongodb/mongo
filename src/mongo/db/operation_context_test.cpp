@@ -201,7 +201,7 @@ TEST(OperationContextTest, OpCtxGroup) {
         auto p3 = opCtx3.opCtx();
         auto opCtx4 = group4.take(std::move(opCtx3));
         ASSERT_EQ(p3, opCtx4.opCtx());
-        ASSERT(opCtx3.opCtx() == nullptr);
+        ASSERT(opCtx3.opCtx() == nullptr);  // NOLINT(bugprone-use-after-move)
         ASSERT_TRUE(group3.isEmpty());
         ASSERT_FALSE(group4.isEmpty());
         group3.interrupt(ErrorCodes::InternalError);
