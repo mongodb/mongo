@@ -919,7 +919,8 @@ protected:
         const QueryPlannerParams& plannerParams,
         size_t decisionWorks) final {
         auto result = makeResult();
-        result->emplace(buildExecutableTree(*solution, true), std::move(solution));
+        auto execTree = buildExecutableTree(*solution, true);
+        result->emplace(std::move(execTree), std::move(solution));
         result->setDecisionWorks(decisionWorks);
         return result;
     }

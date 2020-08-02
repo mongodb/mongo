@@ -119,10 +119,10 @@ void HashJoinStage::open(bool reOpen) {
     _commonStats.opens++;
     _children[0]->open(reOpen);
     // Insert the outer side into the hash table.
-    value::MaterializedRow key;
-    value::MaterializedRow project;
 
     while (_children[0]->getNext() == PlanState::ADVANCED) {
+        value::MaterializedRow key;
+        value::MaterializedRow project;
         key._fields.reserve(_inOuterKeyAccessors.size());
         project._fields.reserve(_inOuterProjectAccessors.size());
 

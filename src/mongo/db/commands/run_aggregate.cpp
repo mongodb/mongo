@@ -717,7 +717,6 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         auto pin = CursorManager::get(opCtx)->registerCursor(opCtx, std::move(cursorParams));
-        invariant(!exec);
 
         cursors.emplace_back(pin.getCursor());
         pins.emplace_back(std::move(pin));

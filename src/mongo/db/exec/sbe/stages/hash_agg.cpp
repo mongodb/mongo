@@ -103,8 +103,8 @@ void HashAggStage::open(bool reOpen) {
     _commonStats.opens++;
     _children[0]->open(reOpen);
 
-    value::MaterializedRow key;
     while (_children[0]->getNext() == PlanState::ADVANCED) {
+        value::MaterializedRow key;
         key._fields.resize(_inKeyAccessors.size());
         // Copy keys in order to do the lookup.
         size_t idx = 0;

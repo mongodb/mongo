@@ -91,7 +91,9 @@ StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx
     qr->setSort(sortObj);
     qr->setProj(projObj);
     qr->setCollation(collationObj);
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+    // TODO(SERVER-49997): remove clang-tidy NOLINT comment.
+    const ExtensionsCallbackReal extensionsCallback(opCtx,
+                                                    &nss);  // NOLINT(bugprone-use-after-move)
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx,

@@ -79,9 +79,8 @@ void SpoolEagerProducerStage::open(bool reOpen) {
         _buffer->clear();
     }
 
-    value::MaterializedRow vals;
-
     while (_children[0]->getNext() == PlanState::ADVANCED) {
+        value::MaterializedRow vals;
         vals._fields.reserve(_inAccessors.size());
 
         for (auto accessor : _inAccessors) {

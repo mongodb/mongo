@@ -3327,8 +3327,8 @@ int PipelineParserGen::parse() {
     | yyreturn -- parsing is finished, return the result.  |
     `-----------------------------------------------------*/
     yyreturn:
-        if (!yyla.empty())
-            yy_destroy_("Cleanup: discarding lookahead", yyla);
+        if (!yyla.empty())                                       // NOLINT(bugprone-use-after-move)
+            yy_destroy_("Cleanup: discarding lookahead", yyla);  // NOLINT(bugprone-use-after-move)
 
         /* Do not reclaim the symbols of the rule whose action triggered
            this YYABORT or YYACCEPT.  */

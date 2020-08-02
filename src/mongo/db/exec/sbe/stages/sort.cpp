@@ -121,9 +121,6 @@ void SortStage::open(bool reOpen) {
     _commonStats.opens++;
     _children[0]->open(reOpen);
 
-    value::MaterializedRow keys;
-    value::MaterializedRow vals;
-
     SortOptions opts;
     opts.tempDir = storageGlobalParams.dbpath + "/_tmp";
     std::string spillFileName = opts.tempDir + "/" + nextFileName();
@@ -150,6 +147,8 @@ void SortStage::open(bool reOpen) {
     };
 
     while (_children[0]->getNext() == PlanState::ADVANCED) {
+        value::MaterializedRow keys;
+        value::MaterializedRow vals;
         keys._fields.reserve(_inKeyAccessors.size());
         vals._fields.reserve(_inValueAccessors.size());
 
