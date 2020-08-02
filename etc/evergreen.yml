@@ -3553,7 +3553,11 @@ tasks:
           set -o errexit
           set -o verbose
           # This could probably be accelerated with gnu parallel
-          /opt/mongodbtoolchain/v3/bin/clang-tidy -p ./compile_commands.json --checks="-*,bugprone-unused-raii" -warnings-as-errors="*" $(jq -r '.[] | .file' compile_commands.json | grep src/mongo)
+          /opt/mongodbtoolchain/v3/bin/clang-tidy \
+            -p ./compile_commands.json \
+            --checks="-*,bugprone-unused-raii,bugprone-use-after-move" \
+            -warnings-as-errors="*" \
+            $(jq -r '.[] | .file' compile_commands.json | grep src/mongo)
 
 ## unittests - run unittests ##
 - name: unittests
