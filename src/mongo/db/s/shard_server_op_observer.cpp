@@ -468,7 +468,7 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
     // sharded or unsharded and set it on the CSR. If this method is called with the metadata as
     // UNKNOWN, this means an internal collection creation, which can only be UNSHARDED
     auto* csr = CollectionShardingRuntime::get(opCtx, collectionName);
-    if (!csr->getCurrentMetadataIfKnown())
+    if (opCtx->writesAreReplicated() && !csr->getCurrentMetadataIfKnown())
         csr->setFilteringMetadata(opCtx, CollectionMetadata());
 }
 

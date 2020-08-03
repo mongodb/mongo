@@ -500,7 +500,15 @@ void refreshAllShards(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const ShardId& dbPrimaryShardId,
                       const std::vector<ChunkType>& initialChunks) {
-    forceShardFilteringMetadataRefresh(opCtx, nss);
+    // If the refresh fails, then the shard will end with a shardVersion UNSHARDED.
+    try {
+        forceShardFilteringMetadataRefresh(opCtx, nss);
+    } catch (const DBException&) {
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
+        throw;
+    }
 
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
@@ -544,13 +552,23 @@ UUID shardCollection(OperationContext* opCtx,
             const InitialSplitPolicy::ShardCollectionConfig& initialChunks) {
             // Insert chunk documents to config.chunks on the config server.
             writeFirstChunksToConfig(opCtx, initialChunks);
+            // If an error happens when contacting the config server, we don't know if the update
+            // succeded or not, which might cause the local shard version to differ from the config
+            // server, so we clear the metadata to allow another operation to refresh it.
+            try {
+                updateShardingCatalogEntryForCollection(opCtx,
+                                                        nss,
+                                                        targetState,
+                                                        initialChunks,
+                                                        *request.getCollation(),
+                                                        request.getUnique());
 
-            updateShardingCatalogEntryForCollection(opCtx,
-                                                    nss,
-                                                    targetState,
-                                                    initialChunks,
-                                                    *request.getCollation(),
-                                                    request.getUnique());
+            } catch (const DBException&) {
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+                CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
+                throw;
+            }
 
             refreshAllShards(opCtx, nss, dbPrimaryShardId, initialChunks.chunks);
         };
