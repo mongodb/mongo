@@ -2,7 +2,10 @@
  * Verifies that the 'dataThroughputLastSecond' and 'dataThroughputAverage' fields appear in the
  * currentOp output while running validation.
  *
- * @tags: [requires_document_locking]
+ * ephemeralForTest does not support background validation, which is needed to report the
+ * 'dataThroughputLastSecond' and 'dataThroughputAverage' fields in currentOp.
+ *
+ * @tags: [incompatible_with_eft]
  */
 (function() {
 const dbName = "test";

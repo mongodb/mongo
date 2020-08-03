@@ -3,7 +3,6 @@
  * is ready to commit by updating the corresponding document in config.system.indexBuilds.
  *
  * @tags: [
- *     requires_document_locking,
  *     requires_replication,
  * ]
  */

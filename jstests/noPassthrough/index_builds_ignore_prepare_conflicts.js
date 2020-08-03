@@ -3,7 +3,6 @@
  * state.
  *
  * @tags: [
- *   requires_document_locking,
  *   requires_replication,
  *   uses_prepare_transaction,
  *   uses_transactions,

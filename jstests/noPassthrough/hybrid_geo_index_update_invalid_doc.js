@@ -2,7 +2,7 @@
  * Tests that building geo indexes using the hybrid method handles the unindexing of invalid
  * geo documents.
  *
- * @tags: [requires_document_locking, requires_replication]
+ * @tags: [requires_replication]
  */
 (function() {
 'use strict';

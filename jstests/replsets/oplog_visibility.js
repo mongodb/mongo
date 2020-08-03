@@ -2,8 +2,6 @@
  * Test oplog visibility enforcement of primaries and secondaries. This test uses a client to read
  * the oplog while there are concurrent writers. The client copies all the timestamps it sees and
  * verifies a later scan over the range returns the same values.
- *
- * @tags: [requires_document_locking]
  */
 (function() {
 "use strict";

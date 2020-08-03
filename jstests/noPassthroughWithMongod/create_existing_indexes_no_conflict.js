@@ -1,9 +1,3 @@
-/*
- * @tags: [
- *     # This test depends on two concurrent ops taking concurrent collection IX locks.
- *     requires_document_locking,
- * ]
- */
 (function() {
 "use strict";
 load("jstests/libs/parallel_shell_helpers.js");

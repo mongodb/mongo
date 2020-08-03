@@ -1,6 +1,5 @@
 /**
  * Tests that findAndModify with upsert=true does not conflict with a collection MODE_IX lock.
- * @tags: [requires_document_locking]
  */
 (function() {
 "use strict";

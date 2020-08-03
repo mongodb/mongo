@@ -7,7 +7,6 @@
  * build for the entire replica set.
  *
  * @tags: [
- *     requires_document_locking,
  *     requires_replication,
  * ]
  */

@@ -4,9 +4,7 @@
  * the two failing on the unique index constraint. This test confirms that the failed insert will be
  * retried, resulting in an update.
  *
- * In order for one of the two conflicting upserts to make progress we require a storage engine
- * which supports document level locking.
- *  @tags: [requires_replication, requires_document_locking]
+ * @tags: [requires_replication]
  */
 
 (function() {

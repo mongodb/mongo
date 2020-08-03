@@ -3,7 +3,6 @@
  * $_internalReadAtClusterTime option.
  *
  * @tags: [
- *   requires_document_locking,
  *   requires_fcv_46,
  *   uses_transactions,
  * ]

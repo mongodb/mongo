@@ -2,9 +2,6 @@
  * Ensures that a createIndexes command request inside a transaction immediately errors if an
  * existing index build of a duplicate index is already in progress outside of the transaction.
  * @tags: [
- *     # This test depends on two concurrent ops taking
- *     #concurrent collection IX locks.
- *     requires_document_locking,
  *     uses_transactions,
  * ]
  */

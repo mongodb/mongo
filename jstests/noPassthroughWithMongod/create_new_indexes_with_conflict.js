@@ -4,8 +4,6 @@
  *     assumes_against_mongod_not_mongos,
  *     # Sets a failpoint on one mongod, so switching primaries would break the test.
  *     does_not_support_stepdowns,
- *     # This test depends on two concurrent ops taking concurrent collection IX locks.
- *     requires_document_locking,
  * ]
  */
 (function() {

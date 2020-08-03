@@ -1,9 +1,6 @@
 /**
  * Test that only the primary can reap a session and remove the config.transactions doc for the
  * session, and that arbiters never try to a reap session.
- *
- * requires_document_locking because it uses retryable writes
- * @tags: [requires_document_locking]
  */
 
 (function() {
