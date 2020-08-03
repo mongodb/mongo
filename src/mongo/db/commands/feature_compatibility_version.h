@@ -106,30 +106,10 @@ public:
     static bool isCleanStartUp();
 
     /**
-     * Examines a document inserted or updated in the server configuration collection
-     * (admin.system.version). If it is the featureCompatibilityVersion document, validates the
-     * document and on commit, updates the server parameter.
-     */
-    static void onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc);
-
-    /**
      * Sets the server's outgoing and incomingInternalClient minWireVersions according to the
      * current featureCompatibilityVersion value.
      */
     static void updateMinWireVersion();
-
-    /**
-     * Ensures the in-memory and on-disk FCV states are consistent after a rollback.
-     */
-    static void onReplicationRollback(OperationContext* opCtx);
-
-private:
-    /**
-     * Set the FCV to newVersion, making sure to close any outgoing connections with incompatible
-     * servers and closing open transactions if necessary. Increments the server TopologyVersion.
-     */
-    static void _setVersion(OperationContext* opCtx,
-                            ServerGlobalParams::FeatureCompatibility::Version newVersion);
 };
 
 /**

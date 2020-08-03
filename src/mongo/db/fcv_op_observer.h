@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,54 +29,67 @@
 
 #pragma once
 
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer_noop.h"
+#include "mongo/db/server_options.h"
 
 namespace mongo {
 
-class OpObserverImpl : public OpObserver {
-    OpObserverImpl(const OpObserverImpl&) = delete;
-    OpObserverImpl& operator=(const OpObserverImpl&) = delete;
+/**
+ * OpObserver for Feature Compatibility Version (FCV).
+ * Observes all writes to the FCV document under admin.system.version and sets the in-memory FCV
+ * value.
+ */
+class FcvOpObserver final : public OpObserver {
+    FcvOpObserver(const FcvOpObserver&) = delete;
+    FcvOpObserver& operator=(const FcvOpObserver&) = delete;
 
 public:
-    OpObserverImpl() = default;
-    virtual ~OpObserverImpl() = default;
+    FcvOpObserver() = default;
+    ~FcvOpObserver() = default;
 
-    class DocumentKey {
-    public:
-        DocumentKey(BSONObj id, boost::optional<BSONObj> _shardKey)
-            : _id(id.getOwned()), _shardKey(std::move(_shardKey)) {
-            invariant(!id.isEmpty());
-        }
+    // FcvOpObserver overrides.
 
-        BSONObj getId() const;
+    void onInserts(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   OptionalCollectionUUID uuid,
+                   std::vector<InsertStatement>::const_iterator first,
+                   std::vector<InsertStatement>::const_iterator last,
+                   bool fromMigrate) final;
 
-        BSONObj getShardKeyAndId() const;
+    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) final;
 
-    private:
-        BSONObj _id;
-        boost::optional<BSONObj> _shardKey;
-    };
+    void onDelete(OperationContext* opCtx,
+                  const NamespaceString& nss,
+                  OptionalCollectionUUID uuid,
+                  StmtId stmtId,
+                  bool fromMigrate,
+                  const boost::optional<BSONObj>& deletedDoc) final;
+
+    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
+
+    // Noop overrides.
 
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        CollectionUUID uuid,
                        BSONObj indexDoc,
-                       bool fromMigrate) final;
+                       bool fromMigrate) final {}
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
                            CollectionUUID collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
-                           bool fromMigrate) final;
-    void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final;
+                           bool fromMigrate) final {}
+
+    void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final {}
 
     void onCommitIndexBuild(OperationContext* opCtx,
                             const NamespaceString& nss,
                             CollectionUUID collUUID,
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
-                            bool fromMigrate) final;
+                            bool fromMigrate) final {}
 
     void onAbortIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
@@ -84,24 +97,11 @@ public:
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
                            const Status& cause,
-                           bool fromMigrate) final;
+                           bool fromMigrate) final {}
 
-    void onInserts(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   OptionalCollectionUUID uuid,
-                   std::vector<InsertStatement>::const_iterator begin,
-                   std::vector<InsertStatement>::const_iterator end,
-                   bool fromMigrate) final;
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) final;
     void aboutToDelete(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       const BSONObj& doc) final;
-    void onDelete(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  OptionalCollectionUUID uuid,
-                  StmtId stmtId,
-                  bool fromMigrate,
-                  const boost::optional<BSONObj>& deletedDoc) final;
+                       const BSONObj& doc) final {}
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<UUID> uuid,
@@ -110,112 +110,91 @@ public:
                              const boost::optional<repl::OpTime> preImageOpTime,
                              const boost::optional<repl::OpTime> postImageOpTime,
                              const boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-                             const boost::optional<OplogSlot> slot) final;
+                             const boost::optional<OplogSlot> slot) final {}
     void onCreateCollection(OperationContext* opCtx,
                             Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
-                            const OplogSlot& createOpTime) final;
+                            const OplogSlot& createOpTime) final {}
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
                    OptionalCollectionUUID uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
-                   boost::optional<IndexCollModInfo> indexInfo) final;
-    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) final;
+                   boost::optional<IndexCollModInfo> indexInfo) final {}
+    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) final {}
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) final;
+                                  const CollectionDropType dropType) final {
+        return {};
+    }
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
                      OptionalCollectionUUID uuid,
                      const std::string& indexName,
-                     const BSONObj& indexInfo) final;
-    repl::OpTime preRenameCollection(OperationContext* opCtx,
-                                     const NamespaceString& fromCollection,
-                                     const NamespaceString& toCollection,
-                                     OptionalCollectionUUID uuid,
-                                     OptionalCollectionUUID dropTargetUUID,
-                                     std::uint64_t numRecords,
-                                     bool stayTemp) final;
-    void postRenameCollection(OperationContext* opCtx,
-                              const NamespaceString& fromCollection,
-                              const NamespaceString& toCollection,
-                              OptionalCollectionUUID uuid,
-                              OptionalCollectionUUID dropTargetUUID,
-                              bool stayTemp) final;
+                     const BSONObj& idxDescriptor) final {}
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             OptionalCollectionUUID uuid,
                             OptionalCollectionUUID dropTargetUUID,
                             std::uint64_t numRecords,
-                            bool stayTemp) final;
+                            bool stayTemp) final {}
+    repl::OpTime preRenameCollection(OperationContext* opCtx,
+                                     const NamespaceString& fromCollection,
+                                     const NamespaceString& toCollection,
+                                     OptionalCollectionUUID uuid,
+                                     OptionalCollectionUUID dropTargetUUID,
+                                     std::uint64_t numRecords,
+                                     bool stayTemp) final {
+        return {};
+    }
+    void postRenameCollection(OperationContext* opCtx,
+                              const NamespaceString& fromCollection,
+                              const NamespaceString& toCollection,
+                              OptionalCollectionUUID uuid,
+                              OptionalCollectionUUID dropTargetUUID,
+                              bool stayTemp) final {}
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
-                    const BSONObj& applyOpCmd) final;
+                    const BSONObj& applyOpCmd) final {}
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,
-                       OptionalCollectionUUID uuid);
+                       OptionalCollectionUUID uuid) final {}
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPreImagesToWrite) final;
+                                       size_t numberOfPreImagesToWrite) final {}
     void onPreparedTransactionCommit(
         OperationContext* opCtx,
         OplogSlot commitOplogEntryOpTime,
         Timestamp commitTimestamp,
-        const std::vector<repl::ReplOperation>& statements) noexcept final;
+        const std::vector<repl::ReplOperation>& statements) noexcept final{};
     void onTransactionPrepare(OperationContext* opCtx,
                               const std::vector<OplogSlot>& reservedSlots,
                               std::vector<repl::ReplOperation>* statements,
-                              size_t numberOfPreImagesToWrite) final;
+                              size_t numberOfPreImagesToWrite) final{};
     void onTransactionAbort(OperationContext* opCtx,
-                            boost::optional<OplogSlot> abortOplogEntryOpTime) final;
-    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
+                            boost::optional<OplogSlot> abortOplogEntryOpTime) final{};
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 
-    /**
-     * Returns a DocumentKey constructed from the shard key fields, if the collection is sharded,
-     * and the _id field, of the given document.
-     */
-    static DocumentKey getDocumentKey(OperationContext* opCtx,
-                                      NamespaceString const& nss,
-                                      BSONObj const& doc);
-
 private:
-    virtual void shardObserveAboutToDelete(OperationContext* opCtx,
-                                           NamespaceString const& nss,
-                                           BSONObj const& doc) {}
-    virtual void shardObserveInsertOp(OperationContext* opCtx,
-                                      const NamespaceString nss,
-                                      const BSONObj& insertedDoc,
-                                      const repl::OpTime& opTime,
-                                      const bool fromMigrate,
-                                      const bool inMultiDocumentTransaction) {}
-    virtual void shardObserveUpdateOp(OperationContext* opCtx,
-                                      const NamespaceString nss,
-                                      boost::optional<BSONObj> preImageDoc,
-                                      const BSONObj& postImageDoc,
-                                      const repl::OpTime& opTime,
-                                      const repl::OpTime& prePostImageOpTime,
-                                      const bool inMultiDocumentTransaction) {}
-    virtual void shardObserveDeleteOp(OperationContext* opCtx,
-                                      const NamespaceString nss,
-                                      const BSONObj& documentKey,
-                                      const repl::OpTime& opTime,
-                                      const repl::OpTime& preImageOpTime,
-                                      const bool inMultiDocumentTransaction) {}
-    virtual void shardObserveTransactionPrepareOrUnpreparedCommit(
-        OperationContext* opCtx,
-        const std::vector<repl::ReplOperation>& stmts,
-        const repl::OpTime& prepareOrCommitOptime) {}
-};
+    /**
+     * Set the FCV to newVersion, making sure to close any outgoing connections with incompatible
+     * servers and closing open transactions if necessary. Increments the server TopologyVersion.
+     */
+    static void _setVersion(OperationContext* opCtx,
+                            ServerGlobalParams::FeatureCompatibility::Version newVersion);
 
-extern const OperationContext::Decoration<boost::optional<OpObserverImpl::DocumentKey>>
-    documentKeyDecoration;
+    /**
+     * Examines a document inserted or updated in the server configuration collection
+     * (admin.system.version). If it is the featureCompatibilityVersion document, validates the
+     * document and on commit, updates the server parameter.
+     */
+    static void _onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc);
+};
 
 }  // namespace mongo

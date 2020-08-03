@@ -806,8 +806,27 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'transaction',
-        '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
+    ],
+)
+
+env.Library(
+    target="fcv_op_observer",
+    source=[
+        "fcv_op_observer.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        'catalog/collection_options',
+        'op_observer',
+        'op_observer_util',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/mongod_fcv',
+        '$BUILD_DIR/mongo/db/kill_sessions_local',
+        '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
+        'op_observer_impl',
     ],
 )
 
@@ -2054,6 +2073,7 @@ env.Library(
         'commands/mongod',
         'concurrency/flow_control_ticketholder',
         'concurrency/lock_manager',
+        'fcv_op_observer',
         'free_mon/free_mon_mongod',
         'ftdc/ftdc_mongod',
         'index/index_access_method_factory',
@@ -2220,6 +2240,7 @@ envWithAsio.CppUnitTest(
         'curop',
         'dbdirectclient',
         'dbmessage',
+        'fcv_op_observer',
         'index_build_entry_helpers',
         'index_builds_coordinator_mongod',
         'keys_collection_client_direct',

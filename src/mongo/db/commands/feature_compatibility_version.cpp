@@ -40,7 +40,6 @@
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -53,7 +52,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/executor/egress_tag_closer_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
@@ -65,8 +63,6 @@ namespace mongo {
 using repl::UnreplicatedWritesBlock;
 
 Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVersionLock");
-
-MONGO_FAIL_POINT_DEFINE(hangBeforeAbortingRunningTransactionsOnFCVDowngrade);
 
 namespace {
 bool isWriteableStorageEngine() {
@@ -203,33 +199,6 @@ bool FeatureCompatibilityVersion::isCleanStartUp() {
     return true;
 }
 
-void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc) {
-    auto idElement = doc["_id"];
-    if (idElement.type() != BSONType::String ||
-        idElement.String() != FeatureCompatibilityVersionParser::kParameterName) {
-        return;
-    }
-    auto newVersion = uassertStatusOK(FeatureCompatibilityVersionParser::parse(doc));
-
-    // To avoid extra log messages when the targetVersion is set/unset, only log when the version
-    // changes.
-    logv2::DynamicAttributes attrs;
-    bool isDifferent = true;
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        const auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
-        attrs.add("currentVersion", FeatureCompatibilityVersionParser::toString(currentVersion));
-        isDifferent = currentVersion != newVersion;
-    }
-
-    if (isDifferent) {
-        attrs.add("newVersion", FeatureCompatibilityVersionParser::toString(newVersion));
-        LOGV2(20459, "Setting featureCompatibilityVersion", attrs);
-    }
-
-    opCtx->recoveryUnit()->onCommit(
-        [opCtx, newVersion](boost::optional<Timestamp>) { _setVersion(opCtx, newVersion); });
-}
-
 void FeatureCompatibilityVersion::updateMinWireVersion() {
     WireSpec& wireSpec = WireSpec::instance();
 
@@ -335,72 +304,6 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
     // featureCompatibilityVersion parameter to still be uninitialized until after startup.
     if (isWriteableStorageEngine() && (!replSettings.usingReplSets() || nonLocalDatabases)) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
-    }
-}
-
-void FeatureCompatibilityVersion::_setVersion(
-    OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version newVersion) {
-    serverGlobalParams.featureCompatibility.setVersion(newVersion);
-    updateMinWireVersion();
-
-    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    if (newVersion != ServerGlobalParams::FeatureCompatibility::kLastLTS) {
-        // Close all incoming connections from internal clients with binary versions lower than
-        // ours.
-        opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
-            transport::Session::kLatestVersionInternalClientKeepOpen |
-            transport::Session::kExternalClientKeepOpen);
-        // Close all outgoing connections to servers with binary versions lower than ours.
-        executor::EgressTagCloserManager::get(opCtx->getServiceContext())
-            .dropConnections(transport::Session::kKeepOpen);
-    }
-
-    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    if (newVersion != ServerGlobalParams::FeatureCompatibility::kLatest) {
-        if (MONGO_unlikely(hangBeforeAbortingRunningTransactionsOnFCVDowngrade.shouldFail())) {
-            LOGV2(20460,
-                  "FeatureCompatibilityVersion - "
-                  "hangBeforeAbortingRunningTransactionsOnFCVDowngrade fail point enabled, "
-                  "blocking until fail point is disabled");
-            hangBeforeAbortingRunningTransactionsOnFCVDowngrade.pauseWhileSet();
-        }
-        // Abort all open transactions when downgrading the featureCompatibilityVersion.
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions);
-    }
-    const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
-    const bool isReplSet =
-        replCoordinator->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-    // We only want to increment the server TopologyVersion when the minWireVersion has changed.
-    // This can only happen in two scenarios:
-    // 1. Setting featureCompatibilityVersion from downgrading to fullyDowngraded.
-    // 2. Setting featureCompatibilityVersion from fullyDowngraded to upgrading.
-    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    const auto shouldIncrementTopologyVersion =
-        newVersion == ServerGlobalParams::FeatureCompatibility::kLastLTS ||
-        newVersion == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To47;
-    if (isReplSet && shouldIncrementTopologyVersion) {
-        replCoordinator->incrementTopologyVersion();
-    }
-}
-
-void FeatureCompatibilityVersion::onReplicationRollback(OperationContext* opCtx) {
-    const auto query = BSON("_id" << FeatureCompatibilityVersionParser::kParameterName);
-    const auto swFcv = repl::StorageInterface::get(opCtx)->findById(
-        opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
-    if (swFcv.isOK()) {
-        const auto featureCompatibilityVersion = swFcv.getValue();
-        auto swVersion = FeatureCompatibilityVersionParser::parse(featureCompatibilityVersion);
-        const auto memoryFcv = serverGlobalParams.featureCompatibility.getVersion();
-        if (swVersion.isOK() && (swVersion.getValue() != memoryFcv)) {
-            auto diskFcv = swVersion.getValue();
-            LOGV2(4675801,
-                  "Setting featureCompatibilityVersion as part of rollback",
-                  "newVersion"_attr = FeatureCompatibilityVersionParser::toString(diskFcv),
-                  "oldVersion"_attr = FeatureCompatibilityVersionParser::toString(memoryFcv));
-            _setVersion(opCtx, diskFcv);
-        }
     }
 }
 
