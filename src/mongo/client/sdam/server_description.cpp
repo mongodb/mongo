@@ -98,6 +98,11 @@ ServerDescription::ServerDescription(ClockSource* clockSource,
     }
 }
 
+ServerDescription::ServerDescription(const ServerDescriptionPtr& source, ServerType serverType)
+    : ServerDescription(*source) {
+    _type = serverType;
+}
+
 void ServerDescription::storeHostListIfPresent(const std::string key,
                                                const BSONObj response,
                                                std::set<HostAndPort>& destination) {

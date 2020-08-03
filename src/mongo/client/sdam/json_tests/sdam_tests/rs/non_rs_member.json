@@ -18,6 +18,10 @@
           "a:27017": {
             "type": "Unknown",
             "setName": null
+          },
+          "b:27017": {
+            "type": "Unknown",
+            "setName": null
           }
         },
         "topologyType": "ReplicaSetNoPrimary",

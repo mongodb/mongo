@@ -195,6 +195,42 @@ TEST_F(TopologyStateMachineTestFixture,
 }
 
 TEST_F(TopologyStateMachineTestFixture,
+       ShouldChangeStandaloneServerToUnknownAndPreserveTopologyType) {
+    const auto primary = (*kTwoSeedConfig.getSeedList()).front();
+    const auto otherMember = (*kTwoSeedConfig.getSeedList()).back();
+
+    TopologyStateMachine stateMachine(kTwoSeedConfig);
+    auto topologyDescription = std::make_shared<TopologyDescription>(kTwoSeedConfig);
+
+    const auto primaryDescription = ServerDescriptionBuilder()
+                                        .withAddress(primary)
+                                        .withMe(primary)
+                                        .withHost(primary)
+                                        .withHost(otherMember)
+                                        .withSetName(kReplicaSetName)
+                                        .withType(ServerType::kRSPrimary)
+                                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, primaryDescription);
+    ASSERT_EQUALS(topologyDescription->getType(), TopologyType::kReplicaSetWithPrimary);
+
+    // Primary transforms to a standalone
+    const auto standaloneDescription = ServerDescriptionBuilder()
+                                           .withType(ServerType::kStandalone)
+                                           .withMe(primary)
+                                           .withAddress(primary)
+                                           .withHost(primary)
+                                           .instance();
+    stateMachine.onServerDescription(*topologyDescription, standaloneDescription);
+
+    ASSERT_EQUALS(topologyDescription->getType(), TopologyType::kReplicaSetNoPrimary);
+    ASSERT_EQUALS(2, topologyDescription->getServers().size());
+
+    const auto finalServerDescription = topologyDescription->findServerByAddress(primary);
+    ASSERT(finalServerDescription);
+    ASSERT_EQUALS(ServerType::kUnknown, (*finalServerDescription)->getType());
+}
+
+TEST_F(TopologyStateMachineTestFixture,
        ShouldNotRemoveNonPrimaryServerWhenTopologyIsReplicaSetWithPrimaryAndMeIsNotPresent) {
     const auto serverAddress = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).front();
     const auto primaryAddress = (*kTwoSeedReplicaSetNoPrimaryConfig.getSeedList()).back();
