@@ -191,7 +191,7 @@ private:
     StringMap<DatabaseVersion> _databaseVersions;
 
     // Stores shards that have undergone a version check.
-    StringDataSet _shardVersionsChecked;
+    StringSet _shardVersionsChecked;
 
     // This value will only be non-null if version check during the operation execution failed due
     // to stale version and there was a migration for that namespace, which was in critical section.
