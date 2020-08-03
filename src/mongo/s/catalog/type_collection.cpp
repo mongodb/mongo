@@ -56,6 +56,7 @@ const BSONField<BSONObj> CollectionType::defaultCollation("defaultCollation");
 const BSONField<bool> CollectionType::unique("unique");
 const BSONField<UUID> CollectionType::uuid("uuid");
 const BSONField<std::string> CollectionType::distributionMode("distributionMode");
+const BSONField<ReshardingFields> CollectionType::reshardingFields("reshardingFields");
 
 StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
     CollectionType coll;
@@ -200,6 +201,15 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
         }
     }
 
+    {
+        const auto reshardingFieldsElem = source.getField(reshardingFields.name());
+        if (reshardingFieldsElem) {
+            coll._reshardingFields =
+                ReshardingFields::parse(IDLParserErrorContext("TypeCollectionReshardingFields"),
+                                        reshardingFieldsElem.Obj());
+        }
+    }
+
     return StatusWith<CollectionType>(coll);
 }
 
@@ -283,6 +293,10 @@ BSONObj CollectionType::toBSON() const {
         }
     }
 
+    if (_reshardingFields) {
+        builder.append(reshardingFields.name(), _reshardingFields->toBSON());
+    }
+
     return builder.obj();
 }
 
@@ -306,6 +320,10 @@ void CollectionType::setUpdatedAt(Date_t updatedAt) {
 void CollectionType::setKeyPattern(const KeyPattern& keyPattern) {
     invariant(!keyPattern.toBSON().isEmpty());
     _keyPattern = keyPattern;
+}
+
+void CollectionType::setReshardingFields(const ReshardingFields& reshardingFields) {
+    _reshardingFields = reshardingFields;
 }
 
 bool CollectionType::hasSameOptions(const CollectionType& other) const {

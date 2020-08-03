@@ -181,6 +181,8 @@ env.Library(
         env.Idlc('request_types/reshard_collection.idl')[0],
         env.Idlc('resharded_chunk.idl')[0],
         env.Idlc('request_types/wait_for_fail_point.idl')[0],
+        env.Idlc('resharding/common_types.idl')[0],
+        env.Idlc('resharding/type_collection_fields.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/connection_string',

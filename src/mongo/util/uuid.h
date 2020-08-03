@@ -95,6 +95,7 @@ class UUID {
     friend class ShardsvrRenameCollection;
     friend class TenantMigrationDonorDocument;
     friend class TenantMigrationRecipientDocument;
+    friend class TypeCollectionReshardingFields;
     friend class VoteCommitIndexBuild;
 
 

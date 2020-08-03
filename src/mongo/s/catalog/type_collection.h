@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -43,6 +44,7 @@ class Status;
 template <typename T>
 class StatusWith;
 
+using ReshardingFields = TypeCollectionReshardingFields;
 
 /**
  * This class represents the layout and contents of documents contained in the config server's
@@ -65,6 +67,24 @@ class StatusWith;
  *      "uuid" : UUID,
  *      "noBalance" : false,
  *      "distributionMode" : "unsharded|sharded",
+ *      // Only populated if the collection is currently undergoing a resharding operation.
+ *      "reshardingFields" : {
+ *          "uuid" : UUID,
+ *          "state" : CoordinatorState<kInitialized>,
+ *          // Only populated if the collection is currently undergoing a resharding operation,
+ *          // and this collection is the original sharded collection.
+ *          "donorFields" : {
+ *              "reshardingKey" : {
+ *                  "_notTheID" : 1
+ *              }
+ *          },
+ *          // Only populated if this collection is the temporary resharding collection in a
+ *          // resharding operation.
+ *          "recipientFields" : {
+ *              "fetchTimestamp" : Timestamp(3, 4),
+ *              "originalNamespace" : "foo.bar",
+ *          }
+ *      }
  *   }
  *
  */
@@ -81,6 +101,7 @@ public:
     static const BSONField<bool> unique;
     static const BSONField<UUID> uuid;
     static const BSONField<std::string> distributionMode;
+    static const BSONField<ReshardingFields> reshardingFields;
 
     /**
      * Constructs a new CollectionType object from BSON. Also does validation of the contents.
@@ -173,6 +194,12 @@ public:
         return _distributionMode.get_value_or(DistributionMode::kSharded);
     }
 
+    void setReshardingFields(const ReshardingFields& reshardingFields);
+
+    boost::optional<ReshardingFields> getReshardingFields() const {
+        return _reshardingFields;
+    }
+
     bool hasSameOptions(const CollectionType& other) const;
 
 private:
@@ -206,6 +233,9 @@ private:
 
     // Optional whether balancing is allowed for this collection. If missing, implies true.
     boost::optional<bool> _allowBalance;
+
+    // Fields on the collection entry specific to resharding.
+    boost::optional<ReshardingFields> _reshardingFields;
 };
 
 }  // namespace mongo

@@ -26,38 +26,43 @@
 # it in the license file.
 #
 
-# This file defines the format of documents stored in config.localReshardingOperations on the
-# recipient shard for a resharding operation.
+# This file defines the format of resharding-related fields stored in a config.collections entry.
 
 global:
     cpp_namespace: "mongo"
 
 imports:
+    - "mongo/db/keypattern.idl"
     - "mongo/s/resharding/common_types.idl"
 
 structs:
-    DonorShardMirroringEntry:
-        description: "Represents a particular donor shard and whether that shard has reported to
-                      this recipient that the shard is now mirroring writes as distributed
-                      transactions."
-        generate_comparison_operators: false
-        strict: true
+    TypeCollectionDonorFields:
+        description: "Resharding-related fields specific to donor shards."
         fields:
-            id: shard_id
-            mirroring: bool
+            reshardingKey:
+                type: KeyPattern
 
-    ReshardingRecipientDocument:
-        description: "Represents a resharding operation on the recipient shard."
+    TypeCollectionRecipientFields:
+        description: "Resharding-related fields specific to recipient shards."
         inline_chained_structs: true
         chained_structs:
-            CommonReshardingMetadata: CommonReshardingMetadata
             FetchTimestamp: FetchTimestampStruct
-            StrictConsistencyTimestamp: StrictConsistencyTimestampStruct
-        generate_comparison_operators: false
-        strict: true
         fields:
-            state: RecipientState
-            donorShardsMirroring:
-                type: array<DonorShardMirroringEntry>
-                description: "The list of donor shards that have reported to this recipient that
-                              the donor shard is now mirroring writes as distributed transactions."
+            originalNamespace:
+                type: namespacestring
+
+    TypeCollectionReshardingFields:
+        description: "Resharding-related fields meant to be stored in a config.collections
+                      document."
+        fields:
+            uuid:
+                type: uuid
+            state:
+                type: CoordinatorState
+                default: kUnused
+            donorFields:
+                type: TypeCollectionDonorFields
+                optional: true
+            recipientFields:
+                type: TypeCollectionRecipientFields
+                optional: true

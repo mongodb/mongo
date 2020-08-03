@@ -74,13 +74,19 @@ TEST(CollectionType, Basic) {
 TEST(CollectionType, AllFieldsPresent) {
     const OID oid = OID::gen();
     const auto uuid = UUID::gen();
+    const auto reshardingUuid = UUID::gen();
+
+    ReshardingFields reshardingFields;
+    reshardingFields.setUuid(reshardingUuid);
+
     StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
         CollectionType::fullNs("db.coll")
         << CollectionType::epoch(oid) << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
         << CollectionType::keyPattern(BSON("a" << 1))
         << CollectionType::defaultCollation(BSON("locale"
                                                  << "fr_CA"))
-        << CollectionType::unique(true) << CollectionType::uuid() << uuid));
+        << CollectionType::unique(true) << CollectionType::uuid() << uuid
+        << CollectionType::reshardingFields() << reshardingFields.toBSON()));
     ASSERT_TRUE(status.isOK());
 
     CollectionType coll = status.getValue();
@@ -97,6 +103,8 @@ TEST(CollectionType, AllFieldsPresent) {
     ASSERT_EQUALS(coll.getDropped(), false);
     ASSERT_TRUE(coll.getUUID());
     ASSERT_EQUALS(*coll.getUUID(), uuid);
+    ASSERT(coll.getReshardingFields()->getState() == CoordinatorStateEnum::kUnused);
+    ASSERT(coll.getReshardingFields()->getUuid() == reshardingUuid);
 }
 
 TEST(CollectionType, EmptyDefaultCollationFailsToParse) {

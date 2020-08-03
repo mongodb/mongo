@@ -33,7 +33,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/db/s/resharding/common_types.idl"
+    - "mongo/s/resharding/common_types.idl"
 
 structs:
     DonorShardEntry:
