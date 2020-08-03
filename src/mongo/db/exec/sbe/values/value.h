@@ -114,8 +114,6 @@ enum class TypeTags : uint8_t {
     timeZoneDB,
 };
 
-std::ostream& operator<<(std::ostream& os, const TypeTags tag);
-
 inline constexpr bool isNumber(TypeTags tag) noexcept {
     return tag == TypeTags::NumberInt32 || tag == TypeTags::NumberInt64 ||
         tag == TypeTags::NumberDouble || tag == TypeTags::NumberDecimal;
@@ -166,8 +164,15 @@ enum class SortDirection : uint8_t { Descending, Ascending };
  */
 void releaseValue(TypeTags tag, Value val) noexcept;
 std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val);
-void printValue(std::ostream& os, TypeTags tag, Value val);
 std::size_t hashValue(TypeTags tag, Value val) noexcept;
+
+/**
+ * Overloads for writing values and tags to stream.
+ */
+std::ostream& operator<<(std::ostream& os, const TypeTags tag);
+str::stream& operator<<(str::stream& str, const TypeTags tag);
+std::ostream& operator<<(std::ostream& os, const std::pair<TypeTags, Value>& value);
+str::stream& operator<<(str::stream& str, const std::pair<TypeTags, Value>& value);
 
 /**
  * Three ways value comparison (aka spaceship operator).

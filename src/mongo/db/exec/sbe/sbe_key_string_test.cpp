@@ -41,7 +41,7 @@ namespace mongo::sbe {
 namespace {
 std::string valueDebugString(std::pair<value::TypeTags, value::Value> value) {
     std::stringstream stream;
-    value::printValue(stream, value.first, value.second);
+    stream << std::make_pair(value.first, value.second);
     return stream.str();
 };
 }  // namespace

@@ -172,8 +172,9 @@ void ScanStage::open(bool reOpen) {
     if (auto collection = _coll->getCollection()) {
         if (_seekKeyAccessor) {
             auto [tag, val] = _seekKeyAccessor->getViewOfValue();
+            const auto msgTag = tag;
             uassert(ErrorCodes::BadValue,
-                    "seek key is wrong type",
+                    str::stream() << "seek key is wrong type: " << msgTag,
                     tag == value::TypeTags::NumberInt64);
 
             _key = RecordId{value::bitcastTo<int64_t>(val)};

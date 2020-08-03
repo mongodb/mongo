@@ -88,157 +88,160 @@ void releaseValue(TypeTags tag, Value val) noexcept {
     }
 }
 
-std::ostream& operator<<(std::ostream& os, const TypeTags tag) {
+template <typename T>
+void writeTagToStream(T& stream, const TypeTags tag) {
     switch (tag) {
         case TypeTags::Nothing:
-            os << "Nothing";
+            stream << "Nothing";
             break;
         case TypeTags::NumberInt32:
-            os << "NumberInt32";
+            stream << "NumberInt32";
             break;
         case TypeTags::NumberInt64:
-            os << "NumberInt64";
+            stream << "NumberInt64";
             break;
         case TypeTags::NumberDouble:
-            os << "NumberDouble";
+            stream << "NumberDouble";
             break;
         case TypeTags::NumberDecimal:
-            os << "NumberDecimal";
+            stream << "NumberDecimal";
             break;
         case TypeTags::Date:
-            os << "Date";
+            stream << "Date";
             break;
         case TypeTags::Timestamp:
-            os << "Timestamp";
+            stream << "Timestamp";
             break;
         case TypeTags::Boolean:
-            os << "Boolean";
+            stream << "Boolean";
             break;
         case TypeTags::Null:
-            os << "Null";
+            stream << "Null";
             break;
         case TypeTags::StringSmall:
-            os << "StringSmall";
+            stream << "StringSmall";
             break;
         case TypeTags::StringBig:
-            os << "StringBig";
+            stream << "StringBig";
             break;
         case TypeTags::Array:
-            os << "Array";
+            stream << "Array";
             break;
         case TypeTags::ArraySet:
-            os << "ArraySet";
+            stream << "ArraySet";
             break;
         case TypeTags::Object:
-            os << "Object";
+            stream << "Object";
             break;
         case TypeTags::ObjectId:
-            os << "ObjectId";
+            stream << "ObjectId";
             break;
         case TypeTags::bsonObject:
-            os << "bsonObject";
+            stream << "bsonObject";
             break;
         case TypeTags::bsonArray:
-            os << "bsonArray";
+            stream << "bsonArray";
             break;
         case TypeTags::bsonString:
-            os << "bsonString";
+            stream << "bsonString";
             break;
         case TypeTags::bsonObjectId:
-            os << "bsonObjectId";
+            stream << "bsonObjectId";
             break;
         case TypeTags::ksValue:
-            os << "KeyString";
+            stream << "KeyString";
+            break;
         case TypeTags::pcreRegex:
-            os << "pcreRegex";
+            stream << "pcreRegex";
+            break;
         case TypeTags::timeZoneDB:
-            os << "timeZoneDB";
+            stream << "timeZoneDB";
             break;
         default:
-            os << "unknown tag";
+            stream << "unknown tag";
             break;
     }
-    return os;
 }
 
-void printValue(std::ostream& os, TypeTags tag, Value val) {
+template <typename T>
+void writeValueToStream(T& stream, TypeTags tag, Value val) {
     switch (tag) {
         case value::TypeTags::NumberInt32:
-            os << bitcastTo<int32_t>(val);
+            stream << bitcastTo<int32_t>(val);
             break;
         case value::TypeTags::NumberInt64:
-            os << bitcastTo<int64_t>(val);
+            stream << bitcastTo<int64_t>(val);
             break;
         case value::TypeTags::NumberDouble:
-            os << bitcastTo<double>(val);
+            stream << bitcastTo<double>(val);
             break;
         case value::TypeTags::NumberDecimal:
-            os << bitcastTo<Decimal128>(val).toString();
+            stream << bitcastTo<Decimal128>(val).toString();
             break;
         case value::TypeTags::Date:
-            os << bitcastTo<int64_t>(val);
+            stream << bitcastTo<int64_t>(val);
             break;
         case value::TypeTags::Boolean:
-            os << ((val) ? "true" : "false");
+            stream << ((val) ? "true" : "false");
             break;
         case value::TypeTags::Null:
-            os << "null";
+            stream << "null";
             break;
         case value::TypeTags::StringSmall:
-            os << '"' << getSmallStringView(val) << '"';
+            stream << '"' << getSmallStringView(val) << '"';
             break;
         case value::TypeTags::StringBig:
-            os << '"' << getBigStringView(val) << '"';
+            stream << '"' << getBigStringView(val) << '"';
             break;
         case value::TypeTags::Array: {
             auto arr = getArrayView(val);
-            os << '[';
+            stream << '[';
             for (size_t idx = 0; idx < arr->size(); ++idx) {
                 if (idx != 0) {
-                    os << ", ";
+                    stream << ", ";
                 }
                 auto [tag, val] = arr->getAt(idx);
-                printValue(os, tag, val);
+                writeValueToStream(stream, tag, val);
             }
-            os << ']';
+            stream << ']';
             break;
         }
         case value::TypeTags::ArraySet: {
             auto arr = getArraySetView(val);
-            os << '[';
+            stream << '[';
             bool first = true;
             for (const auto& v : arr->values()) {
                 if (!first) {
-                    os << ", ";
+                    stream << ", ";
                 }
                 first = false;
-                printValue(os, v.first, v.second);
+                writeValueToStream(stream, v.first, v.second);
             }
-            os << ']';
+            stream << ']';
             break;
         }
         case value::TypeTags::Object: {
             auto obj = getObjectView(val);
-            os << '{';
+            stream << '{';
             for (size_t idx = 0; idx < obj->size(); ++idx) {
                 if (idx != 0) {
-                    os << ", ";
+                    stream << ", ";
                 }
-                os << '"' << obj->field(idx) << '"';
-                os << " : ";
+                stream << '"' << obj->field(idx) << '"';
+                stream << " : ";
                 auto [tag, val] = obj->getAt(idx);
-                printValue(os, tag, val);
+                writeValueToStream(stream, tag, val);
             }
-            os << '}';
+            stream << '}';
             break;
         }
         case value::TypeTags::ObjectId: {
             auto objId = getObjectIdView(val);
-            os << "ObjectId(\"" << OID::from(objId->data()).toString() << "\")";
+            stream << "ObjectId(\"" << OID::from(objId->data()).toString() << "\")";
             break;
         }
         case value::TypeTags::Nothing:
-            os << "---===*** NOTHING ***===---";
+            stream << "---===*** NOTHING ***===---";
             break;
         case value::TypeTags::bsonArray: {
             const char* be = getRawPointerView(val);
@@ -246,21 +249,21 @@ void printValue(std::ostream& os, TypeTags tag, Value val) {
             bool first = true;
             // Skip document length.
             be += 4;
-            os << '[';
+            stream << '[';
             while (*be != 0) {
                 auto sv = bson::fieldNameView(be);
 
                 if (!first) {
-                    os << ", ";
+                    stream << ", ";
                 }
                 first = false;
 
                 auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
-                printValue(os, tag, val);
+                writeValueToStream(stream, tag, val);
 
                 be = bson::advance(be, sv.size());
             }
-            os << ']';
+            stream << ']';
             break;
         }
         case value::TypeTags::bsonObject: {
@@ -269,56 +272,76 @@ void printValue(std::ostream& os, TypeTags tag, Value val) {
             bool first = true;
             // Skip document length.
             be += 4;
-            os << '{';
+            stream << '{';
             while (*be != 0) {
                 auto sv = bson::fieldNameView(be);
 
                 if (!first) {
-                    os << ", ";
+                    stream << ", ";
                 }
                 first = false;
 
-                os << '"' << sv << '"';
-                os << " : ";
+                stream << '"' << std::string(sv) << '"';
+                stream << " : ";
                 auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
-                printValue(os, tag, val);
+                writeValueToStream(stream, tag, val);
 
                 be = bson::advance(be, sv.size());
             }
-            os << '}';
+            stream << '}';
             break;
         }
         case value::TypeTags::bsonString:
-            os << '"' << getStringView(value::TypeTags::bsonString, val) << '"';
+            stream << '"' << std::string(getStringView(value::TypeTags::bsonString, val)) << '"';
             break;
         case value::TypeTags::bsonObjectId:
-            os << "---===*** bsonObjectId ***===---";
+            stream << "---===*** bsonObjectId ***===---";
             break;
         case value::TypeTags::ksValue: {
             auto ks = getKeyStringView(val);
-            os << "KS(" << ks->toString() << ")";
+            stream << "KS(" << ks->toString() << ")";
             break;
         }
         case value::TypeTags::Timestamp: {
             Timestamp ts{bitcastTo<uint64_t>(val)};
-            os << ts.toString();
+            stream << ts.toString();
             break;
         }
         case value::TypeTags::pcreRegex: {
             auto regex = getPcreRegexView(val);
             // TODO: Also include the regex flags.
-            os << "/" << regex->pattern() << "/";
+            stream << "/" << regex->pattern() << "/";
             break;
         }
         case value::TypeTags::timeZoneDB: {
             auto tzdb = getTimeZoneDBView(val);
             auto timeZones = tzdb->getTimeZoneStrings();
-            os << "TimeZoneDatabase(" + timeZones.front() + "..." + timeZones.back() + ")";
+            stream << "TimeZoneDatabase(" + timeZones.front() + "..." + timeZones.back() + ")";
             break;
         }
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+std::ostream& operator<<(std::ostream& os, const TypeTags tag) {
+    writeTagToStream(os, tag);
+    return os;
+}
+
+str::stream& operator<<(str::stream& str, const TypeTags tag) {
+    writeTagToStream(str, tag);
+    return str;
+}
+
+std::ostream& operator<<(std::ostream& os, const std::pair<TypeTags, Value>& value) {
+    writeValueToStream(os, value.first, value.second);
+    return os;
+}
+
+str::stream& operator<<(str::stream& str, const std::pair<TypeTags, Value>& value) {
+    writeValueToStream(str, value.first, value.second);
+    return str;
 }
 
 BSONType tagToType(TypeTags tag) noexcept {

@@ -81,7 +81,10 @@ PlanState CheckBoundsStage::getNext() {
 
     if (state == PlanState::ADVANCED) {
         auto [keyTag, keyVal] = _inKeyAccessor->getViewOfValue();
-        uassert(ErrorCodes::BadValue, "Wrong index key type", keyTag == value::TypeTags::ksValue);
+        const auto msgKeyTag = keyTag;
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Wrong index key type: " << msgKeyTag,
+                keyTag == value::TypeTags::ksValue);
 
         auto key = value::getKeyStringView(keyVal);
         auto bsonKey = KeyString::toBson(*key, _params.ord);

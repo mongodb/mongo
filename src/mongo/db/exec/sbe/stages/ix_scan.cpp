@@ -184,15 +184,24 @@ void IndexScanStage::open(bool reOpen) {
 
             if (_seekKeyLowAccessor && _seekKeyHiAccessor) {
                 auto [tagLow, valLow] = _seekKeyLowAccessor->getViewOfValue();
-                uassert(4822851, "seek key is wrong type", tagLow == value::TypeTags::ksValue);
+                const auto msgTagLow = tagLow;
+                uassert(4822851,
+                        str::stream() << "seek key is wrong type: " << msgTagLow,
+                        tagLow == value::TypeTags::ksValue);
                 _seekKeyLow = value::getKeyStringView(valLow);
 
                 auto [tagHi, valHi] = _seekKeyHiAccessor->getViewOfValue();
-                uassert(4822852, "seek key is wrong type", tagHi == value::TypeTags::ksValue);
+                const auto msgTagHi = tagHi;
+                uassert(4822852,
+                        str::stream() << "seek key is wrong type: " << msgTagHi,
+                        tagHi == value::TypeTags::ksValue);
                 _seekKeyHi = value::getKeyStringView(valHi);
             } else if (_seekKeyLowAccessor) {
                 auto [tagLow, valLow] = _seekKeyLowAccessor->getViewOfValue();
-                uassert(4822853, "seek key is wrong type", tagLow == value::TypeTags::ksValue);
+                const auto msgTagLow = tagLow;
+                uassert(4822853,
+                        str::stream() << "seek key is wrong type: " << msgTagLow,
+                        tagLow == value::TypeTags::ksValue);
                 _seekKeyLow = value::getKeyStringView(valLow);
                 _seekKeyHi = nullptr;
             } else {

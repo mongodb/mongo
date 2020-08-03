@@ -245,9 +245,11 @@ Timestamp PlanExecutorSBE::getLatestOplogTimestamp() const {
 
         auto [tag, val] = _oplogTs->getViewOfValue();
         if (tag != sbe::value::TypeTags::Nothing) {
+            const auto msgTag = tag;
             uassert(4822868,
                     str::stream() << "Collection scan was asked to track latest operation time, "
-                                     "but found a result without a valid 'ts' field",
+                                     "but found a result without a valid 'ts' field: "
+                                  << msgTag,
                     tag == sbe::value::TypeTags::Timestamp);
             return Timestamp{sbe::value::bitcastTo<uint64_t>(val)};
         }
@@ -261,9 +263,11 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
 
         auto [tag, val] = _resultRecordId->getViewOfValue();
         if (tag != sbe::value::TypeTags::Nothing) {
+            const auto msgTag = tag;
             uassert(4822869,
-                    "Collection scan was asked to track resume token, "
-                    "but found a result without a valid RecordId",
+                    str::stream() << "Collection scan was asked to track resume token, "
+                                     "but found a result without a valid RecordId: "
+                                  << msgTag,
                     tag == sbe::value::TypeTags::NumberInt64);
             return BSON("$recordId" << sbe::value::bitcastTo<int64_t>(val));
         }
