@@ -1008,10 +1008,14 @@ env.Library(
         'base_cloner',
         'cloner_utils',
         'initial_sync_shared_data',
+        'task_runner',
         '$BUILD_DIR/mongo/base',
     ],
     LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/util/progress_meter',
     ]
 )
 
@@ -1504,6 +1508,7 @@ env.CppUnitTest(
         'database_cloner_test.cpp',
         'initial_sync_shared_data_test.cpp',
         'tenant_all_database_cloner_test.cpp',
+        'tenant_collection_cloner_test.cpp',
         'tenant_database_cloner_test.cpp'
     ],
     LIBDEPS=[

@@ -59,31 +59,152 @@ public:
         void append(BSONObjBuilder* builder) const;
     };
 
+    /**
+     * Type of function to schedule storage interface tasks with the executor.
+     *
+     * Used for testing only.
+     */
+    using ScheduleDbWorkFn = unique_function<StatusWith<executor::TaskExecutor::CallbackHandle>(
+        executor::TaskExecutor::CallbackFn)>;
+
     TenantCollectionCloner(const NamespaceString& ns,
                            const CollectionOptions& collectionOptions,
                            InitialSyncSharedData* sharedData,
                            const HostAndPort& source,
                            DBClientConnection* client,
                            StorageInterface* storageInterface,
-                           ThreadPool* dbPool);
+                           ThreadPool* dbPool,
+                           StringData tenantId);
 
     virtual ~TenantCollectionCloner() = default;
 
     Stats getStats() const;
 
+    std::string toString() const;
+
+    NamespaceString getSourceNss() const {
+        return _sourceNss;
+    }
+    UUID getSourceUuid() const {
+        return *_sourceDbAndUuid.uuid();
+    }
+
+    /**
+     * Set the cloner batch size.
+     *
+     * Used for testing only.  Set by server parameter 'collectionClonerBatchSize' in normal
+     * operation.
+     */
+    void setBatchSize_forTest(int batchSize) {
+        _collectionClonerBatchSize = batchSize;
+    }
+
+    /**
+     * Overrides how executor schedules database work.
+     *
+     * For testing only.
+     */
+    void setScheduleDbWorkFn_forTest(ScheduleDbWorkFn scheduleDbWorkFn) {
+        _scheduleDbWorkFn = std::move(scheduleDbWorkFn);
+    }
+
+    Timestamp getOperationTime_forTest();
+
 protected:
     ClonerStages getStages() final;
 
+    bool isMyFailPoint(const BSONObj& data) const final;
+
 private:
+    friend class TenantCollectionClonerTest;
+    friend class TenantCollectionClonerStage;
+
+    class TenantCollectionClonerStage : public ClonerStage<TenantCollectionCloner> {
+    public:
+        TenantCollectionClonerStage(std::string name,
+                                    TenantCollectionCloner* cloner,
+                                    ClonerRunFn stageFunc)
+            : ClonerStage<TenantCollectionCloner>(name, cloner, stageFunc) {}
+        AfterStageBehavior run() override;
+
+        bool isTransientError(const Status& status) override {
+            // Always abort on error.
+            return false;
+        }
+    };
+
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
         return _sourceNss.db() + " db: { " + stage->getName() + ": UUID(\"" +
             _sourceDbAndUuid.uuid()->toString() + "\") coll: " + _sourceNss.coll() + " }";
     }
 
     /**
-     * Temporary no-op stage.
+     * The preStage sets the start time in _stats.
      */
-    AfterStageBehavior placeholderStage();
+    void preStage() final;
+
+    /**
+     * The postStage sets the end time in _stats.
+     */
+    void postStage() final;
+
+    /**
+     * Stage function that counts the number of documents in the collection on the source in order
+     * to generate progress information.
+     */
+    AfterStageBehavior countStage();
+
+    /**
+     * Stage function that gets the index information of the collection on the source to re-create
+     * it.
+     */
+    AfterStageBehavior listIndexesStage();
+
+    /**
+     * Stage function that creates the collection using the storageInterface.  This stage does not
+     * actually contact the sync source.
+     */
+    AfterStageBehavior createCollectionStage();
+
+    /**
+     * Stage function that executes a query to retrieve all documents in the collection.  For each
+     * batch returned by the upstream node, handleNextBatch will be called with the data.  This
+     * stage will finish when the entire query is finished or failed.
+     */
+    AfterStageBehavior queryStage();
+
+    /**
+     * Put all results from a query batch into a buffer to be inserted, and schedule
+     * it to be inserted.
+     */
+    void handleNextBatch(DBClientCursorBatchIterator& iter);
+
+    /**
+     * Called whenever there is a new batch of documents ready from the DBClientConnection.
+     */
+    void insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& cbd);
+
+    /**
+     * Sends a query command to the source.
+     */
+    void runQuery();
+
+    /**
+     * Waits for any database work to finish or fail.
+     */
+    void waitForDatabaseWorkToComplete();
+
+    /**
+     * Sets up tracking the lastVisibleOpTime from response metadata.
+     */
+    void setMetadataReader();
+    void unsetMetadataReader();
+    void setLastVisibleOpTime(OpTime opTime) {
+        _lastVisibleOpTime = opTime;
+    }
+    OpTime getLastVisibleOpTime() {
+        return _lastVisibleOpTime;
+    }
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -96,10 +217,36 @@ private:
     const CollectionOptions _collectionOptions;  // (R)
     // Despite the type name, this member must always contain a UUID.
     NamespaceStringOrUUID _sourceDbAndUuid;  // (R)
+    // The size of the batches of documents returned in collection cloning.
+    int _collectionClonerBatchSize;  // (R)
 
-    ClonerStage<TenantCollectionCloner> _placeholderStage;  // (R)
+    TenantCollectionClonerStage _countStage;             // (R)
+    TenantCollectionClonerStage _listIndexesStage;       // (R)
+    TenantCollectionClonerStage _createCollectionStage;  // (R)
+    TenantCollectionClonerStage _queryStage;             // (R)
 
-    Stats _stats;  // (M)
+    ProgressMeter _progressMeter;           // (X) progress meter for this instance.
+    std::vector<BSONObj> _readyIndexSpecs;  // (X) Except for _id_
+    BSONObj _idIndexSpec;                   // (X)
+    // Function for scheduling database work using the executor.
+    ScheduleDbWorkFn _scheduleDbWorkFn;  // (R)
+    // Documents read from source to insert.
+    std::vector<InsertStatement> _documentsToInsert;  // (M)
+    Stats _stats;                                     // (M)
+    // We put _dbWorkTaskRunner after anything the database threads depend on to ensure it is
+    // only destroyed after those threads exit.
+    TaskRunner _dbWorkTaskRunner;  // (R)
+
+    // TODO(SERVER-49780): Move this into TenantMigrationSharedData.
+    OpTime _lastVisibleOpTime;  // (X)
+
+    // The database name prefix of the tenant associated with this migration.
+    // TODO(SERVER-49780): Consider moving this into TenantMigrationSharedData.
+    std::string _tenantId;  // (R)
+
+    // The operationTime returned with the listIndexes result.
+    // TODO(SERVER-49780): Consider moving this into TenantMigrationSharedData.
+    Timestamp _operationTime;  // (X)
 };
 
 }  // namespace repl

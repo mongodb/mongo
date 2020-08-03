@@ -83,6 +83,10 @@ public:
                             const NamespaceString& nss,
                             const CollectionOptions& options) override;
 
+    Status createIndexesOnEmptyCollection(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const std::vector<BSONObj>& secondaryIndexSpecs) override;
+
     Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) override;
 
     Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) override;

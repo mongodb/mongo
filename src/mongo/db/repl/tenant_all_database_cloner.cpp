@@ -52,10 +52,10 @@ TenantAllDatabaseCloner::TenantAllDatabaseCloner(InitialSyncSharedData* sharedDa
                                                  DBClientConnection* client,
                                                  StorageInterface* storageInterface,
                                                  ThreadPool* dbPool,
-                                                 StringData databasePrefix)
+                                                 StringData tenantId)
     : BaseCloner(
           "TenantAllDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
-      _databasePrefix(databasePrefix),
+      _tenantId(tenantId),
       _listDatabasesStage("listDatabases", this, &TenantAllDatabaseCloner::listDatabasesStage) {}
 
 BaseCloner::ClonerStages TenantAllDatabaseCloner::getStages() {
@@ -63,19 +63,23 @@ BaseCloner::ClonerStages TenantAllDatabaseCloner::getStages() {
 }
 
 BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listDatabasesStage() {
+    // This will be set after a successful listDatabases command.
+    _operationTime = Timestamp();
+
     BSONObj res;
-    const BSONObj filter = ClonerUtils::makeTenantDatabaseFilter(_databasePrefix);
+    const BSONObj filter = ClonerUtils::makeTenantDatabaseFilter(_tenantId);
     auto databasesArray = getClient()->getDatabaseInfos(filter, true /* nameOnly */);
 
-    // Do a speculative majority read on the sync source to make sure the databases listed
-    // exist on a majority of nodes in the set. We do not check the rollbackId - rollback
-    // would lead to the sync source closing connections so the stage would fail.
+    // Do a majority read on the sync source to make sure the databases listed exist on a majority
+    // of nodes in the set. We do not check the rollbackId - rollback would lead to the sync source
+    // closing connections so the stage would fail.
     _operationTime = getClient()->getOperationTime();
 
     if (MONGO_unlikely(tenantAllDatabaseClonerHangAfterGettingOperationTime.shouldFail())) {
         LOGV2(4881504,
               "Failpoint 'tenantAllDatabaseClonerHangAfterGettingOperationTime' enabled. Blocking "
-              "until it is disabled.");
+              "until it is disabled.",
+              "tenantId"_attr = _tenantId);
         tenantAllDatabaseClonerHangAfterGettingOperationTime.pauseWhileSet();
     }
 
@@ -88,7 +92,11 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listDatabasesStage() {
 
     // Process and verify the listDatabases results.
     for (const auto& dbBSON : databasesArray) {
-        LOGV2_DEBUG(4881508, 2, "Cloner received listDatabases entry", "db"_attr = dbBSON);
+        LOGV2_DEBUG(4881508,
+                    2,
+                    "Cloner received listDatabases entry",
+                    "db"_attr = dbBSON,
+                    "tenantId"_attr = _tenantId);
         uassert(4881505, "Result from donor must have 'name' set", dbBSON.hasField("name"));
 
         const auto& dbName = dbBSON["name"].str();
@@ -117,7 +125,8 @@ void TenantAllDatabaseCloner::postStage() {
                                                                             getSource(),
                                                                             getClient(),
                                                                             getStorageInterface(),
-                                                                            getDBPool());
+                                                                            getDBPool(),
+                                                                            _tenantId);
         }
         auto dbStatus = _currentDatabaseCloner->run();
         if (dbStatus.isOK()) {
@@ -125,14 +134,16 @@ void TenantAllDatabaseCloner::postStage() {
                         1,
                         "Tenant migration database clone finished",
                         "dbName"_attr = dbName,
-                        "status"_attr = dbStatus);
+                        "status"_attr = dbStatus,
+                        "tenantId"_attr = _tenantId);
         } else {
             LOGV2_WARNING(4881501,
                           "Tenant migration database clone failed",
                           "dbName"_attr = dbName,
                           "dbNumber"_attr = (_stats.databasesCloned + 1),
                           "totalDbs"_attr = _databases.size(),
-                          "error"_attr = dbStatus.toString());
+                          "error"_attr = dbStatus.toString(),
+                          "tenantId"_attr = _tenantId);
             setInitialSyncFailedStatus(dbStatus);
             return;
         }
@@ -158,7 +169,7 @@ std::string TenantAllDatabaseCloner::toString() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return str::stream() << "tenant migration --"
                          << " active:" << isActive(lk) << " status:" << getStatus(lk).toString()
-                         << " source:" << getSource()
+                         << " source:" << getSource() << " tenantId: " << _tenantId
                          << " db cloners completed:" << _stats.databasesCloned;
 }
 

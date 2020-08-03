@@ -53,7 +53,7 @@ public:
                             DBClientConnection* client,
                             StorageInterface* storageInterface,
                             ThreadPool* dbPool,
-                            StringData databasePrefix);
+                            StringData tenantId);
 
     virtual ~TenantAllDatabaseCloner() = default;
 
@@ -111,7 +111,7 @@ private:
     std::unique_ptr<TenantDatabaseCloner> _currentDatabaseCloner;  // (MX)
 
     // The database name prefix of the tenant associated with this migration.
-    std::string _databasePrefix;  // (R)
+    std::string _tenantId;  // (R)
 
     TenantAllDatabaseClonerStage _listDatabasesStage;  // (R)
 

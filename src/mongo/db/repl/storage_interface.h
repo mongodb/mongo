@@ -160,6 +160,14 @@ public:
                                     const CollectionOptions& options) = 0;
 
     /**
+     * Creates all the specified non-_id indexes on a given collection, which must be empty.
+     */
+    virtual Status createIndexesOnEmptyCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const std::vector<BSONObj>& secondaryIndexSpecs) = 0;
+
+    /**
      * Drops a collection.
      */
     virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;

@@ -493,6 +493,30 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
     });
 }
 
+Status StorageInterfaceImpl::createIndexesOnEmptyCollection(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& secondaryIndexSpecs) {
+    return writeConflictRetry(opCtx, "createIndexesOnEmptyCollection", nss.ns(), [&] {
+        AutoGetCollection autoColl(opCtx, nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
+        WriteUnitOfWork wunit(opCtx);
+
+        for (auto&& spec : secondaryIndexSpecs) {
+            // Will error if collection is not empty.
+            auto secIndexSW =
+                autoColl.getCollection()->getIndexCatalog()->createIndexOnEmptyCollection(opCtx,
+                                                                                          spec);
+            auto status = secIndexSW.getStatus();
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+
+        wunit.commit();
+        return Status::OK();
+    });
+}
+
 Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::dropCollection", nss.ns(), [&] {
         AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);

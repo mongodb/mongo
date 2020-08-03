@@ -57,7 +57,8 @@ public:
                          const HostAndPort& source,
                          DBClientConnection* client,
                          StorageInterface* storageInterface,
-                         ThreadPool* dbPool);
+                         ThreadPool* dbPool,
+                         StringData tenantId);
 
     virtual ~TenantDatabaseCloner() = default;
 
@@ -122,6 +123,9 @@ private:
     std::unique_ptr<TenantCollectionCloner> _currentCollectionCloner;         // (MX)
 
     TenantDatabaseClonerStage _listCollectionsStage;  // (R)
+
+    // The database name prefix of the tenant associated with this migration.
+    std::string _tenantId;  // (R)
 
     // The operationTime returned with the listCollections result.
     Timestamp _operationTime;  // (X)

@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 namespace repl {
@@ -54,6 +55,11 @@ public:
      * Assembles a majority read using the operationTime specified as the afterClusterTime.
      */
     static BSONObj buildMajorityWaitRequest(Timestamp operationTime);
+
+    /**
+     * Checks if the collection belongs to the given tenant.
+     */
+    static bool isNamespaceForTenant(NamespaceString nss, StringData prefix);
 };
 
 

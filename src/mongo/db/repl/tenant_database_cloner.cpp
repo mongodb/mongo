@@ -53,10 +53,12 @@ TenantDatabaseCloner::TenantDatabaseCloner(const std::string& dbName,
                                            const HostAndPort& source,
                                            DBClientConnection* client,
                                            StorageInterface* storageInterface,
-                                           ThreadPool* dbPool)
+                                           ThreadPool* dbPool,
+                                           StringData tenantId)
     : BaseCloner("TenantDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
-      _listCollectionsStage("listCollections", this, &TenantDatabaseCloner::listCollectionsStage) {
+      _listCollectionsStage("listCollections", this, &TenantDatabaseCloner::listCollectionsStage),
+      _tenantId(tenantId) {
     invariant(!dbName.empty());
     _stats.dbname = dbName;
 }
@@ -72,15 +74,14 @@ void TenantDatabaseCloner::preStage() {
 
 BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
     // This will be set after a successful listCollections command.
-    _operationTime = Timestamp(0, 0);
+    _operationTime = Timestamp();
 
-    BSONObj res;
     auto collectionInfos =
         getClient()->getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
 
-    // Do a speculative majority read on the sync source to make sure the collections listed
-    // exist on a majority of nodes in the set. We do not check the rollbackId - rollback
-    // would lead to the sync source closing connections so the stage would fail.
+    // Do a majority read on the sync source to make sure the collections listed exist on a majority
+    // of nodes in the set. We do not check the rollbackId - rollback would lead to the sync source
+    // closing connections so the stage would fail.
     _operationTime = getClient()->getOperationTime();
 
     tenantDatabaseClonerHangAfterGettingOperationTime.executeIf(
@@ -90,7 +91,8 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
                 LOGV2(4881605,
                       "tenantDatabaseClonerHangAfterGettingOperationTime fail point "
                       "enabled. Blocking until fail point is disabled",
-                      "dbName"_attr = _dbName);
+                      "dbName"_attr = _dbName,
+                      "tenantId"_attr = _tenantId);
                 mongo::sleepsecs(1);
             }
         },
@@ -126,10 +128,16 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
             LOGV2_DEBUG(4881602,
                         1,
                         "Database cloner skipping 'system' collection",
-                        "namespace"_attr = collectionNamespace.ns());
+                        "namespace"_attr = collectionNamespace.ns(),
+                        "tenantId"_attr = _tenantId);
             continue;
         }
-        LOGV2_DEBUG(4881603, 2, "Allowing cloning of collectionInfo", "info"_attr = info);
+        LOGV2_DEBUG(4881603,
+                    2,
+                    "Allowing cloning of collectionInfo",
+                    "info"_attr = info,
+                    "db"_attr = _dbName,
+                    "tenantId"_attr = _tenantId);
 
         bool isDuplicate = seen.insert(result.getName().toString()).second;
         uassert(4881604,
@@ -173,17 +181,22 @@ void TenantDatabaseCloner::postStage() {
                                                          getSource(),
                                                          getClient(),
                                                          getStorageInterface(),
-                                                         getDBPool());
+                                                         getDBPool(),
+                                                         _tenantId);
         }
         auto collStatus = _currentCollectionCloner->run();
         if (collStatus.isOK()) {
-            LOGV2_DEBUG(
-                4881600, 1, "Tenant collection clone finished", "namespace"_attr = sourceNss);
+            LOGV2_DEBUG(4881600,
+                        1,
+                        "Tenant collection clone finished",
+                        "namespace"_attr = sourceNss,
+                        "tenantId"_attr = _tenantId);
         } else {
             LOGV2_ERROR(4881601,
                         "Tenant collection clone failed",
                         "namespace"_attr = sourceNss,
-                        "error"_attr = collStatus.toString());
+                        "error"_attr = collStatus.toString(),
+                        "tenantId"_attr = _tenantId);
             setInitialSyncFailedStatus(
                 {collStatus.code(),
                  collStatus

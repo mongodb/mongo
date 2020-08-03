@@ -61,7 +61,7 @@ protected:
                                                          _mockClient.get(),
                                                          &_storageInterface,
                                                          _dbWorkThreadPool.get(),
-                                                         _databasePrefix);
+                                                         _tenantId);
     }
 
     std::vector<std::string> getDatabasesFromCloner(TenantAllDatabaseCloner* cloner) {
@@ -80,7 +80,7 @@ protected:
     }
 
     static Timestamp _operationTime;
-    static std::string _databasePrefix;
+    static std::string _tenantId;
     static std::string _tenantDbA;
     static std::string _tenantDbAAB;
     static std::string _tenantDbABC;
@@ -89,11 +89,11 @@ protected:
 
 /* static */
 Timestamp TenantAllDatabaseClonerTest::_operationTime = Timestamp(12345, 67);
-std::string TenantAllDatabaseClonerTest::_databasePrefix = "tenant42";
-std::string TenantAllDatabaseClonerTest::_tenantDbA = _databasePrefix + "_a";
-std::string TenantAllDatabaseClonerTest::_tenantDbAAB = _databasePrefix + "_aab";
-std::string TenantAllDatabaseClonerTest::_tenantDbABC = _databasePrefix + "_abc";
-std::string TenantAllDatabaseClonerTest::_tenantDbB = _databasePrefix + "_b";
+std::string TenantAllDatabaseClonerTest::_tenantId = "tenant42";
+std::string TenantAllDatabaseClonerTest::_tenantDbA = _tenantId + "_a";
+std::string TenantAllDatabaseClonerTest::_tenantDbAAB = _tenantId + "_aab";
+std::string TenantAllDatabaseClonerTest::_tenantDbABC = _tenantId + "_abc";
+std::string TenantAllDatabaseClonerTest::_tenantDbB = _tenantId + "_b";
 
 TEST_F(TenantAllDatabaseClonerTest, FailsOnListDatabases) {
     Status expectedResult{ErrorCodes::BadValue, "foo"};

@@ -104,6 +104,8 @@ public:
     using CreateOplogFn = std::function<Status(OperationContext*, const NamespaceString&)>;
     using CreateCollectionFn =
         std::function<Status(OperationContext*, const NamespaceString&, const CollectionOptions&)>;
+    using CreateIndexesOnEmptyCollectionFn = std::function<Status(
+        OperationContext*, const NamespaceString&, const std::vector<BSONObj>&)>;
     using TruncateCollectionFn =
         std::function<Status(OperationContext*, const NamespaceString& nss)>;
     using DropCollectionFn = std::function<Status(OperationContext*, const NamespaceString& nss)>;
@@ -170,6 +172,13 @@ public:
                             const NamespaceString& nss,
                             const CollectionOptions& options) override {
         return createCollFn(opCtx, nss, options);
+    }
+
+    Status createIndexesOnEmptyCollection(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const std::vector<BSONObj>& secondaryIndexSpecs) override {
+        return createIndexesOnEmptyCollFn(opCtx, nss, secondaryIndexSpecs);
     }
 
     Status dropCollection(OperationContext* opCtx, const NamespaceString& nss) override {
@@ -381,6 +390,12 @@ public:
         [](OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options) {
             return Status{ErrorCodes::IllegalOperation, "CreateCollectionFn not implemented."};
         };
+    CreateIndexesOnEmptyCollectionFn createIndexesOnEmptyCollFn = [](OperationContext* opCtx,
+                                                                     const NamespaceString& nss,
+                                                                     const std::vector<BSONObj>&
+                                                                         secondaryIndexSpecs) {
+        return Status{ErrorCodes::IllegalOperation, "createIndexesOnEmptyCollFn not implemented."};
+    };
     TruncateCollectionFn truncateCollFn = [](OperationContext* opCtx, const NamespaceString& nss) {
         return Status{ErrorCodes::IllegalOperation, "TruncateCollectionFn not implemented."};
     };
