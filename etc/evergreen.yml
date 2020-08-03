@@ -9387,6 +9387,7 @@ buildvariants:
   run_on:
   - windows-64-vs2019-small
   expansions:
+    burn_in_tests_build_variant: enterprise-windows
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
