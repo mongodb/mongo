@@ -53,9 +53,6 @@ class ConcurrentCreateCollectionTest {
 public:
     void run() {
         auto serviceContext = getGlobalServiceContext();
-        if (!serviceContext->getStorageEngine()->supportsDocLocking()) {
-            return;
-        }
 
         NamespaceString competingNss("test.competingCollection");
 

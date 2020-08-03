@@ -54,13 +54,6 @@ public:
     virtual std::unique_ptr<RecordStore> newCappedRecordStore(const std::string& ns,
                                                               int64_t cappedSizeBytes,
                                                               int64_t cappedMaxDocs) = 0;
-
-    /**
-     * Currently this requires that it is possible to have two independent open write operations
-     * at the same time one the same thread (with separate Clients, OperationContexts, and
-     * RecoveryUnits).
-     */
-    virtual bool supportsDocLocking() = 0;
 };
 
 void registerRecordStoreHarnessHelperFactory(

@@ -185,10 +185,6 @@ public:
             checked_cast<WiredTigerRecoveryUnit*>(_engine->newRecoveryUnit()));
     }
 
-    virtual bool supportsDocLocking() final {
-        return true;
-    }
-
     virtual WT_CONNECTION* conn() const {
         return _engine->getConnection();
     }

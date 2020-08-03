@@ -74,10 +74,6 @@ public:
 
     virtual std::vector<std::string> listDatabases() const override;
 
-    virtual bool supportsDocLocking() const override {
-        return _supportsDocLocking;
-    }
-
     virtual bool supportsCappedCollections() const override {
         return _supportsCappedCollections;
     }
@@ -402,7 +398,6 @@ private:
     // Listener for min of checkpoint and oldest timestamp changes.
     TimestampMonitor::TimestampListener _minOfCheckpointAndOldestTimestampListener;
 
-    const bool _supportsDocLocking;
     const bool _supportsCappedCollections;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;

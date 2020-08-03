@@ -295,18 +295,16 @@ void insertDocuments(OperationContext* opCtx,
     // to be written. Multidocument transactions should not generate opTimes because they are
     // generated at the time of commit.
     auto batchSize = std::distance(begin, end);
-    if (supportsDocLocking()) {
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto inTransaction = opCtx->inMultiDocumentTransaction();
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    auto inTransaction = opCtx->inMultiDocumentTransaction();
 
-        if (!inTransaction && !replCoord->isOplogDisabledFor(opCtx, collection->ns())) {
-            // Populate 'slots' with new optimes for each insert.
-            // This also notifies the storage engine of each new timestamp.
-            auto oplogSlots = repl::getNextOpTimes(opCtx, batchSize);
-            auto slot = oplogSlots.begin();
-            for (auto it = begin; it != end; it++) {
-                it->oplogSlot = *slot++;
-            }
+    if (!inTransaction && !replCoord->isOplogDisabledFor(opCtx, collection->ns())) {
+        // Populate 'slots' with new optimes for each insert.
+        // This also notifies the storage engine of each new timestamp.
+        auto oplogSlots = repl::getNextOpTimes(opCtx, batchSize);
+        auto slot = oplogSlots.begin();
+        for (auto it = begin; it != end; it++) {
+            it->oplogSlot = *slot++;
         }
     }
 

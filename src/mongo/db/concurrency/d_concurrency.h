@@ -289,7 +289,7 @@ public:
     };
 
     /**
-     * Database lock with support for collection- and document-level locking
+     * Database lock.
      *
      * This lock supports four modes (see Lock_Mode):
      *   MODE_IS: concurrent database access, requiring further collection read locks
@@ -342,18 +342,16 @@ public:
     };
 
     /**
-     * Collection lock with support for document-level locking
+     * Collection lock.
      *
      * This lock supports four modes (see Lock_Mode):
-     *   MODE_IS: concurrent collection access, requiring document level locking read locks
-     *   MODE_IX: concurrent collection access, requiring document level read or write locks
+     *   MODE_IS: concurrent collection access, requiring read locks
+     *   MODE_IX: concurrent collection access, requiring read or write locks
      *   MODE_S:  shared read access to the collection, blocking any writers
      *   MODE_X:  exclusive access to the collection, blocking all other readers and writers
      *
      * An appropriate DBLock must already be held before locking a collection: it is an error,
-     * checked with a dassert(), to not have a suitable database lock before locking the
-     * collection. For storage engines that do not support document-level locking, MODE_IS
-     * will be upgraded to MODE_S and MODE_IX will be upgraded to MODE_X.
+     * checked with a dassert(), to not have a suitable database lock before locking the collection.
      */
     class CollectionLock {
         CollectionLock(const CollectionLock&) = delete;

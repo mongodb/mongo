@@ -242,11 +242,7 @@ public:
             Client::initThread("test-insert-thread");
             auto innerOpCtx = Client::getCurrent()->makeOperationContext();
 
-            // The ephemeral for test storage engine doesn't support document-level locking, so
-            // requests with txnNumbers aren't allowed. To get around this, we have to manually set
-            // up the session state and perform the insert.
-            initializeOperationSessionInfo(
-                innerOpCtx.get(), insertBuilder.obj(), true, true, true, true);
+            initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
             MongoDOperationContextSession sessionTxnState(innerOpCtx.get());
             auto txnParticipant = TransactionParticipant::get(innerOpCtx.get());
             txnParticipant.beginOrContinue(

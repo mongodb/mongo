@@ -1379,10 +1379,6 @@ boost::optional<Timestamp> StorageInterfaceImpl::getLastStableRecoveryTimestamp(
     return ret;
 }
 
-bool StorageInterfaceImpl::supportsDocLocking(ServiceContext* serviceCtx) const {
-    return serviceCtx->getStorageEngine()->supportsDocLocking();
-}
-
 Timestamp StorageInterfaceImpl::getAllDurableTimestamp(ServiceContext* serviceCtx) const {
     return serviceCtx->getStorageEngine()->getAllDurableTimestamp();
 }

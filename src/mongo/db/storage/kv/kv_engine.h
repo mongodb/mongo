@@ -270,11 +270,6 @@ public:
     /**
      * This must not change over the lifetime of the engine.
      */
-    virtual bool supportsDocLocking() const = 0;
-
-    /**
-     * This must not change over the lifetime of the engine.
-     */
     virtual bool supportsCappedCollections() const {
         return true;
     }

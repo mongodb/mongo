@@ -958,13 +958,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                               << uuid.get() << "): " << redact(opOrGroupedInserts.toBSON()),
                 collection);
         requestNss = collection->ns();
-        dassert(opCtx->lockState()->isCollectionLockedForMode(
-            requestNss, supportsDocLocking() ? MODE_IX : MODE_X));
+        dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX));
     } else {
         requestNss = op.getNss();
         invariant(requestNss.coll().size());
-        dassert(opCtx->lockState()->isCollectionLockedForMode(
-                    requestNss, supportsDocLocking() ? MODE_IX : MODE_X),
+        dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX),
                 requestNss.ns());
         collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, requestNss);
     }

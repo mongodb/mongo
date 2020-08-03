@@ -85,10 +85,6 @@ public:
     std::unique_ptr<mongo::RecoveryUnit> newRecoveryUnit() final {
         return std::make_unique<RecoveryUnit>(&_kvEngine);
     }
-
-    bool supportsDocLocking() final {
-        return true;
-    }
 };
 
 std::unique_ptr<mongo::RecordStoreHarnessHelper> makeRecordStoreHarnessHelper() {

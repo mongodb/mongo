@@ -143,17 +143,11 @@ public:
                     " commands are enabled",
                     getTestCommandsEnabled());
 
-            auto* replCoord = repl::ReplicationCoordinator::get(opCtx);
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "The '$_internalReadAtClusterTime' option is only supported when replication is"
                     " enabled",
                     replCoord->isReplEnabled());
-
-            auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            uassert(ErrorCodes::InvalidOptions,
-                    "The '$_internalReadAtClusterTime' option is only supported by storage engines"
-                    " that support document-level concurrency",
-                    storageEngine->supportsDocLocking());
 
             uassert(ErrorCodes::TypeMismatch,
                     "The '$_internalReadAtClusterTime' option must be a Timestamp",
@@ -185,6 +179,7 @@ public:
             // down. This isn't an actual concern because the testing infrastructure won't use the
             // $_internalReadAtClusterTime option in any test suite where clean shutdown is expected
             // to occur concurrently with tests running.
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             auto allDurableTime = storageEngine->getAllDurableTimestamp();
             invariant(!allDurableTime.isNull());
 

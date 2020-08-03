@@ -42,8 +42,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
                                                               const BSONObj& requestBody,
                                                               bool requiresAuth,
                                                               bool attachToOpCtx,
-                                                              bool isReplSetMemberOrMongos,
-                                                              bool supportsDocLocking) {
+                                                              bool isReplSetMemberOrMongos) {
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
     if (opCtx->getClient()->isInDirectClient()) {
@@ -110,10 +109,6 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction numbers are only allowed on a replica set member or mongos",
                 isReplSetMemberOrMongos);
-        uassert(ErrorCodes::IllegalOperation,
-                "Transaction numbers are only allowed on storage engines that support "
-                "document-level locking",
-                supportsDocLocking);
         uassert(ErrorCodes::InvalidOptions,
                 "Transaction number cannot be negative",
                 *osi.getTxnNumber() >= 0);

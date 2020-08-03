@@ -4815,16 +4815,15 @@ OpTime ReplicationCoordinatorImpl::_recalculateStableOpTime(WithLock lk) {
     // and secondary nodes due to their distinct behaviors, as described below.
     //
 
-    // On a primary node that supports document level locking, oplog writes may commit out of
-    // timestamp order, which can lead to the creation of oplog "holes". On a primary the
-    // all_durable timestamp tracks the newest timestamp T such that no future transactions will
-    // commit behind T. Since all_durable is a timestamp, however, without a term, we need to
-    // construct an optime with a proper term. If we are primary, then the all_durable should always
-    // correspond to a timestamp at or newer than the first write completed by this node as primary,
-    // since we write down a new oplog entry before allowing writes as a new primary. Thus, it can
-    // be assigned the current term of this primary.
+    // On a primary node, oplog writes may commit out of timestamp order, which can lead to the
+    // creation of oplog "holes". On a primary the all_durable timestamp tracks the newest timestamp
+    // T such that no future transactions will commit behind T. Since all_durable is a timestamp,
+    // however, without a term, we need to construct an optime with a proper term. If we are
+    // primary, then the all_durable should always correspond to a timestamp at or newer than the
+    // first write completed by this node as primary, since we write down a new oplog entry before
+    // allowing writes as a new primary. Thus, it can be assigned the current term of this primary.
     OpTime allDurableOpTime = OpTime::max();
-    if (_readWriteAbility->canAcceptNonLocalWrites(lk) && _storage->supportsDocLocking(_service)) {
+    if (_readWriteAbility->canAcceptNonLocalWrites(lk)) {
         allDurableOpTime =
             OpTime(_storage->getAllDurableTimestamp(getServiceContext()), _topCoord->getTerm());
     }

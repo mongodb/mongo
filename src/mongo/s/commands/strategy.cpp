@@ -355,7 +355,6 @@ void runCommand(OperationContext* opCtx,
                                               request.body,
                                               command->requiresAuth(),
                                               command->attachLogicalSessionsToOpCtx(),
-                                              true,
                                               true);
 
     // TODO SERVER-28756: Change allowTransactionsOnConfigDatabase to true once we fix the bug

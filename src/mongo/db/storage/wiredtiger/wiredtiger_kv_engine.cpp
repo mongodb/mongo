@@ -1891,10 +1891,6 @@ void WiredTigerKVEngine::dropSomeQueuedIdents() {
     }
 }
 
-bool WiredTigerKVEngine::supportsDocLocking() const {
-    return true;
-}
-
 bool WiredTigerKVEngine::supportsDirectoryPerDB() const {
     return true;
 }

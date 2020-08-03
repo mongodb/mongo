@@ -55,9 +55,6 @@ RecordId doInsert(unowned_ptr<OperationContext> opCtx, unowned_ptr<RecordStore> 
 
 TEST(RecordStore_CappedVisibility, EmptyInitialState) {
     const auto harness = newRecordStoreHarnessHelper();
-    if (!harness->supportsDocLocking())
-        return;
-
     auto rs = harness->newCappedRecordStore();
 
     auto longLivedClient = harness->serviceContext()->makeClient("longLived");
@@ -107,9 +104,6 @@ TEST(RecordStore_CappedVisibility, EmptyInitialState) {
 
 TEST(RecordStore_CappedVisibility, NonEmptyInitialState) {
     const auto harness = newRecordStoreHarnessHelper();
-    if (!harness->supportsDocLocking())
-        return;
-
     auto rs = harness->newCappedRecordStore();
 
     auto longLivedClient = harness->serviceContext()->makeClient("longLived");

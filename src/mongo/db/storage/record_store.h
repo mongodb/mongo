@@ -196,8 +196,8 @@ public:
  * all RecordStore specific transaction information, as well as the LockState. Methods that take
  * an OperationContext may throw a WriteConflictException.
  *
- * This class must be thread-safe for document-level locking storage engines. In addition, for
- * storage engines implementing the KVEngine some methods must be thread safe, see DurableCatalog.
+ * This class must be thread-safe. In addition, for storage engines implementing the KVEngine some
+ * methods must be thread safe, see DurableCatalog.
  */
 class RecordStore {
     RecordStore(const RecordStore&) = delete;
@@ -471,9 +471,8 @@ public:
     }
 
     /**
-     * When we write to an oplog, we call this so that if the storage engine
-     * supports doc locking, it can manage the visibility of oplog entries to ensure
-     * they are ordered.
+     * When we write to an oplog, we call this so that that the storage engine can manage the
+     * visibility of oplog entries to ensure they are ordered.
      *
      * Since this is called inside of a WriteUnitOfWork while holding a std::mutex, it is
      * illegal to acquire any LockManager locks inside of this function.

@@ -296,8 +296,6 @@ TEST(KVEngineTestHarness, TemporaryRecordStoreSimple) {
 TEST(KVEngineTestHarness, AllDurableTimestamp) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
-    if (!engine->supportsDocLocking())
-        return;
 
     std::unique_ptr<RecordStore> rs;
     {
@@ -454,8 +452,6 @@ TEST(KVEngineTestHarness, PinningOldestWithAnotherSession) {
 TEST(KVEngineTestHarness, AllDurable) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
     KVEngine* engine = helper->getEngine();
-    if (!engine->supportsDocLocking())
-        return;
 
     std::string ns = "a.b";
     std::unique_ptr<RecordStore> rs;

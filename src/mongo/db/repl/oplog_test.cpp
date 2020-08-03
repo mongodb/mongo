@@ -233,7 +233,7 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
     return opTime;
 }
 
-TEST_F(OplogTest, ConcurrentLogOpWithoutDocLockingSupport) {
+TEST_F(OplogTest, ConcurrentLogOp) {
     OpTimeNamespaceStringMap opTimeNssMap;
     std::vector<OplogEntry> oplogEntries;
 
@@ -249,42 +249,9 @@ TEST_F(OplogTest, ConcurrentLogOpWithoutDocLockingSupport) {
 
                 _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
 
-                // In a storage engine that does not support doc locking, upon returning from
-                // logOp(), this thread still holds an implicit MODE_X lock on the oplog collection
-                // until it commits the WriteUnitOfWork. Therefore, we must wait on the barrier
-                // after the WUOW is committed.
-                wunit.commit();
-                barrier->countDownAndWait();
-            };
-        },
-        &opTimeNssMap,
-        &oplogEntries,
-        2U);
-
-    _checkOplogEntry(oplogEntries[0], *(opTimeNssMap.begin()));
-    _checkOplogEntry(oplogEntries[1], *(opTimeNssMap.rbegin()));
-}
-
-TEST_F(OplogTest, ConcurrentLogOpWithDocLockingSupport) {
-    OpTimeNamespaceStringMap opTimeNssMap;
-    std::vector<OplogEntry> oplogEntries;
-
-    ForceSupportsDocLocking support(true);
-    _testConcurrentLogOp(
-        [](const NamespaceString& nss,
-           Mutex* mtx,
-           OpTimeNamespaceStringMap* opTimeNssMap,
-           unittest::Barrier* barrier) {
-            return [=] {
-                auto opCtx = cc().makeOperationContext();
-                AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
-                WriteUnitOfWork wunit(opCtx.get());
-
-                _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
-
-                // In a storage engine that supports doc locking, it is okay for multiple threads to
-                // maintain uncommitted WUOWs upon returning from logOp() because each thread will
-                // hold an implicit MODE_IX lock on the oplog collection.
+                // It is okay for multiple threads to maintain uncommitted WUOWs upon returning from
+                // logOp() because each thread will hold an implicit MODE_IX lock on the oplog
+                // collection.
                 barrier->countDownAndWait();
                 wunit.commit();
             };
@@ -297,11 +264,10 @@ TEST_F(OplogTest, ConcurrentLogOpWithDocLockingSupport) {
     _checkOplogEntry(oplogEntries[1], *(opTimeNssMap.rbegin()));
 }
 
-TEST_F(OplogTest, ConcurrentLogOpWithDocLockingSupportRevertFirstOplogEntry) {
+TEST_F(OplogTest, ConcurrentLogOpRevertFirstOplogEntry) {
     OpTimeNamespaceStringMap opTimeNssMap;
     std::vector<OplogEntry> oplogEntries;
 
-    ForceSupportsDocLocking support(true);
     _testConcurrentLogOp(
         [](const NamespaceString& nss,
            Mutex* mtx,
@@ -314,9 +280,9 @@ TEST_F(OplogTest, ConcurrentLogOpWithDocLockingSupportRevertFirstOplogEntry) {
 
                 auto opTime = _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
 
-                // In a storage engine that supports doc locking, it is okay for multiple threads to
-                // maintain uncommitted WUOWs upon returning from logOp() because each thread will
-                // hold an implicit MODE_IX lock on the oplog collection.
+                // It is okay for multiple threads to maintain uncommitted WUOWs upon returning from
+                // logOp() because each thread will hold an implicit MODE_IX lock on the oplog
+                // collection.
                 barrier->countDownAndWait();
 
                 // Revert the first logOp() call and confirm that there are no holes in the
@@ -344,11 +310,10 @@ TEST_F(OplogTest, ConcurrentLogOpWithDocLockingSupportRevertFirstOplogEntry) {
     _checkOplogEntry(oplogEntries[0], *(opTimeNssMap.crbegin()));
 }
 
-TEST_F(OplogTest, ConcurrentLogOpWithDocLockingSupportRevertLastOplogEntry) {
+TEST_F(OplogTest, ConcurrentLogOpRevertLastOplogEntry) {
     OpTimeNamespaceStringMap opTimeNssMap;
     std::vector<OplogEntry> oplogEntries;
 
-    ForceSupportsDocLocking support(true);
     _testConcurrentLogOp(
         [](const NamespaceString& nss,
            Mutex* mtx,
@@ -361,9 +326,9 @@ TEST_F(OplogTest, ConcurrentLogOpWithDocLockingSupportRevertLastOplogEntry) {
 
                 auto opTime = _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
 
-                // In a storage engine that supports doc locking, it is okay for multiple threads to
-                // maintain uncommitted WUOWs upon returning from logOp() because each thread will
-                // hold an implicit MODE_IX lock on the oplog collection.
+                // It is okay for multiple threads to maintain uncommitted WUOWs upon returning from
+                // logOp() because each thread will hold an implicit MODE_IX lock on the oplog
+                // collection.
                 barrier->countDownAndWait();
 
                 // Revert the last logOp() call and confirm that there are no holes in the

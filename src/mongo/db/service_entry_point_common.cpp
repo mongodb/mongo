@@ -959,8 +959,7 @@ void execCommandDatabase(OperationContext* opCtx,
             request.body,
             command->requiresAuth(),
             command->attachLogicalSessionsToOpCtx(),
-            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet,
-            opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking());
+            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet);
 
         CommandHelpers::evaluateFailCommandFailPoint(opCtx, invocation.get());
 

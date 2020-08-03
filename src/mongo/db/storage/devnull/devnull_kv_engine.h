@@ -78,10 +78,6 @@ public:
         return Status::OK();
     }
 
-    virtual bool supportsDocLocking() const {
-        return true;
-    }
-
     virtual bool supportsDirectoryPerDB() const {
         return false;
     }

@@ -45,9 +45,6 @@ public:
     std::vector<std::string> listDatabases() const final {
         return {};
     }
-    bool supportsDocLocking() const final {
-        return false;
-    }
     bool supportsCappedCollections() const final {
         return true;
     }

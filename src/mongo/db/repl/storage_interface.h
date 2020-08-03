@@ -423,8 +423,7 @@ public:
 
     /**
      * Returns the all_durable timestamp. All transactions with timestamps earlier than the
-     * all_durable timestamp are committed. Only storage engines that support document level locking
-     * must provide an implementation. Other storage engines may provide a no-op implementation.
+     * all_durable timestamp are committed.
      *
      * The all_durable timestamp only includes non-prepared transactions that have been given a
      * commit_timestamp and prepared transactions that have been given a durable_timestamp.
@@ -439,11 +438,6 @@ public:
      * a no-op implementation.
      */
     virtual Timestamp getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const = 0;
-
-    /**
-     * Returns true if the storage engine supports document level locking.
-     */
-    virtual bool supportsDocLocking(ServiceContext* serviceCtx) const = 0;
 
     /**
      * Registers a timestamp with the storage engine so that it can enforce oplog visiblity rules.

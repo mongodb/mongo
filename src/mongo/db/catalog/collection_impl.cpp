@@ -245,8 +245,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
       _catalogId(catalogId),
       _uuid(uuid),
       _recordStore(std::move(recordStore)),
-      _needCappedLock(supportsDocLocking() && _recordStore && _recordStore->isCapped() &&
-                      _ns.db() != "local"),
+      _needCappedLock(_recordStore && _recordStore->isCapped() && _ns.db() != "local"),
       _indexCatalog(std::make_unique<IndexCatalogImpl>(this)),
       _cappedNotifier(_recordStore && _recordStore->isCapped()
                           ? std::make_shared<CappedInsertNotifier>()

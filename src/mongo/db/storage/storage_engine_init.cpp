@@ -59,8 +59,6 @@ namespace {
 void createLockFile(ServiceContext* service);
 }  // namespace
 
-extern bool _supportsDocLocking;
-
 LastStorageEngineShutdownState initializeStorageEngine(ServiceContext* service,
                                                        const StorageEngineInitFlags initFlags) {
     // This should be set once.
@@ -172,8 +170,6 @@ LastStorageEngineShutdownState initializeStorageEngine(ServiceContext* service,
     }
 
     guard.dismiss();
-
-    _supportsDocLocking = service->getStorageEngine()->supportsDocLocking();
 
     if (lockFile && lockFile->createdByUncleanShutdown()) {
         return LastStorageEngineShutdownState::kUnclean;

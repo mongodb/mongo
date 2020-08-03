@@ -83,10 +83,6 @@ public:
 
     virtual Status dropIdent(OperationContext* opCtx, mongo::RecoveryUnit* ru, StringData ident);
 
-    virtual bool supportsDocLocking() const {
-        return true;
-    }
-
     virtual bool supportsDirectoryPerDB() const {
         return false;  // Not persistant so no Directories
     }

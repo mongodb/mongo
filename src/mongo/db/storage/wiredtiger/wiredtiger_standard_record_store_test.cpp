@@ -181,10 +181,6 @@ public:
         return std::unique_ptr<RecoveryUnit>(_engine.newRecoveryUnit());
     }
 
-    virtual bool supportsDocLocking() final {
-        return true;
-    }
-
     virtual WT_CONNECTION* conn() {
         return _engine.getConnection();
     }

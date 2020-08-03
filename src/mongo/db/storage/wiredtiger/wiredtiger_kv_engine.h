@@ -108,8 +108,6 @@ public:
     void setRecordStoreExtraOptions(const std::string& options);
     void setSortedDataInterfaceExtraOptions(const std::string& options);
 
-    bool supportsDocLocking() const override;
-
     bool supportsDirectoryPerDB() const override;
 
     /**

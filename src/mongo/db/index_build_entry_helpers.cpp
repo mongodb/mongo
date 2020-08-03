@@ -204,21 +204,15 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
 
             WriteUnitOfWork wuow(opCtx);
 
-            Status status = Status::OK();
-            if (supportsDocLocking()) {
-                // Reserve a slot in the oplog. This must only be done for document level locking
-                // storage engines, which are allowed to insert oplog documents out-of-order into
-                // the oplog.
-                auto oplogInfo = repl::LocalOplogInfo::get(opCtx);
-                auto oplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
-                status = collection->insertDocument(
-                    opCtx,
-                    InsertStatement(kUninitializedStmtId, indexBuildEntry.toBSON(), oplogSlot),
-                    nullptr);
-            } else {
-                status = collection->insertDocument(
-                    opCtx, InsertStatement(indexBuildEntry.toBSON()), nullptr);
-            }
+            // Reserve a slot in the oplog as the storage engine is allowed to insert oplog
+            // documents out-of-order into the oplog.
+            auto oplogInfo = repl::LocalOplogInfo::get(opCtx);
+            auto oplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
+            Status status = collection->insertDocument(
+                opCtx,
+                InsertStatement(kUninitializedStmtId, indexBuildEntry.toBSON(), oplogSlot),
+                nullptr);
+
             if (!status.isOK()) {
                 return status;
             }

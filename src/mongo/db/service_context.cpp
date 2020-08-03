@@ -96,12 +96,6 @@ void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceConte
     globalServiceContext = serviceContext.release();
 }
 
-bool _supportsDocLocking = false;
-
-bool supportsDocLocking() {
-    return _supportsDocLocking;
-}
-
 ServiceContext::ServiceContext()
     : _tickSource(std::make_unique<SystemTickSource>()),
       _fastClockSource(std::make_unique<SystemClockSource>()),

@@ -245,11 +245,6 @@ Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
                                      LockMode mode,
                                      Date_t deadline)
     : _opCtx(opCtx) {
-    LockMode actualLockMode = mode;
-    if (!supportsDocLocking()) {
-        actualLockMode = isSharedLockMode(mode) ? MODE_S : MODE_X;
-    }
-
     if (nssOrUUID.nss()) {
         auto& nss = *nssOrUUID.nss();
         _id = {RESOURCE_COLLECTION, nss.ns()};
@@ -258,7 +253,7 @@ Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
         dassert(_opCtx->lockState()->isDbLockedForMode(nss.db(),
                                                        isSharedLockMode(mode) ? MODE_IS : MODE_IX));
 
-        _opCtx->lockState()->lock(_opCtx, _id, actualLockMode, deadline);
+        _opCtx->lockState()->lock(_opCtx, _id, mode, deadline);
         return;
     }
 
@@ -282,7 +277,7 @@ Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
         }
 
         _id = ResourceId(RESOURCE_COLLECTION, nss.ns());
-        _opCtx->lockState()->lock(_opCtx, _id, actualLockMode, deadline);
+        _opCtx->lockState()->lock(_opCtx, _id, mode, deadline);
         locked = true;
 
         // We looked up UUID without a collection lock so it's possible that the

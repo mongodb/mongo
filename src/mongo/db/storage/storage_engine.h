@@ -186,15 +186,6 @@ public:
     virtual std::vector<std::string> listDatabases() const = 0;
 
     /**
-     * Returns whether the storage engine supports its own locking locking below the collection
-     * level. If the engine returns true, MongoDB will acquire intent locks down to the
-     * collection level and will assume that the engine will ensure consistency at the level of
-     * documents. If false, MongoDB will lock the entire collection in Shared/Exclusive mode
-     * for read/write operations respectively.
-     */
-    virtual bool supportsDocLocking() const = 0;
-
-    /**
      * Returns whether the storage engine supports capped collections.
      */
     virtual bool supportsCappedCollections() const = 0;
@@ -564,8 +555,7 @@ public:
 
     /**
      * Returns the all_durable timestamp. All transactions with timestamps earlier than the
-     * all_durable timestamp are committed. Only storage engines that support document level locking
-     * must provide an implementation. Other storage engines may provide a no-op implementation.
+     * all_durable timestamp are committed.
      *
      * The all_durable timestamp is the in-memory no holes point. That does not mean that there are
      * no holes behind it on disk. The all_durable timestamp also might not correspond with any

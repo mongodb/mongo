@@ -73,7 +73,6 @@ StorageEngineImpl::StorageEngineImpl(std::unique_ptr<KVEngine> engine, StorageEn
       _minOfCheckpointAndOldestTimestampListener(
           TimestampMonitor::TimestampType::kMinOfCheckpointAndOldest,
           [this](Timestamp timestamp) { _onMinOfCheckpointAndOldestTimestampChanged(timestamp); }),
-      _supportsDocLocking(_engine->supportsDocLocking()),
       _supportsCappedCollections(_engine->supportsCappedCollections()) {
     uassert(28601,
             "Storage engine does not support --directoryperdb",

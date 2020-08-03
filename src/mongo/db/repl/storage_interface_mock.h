@@ -327,8 +327,6 @@ public:
 
     Timestamp getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const override;
 
-    bool supportsDocLocking(ServiceContext* serviceCtx) const override;
-
     Status isAdminDbValid(OperationContext* opCtx) override {
         return isAdminDbValidFn(opCtx);
     };
@@ -416,7 +414,6 @@ public:
         return Status{ErrorCodes::IllegalOperation, "GetCollectionUUIDFn not implemented."};
     };
 
-    bool supportsDocLockingBool = false;
     Timestamp allDurableTimestamp = Timestamp::min();
     Timestamp oldestOpenReadTimestamp = Timestamp::min();
 

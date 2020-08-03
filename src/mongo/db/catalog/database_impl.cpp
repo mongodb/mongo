@@ -649,7 +649,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     // reserve oplog slots here if it is run outside of a multi-document transaction. Multi-
     // document transactions reserve the appropriate oplog slots at commit time.
     OplogSlot createOplogSlot;
-    if (canAcceptWrites && supportsDocLocking() && !coordinator->isOplogDisabledFor(opCtx, nss) &&
+    if (canAcceptWrites && !coordinator->isOplogDisabledFor(opCtx, nss) &&
         !opCtx->inMultiDocumentTransaction()) {
         createOplogSlot = repl::getNextOpTime(opCtx);
     }

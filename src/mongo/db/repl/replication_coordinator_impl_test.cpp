@@ -948,6 +948,7 @@ TEST_F(
 
     auto opCtx = makeOperationContext();
     // Nothing satisfied
+    getStorageInterface()->allDurableTimestamp = time1.getTimestamp();
     replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(100));
     ReplicationCoordinator::StatusAndDuration statusAndDur =
@@ -983,6 +984,7 @@ TEST_F(
     ASSERT_OK(statusAndDur.status);
 
     // multiDC satisfied but not majority or multiRack
+    getStorageInterface()->allDurableTimestamp = time2.getTimestamp();
     replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(time2, Date_t() + Seconds(100));
     getReplCoord()->setLastAppliedOptime_forTest(2, 3, time2).transitional_ignore();
@@ -4819,6 +4821,7 @@ TEST_F(ReplCoordTest, IsMasterWithCommittedSnapshot) {
     time_t majorityWriteDate = lastWriteDate;
     OpTime majorityOpTime = opTime;
 
+    getStorageInterface()->allDurableTimestamp = opTime.getTimestamp();
     replCoordSetMyLastAppliedOpTime(opTime, Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(opTime, Date_t() + Seconds(100));
     ASSERT_EQUALS(majorityOpTime, getReplCoord()->getCurrentCommittedSnapshotOpTime());
@@ -5480,6 +5483,7 @@ TEST_F(ReplCoordTest,
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     OpTime time(Timestamp(100, 1), 1);
+    getStorageInterface()->allDurableTimestamp = time.getTimestamp();
     replCoordSetMyLastAppliedOpTime(time, Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(time, Date_t() + Seconds(100));
     simulateSuccessfulV1Election();
@@ -5596,7 +5600,6 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorage) {
 
     Timestamp stableTimestamp;
 
-    getStorageInterface()->supportsDocLockingBool = true;
     ASSERT_EQUALS(Timestamp::min(), getStorageInterface()->getStableTimestamp());
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -5609,7 +5612,7 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorage) {
     replCoordAdvanceCommitPoint(OpTimeWithTermOne(10, 1), Date_t() + Seconds(100), false);
     ASSERT_EQUALS(Timestamp(1, 1), getStorageInterface()->getStableTimestamp());
 
-    // Check that the stable timestamp is not updated if the all-committed timestamp is behind.
+    // Check that the stable timestamp is not updated if the all durable timestamp is behind.
     replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(1, 2), Date_t() + Seconds(100));
     stableTimestamp = getStorageInterface()->getStableTimestamp();
     ASSERT_EQUALS(Timestamp(1, 1), getStorageInterface()->getStableTimestamp());
@@ -5652,7 +5655,6 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorageDisableMajori
                                                         << "test3:1234"))),
                        HostAndPort("test2", 1234));
 
-    getStorageInterface()->supportsDocLockingBool = true;
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     // Initially the stable timestamp is unset.
@@ -5690,7 +5692,6 @@ TEST_F(StableOpTimeTest, AdvanceCommitPointSetsStableOpTimeForStorage) {
     Timestamp stableTimestamp;
     long long term = 1;
 
-    getStorageInterface()->supportsDocLockingBool = true;
     getStorageInterface()->allDurableTimestamp = Timestamp(2, 1);
 
     // Add three stable optime candidates.
@@ -5705,7 +5706,7 @@ TEST_F(StableOpTimeTest, AdvanceCommitPointSetsStableOpTimeForStorage) {
     stableTimestamp = getStorageInterface()->getStableTimestamp();
     ASSERT_EQUALS(Timestamp(2, 1), stableTimestamp);
 
-    // Check that the stable timestamp is not updated if the all-committed timestamp is behind.
+    // Check that the stable timestamp is not updated if the all durable timestamp is behind.
     replCoordAdvanceCommitPoint(OpTime({2, 2}, term), Date_t() + Seconds(2), false);
     ASSERT_EQUALS(getReplCoord()->getLastCommittedOpTimeAndWallTime().wallTime,
                   Date_t() + Seconds(2));
@@ -5742,7 +5743,6 @@ TEST_F(StableOpTimeTest,
                                                         << "test3:1234"))),
                        HostAndPort("test2", 1234));
 
-    getStorageInterface()->supportsDocLockingBool = true;
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     // Initially the stable timestamp and commit point are unset.
@@ -5751,8 +5751,8 @@ TEST_F(StableOpTimeTest,
 
     // Advance the stable timestamp a bit. In this test we simulate a case where timestamp (1,3) is
     // getting rolled back and timestamp (1,2) is the rollback common point. Note that when
-    // EMRC=false, the stable timestamp is always advanced to the newest all-committed/all-durable
-    // timestamp i.e. it is not required to be behind the majority commit point.
+    // EMRC=false, the stable timestamp is always advanced to the newest all durable timestamp i.e.
+    // it is not required to be behind the majority commit point.
     getStorageInterface()->allDurableTimestamp = Timestamp(1, 3);
     replCoordSetMyLastAppliedOpTime(OpTime({1, 1}, 1), Date_t() + Seconds(1));
     replCoordSetMyLastAppliedOpTime(OpTime({1, 2}, 1), Date_t() + Seconds(2));
@@ -5954,6 +5954,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedGreaterOpTime) {
     auto opCtx = makeOperationContext();
     runSingleNodeElection(opCtx.get());
 
+    getStorageInterface()->allDurableTimestamp = Timestamp(100, 1);
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 1), Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 1), Date_t() + Seconds(100));
 
@@ -5974,6 +5975,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedEqualOpTime) {
     runSingleNodeElection(opCtx.get());
 
     OpTime time(Timestamp(100, 1), 1);
+    getStorageInterface()->allDurableTimestamp = time.getTimestamp();
     replCoordSetMyLastAppliedOpTime(time, Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(time, Date_t() + Seconds(100));
 
@@ -5992,6 +5994,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
 
     auto opCtx = makeOperationContext();
     runSingleNodeElection(opCtx.get());
+    getStorageInterface()->allDurableTimestamp = Timestamp(100, 1);
     replCoordSetMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 1), Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(OpTime(Timestamp(100, 1), 1), Date_t() + Seconds(100));
     OpTime committedOpTime(Timestamp(200, 1), 1);
@@ -6023,6 +6026,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
 
     auto pseudoLogOp = stdx::async(stdx::launch::async, [this, &opTimeToWait]() {
         // Not guaranteed to be scheduled after waitUntil blocks...
+        getStorageInterface()->allDurableTimestamp = opTimeToWait.getTimestamp();
         replCoordSetMyLastAppliedOpTime(opTimeToWait, Date_t() + Seconds(100));
         replCoordSetMyLastDurableOpTime(opTimeToWait, Date_t() + Seconds(100));
     });
@@ -6841,6 +6845,7 @@ TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAppliedOpTimeChanges) {
     ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshotOpTime());
     replCoordSetMyLastAppliedOpTime(time2, Date_t() + Seconds(100));
     ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshotOpTime());
+    getStorageInterface()->allDurableTimestamp = time2.getTimestamp();
     replCoordSetMyLastDurableOpTime(time2, Date_t() + Seconds(100));
     ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 }

@@ -632,9 +632,8 @@ protected:
                 } else if (nss == _nss1 || nss == _nss2 ||
                            nss == NamespaceString::kSessionTransactionsTableNamespace) {
                     // Storing the inserted documents in a sorted data structure to make checking
-                    // for valid results easier. On a document level locking storage engine the
-                    // inserts will be performed by different threads and there's no guarantee of
-                    // the order.
+                    // for valid results easier. The inserts will be performed by different threads
+                    // and there's no guarantee of the order.
                     _insertedDocs[nss].insert(docs.begin(), docs.end());
                 } else
                     FAIL("Unexpected insert") << " into " << nss << " first doc: " << docs.front();

@@ -177,8 +177,6 @@ public:
 
     boost::optional<Timestamp> getRecoveryTimestamp(ServiceContext* serviceCtx) const override;
 
-    bool supportsDocLocking(ServiceContext* serviceCtx) const override;
-
     Timestamp getAllDurableTimestamp(ServiceContext* serviceCtx) const override;
 
     Timestamp getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const override;

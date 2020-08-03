@@ -48,8 +48,6 @@ using std::unique_ptr;
 // Insert a record in a store with capped max docs 1,  and try to delete it by inserting another.
 TEST(RecordStoreTestHarness, CappedDeleteRecord) {
     const auto harness(newRecordStoreHarnessHelper());
-    if (!harness->supportsDocLocking())
-        return;
     auto rs(harness->newCappedRecordStore(RecordStoreHarnessHelper::kDefaultCapedSizeBytes,
                                           /*cappedMaxDocs*/ 1));
 
@@ -95,8 +93,6 @@ TEST(RecordStoreTestHarness, CappedDeleteRecord) {
 // Insert multiple records at once, requiring multiple deletes.
 TEST(RecordStoreTestHarness, DeleteMultipleRecords) {
     const auto harness(newRecordStoreHarnessHelper());
-    if (!harness->supportsDocLocking())
-        return;
     const int cappedMaxDocs = 10;
     auto rs(harness->newCappedRecordStore(RecordStoreHarnessHelper::kDefaultCapedSizeBytes,
                                           cappedMaxDocs));

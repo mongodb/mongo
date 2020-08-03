@@ -248,17 +248,11 @@ private:
 /**
  * RAII-style class to acquire proper locks using special oplog locking rules for oplog accesses.
  *
- * If storage engine supports document-level locking, only global lock is acquired:
+ * Only the global lock is acquired:
  * | OplogAccessMode | Global Lock |
  * +-----------------+-------------|
  * | kRead           | MODE_IS     |
  * | kWrite          | MODE_IX     |
- *
- * Otherwise, database and collection intent locks are also acquired:
- * | OplogAccessMode | Global Lock | 'local' DB Lock | 'oplog.rs' Collection Lock |
- * +-----------------+-------------+-----------------+----------------------------|
- * | kRead           | MODE_IS     | MODE_IS         | MODE_IS                    |
- * | kWrite/kLogOp   | MODE_IX     | MODE_IX         | MODE_IX                    |
  *
  * kLogOp is a special mode for replication operation logging and it behaves similar to kWrite. The
  * difference between kWrite and kLogOp is that kLogOp invariants that global IX lock is already

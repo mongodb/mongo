@@ -91,11 +91,8 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexExclusive)(benchmark::State
 }
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentSharedLock)(benchmark::State& state) {
-    std::unique_ptr<ForceSupportsDocLocking> supportDocLocking;
-
     if (state.thread_index == 0) {
         makeKClientsWithLockers(state.threads);
-        supportDocLocking = std::make_unique<ForceSupportsDocLocking>(true);
     }
 
     for (auto keepRunning : state) {
@@ -110,11 +107,8 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentSharedLock)(benchmark::S
 }
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)(benchmark::State& state) {
-    std::unique_ptr<ForceSupportsDocLocking> supportDocLocking;
-
     if (state.thread_index == 0) {
         makeKClientsWithLockers(state.threads);
-        supportDocLocking = std::make_unique<ForceSupportsDocLocking>(true);
     }
 
     for (auto keepRunning : state) {
@@ -128,12 +122,9 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)(benchmark
     }
 }
 
-BENCHMARK_DEFINE_F(DConcurrencyTest, BM_MMAPv1CollectionSharedLock)(benchmark::State& state) {
-    std::unique_ptr<ForceSupportsDocLocking> supportDocLocking;
-
+BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionSharedLock)(benchmark::State& state) {
     if (state.thread_index == 0) {
         makeKClientsWithLockers(state.threads);
-        supportDocLocking = std::make_unique<ForceSupportsDocLocking>(false);
     }
 
     for (auto keepRunning : state) {
@@ -147,12 +138,9 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_MMAPv1CollectionSharedLock)(benchmark::S
     }
 }
 
-BENCHMARK_DEFINE_F(DConcurrencyTest, BM_MMAPv1CollectionExclusiveLock)(benchmark::State& state) {
-    std::unique_ptr<ForceSupportsDocLocking> supportDocLocking;
-
+BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionExclusiveLock)(benchmark::State& state) {
     if (state.thread_index == 0) {
         makeKClientsWithLockers(state.threads);
-        supportDocLocking = std::make_unique<ForceSupportsDocLocking>(false);
     }
 
     for (auto keepRunning : state) {
@@ -176,10 +164,8 @@ BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionIntentSharedLock)
 BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)
     ->ThreadRange(1, kMaxPerfThreads);
 
-BENCHMARK_REGISTER_F(DConcurrencyTest, BM_MMAPv1CollectionSharedLock)
-    ->ThreadRange(1, kMaxPerfThreads);
-BENCHMARK_REGISTER_F(DConcurrencyTest, BM_MMAPv1CollectionExclusiveLock)
-    ->ThreadRange(1, kMaxPerfThreads);
+BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionSharedLock)->ThreadRange(1, kMaxPerfThreads);
+BENCHMARK_REGISTER_F(DConcurrencyTest, BM_CollectionExclusiveLock)->ThreadRange(1, kMaxPerfThreads);
 
 }  // namespace
 }  // namespace mongo

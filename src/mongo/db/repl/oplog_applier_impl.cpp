@@ -183,16 +183,14 @@ void processCrudOp(OperationContext* opCtx,
                    uint32_t* hash,
                    StringMapHashedKey* hashedNs,
                    CachedCollectionProperties* collPropertiesCache) {
-    const bool supportsDocLocking =
-        opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking();
     auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, *hashedNs);
 
-    // For doc locking engines, include the _id of the document in the hash so we get
-    // parallelism even if all writes are to a single collection.
+    // Include the _id of the document in the hash so we get parallelism even if all writes are to a
+    // single collection.
     //
     // For capped collections, this is illegal, since capped collections must preserve
     // insertion order.
-    if (supportsDocLocking && !collProperties.isCapped) {
+    if (!collProperties.isCapped) {
         BSONElement id = op->getIdElement();
         BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore,
                                             collProperties.collator);
@@ -579,13 +577,9 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     const bool enoughToMultiThread =
         ops.size() >= kMinOplogEntriesPerThread * writerPool->getStats().numThreads;
 
-    // Only doc-locking engines support parallel writes to the oplog because they are required to
-    // ensure that oplog entries are ordered correctly, even if inserted out-of-order. Additionally,
-    // there would be no way to take advantage of multiple threads if a storage engine doesn't
-    // support document locking.
-    if (!enoughToMultiThread ||
-        !opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
-
+    // Storage engines support parallel writes to the oplog because they are required to ensure that
+    // oplog entries are ordered correctly, even if inserted out-of-order.
+    if (!enoughToMultiThread) {
         writerPool->schedule(makeOplogWriterForRange(0, ops.size()));
         return;
     }

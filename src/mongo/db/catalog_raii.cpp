@@ -201,11 +201,6 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
         _globalLock.emplace(opCtx, lockMode, deadline, Lock::InterruptBehavior::kThrow);
     }
 
-    // Obtain database and collection intent locks for non-document-locking storage engines.
-    if (!opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
-        _dbWriteLock.emplace(opCtx, NamespaceString::kLocalDb, lockMode, deadline);
-        _collWriteLock.emplace(opCtx, NamespaceString::kRsOplogNamespace, lockMode, deadline);
-    }
     _oplogInfo = repl::LocalOplogInfo::get(opCtx);
     _oplog = _oplogInfo->getCollection();
 }
