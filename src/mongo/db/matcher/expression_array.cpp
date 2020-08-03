@@ -66,9 +66,9 @@ bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) cons
 
 // -------
 
-ElemMatchObjectMatchExpression::ElemMatchObjectMatchExpression(StringData path,
-                                                               MatchExpression* sub)
-    : ArrayMatchingMatchExpression(ELEM_MATCH_OBJECT, path), _sub(sub) {}
+ElemMatchObjectMatchExpression::ElemMatchObjectMatchExpression(
+    StringData path, MatchExpression* sub, clonable_ptr<ErrorAnnotation> annotation)
+    : ArrayMatchingMatchExpression(ELEM_MATCH_OBJECT, path, std::move(annotation)), _sub(sub) {}
 
 bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
                                                   MatchDetails* details) const {
@@ -117,13 +117,15 @@ MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOpti
 
 // -------
 
-ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(StringData path, MatchExpression* sub)
-    : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path) {
+ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
+    StringData path, MatchExpression* sub, clonable_ptr<ErrorAnnotation> annotation)
+    : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)) {
     add(sub);
 }
 
-ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(StringData path)
-    : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path) {}
+ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
+    StringData path, clonable_ptr<ErrorAnnotation> annotation)
+    : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)) {}
 
 ElemMatchValueMatchExpression::~ElemMatchValueMatchExpression() {
     for (unsigned i = 0; i < _subs.size(); i++)
@@ -201,8 +203,10 @@ MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptim
 
 // ---------
 
-SizeMatchExpression::SizeMatchExpression(StringData path, int size)
-    : ArrayMatchingMatchExpression(SIZE, path), _size(size) {}
+SizeMatchExpression::SizeMatchExpression(StringData path,
+                                         int size,
+                                         clonable_ptr<ErrorAnnotation> annotation)
+    : ArrayMatchingMatchExpression(SIZE, path, std::move(annotation)), _size(size) {}
 
 bool SizeMatchExpression::matchesArray(const BSONObj& anArray, MatchDetails* details) const {
     if (_size < 0)

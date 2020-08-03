@@ -114,6 +114,18 @@ std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     }
 }
 
+/**
+ * Utility which tags an entire tree with 'AnnotationMode::kIgnore'.
+ */
+void annotateTreeToIgnoreForErrorDetails(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         MatchExpression* expr) {
+    expr->setErrorAnnotation(
+        createAnnotation(expCtx, MatchExpression::ErrorAnnotation::Mode::kIgnore));
+    for (const auto childExpr : *expr) {
+        annotateTreeToIgnoreForErrorDetails(expCtx, childExpr);
+    }
+}
+
 }  // namespace
 
 namespace mongo {
@@ -1228,14 +1240,17 @@ StatusWithMatchExpression parseElemMatch(StringData name,
         if (!s.isOK())
             return s;
 
-        auto temp = std::make_unique<ElemMatchValueMatchExpression>(name);
+        auto emValueExpr = std::make_unique<ElemMatchValueMatchExpression>(
+            name,
+            createAnnotation(expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())));
 
+        annotateTreeToIgnoreForErrorDetails(expCtx, &theAnd);
         for (size_t i = 0; i < theAnd.numChildren(); i++) {
-            temp->add(theAnd.getChild(i));
+            emValueExpr->add(theAnd.getChild(i));
         }
         theAnd.clearAndRelease();
 
-        return {std::move(temp)};
+        return {std::move(emValueExpr)};
     }
 
     // DBRef value case
@@ -1256,7 +1271,12 @@ StatusWithMatchExpression parseElemMatch(StringData name,
         return {Status(ErrorCodes::BadValue, "$elemMatch cannot contain $where expression")};
     }
 
-    return {std::make_unique<ElemMatchObjectMatchExpression>(name, sub.release())};
+    annotateTreeToIgnoreForErrorDetails(expCtx, sub.get());
+
+    return {std::make_unique<ElemMatchObjectMatchExpression>(
+        name,
+        sub.release(),
+        createAnnotation(expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())))};
 }
 
 StatusWithMatchExpression parseAll(StringData name,
@@ -1268,7 +1288,8 @@ StatusWithMatchExpression parseAll(StringData name,
         return {Status(ErrorCodes::BadValue, "$all needs an array")};
 
     auto arr = e.Obj();
-    auto myAnd = std::make_unique<AndMatchExpression>();
+    auto myAnd = std::make_unique<AndMatchExpression>(
+        createAnnotation(expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())));
     BSONObjIterator i(arr);
 
     if (arr.firstElement().type() == BSONType::Object &&
@@ -1296,6 +1317,7 @@ StatusWithMatchExpression parseAll(StringData name,
                                         allowedFeatures);
             if (!inner.isOK())
                 return inner;
+            annotateTreeToIgnoreForErrorDetails(expCtx, inner.getValue().get());
             myAnd->add(inner.getValue().release());
         }
 
@@ -1306,20 +1328,23 @@ StatusWithMatchExpression parseAll(StringData name,
         auto e = i.next();
 
         if (e.type() == BSONType::RegEx) {
-            auto expr = std::make_unique<RegexMatchExpression>(name, e);
+            auto expr = std::make_unique<RegexMatchExpression>(
+                name, e, createAnnotation(expCtx, AnnotationMode::kIgnore));
             myAnd->add(expr.release());
         } else if (e.type() == BSONType::Object &&
                    MatchExpressionParser::parsePathAcceptingKeyword(e.Obj().firstElement())) {
             return {Status(ErrorCodes::BadValue, "no $ expressions in $all")};
         } else {
-            auto expr = std::make_unique<EqualityMatchExpression>(name, e);
+            auto expr = std::make_unique<EqualityMatchExpression>(
+                name, e, createAnnotation(expCtx, AnnotationMode::kIgnore));
             expr->setCollator(expCtx->getCollator());
             myAnd->add(expr.release());
         }
     }
 
     if (myAnd->numChildren() == 0) {
-        return {std::make_unique<AlwaysFalseMatchExpression>()};
+        return {std::make_unique<AlwaysFalseMatchExpression>(
+            createAnnotation(expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())))};
     }
 
     return {std::move(myAnd)};
@@ -1615,7 +1640,11 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             if (size < 0) {
                 return {Status(ErrorCodes::BadValue, "$size may not be negative")};
             }
-            return {std::make_unique<SizeMatchExpression>(name, size)};
+            return {std::make_unique<SizeMatchExpression>(
+                name,
+                size,
+                createAnnotation(
+                    expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())))};
         }
 
         case PathAcceptingKeyword::EXISTS: {

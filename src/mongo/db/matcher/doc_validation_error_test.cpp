@@ -1381,5 +1381,238 @@ TEST(GeoMatchExpression, GeneratesValidationErrorForMatchGeoWithin) {
                                          << "consideredValue" << point));
     verifyGeneratedError(query, document, expectedError);
 }
+// Array operators.
+
+// $size
+
+TEST(ArrayMatchingMatchExpression, BasicSize) {
+    BSONObj query = BSON("a" << BSON("$size" << 2));
+    BSONObj document = BSON("a" << BSON_ARRAY(1 << 2 << 3));
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$size"
+                                 << "specifiedAs" << query << "reason"
+                                 << "array length was not equal to given size"
+                                 << "consideredValue" << BSON_ARRAY(1 << 2 << 3));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, SizeNonArray) {
+    BSONObj query = BSON("a" << BSON("$size" << 2));
+    BSONObj document = BSON("a" << 3);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$size"
+                                 << "specifiedAs" << query << "reason"
+                                 << "type mismatch"
+                                 << "consideredType"
+                                 << "int"
+                                 << "expectedType"
+                                 << "array"
+                                 << "consideredValue" << 3);
+    verifyGeneratedError(query, document, expectedError);
+}
+
+
+TEST(ArrayMatchingMatchExpression, SizeMissingPath) {
+    BSONObj query = BSON("a" << BSON("$size" << 2));
+    BSONObj document = BSON("b" << 3);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$size"
+                                 << "specifiedAs" << query << "reason"
+                                 << "field was missing");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+
+TEST(ArrayMatchingMatchExpression, NotOverSize) {
+    BSONObj query = BSON("a" << BSON("$not" << BSON("$size" << 2)));
+    BSONObj document = BSON("a" << BSON_ARRAY(1 << 2));
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$not"
+                                 << "details"
+                                 << BSON("operatorName"
+                                         << "$size"
+                                         << "specifiedAs" << BSON("a" << BSON("$size" << 2))
+                                         << "reason"
+                                         << "array length was equal to given size"
+                                         << "consideredValue" << BSON_ARRAY(1 << 2)));
+    verifyGeneratedError(query, document, expectedError);
+}
+
+// $all
+TEST(ArrayMatchingMatchExpression, BasicAll) {
+    BSONObj query = fromjson("{'a': {'$all': [1,2,3]}}");
+    BSONObj document = fromjson("{'a': [1,2,4]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$all',"
+        "'specifiedAs': {'a': {'$all': [1,2,3]}},"
+        "'reason': 'array did not contain all specified values',"
+        "'consideredValue': [1,2,4]}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, AllRegex) {
+    BSONObj query = fromjson("{'a': {'$all': [/^a/,/^b/]}}");
+    BSONObj document = fromjson("{'a': ['abc', 'cbc']}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$all',"
+        "'specifiedAs': {'a': {'$all': [/^a/,/^b/]}},"
+        "'reason': 'array did not contain all specified values',"
+        "'consideredValue': ['abc', 'cbc']}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, AllMissingPath) {
+    BSONObj query = fromjson("{'a': {'$all': [1,2,3]}}");
+    BSONObj document = fromjson("{'b': [1,2,3]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$all',"
+        "'specifiedAs': {'a': {'$all': [1,2,3]}},"
+        "'reason': 'field was missing'}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, AllNoValues) {
+    BSONObj query = fromjson("{'a': {'$all': []}}");
+    BSONObj document = fromjson("{'a': [1,2,3]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$all',"
+        "'specifiedAs': {'a': {'$all': []}},"
+        "'reason': 'expression always evaluates to false'}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, NotOverAll) {
+    BSONObj query = fromjson("{'a': {'$not': {'$all': [1,2,3]}}}");
+    BSONObj document = fromjson("{'a': [1,2,3]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$not',"
+        "'details':"
+        "   {'operatorName': '$all',"
+        "   'specifiedAs': {'a': {'$all': [1,2,3]}},"
+        "   'reason': 'array did contain all specified values',"
+        "   'consideredValue': [1,2,3]}}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+// $elemMatch
+TEST(ArrayMatchingMatchExpression, BasicElemMatchValue) {
+    BSONObj query = fromjson("{'a': {'$elemMatch': {'$gt': 0,'$lt': 10}}}");
+    BSONObj document = fromjson("{'a': [10,11,12]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$elemMatch',"
+        "'specifiedAs': {'a':{'$elemMatch':{'$gt': 0,'$lt': 10}}},"
+        "'reason': 'array did not satisfy the child predicate',"
+        "'consideredValue': [10,11,12]}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, ElemMatchValueMissingPath) {
+    BSONObj query = fromjson("{'a': {'$elemMatch': {'$gt': 0,'$lt': 10}}}");
+    BSONObj document = fromjson("{'b': [10,11,12]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$elemMatch',"
+        "'specifiedAs': {'a':{'$elemMatch':{'$gt': 0,'$lt': 10}}},"
+        "'reason': 'field was missing'}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, ElemMatchValueNonArray) {
+    BSONObj query = fromjson("{'a': {'$elemMatch': {'$gt': 0,'$lt': 10}}}");
+    BSONObj document = fromjson("{'a': 5}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$elemMatch',"
+        "'specifiedAs': {'a':{'$elemMatch':{'$gt': 0,'$lt': 10}}},"
+        "'reason': 'type mismatch',"
+        "'consideredType': 'int',"
+        "'expectedType': 'array',"
+        "'consideredValue': 5}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, NotOverElemMatchValue) {
+    BSONObj query = fromjson("{'a': {'$not': {'$elemMatch': {'$gt': 0,'$lt': 10}}}}");
+    BSONObj document = fromjson("{'a': [3,4,5]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$not', "
+        "'details': {'operatorName': '$elemMatch',"
+        "   'specifiedAs': {'a':{'$elemMatch':{'$gt': 0,'$lt': 10}}},"
+        "   'reason': 'array did satisfy the child predicate',"
+        "   'consideredValue': [3,4,5]}}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, BasicElemMatchObject) {
+    BSONObj query = fromjson("{'a': {'$elemMatch': {'b': {'$gt': 0}, 'c': {'$lt': 0}}}}");
+    BSONObj document = fromjson("{'a': [{'b': 0, 'c': 0}, {'b': 1, 'c': 1}]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$elemMatch',"
+        "'specifiedAs': {'a': {'$elemMatch': {'b': {'$gt': 0}, 'c': {'$lt': 0}}}},"
+        "'reason': 'array did not satisfy the child predicate',"
+        "'consideredValue': [{'b': 0, 'c': 0}, {'b': 1, 'c': 1}]}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, ElemMatchObjectMissingPath) {
+    BSONObj query = fromjson("{'a': {'$elemMatch': {'b': {'$gt': 0}, 'c': {'$lt': 0}}}}");
+    BSONObj document = fromjson("{'b': [{'b': 0, 'c': 0}, {'b': 1, 'c': 1}]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$elemMatch',"
+        "'specifiedAs': {'a': {'$elemMatch': {'b': {'$gt': 0}, 'c': {'$lt': 0}}}},"
+        "'reason': 'field was missing'}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, ElemMatchObjectNonArray) {
+    BSONObj query = fromjson("{'a': {'$elemMatch': {'b': {'$gt': 0}, 'c': {'$lt': 0}}}}");
+    BSONObj document = fromjson("{'a': 'foo'}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$elemMatch',"
+        "'specifiedAs': {'a': {'$elemMatch': {'b': {'$gt': 0}, 'c': {'$lt': 0}}}},"
+        "'reason': 'type mismatch',"
+        "'consideredType': 'string',"
+        "'expectedType': 'array',"
+        "'consideredValue': 'foo'}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, NestedElemMatchObject) {
+    BSONObj query = fromjson("{'a': {'$elemMatch': {'b': {$elemMatch: {'c': {'$lt': 0}}}}}}");
+    BSONObj document = fromjson("{'a': [{'b': [{'c': [1,2,3]}, {'c': [4,5,6]}]}]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$elemMatch',"
+        "'specifiedAs': {'a': {'$elemMatch': {'b': {$elemMatch: {'c': {'$lt': 0}}}}}},"
+        "'reason': 'array did not satisfy the child predicate',"
+        "'consideredValue': [{'b': [{'c': [1,2,3]}, {'c': [4,5,6]}]}]}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ArrayMatchingMatchExpression, NotOverElemMatchObject) {
+    BSONObj query =
+        fromjson("{'a': {'$not': {'$elemMatch': {'b': {'$gte': 0}, 'c': {'$lt': 10}}}}}");
+    BSONObj document = fromjson("{'a': [{'b': 0, 'c': 0}, {'b': 1, 'c': 1}]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$not', "
+        "'details': {'operatorName': '$elemMatch',"
+        "   'specifiedAs': {'a':{'$elemMatch': {'b': {'$gte': 0}, 'c': {'$lt': 10}}}},"
+        "   'reason': 'array did satisfy the child predicate',"
+        "   'consideredValue': [{'b': 0, 'c': 0}, {'b': 1, 'c': 1}]}}");
+    verifyGeneratedError(query, document, expectedError);
+}
+
+// $all and $elemMatch
+TEST(ArrayMatchingMatchExpression, AllOverElemMatch) {
+    BSONObj query = fromjson(
+        "{'a': {$all: ["
+        "  {'$elemMatch': {'b': {'$gte': 0}}},"
+        "  {'$elemMatch': {'c': {'$lt': 0}}}]}}");
+    BSONObj document = fromjson("{'a': [{'b': 0, 'c': 0}, {'b': 1, 'c': 1}]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$all',"
+        "'specifiedAs': {'a': {'$all': "
+        "   [{'$elemMatch': {'b': {'$gte': 0}}}, {'$elemMatch': {'c': {'$lt': 0}}}]}},"
+        "'reason': 'array did not contain all specified values',"
+        "'consideredValue': [{'b': 0, 'c': 0}, {'b': 1, 'c': 1}]}");
+    verifyGeneratedError(query, document, expectedError);
+}
 }  // namespace
 }  // namespace mongo

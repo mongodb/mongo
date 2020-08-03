@@ -35,6 +35,8 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_leaf.h"
@@ -225,14 +227,32 @@ void finishLogicalOperatorChildError(const ListOfMatchExpression* expr,
 class ValidationErrorPreVisitor final : public MatchExpressionConstVisitor {
 public:
     ValidationErrorPreVisitor(ValidationErrorContext* context) : _context(context) {}
-    void visit(const AlwaysFalseMatchExpression* expr) final {}
+    void visit(const AlwaysFalseMatchExpression* expr) final {
+        _context->pushNewFrame(*expr);
+        if (_context->shouldGenerateError(*expr)) {
+            appendErrorDetails(*expr);
+            static constexpr auto kNormalReason = "expression always evaluates to false";
+            // It is not possible to generate an error for 'AlwaysFalseMatchExpression' in an
+            // inverted context, since this means that an ancestor of this expression is either a
+            // 'not' or a 'nor', in which case the either the ancestor expression evaluates to true
+            // or this expression will not have contributed to the failure of its ancestor.
+            invariant(_context->inversion == InvertError::kNormal);
+            static constexpr auto kInvertedReason = "";
+            appendErrorReason(*expr, kNormalReason, kInvertedReason);
+        }
+    }
     void visit(const AlwaysTrueMatchExpression* expr) final {}
     void visit(const AndMatchExpression* expr) final {
-        preVisitTreeOperator(expr);
-        // An AND needs its children to call 'matches' in a normal context to discern which
-        // clauses failed.
-        if (_context->inversion == InvertError::kNormal) {
-            _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
+        // $all is treated as a leaf operator.
+        if (expr->getErrorAnnotation()->operatorName == "$all") {
+            processAll(*expr);
+        } else {
+            preVisitTreeOperator(expr);
+            // An AND needs its children to call 'matches' in a normal context to discern which
+            // clauses failed.
+            if (_context->inversion == InvertError::kNormal) {
+                _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
+            }
         }
     }
     void visit(const BitsAllClearMatchExpression* expr) final {
@@ -247,8 +267,12 @@ public:
     void visit(const BitsAnySetMatchExpression* expr) final {
         generateError(expr);
     }
-    void visit(const ElemMatchObjectMatchExpression* expr) final {}
-    void visit(const ElemMatchValueMatchExpression* expr) final {}
+    void visit(const ElemMatchObjectMatchExpression* expr) final {
+        generateElemMatchError(expr);
+    }
+    void visit(const ElemMatchValueMatchExpression* expr) final {
+        generateElemMatchError(expr);
+    }
     void visit(const EqualityMatchExpression* expr) final {
         generateComparisonError(expr);
     }
@@ -289,14 +313,14 @@ public:
                 static constexpr auto kInvertedReason =
                     "at least one of considered geometries was contained within the expression’s "
                     "geometry";
-                generateLeafError(expr, kNormalReason, kInvertedReason, &kExpectedTypes);
+                generatePathError(*expr, kNormalReason, kInvertedReason, &kExpectedTypes);
             } break;
             case GeoExpression::Predicate::INTERSECT: {
                 static constexpr auto kNormalReason =
                     "none of considered geometries intersected the expression’s geometry";
                 static constexpr auto kInvertedReason =
                     "at least one of considered geometries intersected the expression’s geometry";
-                generateLeafError(expr, kNormalReason, kInvertedReason, &kExpectedTypes);
+                generatePathError(*expr, kNormalReason, kInvertedReason, &kExpectedTypes);
             } break;
             default:
                 MONGO_UNREACHABLE;
@@ -308,7 +332,7 @@ public:
     void visit(const InMatchExpression* expr) final {
         static constexpr auto kNormalReason = "no matching value found in array";
         static constexpr auto kInvertedReason = "matching value found in array";
-        generateLeafError(expr, kNormalReason, kInvertedReason);
+        generatePathError(*expr, kNormalReason, kInvertedReason);
     }
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
@@ -341,7 +365,7 @@ public:
         static constexpr auto kInvertedReason = "$mod did evaluate to expected remainder";
         static const std::set<BSONType> expectedTypes{
             NumberLong, NumberDouble, NumberDecimal, NumberInt};
-        generateLeafError(expr, kNormalReason, kInvertedReason, &expectedTypes);
+        generatePathError(*expr, kNormalReason, kInvertedReason, &expectedTypes);
     }
     void visit(const NorMatchExpression* expr) final {
         preVisitTreeOperator(expr);
@@ -368,9 +392,13 @@ public:
         static constexpr auto kNormalReason = "regular expression did not match";
         static constexpr auto kInvertedReason = "regular expression did match";
         static const std::set<BSONType> expectedTypes{String, Symbol, RegEx};
-        generateLeafError(expr, kNormalReason, kInvertedReason, &expectedTypes);
+        generatePathError(*expr, kNormalReason, kInvertedReason, &expectedTypes);
     }
-    void visit(const SizeMatchExpression* expr) final {}
+    void visit(const SizeMatchExpression* expr) final {
+        static constexpr auto kNormalReason = "array length was not equal to given size";
+        static constexpr auto kInvertedReason = "array length was equal to given size";
+        generateArrayError(expr, kNormalReason, kInvertedReason);
+    }
     void visit(const TextMatchExpression* expr) final {
         MONGO_UNREACHABLE;
     }
@@ -412,7 +440,8 @@ private:
         appendOperatorName(*annotation, &bob);
         appendSpecifiedAs(*annotation, &bob);
     }
-    BSONArray createValuesArray(ElementPath path) {
+
+    BSONArray createValuesArray(const ElementPath& path) {
         MatchableDocument::IteratorHolder cursor(_context->doc, &path);
         BSONArrayBuilder bab;
         while (cursor->more()) {
@@ -430,7 +459,7 @@ private:
      */
     void appendMissingField(const BSONArray& arr) {
         BSONObjBuilder& bob = _context->getCurrentObjBuilder();
-        if (arr.nFields() == 0) {
+        if (arr.isEmpty()) {
             bob.append("reason", "field was missing");
         }
     }
@@ -503,27 +532,59 @@ private:
             bob.append("consideredTypes", types);
         }
     }
-    void generateLeafError(const LeafMatchExpression* expr,
+
+    /**
+     * Given a pointer to a PathMatchExpression 'expr', appends details to the current
+     * BSONObjBuilder tracked by '_context' describing why the document failed to match against
+     * 'expr'. In particular:
+     * - Appends "reason: field was missing" if expr's path is missing from the document.
+     * - Appends "reason: type mismatch" along with 'expectedTypes' and 'consideredTypes' if none
+     * of the values at expr's path match any of the types specified in 'expectedTypes'.
+     * - Appends the specified 'reason' along with 'consideredValue' if the 'path' in the
+     * document resolves to a single value.
+     * - Appends the specified 'reason' along with 'consideredValues' if the 'path' in the
+     * document resolves to an array of values that is implicitly traversed by 'expr'.
+     */
+    void generatePathError(const PathMatchExpression& expr,
                            const std::string& normalReason,
                            const std::string& invertedReason,
-                           const std::set<BSONType>* expectedTypes = nullptr) {
-        _context->pushNewFrame(*expr);
-        if (_context->shouldGenerateError(*expr)) {
-            appendErrorDetails(*expr);
-            BSONArray attributeValues = createValuesArray(expr->path());
-            appendMissingField(attributeValues);
-            appendTypeMismatch(attributeValues, expectedTypes);
-            appendErrorReason(*expr, normalReason, invertedReason);
-            appendConsideredValues(attributeValues);
+                           const std::set<BSONType>* expectedTypes = nullptr,
+                           ElementPath::LeafArrayBehavior leafArrayBehavior =
+                               ElementPath::LeafArrayBehavior::kTraverse) {
+        _context->pushNewFrame(expr);
+        if (_context->shouldGenerateError(expr)) {
+            appendErrorDetails(expr);
+            ElementPath path(expr.path(), leafArrayBehavior);
+            BSONArray arr = createValuesArray(path);
+            appendMissingField(arr);
+            appendTypeMismatch(arr, expectedTypes);
+            appendErrorReason(expr, normalReason, invertedReason);
+            appendConsideredValues(arr);
         }
     }
 
     void generateComparisonError(const ComparisonMatchExpression* expr) {
         static constexpr auto normalReason = "comparison failed";
         static constexpr auto invertedReason = "comparison succeeded";
-        generateLeafError(expr, normalReason, invertedReason);
+        generatePathError(*expr, normalReason, invertedReason);
     }
 
+    void generateElemMatchError(const ArrayMatchingMatchExpression* expr) {
+        static constexpr auto kNormalReason = "array did not satisfy the child predicate";
+        static constexpr auto kInvertedReason = "array did satisfy the child predicate";
+        generateArrayError(expr, kNormalReason, kInvertedReason);
+    }
+
+    void generateArrayError(const ArrayMatchingMatchExpression* expr,
+                            const std::string& normalReason,
+                            const std::string& invertedReason) {
+        static const std::set<BSONType> expectedTypes{BSONType::Array};
+        generatePathError(*expr,
+                          normalReason,
+                          invertedReason,
+                          &expectedTypes,
+                          ElementPath::LeafArrayBehavior::kNoTraversal);
+    }
     /**
      * Generates a document validation error for a bit test expression 'expr'.
      */
@@ -535,7 +596,7 @@ private:
                                                        BSONType::NumberDouble,
                                                        BSONType::NumberDecimal,
                                                        BSONType::BinData};
-        generateLeafError(expr, kNormalReason, kInvertedReason, &kExpectedTypes);
+        generatePathError(*expr, kNormalReason, kInvertedReason, &kExpectedTypes);
     }
 
     /**
@@ -547,6 +608,26 @@ private:
         if (_context->shouldGenerateError(*expr)) {
             auto annotation = expr->getErrorAnnotation();
             appendOperatorName(*annotation, &_context->getCurrentObjBuilder());
+        }
+    }
+    /**
+     * Utility to generate an error for $all. Though $all is internally translated to an 'AND'
+     * over some child expressions, it is treated as a leaf operator for the purposes of error
+     * reporting.
+     */
+    void processAll(const AndMatchExpression& expr) {
+        _context->pushNewFrame(expr);
+        if (_context->shouldGenerateError(expr)) {
+            invariant(expr.numChildren() > 0);
+            appendErrorDetails(expr);
+            auto childExpr = expr.getChild(0);
+            static constexpr auto kNormalReason = "array did not contain all specified values";
+            static constexpr auto kInvertedReason = "array did contain all specified values";
+            ElementPath path(childExpr->path(), ElementPath::LeafArrayBehavior::kNoTraversal);
+            auto arr = createValuesArray(path);
+            appendMissingField(arr);
+            appendErrorReason(expr, kNormalReason, kInvertedReason);
+            appendConsideredValues(arr);
         }
     }
 
@@ -640,10 +721,17 @@ private:
 class ValidationErrorPostVisitor final : public MatchExpressionConstVisitor {
 public:
     ValidationErrorPostVisitor(ValidationErrorContext* context) : _context(context) {}
-    void visit(const AlwaysFalseMatchExpression* expr) final {}
+    void visit(const AlwaysFalseMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const AlwaysTrueMatchExpression* expr) final {}
     void visit(const AndMatchExpression* expr) final {
-        postVisitTreeOperator(expr);
+        auto operatorName = expr->getErrorAnnotation()->operatorName;
+        if (operatorName == "$all") {
+            _context->finishCurrentError(expr);
+        } else {
+            postVisitTreeOperator(expr);
+        }
     }
     void visit(const BitsAllClearMatchExpression* expr) final {
         _context->finishCurrentError(expr);
@@ -657,8 +745,12 @@ public:
     void visit(const BitsAnySetMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
-    void visit(const ElemMatchObjectMatchExpression* expr) final {}
-    void visit(const ElemMatchValueMatchExpression* expr) final {}
+    void visit(const ElemMatchObjectMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
+    void visit(const ElemMatchValueMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const EqualityMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
@@ -729,7 +821,9 @@ public:
     void visit(const RegexMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
-    void visit(const SizeMatchExpression* expr) final {}
+    void visit(const SizeMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const TextMatchExpression* expr) final {
         MONGO_UNREACHABLE;
     }

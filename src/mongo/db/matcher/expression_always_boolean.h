@@ -37,8 +37,10 @@ namespace mongo {
 
 class AlwaysBooleanMatchExpression : public MatchExpression {
 public:
-    AlwaysBooleanMatchExpression(MatchType type, bool value)
-        : MatchExpression(type), _value(value) {}
+    AlwaysBooleanMatchExpression(MatchType type,
+                                 bool value,
+                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : MatchExpression(type, std::move(annotation)), _value(value) {}
 
     virtual ~AlwaysBooleanMatchExpression() = default;
 
@@ -96,14 +98,15 @@ class AlwaysFalseMatchExpression final : public AlwaysBooleanMatchExpression {
 public:
     static constexpr StringData kName = "$alwaysFalse"_sd;
 
-    AlwaysFalseMatchExpression() : AlwaysBooleanMatchExpression(MatchType::ALWAYS_FALSE, false) {}
+    AlwaysFalseMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : AlwaysBooleanMatchExpression(MatchType::ALWAYS_FALSE, false, std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
-        return std::make_unique<AlwaysFalseMatchExpression>();
+        return std::make_unique<AlwaysFalseMatchExpression>(_errorAnnotation);
     }
 
     bool isTriviallyFalse() const final {
