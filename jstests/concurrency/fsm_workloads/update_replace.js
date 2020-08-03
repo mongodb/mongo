@@ -7,7 +7,7 @@
  * The collection has indexes on some but not all fields.
  */
 
-// For isMongod and supportsDocumentLevelConcurrency.
+// For isMongod.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -15,10 +15,9 @@ var $config = (function() {
     function assertResult(db, res) {
         assertAlways.eq(0, res.nUpserted, tojson(res));
 
-        if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
-            // Storage engines which support document-level concurrency will automatically retry
-            // any operations when there are conflicts, so we should always see a matching
-            // document.
+        if (isMongod(db)) {
+            // Storage engines will automatically retry any operations when there are conflicts, so
+            // we should always see a matching document.
             assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
         } else {
             // On storage engines that do not support document-level concurrency, it is possible

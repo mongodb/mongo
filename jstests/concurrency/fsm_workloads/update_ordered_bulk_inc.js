@@ -11,7 +11,7 @@
  * Uses an ordered, bulk operation to perform the updates.
  */
 
-// For isMongod and supportsDocumentLevelConcurrency.
+// For isMongod.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -45,10 +45,9 @@ var $config = (function() {
             // our collection scan or index scan.
             assertWhenOwnColl.eq(this.docCount, docs.length);
 
-            if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
-                // Storage engines which support document-level concurrency will automatically retry
-                // any operations when there are conflicts, so we should have updated all matching
-                // documents.
+            if (isMongod(db)) {
+                // Storage engines will automatically retry any operations when there are conflicts,
+                // so we should have updated all matching documents.
                 docs.forEach(function(doc) {
                     assertWhenOwnColl.eq(this.count, doc[this.fieldName]);
                 }, this);

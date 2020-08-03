@@ -8,7 +8,6 @@
  * {
  *     ns1: <string>,
  *     ns1: <string>,
- *     requiresDocumentLevelConcurrency: <bool>,
  * }
  *
  * ns1:
@@ -19,10 +18,6 @@
  * ns2:
  *     Fully qualified namespace of second set of CRUD operations. This may be the same namespace as
  *     ns1. As with ns1, only insert operations will be used.
- *
- * requiresDocumentLevelConcurrency:
- *     Set to true if this test case can only be run with a storage engine that supports document
- *     level concurrency.
  */
 var ApplyOpsConcurrentNonAtomicTest = function(options) {
     'use strict';
@@ -152,14 +147,6 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
 
         const primary = replTest.getPrimary();
         const adminDb = primary.getDB('admin');
-
-        if (options.requiresDocumentLevelConcurrency &&
-            !supportsDocumentLevelConcurrency(adminDb)) {
-            testLog('Skipping test because storage engine does not support document level ' +
-                    'concurrency.');
-            replTest.stopSet();
-            return;
-        }
 
         const coll1 = primary.getCollection(options.ns1);
         const db1 = coll1.getDB();

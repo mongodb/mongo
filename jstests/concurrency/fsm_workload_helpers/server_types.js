@@ -71,15 +71,6 @@ function isEphemeral(db) {
 }
 
 /**
- * Returns true if the current storage engine supports document-level concurrency, and false
- * otherwise.
- */
-function supportsDocumentLevelConcurrency(db) {
-    var engine = getStorageEngineName(db);
-    return ['wiredTiger', 'rocksdb', 'inMemory'].indexOf(engine) !== -1;
-}
-
-/**
  * Returns true if the current storage engine supports committed reads.
  *
  * Throws an error if db is connected to a mongos, or if there is no reported storage engine.
