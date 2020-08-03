@@ -253,6 +253,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/vector_clock_mutable',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
     ],
 )
 

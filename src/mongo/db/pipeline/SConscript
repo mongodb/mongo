@@ -381,6 +381,7 @@ env.CppUnitTest(
         'lookup_set_cache_test.cpp',
         'pipeline_metadata_tree_test.cpp',
         'pipeline_test.cpp',
+        'resharding_initial_split_policy_test.cpp',
         'resume_token_test.cpp',
         'semantic_analysis_test.cpp',
         'sequential_document_cache_test.cpp',

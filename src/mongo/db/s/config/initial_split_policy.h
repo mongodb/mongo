@@ -272,4 +272,31 @@ private:
     StringMap<size_t> _numTagsPerShard;
 };
 
+/**
+ * Split point building strategy to be used for resharding when zones are not defined.
+ */
+class ReshardingSplitPolicy : public InitialSplitPolicy {
+public:
+    ReshardingSplitPolicy(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const ShardKeyPattern& shardKey,
+                          int numInitialChunks,
+                          const std::vector<ShardId>& recipientShardIds,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          int samplingRatio = 10);
+    ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
+                                            const ShardKeyPattern& shardKeyPattern,
+                                            SplitPolicyParams params);
+    /**
+     * Creates the aggregation pipeline BSON to get documents for sampling from shards.
+     */
+    static std::vector<BSONObj> createRawPipeline(const ShardKeyPattern& shardKey,
+                                                  int samplingRatio,
+                                                  int numSplitPoints);
+
+private:
+    std::vector<BSONObj> _splitPoints;
+    std::vector<ShardId> _recipientShardIds;
+    int _numContiguousChunksPerShard;
+};
 }  // namespace mongo
