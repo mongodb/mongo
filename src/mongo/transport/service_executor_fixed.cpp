@@ -162,5 +162,10 @@ void ServiceExecutorFixed::appendStats(BSONObjBuilder* bob) const {
          << static_cast<int>(_numRunningExecutorThreads.load());
 }
 
+int ServiceExecutorFixed::getRecursionDepthForExecutorThread() const {
+    invariant(_executorContext);
+    return _executorContext->getRecursionDepth();
+}
+
 }  // namespace transport
 }  // namespace mongo

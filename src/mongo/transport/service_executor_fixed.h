@@ -67,6 +67,12 @@ public:
 
     void appendStats(BSONObjBuilder* bob) const override;
 
+    /**
+     * Returns the recursion depth of the active executor thread.
+     * It is forbidden to invoke this method outside scheduled tasks.
+     */
+    int getRecursionDepthForExecutorThread() const;
+
 private:
     // Maintains the execution state (e.g., recursion depth) for executor threads
     class ExecutorThreadContext {

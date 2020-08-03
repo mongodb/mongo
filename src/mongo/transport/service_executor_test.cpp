@@ -213,18 +213,6 @@ public:
         const bool _skipShutdown;
         std::shared_ptr<ServiceExecutorFixed> _executor;
     };
-
-    auto makeRecursionGuard() {
-        _recursionDepth.fetchAndAdd(1);
-        return makeGuard([this] { _recursionDepth.fetchAndSubtract(1); });
-    }
-
-    auto getRecursionDepth() const {
-        return _recursionDepth.load();
-    }
-
-private:
-    AtomicWord<int> _recursionDepth{0};
 };
 
 TEST_F(ServiceExecutorFixedFixture, ScheduleFailsBeforeStartup) {
@@ -251,8 +239,8 @@ TEST_F(ServiceExecutorFixedFixture, RecursiveTask) {
 
     std::function<void()> recursiveTask;
     recursiveTask = [&, barrier, executor = *executorHandle] {
-        auto recursionGuard = makeRecursionGuard();
-        if (getRecursionDepth() < fixedServiceExecutorRecursionLimit.load()) {
+        if (executor->getRecursionDepthForExecutorThread() <
+            fixedServiceExecutorRecursionLimit.load()) {
             ASSERT_OK(executor->scheduleTask(recursiveTask, ServiceExecutor::kMayRecurse));
         } else {
             // This test never returns unless the service executor can satisfy the recursion depth.
@@ -275,8 +263,7 @@ TEST_F(ServiceExecutorFixedFixture, FlattenRecursiveScheduledTasks) {
     // recursion depth remains zero during its execution.
     std::function<void()> recursiveTask;
     recursiveTask = [&, barrier, executor = *executorHandle] {
-        auto recursionGuard = makeRecursionGuard();
-        ASSERT_EQ(getRecursionDepth(), 1);
+        ASSERT_EQ(executor->getRecursionDepthForExecutorThread(), 1);
         if (tasksToSchedule.fetchAndSubtract(1) > 0) {
             ASSERT_OK(executor->scheduleTask(recursiveTask, ServiceExecutor::kEmptyFlags));
         } else {
