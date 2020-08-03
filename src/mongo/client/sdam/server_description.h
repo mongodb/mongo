@@ -63,6 +63,11 @@ public:
                       boost::optional<TopologyVersion> topologyVersion = boost::none);
 
     /**
+     * Copy ServerDescriptionPtr, but set server type explicitly
+     */
+    ServerDescription(const ServerDescriptionPtr& source, ServerType serverType);
+
+    /**
      * This determines if a server description is equivalent according to the Server Discovery and
      * Monitoring specification. Members marked with (=) are used to determine equality. Note that
      * these members do not include RTT or the server's address.

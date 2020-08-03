@@ -90,6 +90,7 @@ TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
     topologyManager.onServerDescription(isMasterOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     auto newServerDescription = topologyDescription->getServers()[0];
+    ASSERT(newServerDescription->getTopologyVersion());
     ASSERT_BSONOBJ_EQ(newServerDescription->getTopologyVersion()->toBSON(),
                       kBsonTopologyVersionLow.getObjectField("topologyVersion"));
 
@@ -100,6 +101,7 @@ TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
     topologyManager.onServerDescription(isMasterOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     newServerDescription = topologyDescription->getServers()[0];
+    ASSERT(newServerDescription->getTopologyVersion());
     ASSERT_BSONOBJ_EQ(newServerDescription->getTopologyVersion()->toBSON(),
                       kBsonTopologyVersionHigh.getObjectField("topologyVersion"));
 }

@@ -129,8 +129,7 @@ void mongo::sdam::TopologyStateMachine::initTransitionTable() {
     }
 
     {
-        const auto serverTypes =
-            std::vector<ServerType>{ServerType::kStandalone, ServerType::kMongos};
+        const auto serverTypes = std::vector<ServerType>{ServerType::kMongos};
         for (auto serverType : serverTypes) {
             _stt[idx(TopologyType::kReplicaSetWithPrimary)][idx(serverType)] =
                 std::bind(&TopologyStateMachine::removeAndCheckIfHasPrimary, this, _1, _2);
@@ -162,11 +161,23 @@ void TopologyStateMachine::onServerDescription(TopologyDescription& topologyDesc
         return;
     }
 
-    installServerDescription(topologyDescription, serverDescription, false);
+    ServerDescriptionPtr descriptionToInstall;
+    if (topologyDescription.getType() != TopologyType::kSingle &&
+        serverDescription->getType() == ServerType::kStandalone) {
+        // Create unknown server description with same address
+        descriptionToInstall =
+            std::make_shared<ServerDescription>(serverDescription, ServerType::kUnknown);
+    } else {
+        descriptionToInstall = serverDescription;
+    }
+
+    installServerDescription(topologyDescription, descriptionToInstall, false);
 
     if (topologyDescription.getType() != TopologyType::kSingle) {
-        auto& action = _stt[idx(topologyDescription.getType())][idx(serverDescription->getType())];
-        action(topologyDescription, serverDescription);
+        auto& action =
+            _stt[idx(topologyDescription.getType())][idx(descriptionToInstall->getType())];
+
+        action(topologyDescription, descriptionToInstall);
     }
 }
 
