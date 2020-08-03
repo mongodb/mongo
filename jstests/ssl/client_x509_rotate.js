@@ -85,20 +85,31 @@ assert(primary.host in getConnPoolHosts());
 assert.commandWorked(mongos.adminCommand({dropConnections: 1, hostAndPort: keys}));
 assert(!(primary.host in getConnPoolHosts()));
 
-output = mongos.adminCommand({multicast: {ping: 0}});
-jsTestLog("Multicast 1 output: " + tojson(output));
-// multicast should fail, because the primary shard isn't hit
-assert.eq(output.ok, 0);
-for (let host in output.hosts) {
-    if (host === primary.host) {
-        assert.eq(output.hosts[host].ok, 0);
-    } else {
-        assert.eq(output.hosts[host].ok, 1);
+assert.soon(() => {
+    output = mongos.adminCommand({multicast: {ping: 0}});
+    jsTestLog("Multicast 1 output: " + tojson(output));
+    // multicast should fail, because the primary shard isn't hit
+    if (output.ok !== 0) {
+        return false;
     }
-}
-for (let key of keys) {
-    assert(key in output.hosts);
-}
+    for (let host in output.hosts) {
+        if (host === primary.host) {
+            if (output.hosts[host].ok !== 0) {
+                return false;
+            }
+        } else {
+            if (output.hosts[host].ok !== 1) {
+                return false;
+            }
+        }
+    }
+    for (let key of keys) {
+        if (!(key in output.hosts)) {
+            return false;
+        }
+    }
+    return true;
+});
 
 // rotate, drop all connections, re-multicast and see what we now hit
 assert.commandWorked(mongos.adminCommand({rotateCertificates: 1}));
@@ -106,19 +117,30 @@ assert.commandWorked(mongos.adminCommand({rotateCertificates: 1}));
 mongos.adminCommand({dropConnections: 1, hostAndPort: keys});
 assert(!(primary.host in getConnPoolHosts()));
 
-output = mongos.adminCommand({multicast: {ping: 0}});
-jsTestLog("Multicast 2 output: " + tojson(output));
-assert.eq(output.ok, 0);
-for (let host in output.hosts) {
-    if (host === primary.host) {
-        assert.eq(output.hosts[host].ok, 1);
-    } else {
-        assert.eq(output.hosts[host].ok, 0);
+assert.soon(() => {
+    output = mongos.adminCommand({multicast: {ping: 0}});
+    jsTestLog("Multicast 2 output: " + tojson(output));
+    if (output.ok !== 0) {
+        return false;
     }
-}
-for (let key of keys) {
-    assert(key in output.hosts);
-}
+    for (let host in output.hosts) {
+        if (host === primary.host) {
+            if (output.hosts[host].ok !== 1) {
+                return false;
+            }
+        } else {
+            if (output.hosts[host].ok !== 0) {
+                return false;
+            }
+        }
+    }
+    for (let key of keys) {
+        if (!(key in output.hosts)) {
+            return false;
+        }
+    }
+    return true;
+});
 // Don't call st.stop() -- breaks because cluster is only partially rotated (this is hard to fix)
 return;
 }());
