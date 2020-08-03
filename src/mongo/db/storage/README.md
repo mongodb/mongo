@@ -45,15 +45,11 @@ individual documents, though there is a BulkBuilder class for more efficiently b
 ### Locking and Concurrency
 MongoDB uses multi-granular intent locking; see the [Concurrency FAQ][]. In all cases, this will
 ensure that operations to meta-data, such as creation and deletion of record stores, are serialized
-with respect to other accesses. Storage engines can choose to support document-level concurrency,
-in which case the storage engine is responsible for any additional synchronization necessary. For
-storage engines not supporting document-level concurrency, MongoDB will use shared/exclusive locks
-at the collection level, so all record store accesses will be serialized.
+with respect to other accesses.
 
 MongoDB uses [two-phase locking][] (2PL) to guarantee serializability of accesses to resources it
-manages. For storage engines that support document level concurrency, MongoDB will only use intent
-locks for the most common operations, leaving synchronization at the record store layer up to the
-storage engine.
+manages. MongoDB will only use intent locks for the most common operations, leaving synchronization
+at the record store layer up to the storage engine.
 
 ### Transactions
 Each operation creates an OperationContext with a new RecoveryUnit, implemented by the storage
