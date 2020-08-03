@@ -408,7 +408,7 @@ private:
     // Handle to currently scheduled _runQuery task.
     executor::TaskExecutor::CallbackHandle _runQueryHandle;
 
-    int _lastBatchElapsedMS;
+    int _lastBatchElapsedMS = 0;
 };
 
 }  // namespace repl
