@@ -483,7 +483,7 @@ add_option('cache-signature-mode',
 add_option("cxx-std",
     choices=["17"],
     default="17",
-    help="Select the C++ langauge standard to build with",
+    help="Select the C++ language standard to build with",
 )
 
 add_option("dynamic-runtime",
@@ -566,7 +566,7 @@ add_option('experimental-runtime-hardening',
 add_option('use-hardware-crc32',
     choices=["on", "off"],
     default="on",
-    help="Enable CRC32 hardware accelaration",
+    help="Enable CRC32 hardware acceleration",
     type='choice',
 )
 
@@ -581,7 +581,7 @@ add_option('git-decider',
 
 add_option('toolchain-root',
     default=None,
-    help="Names a toolchain root for use with toolchain selection Variables files in etc/scons",
+    help="Name a toolchain root for use with toolchain selection Variables files in etc/scons",
 )
 
 add_option('msvc-debugging-format',
@@ -613,7 +613,7 @@ add_option('jlink',
 add_option('enable-usdt-probes',
 	choices=["on", "off", "auto"],
 	default="auto",
-	help='Enables USDT probes. Default is auto, which is enabled only on Linux with SystemTap headers',
+	help='Enable USDT probes. Default is auto, which is enabled only on Linux with SystemTap headers',
 	type='choice',
     nargs='?',
     const='on',
@@ -672,7 +672,7 @@ except ValueError as e:
 
 # Setup the command-line variables
 def variable_shlex_converter(val):
-    # If the argument is something other than a string, propogate
+    # If the argument is something other than a string, propagate
     # it literally.
     if not isinstance(val, str):
         return val
@@ -720,7 +720,7 @@ def decide_platform_tools():
 
 def variable_tools_converter(val):
     tool_list = shlex.split(val)
-    # This list is not sorted intentionally, the order of tool loading
+    # This list is intentionally not sorted; the order of tool loading
     # matters as some of the tools have dependencies on other tools.
     return tool_list + [
         "distsrc",
@@ -782,7 +782,7 @@ env_vars.Add('ARFLAGS',
     converter=variable_shlex_converter)
 
 env_vars.Add('CCACHE',
-    help='Tell SCons where the ccache binary is')
+    help='Tells SCons where the ccache binary is')
 
 env_vars.Add(
     'CACHE_SIZE',
@@ -799,7 +799,7 @@ env_vars.Add(
 )
 
 env_vars.Add('CC',
-    help='Select the C compiler to use')
+    help='Selects the C compiler to use')
 
 env_vars.Add('CCFLAGS',
     help='Sets flags for the C and C++ compiler',
@@ -819,7 +819,7 @@ env_vars.Add('CPPPATH',
     converter=variable_shlex_converter)
 
 env_vars.Add('CXX',
-    help='Select the C++ compiler to use')
+    help='Selects the C++ compiler to use')
 
 env_vars.Add('CXXFLAGS',
     help='Sets flags for the C++ compiler',
@@ -871,13 +871,13 @@ env_vars.Add('HOST_ARCH',
     default=None)
 
 env_vars.Add('ICECC',
-    help='Tell SCons where icecream icecc tool is')
+    help='Tells SCons where icecream icecc tool is')
 
 env_vars.Add('ICERUN',
-    help='Tell SCons where icecream icerun tool is')
+    help='Tells SCons where icecream icerun tool is')
 
 env_vars.Add('ICECC_CREATE_ENV',
-    help='Tell SCons where icecc-create-env tool is',
+    help='Tells SCons where icecc-create-env tool is',
     default='icecc-create-env')
 
 env_vars.Add('ICECC_DEBUG',
@@ -885,13 +885,13 @@ env_vars.Add('ICECC_DEBUG',
     default=False)
 
 env_vars.Add('ICECC_SCHEDULER',
-    help='Tell ICECC where the sceduler daemon is running')
+    help='Tells ICECC where the scheduler daemon is running')
 
 env_vars.Add('ICECC_VERSION',
-    help='Tell ICECC where the compiler package is')
+    help='Tells ICECC where the compiler package is')
 
 env_vars.Add('ICECC_VERSION_ARCH',
-    help='Tell ICECC the target archicture for the compiler package, if non-native')
+    help='Tells ICECC the target architecture for the compiler package, if non-native')
 
 env_vars.Add('LIBPATH',
     help='Adds paths to the linker search path',
@@ -975,7 +975,7 @@ Will generate the files (respectively):
     asan.ninja
     tsan.ninja
 
-Defaults to build, best used with the generate-ninja alias so you don't have to
+Defaults to build. Best used with the generate-ninja alias so you don't have to
 reiterate the prefix in the target name and variable.
 """)
 
@@ -995,7 +995,7 @@ Will generate the files (respectively):
 """)
 
 env_vars.Add('__NINJA_NO',
-    help="Disable the Ninja tool unconditionally. Not intended for human use.",
+    help="Disables the Ninja tool unconditionally. Not intended for human use.",
     default=0)
 
 
@@ -1009,7 +1009,7 @@ env_vars.Add('PKGDIR',
     default='$BUILD_DIR/pkgs')
 
 env_vars.Add('PREFIX',
-    help='Final installation location of files, will be made into a sub dir of $DESTDIR',
+    help='Final installation location of files. Will be made into a sub dir of $DESTDIR',
     default='.')
 
 # Exposed to be able to cross compile Android/*nix from Windows without ending up with the .exe suffix.
@@ -1033,7 +1033,7 @@ env_vars.Add('SHCXXFLAGS',
     converter=variable_shlex_converter)
 
 env_vars.Add('SHELL',
-    help='Pick the shell to use when spawning commands')
+    help='Picks the shell to use when spawning commands')
 
 env_vars.Add('SHLINKFLAGS',
     help='Sets flags for the linker when building shared libraries',
@@ -1066,7 +1066,7 @@ env_vars.Add('VARIANT_DIR',
 )
 
 env_vars.Add('VERBOSE',
-    help='Control build verbosity (auto, on/off true/false 1/0)',
+    help='Controls build verbosity (auto, on/off true/false 1/0)',
     default='auto',
 )
 
@@ -1111,7 +1111,7 @@ if ('CC' in variables_only_env) != ('CXX' in variables_only_env):
 
 # If the user isn't using the # to indicate top-of-tree or $ to expand a variable, forbid
 # relative paths. Relative paths don't really work as expected, because they end up relative to
-# the top level SConstruct, not the invokers CWD. We could in theory fix this with
+# the top level SConstruct, not the invoker's CWD. We could in theory fix this with
 # GetLaunchDir, but that seems a step too far.
 buildDir = get_option('build-dir').rstrip('/')
 if buildDir[0] not in ['$', '#']:
@@ -1578,7 +1578,7 @@ if has_option("cache"):
     env.CacheDir(str(env.Dir(cacheDir)))
 
 # Normalize the link model. If it is auto, then for now both developer and release builds
-# use the "static" mode. Somday later, we probably want to make the developer build default
+# use the "static" mode. Someday later, we probably want to make the developer build default
 # dynamic.
 link_model = get_option('link-model')
 if link_model == "auto":
@@ -1713,7 +1713,7 @@ if link_model.startswith("dynamic"):
     # - No unique provider for the symbol: Some symbols do not have a
     #   unique dependency that provides a definition, in which case it
     #   is impossible for the library to express a dependency edge to
-    #   resolve the symbol
+    #   resolve the symbol.
     #
     # - The library is part of a cycle: If library A depends on B,
     #   which depends on C, which depends on A, then it is impossible
@@ -1911,7 +1911,7 @@ if optBuild:
 
 # Enable the fast decider if explicitly requested or if in 'auto' mode
 # and not in conflict with other options like the ninja option which
-# sets it's own decider
+# sets its own decider.
 if (
         get_option('ninja') == 'disabled' and
         get_option('build-fast-and-loose') == 'on' or
@@ -1985,8 +1985,8 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
             fake_lib.write(str(uuid.uuid4()))
             fake_lib.write('\n')
 
-    # We originally did this by setting ARCOM to write_uuid_to_file,
-    # this worked more or less by accident. It works when SCons is
+    # We originally did this by setting ARCOM to write_uuid_to_file.
+    # This worked more or less by accident. It works when SCons is
     # doing the action execution because when it would subst the
     # command line subst would execute the function as part of string
     # resolution which would have the side effect of writing the
@@ -2293,7 +2293,7 @@ elif env.TargetOSIs('windows'):
         # C4355: 'this' : used in base member initializer list. The
         # this pointer is valid only within nonstatic member
         # functions. It cannot be used in the initializer list for a
-        # base class
+        # base class.
         "/wd4355",
 
         # C4373: Older versions of MSVC would fail to make a function
@@ -2331,7 +2331,7 @@ elif env.TargetOSIs('windows'):
     #    This warning occurs when files compiled for the C language use functions not defined
     #    in a header file.
     # c4099
-    #  identifier' : type name first seen using 'objecttype1' now seen using 'objecttype2'
+    #  'identifier' : type name first seen using 'objecttype1' now seen using 'objecttype2'
     #    This warning occurs when classes and structs are declared with a mix of struct and class
     #    which can cause linker failures
     # c4930
@@ -2350,7 +2350,7 @@ elif env.TargetOSIs('windows'):
     # Don't send error reports in case of internal compiler error
     env.Append( CCFLAGS= ["/errorReport:none"] )
 
-    # Select debugging format. /Zi gives faster links but seem to use more memory
+    # Select debugging format. /Zi gives faster links but seems to use more memory.
     if get_option('msvc-debugging-format') == "codeview":
         env['CCPDBFLAGS'] = "/Z7"
     elif get_option('msvc-debugging-format') == "pdb":
@@ -2473,8 +2473,8 @@ if env.TargetOSIs('posix'):
     # test macros, so this is safe to do. Other platforms like macOS
     # and BSD have crazy rules, so don't try this there.
     #
-    # Furthermore, as both C++ compilers appears to unconditioanlly
-    # define _GNU_SOURCE (because libstdc++ requires it), it seems
+    # Furthermore, as both C++ compilers appear to define _GNU_SOURCE
+    # unconditionally (because libstdc++ requires it), it seems
     # prudent to explicitly add that too, so that C language checks
     # see a consistent set of definitions.
     if env.TargetOSIs('linux'):
@@ -2839,7 +2839,7 @@ def doConfigure(myenv):
         if has_option('win-version-min'):
             win_version_min = get_option('win-version-min')
         else:
-            # If no minimum version has beeen specified, use our default
+            # If no minimum version has been specified, use our default.
             win_version_min = 'win10'
 
         env['WIN_VERSION_MIN'] = win_version_min
@@ -3316,7 +3316,7 @@ def doConfigure(myenv):
     if conf.CheckFunc('strnlen'):
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_STRNLEN")
 
-    # Gblic 2.25+, OpenBSD 5.5+ and FreeBSD 11.0+ offer explicit_bzero, a secure way to zero memory
+    # Glibc 2.25+, OpenBSD 5.5+ and FreeBSD 11.0+ offer explicit_bzero, a secure way to zero memory
     if conf.CheckFunc('explicit_bzero'):
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_EXPLICIT_BZERO")
 
@@ -4605,7 +4605,7 @@ if env.GetOption('num_jobs') == altered_num_jobs:
         if get_option("ninja") != "disabled":
             env.FatalError("Cannot auto-determine the appropriate size for the Ninja local_job pool. Please regenerate with an explicit -j argument to SCons")
         else:
-            env.FatalError("Cannot auto-determine the appropriate build paralleism on this platform. Please build with an explicit -j argument to SCons")
+            env.FatalError("Cannot auto-determine the appropriate build parallelism on this platform. Please build with an explicit -j argument to SCons")
 
     if 'ICECC' in env and env['ICECC'] and get_option("ninja") == "disabled":
         # If SCons is driving and we are using icecream, scale up the
@@ -4742,8 +4742,8 @@ if get_option('ninja') != 'disabled':
         new_emitter = SCons.Builder.ListEmitter([base_emitter, winlink_workaround_emitter])
         builder.emitter = new_emitter
 
-    # idlc.py has the ability to print it's implicit dependencies
-    # while generating, Ninja can consume these prints using the
+    # idlc.py has the ability to print its implicit dependencies
+    # while generating. Ninja can consume these prints using the
     # deps=msvc method.
     env.AppendUnique(IDLCFLAGS=[
         "--write-dependencies-inline",
@@ -5021,7 +5021,7 @@ if env['PLATFORM'] == 'posix':
         ]
     )
 elif env['PLATFORM'] == 'darwin':
-    # The darwin case uses a adhoc implementation of RPATH for SCons
+    # The darwin case uses an adhoc implementation of RPATH for SCons
     # since SCons does not support RPATH directly for macOS:
     #   https://github.com/SCons/scons/issues/2127
     # so we setup RPATH and LINKFLAGS ourselves.
@@ -5362,7 +5362,7 @@ resmoke_install_dir = os.path.normpath(resmoke_install_dir).replace("\\", r"\\")
 # Much blood sweat and tears were shed getting to this point. Any version of
 # this that uses SCons builders and a scanner will either not regenerate when it
 # should, cause everything to rebuild, or conflict with ninja. Sometimes all
-# three. So we've decieded it's best to just write this file here every time
+# three. So we've decided it's best to just write this file here every time
 # because it's the only solution that always works.
 with open("resmoke.ini", "w") as resmoke_config:
     resmoke_config.write("""
