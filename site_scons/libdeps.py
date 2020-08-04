@@ -51,6 +51,7 @@ automatically added when missing.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import copy
 import os
 import textwrap
 
@@ -72,7 +73,7 @@ class Constants:
     LibdepsTags = "LIBDEPS_TAGS"
     LibdepsTagExpansion = "LIBDEPS_TAG_EXPANSIONS"
 
-class dependency(object):
+class dependency:
     Public, Private, Interface = list(range(3))
 
     def __init__(self, value, deptype):
@@ -82,7 +83,95 @@ class dependency(object):
     def __str__(self):
         return str(self.target_node)
 
-class LibdepLinter(object):
+class FlaggedLibdep:
+    """
+    Utility class used for processing prefix and postfix flags on libdeps. The class
+    can keep track of separate lists for prefix and postfix as well separators,
+    allowing for modifications to the lists and then re-application of the flags with
+    modifications to a larger list representing the link line.
+    """
+
+    def __init__(self, libnode=None, env=None, start_index=None):
+        """
+        The libnode should be a Libdep SCons node, and the env is the target env in
+        which the target has a dependency on the libdep. The start_index is important as
+        it determines where this FlaggedLibdep starts in the larger list of libdeps.
+
+        The start_index will cut the larger list, and then re-apply this libdep with flags
+        at that location. This class will exract the prefix and postfix flags
+        from the Libdep nodes env.
+        """
+        self.libnode = libnode
+        self.env = env
+
+        # We need to maintain our own copy so as not to disrupt the env's original list.
+        try:
+            self.prefix_flags = copy.copy(libnode.get_env().get('LIBDEPS_PREFIX_FLAGS', []))
+            self.postfix_flags = copy.copy(libnode.get_env().get('LIBDEPS_POSTFIX_FLAGS', []))
+        except AttributeError:
+            self.prefix_flags = []
+            self.postfix_flags = []
+
+        self.start_index = start_index
+
+    def __str__(self):
+        return str(self.libnode)
+
+    def add_lib_to_result_list(self, result):
+        """
+        This function takes in the current list of libdeps for a given target, and will
+        apply the libdep taking care of the prefix, postfix and any required separators when
+        adding to the list.
+        """
+        if self.start_index != None:
+            result[:] = result[:self.start_index]
+        self._add_lib_and_flags(result)
+
+    def _get_separators(self, flags):
+
+        separated_list = []
+
+        for flag in flags:
+            separators = self.env.get('LIBDEPS_FLAG_SEPARATORS', {}).get(flag, {})
+            separated_list.append(separators.get('prefix', ' '))
+            separated_list.append(flag)
+            separated_list.append(separators.get('suffix', ' '))
+
+        return separated_list
+
+    def _get_lib_with_flags(self):
+
+        lib_and_flags = []
+
+        lib_and_flags += self._get_separators(self.prefix_flags)
+        lib_and_flags += [str(self)]
+        lib_and_flags += self._get_separators(self.postfix_flags)
+
+        return lib_and_flags
+
+    def _add_lib_and_flags(self, result):
+        """
+        This function will clean up the flags for the link line after extracting everything
+        from the environment. This will mostly look for separators that are just a space, and
+        remove them from the list, as the final link line will add spaces back for each item
+        in the list. It will take to concat flags where the separators don't allow for a space.
+        """
+        next_contig_str = ''
+
+        for item in self._get_lib_with_flags():
+            if item != ' ':
+                next_contig_str += item
+            else:
+                if next_contig_str:
+                    result.append(next_contig_str)
+                next_contig_str = ''
+
+        if next_contig_str:
+            result.append(next_contig_str)
+
+
+
+class LibdepLinter:
     """
     This class stores the rules for linting the libdeps. Using a decorator,
     new rules can easily be added to the class, and will be called when
@@ -459,7 +548,7 @@ def __get_libdeps(node):
 def __get_syslibdeps(node):
     """ Given a SCons Node, return its system library dependencies.
 
-    These are the depencencies listed with SYSLIBDEPS, and are linked using -l.
+    These are the dependencies listed with SYSLIBDEPS, and are linked using -l.
     """
     result = getattr(node.attributes, Constants.SysLibdepsCached, None)
     if result is not None:
@@ -556,6 +645,19 @@ def __append_direct_libdeps(node, prereq_nodes):
     if getattr(node.attributes, "libdeps_direct", None) is None:
         node.attributes.libdeps_direct = []
     node.attributes.libdeps_direct.extend(prereq_nodes)
+
+
+def __get_flagged_libdeps(source, target, env, for_signature):
+    for lib in get_libdeps(source, target, env, for_signature):
+        # Make sure lib is a Node so we can get the env to check for flags.
+        libnode = lib
+        if not isinstance(lib, (str, SCons.Node.FS.File, SCons.Node.FS.Entry)):
+            libnode = env.File(lib)
+
+        # Create a libdep and parse the prefix and postfix (and separators if any)
+        # flags from the environment.
+        cur_lib = FlaggedLibdep(libnode, env)
+        yield cur_lib
 
 
 def __get_node_with_ixes(env, node, node_builder_type):
@@ -688,35 +790,55 @@ def expand_libdeps_tags(source, target, env, for_signature):
     return results
 
 
-def expand_libdeps_with_extraction_flags(source, target, env, for_signature):
-    result = []
-    libs = get_libdeps(source, target, env, for_signature)
-    whole_archive_start = env.subst("$LINK_WHOLE_ARCHIVE_LIB_START")
-    whole_archive_end = env.subst("$LINK_WHOLE_ARCHIVE_LIB_END")
-    whole_archive_separator = env.get("LINK_WHOLE_ARCHIVE_SEP", " ")
+def expand_libdeps_with_flags(source, target, env, for_signature):
 
-    for lib in libs:
-        if isinstance(lib, (str, SCons.Node.FS.File, SCons.Node.FS.Entry)):
-            lib_target = str(lib)
-            lib_tags = lib.get_env().get(Constants.LibdepsTags, [])
-        else:
-            lib_target = env.subst("$TARGET", target=lib)
-            lib_tags = env.File(lib).get_env().get(Constants.LibdepsTags, [])
+    libdeps_with_flags = []
 
-        if "init-no-global-side-effects" in lib_tags:
-            result.append(lib_target)
-        else:
-            whole_archive_flag = "{}{}{}".format(
-                whole_archive_start, whole_archive_separator, lib_target
-            )
-            if whole_archive_end:
-                whole_archive_flag += "{}{}".format(
-                    whole_archive_separator, whole_archive_end
-                )
+    # Used to make modifications to the previous libdep on the link line
+    # if needed. An empty class here will make the switch_flag conditionals
+    # below a bit cleaner.
+    prev_libdep = None
 
-            result.extend(whole_archive_flag.split())
+    for flagged_libdep in __get_flagged_libdeps(source, target, env, for_signature):
 
-    return result
+        # If there are no flags to process we can move on to the next lib.
+        # start_index wont mater in the case because if there are no flags
+        # on the previous lib, then we will never need to do the chopping
+        # mechanism on the next iteration.
+        if not flagged_libdep.prefix_flags and not flagged_libdep.postfix_flags:
+            libdeps_with_flags.append(str(flagged_libdep))
+            prev_libdep = flagged_libdep
+            continue
+
+        # This for loop will go through the previous results and remove the 'off'
+        # flag as well as removing the new 'on' flag. For example, let libA and libB
+        # both use on and off flags which would normally generate on the link line as:
+        #   -Wl--on-flag libA.a -Wl--off-flag -Wl--on-flag libA.a -Wl--off-flag
+        # This loop below will spot the cases were the flag was turned off and then
+        # immediately turned back on
+        for switch_flag in env.get('LIBDEPS_SWITCH_FLAGS', []):
+            if (prev_libdep and switch_flag['on'] in flagged_libdep.prefix_flags
+                and switch_flag['off'] in prev_libdep.postfix_flags):
+
+                flagged_libdep.prefix_flags.remove(switch_flag['on'])
+                prev_libdep.postfix_flags.remove(switch_flag['off'])
+
+                # prev_lib has had its list modified, and it has a start index
+                # from the last iteration, so it will chop of the end the current
+                # list and reapply the end with the new flags.
+                prev_libdep.add_lib_to_result_list(libdeps_with_flags)
+
+        # Store the information of the len of the current list before adding
+        # the next set of flags as that will be the start index for the previous
+        # lib next time around in case there are any switch flags to chop off.
+        start_index = len(libdeps_with_flags)
+        flagged_libdep.add_lib_to_result_list(libdeps_with_flags)
+
+        # Done processing the current lib, so set it to previous for the next iteration.
+        prev_libdep = flagged_libdep
+        prev_libdep.start_index = start_index
+
+    return libdeps_with_flags
 
 
 def setup_environment(env, emitting_shared=False, linting='on'):
@@ -741,7 +863,7 @@ def setup_environment(env, emitting_shared=False, linting='on'):
     # We need a way for environments to alter just which libdeps
     # emitter they want, without altering the overall program or
     # library emitter which may have important effects. The
-    # subsitution rules for emitters are a little strange, so build
+    # substitution rules for emitters are a little strange, so build
     # ourselves a little trampoline to use below so we don't have to
     # deal with it.
     def make_indirect_emitter(variable):
@@ -765,14 +887,12 @@ def setup_environment(env, emitting_shared=False, linting='on'):
         PROGEMITTER=make_indirect_emitter("LIBDEPS_PROGEMITTER"),
     )
 
-    env["_LIBDEPS_LIBS_WITH_TAGS"] = expand_libdeps_with_extraction_flags
+    env["_LIBDEPS_LIBS_WITH_TAGS"] = expand_libdeps_with_flags
 
     env["_LIBDEPS_LIBS"] = (
-        "$LINK_WHOLE_ARCHIVE_START "
         "$LINK_LIBGROUP_START "
         "$_LIBDEPS_LIBS_WITH_TAGS "
         "$LINK_LIBGROUP_END "
-        "$LINK_WHOLE_ARCHIVE_END"
     )
 
     env.Prepend(_LIBFLAGS="$_LIBDEPS_TAGS $_LIBDEPS $_SYSLIBDEPS ")

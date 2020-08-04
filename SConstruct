@@ -1690,21 +1690,69 @@ if env['_LIBDEPS'] == '$_LIBDEPS_LIBS':
         env.Tool('thin_archive')
 
 if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
-    # NOTE: The leading and trailing spaces here are important. Do not remove them.
-    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,--whole-archive '
-    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -Wl,--no-whole-archive'
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,--whole-archive'
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = '-Wl,--no-whole-archive'
+    env['LINK_AS_NEEDED_LIB_START'] = '-Wl,--as-needed'
+    env['LINK_AS_NEEDED_LIB_END'] = '-Wl,--no-as-needed'
 elif env.TargetOSIs('darwin'):
-    # NOTE: The trailing space here is important. Do not remove it.
-    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,-force_load '
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,-force_load'
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
+    env['LINK_AS_NEEDED_LIB_START'] = '-Wl,-mark_dead_strippable_dylib'
+    env['LINK_AS_NEEDED_LIB_END'] = ''
 elif env.TargetOSIs('solaris'):
-    # NOTE: The leading and trailing spaces here are important. Do not remove them.
-    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,-z,allextract '
-    env['LINK_WHOLE_ARCHIVE_LIB_END'] = ' -Wl,-z,defaultextract'
+    env['LINK_WHOLE_ARCHIVE_LIB_START'] = '-Wl,-z,allextract'
+    env['LINK_WHOLE_ARCHIVE_LIB_END'] = '-Wl,-z,defaultextract'
 elif env.TargetOSIs('windows'):
     env['LINK_WHOLE_ARCHIVE_LIB_START'] = '/WHOLEARCHIVE'
-    env['LINK_WHOLE_ARCHIVE_SEP'] = ':'
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
+    env['LIBDEPS_FLAG_SEPARATORS'] = {env['LINK_WHOLE_ARCHIVE_LIB_START']:{'suffix':':'}}
+
+def init_no_global_add_flags(env, start_flag, end_flag):
+    """ Helper function for init_no_global_libdeps_tag_expand"""
+    env.AppendUnique(LIBDEPS_PREFIX_FLAGS=[start_flag])
+    env.PrependUnique(LIBDEPS_POSTFIX_FLAGS=[end_flag])
+    if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
+        env.AppendUnique(
+            LIBDEPS_SWITCH_FLAGS=[{
+                'on':start_flag,
+                'off':end_flag
+        }])
+
+def init_no_global_libdeps_tag_expand(source, target, env, for_signature):
+    """
+    This callable will be expanded by scons and modify the environment by
+    adjusting the prefix and postfix flags to account for linking options
+    related to the use of global static initializers for any given libdep.
+    """
+
+    if link_model.startswith("dynamic"):
+        start_flag = env.get('LINK_AS_NEEDED_LIB_START', '')
+        end_flag = env.get('LINK_AS_NEEDED_LIB_END', '')
+
+        # In the dynamic case, any library that is known to not have global static
+        # initializers can supply the flag and be wrapped in --as-needed linking,
+        # allowing the linker to be smart about linking libraries it may not need.
+        if "init-no-global-side-effects" in env.get(libdeps.Constants.LibdepsTags, []):
+            if env.TargetOSIs('darwin'):
+                # macos as-needed flag is used on the library directly when it is built
+                env.AppendUnique(SHLINKFLAGS=[start_flag])
+            else:
+                init_no_global_add_flags(env, start_flag, end_flag)
+
+    else:
+        start_flag = env.get('LINK_WHOLE_ARCHIVE_LIB_START', '')
+        end_flag = env.get('LINK_WHOLE_ARCHIVE_LIB_END', '')
+
+        # In the static case, any library that is unknown to have global static
+        # initializers should supply the flag and be wrapped in --whole-archive linking,
+        # allowing the linker to bring in all those symbols which may not be directly needed
+        # at link time.
+        if "init-no-global-side-effects" not in env.get(libdeps.Constants.LibdepsTags, []):
+            init_no_global_add_flags(env, start_flag, end_flag)
+
+    return []
+
+env['LIBDEPS_TAG_EXPANSIONS'].append(init_no_global_libdeps_tag_expand)
 
 # ---- other build setup -----
 if debugBuild:
