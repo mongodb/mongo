@@ -4,6 +4,7 @@ selector:
   roots:
   - jstests/multiVersion/**/*.js
   - src/mongo/db/modules/*/jstests/hot_backups/*last_lts*.js
+  - src/mongo/db/modules/*/jstests/hot_backups/*last_cont*.js
   exclude_files:
   # Do not execute files with helper functions.
   - jstests/multiVersion/libs/*.js
