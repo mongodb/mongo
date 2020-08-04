@@ -133,6 +133,13 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
     // either with success or error and the scheduled deadline task above has been joined.
     std::move(kickOffCommitPF.future)
         .then([this] {
+            // TODO SERVER-49921 Optimize wait for vector clock persistence
+            // Persist the vector clock in order to ensure casual consistency on topologyTime
+            auto vectorClock = VectorClock::get(_serviceContext);
+            return vectorClock->persist();
+        })
+        .thenRunOn(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor())
+        .then([this] {
             // Persist the participants, unless they have been made durable already (which would
             // only be the case if this coordinator was created as part of step-up recovery).
             //  Input: _participants

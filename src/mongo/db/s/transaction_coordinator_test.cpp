@@ -2205,10 +2205,11 @@ TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionsOverSlowMSThreshold) {
 
     coordinator.runCommit(operationContext(), kTwoShardIdList);
 
+    assertPrepareSentAndRespondWithSuccess();
+    assertPrepareSentAndRespondWithSuccess();
+
     tickSource()->advance(Milliseconds(101));
 
-    assertPrepareSentAndRespondWithSuccess();
-    assertPrepareSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
     assertCommitSentAndRespondWithSuccess();
 

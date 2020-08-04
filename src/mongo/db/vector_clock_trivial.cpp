@@ -67,7 +67,7 @@ protected:
 
 const auto vectorClockTrivialDecoration = ServiceContext::declareDecoration<VectorClockTrivial>();
 
-ServiceContext::ConstructorActionRegisterer _registerer(
+ServiceContext::ConstructorActionRegisterer vectorClockTrivialRegisterer(
     "VectorClockTrivial-VectorClockRegistration",
     {},
     [](ServiceContext* service) {

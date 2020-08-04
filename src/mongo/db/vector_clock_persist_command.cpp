@@ -67,7 +67,7 @@ public:
         auto sc = opCtx->getServiceContext();
         auto vc = VectorClock::get(sc);
 
-        vc->persist(opCtx).get(opCtx);
+        vc->persist().get(opCtx);
 
         return true;
     }

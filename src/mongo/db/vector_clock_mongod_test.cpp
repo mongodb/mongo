@@ -34,6 +34,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -83,27 +84,6 @@ protected:
 
 private:
     std::shared_ptr<KeysCollectionManager> _keyManager;
-};
-
-class VectorClockMongoDPrimaryTest : public VectorClockMongoDTest {
-protected:
-    void setUp() override {
-        VectorClockMongoDTest::setUp();
-
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
-        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
-        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-    }
-
-    void tearDown() override {
-        serverGlobalParams.clusterRole = ClusterRole::None;
-
-        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
-        replCoord->setFollowerMode(repl::MemberState::RS_UNKNOWN).ignore();
-
-        VectorClockMongoDTest::tearDown();
-    }
 };
 
 TEST_F(VectorClockMongoDTest, TickClusterTime) {
@@ -303,6 +283,27 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
     ASSERT_EQ(afterTime3.topologyTime().asTimestamp(), Timestamp(0, 0));
 }
 
+class VectorClockMongoDPrimaryTest : public ShardServerTestFixture {
+protected:
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
+        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    }
+
+    void tearDown() override {
+        serverGlobalParams.clusterRole = ClusterRole::None;
+
+        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
+        replCoord->setFollowerMode(repl::MemberState::RS_UNKNOWN).ignore();
+
+        ShardServerTestFixture::tearDown();
+    }
+};
+
 TEST_F(VectorClockMongoDPrimaryTest, PersistVectorClockDocument) {
     auto sc = getServiceContext();
     auto opCtx = operationContext();
@@ -318,13 +319,13 @@ TEST_F(VectorClockMongoDPrimaryTest, PersistVectorClockDocument) {
     ASSERT_EQUALS(store.count(opCtx, VectorClock::stateQuery()), 0);
 
     // Persist and check that the vectorClockState document has been persisted
-    auto future = vc->persist(opCtx);
+    auto future = vc->persist();
     future.get();
     ASSERT_EQUALS(store.count(opCtx, VectorClock::stateQuery()), 1);
 
     // Check that the vectorClockState document is still one after more persist calls
-    future = vc->persist(opCtx);
-    vc->waitForInMemoryVectorClockToBePersisted(opCtx);
+    future = vc->persist();
+    vc->waitForInMemoryVectorClockToBePersisted();
     ASSERT_EQUALS(store.count(opCtx, VectorClock::stateQuery()), 1);
 }
 
@@ -339,15 +340,15 @@ TEST_F(VectorClockMongoDPrimaryTest, RecoverVectorClockDocument) {
     vc->advanceTopologyTime_forTest(topologyTime);
 
     // Persist the vector clock, then reset its components
-    auto future = vc->persist(opCtx);
+    auto future = vc->persist();
     future.get(opCtx);
     vc->resetVectorClock_forTest();
 
     NamespaceString nss(NamespaceString::kVectorClockNamespace);
     PersistentTaskStore<VectorClockDocument> store(nss);
 
-    future = vc->recover(opCtx);
-    vc->waitForVectorClockToBeRecovered(opCtx);
+    future = vc->recover();
+    vc->waitForVectorClockToBeRecovered();
 
     auto time = vc->getTime();
     auto actualConfTime = time.configTime();
@@ -374,8 +375,8 @@ TEST_F(VectorClockMongoDPrimaryTest, RecoverNotExistingVectorClockDocument) {
     int nDocuments = store.count(opCtx, VectorClock::stateQuery());
     ASSERT_EQUALS(nDocuments, 0);
 
-    auto future = vc->recover(opCtx);
-    vc->waitForVectorClockToBeRecovered(opCtx);
+    auto future = vc->recover();
+    vc->waitForVectorClockToBeRecovered();
 
     // Verify that times didn't change after an unsuccessful recovery
     auto time = vc->getTime();
@@ -398,12 +399,12 @@ TEST_F(VectorClockMongoDPrimaryTest, SubsequentPersistRecoverVectorClockDocument
         vc->advanceTopologyTime_forTest(newTime);
 
         // Persist the vector clock, then reset its components
-        auto future = vc->persist(opCtx);
+        auto future = vc->persist();
         future.get(opCtx);
         vc->resetVectorClock_forTest();
 
-        future = vc->recover(opCtx);
-        vc->waitForVectorClockToBeRecovered(opCtx);
+        future = vc->recover();
+        vc->waitForVectorClockToBeRecovered();
 
         auto time = vc->getTime();
         auto actualConfTime = time.configTime();

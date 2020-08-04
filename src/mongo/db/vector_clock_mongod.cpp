@@ -37,10 +37,8 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace {
@@ -59,11 +57,11 @@ public:
     VectorClockMongoD();
     virtual ~VectorClockMongoD();
 
-    SharedSemiFuture<void> persist(OperationContext* opCtx) override;
-    void waitForInMemoryVectorClockToBePersisted(OperationContext* opCtx) override;
+    SharedSemiFuture<void> persist() override;
+    void waitForInMemoryVectorClockToBePersisted() override;
 
-    SharedSemiFuture<void> recover(OperationContext* opCtx) override;
-    void waitForVectorClockToBeRecovered(OperationContext* opCtx) override;
+    SharedSemiFuture<void> recover() override;
+    void waitForVectorClockToBeRecovered() override;
 
     void _tickTo(Component component, LogicalTime newTime) override;
 
@@ -100,8 +98,6 @@ private:
                            BSONObjBuilder* out,
                            const VectorTime& time,
                            Component component) const;
-
-    static const ComponentArray<std::unique_ptr<ComponentFormat>> _vectorClockStateFormatters;
 
     /*
      * Manages the components persistence format, stripping field names of intitial '$' symbol.
@@ -156,7 +152,8 @@ private:
                                                 ServiceContext* serviceContext) {
             stdx::lock_guard<Latch> lk(_opMutex);
             _opFuture =
-                _opFuture.thenRunOn(_getExecutorPool())
+                _opFuture
+                    .thenRunOn(Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor())
                     .then([this, vectorClock, serviceContext, initialGeneration = _generation] {
                         stdx::unique_lock<Latch> lk(_opMutex);
 
@@ -198,29 +195,13 @@ private:
             _opFuture.get();
         }
 
-    protected:
+    private:
         virtual void execute(VectorClockMongoD* vectorClock, OperationContext* opCtx) = 0;
 
-    private:
-        std::shared_ptr<ThreadPool> _getExecutorPool() {
-            static Mutex mutex = MONGO_MAKE_LATCH("VectorClockStateOperation::_executorMutex");
-            static std::shared_ptr<ThreadPool> executor;
+        Mutex _opMutex = MONGO_MAKE_LATCH("VectorClockStateOperation::_opMutex");
 
-            stdx::lock_guard<Latch> lg(mutex);
-            if (!executor) {
-                ThreadPool::Options options;
-                options.poolName = "VectorClockStateOperation";
-                options.minThreads = 0;
-                options.maxThreads = 1;
-                executor = std::make_shared<ThreadPool>(std::move(options));
-                executor->startup();
-            }
+        SharedSemiFuture<void> _opFuture;
 
-            return executor;
-        }
-
-        Mutex _opMutex = MONGO_MAKE_LATCH();
-        SharedSemiFuture<void> _opFuture = SharedSemiFuture<void>();
         size_t _generation = 0;
     };
 
@@ -228,6 +209,7 @@ private:
      * VectorClockStateOperation persisting configTime and topologyTime in the VectorClockDocument.
      */
     class PersistOperation : public VectorClockStateOperation {
+    private:
         void execute(VectorClockMongoD* vectorClock, OperationContext* opCtx) override {
             const auto time = vectorClock->getTime();
 
@@ -259,6 +241,7 @@ private:
      * VectorClockStateOperation invoking PersistOperation on a shard server's primary.
      */
     class RemotePersistOperation : public VectorClockStateOperation {
+    private:
         void execute(VectorClockMongoD* vectorClock, OperationContext* opCtx) override {
             auto const shardingState = ShardingState::get(opCtx);
             invariant(shardingState->enabled());
@@ -287,6 +270,7 @@ private:
      * VectorClockDocument.
      */
     class RecoverOperation : public VectorClockStateOperation {
+    private:
         void execute(VectorClockMongoD* vectorClock, OperationContext* opCtx) override {
             NamespaceString nss(NamespaceString::kVectorClockNamespace);
             PersistentTaskStore<VectorClockDocument> store(nss);
@@ -315,6 +299,8 @@ private:
         }
     };
 
+    static const ComponentArray<std::unique_ptr<ComponentFormat>> _vectorClockStateFormatters;
+
     PersistOperation _persistOperation;
     RemotePersistOperation _remotePersistOperation;
     RecoverOperation _recoverOperation;
@@ -322,9 +308,17 @@ private:
 
 const auto vectorClockMongoDDecoration = ServiceContext::declareDecoration<VectorClockMongoD>();
 
-const ReplicaSetAwareServiceRegistry::Registerer<VectorClockMongoD> vectorClockMongoDRegisterer(
-    "VectorClockMongoD-ReplicaSetAwareServiceRegistration");
+const ReplicaSetAwareServiceRegistry::Registerer<VectorClockMongoD>
+    vectorClockMongoDServiceRegisterer("VectorClockMongoD-ReplicaSetAwareServiceRegistration");
 
+const ServiceContext::ConstructorActionRegisterer vectorClockMongoDRegisterer(
+    "VectorClockMongoD-VectorClockRegistration",
+    {},
+    [](ServiceContext* service) {
+        VectorClockMongoD::registerVectorClockOnServiceContext(
+            service, &vectorClockMongoDDecoration(service));
+    },
+    {});
 
 const VectorClock::ComponentArray<std::unique_ptr<VectorClock::ComponentFormat>>
     VectorClockMongoD::_vectorClockStateFormatters{
@@ -338,15 +332,6 @@ const VectorClock::ComponentArray<std::unique_ptr<VectorClock::ComponentFormat>>
 VectorClockMongoD* VectorClockMongoD::get(ServiceContext* serviceContext) {
     return &vectorClockMongoDDecoration(serviceContext);
 }
-
-ServiceContext::ConstructorActionRegisterer _registerer(
-    "VectorClockMongoD-VectorClockRegistration",
-    {},
-    [](ServiceContext* service) {
-        VectorClockMongoD::registerVectorClockOnServiceContext(
-            service, &vectorClockMongoDDecoration(service));
-    },
-    {});
 
 VectorClockMongoD::VectorClockMongoD() = default;
 
@@ -462,31 +447,33 @@ void VectorClockMongoD::_recoverComponent(OperationContext* opCtx,
         _service, opCtx, in, true /*couldBeUnauthenticated*/, component);
 }
 
-SharedSemiFuture<void> VectorClockMongoD::persist(OperationContext* opCtx) {
+SharedSemiFuture<void> VectorClockMongoD::persist() {
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        auto serviceContext = vectorClockMongoDDecoration.owner(this);
 
+        const auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
         if (replCoord->getMemberState().primary()) {
-            return _persistOperation.performOperation(this, opCtx->getServiceContext());
+            return _persistOperation.performOperation(this, serviceContext);
         }
 
-        return _remotePersistOperation.performOperation(this, opCtx->getServiceContext());
+        return _remotePersistOperation.performOperation(this, serviceContext);
     }
 
     return SharedSemiFuture<void>();
 }
 
-void VectorClockMongoD::waitForInMemoryVectorClockToBePersisted(OperationContext* opCtx) {
+void VectorClockMongoD::waitForInMemoryVectorClockToBePersisted() {
     _persistOperation.waitForCompletion();
 }
 
-SharedSemiFuture<void> VectorClockMongoD::recover(OperationContext* opCtx) {
-    return _recoverOperation.performOperation(this, opCtx->getServiceContext());
+SharedSemiFuture<void> VectorClockMongoD::recover() {
+    auto serviceContext = vectorClockMongoDDecoration.owner(this);
+    return _recoverOperation.performOperation(this, serviceContext);
 }
 
-void VectorClockMongoD::waitForVectorClockToBeRecovered(OperationContext* opCtx) {
+void VectorClockMongoD::waitForVectorClockToBeRecovered() {
     _recoverOperation.waitForCompletion();
-};
+}
 
 }  // namespace
 }  // namespace mongo

@@ -63,7 +63,7 @@ protected:
 
 const auto vectorClockMongoSDecoration = ServiceContext::declareDecoration<VectorClockMongoS>();
 
-ServiceContext::ConstructorActionRegisterer _registerer(
+ServiceContext::ConstructorActionRegisterer vectorClockMongoSRegisterer(
     "VectorClockMongoS-VectorClockRegistration",
     {},
     [](ServiceContext* service) {

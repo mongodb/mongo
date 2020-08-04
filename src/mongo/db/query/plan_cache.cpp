@@ -589,7 +589,6 @@ Status PlanCache::set(const CanonicalQuery& query,
                                  [](std::vector<std::unique_ptr<sbe::PlanStageStats>>& stats) {
                                      return calculateNumberOfReads(stats[0].get());
                                  }},
-
         why->stats);
     const auto key = computeKey(query);
     stdx::lock_guard<Latch> cacheLock(_cacheMutex);

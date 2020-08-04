@@ -609,12 +609,15 @@ TEST_F(TransactionCoordinatorServiceTest, CoordinatorAbortsIfDeadlinePassesAndSt
     const auto deadline = executor()->now() + Milliseconds(1000 * 60 * 10 /* 10 hours */);
     coordinatorService->createCoordinator(operationContext(), _lsid, _txnNumber, deadline);
 
-    // Deliver the participant list before the deadline.
     ASSERT(boost::none !=
            coordinatorService->coordinateCommit(
                operationContext(), _lsid, _txnNumber, kTwoShardIdSet));
 
-    // Reach the deadline.
+    // This ensures that the VectorClock and the participants persistence step executes
+    advanceClockAndExecuteScheduledTasks();
+
+    // This ensures that the coordinator will reach the deadline and cause it to abort the
+    // transaction
     network()->enterNetwork();
     network()->advanceTime(deadline);
     network()->exitNetwork();
