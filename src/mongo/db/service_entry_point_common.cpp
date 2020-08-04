@@ -519,8 +519,8 @@ void invokeWithNoSession(OperationContext* opCtx,
                          const OpMsgRequest& request,
                          CommandInvocation* invocation,
                          rpc::ReplyBuilderInterface* replyBuilder) {
-    tenant_migration::checkIfCanReadOrBlock(opCtx, request.getDatabase());
-    tenant_migration::migrationConflictRetry(
+    tenant_migration_donor::checkIfCanReadOrBlock(opCtx, request.getDatabase());
+    tenant_migration_donor::migrationConflictRetry(
         opCtx,
         [&] { CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder); },
         replyBuilder);
@@ -627,10 +627,10 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
         }
     }
 
-    tenant_migration::checkIfCanReadOrBlock(opCtx, request.getDatabase());
+    tenant_migration_donor::checkIfCanReadOrBlock(opCtx, request.getDatabase());
 
     try {
-        tenant_migration::migrationConflictRetry(
+        tenant_migration_donor::migrationConflictRetry(
             opCtx,
             [&] { CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder); },
             replyBuilder);
@@ -874,7 +874,7 @@ bool runCommandImpl(OperationContext* opCtx,
     });
 
     behaviors.waitForLinearizableReadConcern(opCtx);
-    tenant_migration::checkIfLinearizableReadWasAllowedOrThrow(opCtx, request.getDatabase());
+    tenant_migration_donor::checkIfLinearizableReadWasAllowedOrThrow(opCtx, request.getDatabase());
 
     // Wait for data to satisfy the read concern level, if necessary.
     behaviors.waitForSpeculativeMajorityReadConcern(opCtx);

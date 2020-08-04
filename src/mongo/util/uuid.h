@@ -65,9 +65,10 @@ class UUID {
 
     // Make the IDL generated parser a friend
     friend class ConfigsvrShardCollectionResponse;
-    friend class ShardsvrShardCollectionResponse;
-    friend class ShardsvrRenameCollection;
     friend class CommonReshardingMetadata;
+    friend class DonorStartMigration;
+    friend class DonorWaitForMigrationToCommit;
+    friend class DonorForgetMigration;
     friend class DatabaseVersion;
     friend class DbCheckOplogCollection;
     friend class EncryptionPlaceholder;
@@ -86,15 +87,16 @@ class UUID {
     friend class repl::OplogEntryBase;
     friend class repl::DurableReplOperation;
     friend class repl::InitialSyncIdDocument;
+    friend class RecipientSyncData;
     friend class ResumeIndexInfo;
     friend class ResumeTokenInternal;
     friend class ShardCollectionTypeBase;
+    friend class ShardsvrShardCollectionResponse;
+    friend class ShardsvrRenameCollection;
     friend class TenantMigrationDonorDocument;
     friend class TenantMigrationRecipientDocument;
     friend class VoteCommitIndexBuild;
-    friend class DonorStartMigration;
-    friend class DonorWaitForMigrationToCommit;
-    friend class DonorForgetMigration;
+
 
 public:
     /**

@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/tenant_migration_cmds_gen.h"
+#include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-namespace tenant_migration {
+namespace tenant_migration_donor {
 
 /**
  * Starts a tenant migration as defined in the given donor's state document.
@@ -114,6 +114,6 @@ void migrationConflictRetry(OperationContext* opCtx,
     }
 }
 
-}  // namespace tenant_migration
+}  // namespace tenant_migration_donor
 
 }  // namespace mongo

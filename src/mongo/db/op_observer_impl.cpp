@@ -574,7 +574,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
             opCtx, args.updateArgs.updatedDoc["_id"], args.updateArgs.updatedDoc);
     } else if (args.nss == NamespaceString::kTenantMigrationDonorsNamespace) {
-        tenant_migration::onDonorStateTransition(opCtx, args.updateArgs.updatedDoc);
+        tenant_migration_donor::onDonorStateTransition(opCtx, args.updateArgs.updatedDoc);
     }
 }
 

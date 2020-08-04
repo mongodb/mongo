@@ -14,8 +14,19 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 
+const donorRst = new ReplSetTest(
+    {nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}], name: 'donor'});
+const recipientRst = new ReplSetTest({nodes: 1, name: 'recipient'});
+
+donorRst.startSet();
+donorRst.initiate();
+recipientRst.startSet();
+recipientRst.initiate();
+
+const kCollName = "testColl";
+const kRecipientConnString = recipientRst.getURL();
+
 const kMaxTimeMS = 5 * 1000;
-const kRecipientConnString = "testConnString";
 const kConfigDonorsNS = "config.tenantMigrationDonors";
 
 function startMigration(host, dbName, recipientConnString) {
@@ -355,12 +366,6 @@ const testCases = {
     }
 };
 
-const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}]});
-rst.startSet();
-rst.initiate();
-
-const kCollName = "testColl";
-
 // Run test cases.
 const testFuncs = {
     inCommitted: testReadIsRejectedIfSentAfterMigrationHasCommitted,
@@ -373,9 +378,10 @@ const testFuncs = {
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [commandName, testCase] of Object.entries(testCases)) {
         let dbName = commandName + "-" + testName + "0";
-        testFunc(rst, testCase, dbName, kCollName);
+        testFunc(donorRst, testCase, dbName, kCollName);
     }
 }
 
-rst.stopSet();
+donorRst.stopSet();
+recipientRst.stopSet();
 })();

@@ -11,6 +11,18 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 
+const donorRst = new ReplSetTest({nodes: 1, name: 'donor'});
+const recipientRst = new ReplSetTest({nodes: 1, name: 'recipient'});
+
+donorRst.startSet();
+donorRst.initiate();
+recipientRst.startSet();
+recipientRst.initiate();
+
+const primary = donorRst.getPrimary();
+const kRecipientConnString = recipientRst.getURL();
+const kCollName = "testColl";
+
 const kTestDoc = {
     x: -1
 };
@@ -28,7 +40,6 @@ const kTestIndex = {
 const kNumInitialDocs = 2;  // num initial docs to insert into test collections.
 const kMaxSize = 1024;      // max size of capped collections.
 const kTxnNumber = NumberLong(0);
-const kRecipientConnString = "testConnString";
 const kMaxTimeMS = 1 * 1000;
 
 function startMigration(host, dbName, recipientConnString) {
@@ -810,13 +821,6 @@ const testCases = {
     whatsmyuri: {skip: isNotRunOnUserDatabase}
 };
 
-const rst = new ReplSetTest({nodes: 1});
-rst.startSet();
-rst.initiate();
-const primary = rst.getPrimary();
-
-const kCollName = "testColl";
-
 // Validate test cases for all commands.
 for (let command of Object.keys(testCases)) {
     validateTestCase(testCases[command]);
@@ -857,5 +861,6 @@ for (const [testName, testFunc] of Object.entries(testFuncs)) {
     }
 }
 
-rst.stopSet();
+donorRst.stopSet();
+recipientRst.stopSet();
 })();

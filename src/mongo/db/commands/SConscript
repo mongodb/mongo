@@ -409,16 +409,17 @@ env.Library(
         "sharded_index_consistency_server_status.cpp",
         "shutdown_d.cpp",
         "snapshot_management.cpp",
+        "tenant_migration_donor_cmds.cpp",
+        "tenant_migration_recipient_cmds.cpp",
         "top_command.cpp",
-        "tenant_migration_cmds.cpp",
         "txn_cmds.cpp",
         "user_management_commands.cpp",
         "vote_commit_index_build_command.cpp",
         env.Idlc('internal_rename_if_options_and_indexes_match.idl')[0],
-        env.Idlc('tenant_migration_cmds.idl')[0],
         env.Idlc('vote_commit_index_build.idl')[0],
     ],
     LIBDEPS=[
+        'tenant_migration_cmds_request',
         'txn_cmd_request',
     ],
     LIBDEPS_PRIVATE=[
@@ -445,6 +446,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/dbcheck',
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/tenant_migration_donor',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/server_options_core',
@@ -526,6 +528,18 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='tenant_migration_cmds_request',
+    source=[
+        env.Idlc('tenant_migration_donor_cmds.idl')[0],
+        env.Idlc('tenant_migration_recipient_cmds.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/client/read_preference',
+    ]
+)
 env.Library(
     target='txn_cmd_request',
     source=[

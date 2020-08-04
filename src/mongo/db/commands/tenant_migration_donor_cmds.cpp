@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/tenant_migration_cmds_gen.h"
+#include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 
 namespace mongo {
@@ -51,7 +51,7 @@ public:
                 requestBody.getDatabasePrefix().toString(),
                 TenantMigrationDonorStateEnum::kDataSync);
 
-            tenant_migration::startMigration(opCtx, donorStateDoc);
+            tenant_migration_donor::startMigration(opCtx, donorStateDoc);
         }
 
 

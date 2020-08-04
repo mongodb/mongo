@@ -241,6 +241,7 @@ const allCommands = {
     prepareTransaction: {skip: isPrimaryOnly},
     profile: {skip: isPrimaryOnly},
     reapLogicalSessionCacheNow: {skip: isNotAUserDataRead},
+    recipientSyncData: {skip: isPrimaryOnly},
     refreshLogicalSessionCacheNow: {skip: isNotAUserDataRead},
     refreshSessions: {skip: isNotAUserDataRead},
     reIndex: {skip: isNotAUserDataRead},

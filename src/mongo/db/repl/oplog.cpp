@@ -230,7 +230,7 @@ void _logOpsInner(OperationContext* opCtx,
     // The oplogEntry for renameCollection has nss set to the fromCollection's ns. renameCollection
     // can be across databases, but a tenant will never be able to rename into a database with a
     // different prefix, so it is safe to use the fromCollection's db's prefix for this check.
-    tenant_migration::onWriteToDatabase(opCtx, nss.db());
+    tenant_migration_donor::onWriteToDatabase(opCtx, nss.db());
 
     Status result = oplogCollection->insertDocumentsForOplog(opCtx, records, timestamps);
     if (!result.isOK()) {
