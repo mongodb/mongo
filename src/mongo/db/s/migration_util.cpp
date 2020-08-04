@@ -94,6 +94,8 @@ MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInAdvanceTxnNumInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInAdvanceTxnNumThenSimulateErrorUninterruptible);
+MONGO_FAIL_POINT_DEFINE(setFCVHangWhileEnumeratingOrphanedRanges);
+MONGO_FAIL_POINT_DEFINE(setFCVHangWhileInsertingRangeDeletionTasks);
 
 const char kSourceShard[] = "source";
 const char kDestinationShard[] = "destination";
@@ -221,6 +223,8 @@ void batchInsertRangeDeletionTasks(OperationContext* opCtx,
 
         begin = end;
         end = end + getMinIncrement(begin);
+
+        setFCVHangWhileInsertingRangeDeletionTasks.pauseWhileSet(opCtx);
     }
 }
 }  // namespace
@@ -471,58 +475,6 @@ void dropRangeDeletionsCollection(OperationContext* opCtx) {
                           WriteConcerns::kMajorityWriteConcern);
 }
 
-template <typename Callable>
-void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Callable&& handler) {
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-
-    const auto css = CollectionShardingRuntime::get(opCtx, nss);
-    const auto collDesc = css->getCollectionDescription();
-    const auto emptyReceivingChunks =
-        RangeMap{SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()};
-
-    if (!collDesc.isSharded()) {
-        LOGV2(22029,
-              "Upgrade: Skipping orphaned range enumeration because the collection is not "
-              "sharded",
-              "namespace"_attr = nss);
-        return;
-    }
-
-    auto startingKey = collDesc.getMinKey();
-    const auto ownedChunks = collDesc->getOwnedChunks();
-
-    auto numOrphanedRangesSoFar = 0;
-
-    while (true) {
-        auto range = collDesc->getNextOrphanRange(ownedChunks, emptyReceivingChunks, startingKey);
-        ++numOrphanedRangesSoFar;
-
-        if (!range) {
-            LOGV2_DEBUG(22030,
-                        2,
-                        "Upgrade: Completed orphaned range enumeration; no orphaned ranges "
-                        "remain",
-                        "namespace"_attr = nss.toString(),
-                        "startingKey"_attr = redact(startingKey));
-
-            return;
-        }
-
-        // Log progress every 1000 ranges.
-        if (numOrphanedRangesSoFar % 1000 == 0) {
-            LOGV2(4968000,
-                  "Upgrade: Enumerating orphaned ranges",
-                  "namespace"_attr = nss.toString(),
-                  "startingKey"_attr = redact(startingKey),
-                  "numOrphanedRangesSoFar"_attr = numOrphanedRangesSoFar);
-        }
-
-        handler(*range);
-
-        startingKey = range->getMax();
-    }
-}
-
 void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
     try {
         auto version = forceShardFilteringMetadataRefresh(opCtx, nss, true);
@@ -541,12 +493,12 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
 
         LOGV2_DEBUG(22031,
                     2,
-                    "Upgrade: Cleaning up existing orphans",
+                    "Upgrade: Going to find orphan ranges for namespace",
                     "namespace"_attr = nss,
                     "uuid"_attr = uuid);
 
         std::vector<RangeDeletionTask> deletions;
-        forEachOrphanRange(opCtx, nss, [&deletions, &opCtx, &nss, &uuid](const auto& range) {
+        forEachOrphanRange(opCtx, nss, [&](const auto& range) {
             // Since this is not part of an active migration, the migration UUID and the donor
             // shard are set to unused values so that they don't conflict.
             RangeDeletionTask task(UUID::gen(),
@@ -556,13 +508,34 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
                                    range,
                                    CleanWhenEnum::kDelayed);
             deletions.emplace_back(task);
+
+            if (deletions.size() % 1000 == 0) {
+                LOGV2(4968000,
+                      "Still enumerating orphaned ranges for namespace",
+                      "namespace"_attr = nss.toString(),
+                      "reachedOrphanRange"_attr = redact(range.toBSON()),
+                      "numOrphanRangesEnumerated"_attr = deletions.size());
+            }
+
+            setFCVHangWhileEnumeratingOrphanedRanges.pauseWhileSet(opCtx);
         });
 
-        if (deletions.empty())
+        if (deletions.empty()) {
+            LOGV2_DEBUG(49715,
+                        0,
+                        "Upgrade: Did not find any orphan ranges for namespace",
+                        "namespace"_attr = nss);
             return;
+        }
+
+        LOGV2_DEBUG(
+            22032,
+            0,
+            "Upgrade: Found orphan ranges for namespace. Going to insert range deletion tasks.",
+            "namespace"_attr = nss,
+            "numOrphanRanges"_attr = deletions.size());
 
         batchInsertRangeDeletionTasks(opCtx, deletions);
-
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
         LOGV2(22033,
               "Upgrade: Failed to clean up orphans because the namespace was not found; the "

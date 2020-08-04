@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/persistent_task_store.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
@@ -220,6 +222,35 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
  * migration coordination to completion.
  */
 void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
+
+template <typename Callable>
+void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Callable&& handler) {
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+
+    const auto css = CollectionShardingRuntime::get(opCtx, nss);
+    const auto collDesc = css->getCollectionDescription();
+    if (!collDesc.isSharded()) {
+        return;
+    }
+
+    auto startingKey = collDesc.getMinKey();
+    const auto ownedChunks = collDesc->getOwnedChunks();
+    const auto emptyReceivingChunks =
+        RangeMap{SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()};
+
+    while (true) {
+        opCtx->checkForInterrupt();
+        auto range = collDesc->getNextOrphanRange(ownedChunks, emptyReceivingChunks, startingKey);
+
+        if (!range) {
+            return;
+        }
+
+        handler(*range);
+
+        startingKey = range->getMax();
+    }
+}
 
 }  // namespace migrationutil
 }  // namespace mongo

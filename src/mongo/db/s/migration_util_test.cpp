@@ -43,6 +43,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/database_version_helpers.h"
 #include "mongo/s/shard_server_test_fixture.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
 
@@ -691,6 +692,91 @@ TEST_F(SubmitRangeDeletionTaskTest,
                        AssertionException,
                        ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist);
     ASSERT_EQ(store.count(opCtx), 0);
+}
+
+using ForEachOrphanRangeTest = ShardServerTestFixture;
+
+ChunkRange getRangeForChunk(int i, int nChunks) {
+    invariant(i >= 0);
+    invariant(nChunks > 0);
+    invariant(i < nChunks);
+    if (i == 0) {
+        return {BSON("_id" << MINKEY), BSON("_id" << 0)};
+    }
+    if (i + 1 == nChunks) {
+        return {BSON("_id" << (i - 1) * 100), BSON("_id" << MAXKEY)};
+    }
+    return {BSON("_id" << (i - 1) * 100), BSON("_id" << i * 100)};
+}
+
+
+TEST_F(ForEachOrphanRangeTest, ForEachOrphanRangeIsInterruptible) {
+    const auto kNss = NamespaceString("test.foo");
+
+    // Create a chunk distribution with 1000 chunks alternating between shard1 and shard2.
+    const auto cm = [&]() {
+        const auto nChunks = 1000;
+        const auto collEpoch = OID::gen();
+
+        std::vector<ChunkType> chunks;
+        chunks.reserve(nChunks);
+        for (uint32_t i = 0; i < nChunks; ++i) {
+            chunks.emplace_back(kNss,
+                                getRangeForChunk(i, nChunks),
+                                ChunkVersion{i + 1, 0, collEpoch},
+                                (i % 2 == 0 ? ShardId("shard1") : ShardId("shard2")));
+        }
+
+        auto routingTableHistory = RoutingTableHistory::makeNew(
+            kNss, UUID::gen(), KeyPattern(BSON("_id" << 1)), nullptr, true, collEpoch, chunks);
+        return std::make_shared<ChunkManager>(routingTableHistory, boost::none);
+    }();
+
+    // Install the chunk distribution in the filtering metadata for this shard, "shard1".
+    {
+        AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
+        CollectionShardingRuntime::get(operationContext(), kNss)
+            ->setFilteringMetadata(operationContext(), CollectionMetadata(cm, ShardId("shard1")));
+    }
+
+    unittest::Barrier barrier1(2);
+    unittest::Barrier barrier2(2);
+
+    auto numOrphanRangesEnumerated = 0;
+    auto mainThreadOpCtx = operationContext();
+
+    auto interruptThread = stdx::async(stdx::launch::async, [&] {
+        // Wait for getNextOrphanRange to have enumerated one range.
+        barrier1.countDownAndWait();
+        {
+            stdx::lock_guard<Client> lk(*mainThreadOpCtx->getClient());
+            mainThreadOpCtx->markKilled();
+        }
+
+        // Signal that we have interrupted getNextOrphanRange's opCtx.
+        barrier2.countDownAndWait();
+    });
+
+    // getNextOrphanRange should throw because its OperationContext gets interrupted.
+    ASSERT_THROWS_CODE(migrationutil::forEachOrphanRange(operationContext(),
+                                                         kNss,
+                                                         [&](const auto& range) {
+                                                             numOrphanRangesEnumerated++;
+                                                             // Signal that we have enumerated one
+                                                             // range.
+                                                             barrier1.countDownAndWait();
+
+                                                             // Wait for our opCtx to be killed.
+                                                             barrier2.countDownAndWait();
+                                                         }),
+                       AssertionException,
+                       ErrorCodes::Interrupted);
+
+    interruptThread.get();
+
+    // Only one orphan range should have been enumerated.
+    ASSERT_EQUALS(1, numOrphanRangesEnumerated);
 }
 
 }  // namespace
