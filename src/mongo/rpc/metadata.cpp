@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -107,7 +108,13 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj, bo
         uassertStatusOK(TrackingMetadata::readFromMetadata(trackingElem));
 
     auto logicalClock = LogicalClock::get(opCtx);
-    if (logicalClock && logicalClock->isEnabled()) {
+    auto replicationCoordinator = repl::ReplicationCoordinator::get(opCtx);
+    if (logicalClock && logicalClock->isEnabled() &&
+        (!replicationCoordinator ||
+         (replicationCoordinator->getReplicationMode() ==
+              repl::ReplicationCoordinator::modeReplSet &&
+          replicationCoordinator->getMemberState().readable()))) {
+
         auto logicalTimeMetadata =
             uassertStatusOK(rpc::LogicalTimeMetadata::readFromMetadata(logicalTimeElem));
 
