@@ -138,6 +138,15 @@ public:
     }
 
     /**
+     * Convenience wrapper around addDependencies.
+     */
+    DepsTracker getDependencies() const {
+        DepsTracker deps;
+        addDependencies(&deps);
+        return deps;
+    }
+
+    /**
      * Serialize the Expression tree recursively.
      *
      * If 'explain' is false, the returned Value must result in the same Expression when parsed by

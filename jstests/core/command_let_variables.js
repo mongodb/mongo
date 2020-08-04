@@ -405,4 +405,97 @@ assert.commandFailedWithCode(testDB.runCommand({
     let : {cat: "not_a_bird"}
 }),
                              17276);
+
+// Test that let variables can be initialized with an expression.
+result = assert
+             .commandWorked(testDB.runCommand({
+                 find: coll.getName(),
+                 filter: {},
+                 projection: {_id: "$$a"},
+                 limit: 1,
+                 let : {a: {$add: [2, 3]}},
+             }))
+             .cursor.firstBatch;
+assert.eq(result, [{_id: 5}]);
+
+// Test that the expression cannot refer to any fields or variables.
+assert.commandFailedWithCode(testDB.runCommand({
+    find: coll.getName(),
+    filter: {},
+    let : {a: "$_id"},
+}),
+                             4890500);
+assert.commandFailedWithCode(testDB.runCommand({
+    find: coll.getName(),
+    filter: {},
+    let : {a: "$$oops_undefined_var"},
+}),
+                             17276);
+
+// Test that each expression can refer to previously defined let variables.
+result = assert
+             .commandWorked(testDB.runCommand({
+                 find: coll.getName(),
+                 filter: {},
+                 projection: {_id: "$$c"},
+                 limit: 1,
+                 let : {
+                     a: 2,
+                     b: {$add: ["$$a", 3]},
+                     c: {$multiply: ["$$a", "$$b"]},
+                 }
+             }))
+             .cursor.firstBatch;
+assert.eq([{_id: (2 + 3) * 2}], result);
+
+// Test that $rand is allowed in the initializer.
+result = assert
+             .commandWorked(testDB.runCommand({
+                 find: coll.getName(),
+                 filter: {},
+                 projection: {_id: "$$a"},
+                 limit: 1,
+                 let : {a: {$rand: {}}},
+             }))
+             .cursor.firstBatch[0]
+             ._id;
+assert.between(0, result, 1);
+
+// Test that each initializer expression is evaluated separately.
+{
+    const values = assert
+                       .commandWorked(testDB.runCommand({
+                           find: coll.getName(),
+                           filter: {},
+                           projection: {_id: ["$$a", "$$b", "$$c", "$$d"]},
+                           limit: 1,
+                           let : {
+                               a: {$rand: {}},
+                               b: {$rand: {}},
+                               c: {$rand: {}},
+                               d: {$rand: {}},
+                           }
+                       }))
+                       .cursor.firstBatch[0]
+                       ._id;
+
+    const deduped = [...new Set(values)];
+    assert.eq(values.length, deduped.length, `Expected all distinct values: ${values}`);
+}
+
+// Test that the expressions are evaluated once up front.
+{
+    const values = assert
+                       .commandWorked(testDB.runCommand({
+                           find: coll.getName(),
+                           filter: {},
+                           projection: {_id: "$$a"},
+                           let : {a: {$rand: {}}},
+                       }))
+                       .cursor.firstBatch.map(doc => doc._id);
+    assert.gt(values.length, 1);
+
+    const deduped = [...new Set(values)];
+    assert.eq(1, deduped.length, `Expected all identical values: ${deduped}`);
+}
 }());

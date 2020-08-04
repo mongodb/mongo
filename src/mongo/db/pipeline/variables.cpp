@@ -238,11 +238,13 @@ void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
     for (auto&& elem : letParams) {
         Variables::validateNameForUserWrite(elem.fieldName());
         auto expr = Expression::parseOperand(expCtx, elem, expCtx->variablesParseState);
-        auto foldedExpr = expr->optimize();
-        uassert(31474,
-                "Command let Expression does not evaluate to constant "s + elem.toString(),
-                ExpressionConstant::isNullOrConstant(foldedExpr));
-        auto value = static_cast<ExpressionConstant&>(*foldedExpr).getValue();
+
+        uassert(4890500,
+                "Command let Expression tried to access a field, but this is not allowed because "
+                "Command let Expressions run before the query examines any documents.",
+                expr->getDependencies().hasNoRequirements());
+        Value value = expr->evaluate(Document{}, &expCtx->variables);
+
         const auto sysVarName = [&]() -> boost::optional<StringData> {
             // ROOT and REMOVE are excluded since they're not constants.
             auto name = elem.fieldNameStringData();

@@ -210,7 +210,7 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfNonConstant) {
                                                  << "$b"),
                                             false}),
         DBException,
-        31474);
+        4890500);
 }
 
 TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfUppercase) {
