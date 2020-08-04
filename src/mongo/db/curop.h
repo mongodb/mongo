@@ -469,13 +469,13 @@ public:
     // negative, if the system time has been reset during the course of this operation.
     //
 
-    void ensureStarted();
+    void ensureStarted() {
+        static_cast<void>(startTime());
+    }
     bool isStarted() const {
-        return _start > 0;
+        return _start.load() != 0;
     }
-    void done() {
-        _end = _tickSource->getTicks();
-    }
+    void done();
     bool isDone() const {
         return _end > 0;
     }
@@ -571,15 +571,12 @@ public:
      * If this op has not yet been started, returns 0.
      */
     Microseconds elapsedTimeTotal() {
-        if (!isStarted()) {
+        auto start = _start.load();
+        if (start == 0) {
             return Microseconds{0};
         }
 
-        if (!_end) {
-            return _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - startTime());
-        } else {
-            return _tickSource->ticksTo<Microseconds>(_end - startTime());
-        }
+        return computeElapsedTimeTotal(start, _end.load());
     }
 
     /**
@@ -593,11 +590,13 @@ public:
      */
     Microseconds elapsedTimeExcludingPauses() {
         invariant(!_lastPauseTime);
-        if (!isStarted()) {
+
+        auto start = _start.load();
+        if (start == 0) {
             return Microseconds{0};
         }
 
-        return elapsedTimeTotal() - _totalPausedDuration;
+        return computeElapsedTimeTotal(start, _end.load()) - _totalPausedDuration;
     }
 
     /**
@@ -727,10 +726,9 @@ public:
 private:
     class CurOpStack;
 
-    TickSource::Tick startTime() {
-        ensureStarted();
-        return _start;
-    }
+    TickSource::Tick startTime();
+    Microseconds computeElapsedTimeTotal(TickSource::Tick startTime,
+                                         TickSource::Tick endTime) const;
 
     static const OperationContext::Decoration<CurOpStack> _curopStack;
 
@@ -741,10 +739,10 @@ private:
     const Command* _command{nullptr};
 
     // The time at which this CurOp instance was marked as started.
-    TickSource::Tick _start{0};
+    std::atomic<TickSource::Tick> _start{0};  // NOLINT
 
-    // The time at which this CurOp instance was marked as done.
-    TickSource::Tick _end{0};
+    // The time at which this CurOp instance was marked as done or 0 if the CurOp is not yet done.
+    std::atomic<TickSource::Tick> _end{0};  // NOLINT
 
     // The time at which this CurOp instance had its timer paused, or 0 if the timer is not
     // currently paused.

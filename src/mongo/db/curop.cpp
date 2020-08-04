@@ -220,6 +220,10 @@ public:
         return retval;
     }
 
+    const OperationContext* opCtx() {
+        return _opCtx;
+    }
+
 private:
     OperationContext* _opCtx = nullptr;
 
@@ -409,10 +413,49 @@ void CurOp::setNS_inlock(StringData ns) {
     _ns = ns.toString();
 }
 
-void CurOp::ensureStarted() {
-    if (_start == 0) {
-        _start = _tickSource->getTicks();
+TickSource::Tick CurOp::startTime() {
+    // It is legal for this function to get called multiple times, but all of those calls should be
+    // from the same thread, which should be the thread that "owns" this CurOp object. We define
+    // ownership here in terms of the Client object: each thread is associated with a Client
+    // (accessed by 'Client::getCurrent()'), which should be the same as the Client associated with
+    // this CurOp (by way of the OperationContext). Note that, if this is the "base" CurOp on the
+    // CurOpStack, then we don't yet hava an initialized pointer to the OperationContext, and we
+    // cannot perform this check. That is a rare case, however.
+    invariant(!_stack->opCtx() || Client::getCurrent() == _stack->opCtx()->getClient());
+
+    auto start = _start.load();
+    if (start != 0) {
+        return start;
     }
+
+    // The '_start' value is initialized to 0 and gets assigned on demand the first time it gets
+    // accessed. The above thread ownership requirement ensures that there will never be concurrent
+    // calls to this '_start' assignment, but we use compare-exchange anyway as an additional check
+    // that writes to '_start' never race.
+    TickSource::Tick unassignedStart = 0;
+    invariant(_start.compare_exchange_strong(unassignedStart, _tickSource->getTicks()));
+    return _start.load();
+}
+
+void CurOp::done() {
+    // As documented in the 'CurOp::startTime()' member function, it is legal for this function to
+    // be called multiple times, but all calls must be in in the thread that "owns" this CurOp
+    // object.
+    invariant(!_stack->opCtx() || Client::getCurrent() == _stack->opCtx()->getClient());
+
+    _end = _tickSource->getTicks();
+}
+
+Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
+                                            TickSource::Tick endTime) const {
+    invariant(startTime != 0);
+
+    if (!endTime) {
+        // This operation is ongoing.
+        return _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - startTime);
+    }
+
+    return _tickSource->ticksTo<Microseconds>(endTime - startTime);
 }
 
 void CurOp::enter_inlock(const char* ns, int dbProfileLevel) {
@@ -438,7 +481,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     }
 
     // Obtain the total execution time of this operation.
-    _end = _tickSource->getTicks();
+    done();
     _debug.executionTime = duration_cast<Microseconds>(elapsedTimeExcludingPauses());
 
     const auto executionTimeMillis = durationCount<Milliseconds>(_debug.executionTime);
@@ -609,9 +652,12 @@ BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor* cursor,
 }
 
 void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool truncateOps) {
-    if (_start) {
-        builder->append("secs_running", durationCount<Seconds>(elapsedTimeTotal()));
-        builder->append("microsecs_running", durationCount<Microseconds>(elapsedTimeTotal()));
+    auto start = _start.load();
+    if (start) {
+        auto end = _end.load();
+        auto elapsedTimeTotal = computeElapsedTimeTotal(start, end);
+        builder->append("secs_running", durationCount<Seconds>(elapsedTimeTotal));
+        builder->append("microsecs_running", durationCount<Microseconds>(elapsedTimeTotal));
     }
 
     builder->append("op", logicalOpToString(_logicalOp));

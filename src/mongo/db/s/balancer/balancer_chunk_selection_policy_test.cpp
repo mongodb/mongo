@@ -134,26 +134,30 @@ TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
     ChunkType chunk = setUpChunk(
         kNamespace, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
-    auto assertRangeOverlapConflictWhenMoveChunk = [this, &chunk](const StringMap<ChunkRange>&
-                                                                      tagChunkRanges) {
-        // Set up two zones whose ranges overlap.
-        setUpTags(kNamespace, tagChunkRanges);
+    auto assertRangeOverlapConflictWhenMoveChunk =
+        [this, &chunk](const StringMap<ChunkRange>& tagChunkRanges) {
+            // Set up two zones whose ranges overlap.
+            setUpTags(kNamespace, tagChunkRanges);
 
-        auto future = launchAsync([this, &chunk] {
-            // Requesting chunks to be relocated requires running commands on each shard to get
-            // shard statistics. Set up dummy hosts for the source shards.
-            shardTargeterMock(operationContext(), kShardId0)->setFindHostReturnValue(kShardHost0);
-            shardTargeterMock(operationContext(), kShardId1)->setFindHostReturnValue(kShardHost1);
+            auto future = launchAsync([this, &chunk] {
+                ThreadClient tc(getServiceContext());
+                auto opCtx = Client::getCurrent()->makeOperationContext();
 
-            auto migrateInfoStatus =
-                _chunkSelectionPolicy.get()->selectSpecificChunkToMove(operationContext(), chunk);
-            ASSERT_EQUALS(ErrorCodes::RangeOverlapConflict, migrateInfoStatus.getStatus().code());
-        });
+                // Requesting chunks to be relocated requires running commands on each shard to get
+                // shard statistics. Set up dummy hosts for the source shards.
+                shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+                shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
 
-        expectGetStatsCommands(2);
-        future.default_timed_get();
-        removeAllTags(kNamespace);
-    };
+                auto migrateInfoStatus =
+                    _chunkSelectionPolicy.get()->selectSpecificChunkToMove(opCtx.get(), chunk);
+                ASSERT_EQUALS(ErrorCodes::RangeOverlapConflict,
+                              migrateInfoStatus.getStatus().code());
+            });
+
+            expectGetStatsCommands(2);
+            future.default_timed_get();
+            removeAllTags(kNamespace);
+        };
 
     assertRangeOverlapConflictWhenMoveChunk(
         {{"A", {kKeyPattern.globalMin(), BSON(kPattern << -10)}},
@@ -193,13 +197,16 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
         }
 
         auto future = launchAsync([this] {
+            ThreadClient tc(getServiceContext());
+            auto opCtx = Client::getCurrent()->makeOperationContext();
+
             // Requests chunks to be relocated requires running commands on each shard to
             // get shard statistics. Set up dummy hosts for the source shards.
-            shardTargeterMock(operationContext(), kShardId0)->setFindHostReturnValue(kShardHost0);
-            shardTargeterMock(operationContext(), kShardId1)->setFindHostReturnValue(kShardHost1);
+            shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+            shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
 
             auto candidateChunksStatus =
-                _chunkSelectionPolicy.get()->selectChunksToMove(operationContext());
+                _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get());
             ASSERT_OK(candidateChunksStatus.getStatus());
 
             // The balancer does not bubble up the IllegalOperation error, but it is expected
