@@ -8825,6 +8825,7 @@ buildvariants:
     multiversion_architecture: arm64
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
+    scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -8866,6 +8867,7 @@ buildvariants:
     multiversion_architecture: arm64
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
+    scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -8910,6 +8912,7 @@ buildvariants:
     multiversion_architecture: arm64
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: targeted
+    scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
   - name: free_monitoring
@@ -9195,6 +9198,7 @@ buildvariants:
     multiversion_architecture: arm64
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: enterprise
+    scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -9239,6 +9243,7 @@ buildvariants:
     multiversion_architecture: arm64
     multiversion_architecture_42_or_later: aarch64
     multiversion_edition: targeted
+    scons_cache_scope: shared
   tasks:
   - name: compile_all_run_unittests_TG
   - name: free_monitoring
