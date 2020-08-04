@@ -60,6 +60,14 @@ server_parameters:
   requireApiVersion:
     description: "Require clients to pass the 'apiVersion' parameter with all commands"
     set_at: ["startup", "runtime"]
-    cpp_vartype: 'AtomicWord<bool>'
-    cpp_varname: "gRequireApiVersion"
+    cpp_vartype: AtomicWord<bool>
+    cpp_varname: gRequireApiVersion
+    default: false
+
+  acceptAPIVersion2:
+    description: "Allow users to issue commands that include apiVersion: \"2\". Test only."
+    test_only: true
+    set_at: startup
+    cpp_vartype: bool
+    cpp_varname: acceptAPIVersion2
     default: false

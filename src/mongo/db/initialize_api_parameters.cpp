@@ -51,26 +51,37 @@ const APIParametersFromClient initializeAPIParameters(OperationContext* opCtx,
     }
 
     if (apiParamsFromClient.getApiVersion()) {
-        uassert(ErrorCodes::APIVersionError,
-                "API version must be \"1\"",
-                "1" == apiParamsFromClient.getApiVersion().value());
+        auto apiVersionFromClient = apiParamsFromClient.getApiVersion().value();
+        if (apiVersionFromClient == "2") {
+            uassert(ErrorCodes::APIVersionError, "Cannot accept API version 2", acceptAPIVersion2);
+        } else {
+            uassert(ErrorCodes::APIVersionError,
+                    "API version must be \"1\"",
+                    "1" == apiVersionFromClient);
+        }
     }
 
     if (apiParamsFromClient.getApiStrict().get_value_or(false)) {
         auto cmdApiVersions = command->apiVersions();
-        bool strictAssert = (cmdApiVersions.find("1") != cmdApiVersions.end());
+        auto apiVersionFromClient = apiParamsFromClient.getApiVersion().value().toString();
+
+        bool strictAssert = (cmdApiVersions.find(apiVersionFromClient) != cmdApiVersions.end());
         uassert(ErrorCodes::APIStrictError,
                 str::stream() << "Provided apiStrict:true, but the command " << command->getName()
-                              << " is not in API Version \"1\"",
+                              << " is not in API Version " << apiVersionFromClient,
                 strictAssert);
     }
 
     if (apiParamsFromClient.getApiDeprecationErrors().get_value_or(false)) {
         auto cmdDepApiVersions = command->deprecatedApiVersions();
-        bool deprecationAssert = (cmdDepApiVersions.find("1") == cmdDepApiVersions.end());
+        auto apiVersionFromClient = apiParamsFromClient.getApiVersion().value().toString();
+
+        bool deprecationAssert =
+            (cmdDepApiVersions.find(apiVersionFromClient) == cmdDepApiVersions.end());
         uassert(ErrorCodes::APIDeprecationError,
                 str::stream() << "Provided apiDeprecationErrors:true, but the command "
-                              << command->getName() << " is deprecated in API Version \"1\"",
+                              << command->getName() << " is deprecated in API Version "
+                              << apiVersionFromClient,
                 deprecationAssert);
     }
 

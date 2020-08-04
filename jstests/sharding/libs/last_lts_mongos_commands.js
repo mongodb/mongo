@@ -7,5 +7,12 @@ const commandsRemovedFromMongosSinceLastLTS = [];
 // These commands were added in mongos since the last LTS version, so will not appear in the
 // listCommands output of a last LTS version mongos. We will allow these commands to have a test
 // defined without always existing on the mongos being used.
-const commandsAddedToMongosSinceLastLTS =
-    ["reshardCollection", "rotateCertificates", "testDeprecation"];
+const commandsAddedToMongosSinceLastLTS = [
+    "reshardCollection",
+    "rotateCertificates",
+    "testDeprecation",
+    "testDeprecationInVersion2",
+    "testRemoval",
+    "testVersions1And2",
+    "testVersion2"
+];

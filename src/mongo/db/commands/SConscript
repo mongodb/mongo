@@ -147,6 +147,7 @@ env.Library(
         'logical_session_server_status_section.cpp',
         'mr_common.cpp',
         'reap_logical_session_cache_now.cpp',
+        'test_api_version_2_commands.cpp',
         'test_deprecation_command.cpp',
         'traffic_recording_cmds.cpp',
         'user_management_commands_common.cpp',
