@@ -57,7 +57,7 @@ auto getExpCtx() {
 
 auto makePipelineContainingProjectStageWithLiteral(CNode&& literal) {
     return CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
+        {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
              {UserFieldname{"a"},
               CNode{CNode::ObjectChildren{{KeyFieldname::literal, std::move(literal)}}}}}}}}}}};

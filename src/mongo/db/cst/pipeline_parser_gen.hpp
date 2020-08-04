@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.6.
+// A Bison parser, made by GNU Bison 3.6.3.
 
 // Skeleton interface for Bison LALR(1) parsers in C++
 
@@ -32,7 +32,7 @@
 
 
 /**
- ** \file src/mongo/db/cst/pipeline_parser_gen.hpp
+ ** \file pipeline_parser_gen.hpp
  ** Define the mongo::parser class.
  */
 
@@ -42,14 +42,12 @@
 // especially those whose name start with YY_ or yy_.  They are
 // private implementation details that can be changed or removed.
 
-#ifndef YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
-#define YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#ifndef YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#define YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED
 // "%code requires" blocks.
-#line 66 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 66 "pipeline_grammar.yy"
 
 #include "mongo/db/cst/c_node.h"
-#include "mongo/db/cst/key_fieldname.h"
-#include "mongo/stdx/variant.h"
 
 // Forward declare any parameters needed for lexing/parsing.
 namespace mongo {
@@ -61,7 +59,7 @@ class BSONLexer;
 #pragma warning(disable : 4065)
 #endif
 
-#line 65 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 63 "pipeline_parser_gen.hpp"
 
 #include <cassert>
 #include <cstdlib>  // std::abort
@@ -190,9 +188,9 @@ class BSONLexer;
 #define YYDEBUG 0
 #endif
 
-#line 58 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 58 "pipeline_grammar.yy"
 namespace mongo {
-#line 200 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 198 "pipeline_parser_gen.hpp"
 
 
 /// A Bison parser.
@@ -1491,6 +1489,14 @@ public:
             Base::clear();
         }
 
+#if YYDEBUG || 0
+        /// The user-facing name of this symbol.
+        const char* name() const YY_NOEXCEPT {
+            return PipelineParserGen::symbol_name(this->kind());
+        }
+#endif  // #if YYDEBUG || 0
+
+
         /// Backward compatibility (Bison 3.6).
         symbol_kind_type type_get() const YY_NOEXCEPT;
 
@@ -1859,6 +1865,13 @@ public:
 
     /// Report a syntax error.
     void error(const syntax_error& err);
+
+#if YYDEBUG || 0
+    /// The user-facing name of the symbol whose (internal) number is
+    /// YYSYMBOL.  No bounds checking.
+    static const char* symbol_name(symbol_kind_type yysymbol);
+#endif  // #if YYDEBUG || 0
+
 
     // Implementation of make_symbol for each symbol type.
 #if 201103L <= YY_CPLUSPLUS
@@ -2680,10 +2693,6 @@ private:
     static symbol_kind_type yytranslate_(int t);
 
 #if YYDEBUG || 0
-    /// The user-facing name of the symbol whose (internal) number is
-    /// YYSYMBOL.  No bounds checking.
-    static const char* symbol_name(symbol_kind_type yysymbol);
-
     /// For a symbol, its name in clear.
     static const char* const yytname_[];
 #endif  // #if YYDEBUG || 0
@@ -2924,7 +2933,7 @@ private:
 
     /// Constants.
     enum {
-        yylast_ = 623,  ///< Last index in yytable_.
+        yylast_ = 597,  ///< Last index in yytable_.
         yynnts_ = 112,  ///< Number of nonterminal symbols.
         yyfinal_ = 8    ///< Termination state number.
     };
@@ -3387,9 +3396,9 @@ inline PipelineParserGen::symbol_kind_type PipelineParserGen::by_kind::type_get(
     return this->kind();
 }
 
-#line 58 "src/mongo/db/cst/pipeline_grammar.yy"
+#line 58 "pipeline_grammar.yy"
 }  // namespace mongo
-#line 4173 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 4184 "pipeline_parser_gen.hpp"
 
 
-#endif  // !YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED
+#endif  // !YY_YY_PIPELINE_PARSER_GEN_HPP_INCLUDED

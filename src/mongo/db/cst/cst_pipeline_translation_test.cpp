@@ -65,9 +65,9 @@ TEST(CstPipelineTranslationTest, TranslatesEmpty) {
     ASSERT_EQ(0u, sources.size());
 }
 
-TEST(CstTest, TranslatesEmptyProject) {
-    const auto cst = CNode{CNode::ArrayChildren{
-        CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}}}};
+TEST(CstPipelineTranslationTest, TranslatesEmptyProject) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{
+        CNode::ObjectChildren{{KeyFieldname::projectInclusion, CNode{CNode::ObjectChildren{}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
@@ -76,10 +76,13 @@ TEST(CstTest, TranslatesEmptyProject) {
 }
 
 TEST(CstPipelineTranslationTest, TranslatesEmptyProjects) {
-    const auto cst = CNode{CNode::ArrayChildren{
-        CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}},
-        CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}},
-        CNode{CNode::ObjectChildren{{KeyFieldname::project, CNode{CNode::ObjectChildren{}}}}}}};
+    const auto cst =
+        CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{{KeyFieldname::projectInclusion,
+                                                                CNode{CNode::ObjectChildren{}}}}},
+                                   CNode{CNode::ObjectChildren{{KeyFieldname::projectInclusion,
+                                                                CNode{CNode::ObjectChildren{}}}}},
+                                   CNode{CNode::ObjectChildren{{KeyFieldname::projectInclusion,
+                                                                CNode{CNode::ObjectChildren{}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(3u, sources.size());
@@ -91,7 +94,7 @@ TEST(CstPipelineTranslationTest, TranslatesEmptyProjects) {
 
 TEST(CstPipelineTranslationTest, TranslatesOneFieldInclusionProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
+        {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}}}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
@@ -106,7 +109,7 @@ TEST(CstPipelineTranslationTest, TranslatesOneFieldInclusionProjectionStage) {
 
 TEST(CstPipelineTranslationTest, TranslatesMultifieldInclusionProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
+        {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{{KeyFieldname::id, CNode{KeyValue::trueKey}},
                                      {UserFieldname{"a"}, CNode{NonZeroKey{7}}},
                                      {UserFieldname{"b"}, CNode{NonZeroKey{-99999999999ll}}}}}}}}}};
@@ -123,7 +126,7 @@ TEST(CstPipelineTranslationTest, TranslatesMultifieldInclusionProjection) {
 
 TEST(CstPipelineTranslationTest, TranslatesOneFieldExclusionProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
+        {KeyFieldname::projectExclusion,
          CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::falseKey}}}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
@@ -138,7 +141,7 @@ TEST(CstPipelineTranslationTest, TranslatesOneFieldExclusionProjectionStage) {
 
 TEST(CstPipelineTranslationTest, TranslatesMultifieldExclusionProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
+        {KeyFieldname::projectExclusion,
          CNode{CNode::ObjectChildren{{KeyFieldname::id, CNode{KeyValue::falseKey}},
                                      {UserFieldname{"a"}, CNode{KeyValue::doubleZeroKey}},
                                      {UserFieldname{"b"}, CNode{KeyValue::decimalZeroKey}}}}}}}}};
@@ -153,18 +156,9 @@ TEST(CstPipelineTranslationTest, TranslatesMultifieldExclusionProjection) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstPipelineTranslationTest, FailsToTranslateInclusionExclusionMixedProjectionStage) {
-    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
-         CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}},
-                                     {UserFieldname{"b"}, CNode{KeyValue::falseKey}}}}}}}}};
-    ASSERT_THROWS_CODE(
-        cst_pipeline_translation::translatePipeline(cst, getExpCtx()), DBException, 4933100);
-}
-
 TEST(CstPipelineTranslationTest, TranslatesComputedProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
+        {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
              {UserFieldname{"a"},
               CNode{CNode::ObjectChildren{
@@ -193,22 +187,9 @@ TEST(CstPipelineTranslationTest, TranslatesComputedProjection) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
-TEST(CstPipelineTranslationTest, FailsToTranslateComputedExclusionMixedProjectionStage) {
-    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
-         CNode{CNode::ObjectChildren{
-             {UserFieldname{"a"},
-              CNode{CNode::ObjectChildren{
-                  {KeyFieldname::atan2,
-                   CNode{CNode::ArrayChildren{CNode{UserDouble{1.0}}, CNode{UserDecimal{0.0}}}}}}}},
-             {UserFieldname{"b"}, CNode{KeyValue::falseKey}}}}}}}}};
-    ASSERT_THROWS_CODE(
-        cst_pipeline_translation::translatePipeline(cst, getExpCtx()), DBException, 4933100);
-}
-
 TEST(CstPipelineTranslationTest, TranslatesComputedInclusionMixedProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
+        {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
              {UserFieldname{"a"},
               CNode{CNode::ObjectChildren{
@@ -239,13 +220,13 @@ TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStages) {
     // ]
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{
-            {KeyFieldname::project,
+            {KeyFieldname::projectInclusion,
              CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}}}}}}},
         CNode{CNode::ObjectChildren{
-            {KeyFieldname::project,
+            {KeyFieldname::projectExclusion,
              CNode{CNode::ObjectChildren{{UserFieldname{"b"}, CNode{KeyValue::falseKey}}}}}}},
         CNode{
-            CNode::ObjectChildren{{KeyFieldname::project,
+            CNode::ObjectChildren{{KeyFieldname::projectInclusion,
                                    CNode{CNode::ObjectChildren{
                                        {UserFieldname{"c"},
                                         CNode{CNode::ObjectChildren{
@@ -301,14 +282,14 @@ TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStagesWithAndOrNot)
     // ]
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{
-            {KeyFieldname::project,
+            {KeyFieldname::projectInclusion,
              CNode{CNode::ObjectChildren{
                  {UserFieldname{"a"},
                   CNode{CNode::ObjectChildren{
                       {KeyFieldname::notExpr,
                        CNode{CNode::ArrayChildren{CNode{UserInt{0}}}}}}}}}}}}},
         CNode{
-            CNode::ObjectChildren{{KeyFieldname::project,
+            CNode::ObjectChildren{{KeyFieldname::projectInclusion,
                                    CNode{CNode::ObjectChildren{
                                        {UserFieldname{"c"},
                                         CNode{CNode::ObjectChildren{
@@ -350,7 +331,7 @@ TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStagesWithAndOrNot)
 
 TEST(CstPipelineTranslationTest, TranslatesComputedProjectionWithAndOr) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
+        {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
              {UserFieldname{"a"},
               CNode{CNode::ObjectChildren{
@@ -388,7 +369,7 @@ TEST(CstPipelineTranslationTest, TranslatesComputedProjectionWithAndOr) {
 
 TEST(CstPipelineTranslationTest, TranslatesComputedProjectionWithExpressionOnId) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
+        {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
              {KeyFieldname::id,
               CNode{CNode::ObjectChildren{
@@ -615,7 +596,7 @@ TEST(CstPipelineTranslationTest, TranslatesProjectionWithConvert) {
     //     } }
     // ]
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
-        {KeyFieldname::project,
+        {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
              {UserFieldname{"a"},
               CNode{CNode::ObjectChildren{

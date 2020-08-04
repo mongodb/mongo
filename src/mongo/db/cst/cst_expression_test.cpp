@@ -53,10 +53,10 @@ TEST(CstExpressionTest, ParsesProjectWithAnd) {
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
-    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ project: { id: \"<NonZeroKey of type double 9.100000>\", a: { andExpr: [ "
+        "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { andExpr: [ "
         "\"<UserInt 4>\", { andExpr: [ \"<UserInt 7>\", \"<UserInt 8>\" ] } ] }, b: { andExpr: [ "
         "\"<UserInt 2>\", \"<UserInt -3>\" ] } } }");
 }
@@ -70,10 +70,10 @@ TEST(CstExpressionTest, ParsesProjectWithOr) {
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
-    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ project: { id: \"<NonZeroKey of type double 9.100000>\", a: { orExpr: [ "
+        "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { orExpr: [ "
         "\"<UserInt 4>\", { orExpr: [ \"<UserInt 7>\", \"<UserInt 8>\" ] } ] }, b: { orExpr: [ "
         "\"<UserInt 2>\", \"<UserInt -3>\" ] } } }");
 }
@@ -88,9 +88,9 @@ TEST(CstExpressionTest, ParsesProjectWithNot) {
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
-    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
-              "{ project: { id: \"<NonZeroKey of type double 9.100000>\", a: { notExpr: [ "
+              "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { notExpr: [ "
               "\"<UserInt 4>\" ] }, b: { andExpr: [ \"<UserDouble 1.000000>\", { notExpr: [ "
               "\"<UserBoolean 1>\" ] } ] } } }");
 }
@@ -104,9 +104,9 @@ TEST(CstExpressionTest, ParsesComparisonExpressions) {
         ASSERT_EQ(0, parseTree.parse());
         auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
-        ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
-                  "{ project: { id: { " + expr +
+                  "{ projectInclusion: { id: { " + expr +
                       ": [ \"<UserInt 1>\", \"<UserDouble 2.500000>\" ] } } }");
     };
 
@@ -173,9 +173,9 @@ TEST(CstExpressionTest, ParsesConvertExpressions) {
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
-    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
-              "{ project: { a: { toBool: \"<UserInt 1>\" }, b: { toDate: \"<UserLong "
+              "{ projectInclusion: { a: { toBool: \"<UserInt 1>\" }, b: { toDate: \"<UserLong "
               "1100000000000>\" }, c: { toDecimal: \"<UserInt 5>\" }, d: { toDouble: \"<UserInt "
               "-2>\" }, e: { toInt: \"<UserDouble 1.999999>\" }, f: { toLong: \"<UserDouble "
               "1.999999>\" }, g: { toObjectId: \"<UserString $_id>\" }, h: { toString: "
@@ -192,13 +192,14 @@ TEST(CstExpressionTest, ParsesConvertExpressionsNoOptArgs) {
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
-    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
-    ASSERT_EQ(stages[0].toBson().toString(),
-              "{ project: { a: { convert: { inputArg: \"<UserInt 1>\", toArg: \"<UserString "
-              "string>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: \"<KeyValue "
-              "absentKey>\" } }, b: { convert: { inputArg: \"<UserString true>\", toArg: "
-              "\"<UserString bool>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
-              "\"<KeyValue absentKey>\" } } } }");
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { a: { convert: { inputArg: \"<UserInt 1>\", toArg: \"<UserString "
+        "string>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: \"<KeyValue "
+        "absentKey>\" } }, b: { convert: { inputArg: \"<UserString true>\", toArg: "
+        "\"<UserString bool>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
+        "\"<KeyValue absentKey>\" } } } }");
 }
 
 TEST(CstExpressionTest, ParsesConvertExpressionsWithOptArgs) {
@@ -212,13 +213,14 @@ TEST(CstExpressionTest, ParsesConvertExpressionsWithOptArgs) {
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
-    ASSERT(KeyFieldname::project == stages[0].firstKeyFieldname());
-    ASSERT_EQ(stages[0].toBson().toString(),
-              "{ project: { a: { convert: { inputArg: \"<UserInt 1>\", toArg: \"<UserString "
-              "string>\", onErrorArg: \"<UserString Could not convert>\", onNullArg: \"<KeyValue "
-              "absentKey>\" } }, b: { convert: { inputArg: \"<UserBoolean 1>\", toArg: "
-              "\"<UserString double>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
-              "\"<UserInt 0>\" } } } }");
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { a: { convert: { inputArg: \"<UserInt 1>\", toArg: \"<UserString "
+        "string>\", onErrorArg: \"<UserString Could not convert>\", onNullArg: \"<KeyValue "
+        "absentKey>\" } }, b: { convert: { inputArg: \"<UserBoolean 1>\", toArg: "
+        "\"<UserString double>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
+        "\"<UserInt 0>\" } } } }");
 }
 
 }  // namespace

@@ -62,7 +62,8 @@
     ENUMIFY(lt)                  \
     ENUMIFY(lte)                 \
     ENUMIFY(ne)                  \
-    ENUMIFY(project)             \
+    ENUMIFY(projectExclusion)    \
+    ENUMIFY(projectInclusion)    \
     ENUMIFY(match)               \
     ENUMIFY(inhibitOptimization) \
     ENUMIFY(unionWith)           \

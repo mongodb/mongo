@@ -313,100 +313,72 @@ Value translateLiteralLeaf(const CNode& cst) {
 }
 
 /**
- * Walk a projection CNode and produce a ProjectionASTNode. Also returns whether this was an
- * inclusion (or expressive projection) or an exclusion projection.
+ * Walk a projection CNode and produce a ProjectionASTNode.
  */
-auto translateProjection(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+std::unique_ptr<projection_ast::ASTNode> translateProjection(
+    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     using namespace projection_ast;
-    // Returns whether a KeyValue indicates inclusion or exclusion.
-    auto isInclusionKeyValue = [](auto&& keyValue) {
-        switch (stdx::get<KeyValue>(keyValue)) {
-            case KeyValue::trueKey:
-                return true;
-            case KeyValue::intZeroKey:
-            case KeyValue::longZeroKey:
-            case KeyValue::doubleZeroKey:
-            case KeyValue::decimalZeroKey:
-            case KeyValue::falseKey:
-                return false;
-            default:
-                MONGO_UNREACHABLE;
-        }
-    };
-
-    if (stdx::holds_alternative<NonZeroKey>(cst.payload) ||
-        (stdx::holds_alternative<KeyValue>(cst.payload) && isInclusionKeyValue(cst.payload)))
+    if (cst.isInclusionKeyValue())
         // This is an inclusion Key.
-        return std::pair{std::unique_ptr<ASTNode>{std::make_unique<BooleanConstantASTNode>(true)},
-                         true};
-    else if (stdx::holds_alternative<KeyValue>(cst.payload) && !isInclusionKeyValue(cst.payload))
+        return std::make_unique<BooleanConstantASTNode>(true);
+    else if (stdx::holds_alternative<KeyValue>(cst.payload))
         // This is an exclusion Key.
-        return std::pair{std::unique_ptr<ASTNode>{std::make_unique<BooleanConstantASTNode>(false)},
-                         false};
+        return std::make_unique<BooleanConstantASTNode>(false);
     else
         // This is an arbitrary expression to produce a computed field (this counts as inclusion).
-        return std::pair{std::unique_ptr<ASTNode>{
-                             std::make_unique<ExpressionASTNode>(translateExpression(cst, expCtx))},
-                         true};
+        return std::make_unique<ExpressionASTNode>(translateExpression(cst, expCtx));
 }
 
 /**
- * Walk a project stage object CNode and produce a DocumentSourceSingleDocumentTransformation.
+ * Walk an inclusion project stage object CNode and produce a
+ * DocumentSourceSingleDocumentTransformation.
  */
-auto translateProject(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+auto translateProjectInclusion(const CNode& cst,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     using namespace projection_ast;
     auto root = ProjectionPathASTNode{};
-    bool sawId = false;
-    bool removeId = false;
-    boost::optional<bool> inclusion;
 
-    for (auto&& [name, child] : cst.objectChildren()) {
-        // Turn the CNode into a projection AST node.
-        auto&& [projection, wasInclusion] = translateProjection(child, expCtx);
+    for (auto&& [name, child] : cst.objectChildren())
         // If we see a key fieldname, make sure it's _id.
-        if (auto keyFieldname = stdx::get_if<KeyFieldname>(&name);
-            keyFieldname && *keyFieldname == KeyFieldname::id) {
-            // Keep track of whether we've ever seen _id at all.
-            sawId = true;
-            // Keep track of whether we will need to remove the _id field to get around an exclusion
-            // projection bug in the case where it was manually included.
-            removeId = wasInclusion;
-            // Add node to the projection AST.
-            addNodeAtPath(&root, "_id", std::move(projection));
-        } else {
-            // This conditional changes the status of 'inclusion' to indicate whether we're in an
-            // inclusion or exclusion projection.
-            // TODO SERVER-48810: Improve error message with BSON locations.
-            inclusion = !inclusion ? wasInclusion
-                                   : *inclusion == wasInclusion ? wasInclusion : []() -> bool {
-                uasserted(4933100,
-                          "$project must include only exclusion "
-                          "projection or only inclusion projection");
-            }();
-            // Add node to the projection AST.
-            addNodeAtPath(&root, stdx::get<UserFieldname>(name), std::move(projection));
-        }
-    }
+        if (CNode::fieldnameIsId(name))
+            addNodeAtPath(&root, "_id", translateProjection(child, expCtx));
+        else
+            addNodeAtPath(
+                &root, stdx::get<UserFieldname>(name), translateProjection(child, expCtx));
 
-    // If we saw any non-_id exclusions, this is an exclusion projection.
-    if (inclusion && !*inclusion) {
-        // If we saw an inclusion _id for an exclusion projection, we must manually remove it or
-        // projection AST will turn it into an _id exclusion due to a bug.
-        // TODO Fix the bug or organize this code to circumvent projection AST.
-        if (removeId)
+    // If we didn't see _id we need to add it in manually for inclusion or projection AST
+    // will incorrectly assume we want it gone.
+    if (!root.getChild("_id"))
+        addNodeAtPath(&root, "_id", std::make_unique<BooleanConstantASTNode>(true));
+    return DocumentSourceProject::create(
+        Projection{root, ProjectType::kInclusion}, expCtx, "$project");
+}
+
+/**
+ * Walk an exclusion project stage object CNode and produce a
+ * DocumentSourceSingleDocumentTransformation.
+ */
+auto translateProjectExclusion(const CNode& cst,
+                               const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    using namespace projection_ast;
+    auto root = ProjectionPathASTNode{};
+
+    for (auto&& [name, child] : cst.objectChildren())
+        // If we see a key fieldname, make sure it's _id.
+        if (CNode::fieldnameIsId(name))
+            addNodeAtPath(&root, "_id", translateProjection(child, expCtx));
+        else
+            addNodeAtPath(
+                &root, stdx::get<UserFieldname>(name), translateProjection(child, expCtx));
+
+    // If we saw an inclusion _id for an exclusion projection, we must manually remove it or
+    // projection AST will turn it into an _id exclusion due to a bug.
+    // TODO SERVER-48834: Fix the bug or organize this code to circumvent projection AST.
+    if (auto childPtr = root.getChild("_id"))
+        if (dynamic_cast<BooleanConstantASTNode*>(childPtr)->value())
             static_cast<void>(root.removeChild("_id"));
-        return DocumentSourceProject::create(
-            Projection{root, ProjectType::kExclusion}, expCtx, "$project");
-        // If we saw any non-_id inclusions or computed fields, this is an inclusion projectioion.
-        // Also if inclusion was not determinted, it is the default.
-    } else {
-        // If we didn't see _id we need to add it in manually for inclusion or projection AST
-        // will incorrectly assume we want it gone.
-        if (!sawId)
-            addNodeAtPath(&root, "_id", std::make_unique<BooleanConstantASTNode>(true));
-        return DocumentSourceProject::create(
-            Projection{root, ProjectType::kInclusion}, expCtx, "$project");
-    }
+    return DocumentSourceProject::create(
+        Projection{root, ProjectType::kExclusion}, expCtx, "$project");
 }
 
 /**
@@ -465,8 +437,10 @@ auto translateMatch(const CNode& cst, const boost::intrusive_ptr<ExpressionConte
 boost::intrusive_ptr<DocumentSource> translateSource(
     const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     switch (cst.firstKeyFieldname()) {
-        case KeyFieldname::project:
-            return translateProject(cst.objectChildren()[0].second, expCtx);
+        case KeyFieldname::projectInclusion:
+            return translateProjectInclusion(cst.objectChildren()[0].second, expCtx);
+        case KeyFieldname::projectExclusion:
+            return translateProjectExclusion(cst.objectChildren()[0].second, expCtx);
         case KeyFieldname::match:
             return translateMatch(cst.objectChildren()[0].second, expCtx);
         case KeyFieldname::skip:

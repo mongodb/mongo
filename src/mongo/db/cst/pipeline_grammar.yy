@@ -65,8 +65,6 @@
 // Header only.
 %code requires {
     #include "mongo/db/cst/c_node.h"
-    #include "mongo/db/cst/key_fieldname.h"
-    #include "mongo/stdx/variant.h"
 
     // Forward declare any parameters needed for lexing/parsing.
     namespace mongo {
@@ -82,11 +80,14 @@
 // Cpp only.
 %code { 
     #include "mongo/db/cst/bson_lexer.h"
+    #include "mongo/db/cst/c_node_validation.h"
+    #include "mongo/db/cst/key_fieldname.h"
     #include "mongo/platform/decimal128.h"
+    #include "mongo/stdx/variant.h"
 
     namespace mongo {
         // Mandatory error function.
-        void PipelineParserGen::error (const PipelineParserGen::location_type& loc, 
+        void PipelineParserGen::error (const PipelineParserGen::location_type& loc,
                                        const std::string& msg) {
             uasserted(ErrorCodes::FailedToParse, str::stream() << msg <<
                     " at location " <<
@@ -315,7 +316,17 @@ limit:
 
 project:
     STAGE_PROJECT START_OBJECT projectFields END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::project, $projectFields}}};
+        auto&& fields = $projectFields;
+        if (auto inclusion = c_node_validation::validateProjectionAsInclusionOrExclusion(fields);
+            inclusion.isOK())
+            $$ = CNode{CNode::ObjectChildren{std::pair{inclusion.getValue() ==
+                                                       c_node_validation::IsInclusion::yes ?
+                                                       KeyFieldname::projectInclusion :
+                                                       KeyFieldname::projectExclusion,
+                                                       std::move(fields)}}};
+        else
+            // TODO SERVER-48810: Convert error string to Bison error with BSON location.
+            uassertStatusOK(inclusion);
     }
 ;
 
@@ -340,6 +351,16 @@ projectField:
 
 projection:
     string
+    | binary
+    | undefined
+    | objectId
+    | date
+    | null
+    | regex
+    | dbPointer
+    | javascript
+    | symbol
+    | javascriptWScope
     | INT_NON_ZERO {
         $$ = CNode{NonZeroKey{$1}};
     }
@@ -370,6 +391,9 @@ projection:
     | BOOL_FALSE {
         $$ = CNode{KeyValue::falseKey};
     }
+    | timestamp
+    | minKey
+    | maxKey
     | compoundExpression
 ;
 

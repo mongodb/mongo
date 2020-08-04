@@ -149,6 +149,16 @@ struct CNode {
         return stdx::get<KeyFieldname>(objectChildren().begin()->first);
     }
 
+    /*
+     * Returns whether the payload indicates inclusion through a key. Note that this does not return
+     * true for ObjectChildren payloads indicating a computed projection.
+     */
+    auto isInclusionKeyValue() const {
+        return stdx::holds_alternative<NonZeroKey>(payload) ||
+            (stdx::holds_alternative<KeyValue>(payload) &&
+             stdx::get<KeyValue>(payload) == KeyValue::trueKey);
+    }
+
 private:
     std::string toStringHelper(int numTabs) const;
 
@@ -180,6 +190,14 @@ public:
                   UserMinKey,
                   UserMaxKey>
         payload;
+
+    /*
+     * Returns whether this fieldname is the key fieldname representing the _id syntax.
+     */
+    static auto fieldnameIsId(const CNode::Fieldname& name) {
+        return stdx::holds_alternative<KeyFieldname>(name) &&
+            stdx::get<KeyFieldname>(name) == KeyFieldname::id;
+    }
 };
 
 }  // namespace mongo

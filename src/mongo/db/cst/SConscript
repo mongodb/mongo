@@ -10,6 +10,7 @@ env.Library(
         'bson_lexer.cpp',
         'cst_pipeline_translation.cpp',
         'c_node.cpp',
+        'c_node_validation.cpp',
         'pipeline_parser_gen.cpp',
     ],
     LIBDEPS=[
