@@ -20,6 +20,12 @@ assert.commandFailedWithCode(st.admin.runCommand({addshard: lastLTSMongod.host})
                              ErrorCodes.IncompatibleServerVersion);
 MongoRunner.stopMongod(lastLTSMongod);
 
+// Can't add a mongod with a lower binary version than our featureCompatibilityVersion.
+var lastContinuousMongod = MongoRunner.runMongod({binVersion: "last-continuous", shardsvr: ""});
+assert.commandFailedWithCode(st.admin.runCommand({addshard: lastContinuousMongod.host}),
+                             ErrorCodes.IncompatibleServerVersion);
+MongoRunner.stopMongod(lastContinuousMongod);
+
 // Can't add config servers as shard.
 assert.commandFailed(st.admin.runCommand({addshard: st._configDB}));
 
