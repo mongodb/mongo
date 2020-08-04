@@ -23,19 +23,31 @@ const donorRst = new ReplSetTest(
     {nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}], name: 'donor'});
 const recipientRst = new ReplSetTest({nodes: 1, name: 'recipient'});
 
-donorRst.startSet();
-donorRst.initiate();
-recipientRst.startSet();
-recipientRst.initiate();
-
-const donorPrimary = donorRst.getPrimary();
-const recipientPrimary = recipientRst.getPrimary();
-const kRecipientConnString = recipientRst.getURL();
 const kDBPrefix = 'testDb';
 const kConfigDonorsNS = "config.tenantMigrationDonors";
 
+let donorPrimary;
+let recipientPrimary;
+let kRecipientConnString;
+
+const setup = () => {
+    donorRst.startSet();
+    donorRst.initiate();
+    recipientRst.startSet();
+    recipientRst.initiate();
+
+    donorPrimary = donorRst.getPrimary();
+    recipientPrimary = recipientRst.getPrimary();
+    kRecipientConnString = recipientRst.getURL();
+};
+const tearDown = () => {
+    donorRst.stopSet();
+    recipientRst.stopSet();
+};
+
 (() => {
     // Test the case where the migration commits.
+    setup();
     const dbName = kDBPrefix + "Commit";
 
     function startMigration(host, recipientConnString, dbName) {
@@ -88,11 +100,13 @@ const kConfigDonorsNS = "config.tenantMigrationDonors";
     const recipientSyncDataMetrics =
         recipientPrimary.adminCommand({serverStatus: 1}).metrics.commands.recipientSyncData;
     assert.eq(recipientSyncDataMetrics.failed, 0);
-    assert.neq(recipientSyncDataMetrics.total, 0);
+    assert.eq(recipientSyncDataMetrics.total, 2);
+    tearDown();
 })();
 
 (() => {
     // Test the case where the migration aborts.
+    setup();
     const dbName = kDBPrefix + "Abort";
 
     let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
@@ -123,9 +137,7 @@ const kConfigDonorsNS = "config.tenantMigrationDonors";
     const recipientSyncDataMetrics =
         recipientPrimary.adminCommand({serverStatus: 1}).metrics.commands.recipientSyncData;
     assert.eq(recipientSyncDataMetrics.failed, 0);
-    assert.neq(recipientSyncDataMetrics.total, 0);
+    assert.eq(recipientSyncDataMetrics.total, 2);
+    tearDown();
 })();
-
-donorRst.stopSet();
-recipientRst.stopSet();
 })();

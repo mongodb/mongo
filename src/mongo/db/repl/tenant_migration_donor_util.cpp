@@ -265,7 +265,7 @@ void sendRecipientSyncDataCommand(OperationContext* opCtx,
                                   donorConnectionString,
                                   donorStateDoc.getDatabasePrefix().toString(),
                                   ReadPreferenceSetting());
-
+        request.setReturnAfterReachingOpTime(donorStateDoc.getBlockTimestamp());
         return request.toBSON(BSONObj());
     }());
 
@@ -317,7 +317,7 @@ void startMigration(OperationContext* opCtx, TenantMigrationDonorDocument donorS
 
         updateDonorStateDocument(opCtx, donorStateDoc, TenantMigrationDonorStateEnum::kBlocking);
 
-        // TODO: Send recipientSyncData with returnAfterReachingTimestamp set to the blockTimestamp.
+        sendRecipientSyncDataCommand(opCtx, donorStateDoc);
 
         pauseTenantMigrationAfterBlockingStarts.pauseWhileSet(opCtx);
 

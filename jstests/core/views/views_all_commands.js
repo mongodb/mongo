@@ -418,6 +418,7 @@ let viewsCommandTests = {
     refineCollectionShardKey: {skip: isUnrelated},
     refreshLogicalSessionCacheNow: {skip: isAnInternalCommand},
     reapLogicalSessionCacheNow: {skip: isAnInternalCommand},
+    recipientSyncData: {skip: isUnrelated},
     refreshSessions: {skip: isUnrelated},
     reIndex: {
         command: {reIndex: "view"},
