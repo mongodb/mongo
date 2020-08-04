@@ -241,10 +241,12 @@ void CollectionShardingRuntime::forgetReceive(const ChunkRange& range) {
 }
 SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const& range,
                                                                boost::optional<UUID> migrationId,
-                                                               CleanWhen when) {
+                                                               CleanWhen when,
+                                                               bool fromFCVUpgrade) {
     stdx::lock_guard lk(_metadataManagerLock);
     invariant(_metadataType == MetadataType::kSharded);
-    return _metadataManager->cleanUpRange(range, std::move(migrationId), when == kDelayed);
+    return _metadataManager->cleanUpRange(
+        range, std::move(migrationId), when == kDelayed, fromFCVUpgrade);
 }
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,

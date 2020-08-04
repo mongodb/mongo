@@ -65,6 +65,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
 
@@ -100,6 +101,7 @@ const char kIsDonorShard[] = "isDonorShard";
 const char kChunk[] = "chunk";
 const char kCollection[] = "collection";
 const auto kLogRetryAttemptThreshold = 20;
+const auto kRangeDeletionTaskShardIdForFCVUpgrade = "fromFCVUpgrade";
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -187,6 +189,40 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
     }
 }
 
+void batchInsertRangeDeletionTasks(OperationContext* opCtx,
+                                   const std::vector<RangeDeletionTask>& deletions) {
+    DBDirectClient directClient(opCtx);
+
+    const StringData rangeDeletionDb = NamespaceString::kRangeDeletionNamespace.db();
+    const auto batchSizeLimit = 100;
+
+    auto getMinIncrement = [&](const auto startIterator) {
+        return std::min(batchSizeLimit, (int)std::distance(startIterator, deletions.end()));
+    };
+
+    auto begin = deletions.begin();
+    auto end = begin + getMinIncrement(begin);
+
+    while (std::distance(begin, end) > 0 && end <= deletions.end()) {
+        std::vector<BSONObj> batch(getMinIncrement(begin));
+
+        std::transform(
+            begin, end, batch.begin(), [](const RangeDeletionTask& task) { return task.toBSON(); });
+
+        BatchedCommandRequest request([&batch] {
+            write_ops::Insert insertOp(NamespaceString::kRangeDeletionNamespace);
+            insertOp.setDocuments(std::move(batch));
+            return insertOp;
+        }());
+
+        BSONObj response;
+        directClient.runCommand(rangeDeletionDb.toString(), request.toBSON(), response);
+        uassertStatusOK(getStatusFromWriteCommandReply(response));
+
+        begin = end;
+        end = end + getMinIncrement(begin);
+    }
+}
 }  // namespace
 
 std::shared_ptr<ThreadPool> getMigrationUtilExecutor() {
@@ -229,18 +265,18 @@ ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
     // 'metadata', we must extend its bounds to get a correct comparison. If the input
     // range is longer than the range in the ChunkManager, we likewise must shorten it.
     // We make sure to match what's in the ChunkManager instead of the other way around,
-    // since the ChunkManager only stores ranges and compares overlaps using a string version of the
-    // key, rather than a BSONObj. This logic is necessary because the _metadata list can
+    // since the ChunkManager only stores ranges and compares overlaps using a string version of
+    // the key, rather than a BSONObj. This logic is necessary because the _metadata list can
     // contain ChunkManagers with different shard keys if the shard key has been refined.
     //
     // Note that it's safe to use BSONObj::nFields() (which returns the number of top level
     // fields in the BSONObj) to compare the two, since shard key refine operations can only add
     // top-level fields.
     //
-    // Using extractFieldsUndotted to shorten the input range is correct because the ChunkRange and
-    // the shard key pattern will both already store nested shard key fields as top-level dotted
-    // fields, and extractFieldsUndotted uses the top-level fields verbatim rather than treating
-    // dots as accessors for subfields.
+    // Using extractFieldsUndotted to shorten the input range is correct because the ChunkRange
+    // and the shard key pattern will both already store nested shard key fields as top-level
+    // dotted fields, and extractFieldsUndotted uses the top-level fields verbatim rather than
+    // treating dots as accessors for subfields.
     auto metadataShardKeyPatternBson = metadataShardKeyPattern.toBSON();
     auto numFieldsInMetadataShardKey = metadataShardKeyPatternBson.nFields();
     auto numFieldsInInputRangeShardKey = range.getMin().nFields();
@@ -295,12 +331,12 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
             auto uniqueOpCtx = tc->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 
-            uassert(
-                ErrorCodes::ResumableRangeDeleterDisabled,
-                str::stream()
-                    << "Not submitting range deletion task " << redact(deletionTask.toBSON())
-                    << " because the disableResumableRangeDeleter server parameter is set to true",
-                !disableResumableRangeDeleter.load());
+            uassert(ErrorCodes::ResumableRangeDeleterDisabled,
+                    str::stream() << "Not submitting range deletion task "
+                                  << redact(deletionTask.toBSON())
+                                  << " because the disableResumableRangeDeleter server "
+                                     "parameter is set to true",
+                    !disableResumableRangeDeleter.load());
 
             // Make sure the collection metadata is up-to-date.
             {
@@ -309,9 +345,9 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                 auto csr = CollectionShardingRuntime::get(opCtx, deletionTask.getNss());
                 if (!deletionTaskUuidMatchesFilteringMetadataUuid(csr, deletionTask)) {
                     // If the collection's filtering metadata is not known, is unsharded, or its
-                    // UUID does not match the UUID of the deletion task, force a filtering metadata
-                    // refresh once, because this node may have just stepped up and therefore may
-                    // have a stale cache.
+                    // UUID does not match the UUID of the deletion task, force a filtering
+                    // metadata refresh once, because this node may have just stepped up and
+                    // therefore may have a stale cache.
                     LOGV2(22024,
                           "Filtering metadata for this range deletion task may be outdated; "
                           "forcing refresh",
@@ -346,16 +382,26 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                                 : " is not known"),
                     deletionTaskUuidMatchesFilteringMetadataUuid(csr, deletionTask));
 
-            LOGV2(22026,
-                  "Submitting range deletion task",
-                  "deletionTask"_attr = redact(deletionTask.toBSON()),
-                  "migrationId"_attr = deletionTask.getId());
+            // If the deletion task came from a setFCV to 4.4 upgrade then in large clusters the
+            // logging can significantly slow down the upgrade if there are a large number (tens of
+            // thousands) of range deletion tasks.
+            if (deletionTask.getDonorShardId() != kRangeDeletionTaskShardIdForFCVUpgrade) {
+                LOGV2(22026,
+                      "Submitting range deletion task",
+                      "deletionTask"_attr = redact(deletionTask.toBSON()),
+                      "migrationId"_attr = deletionTask.getId());
+            }
+
 
             const auto whenToClean = deletionTask.getWhenToClean() == CleanWhenEnum::kNow
                 ? CollectionShardingRuntime::kNow
                 : CollectionShardingRuntime::kDelayed;
 
-            return csr->cleanUpRange(deletionTask.getRange(), deletionTask.getId(), whenToClean);
+            const auto fromFCVUpgrade =
+                deletionTask.getDonorShardId() == kRangeDeletionTaskShardIdForFCVUpgrade;
+
+            return csr->cleanUpRange(
+                deletionTask.getRange(), deletionTask.getId(), whenToClean, fromFCVUpgrade);
         })
         .onError([=](const Status status) {
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);
@@ -366,19 +412,20 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
             auto uniqueOpCtx = tc->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 
-            LOGV2(22027,
-                  "Failed to submit range deletion task",
-                  "deletionTask"_attr = redact(deletionTask.toBSON()),
-                  "error"_attr = redact(status),
-                  "migrationId"_attr = deletionTask.getId());
+            LOGV2_DEBUG(22027,
+                        1,
+                        "Failed to submit range deletion task",
+                        "deletionTask"_attr = redact(deletionTask.toBSON()),
+                        "error"_attr = redact(status),
+                        "migrationId"_attr = deletionTask.getId());
 
             if (status == ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
                 deleteRangeDeletionTaskLocally(
                     opCtx, deletionTask.getId(), ShardingCatalogClient::kLocalWriteConcern);
             }
 
-            // Note, we use onError and make it return its input status, because ExecutorFuture does
-            // not support tapError.
+            // Note, we use onError and make it return its input status, because ExecutorFuture
+            // does not support tapError.
             return status;
         });
 }
@@ -435,7 +482,8 @@ void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Cal
 
     if (!collDesc.isSharded()) {
         LOGV2(22029,
-              "Upgrade: Skipping orphaned range enumeration because the collection is not sharded",
+              "Upgrade: Skipping orphaned range enumeration because the collection is not "
+              "sharded",
               "namespace"_attr = nss);
         return;
     }
@@ -482,9 +530,9 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
         if (version == ChunkVersion::UNSHARDED())
             return;
 
-        // We clear the list of receiving chunks to ensure that that a RangeDeletionTask submitted
-        // by this setFCV command cannot be blocked behind a chunk received as a part of a
-        // migration that completed on the recipient (this node) but failed to commit.
+        // We clear the list of receiving chunks to ensure that that a RangeDeletionTask
+        // submitted by this setFCV command cannot be blocked behind a chunk received as a part
+        // of a migration that completed on the recipient (this node) but failed to commit.
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
             auto csr = CollectionShardingRuntime::get(opCtx, nss);
@@ -499,27 +547,22 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
 
         std::vector<RangeDeletionTask> deletions;
         forEachOrphanRange(opCtx, nss, [&deletions, &opCtx, &nss, &uuid](const auto& range) {
-            // Since this is not part of an active migration, the migration UUID and the donor shard
-            // are set to unused values so that they don't conflict.
-            RangeDeletionTask task(
-                UUID::gen(), nss, uuid, ShardId("fromFCVUpgrade"), range, CleanWhenEnum::kDelayed);
+            // Since this is not part of an active migration, the migration UUID and the donor
+            // shard are set to unused values so that they don't conflict.
+            RangeDeletionTask task(UUID::gen(),
+                                   nss,
+                                   uuid,
+                                   ShardId(kRangeDeletionTaskShardIdForFCVUpgrade),
+                                   range,
+                                   CleanWhenEnum::kDelayed);
             deletions.emplace_back(task);
         });
 
         if (deletions.empty())
             return;
 
-        PersistentTaskStore<RangeDeletionTask> store(opCtx,
-                                                     NamespaceString::kRangeDeletionNamespace);
+        batchInsertRangeDeletionTasks(opCtx, deletions);
 
-        for (const auto& task : deletions) {
-            LOGV2_DEBUG(22032,
-                        2,
-                        "Upgrade: Submitting chunk range for cleanup",
-                        "range"_attr = redact(task.getRange().toString()),
-                        "namespace"_attr = nss);
-            store.add(opCtx, task);
-        }
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
         LOGV2(22033,
               "Upgrade: Failed to clean up orphans because the namespace was not found; the "
@@ -530,6 +573,7 @@ void submitOrphanRanges(OperationContext* opCtx, const NamespaceString& nss, con
 }
 
 void submitOrphanRangesForCleanup(OperationContext* opCtx) {
+    Timer t;
     auto& catalog = CollectionCatalog::get(opCtx);
     const auto& dbs = catalog.getAllDbNames();
 
@@ -548,6 +592,10 @@ void submitOrphanRangesForCleanup(OperationContext* opCtx) {
             submitOrphanRanges(opCtx, nss, uuid);
         }
     }
+    LOGV2(4954600,
+          "Submitting orphan ranges for cleanup on setFCV to 4.4 finished in: {durationMillis}ms"
+          "Submitting orphan ranges for cleanup on setFCV to 4.4 finished",
+          "durationMillis"_attr = t.millis());
 }
 
 void persistMigrationCoordinatorLocally(OperationContext* opCtx,
@@ -845,20 +893,20 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
             auto uniqueOpCtx = tc->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
 
-            // Wait for the latest OpTime to be majority committed to ensure any decision that is
-            // read is on the true branch of history.
-            // Note (Esha): I don't think this is strictly required for correctness, but it is
-            // difficult to reason about, and being pessimistic by waiting for the decision to be
-            // majority committed does not cost much, since stepup should be rare. It *is* required
-            // that this node ensure a decision that it itself recovers is majority committed. For
-            // example, it is possible that this node is a stale primary, and the true primary has
-            // already sent a *commit* decision and re-received a chunk containing the minKey of
-            // this migration. In this case, this node would see that the minKey is still owned and
-            // assume the migration *aborted*. If this node communicated the abort decision to the
-            // recipient, the recipient (if it had not heard the decision yet) would delete data
-            // that the recipient actually owns. (The recipient does not currently wait to hear the
-            // range deletion decision for the first migration before being able to donate (any
-            // part of) the chunk again.)
+            // Wait for the latest OpTime to be majority committed to ensure any decision that
+            // is read is on the true branch of history. Note (Esha): I don't think this is
+            // strictly required for correctness, but it is difficult to reason about, and being
+            // pessimistic by waiting for the decision to be majority committed does not cost
+            // much, since stepup should be rare. It *is* required that this node ensure a
+            // decision that it itself recovers is majority committed. For example, it is
+            // possible that this node is a stale primary, and the true primary has already sent
+            // a *commit* decision and re-received a chunk containing the minKey of this
+            // migration. In this case, this node would see that the minKey is still owned and
+            // assume the migration *aborted*. If this node communicated the abort decision to
+            // the recipient, the recipient (if it had not heard the decision yet) would delete
+            // data that the recipient actually owns. (The recipient does not currently wait to
+            // hear the range deletion decision for the first migration before being able to
+            // donate (any part of) the chunk again.)
             auto& replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
             replClientInfo.setLastOpToSystemLastOpTime(opCtx);
             const auto lastOpTime = replClientInfo.getLastOp();
@@ -952,8 +1000,8 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                         return true;
                     }
 
-                    // Note this should only extend the range boundaries (if there has been a shard
-                    // key refine since the migration began) and never truncate them.
+                    // Note this should only extend the range boundaries (if there has been a
+                    // shard key refine since the migration began) and never truncate them.
                     auto chunkRangeToCompareToMetadata =
                         extendOrTruncateBoundsForMetadata(refreshedMetadata->get(), doc.getRange());
                     if ((*refreshedMetadata)

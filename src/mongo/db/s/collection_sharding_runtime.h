@@ -144,7 +144,8 @@ public:
     enum CleanWhen { kNow, kDelayed };
     SharedSemiFuture<void> cleanUpRange(ChunkRange const& range,
                                         boost::optional<UUID> migrationId,
-                                        CleanWhen when);
+                                        CleanWhen when,
+                                        bool fromFCVUpgrade = false);
 
     /**
      * Returns a range _not_ owned by this shard that starts no lower than the specified

@@ -361,7 +361,8 @@ void MetadataManager::forgetReceive(ChunkRange const& range) {
 
 SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
                                                      boost::optional<UUID> migrationId,
-                                                     bool shouldDelayBeforeDeletion) {
+                                                     bool shouldDelayBeforeDeletion,
+                                                     bool fromFCVUpgrade) {
     stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
 
@@ -402,12 +403,17 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
                                        delayForActiveQueriesOnSecondariesToComplete);
     } else {
         // No running queries can depend on this range, so queue it for deletion immediately.
-        LOGV2_OPTIONS(21990,
-                      {logv2::LogComponent::kShardingMigration},
-                      "Scheduling deletion of {namespace} range {range}",
-                      "Scheduling deletion of the collection's specified range",
-                      "namespace"_attr = _nss.ns(),
-                      "range"_attr = redact(range.toString()));
+
+        // On FCV upgrade in large clusters, there may be tens of thousands of range deletion tasks.
+        // This floods the logs and causes significant slow down for the upgrade.
+        if (!fromFCVUpgrade) {
+            LOGV2_OPTIONS(21990,
+                          {logv2::LogComponent::kShardingMigration},
+                          "Scheduling deletion of {namespace} range { range } ",
+                          "Scheduling deletion of the collection's specified range",
+                          "namespace"_attr = _nss.ns(),
+                          "range"_attr = redact(range.toString()));
+        }
 
         return _submitRangeForDeletion(lg,
                                        SemiFuture<void>::makeReady(),

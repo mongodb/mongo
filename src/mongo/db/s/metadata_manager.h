@@ -149,7 +149,8 @@ public:
      */
     SharedSemiFuture<void> cleanUpRange(ChunkRange const& range,
                                         boost::optional<UUID> migrationId,
-                                        bool shouldDelayBeforeDeletion);
+                                        bool shouldDelayBeforeDeletion,
+                                        bool fromFCVUpgrade = false);
 
     /**
      * Returns the number of ranges scheduled to be cleaned, exclusive of such ranges that might
