@@ -47,8 +47,8 @@ enums:
             kCloning: "cloning"
             kMirroring: "mirroring"
             kCommitted: "committed"
-            kDropping: "dropping"
             kRenaming: "renaming"
+            kDropping: "dropping"
             kDone: "done"
             kError: "error"
 

@@ -73,6 +73,10 @@ structs:
         generate_comparison_operators: false
         strict: true
         fields:
+            tempReshardingNss:
+                type: namespacestring
+                description: "The namespace of the temporary resharding collection that exists on
+                            recipient shards."
             state: CoordinatorState
             donorShards:
                 type: array<DonorShardEntry>
