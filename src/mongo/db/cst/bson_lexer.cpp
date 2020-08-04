@@ -51,6 +51,10 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"$unionWith", PipelineParserGen::token::STAGE_UNION_WITH},
     {"coll", PipelineParserGen::token::COLL_ARG},
     {"pipeline", PipelineParserGen::token::PIPELINE_ARG},
+    {"$unwind", PipelineParserGen::token::STAGE_UNWIND},
+    {"path", PipelineParserGen::token::PATH_ARG},
+    {"includeArrayIndex", PipelineParserGen::token::INCLUDE_ARRAY_INDEX_ARG},
+    {"preserveNullAndEmptyArrays", PipelineParserGen::token::PRESERVE_NULL_AND_EMPTY_ARRAYS_ARG},
     // Expressions
     {"$add", PipelineParserGen::token::ADD},
     {"$atan2", PipelineParserGen::token::ATAN2},
@@ -206,9 +210,17 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
                 _tokens.emplace_back(
                     PipelineParserGen::make_DOUBLE_NON_ZERO(elem.numberDouble(), getNextLoc()));
             break;
-        case BSONType::String:
-            _tokens.emplace_back(PipelineParserGen::make_STRING(elem.String(), getNextLoc()));
+        case BSONType::String: {
+            if (elem.String().empty())
+                _tokens.emplace_back(PipelineParserGen::token::EMPTY_STRING, getNextLoc());
+            else if (elem.String()[0] == '$')
+                _tokens.emplace_back(
+                    PipelineParserGen::make_DOLLAR_STRING(elem.String(), getNextLoc()));
+            else
+                _tokens.emplace_back(
+                    PipelineParserGen::make_NONEMPTY_STRING(elem.String(), getNextLoc()));
             break;
+        }
         case BSONType::BinData: {
             int len;
             auto data = elem.binData(len);

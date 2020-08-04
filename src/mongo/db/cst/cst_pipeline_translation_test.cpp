@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -743,7 +744,6 @@ TEST(CstPipelineTranslationTest, TranslatesTypeExpression) {
     ASSERT(dynamic_cast<ExpressionType*>(expr.get()));
 }
 
-
 TEST(CstTest, AbsConstantTranslation) {
     auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::abs, CNode{UserInt{-1}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
@@ -881,6 +881,36 @@ TEST(CstTest, TruncTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$trunc: [{$const: 1.5786}, {$const: 2}]}")) == expr->serialize(false)));
+}
+TEST(CstPipelineTranslationTest, TranslatesUnwindStageWithPathOnly) {
+    const auto cst = CNode{CNode::ArrayChildren{
+        CNode{CNode::ObjectChildren{{KeyFieldname::unwind, CNode{UserString{"$coll"}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto& source = dynamic_cast<DocumentSourceUnwind&>(**(sources.begin()));
+    ASSERT(typeid(DocumentSourceUnwind) == typeid(source));
+    ASSERT_EQ(source.getUnwindPath(), "coll"_sd);
+    ASSERT(!source.indexPath());
+    ASSERT(!source.preserveNullAndEmptyArrays());
+}
+
+TEST(CstPipelineTranslationTest, TranslatesUnwindStageWithOptionalFields) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::unwind,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::pathArg, CNode{UserString{"$coll"}}},
+             {KeyFieldname::includeArrayIndexArg, CNode{UserString{"arrayIndex"}}},
+             {KeyFieldname::preserveNullAndEmptyArraysArg, CNode{UserBoolean{true}}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto& source = dynamic_cast<DocumentSourceUnwind&>(**(sources.begin()));
+    ASSERT(typeid(DocumentSourceUnwind) == typeid(source));
+    ASSERT_EQ(source.getUnwindPath(), "coll"_sd);
+    ASSERT(source.indexPath());
+    ASSERT_EQ(source.indexPath().get().fullPath(), "arrayIndex"_sd);
+    ASSERT(source.preserveNullAndEmptyArrays());
 }
 
 }  // namespace

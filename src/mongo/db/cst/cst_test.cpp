@@ -847,5 +847,103 @@ TEST(CstGrammarTest, ParsesMatchInFind) {
               "1>\" } }");
 }
 
+TEST(CstGrammarTest, ParsesUnwindWithFieldPathOnly) {
+    CNode output;
+    const auto input = fromjson("{pipeline: [{$unwind: '$items'}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    const auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::unwind == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(), "{ unwind: \"<UserString $items>\" }");
+}
+
+TEST(CstGrammarTest, InvalidUnwindFieldPaths) {
+    {
+        CNode output;
+        const auto input = fromjson("{pipeline: [{$unwind: 'items'}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        // Field path to $unwind stage should be prefixed with a '$'.
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        CNode output;
+        const auto input =
+            fromjson("{pipeline: [{$unwind: {path: '$items', includeArrayIndex: '$index'}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        // includeArrayIndex option to $unwind stage should not be prefixed with a '$'.
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        CNode output;
+        const auto input =
+            fromjson("{pipeline: [{$unwind: {path: 'items', includeArrayIndex: 'index'}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        // path option to $unwind stage should be prefixed with a '$'.
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        CNode output;
+        const auto input =
+            fromjson("{pipeline: [{$unwind: {path: 'items', includeArrayIndex: ''}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        // includeArrayIndex option to $unwind stage should be non-empty.
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstGrammarTest, ParsesUnwindWithOptionalFields) {
+    {
+        CNode output;
+        const auto input =
+            fromjson("{pipeline: [{$unwind: {path: '$items', preserveNullAndEmptyArrays: true}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        const auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::unwind == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ unwind: { pathArg: \"<UserString $items>\", includeArrayIndexArg: \"<KeyValue "
+                  "absentKey>\", preserveNullAndEmptyArraysArg: \"<UserBoolean 1>\" } }");
+    }
+    {
+        CNode output;
+        const auto input =
+            fromjson("{pipeline: [{$unwind: {path: '$items', includeArrayIndex: 'index'}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        const auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::unwind == stages[0].firstKeyFieldname());
+        ASSERT_EQ(
+            stages[0].toBson().toString(),
+            "{ unwind: { pathArg: \"<UserString $items>\", includeArrayIndexArg: \"<UserString "
+            "index>\", preserveNullAndEmptyArraysArg: \"<KeyValue absentKey>\" } }");
+    }
+    {
+        CNode output;
+        const auto input = fromjson(
+            "{pipeline: [{$unwind: {path: '$items', includeArrayIndex: 'index', "
+            "preserveNullAndEmptyArrays: true}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        const auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::unwind == stages[0].firstKeyFieldname());
+        ASSERT_EQ(
+            stages[0].toBson().toString(),
+            "{ unwind: { pathArg: \"<UserString $items>\", includeArrayIndexArg: \"<UserString "
+            "index>\", preserveNullAndEmptyArraysArg: \"<UserBoolean 1>\" } }");
+    }
+}
+
 }  // namespace
 }  // namespace mongo

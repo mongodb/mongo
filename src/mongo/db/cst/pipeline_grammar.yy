@@ -129,6 +129,7 @@
     STAGE_SAMPLE
     STAGE_SKIP
     STAGE_UNION_WITH
+    STAGE_UNWIND
 
     // $unionWith arguments.
     COLL_ARG
@@ -136,6 +137,11 @@
 
     // $sample arguments.
     SIZE_ARG
+    
+    // $unwind arguments.
+    PATH_ARG
+    INCLUDE_ARRAY_INDEX_ARG
+    PRESERVE_NULL_AND_EMPTY_ARRAYS_ARG
 
     // Expressions
     ADD
@@ -188,7 +194,7 @@
 ;
 
 %token <std::string> FIELDNAME
-%token <std::string> STRING
+%token <std::string> NONEMPTY_STRING
 %token <BSONBinData> BINARY
 %token <UserUndefined> UNDEFINED
 %token <OID> OBJECT_ID
@@ -208,6 +214,10 @@
 %token <UserMaxKey> MAX_KEY
 %token START_PIPELINE START_MATCH
 
+// Special string literals.
+%token <std::string> DOLLAR_STRING "a $-prefixed string"
+%token <std::string> EMPTY_STRING "an empty string"
+
 //
 // Semantic values (aka the C++ types produced by the actions).
 //
@@ -222,10 +232,12 @@
 %nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal 
 %nterm <CNode> minKey maxKey value string binary undefined objectId bool date null regex
 %nterm <CNode> simpleValue compoundValue valueArray valueObject valueFields
+%nterm <CNode> dollarString nonDollarString
 
 // Pipeline stages and related non-terminals.
-%nterm <CNode> stageList stage inhibitOptimization unionWith skip limit project sample
+%nterm <CNode> stageList stage inhibitOptimization unionWith skip limit project sample unwind
 %nterm <CNode> projectFields projection num
+%nterm <std::pair<CNode::Fieldname, CNode>> includeArrayIndexArg preserveNullAndEmptyArraysArg
 
 // Aggregate expressions
 %nterm <CNode> expression compoundExpression exprFixedTwoArg expressionArray expressionObject
@@ -271,7 +283,43 @@ stageList:
 START_ORDERED_OBJECT: { lexer.sortObjTokens(); } START_OBJECT;
 
 stage:
-    inhibitOptimization | unionWith | skip | limit | project | sample
+    inhibitOptimization | unionWith | skip | limit | project | sample | unwind
+;
+
+unwind:
+    STAGE_UNWIND dollarString {
+       $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::unwind, $dollarString}}};
+    }
+    | STAGE_UNWIND START_ORDERED_OBJECT PATH_ARG dollarString includeArrayIndexArg 
+        preserveNullAndEmptyArraysArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::unwind,
+                CNode{CNode::ObjectChildren{
+                    {KeyFieldname::pathArg, $dollarString},
+                    $includeArrayIndexArg,
+                    $preserveNullAndEmptyArraysArg
+                }}
+            }}};
+    }
+;
+
+// Optional argument for $unwind.
+includeArrayIndexArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::includeArrayIndexArg, CNode{KeyValue::absentKey}};
+    }
+    | INCLUDE_ARRAY_INDEX_ARG nonDollarString {
+        $$ = std::pair{KeyFieldname::includeArrayIndexArg, $nonDollarString};
+    }
+;
+
+// Optional argument for $unwind.
+preserveNullAndEmptyArraysArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::preserveNullAndEmptyArraysArg, CNode{KeyValue::absentKey}};
+    }
+    | PRESERVE_NULL_AND_EMPTY_ARRAYS_ARG bool {
+        $$ = std::pair{KeyFieldname::preserveNullAndEmptyArraysArg, $bool};
+    }
 ;
 
 sample: STAGE_SAMPLE START_OBJECT SIZE_ARG num END_OBJECT {
@@ -437,6 +485,9 @@ stageAsUserFieldname:
     | STAGE_SAMPLE {
         $$ = UserFieldname{"$sample"};
     }
+    | STAGE_UNWIND {
+        $$ = UserFieldname{"$unwind"};
+    }
 ;
 
 argAsUserFieldname:
@@ -463,6 +514,15 @@ argAsUserFieldname:
     }
     | ON_NULL_ARG {
         $$ = UserFieldname{"onNull"};
+    }
+    | PATH_ARG {
+        $$ = UserFieldname{"path"};
+    }
+    | INCLUDE_ARRAY_INDEX_ARG {
+        $$ = UserFieldname{"includeArrayIndex"};
+    }
+    | PRESERVE_NULL_AND_EMPTY_ARRAYS_ARG {
+        $$ = UserFieldname{"preserveNullAndEmptyArrays"};
     }
 ;
 
@@ -590,7 +650,27 @@ aggExprAsUserFieldname:
 
 // Rules for literal non-terminals. 
 string:
-    STRING {
+    NONEMPTY_STRING {
+        $$ = CNode{UserString{$1}};
+    }
+    | DOLLAR_STRING {
+        $$ = CNode{UserString{$1}};
+    }
+    | EMPTY_STRING {
+        $$ = CNode{UserString{$1}};
+    }
+;
+
+// '$'-prefixed, non-empty strings.
+dollarString:
+    DOLLAR_STRING {
+        $$ = CNode{UserString{$1}};
+    }
+;
+
+// Non-'$'-prefixed, non-empty strings.
+nonDollarString:
+    NONEMPTY_STRING {
         $$ = CNode{UserString{$1}};
     }
 ;
