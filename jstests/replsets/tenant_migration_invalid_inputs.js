@@ -2,7 +2,7 @@
  * Tests that the donorStartMigration command does not allow users to provide a 'databasePrefix'
  * that is unsupported. The unsupported prefixes are: '', 'admin', 'local', 'config'.
  *
- * @tags: [requires_fcv_46]
+ * @tags: [requires_fcv_47]
  */
 
 (function() {

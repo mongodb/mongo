@@ -5,7 +5,7 @@
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
 //   requires_fastcount,
-//   requires_fcv_46,
+//   requires_fcv_47,
 // ]
 
 // Test basic inserts and updates with document validation.

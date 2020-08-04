@@ -4,7 +4,7 @@
 //   requires_non_retryable_commands,
 //   uses_$out,
 //   uses_map_reduce_with_temp_collections,
-//   requires_fcv_46,
+//   requires_fcv_47,
 // ]
 
 /**

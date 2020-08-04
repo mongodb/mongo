@@ -5,7 +5,7 @@ selector:
   - jstests/replsets/*.js
   exclude_with_any_tags:
   - multiversion_incompatible
-  - requires_fcv_46
+  - requires_fcv_47
   exclude_files:
   - jstests/replsets/initial_sync_rename_collection.js
   - jstests/replsets/initial_sync_drop_collection.js

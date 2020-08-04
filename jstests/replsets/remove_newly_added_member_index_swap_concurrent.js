@@ -4,7 +4,7 @@
  * that we can test that we target members by id and not index when removing 'newlyAdded' fields.
  *
  * @tags: [
- *   requires_fcv_46,
+ *   requires_fcv_47,
  * ]
  */
 

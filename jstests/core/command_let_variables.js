@@ -1,6 +1,6 @@
 // Tests that commands like find, aggregate and update accepts a 'let' parameter which defines
 // variables for use in expressions within the command.
-// @tags: [requires_fcv_46]
+// @tags: [requires_fcv_47]
 //
 (function() {
 "use strict";

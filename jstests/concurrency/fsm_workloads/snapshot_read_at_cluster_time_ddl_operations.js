@@ -5,7 +5,7 @@
  * CRUD operations. Index operations running concurrently with the snapshot read may cause
  * the read to fail with a SnapshotUnavailable error.
  *
- * @tags: [creates_background_indexes, requires_fcv_46, requires_replication,
+ * @tags: [creates_background_indexes, requires_fcv_47, requires_replication,
  * does_not_support_causal_consistency, requires_majority_read_concern]
  */
 

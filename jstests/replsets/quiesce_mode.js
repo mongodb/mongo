@@ -2,7 +2,7 @@
  * Tests the behavior of quiesce mode: the period during secondary shutdown where existing
  * operations are allowed to continue and new operations are accepted, but isMaster requests return
  * a ShutdownInProgress error, so that clients begin routing operations elsewhere.
- * @tags: [requires_fcv_46]
+ * @tags: [requires_fcv_47]
  */
 (function() {
 "use strict";

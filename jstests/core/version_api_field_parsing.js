@@ -1,7 +1,7 @@
 /**
  * Checks that the server properly parses "API Version" parameters
  *
- * @tags: [requires_fcv_46]
+ * @tags: [requires_fcv_47]
  */
 
 (function() {

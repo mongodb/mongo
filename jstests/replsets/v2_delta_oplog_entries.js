@@ -7,7 +7,7 @@
  * secondaries have the same data. For that reason it's important that this test not drop
  * intermediate collections.
  *
- * @tags: [requires_fcv_46]
+ * @tags: [requires_fcv_47]
  */
 (function() {
 const rst = new ReplSetTest({

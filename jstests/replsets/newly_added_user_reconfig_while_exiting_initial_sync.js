@@ -4,7 +4,7 @@
  * than one party having to retry).
  *
  * @tags: [
- *   requires_fcv_46,
+ *   requires_fcv_47,
  * ]
  */
 

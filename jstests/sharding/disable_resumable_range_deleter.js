@@ -2,8 +2,8 @@
  * Verifies the effect of setting disableResumableRangeDeleter to true on a shard.
  *
  * requires_persistence - This test restarts shards and expects them to remember their data.
- * requires_fcv_46 - This test changed the behavior of disableResumableRangeDeleter from 4.4.
- * @tags: [requires_persistence, requires_fcv_46]
+ * requires_fcv_47 - This test changed the behavior of disableResumableRangeDeleter from 4.4.
+ * @tags: [requires_persistence, requires_fcv_47]
  */
 (function() {
 

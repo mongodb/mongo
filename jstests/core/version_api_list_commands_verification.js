@@ -1,7 +1,7 @@
 /**
  * Checks that listCommands returns the API Version information of a command.
  *
- * @tags: [requires_fcv_46, requires_non_retryable_commands]
+ * @tags: [requires_fcv_47, requires_non_retryable_commands]
  */
 
 (function() {

@@ -7,8 +7,8 @@ selector:
   - jstests/sharding/query/*.js
   exclude_with_any_tags:
   - multiversion_incompatible
-  - requires_fcv_46
-  - need_fixing_for_46
+  - requires_fcv_47
+  - need_fixing_for_47
   exclude_files:
   # Requires fix to SERVER-31689
   - jstests/sharding/query/aggregation_currentop.js

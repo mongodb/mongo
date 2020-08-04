@@ -3,7 +3,7 @@
  * non-internal client while in the critical section.
  *
  * @tags: [
- *   requires_fcv_46,
+ *   requires_fcv_47,
  * ]
  */
 (function() {

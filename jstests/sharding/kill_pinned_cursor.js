@@ -3,7 +3,7 @@
  * should always succeed.
  *
  * Uses getMore to pin an open cursor.
- * @tags: [requires_getmore, requires_fcv_46]
+ * @tags: [requires_getmore, requires_fcv_47]
  */
 
 (function() {

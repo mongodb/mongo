@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   requires_non_retryable_writes,
- *   requires_fcv_46,
+ *   requires_fcv_47,
  * ]
  */
 (function() {

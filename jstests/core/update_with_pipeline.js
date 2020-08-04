@@ -4,7 +4,7 @@
  * 'requires_find_command' needed to prevent this test from running with 'compatibility' write mode
  * as pipeline-style update is not supported by OP_UPDATE.
  *
- * @tags: [requires_find_command, requires_non_retryable_writes, requires_fcv_46]
+ * @tags: [requires_find_command, requires_non_retryable_writes, requires_fcv_47]
  */
 (function() {
 "use strict";

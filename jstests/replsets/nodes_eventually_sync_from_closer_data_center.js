@@ -5,7 +5,7 @@
  * significantly farther away from S2 than S1's data center. Finally, we verify that S2 will decide
  * to sync from S1, since S1's data center is closer.
  *
- * @tags: [requires_fcv_46]
+ * @tags: [requires_fcv_47]
  */
 
 (function() {

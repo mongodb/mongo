@@ -2,7 +2,7 @@
  * Tests the TenantMigrationAccessBlocker and donor state document are updated correctly after
  * the donorStartMigration command is run.
  *
- * @tags: [requires_fcv_46]
+ * @tags: [requires_fcv_47]
  */
 
 (function() {

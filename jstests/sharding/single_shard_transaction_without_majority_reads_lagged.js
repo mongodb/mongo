@@ -13,7 +13,7 @@
  * @tags: [
  *   uses_transactions,
  *   requires_find_command,
- *   need_fixing_for_46
+ *   need_fixing_for_47
  * ]
  */
 

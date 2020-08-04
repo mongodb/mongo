@@ -3,7 +3,7 @@
  * which uniquely identify an index. Multiple indexes can be created on the same key pattern if
  * their signature parameters differ.
  *
- * @tags: [requires_fcv_46, requires_non_retryable_writes]
+ * @tags: [requires_fcv_47, requires_non_retryable_writes]
  */
 (function() {
 "use strict";

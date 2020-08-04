@@ -7,7 +7,7 @@
  *   assumes_unsharded_collection,
  *   # We chose not to backport the bug fix for $text + findAndModify to the 4.4 branch, so all
  *   # nodes must be at least binary version 4.7.
- *   requires_fcv_46,
+ *   requires_fcv_47,
  *   # Ban in any configurations that require retryable writes. Although findAndModify is a
  *   # retryable write command, the 'fields' option does not currently work with retryable writes.
  *   # See SERVER-31242.

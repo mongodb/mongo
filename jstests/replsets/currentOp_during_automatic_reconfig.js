@@ -2,7 +2,7 @@
  * Tests that currentOp displays information about in-progress automatic reconfigs.
  *
  * @tags: [
- *   requires_fcv_46,
+ *   requires_fcv_47,
  * ]
  */
 

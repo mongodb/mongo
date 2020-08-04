@@ -2,7 +2,7 @@
  * Checks that commands included/omitted in API V1 behave correctly with various combinations of API
  * parameters.
  *
- * @tags: [requires_fcv_46, requires_non_retryable_commands]
+ * @tags: [requires_fcv_47, requires_non_retryable_commands]
  */
 
 (function() {

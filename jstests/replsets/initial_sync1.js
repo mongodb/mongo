@@ -16,7 +16,7 @@
  *
  * SERVER-49428: Disable for ephemeralForTest, writeConcernMajorityJournalDefault is not off
  * @tags: [
- *   requires_fcv_46,
+ *   requires_fcv_47,
  *   incompatible_with_eft,
  * ]
  */

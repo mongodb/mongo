@@ -2,7 +2,7 @@
  * Test that config servers keep chunk history for up to minSnapshotHistoryWindowInSeconds.
  *
  * @tags: [
- *   requires_fcv_46,
+ *   requires_fcv_47,
  *   requires_majority_read_concern,
  *   requires_persistence,
  * ]

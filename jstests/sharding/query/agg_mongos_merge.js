@@ -9,7 +9,7 @@
  * @tags: [
  *   requires_sharding,
  *   requires_profiling,
- *   requires_fcv_46,
+ *   requires_fcv_47,
  * ]
  */
 

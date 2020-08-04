@@ -3,7 +3,7 @@
  * During quiesce mode, existing operations are allowed to continue and new operations are
  * accepted. However, isMaster requests return a ShutdownInProgress error, so that clients can
  * begin re-routing operations.
- * @tags: [requires_fcv_46]
+ * @tags: [requires_fcv_47]
  */
 
 (function() {

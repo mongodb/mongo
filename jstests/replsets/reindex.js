@@ -3,7 +3,7 @@
  * that the command can't be run on a primary or a secondary. Then it will make sure that the
  * reindex command can be successfully run on a standalone node.
  *
- * @tags: [requires_fcv_46]
+ * @tags: [requires_fcv_47]
  */
 
 (function() {

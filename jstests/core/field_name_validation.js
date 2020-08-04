@@ -7,7 +7,7 @@
  *
  * contained in a top-level element, embedded element, and within _id.
  *
- * @tags: [assumes_unsharded_collection, requires_fcv_46]
+ * @tags: [assumes_unsharded_collection, requires_fcv_47]
  */
 (function() {
 "use strict";

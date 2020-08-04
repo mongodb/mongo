@@ -9,7 +9,7 @@
  * updates increment the value of x. We test that the snapshot read only returns documents where _id
  * is between 0-99, and the value of x is always 1.
  *
- * @tags: [requires_fcv_46, requires_replication, does_not_support_causal_consistency,
+ * @tags: [requires_fcv_47, requires_replication, does_not_support_causal_consistency,
  * requires_majority_read_concern]
  */
 

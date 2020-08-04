@@ -1,7 +1,7 @@
 // Verifies mongos uses a versioned routing table to target subsequent requests for snapshot reads.
 //
 // @tags: [
-//   requires_fcv_46,
+//   requires_fcv_47,
 //   requires_find_command,
 //   requires_persistence,
 //   requires_sharding,

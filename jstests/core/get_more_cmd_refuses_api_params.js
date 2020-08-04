@@ -1,6 +1,6 @@
 /**
  * Tests that passing API parameters into 'getMore' commands should fail.
- * @tags: [requires_getmore, requires_fcv_46]
+ * @tags: [requires_getmore, requires_fcv_47]
  */
 
 (function() {

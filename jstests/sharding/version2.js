@@ -1,6 +1,6 @@
 /**
  * @tags: [
- *   need_fixing_for_46
+ *   need_fixing_for_47
  * ]
  */
 (function() {

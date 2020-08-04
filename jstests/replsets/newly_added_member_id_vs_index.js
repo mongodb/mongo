@@ -4,7 +4,7 @@
  * remove the 'newlyAdded' field for the node identified by _id.
  *
  * @tags: [
- *   requires_fcv_46,
+ *   requires_fcv_47,
  * ]
  */
 

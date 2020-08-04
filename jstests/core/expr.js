@@ -4,7 +4,7 @@
 //   requires_non_retryable_writes,
 //   # Explain reports errors from $expr differently in 4.4 and older, so this test assumes that all
 //   # nodes are at least binary version 4.7.
-//   requires_fcv_46,
+//   requires_fcv_47,
 // ]
 
 // Tests for $expr in the CRUD commands.

@@ -2,7 +2,7 @@
  * FLE-supported commands that contain an invalid 'jsonSchema' field should return to the user a
  * more specific error message for diagnostic purposes.
  *
- * @tags: [requires_fcv_46, requires_non_retryable_writes]
+ * @tags: [requires_fcv_47, requires_non_retryable_writes]
  */
 (function() {
 'use strict';

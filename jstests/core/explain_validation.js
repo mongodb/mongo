@@ -2,7 +2,7 @@
  * Tests that an unknown field in the explain command will be rejected while generic command
  * arguments will be permitted to pass validation.
  *
- * @tags: [requires_fcv_46]
+ * @tags: [requires_fcv_47]
  */
 
 (function() {

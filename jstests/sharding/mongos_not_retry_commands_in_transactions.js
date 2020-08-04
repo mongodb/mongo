@@ -1,6 +1,6 @@
 /*
  * Tests that mongos doesn't retry commands with startTransaction=true.
- * @tags: [requires_fcv_46]
+ * @tags: [requires_fcv_47]
  */
 (function() {
 'use strict';

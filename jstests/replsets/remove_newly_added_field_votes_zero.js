@@ -3,7 +3,7 @@
  * 'votes:0', but is also removed if a node ends up with 'votes:0' and 'newlyAdded'.
  *
  * @tags: [
- *   requires_fcv_46,
+ *   requires_fcv_47,
  * ]
  */
 
