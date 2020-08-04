@@ -767,6 +767,65 @@ TEST(OpMsg, ServerStatusCorrectlyShowsExhaustIsMasterMetrics) {
     // The exhaust stream would continue indefinitely.
 }
 
+TEST(OpMsg, ServerStatusCorrectlyShowsExhaustIsMasterMetricsWithIsMasterAlias) {
+    std::string errMsg;
+    auto conn = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", errMsg));
+    uassert(ErrorCodes::SocketException, errMsg, conn);
+
+    if (conn->isReplicaSetMember()) {
+        // Don't run on replica sets as the RSM will use the streamable isMaster protocol by
+        // default. This can cause inconsistencies in our metrics tests.
+        return;
+    }
+
+    // Wait for stale exhuast streams to finish closing before testing the exhaust isMaster metrics.
+    ASSERT(waitForCondition([&] {
+        auto serverStatusCmd = BSON("serverStatus" << 1);
+        BSONObj serverStatusReply;
+        ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
+        return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0;
+    }));
+
+    // Issue an isMaster command with the "ismaster" alias without a topology version.
+    auto lowerCaseIsMasterCmd = BSON("ismaster" << 1);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody("admin", lowerCaseIsMasterCmd);
+    auto request = opMsgRequest.serialize();
+
+    Message reply;
+    ASSERT(conn->call(request, reply));
+    auto res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+    auto topologyVersion = res["topologyVersion"].Obj().getOwned();
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+
+    lowerCaseIsMasterCmd =
+        BSON("ismaster" << 1 << "topologyVersion" << topologyVersion << "maxAwaitTimeMS" << 100);
+    opMsgRequest = OpMsgRequest::fromDBAndBody("admin", lowerCaseIsMasterCmd);
+    request = opMsgRequest.serialize();
+    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+
+    // Run the isMaster command with the "ismaster" alias. The aliased command should work
+    // identically to the default "isMaster" command name and initiate the the exhaust stream.
+    ASSERT(conn->call(request, reply));
+    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    res = OpMsg::parse(reply).body;
+    ASSERT_OK(getStatusFromCommandResult(res));
+
+    // Start a new connection to the server to check the serverStatus metrics.
+    std::string newErrMsg;
+    auto conn2 = std::unique_ptr<DBClientBase>(
+        unittest::getFixtureConnectionString().connect("integration_test", newErrMsg));
+    uassert(ErrorCodes::SocketException, newErrMsg, conn2);
+
+    auto serverStatusCmd = BSON("serverStatus" << 1);
+    BSONObj serverStatusReply;
+    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
+
+    // The exhaust stream would continue indefinitely.
+}
+
 TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream) {
     std::string errMsg;
     const auto conn1AppName = "integration_test";

@@ -354,9 +354,10 @@ MONGO_FAIL_POINT_DEFINE(doNotRefreshShardsOnRetargettingError);
  */
 void runCommand(OperationContext* opCtx,
                 const OpMsgRequest& request,
-                const NetworkOp opType,
+                const Message& m,
                 rpc::ReplyBuilderInterface* replyBuilder,
                 BSONObjBuilder* errorBuilder) {
+    auto const opType = m.operation();
     auto const commandName = request.getCommandName();
     auto const command = CommandHelpers::findCommand(commandName);
     if (!command) {
@@ -367,6 +368,14 @@ void runCommand(OperationContext* opCtx,
         globalCommandRegistry()->incrementUnknownCommands();
         appendRequiredFieldsToResponse(opCtx, &builder);
         return;
+    }
+
+    opCtx->setExhaust(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
+    const auto session = opCtx->getClient()->session();
+    if (session) {
+        if (!opCtx->isExhaust() || command->getName() != "isMaster"_sd) {
+            InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false);
+        }
     }
 
     CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
@@ -1038,14 +1047,6 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
             }
         }();
 
-        opCtx->setExhaust(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
-        const auto session = opCtx->getClient()->session();
-        if (session) {
-            if (!opCtx->isExhaust() || request.getCommandName() != "isMaster"_sd) {
-                InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false);
-            }
-        }
-
         // Execute.
         std::string db = request.getDatabase().toString();
         try {
@@ -1055,7 +1056,7 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
                         "Command begin",
                         "db"_attr = db,
                         "headerId"_attr = m.header().getId());
-            runCommand(opCtx, request, m.operation(), reply.get(), &errorBuilder);
+            runCommand(opCtx, request, m, reply.get(), &errorBuilder);
             LOGV2_DEBUG(22771,
                         3,
                         "Command end db: {db} msg id: {headerId}",
@@ -1273,7 +1274,7 @@ void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
                            MONGO_UNREACHABLE;
                    }
                }(),
-               msg.operation(),
+               msg,
                &reply,
                &errorBuilder);  // built objects are ignored
 }
