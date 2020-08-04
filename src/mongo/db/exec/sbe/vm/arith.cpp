@@ -457,7 +457,8 @@ std::pair<value::TypeTags, value::Value> ByteCode::genericCompareEq(value::TypeT
         return {value::TypeTags::Boolean,
                 (*value::getObjectIdView(lhsValue)) == (*value::getObjectIdView(rhsValue))};
     } else if ((value::isArray(lhsTag) && value::isArray(rhsTag)) ||
-               (value::isObject(lhsTag) && value::isObject(rhsTag))) {
+               (value::isObject(lhsTag) && value::isObject(rhsTag)) ||
+               (value::isBinData(lhsTag) && value::isBinData(rhsTag))) {
         auto [tag, val] = value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue);
         if (tag == value::TypeTags::NumberInt32) {
             auto result = (value::bitcastTo<int32_t>(val) == 0);

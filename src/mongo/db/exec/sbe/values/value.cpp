@@ -75,7 +75,8 @@ void releaseValue(TypeTags tag, Value val) noexcept {
         case TypeTags::bsonObject:
         case TypeTags::bsonArray:
         case TypeTags::bsonObjectId:
-            delete[] bitcastTo<uint8_t*>(val);
+        case TypeTags::bsonBinData:
+            delete[] getRawPointerView(val);
             break;
         case TypeTags::ksValue:
             delete getKeyStringView(val);
@@ -147,6 +148,9 @@ void writeTagToStream(T& stream, const TypeTags tag) {
             break;
         case TypeTags::bsonObjectId:
             stream << "bsonObjectId";
+            break;
+        case TypeTags::bsonBinData:
+            stream << "bsonBinData";
             break;
         case TypeTags::ksValue:
             stream << "KeyString";
@@ -297,6 +301,9 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         case value::TypeTags::bsonObjectId:
             stream << "---===*** bsonObjectId ***===---";
             break;
+        case value::TypeTags::bsonBinData:
+            stream << "---===*** bsonBinData ***===---";
+            break;
         case value::TypeTags::ksValue: {
             auto ks = getKeyStringView(val);
             stream << "KS(" << ks->toString() << ")";
@@ -384,6 +391,8 @@ BSONType tagToType(TypeTags tag) noexcept {
             return BSONType::String;
         case TypeTags::bsonObjectId:
             return BSONType::jstOID;
+        case TypeTags::bsonBinData:
+            return BSONType::BinData;
         case TypeTags::ksValue:
             // This is completely arbitrary.
             return BSONType::EOO;
@@ -549,6 +558,19 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         auto rhsObjId = rhsTag == TypeTags::ObjectId ? getObjectIdView(rhsValue)->data()
                                                      : bitcastTo<uint8_t*>(rhsValue);
         auto result = memcmp(lhsObjId, rhsObjId, sizeof(ObjectIdType));
+        return {TypeTags::NumberInt32, bitcastFrom(compareHelper(result, 0))};
+    } else if (isBinData(lhsTag) && isBinData(rhsTag)) {
+        auto lsz = getBSONBinDataSize(lhsTag, lhsValue);
+        auto rsz = getBSONBinDataSize(rhsTag, rhsValue);
+        if (lsz != rsz) {
+            return {TypeTags::NumberInt32, bitcastFrom(compareHelper(lsz, rsz))};
+        }
+
+        // Since we already compared the size above, skip the first 4 bytes of the buffer and
+        // compare the lsz+1 bytes carrying the subtype and binData payload in one pass.
+        auto result = memcmp(getRawPointerView(lhsValue) + sizeof(uint32_t),
+                             getRawPointerView(rhsValue) + sizeof(uint32_t),
+                             lsz + 1);
         return {TypeTags::NumberInt32, bitcastFrom(compareHelper(result, 0))};
     } else if (lhsTag == TypeTags::ksValue && rhsTag == TypeTags::ksValue) {
         auto result = getKeyStringView(lhsValue)->compare(*getKeyStringView(lhsValue));

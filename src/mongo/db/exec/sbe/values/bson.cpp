@@ -130,6 +130,27 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
                 return {value::TypeTags::StringBig, value::bitcastFrom(str)};
             }
         }
+        case BSONType::BinData: {
+            if (view) {
+                return {value::TypeTags::bsonBinData, value::bitcastFrom(be)};
+            }
+
+            auto size = ConstDataView(be).read<LittleEndian<uint32_t>>();
+            auto subtype = static_cast<BinDataType>((be + sizeof(uint32_t))[0]);
+
+            if (subtype != BinDataType::ByteArrayDeprecated) {
+                auto metaSize = sizeof(uint32_t) + 1;
+                auto binData = new uint8_t[size + metaSize];
+                memcpy(binData, be, size + metaSize);
+                return {value::TypeTags::bsonBinData, value::bitcastFrom(binData)};
+            } else {
+                // The legacy byte array stores an extra int32 in byte[size].
+                auto metaSize = 2 * sizeof(uint32_t) + 1;
+                auto binData = new uint8_t[size + metaSize];
+                memcpy(binData, be, size + metaSize);
+                return {value::TypeTags::bsonBinData, value::bitcastFrom(binData)};
+            }
+        }
         case BSONType::Object: {
             if (view) {
                 return {value::TypeTags::bsonObject, value::bitcastFrom(be)};
@@ -268,6 +289,13 @@ void convertToBsonObj(BSONArrayBuilder& builder, value::ArrayEnumerator arr) {
             case value::TypeTags::bsonObjectId:
                 builder.append(OID::from(value::bitcastTo<const char*>(val)));
                 break;
+            case value::TypeTags::bsonBinData: {
+                // BinData is also subject to the bson size limit, so the cast here is safe.
+                builder.append(BSONBinData{value::getBSONBinData(tag, val),
+                                           static_cast<int>(value::getBSONBinDataSize(tag, val)),
+                                           getBSONBinDataSubtype(tag, val)});
+                break;
+            }
             default:
                 MONGO_UNREACHABLE;
         }
@@ -346,6 +374,13 @@ void convertToBsonObj(BSONObjBuilder& builder, value::Object* obj) {
             case value::TypeTags::bsonObjectId:
                 builder.append(name, OID::from(value::bitcastTo<const char*>(val)));
                 break;
+            case value::TypeTags::bsonBinData: {
+                builder.appendBinData(name,
+                                      value::getBSONBinDataSize(tag, val),
+                                      value::getBSONBinDataSubtype(tag, val),
+                                      value::getBSONBinData(tag, val));
+                break;
+            }
             default:
                 MONGO_UNREACHABLE;
         }

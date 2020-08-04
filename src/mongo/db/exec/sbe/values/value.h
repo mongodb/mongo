@@ -103,6 +103,7 @@ enum class TypeTags : uint8_t {
     bsonArray,
     bsonString,
     bsonObjectId,
+    bsonBinData,
 
     // KeyString::Value
     ksValue,
@@ -134,6 +135,10 @@ inline constexpr bool isArray(TypeTags tag) noexcept {
 
 inline constexpr bool isObjectId(TypeTags tag) noexcept {
     return tag == TypeTags::ObjectId || tag == TypeTags::bsonObjectId;
+}
+
+inline constexpr bool isBinData(TypeTags tag) noexcept {
+    return tag == TypeTags::bsonBinData;
 }
 
 BSONType tagToType(TypeTags tag) noexcept;
@@ -506,6 +511,22 @@ inline std::string_view getStringView(TypeTags tag, Value& val) noexcept {
     MONGO_UNREACHABLE;
 }
 
+inline size_t getBSONBinDataSize(TypeTags tag, Value val) {
+    invariant(tag == TypeTags::bsonBinData);
+    return static_cast<size_t>(
+        ConstDataView(getRawPointerView(val)).read<LittleEndian<uint32_t>>());
+}
+
+inline BinDataType getBSONBinDataSubtype(TypeTags tag, Value val) {
+    invariant(tag == TypeTags::bsonBinData);
+    return static_cast<BinDataType>((getRawPointerView(val) + sizeof(uint32_t))[0]);
+}
+
+inline uint8_t* getBSONBinData(TypeTags tag, Value val) {
+    invariant(tag == TypeTags::bsonBinData);
+    return reinterpret_cast<uint8_t*>(getRawPointerView(val) + sizeof(uint32_t) + 1);
+}
+
 inline std::pair<TypeTags, Value> makeSmallString(std::string_view input) {
     size_t len = input.size();
     invariant(len < kSmallStringThreshold - 1);
@@ -659,6 +680,13 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             auto dst = new uint8_t[size];
             memcpy(dst, bson, size);
             return {TypeTags::bsonArray, bitcastFrom(dst)};
+        }
+        case TypeTags::bsonBinData: {
+            auto binData = getRawPointerView(val);
+            auto size = getBSONBinDataSize(tag, val);
+            auto dst = new uint8_t[size + sizeof(uint32_t) + 1];
+            memcpy(dst, binData, size + sizeof(uint32_t) + 1);
+            return {TypeTags::bsonBinData, bitcastFrom(dst)};
         }
         case TypeTags::ksValue:
             return makeCopyKeyString(*getKeyStringView(val));

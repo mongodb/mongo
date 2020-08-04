@@ -129,7 +129,10 @@ public:
     }
 
     void append(const BSONBinData& in) {
-        unsupportedType("binData");
+        appendValueBufferOffset(TypeTags::bsonBinData);
+        _valueBufferBuilder->appendNum(in.length);
+        _valueBufferBuilder->appendNum(static_cast<char>(in.type));
+        _valueBufferBuilder->appendBuf(in.data, in.length);
     }
 
     void append(const BSONRegEx& in) {
@@ -201,7 +204,8 @@ public:
                 case TypeTags::StringBig:
                 case TypeTags::NumberDecimal:
                 case TypeTags::bsonObject:
-                case TypeTags::bsonArray: {
+                case TypeTags::bsonArray:
+                case TypeTags::bsonBinData: {
                     auto offset = bitcastTo<decltype(bufferLen)>(val);
                     invariant(offset < bufferLen);
                     val = bitcastFrom(_valueBufferBuilder->buf() + offset);

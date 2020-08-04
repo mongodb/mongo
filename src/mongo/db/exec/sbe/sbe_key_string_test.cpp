@@ -84,6 +84,7 @@ TEST_F(SBEKeyStringTest, Basic) {
     APPEND_TWICE(bob, "longString", "I am the very model of a modern major general.");
     APPEND_TWICE(bob, "date", Date_t::fromMillisSinceEpoch(123));
     APPEND_TWICE(bob, "timestamp", Timestamp(123));
+    APPEND_TWICE(bob, "binData", BSONBinData("\xde\xad\xbe\xef", 4, BinDataGeneral));
 
     bob.appendNull("null-ascending");
     bob.appendNull("null-descending");

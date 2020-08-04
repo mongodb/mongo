@@ -139,6 +139,14 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
             val = bitcastFrom(arr);
             break;
         }
+        case TypeTags::bsonBinData: {
+            auto binDataSize = buf.peek<LittleEndian<uint32_t>>();
+            auto size = binDataSize + sizeof(uint32_t) + 1;
+            auto binData = new uint8_t[size];
+            memcpy(binData, buf.skip(size), size);
+            val = bitcastFrom(binData);
+            break;
+        }
         case TypeTags::ksValue: {
             auto version = static_cast<KeyString::Version>(buf.read<uint8_t>());
             auto ks = KeyString::Value::deserialize(buf, version);
@@ -252,6 +260,13 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             buf.appendBuf(objId, sizeof(ObjectIdType));
             break;
         }
+        case TypeTags::bsonBinData: {
+            auto binData = getRawPointerView(val);
+            auto size = getBSONBinDataSize(tag, val);
+            buf.appendNum(static_cast<uint32_t>(size));
+            buf.appendBuf(binData + sizeof(uint32_t), size + 1);
+            break;
+        }
         case TypeTags::ksValue: {
             auto ks = getKeyStringView(val);
             buf.appendUChar(static_cast<uint8_t>(ks->getVersion()));
@@ -331,6 +346,11 @@ static int getApproximateSize(TypeTags tag, Value val) {
         case TypeTags::bsonArray: {
             auto ptr = getRawPointerView(val);
             result += ConstDataView(ptr).read<LittleEndian<uint32_t>>();
+            break;
+        }
+        case TypeTags::bsonBinData: {
+            auto binData = getRawPointerView(val);
+            result += ConstDataView(binData).read<LittleEndian<uint32_t>>();
             break;
         }
         case TypeTags::ksValue: {
