@@ -297,6 +297,8 @@ functions:
           aws_secret_key: "${terraform_secret}"
           perf_jira_user: "${perf_jira_user}"
           perf_jira_pw: "${perf_jira_pw}"
+          cedar_api_user: ${cedar_api_user}
+          cedar_api_key: ${cedar_api_key}
           dsi_analysis_atlas_user: "${dsi_analysis_atlas_user}"
           dsi_analysis_atlas_pw: "${dsi_analysis_atlas_pw}"
           EOF
