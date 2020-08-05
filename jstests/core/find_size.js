@@ -1,5 +1,5 @@
 // Tests the behavior of $size for match expressions.
-// @tags [
+// @tags: [
 //   sbe_incompatible,
 // ]
 
