@@ -444,9 +444,8 @@ void appendClusterAndOperationTime(OperationContext* opCtx,
                                    BSONObjBuilder* commandBodyFieldsBob,
                                    BSONObjBuilder* metadataBob,
                                    LogicalTime startTime) {
-    auto replicationCoordinator = repl::ReplicationCoordinator::get(opCtx);
-    if (replicationCoordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-        !replicationCoordinator->getMemberState().readable() ||
+    if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
+            repl::ReplicationCoordinator::modeReplSet ||
         !LogicalClock::get(opCtx)->isEnabled()) {
         return;
     }
