@@ -577,5 +577,35 @@ struct ValidateResults {
     std::vector<BSONObj> missingIndexEntries;
     std::vector<RecordId> corruptRecords;
     long long numRemovedCorruptRecords = 0;
+    long long numRemovedExtraIndexEntries = 0;
+    long long numInsertedMissingIndexEntries = 0;
+
+    // Takes a bool that indicates the context of the caller and a BSONObjBuilder to append with
+    // validate results.
+    void appendToResultObj(BSONObjBuilder& resultObj, bool debugging) const {
+        resultObj.appendBool("valid", valid);
+        resultObj.appendBool("repaired", repaired);
+        if (readTimestamp) {
+            resultObj.append("readTimestamp", readTimestamp.get());
+        }
+        resultObj.append("warnings", warnings);
+        resultObj.append("errors", errors);
+        resultObj.append("extraIndexEntries", extraIndexEntries);
+        resultObj.append("missingIndexEntries", missingIndexEntries);
+
+        // Need to convert RecordId to int64_t to append to BSONObjBuilder
+        BSONArrayBuilder builder;
+        for (RecordId corruptRecord : corruptRecords) {
+            builder.append(corruptRecord.repr());
+        }
+        resultObj.append("corruptRecords", builder.done());
+
+        if (repaired || debugging) {
+            resultObj.appendNumber("numRemovedCorruptRecords", numRemovedCorruptRecords);
+            resultObj.appendNumber("numRremovedExtraIndexEntries", numRemovedExtraIndexEntries);
+            resultObj.appendNumber("numInsertedMissingIndexEntries",
+                                   numInsertedMissingIndexEntries);
+        }
+    }
 };
 }  // namespace mongo

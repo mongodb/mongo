@@ -1301,7 +1301,7 @@ public:
             iam->getKeys(executionCtx.pooledBufferBuilder(),
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kAddingKeys,
+                         IndexAccessMethod::GetKeysContext::kRemovingKeys,
                          &keys,
                          nullptr,
                          nullptr,
@@ -1438,18 +1438,913 @@ public:
     }
 };
 
+class ValidateMissingAndExtraIndexEntryRepair : public ValidateBase {
+public:
+    // No need to test with background validation as repair mode is not supported in background
+    // validation.
+    ValidateMissingAndExtraIndexEntryRepair()
+        : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+        // Create a new collection.
+        lockDb(MODE_X);
+        Collection* coll;
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+            wunit.commit();
+        }
+
+        // Create index "a".
+        const auto indexNameA = "a";
+        const auto indexKeyA = BSON("a" << 1);
+        ASSERT_OK(
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name" << indexNameA << "key" << indexKeyA << "v"
+                                                     << static_cast<int>(kIndexVersion))));
+
+        // Create index "b".
+        const auto indexNameB = "b";
+        const auto indexKeyB = BSON("b" << 1);
+        ASSERT_OK(
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name" << indexNameB << "key" << indexKeyB << "v"
+                                                     << static_cast<int>(kIndexVersion))));
+
+        // Insert documents.
+        OpDebug* const nullOpDebug = nullptr;
+        ;
+        lockDb(MODE_X);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(
+                coll->insertDocument(&_opCtx,
+                                     InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
+                                     nullOpDebug,
+                                     true));
+            ASSERT_OK(
+                coll->insertDocument(&_opCtx,
+                                     InsertStatement(BSON("_id" << 2 << "a" << 3 << "b" << 3)),
+                                     nullOpDebug,
+                                     true));
+            ASSERT_OK(
+                coll->insertDocument(&_opCtx,
+                                     InsertStatement(BSON("_id" << 3 << "a" << 6 << "b" << 6)),
+                                     nullOpDebug,
+                                     true));
+            wunit.commit();
+        }
+        releaseDb();
+        ensureValidateWorked();
+
+        RecordStore* rs = coll->getRecordStore();
+
+        // Updating documents without updating the index entries should cause us to have missing and
+        // extra index entries.
+        lockDb(MODE_X);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            auto doc1 = BSON("_id" << 1 << "a" << 8 << "b" << 8);
+            auto doc2 = BSON("_id" << 2 << "a" << 3 << "b" << 7);
+            std::unique_ptr<SeekableRecordCursor> cursor = coll->getCursor(&_opCtx);
+            auto record = cursor->next();
+            RecordId rid = record->id;
+            ASSERT_OK(rs->updateRecord(&_opCtx, rid, doc1.objdata(), doc1.objsize()));
+            record = cursor->next();
+            rid = record->id;
+            ASSERT_OK(rs->updateRecord(&_opCtx, rid, doc2.objdata(), doc2.objsize()));
+            wunit.commit();
+        }
+        releaseDb();
+
+        // Confirm missing and extra index entries are detected.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kNone,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(3), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(3), results.missingIndexEntries.size());
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Run validate with repair, expect extra index entries are removed and missing index
+        // entries are inserted.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kRepair,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(true, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(3, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(3, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Confirm repair worked such that results is now valid and no errors were suppressed by
+        // repair.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kRepair,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
+class ValidateMissingIndexEntryRepair : public ValidateBase {
+public:
+    // No need to test with background validation as repair mode is not supported in background
+    // validation.
+    ValidateMissingIndexEntryRepair() : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+
+        // Create a new collection.
+        lockDb(MODE_X);
+        Collection* coll;
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+            wunit.commit();
+        }
+
+        // Create an index.
+        const auto indexName = "a";
+        const auto indexKey = BSON("a" << 1);
+        auto status =
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name" << indexName << "key" << indexKey << "v"
+                                                     << static_cast<int>(kIndexVersion)));
+        ASSERT_OK(status);
+
+        // Insert documents.
+        OpDebug* const nullOpDebug = nullptr;
+        RecordId rid = RecordId::min();
+        lockDb(MODE_X);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
+            rid = coll->getCursor(&_opCtx)->next()->id;
+            wunit.commit();
+        }
+        releaseDb();
+        ensureValidateWorked();
+
+        // Removing an index entry without removing the document should cause us to have a missing
+        // index entry.
+        {
+            lockDb(MODE_X);
+
+            IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam =
+                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+
+            WriteUnitOfWork wunit(&_opCtx);
+            int64_t numDeleted;
+            const BSONObj actualKey = BSON("a" << 1);
+            InsertDeleteOptions options;
+            options.logIfError = true;
+            options.dupsAllowed = true;
+
+            KeyStringSet keys;
+            iam->getKeys(executionCtx.pooledBufferBuilder(),
+                         actualKey,
+                         IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                         IndexAccessMethod::GetKeysContext::kRemovingKeys,
+                         &keys,
+                         nullptr,
+                         nullptr,
+                         rid,
+                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
+            auto removeStatus =
+                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
+
+            ASSERT_EQUALS(numDeleted, 1);
+            ASSERT_OK(removeStatus);
+            wunit.commit();
+
+            releaseDb();
+        }
+
+        // Confirm validate detects missing index entries.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kNone,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
+            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Run validate with repair, expect missing index entries are inserted.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kRepair,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(1, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Confirm missing index entries have been inserted such that results are valid and no
+        // errors were suppressed by repair.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kNone,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
+class ValidateExtraIndexEntryRepair : public ValidateBase {
+public:
+    // No need to test with background validation as repair mode is not supported in background
+    // validation.
+    ValidateExtraIndexEntryRepair() : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+        // Create a new collection.
+        lockDb(MODE_X);
+        Collection* coll;
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+            wunit.commit();
+        }
+
+        // Create an index.
+        const auto indexName = "a";
+        const auto indexKey = BSON("a" << 1);
+        auto status =
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name" << indexName << "key" << indexKey << "v"
+                                                     << static_cast<int>(kIndexVersion)));
+        ASSERT_OK(status);
+
+        // Insert documents.
+        OpDebug* const nullOpDebug = nullptr;
+        RecordId rid = RecordId::min();
+        lockDb(MODE_X);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
+            rid = coll->getCursor(&_opCtx)->next()->id;
+            wunit.commit();
+        }
+        releaseDb();
+        ensureValidateWorked();
+
+        // Removing a document without removing the index entries should cause us to have extra
+        // index entries.
+        {
+            lockDb(MODE_X);
+            RecordStore* rs = coll->getRecordStore();
+
+            WriteUnitOfWork wunit(&_opCtx);
+            rs->deleteRecord(&_opCtx, rid);
+            wunit.commit();
+            releaseDb();
+        }
+
+        // Confirm validation detects extra index entries error.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kNone,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(2), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Run validate with repair, expect extra index entries are removed.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kRepair,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(true, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(2, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Confirm extra index entries are removed such that results are valid.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kNone,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
+class ValidateDuplicateDocumentMissingIndexEntryRepair : public ValidateBase {
+public:
+    // No need to test with background validation as repair mode is not supported in background
+    // validation.
+    ValidateDuplicateDocumentMissingIndexEntryRepair()
+        : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+
+        // Create a new collection and insert a document.
+        lockDb(MODE_X);
+        Collection* coll;
+        OpDebug* const nullOpDebug = nullptr;
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+            ASSERT_OK(coll->insertDocument(
+                &_opCtx, InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            wunit.commit();
+        }
+
+        // Create a unique index.
+        const auto indexName = "a";
+        {
+            const auto indexKey = BSON("a" << 1);
+            auto status = dbtests::createIndexFromSpec(
+                &_opCtx,
+                coll->ns().ns(),
+                BSON("name" << indexName << "key" << indexKey << "v"
+                            << static_cast<int>(kIndexVersion) << "unique" << true));
+            ASSERT_OK(status);
+        }
+
+        // Confirm that inserting a document with the same value for "a" fails, verifying the
+        // uniqueness constraint.
+        BSONObj dupObj = BSON("_id" << 2 << "a" << 1);
+        {
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_NOT_OK(
+                coll->insertDocument(&_opCtx, InsertStatement(dupObj), nullOpDebug, true));
+        }
+        releaseDb();
+        ensureValidateWorked();
+
+        // Insert a document with a duplicate key for "a".
+        RecordId rid;
+        {
+            lockDb(MODE_X);
+
+            IndexCatalog* indexCatalog = coll->getIndexCatalog();
+
+            InsertDeleteOptions options;
+            options.logIfError = true;
+            options.dupsAllowed = true;
+
+            WriteUnitOfWork wunit(&_opCtx);
+
+            // Insert a record and its keys separately. We do this to bypass duplicate constraint
+            // checking. Inserting a record and all of its keys ensures that validation fails
+            // because there are duplicate keys, and not just because there are keys without
+            // corresponding records.
+            auto swRecordId = coll->getRecordStore()->insertRecord(
+                &_opCtx, dupObj.objdata(), dupObj.objsize(), Timestamp());
+            ASSERT_OK(swRecordId);
+            rid = swRecordId.getValue();
+
+            wunit.commit();
+
+            // Insert the key on _id.
+            {
+                WriteUnitOfWork wunit(&_opCtx);
+
+                auto descriptor = indexCatalog->findIdIndex(&_opCtx);
+                auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
+                auto iam = entry->accessMethod();
+                auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
+
+                KeyStringSet keys;
+                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                             dupObj,
+                             IndexAccessMethod::GetKeysMode::kRelaxConstraints,
+                             IndexAccessMethod::GetKeysContext::kAddingKeys,
+                             &keys,
+                             nullptr,
+                             nullptr,
+                             swRecordId.getValue(),
+                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                ASSERT_EQ(1, keys.size());
+
+                int64_t numInserted;
+                auto insertStatus = iam->insertKeys(
+                    &_opCtx,
+                    coll,
+                    {keys.begin(), keys.end()},
+                    {},
+                    MultikeyPaths{},
+                    swRecordId.getValue(),
+                    options,
+                    [this, &interceptor](const KeyString::Value& duplicateKey) {
+                        return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                    },
+                    &numInserted);
+
+                wunit.commit();
+
+                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
+                ASSERT_EQUALS(numInserted, 1);
+                ASSERT_OK(insertStatus);
+
+                interceptor->finalizeTemporaryTables(
+                    &_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
+            }
+
+            // Removing an index entry without removing the document should cause us to have a
+            // duplicate document in the RecordStore but no matching key in the index.
+            {
+                auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+                auto iam = const_cast<IndexAccessMethod*>(
+                    indexCatalog->getEntry(descriptor)->accessMethod());
+
+                WriteUnitOfWork wunit(&_opCtx);
+                int64_t numDeleted;
+                const BSONObj actualKey = BSON("a" << 1);
+
+                KeyStringSet keys;
+                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                             actualKey,
+                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                             IndexAccessMethod::GetKeysContext::kRemovingKeys,
+                             &keys,
+                             nullptr,
+                             nullptr,
+                             rid,
+                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                auto removeStatus =
+                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
+
+                ASSERT_EQUALS(numDeleted, 1);
+                ASSERT_OK(removeStatus);
+                wunit.commit();
+            }
+
+            releaseDb();
+        }
+
+        // Confirm validation detects missing index entry.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kNone,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Run validate with repair, unable to insert missing index entry. Results remain not valid.
+        // TODO SERVER-50081: Support validation repair mode with duplicates on unique indexes.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kRepair,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
+            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
+class ValidateIndexWithMissingMultikeyDocRepair : public ValidateBase {
+public:
+    // No need to test with background validation as repair mode is not supported in background
+    // validation.
+    ValidateIndexWithMissingMultikeyDocRepair()
+        : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+
+        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+
+        // Create a new collection and insert non-multikey document.
+        lockDb(MODE_X);
+        Collection* coll;
+        RecordId id1;
+        BSONObj doc = BSON("_id" << 1 << "a" << 1);
+        {
+            OpDebug* const nullOpDebug = nullptr;
+            WriteUnitOfWork wunit(&_opCtx);
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            coll = _db->createCollection(&_opCtx, _nss);
+
+            ASSERT_OK(coll->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug, true));
+            id1 = coll->getCursor(&_opCtx)->next()->id;
+            wunit.commit();
+        }
+
+        // Create non-multikey index.
+        const auto indexName = "non_mk_index";
+        auto status =
+            dbtests::createIndexFromSpec(&_opCtx,
+                                         coll->ns().ns(),
+                                         BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                                     << static_cast<int>(kIndexVersion)));
+        ASSERT_OK(status);
+
+        releaseDb();
+        ensureValidateWorked();
+
+        // Set up a non-multikey index with multikey document.
+        {
+            lockDb(MODE_X);
+            IndexCatalog* indexCatalog = coll->getIndexCatalog();
+            auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
+            auto iam =
+                const_cast<IndexAccessMethod*>(indexCatalog->getEntry(descriptor)->accessMethod());
+            InsertDeleteOptions options;
+            options.dupsAllowed = true;
+            options.logIfError = true;
+
+            // Remove non-multikey index entry.
+            {
+                WriteUnitOfWork wunit(&_opCtx);
+                KeyStringSet keys;
+                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                             doc,
+                             IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
+                             IndexAccessMethod::GetKeysContext::kRemovingKeys,
+                             &keys,
+                             nullptr,
+                             nullptr,
+                             id1,
+                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                ASSERT_EQ(keys.size(), 1);
+
+                int64_t numDeleted;
+                auto removeStatus =
+                    iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
+                ASSERT_OK(removeStatus);
+                ASSERT_EQUALS(numDeleted, 1);
+                wunit.commit();
+            }
+
+            // Update non-multikey document with multikey document.   {a: 1}   ->   {a: [2, 3]}
+            BSONObj mkDoc = BSON("_id" << 1 << "a" << BSON_ARRAY(2 << 3));
+            {
+                WriteUnitOfWork wunit(&_opCtx);
+                auto updateStatus = coll->getRecordStore()->updateRecord(
+                    &_opCtx, id1, mkDoc.objdata(), mkDoc.objsize());
+                ASSERT_OK(updateStatus);
+                wunit.commit();
+            }
+
+            // Not inserting keys into index should create missing multikey entries.
+            releaseDb();
+        }
+
+        // Confirm missing multikey document found on non-multikey index error detected by validate.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kNone,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            // TODO SERVER-50088: Avoid double checking multikey errors when there are index
+            // inconsistencies.
+            ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(2), results.missingIndexEntries.size());
+            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Run validate in repair mode.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kRepair,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(true, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(2), results.warnings.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(2, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+
+        // Confirm index updated as multikey and missing index entries are inserted such that valid
+        // is true.
+        {
+            ValidateResults results;
+            BSONObjBuilder output;
+
+            ASSERT_OK(
+                CollectionValidation::validate(&_opCtx,
+                                               _nss,
+                                               CollectionValidation::ValidateMode::kForeground,
+                                               CollectionValidation::RepairMode::kRepair,
+                                               &results,
+                                               &output,
+                                               kTurnOnExtraLoggingForTest));
+
+            auto dumpOnErrorGuard = makeGuard([&] {
+                StorageDebugUtil::printValidateResults(results);
+                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
+            });
+            StorageDebugUtil::printValidateResults(results);
+            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(false, results.repaired);
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.warnings.size());
+            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
+            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+
+            dumpOnErrorGuard.dismiss();
+        }
+    }
+};
+
 class ValidateDuplicateDocumentIndexKeySet : public ValidateBase {
 public:
     ValidateDuplicateDocumentIndexKeySet() : ValidateBase(/*full=*/false, /*background=*/false) {}
 
     void run() {
-        // Cannot run validate with {background:true} if either
-        //  - the RecordStore cursor does not retrieve documents in RecordId order
-        //  - or the storage engine does not support checkpoints.
-        if (_background && (!_isInRecordIdOrder || !_engineSupportsCheckpoints)) {
-            return;
-        }
-
         auto& executionCtx = StorageExecutionContext::get(&_opCtx);
 
         // Create a new collection.
@@ -1523,7 +2418,7 @@ public:
             iam->getKeys(executionCtx.pooledBufferBuilder(),
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kAddingKeys,
+                         IndexAccessMethod::GetKeysContext::kRemovingKeys,
                          &keys,
                          nullptr,
                          nullptr,
@@ -1560,7 +2455,7 @@ public:
             iam->getKeys(executionCtx.pooledBufferBuilder(),
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
-                         IndexAccessMethod::GetKeysContext::kAddingKeys,
+                         IndexAccessMethod::GetKeysContext::kRemovingKeys,
                          &keys,
                          nullptr,
                          nullptr,
@@ -2477,6 +3372,12 @@ public:
         add<ValidateMissingAndExtraIndexEntryResults<false, false>>();
         add<ValidateMissingIndexEntryResults<false, false>>();
         add<ValidateExtraIndexEntryResults<false, false>>();
+
+        add<ValidateMissingAndExtraIndexEntryRepair>();
+        add<ValidateMissingIndexEntryRepair>();
+        add<ValidateExtraIndexEntryRepair>();
+        add<ValidateDuplicateDocumentMissingIndexEntryRepair>();
+        add<ValidateIndexWithMissingMultikeyDocRepair>();
 
         add<ValidateDuplicateDocumentIndexKeySet>();
 

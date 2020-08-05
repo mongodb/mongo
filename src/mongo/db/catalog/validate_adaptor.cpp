@@ -305,7 +305,8 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
             continue;
         }
 
-        _indexConsistency->addIndexKey(indexEntry->keyString, &indexInfo, indexEntry->loc);
+        _indexConsistency->addIndexKey(
+            opCtx, indexEntry->keyString, &indexInfo, indexEntry->loc, results);
         _progress->hit();
         numKeys++;
         isFirstEntry = false;

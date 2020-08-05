@@ -225,7 +225,17 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
         indexValidator->traverseIndex(opCtx,
                                       index.get(),
                                       /*numTraversedKeys=*/nullptr,
-                                      /*ValidateResults=*/nullptr);
+                                      result);
+    }
+
+    if (result->numRemovedExtraIndexEntries > 0) {
+        result->warnings.push_back(str::stream()
+                                   << "Removed " << result->numRemovedExtraIndexEntries
+                                   << " extra index entries.");
+    }
+
+    if (validateState->shouldRunRepair()) {
+        indexConsistency->repairMissingIndexEntries(opCtx, result);
     }
 
     LOGV2_OPTIONS(20301, {LogComponent::kIndex}, "Finished traversing through all the indexes");

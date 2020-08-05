@@ -50,8 +50,8 @@ let runTest = function(mongodOptions) {
     mongod = startMongodOnExistingPath(dbpath, mongodOptions);
     testColl = mongod.getDB(baseName)[collName];
 
-    // Repair creates new idents.
-    assert.neq(indexUri, getUriForIndex(testColl, indexName));
+    // Repair doesn't create new idents because validate repair mode fixed index inconsistencies.
+    assert.eq(indexUri, getUriForIndex(testColl, indexName));
 
     assertQueryUsesIndex(testColl, doc, indexName);
     assert.eq(testCollUri, getUriForColl(testColl));

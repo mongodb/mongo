@@ -41,7 +41,7 @@ class IndexDescriptor;
  * Contains all the index information and stats throughout the validation.
  */
 struct IndexInfo {
-    IndexInfo(const IndexDescriptor* descriptor);
+    IndexInfo(const IndexDescriptor* descriptor, IndexAccessMethod* indexAccessMethod);
     // Index name.
     const std::string indexName;
     // Contains the indexes key pattern.
@@ -57,6 +57,27 @@ struct IndexInfo {
     int64_t numRecords = 0;
     // A hashed set of indexed multikey paths (applies to $** indexes only).
     std::set<uint32_t> hashedMultikeyMetadataPaths;
+    // Indicates whether key entries must be unique.
+    const bool unique;
+    // Index access method pointer.
+    IndexAccessMethod* accessMethod;
+};
+
+/**
+ * Used by _missingIndexEntries to be able to easily access keyString during
+ * repairMissingIndexEntries.
+ */
+struct IndexEntryInfo {
+    IndexEntryInfo(const IndexInfo& indexInfo,
+                   RecordId entryRecordId,
+                   boost::optional<BSONElement> entryIdKey,
+                   KeyString::Value entryKeyString);
+    const std::string indexName;
+    const BSONObj keyPattern;
+    const Ordering ord;
+    RecordId recordId;
+    boost::optional<BSONElement> idKey;
+    KeyString::Value keyString;
 };
 
 /**
@@ -91,7 +112,11 @@ public:
      * For the second phase of validation, try to match the index entry keys that hashed to
      * inconsistent hash buckets during the first phase of validation to document keys.
      */
-    void addIndexKey(const KeyString::Value& ks, IndexInfo* indexInfo, RecordId recordId);
+    void addIndexKey(OperationContext* opCtx,
+                     const KeyString::Value& ks,
+                     IndexInfo* indexInfo,
+                     RecordId recordId,
+                     ValidateResults* results);
 
     /**
      * To validate $** multikey metadata paths, we first scan the collection and add a hash of all
@@ -124,6 +149,11 @@ public:
      * validation.
      */
     void setSecondPhase();
+
+    /**
+     * If repair mode enabled, try inserting _missingIndexEntries into indexes.
+     */
+    void repairMissingIndexEntries(OperationContext* opCtx, ValidateResults* results);
 
     /**
      * Records the errors gathered from the second phase of index validation into the provided
@@ -175,9 +205,9 @@ private:
 
     // Populated during the second phase of validation, this map contains the index entries that
     // were missing while the document key was in place.
-    // The map contains a IndexKey pointing to a BSON object as there can only be one missing index
-    // entry for a given IndexKey for each index.
-    std::map<IndexKey, BSONObj> _missingIndexEntries;
+    // The map contains a IndexKey pointing to a IndexEntryInfo as there can only be one missing
+    // index entry for a given IndexKey for each index.
+    std::map<IndexKey, IndexEntryInfo> _missingIndexEntries;
 
     /**
      * Generates a key for the second phase of validation. The keys format is the following:
@@ -191,7 +221,8 @@ private:
      *     }
      * }
      */
-    BSONObj _generateInfo(const IndexInfo& indexInfo,
+    BSONObj _generateInfo(const std::string& indexName,
+                          const BSONObj& keyPattern,
                           RecordId recordId,
                           const BSONObj& indexKey,
                           boost::optional<BSONElement> idKey);

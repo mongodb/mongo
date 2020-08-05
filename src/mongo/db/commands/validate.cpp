@@ -200,27 +200,7 @@ public:
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
 
-        result.appendBool("valid", validateResults.valid);
-        result.appendBool("repaired", validateResults.repaired);
-        if (validateResults.readTimestamp) {
-            result.append("readTimestamp", validateResults.readTimestamp.get());
-        }
-        result.append("warnings", validateResults.warnings);
-        result.append("errors", validateResults.errors);
-        result.append("extraIndexEntries", validateResults.extraIndexEntries);
-        result.append("missingIndexEntries", validateResults.missingIndexEntries);
-
-        // Need to convert RecordId to int64_t to append to BSONObjBuilder
-        BSONArrayBuilder builder;
-        for (RecordId corruptRecord : validateResults.corruptRecords) {
-            builder.append(corruptRecord.repr());
-        }
-        result.append("corruptRecords", builder.done());
-
-        if (validateResults.repaired) {
-            result.appendNumber("numRemovedCorruptRecords",
-                                validateResults.numRemovedCorruptRecords);
-        }
+        validateResults.appendToResultObj(result, /*debugging=*/false);
 
         if (!validateResults.valid) {
             result.append("advice",
