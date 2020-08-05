@@ -569,6 +569,7 @@ env.CppUnitTest(
         'build_versioned_requests_for_targeted_shards_test.cpp',
         'catalog_cache_test.cpp',
         'catalog_cache_refresh_test.cpp',
+        'comparable_database_version_test.cpp',
         'catalog/type_changelog_test.cpp',
         'catalog/type_chunk_test.cpp',
         'catalog/type_collection_test.cpp',

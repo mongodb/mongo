@@ -230,8 +230,11 @@ auto shardVersionRetry(OperationContext* opCtx,
             invariant(ex->getDb() == nss.db(),
                       str::stream() << "StaleDbVersion error on unexpected database. Expected "
                                     << nss.db() << ", received " << ex->getDb());
+
             // If the database version is stale, refresh its entry in the catalog cache.
-            catalogCache->onStaleDatabaseVersion(ex->getDb(), ex->getVersionReceived());
+            Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
+                                                                     ex->getVersionWanted());
+
             if (!logAndTestMaxRetries(ex)) {
                 throw;
             }

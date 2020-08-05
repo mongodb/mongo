@@ -31,8 +31,6 @@
 
 #include "mongo/s/database_version_helpers.h"
 
-#include "mongo/s/database_version_gen.h"
-
 namespace mongo {
 namespace databaseVersion {
 

@@ -764,7 +764,7 @@ void runCommand(OperationContext* opCtx,
             } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
                 // Mark database entry in cache as stale.
                 Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
-                                                                         ex->getVersionReceived());
+                                                                         ex->getVersionWanted());
 
                 // Retry logic specific to transactions. Throws and aborts the transaction if the
                 // error cannot be retried on.
@@ -1308,7 +1308,7 @@ void Strategy::explainFind(OperationContext* opCtx,
         } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
             // Mark database entry in cache as stale.
             Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
-                                                                     ex->getVersionReceived());
+                                                                     ex->getVersionWanted());
             if (canRetry) {
                 continue;
             }

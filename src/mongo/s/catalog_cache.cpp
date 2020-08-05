@@ -157,7 +157,8 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
               "SERVER-37398.");
     try {
         // TODO SERVER-49724: Make ReadThroughCache support StringData keys
-        auto dbEntry = _databaseCache.acquire(opCtx, dbName.toString());
+        auto dbEntry =
+            _databaseCache.acquire(opCtx, dbName.toString(), CacheCausalConsistency::kLatestKnown);
         if (!dbEntry) {
             return {ErrorCodes::NamespaceNotFound,
                     str::stream() << "database " << dbName << " not found"};
@@ -311,10 +312,17 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutin
 }
 
 void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
-                                          const DatabaseVersion& databaseVersion) {
-    // TODO SERVER-49856: Use a comparable DatabaseVersion to advance the time of the cached entry
-    // istead of invalidating it.
-    _databaseCache.invalidate(dbName.toString());
+                                          const boost::optional<DatabaseVersion>& databaseVersion) {
+    if (databaseVersion) {
+        const auto version =
+            ComparableDatabaseVersion::makeComparableDatabaseVersion(databaseVersion.get());
+        LOGV2_FOR_CATALOG_REFRESH(4899101,
+                                  2,
+                                  "Registering new database version",
+                                  "db"_attr = dbName,
+                                  "version"_attr = version);
+        _databaseCache.advanceTimeInStore(dbName.toString(), version);
+    }
 }
 
 void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInvalidate,
@@ -759,28 +767,35 @@ CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
                        threadPool,
                        [this](OperationContext* opCtx,
                               const std::string& dbName,
-                              const ValueHandle& db) { return _lookupDatabase(opCtx, dbName); },
+                              const ValueHandle& db,
+                              const ComparableDatabaseVersion& previousDbVersion) {
+                           return _lookupDatabase(opCtx, dbName, previousDbVersion);
+                       },
                        kDatabaseCacheSize),
-      _catalogCacheLoader(catalogCacheLoader){};
+      _catalogCacheLoader(catalogCacheLoader) {}
 
 CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDatabase(
-    OperationContext* opCtx, const std::string& dbName) {
+    OperationContext* opCtx,
+    const std::string& dbName,
+    const ComparableDatabaseVersion& previousDbVersion) {
 
     // TODO (SERVER-34164): Track and increment stats for database refreshes
 
-    LOGV2_FOR_CATALOG_REFRESH(24102, 1, "Refreshing cached database entry", "db"_attr = dbName);
+    LOGV2_FOR_CATALOG_REFRESH(24102, 2, "Refreshing cached database entry", "db"_attr = dbName);
 
     Timer t{};
     try {
         auto newDb = _catalogCacheLoader.getDatabase(dbName).get();
-        auto const newDbVersion = newDb.getVersion();
+        auto newDbVersion =
+            ComparableDatabaseVersion::makeComparableDatabaseVersion(newDb.getVersion());
         LOGV2_FOR_CATALOG_REFRESH(24101,
-                                  2,
+                                  1,
                                   "Refreshed cached database entry",
                                   "db"_attr = dbName,
                                   "newDbVersion"_attr = newDbVersion,
+                                  "oldDbVersion"_attr = previousDbVersion,
                                   "duration"_attr = Milliseconds(t.millis()));
-        return CatalogCache::DatabaseCache::LookupResult(boost::make_optional(std::move(newDb)));
+        return CatalogCache::DatabaseCache::LookupResult(std::move(newDb), std::move(newDbVersion));
     } catch (const DBException& ex) {
         LOGV2_FOR_CATALOG_REFRESH(24100,
                                   1,
@@ -789,11 +804,39 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
                                   "duration"_attr = Milliseconds(t.millis()),
                                   "error"_attr = redact(ex));
         if (ex.code() == ErrorCodes::NamespaceNotFound) {
-            return CatalogCache::DatabaseCache::LookupResult(boost::none);
+            return CatalogCache::DatabaseCache::LookupResult(boost::none, previousDbVersion);
         }
         throw;
     }
 }
+
+AtomicWord<uint64_t> ComparableDatabaseVersion::_localSequenceNumSource{1ULL};
+
+ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersion(
+    const DatabaseVersion& version) {
+    return ComparableDatabaseVersion(version, _localSequenceNumSource.fetchAndAdd(1));
+}
+
+const DatabaseVersion& ComparableDatabaseVersion::getVersion() const {
+    return _dbVersion;
+}
+
+uint64_t ComparableDatabaseVersion::getLocalSequenceNum() const {
+    return _localSequenceNum;
+}
+
+BSONObj ComparableDatabaseVersion::toBSON() const {
+    BSONObjBuilder builder;
+    _dbVersion.getUuid().appendToBuilder(&builder, "uuid");
+    builder.append("lastMod", _dbVersion.getLastMod());
+    builder.append("localSequenceNum", std::to_string(_localSequenceNum));
+    return builder.obj();
+}
+
+std::string ComparableDatabaseVersion::toString() const {
+    return toBSON().toString();
+}
+
 
 CachedDatabaseInfo::CachedDatabaseInfo(DatabaseType dbt, std::shared_ptr<Shard> primaryShard)
     : _dbt(std::move(dbt)), _primaryShard(std::move(primaryShard)) {}

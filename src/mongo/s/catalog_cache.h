@@ -61,6 +61,95 @@ static constexpr int kMaxNumStaleVersionRetries = 10;
 extern const OperationContext::Decoration<bool> operationShouldBlockBehindCatalogCacheRefresh;
 
 /**
+ * Constructed exclusively by the CatalogCache to be used as vector clock (Time) to drive
+ * DatabaseCache's refreshes.
+ *
+ * The DatabaseVersion class contains a UUID that is not comparable,
+ * in fact is impossible to compare two different DatabaseVersion that have different UUIDs.
+ *
+ * This class wrap a DatabaseVersion object to make it always comparable by timestamping it with a
+ * node-local sequence number (_dbVersionLocalSequence).
+ *
+ * This class class should go away once a cluster-wide comparable DatabaseVersion will be
+ * implemented.
+ */
+class ComparableDatabaseVersion {
+public:
+    /*
+     * Create a ComparableDatabaseVersion that wraps the given DatabaseVersion.
+     * Each object created through this method will have a local sequence number grater then the
+     * previously created ones.
+     */
+    static ComparableDatabaseVersion makeComparableDatabaseVersion(const DatabaseVersion& version);
+
+    /*
+     * Empty constructor needed by the ReadThroughCache.
+     *
+     * Instances created through this constructor will be always less then the ones created through
+     * the static constructor.
+     */
+    ComparableDatabaseVersion() = default;
+
+    const DatabaseVersion& getVersion() const;
+
+    uint64_t getLocalSequenceNum() const;
+
+    BSONObj toBSON() const;
+
+    std::string toString() const;
+
+    // Rerturns true if the two versions have the same UUID
+    bool sameUuid(const ComparableDatabaseVersion& other) const {
+        return _dbVersion.getUuid() == other._dbVersion.getUuid();
+    }
+
+    bool operator==(const ComparableDatabaseVersion& other) const {
+        return sameUuid(other) && (_dbVersion.getLastMod() == other._dbVersion.getLastMod());
+    }
+
+    bool operator!=(const ComparableDatabaseVersion& other) const {
+        return !(*this == other);
+    }
+
+    /*
+     * In the case the two compared instances have different UUIDs the most recently created one
+     * will be grater, otherwise the comparision will be driven by the lastMod field of the
+     * underlying DatabaseVersion.
+     */
+    bool operator<(const ComparableDatabaseVersion& other) const {
+        if (sameUuid(other)) {
+            return _dbVersion.getLastMod() < other._dbVersion.getLastMod();
+        } else {
+            return _localSequenceNum < other._localSequenceNum;
+        }
+    }
+
+    bool operator>(const ComparableDatabaseVersion& other) const {
+        return other < *this;
+    }
+
+    bool operator<=(const ComparableDatabaseVersion& other) const {
+        return !(*this > other);
+    }
+
+    bool operator>=(const ComparableDatabaseVersion& other) const {
+        return !(*this < other);
+    }
+
+private:
+    static AtomicWord<uint64_t> _localSequenceNumSource;
+
+    ComparableDatabaseVersion(const DatabaseVersion& version, uint64_t localSequenceNum)
+        : _dbVersion(version), _localSequenceNum(localSequenceNum) {}
+
+    DatabaseVersion _dbVersion;
+    // Locally incremented sequence number that allows to compare two database versions with
+    // different UUIDs. Each new comparableDatabaseVersion will have a grater sequence number then
+    // the ones created before.
+    uint64_t _localSequenceNum{0};
+};
+
+/**
  * Constructed exclusively by the CatalogCache, contains a reference to the cached information for
  * the specified database.
  */
@@ -198,13 +287,15 @@ public:
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Non-blocking method that marks the current cached database entry as needing refresh if the
-     * entry's databaseVersion matches 'databaseVersion'.
+     * Advances the version in the cache for the given database.
      *
-     * To be called if routing by a copy of the cached database entry as of 'databaseVersion' caused
-     * a StaleDbVersion to be received.
+     * To be called with the wantedVersion returned by a targeted node in case of a
+     * StaleDatabaseVersion response.
+     *
+     * In the case the passed version is boost::none, nothing will be done.
      */
-    void onStaleDatabaseVersion(const StringData dbName, const DatabaseVersion& databaseVersion);
+    void onStaleDatabaseVersion(const StringData dbName,
+                                const boost::optional<DatabaseVersion>& wantedVersion);
 
     /**
      * Non-blocking method that marks the current cached collection entry as needing refresh if its
@@ -328,14 +419,17 @@ private:
         std::shared_ptr<RoutingTableHistory> routingInfo;
     };
 
-    class DatabaseCache : public ReadThroughCache<std::string, DatabaseType> {
+    class DatabaseCache
+        : public ReadThroughCache<std::string, DatabaseType, ComparableDatabaseVersion> {
     public:
         DatabaseCache(ServiceContext* service,
                       ThreadPoolInterface& threadPool,
                       CatalogCacheLoader& catalogCacheLoader);
 
     private:
-        LookupResult _lookupDatabase(OperationContext* opCtx, const std::string& dbName);
+        LookupResult _lookupDatabase(OperationContext* opCtx,
+                                     const std::string& dbName,
+                                     const ComparableDatabaseVersion& previousDbVersion);
 
         CatalogCacheLoader& _catalogCacheLoader;
         Mutex _mutex = MONGO_MAKE_LATCH("DatabaseCache::_mutex");

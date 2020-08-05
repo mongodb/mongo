@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/s/database_version_gen.h"
 
 namespace mongo {
