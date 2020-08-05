@@ -169,9 +169,9 @@ public:
         startNet(std::make_unique<WaitForIsMasterHook>(this));
     }
 
-    void tearDown() override {
-        // Nothing
-    }
+    // NetworkInterfaceIntegrationFixture::tearDown() shuts down the NetworkInterface. We always
+    // need to do it even if we have additional tearDown tasks.
+    using NetworkInterfaceIntegrationFixture::tearDown;
 
     RemoteCommandRequest makeTestCommand(
         Milliseconds timeout,
