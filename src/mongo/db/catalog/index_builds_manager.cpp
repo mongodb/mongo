@@ -224,8 +224,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     long long recordsRemoved = 0;
     long long bytesRemoved = 0;
 
-    const NamespaceString lostAndFoundNss = NamespaceString(
-        NamespaceString::kLocalDb, "system.lost_and_found." + coll->uuid().toString());
+    const NamespaceString lostAndFoundNss =
+        NamespaceString(NamespaceString::kLocalDb, "lost_and_found." + coll->uuid().toString());
 
     // Delete duplicate record and insert it into local lost and found.
     Status status = [&] {
@@ -400,10 +400,11 @@ StatusWith<MultiIndexBlock*> IndexBuildsManager::_getBuilder(const UUID& buildUU
     return builderIt->second.get();
 }
 
-StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(OperationContext* opCtx,
-                                                              NamespaceString nss,
-                                                              NamespaceString lostAndFoundNss,
-                                                              RecordId dupRecord) {
+StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const NamespaceString& lostAndFoundNss,
+    RecordId dupRecord) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
     auto originalCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);

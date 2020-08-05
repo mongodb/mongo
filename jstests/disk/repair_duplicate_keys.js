@@ -13,7 +13,7 @@ load("jstests/libs/uuid_util.js");
 const baseName = "repair_duplicate_keys";
 const localBaseName = "local";
 const collName = "test";
-const lostAndFoundCollBaseName = "system.lost_and_found.";
+const lostAndFoundCollBaseName = "lost_and_found.";
 
 const dbpath = MongoRunner.dataPath + baseName + "/";
 const indexName = "a_1";

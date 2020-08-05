@@ -219,12 +219,12 @@ private:
 
     /**
      * Deletes record containing duplicate keys and insert it into a local lost and found collection
-     * titled "local.system.lost_and_found.<original collection UUID>". Returns the size of the
+     * titled "local.lost_and_found.<original collection UUID>". Returns the size of the
      * record removed.
      */
     StatusWith<int> _moveRecordToLostAndFound(OperationContext* opCtx,
-                                              NamespaceString ns,
-                                              NamespaceString lostAndFoundNss,
+                                              const NamespaceString& ns,
+                                              const NamespaceString& lostAndFoundNss,
                                               RecordId dupRecord);
 };
 
