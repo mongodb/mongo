@@ -1,0 +1,21 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/resmoke_selftest/end2end/**.js
+
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          outputLocation: ./output.json # This is a template value replaced at runtime.
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity: {storage: 2}
+        testingDiagnosticsEnabled: false

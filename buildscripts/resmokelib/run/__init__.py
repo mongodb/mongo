@@ -673,7 +673,7 @@ class RunPlugin(PluginInterface):
                             help="The path to the mongod executable for resmoke.py to use.")
 
         parser.add_argument(
-            "--mongodSetParameters", dest="mongod_set_parameters",
+            "--mongodSetParameters", dest="mongod_set_parameters", action="append",
             metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
             help=("Passes one or more --setParameter options to all mongod processes"
                   " started by resmoke.py. The argument is specified as bracketed YAML -"
@@ -683,7 +683,7 @@ class RunPlugin(PluginInterface):
                             help="The path to the mongos executable for resmoke.py to use.")
 
         parser.add_argument(
-            "--mongosSetParameters", dest="mongos_set_parameters",
+            "--mongosSetParameters", dest="mongos_set_parameters", action="append",
             metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
             help=("Passes one or more --setParameter options to all mongos processes"
                   " started by resmoke.py. The argument is specified as bracketed YAML -"

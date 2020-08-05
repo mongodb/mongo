@@ -7,6 +7,7 @@ import os.path
 import sys
 import time
 import unittest
+import yaml
 
 from buildscripts.resmokelib import core
 from buildscripts.resmokelib.utils import rmtree
@@ -17,16 +18,14 @@ from buildscripts.resmokelib.utils import rmtree
 class _ResmokeSelftest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.end2end_root = "buildscripts/tests/resmoke_end2end"
         cls.test_dir = os.path.normpath("/data/db/selftest")
         cls.resmoke_const_args = ["run", "--dbpathPrefix={}".format(cls.test_dir)]
+        cls.suites_root = os.path.join(cls.end2end_root, "suites")
+        cls.testfiles_root = os.path.join(cls.end2end_root, "testfiles")
+        cls.report_file = os.path.join(cls.test_dir, "reports.json")
 
     def setUp(self):
-        #self.test_dir = os.path.normpath("/data/db/selftest")
-        self.end2end_root = "buildscripts/tests/resmoke_end2end"
-        self.suites_root = f"{self.end2end_root}/suites"
-        self.testfiles_root = f"{self.end2end_root}/testfiles"
-        self.report_file = os.path.join(self.test_dir, "reports.json")
-
         self.logger = logging.getLogger(self._testMethodName)
         self.logger.setLevel(logging.DEBUG)
         handler = logging.StreamHandler(sys.stdout)
@@ -248,9 +247,140 @@ class TestTestSelection(_ResmokeSelftest):
         self.assertEqual(6 * [f"{self.testfiles_root}/two.js"], self.get_tests_run())
 
     def test_disallow_mixing_replay_and_positional(self):
-        # Additionally can assert on the error message.
-        self.assertEqual(1, self.execute_resmoke(["--replay=foo", "jstests/filename.js"]).wait())
-        self.assertEqual(1, self.execute_resmoke(["@foo", "jstests/filename.js"]).wait())
+        self.create_file_in_test_dir("replay", f"{self.testfiles_root}/two.js\n" * 3)
 
-        # Technically errors on file `@foo` not existing. Only the first positional argument can be interpreted as a `@replay_file`. This is a limitation not a feature, this test just serves as documentation.
-        self.assertEqual(1, self.execute_resmoke([f"{self.testfiles_root}/one.js", "@foo"]).wait())
+        # Additionally can assert on the error message.
+        self.assertEqual(
+            2,
+            self.execute_resmoke([f"--replay={self.test_dir}/replay",
+                                  "jstests/filename.js"]).wait())
+
+        # When multiple positional arguments are presented, they're all treated as test files. Technically errors on file `@<testdir>/replay` not existing. It's not a requirement that this invocation errors in this less specific way.
+        self.assertEqual(
+            1,
+            self.execute_resmoke([f"@{self.test_dir}/replay", "jstests/filename.js"]).wait())
+        self.assertEqual(
+            1,
+            self.execute_resmoke([f"{self.testfiles_root}/one.js",
+                                  f"@{self.test_dir}/replay"]).wait())
+
+
+class TestSetParameters(_ResmokeSelftest):
+    def setUp(self):
+        self.shell_output_file = f"{self.test_dir}/output.json"
+        try:
+            os.remove(self.shell_output_file)
+        except OSError:
+            pass
+
+        super().setUp()
+
+    def parse_output_json(self):
+        # Parses the outputted json.
+        with open(self.shell_output_file) as fd:
+            return json.load(fd)
+
+    def generate_suite(self, suite_output_path, template_file):
+        """Read the template file, substitute the `outputLocation` and rewrite to the file `suite_output_path`."""
+
+        with open(os.path.normpath(template_file), "r") as template_suite_fd:
+            suite = yaml.safe_load(template_suite_fd)
+
+        try:
+            os.remove(suite_output_path)
+        except FileNotFoundError:
+            pass
+
+        suite["executor"]["config"]["shell_options"]["global_vars"]["TestData"][
+            "outputLocation"] = self.shell_output_file
+        with open(os.path.normpath(suite_output_path), "w") as fd:
+            yaml.dump(suite, fd, default_flow_style=False)
+
+    def generate_suite_and_execute_resmoke(self, suite_template, resmoke_args):
+        """Generates a resmoke suite with the appropriate `outputLocation` and runs resmoke against that suite with the `fixture_info` test. Input `resmoke_args` are appended to the run command."""
+
+        suite_file = f"{self.test_dir}/suite.yml"
+        self.generate_suite(suite_file, suite_template)
+
+        self.logger.info(
+            "Running test. Template suite: {suite_template} Rewritten suite: {self.suite_file} Resmoke Args: {resmoke_args} Test output file: {self.shell_output_file}."
+        )
+
+        resmoke_process = core.programs.make_process(self.logger, [
+            sys.executable, "buildscripts/resmoke.py", "run", f"--suites={suite_file}",
+            f"{self.testfiles_root}/fixture_info.js"
+        ] + resmoke_args)
+        resmoke_process.start()
+
+        return resmoke_process
+
+    def test_suite_set_parameters(self):
+        self.generate_suite_and_execute_resmoke(
+            f"{self.suites_root}/resmoke_selftest_set_parameters.yml", []).wait()
+
+        set_params = self.parse_output_json()
+        self.assertEqual("1", set_params["enableTestCommands"])
+        self.assertEqual("false", set_params["testingDiagnosticsEnabled"])
+        self.assertEqual("{'storage': 2}", set_params["logComponentVerbosity"])
+
+    def test_cli_set_parameters(self):
+        self.generate_suite_and_execute_resmoke(
+            f"{self.suites_root}/resmoke_selftest_set_parameters.yml",
+            ["""--mongodSetParameter={"enableFlowControl": false, "flowControlMaxSamples": 500}"""
+             ]).wait()
+
+        set_params = self.parse_output_json()
+        self.assertEqual("1", set_params["enableTestCommands"])
+        self.assertEqual("false", set_params["enableFlowControl"])
+        self.assertEqual("500", set_params["flowControlMaxSamples"])
+
+    def test_override_set_parameters(self):
+        self.generate_suite_and_execute_resmoke(
+            f"{self.suites_root}/resmoke_selftest_set_parameters.yml",
+            ["""--mongodSetParameter={"testingDiagnosticsEnabled": true}"""]).wait()
+
+        set_params = self.parse_output_json()
+        self.assertEqual("true", set_params["testingDiagnosticsEnabled"])
+        self.assertEqual("{'storage': 2}", set_params["logComponentVerbosity"])
+
+    def test_merge_cli_set_parameters(self):
+        self.generate_suite_and_execute_resmoke(
+            f"{self.suites_root}/resmoke_selftest_set_parameters.yml", [
+                """--mongodSetParameter={"enableFlowControl": false}""",
+                """--mongodSetParameter={"flowControlMaxSamples": 500}"""
+            ]).wait()
+
+        set_params = self.parse_output_json()
+        self.assertEqual("false", set_params["testingDiagnosticsEnabled"])
+        self.assertEqual("{'storage': 2}", set_params["logComponentVerbosity"])
+        self.assertEqual("false", set_params["enableFlowControl"])
+        self.assertEqual("500", set_params["flowControlMaxSamples"])
+
+    def test_merge_error_cli_set_parameters(self):
+        self.assertEqual(
+            2,
+            self.generate_suite_and_execute_resmoke(
+                f"{self.suites_root}/resmoke_selftest_set_parameters.yml", [
+                    """--mongodSetParameter={"enableFlowControl": false}""",
+                    """--mongodSetParameter={"enableFlowControl": true}"""
+                ]).wait())
+
+    def test_mongos_set_parameter(self):
+        self.generate_suite_and_execute_resmoke(
+            f"{self.suites_root}/resmoke_selftest_set_parameters_sharding.yml", [
+                """--mongosSetParameter={"maxTimeMSForHedgedReads": 100}""",
+                """--mongosSetParameter={"mongosShutdownTimeoutMillisForSignaledShutdown": 1000}"""
+            ]).wait()
+
+        set_params = self.parse_output_json()
+        self.assertEqual("100", set_params["maxTimeMSForHedgedReads"])
+        self.assertEqual("1000", set_params["mongosShutdownTimeoutMillisForSignaledShutdown"])
+
+    def test_merge_error_cli_mongos_set_parameter(self):
+        self.assertEqual(
+            2,
+            self.generate_suite_and_execute_resmoke(
+                f"{self.suites_root}/resmoke_selftest_set_parameters_sharding.yml", [
+                    """--mongosSetParameter={"maxTimeMSForHedgedReads": 100}""",
+                    """--mongosSetParameter={"maxTimeMSForHedgedReads": 1000}"""
+                ]).wait())

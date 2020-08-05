@@ -10040,10 +10040,8 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     large_distro_name: rhel62-large
-    # TODO (SERVER-47509): Re-enable index build commit-quorum when resmoke handles multiple
-    # mongodSetParameters.
     test_flags: >-
-        --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2, enableIndexBuildCommitQuorum: false}"
+        --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
         --excludeWithAnyTags=exclude_from_large_txns
   tasks:
   - name: compile_TG
@@ -10127,12 +10125,10 @@ buildvariants:
     # works correctly.
     # TODO (SERVER-47022): Re-enable oplog constraint enforcement once we set the application mode
     # correctly after rollbackViaRefetch.
-    # TODO (SERVER-47509): Re-enable index build commit-quorum when resmoke handles multiple
-    # mongodSetParameters.
     test_flags: >-
       --majorityReadConcern=off
       --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction,uses_atclustertime
-      --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false, enableIndexBuildCommitQuorum: false}"
+      --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false}"
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
@@ -10360,7 +10356,6 @@ buildvariants:
     scons_cache_scope: shared
     build_mongoreplay: false
     large_distro_name: rhel62-large
-  # Additions of tasks already defining '--mongodSetParameters' will override this test suite's parameter settings (SERVER-47509).
   tasks:
   - name: compile_TG
     distros:
@@ -11860,12 +11855,10 @@ buildvariants:
     # We also relax oplog constraints so that applying oplog entries after a rollbackViaRefetch works correctly.
     # TODO (SERVER-47022): Re-enable oplog constraint enforcement once we set the application mode
     # correctly after rollbackViaRefetch.
-    # TODO (SERVER-47509): Re-enable index build commit-quorum when resmoke handles multiple
-    # mongodSetParameters.
     test_flags: >-
       --storageEngine=ephemeralForTest
-      --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern,uses_change_streams,requires_sharding,incompatible_with_eft
-      --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false, enableIndexBuildCommitQuorum: false}"
+      --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,requires_document_locking,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern,uses_change_streams,requires_sharding,incompatible_with_eft
+      --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false}"
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: rhel62
     multiversion_edition: targeted
