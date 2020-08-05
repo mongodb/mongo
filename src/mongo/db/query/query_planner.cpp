@@ -175,6 +175,8 @@ string optionString(size_t options) {
                 break;
             case QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG:
                 ss << "ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG ";
+            case QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP:
+                ss << "ENUMERATE_OR_CHILDREN_LOCKSTEP ";
                 break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;
@@ -852,12 +854,15 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         enumParams.intersect = params.options & QueryPlannerParams::INDEX_INTERSECTION;
         enumParams.root = query.root();
         enumParams.indices = &relevantIndices;
+        enumParams.enumerateOrChildrenLockstep =
+            params.options & QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
 
-        PlanEnumerator isp(enumParams);
-        isp.init().transitional_ignore();
+        PlanEnumerator planEnumerator(enumParams);
+        uassertStatusOKWithContext(planEnumerator.init(), "failed to initialize plan enumerator");
 
         unique_ptr<MatchExpression> nextTaggedTree;
-        while ((nextTaggedTree = isp.getNext()) && (out.size() < params.maxIndexedSolutions)) {
+        while ((nextTaggedTree = planEnumerator.getNext()) &&
+               (out.size() < params.maxIndexedSolutions)) {
             LOGV2_DEBUG(20976,
                         5,
                         "About to build solntree from tagged tree",

@@ -473,6 +473,7 @@ void IndexScanNode::appendToString(str::stream* ss, int indent) const {
     *ss << "IXSCAN\n";
     addIndent(ss, indent + 1);
     *ss << "indexName = " << index.identifier.catalogName << '\n';
+    addIndent(ss, indent + 1);
     *ss << "keyPattern = " << index.keyPattern << '\n';
     if (nullptr != filter) {
         addIndent(ss, indent + 1);
