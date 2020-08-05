@@ -418,10 +418,6 @@ env.Library(
         env.Idlc('internal_rename_if_options_and_indexes_match.idl')[0],
         env.Idlc('vote_commit_index_build.idl')[0],
     ],
-    LIBDEPS=[
-        'tenant_migration_cmds_request',
-        'txn_cmd_request',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
@@ -464,7 +460,9 @@ env.Library(
         'shell_protocol',
         'shutdown_idl',
         'standalone',
+        'tenant_migration_cmds_request',
         'test_commands_enabled',
+        'txn_cmd_request',
     ],
 )
 
