@@ -161,8 +161,7 @@ public:
      */
     bool abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
                                                   Collection* collection,
-                                                  const UUID& buildUUID,
-                                                  const std::string& reason);
+                                                  const UUID& buildUUID);
 
     /**
      * The same as abortIndexBuildWithoutCleanupForRollback above, but additionally writes the

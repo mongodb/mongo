@@ -218,6 +218,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangDuringQuiesceMode);
 MONGO_FAIL_POINT_DEFINE(pauseWhileKillingOperationsAtShutdown);
+MONGO_FAIL_POINT_DEFINE(hangBeforeShutdown);
 
 const NamespaceString startupLogCollectionName("local.startup_log");
 
@@ -1023,6 +1024,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     } else {
         invariant(!shutdownArgs.isUserInitiated);
         shutdownTimeout = Milliseconds(repl::shutdownTimeoutMillisForSignaledShutdown.load());
+    }
+
+    if (MONGO_unlikely(hangBeforeShutdown.shouldFail())) {
+        LOGV2(4944800, "Hanging before shutdown due to hangBeforeShutdown failpoint");
+        hangBeforeShutdown.pauseWhileSet();
     }
 
     // If we don't have shutdownArgs, we're shutting down from a signal, or other clean shutdown

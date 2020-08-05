@@ -53,14 +53,14 @@
 namespace mongo {
 namespace {
 
-void checkDrainPhaseFailPoint(FailPoint* fp, long long iteration) {
+void checkDrainPhaseFailPoint(OperationContext* opCtx, FailPoint* fp, long long iteration) {
     fp->executeIf(
         [=](const BSONObj& data) {
             LOGV2(4841800,
                   "Hanging index build during drain writes phase",
                   "iteration"_attr = iteration);
 
-            fp->pauseWhileSet();
+            fp->pauseWhileSet(opCtx);
         },
         [iteration](const BSONObj& data) { return iteration == data["iteration"].numberLong(); });
 }
@@ -115,12 +115,13 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                                              boost::optional<StringData> duplicateKeyTrackerIdent,
                                              boost::optional<StringData> skippedRecordTrackerIdent)
     : _indexCatalogEntry(entry),
+      _sideWritesTable(
+          opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
+              opCtx, sideWritesIdent)),
       _skippedRecordTracker(opCtx, entry, skippedRecordTrackerIdent),
-      _sideWritesCounter(std::make_shared<AtomicWord<long long>>()) {
+      _sideWritesCounter(
+          std::make_shared<AtomicWord<long long>>(_sideWritesTable->rs()->numRecords(opCtx))) {
 
-    _sideWritesTable =
-        opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
-            opCtx, sideWritesIdent);
     auto finalizeTableOnFailure = makeGuard([&] {
         _sideWritesTable->finalizeTemporaryTable(opCtx,
                                                  TemporaryRecordStore::FinalizationAction::kDelete);
@@ -241,8 +242,8 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
             }
 
             const long long iteration = _numApplied + batchSize;
-            checkDrainPhaseFailPoint(&hangIndexBuildDuringDrainWritesPhase, iteration);
-            checkDrainPhaseFailPoint(&hangIndexBuildDuringDrainWritesPhaseSecond, iteration);
+            checkDrainPhaseFailPoint(opCtx, &hangIndexBuildDuringDrainWritesPhase, iteration);
+            checkDrainPhaseFailPoint(opCtx, &hangIndexBuildDuringDrainWritesPhaseSecond, iteration);
 
             batchSize += 1;
             batchSizeBytes += objSize;

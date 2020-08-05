@@ -857,9 +857,8 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
     }
 
     // If no SizeStorer is in use, start counting at zero. In practice, this will only ever be the
-    // the case for temporary RecordStores (those not associated with any collection) and in unit
-    // tests. Persistent size information is not required in either case. If a RecordStore needs
-    // persistent size information, we require it to use a SizeStorer.
+    // the case in unit tests. Persistent size information is not required in this case. If a
+    // RecordStore needs persistent size information, we require it to use a SizeStorer.
     _sizeInfo = _sizeStorer ? _sizeStorer->load(_uri)
                             : std::make_shared<WiredTigerSizeStorer::SizeInfo>(0, 0);
 }

@@ -72,6 +72,38 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseBeforeInsertion);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseAfterInsertion);
 MONGO_FAIL_POINT_DEFINE(leaveIndexBuildUnfinishedForShutdown);
 
+namespace {
+
+void failPointHangDuringBuild(OperationContext* opCtx,
+                              FailPoint* fp,
+                              StringData where,
+                              const BSONObj& doc,
+                              unsigned long long iteration) {
+    fp->executeIf(
+        [=, &doc](const BSONObj& data) {
+            LOGV2(20386,
+                  "Hanging index build during collection scan phase insertion",
+                  "where"_attr = where,
+                  "doc"_attr = doc);
+
+            fp->pauseWhileSet(opCtx);
+        },
+        [&doc, iteration](const BSONObj& data) {
+            if (data.hasField("iteration")) {
+                return iteration == static_cast<unsigned long long>(data["iteration"].numberLong());
+            }
+
+            auto fieldsToMatch = data.getObjectField("fieldsToMatch");
+            return std::all_of(
+                fieldsToMatch.begin(), fieldsToMatch.end(), [&doc](const auto& elem) {
+                    return SimpleBSONElementComparator::kInstance.evaluate(elem ==
+                                                                           doc[elem.fieldName()]);
+                });
+        });
+}
+
+}  // namespace
+
 MultiIndexBlock::~MultiIndexBlock() {
     invariant(_buildIsCleanedUp);
 }
@@ -172,7 +204,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
     invariant(_indexes.empty());
 
-    if (resumeInfo) {
+    // TODO (SERVER-49409): Resume from the collection scan phase.
+    // TODO (SERVER-49408): Resume from the bulk load phase.
+    if (resumeInfo && resumeInfo->getPhase() == IndexBuildPhaseEnum::kDrainWrites) {
         _phase = resumeInfo->getPhase();
     }
 
@@ -338,26 +372,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     }
 }
 
-void failPointHangDuringBuild(FailPoint* fp, StringData where, const BSONObj& doc) {
-    fp->executeIf(
-        [&](const BSONObj& data) {
-            LOGV2(20386,
-                  "Hanging index build during collection scan phase insertion",
-                  "where"_attr = where,
-                  "doc"_attr = doc);
-
-            fp->pauseWhileSet();
-        },
-        [&doc](const BSONObj& data) {
-            auto fieldsToMatch = data.getObjectField("fieldsToMatch");
-            return std::all_of(
-                fieldsToMatch.begin(), fieldsToMatch.end(), [&doc](const auto& elem) {
-                    return SimpleBSONElementComparator::kInstance.evaluate(elem ==
-                                                                           doc[elem.fieldName()]);
-                });
-        });
-}
-
 Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
                                                        Collection* collection) {
     invariant(!_buildIsCleanedUp);
@@ -445,8 +459,11 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 
             progress->setTotalWhileRunning(collection->numRecords(opCtx));
 
-            failPointHangDuringBuild(
-                &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion, "before", objToIndex);
+            failPointHangDuringBuild(opCtx,
+                                     &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion,
+                                     "before",
+                                     objToIndex,
+                                     n);
 
             // The external sorter is not part of the storage engine and therefore does not need a
             // WriteUnitOfWork to write keys.
@@ -455,8 +472,11 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
                 return ret;
             }
 
-            failPointHangDuringBuild(
-                &hangIndexBuildDuringCollectionScanPhaseAfterInsertion, "after", objToIndex);
+            failPointHangDuringBuild(opCtx,
+                                     &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
+                                     "after",
+                                     objToIndex,
+                                     n);
 
             // Go to the next document.
             progress->hit();

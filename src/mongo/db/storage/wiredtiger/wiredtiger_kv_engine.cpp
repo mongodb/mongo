@@ -1754,10 +1754,8 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     params.isCapped = false;
     params.isEphemeral = _ephemeral;
     params.cappedCallback = nullptr;
-    // Temporary collections do not need to persist size information to the size storer.
-    params.sizeStorer = nullptr;
-    // Temporary collections do not need to reconcile collection size/counts.
-    params.tracksSizeAdjustments = false;
+    params.sizeStorer = _sizeStorer.get();
+    params.tracksSizeAdjustments = true;
     params.isReadOnly = false;
 
     params.cappedMaxSize = -1;

@@ -327,8 +327,7 @@ bool IndexBuildsManager::abortIndexBuild(OperationContext* opCtx,
 
 bool IndexBuildsManager::abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
                                                                   Collection* collection,
-                                                                  const UUID& buildUUID,
-                                                                  const std::string& reason) {
+                                                                  const UUID& buildUUID) {
     auto builder = _getBuilder(buildUUID);
     if (!builder.isOK()) {
         return false;
@@ -351,7 +350,8 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanupForShutdown(OperationConte
         return false;
     }
 
-    LOGV2(4841500, "Index build aborted without cleanup for shutdown", logAttrs(buildUUID));
+    LOGV2(
+        4841500, "Index build aborted without cleanup for shutdown", "buildUUID"_attr = buildUUID);
 
     builder.getValue()->abortWithoutCleanupForShutdown(opCtx);
     return true;

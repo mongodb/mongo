@@ -1278,7 +1278,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
             invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
             invariant(replCoord->getMemberState().rollback());
             _indexBuildsManager.abortIndexBuildWithoutCleanupForRollback(
-                opCtx, coll, replState->buildUUID, reason.reason());
+                opCtx, coll, replState->buildUUID);
             break;
         }
         case IndexBuildAction::kNoAction:
@@ -2231,7 +2231,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
             hangAfterInitializingIndexBuild.pauseWhileSet(opCtx);
         }
 
-        if (resumeInfo) {
+        // TODO (SERVER-49409): Resume from the collection scan phase.
+        // TODO (SERVER-49408): Resume from the bulk load phase.
+        if (resumeInfo && resumeInfo->getPhase() == IndexBuildPhaseEnum::kDrainWrites) {
             _resumeIndexBuildFromPhase(opCtx, replState, indexBuildOptions, resumeInfo.get());
         } else {
             _buildIndex(opCtx, replState, indexBuildOptions);

@@ -33,7 +33,7 @@ const RollbackResumableIndexBuildTest = class {
         const coll = originalPrimary.getDB(dbName).getCollection(collName);
         const indexName = "rollback_resumable_index_build";
 
-        let rollbackEndFp =
+        const rollbackEndFp =
             configureFailPoint(originalPrimary, rollbackEndFailPointName, rollbackEndFailPointData);
         const rollbackStartFp = configureFailPoint(
             originalPrimary, rollbackStartFailPointName, rollbackStartFailPointData);
@@ -60,13 +60,23 @@ const RollbackResumableIndexBuildTest = class {
 
         // Disable the failpoint in a parallel shell so that the primary can step down when the
         // rollback test is transitioning to sync source operations before rollback.
-        const awaitDisableFailPointAfterInterruption =
-            ResumableIndexBuildTest.disableFailPointAfterInterruption(
-                originalPrimary, rollbackEndFp.failPointName, buildUUID);
+        const awaitDisableFailPointAfterContinuingInBackground = startParallelShell(
+            funWithArgs(function(failPointName, buildUUID) {
+                // Wait for the index build to be continue in the background.
+                checkLog.containsJson(db.getMongo(), 20442, {
+                    buildUUID: function(uuid) {
+                        return uuid["uuid"]["$uuid"] === buildUUID;
+                    }
+                });
+
+                // Disable the failpoint so that stepdown can proceed.
+                assert.commandWorked(
+                    db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
+            }, rollbackEndFp.failPointName, buildUUID), originalPrimary.port);
 
         rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
-        awaitDisableFailPointAfterInterruption();
+        awaitDisableFailPointAfterContinuingInBackground();
 
         // The index creation will report as having failed due to InterruptedDueToReplStateChange,
         // but it is still building in the background.

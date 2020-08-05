@@ -239,29 +239,6 @@ const ResumableIndexBuildTest = class {
     }
 
     /**
-     * Waits for the specified index build to be interrupted and then disables the given failpoint.
-     */
-    static disableFailPointAfterInterruption(conn, failPointName, buildUUID) {
-        return startParallelShell(
-            funWithArgs(function(failPointName, buildUUID) {
-                // Wait for the index build to be interrupted.
-                checkLog.containsJson(db.getMongo(), 20449, {
-                    buildUUID: function(uuid) {
-                        return uuid["uuid"]["$uuid"] === buildUUID;
-                    },
-                    error: function(error) {
-                        return error.code === ErrorCodes.InterruptedDueToReplStateChange;
-                    }
-                });
-
-                // Once the index build has been interrupted, disable the failpoint so that shutdown
-                // or stepdown can proceed.
-                assert.commandWorked(
-                    db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
-            }, failPointName, buildUUID), conn.port);
-    }
-
-    /**
      * Inserts the given documents once an index build reaches the end of the bulk load phase so
      * that the documents are inserted into the side writes table for that index build.
      */
@@ -299,7 +276,7 @@ const ResumableIndexBuildTest = class {
      * Restarts the given node, ensuring that the the index build with name indexName has its state
      * written to disk upon shutdown and is completed upon startup.
      */
-    static restart(rst, conn, coll, indexName, failPointName) {
+    static restart(rst, conn, coll, indexName, failPointName, failPointData) {
         clearRawMongoProgramOutput();
 
         const buildUUID = extractUUIDFromObject(
@@ -307,11 +284,42 @@ const ResumableIndexBuildTest = class {
                 .assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName]
                 .buildUUID);
 
-        const awaitDisableFailPoint = ResumableIndexBuildTest.disableFailPointAfterInterruption(
-            conn, failPointName, buildUUID);
+        // Don't interrupt the index build for shutdown until it is at the desired point.
+        const shutdownFpTimesEntered =
+            assert
+                .commandWorked(
+                    conn.adminCommand({configureFailPoint: "hangBeforeShutdown", mode: "alwaysOn"}))
+                .count;
+
+        const awaitContinueShutdown = startParallelShell(
+            funWithArgs(function(failPointName, failPointData, shutdownFpTimesEntered) {
+                load("jstests/libs/fail_point_util.js");
+
+                // Wait until we hang before shutdown to ensure that we do not move the index build
+                // forward before the step down process is complete.
+                assert.commandWorked(db.adminCommand({
+                    waitForFailPoint: "hangBeforeShutdown",
+                    timesEntered: shutdownFpTimesEntered + 1,
+                    maxTimeMS: kDefaultWaitForFailPointTimeout
+                }));
+
+                // Move the index build forward to the point that we want it to be interrupted for
+                // shutdown at.
+                const fp = configureFailPoint(db.getMongo(), failPointName, failPointData);
+                assert.commandWorked(db.adminCommand(
+                    {configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked", mode: "off"}));
+                fp.wait();
+
+                // Disabling this failpoint will allow shutdown to continue and cause the operation
+                // context to be killed. This will cause the failpoint specified by failPointName
+                // to be interrupted and allow the index build to be interrupted for shutdown at
+                // its current location.
+                assert.commandWorked(
+                    db.adminCommand({configureFailPoint: "hangBeforeShutdown", mode: "off"}));
+            }, failPointName, failPointData, shutdownFpTimesEntered), conn.port);
 
         rst.stop(conn);
-        awaitDisableFailPoint();
+        awaitContinueShutdown();
 
         // Ensure that the resumable index build state was written to disk upon clean shutdown.
         assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput()));
@@ -337,10 +345,16 @@ const ResumableIndexBuildTest = class {
                insertIntoSideWritesTable,
                postIndexBuildInserts = {}) {
         const primary = rst.getPrimary();
+
+        if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(primary)) {
+            jsTestLog("Skipping test because resumable index builds are not enabled");
+            return;
+        }
+
         const coll = primary.getDB(dbName).getCollection(collName);
         const indexName = "resumable_index_build";
 
-        const fp = configureFailPoint(primary, failPointName, failPointData);
+        const fp = configureFailPoint(primary, "hangAfterSettingUpIndexBuildUnlocked");
 
         const awaitInsertIntoSideWritesTable = ResumableIndexBuildTest.insertIntoSideWritesTable(
             primary, collName, insertIntoSideWritesTable);
@@ -350,7 +364,8 @@ const ResumableIndexBuildTest = class {
 
         fp.wait();
 
-        ResumableIndexBuildTest.restart(rst, primary, coll, indexName, failPointName);
+        ResumableIndexBuildTest.restart(
+            rst, primary, coll, indexName, failPointName, failPointData);
 
         awaitInsertIntoSideWritesTable();
         awaitCreateIndex();

@@ -652,13 +652,13 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         }
 
         hangIndexBuildDuringBulkLoadPhase.executeIf(
-            [i](const BSONObj& data) {
+            [opCtx, i](const BSONObj& data) {
                 LOGV2(4924400,
                       "Hanging index build during bulk load phase due to "
                       "'hangIndexBuildDuringBulkLoadPhase' failpoint",
                       "iteration"_attr = i);
 
-                hangIndexBuildDuringBulkLoadPhase.pauseWhileSet();
+                hangIndexBuildDuringBulkLoadPhase.pauseWhileSet(opCtx);
             },
             [i](const BSONObj& data) { return i == data["iteration"].numberLong(); });
 
