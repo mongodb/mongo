@@ -879,7 +879,6 @@ functions:
 
         ${activate_virtualenv}
         pip install -r buildscripts/requirements.txt
-        pip install boto3==1.5.27
 
   "execute resmoke tests" : &execute_resmoke_tests
     command: shell.exec
@@ -894,7 +893,6 @@ functions:
         # Install any pip modules needed by the scripts or tests
         ${activate_virtualenv}
         pip install -r buildscripts/requirements.txt
-        pip install boto3==1.5.27
 
         if [[ ${disable_unit_tests|false} = "false" && ! -f ${skip_tests|/dev/null} ]]; then
 
