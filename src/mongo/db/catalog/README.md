@@ -193,14 +193,51 @@ to read at
 [kLastApplied](https://github.com/mongodb/mongo/blob/58283ca178782c4d1c4a4d2acd4313f6f6f86fd5/src/mongo/db/storage/recovery_unit.h#L411).
 
 # Write Operations
-an overview of how writes (insert, update, delete) are processed
 
-## Index Writes
-_could pull out index reads and writes into its own section, if preferable_
+Operations that write to collections and indexes must take collection locks. Storage engines require
+all operations to hold at least a collection IX lock to provide document-level concurrency.
+Operations must perform writes in the scope of a WriteUnitOfWork.
 
-how index tables also get updated when a write happens, (numIndexes + 1) writes total
+## WriteUnitOfWork
 
-## Vectored Insert
+All reads and writes in the scope of a WriteUnitOfWork (WUOW) operate on the same storage engine
+snapshot, and all writes in the scope of a WUOW are transactional; they are either all committed or
+all rolled-back. The WUOW commits writes that took place in its scope by a call to commit(). It
+rolls-back writes when it goes out of scope and its destructor is called before a call to commit().
+
+Writers may conflict with each other when more than one operation stages an uncommitted write to the
+same document concurrently. To force one or more of the writers to retry, the storage engine may
+throw a WriteConflictException at any point, up to and including the the call to commit(). This is
+referred to as optimistic concurrency control because it allows uncontended writes to commit
+quickly. Because of this behavior, most WUOWs are enclosed in a writeConflictRetry loop that retries
+the write transaction until it succeeds, accompanied by a bounded exponential back-off.
+
+See
+[WriteUnitOfWork](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/storage/write_unit_of_work.h)
+and
+[writeConflictRetry](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/concurrency/write_conflict_exception.h).
+
+## Collection and Index Writes
+
+Collection write operations (inserts, updates, and deletes) perform storage engine writes to both
+the collection's RecordStore and relevant index's SortedDataInterface in the same storage transaction, or
+WUOW. This ensures that completed, not-building indexes are always consistent with collection data.
+
+## Vectored Inserts
+
+To support efficient bulk inserts, we provide an internal API on collections, insertDocuments, that
+supports 'vectored' inserts. Writers that wish to insert a vector of many documents will
+bulk-allocate OpTimes for each document into a vector and pass both to insertDocument. In a single
+WriteUnitOfWork, for every document, a commit timestamp is set with the OpTime, and the document is
+inserted. The storage engine allows each document to appear committed at a different timestamp, even
+though all writes took place in a single storage transaction.
+
+See
+[insertDocuments](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/ops/write_ops_exec.cpp#L315)
+and
+[WiredTigerRecordStore::insertRecords](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/storage/wiredtiger/wiredtiger_record_store.cpp#L1494).
+
+
 
 # Concurrency Control
 
