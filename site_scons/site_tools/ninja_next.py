@@ -471,8 +471,16 @@ class NinjaState:
                 "rspfile_content": "$rspc",
                 "pool": "local_pool",
             },
+            # Ninja does not automatically delete the archive before
+            # invoking ar. The ar utility will append to an existing archive, which
+            # can cause duplicate symbols if the symbols moved between object files.
+            # Native SCons will perform this operation so we need to force ninja
+            # to do the same. See related for more info:
+            # https://jira.mongodb.org/browse/SERVER-49457
             "AR": {
-                "command": "$env$AR @$out.rsp",
+                "command": "{}$env$AR @$out.rsp".format(
+                    '' if sys.platform == "win32" else "rm -f $out && "
+                ),
                 "description": "Archiving $out",
                 "rspfile": "$out.rsp",
                 "rspfile_content": "$rspc",
