@@ -23,22 +23,18 @@ index implementations found in the [**index/**][] directory; and the sorter foun
 
 # The Catalog
 
-## In-Memory Catalog
-
-### Collection Catalog
-include discussion of RecordStore interface
-
-### Index Catalog
-include discussion of SortedDataInterface interface
-
-### Versioning
-in memory versioning (or lack thereof) is separate from on disk
-
-#### The Minimum Visible Snapshot
+The catalog is where MongoDB stores information about the collections and indexes for a MongoDB
+node. In some contexts we refer to this as metadata and to operations changing this metadata as
+[DDL](#glossary) (Data Definition Language) operations. The catalog is persisted as a table with
+BSON documents that each describe properties of a collection and its indexes. An in-memory catalog
+caches the most recent catalog information for more efficient access.
 
 ## Durable Catalog
-Discuss what the catalog looks like on disk -- e.g. just another WT data table we structure
-specially
+
+The durable catalog is persisted as a table with the `_mdb_catalog` [ident](#glossary). Each entry
+in this table is indexed with a 64-bit `RecordId`, referred to as the catalog ID, and contains a
+BSON document that describes the properties of a collection and its indexes. The `DurableCatalog`
+class allows read and write access to the durable data.
 
 **Example**: an entry in the durable catalog for a collection `test.employees` with an in-progress
 index build on `{lastName: 1}`:
@@ -67,19 +63,66 @@ index build on `{lastName: 1}`:
   'ns': 'test.employees'}
 ```
 
+## Collection Catalog
+The `CollectionCatalog` class holds in-memory state about all collections in all databases and is a
+cache of the [durable catalog](#durable-catalog) state. It provides the following functionality:
+ * Register new `Collection` objects, taking ownership of them.
+ * Lookup `Collection` objects by their `UUID` or `NamespaceString`.
+ * Iterate over `Collection` objects in a database in `UUID` order.
+ * Deregister individual dropped `Collection` objects, releasing ownership.
+ * Allow closing/reopening the catalog while still providing limited `UUID` to `NamespaceString`
+   lookup to support rollback to a point in time.
 
-### Catalog Data Formats
-What do the catalog documents look like? Are there catalog concepts constructed only in-memory and not on disk?
+All catalog access is internally synchronized, and use of iterators after catalog changes generally
+results in automatic repositioning.
 
-#### Collection Data Format
+### Collection objects
+Objects of the `Collection` class provide access to a collection's main properties across some range
+of time between [DDL](#glossary) operations that may change these properties. Such operations may
+change the collection name for example, resulting in a new `Collection` object. It is possible for
+operations that read at different points in time to use different `Collection` objects.
 
-#### Index Data Format
+Notable properties of `Collection` objects are:
+ * catalog ID - to look up or change information from the DurableCatalog.
+ * UUID - Identifier that remains for the lifetime of the underlying MongoDb collection, even across
+   DDL operations such as renames, and is consistent between different nodes and shards in a
+   cluster.
+ * NamespaceString - The current name associated with the collection.
+ * Collation and validation properties.
+ * Decorations that are either `Collection` instance specific or shared between all `Collection`
+   objects over the lifetime of the collection.
+ * minimum visible snapshot - The minimum point-in-time snapshot at which the information the
+   `Collection` object is valid.
 
-### Versioning
-e.g. data changes in tables are versioned, dropping/creating tables is not versioned
+In addition `Collection` objects have shared ownership of:
+ * An [`IndexCatalog`](#index-catalog) - an in-memory structure representing the `md.indexes` data
+   from the durable catalog.
+ * A `RecordStore` - an interface to access and manipulate the documents in the collection as stored
+   by the storage engine.
 
-## Catalog Changes
-How are updates to the catalog done in-memory and on disk?
+Finally, there are two kinds of decorations on `Collection` objects. The `Collection` object derives
+from `Decorable` and can have `Decoration`s that keep non-durable state that is discarded when DDL
+operations occur. This is used for query information. Additionally, there are
+`SharedCollectionDecorations` for storing index usage statistics and query settings that are shared
+between `Collection` instances across DDL operations.
+
+### Index Catalog
+
+Each `Collection` object owns an `IndexCatalog` object, which in turn has shared ownership of
+`IndexCatalogEntry` objects that each again own an `IndexDescriptor` containing an in-memory
+presentation of the data stored in the [durable catalog](#durable-catalog).
+
+## Catalog Changes, versioning and the Minimum Visible Snapshot
+Every catalog change has a corresponding write with a commit time. When registered `OpObserver`
+objects observe catalog changes, they set the minimum visible snapshot of the `Collection` or
+`IndexCatalogEntry` object to the commit timestamp. Readers use this timestamp to determine whether
+the information cached in the `Collection` and `IndexCatalog` is valid for the point in time at
+which they read.
+
+Operations that use collection locks (in any [lockmode](#lock-modes)) can rely on the catalog
+information of the collection not changing. However, when unlocking and then relocking, not only
+should operations recheck catalog information to ensure it is still valid, they should also make
+sure to abandon the storage snapshot, so it is consistent with the in memory catalog.
 
 ## Two-Phase Collection and Index Drop
 
@@ -839,7 +882,7 @@ the data files.
 
 To avoid taking unnecessary checkpoints on an idle server, WiredTiger will only take checkpoints for
 the following scenarios:
-* When the [stable timestamp](../repl/README.md#replication-timestamp-glossary) is greater than or 
+* When the [stable timestamp](../repl/README.md#replication-timestamp-glossary) is greater than or
   equal to the [initial data timestamp](../repl/README.md#replication-timestamp-glossary), we take a
   stable checkpoint, which is a durable view of the data at a particular timestamp. This is for
   steady-state replication.
@@ -1049,7 +1092,7 @@ Additionally, users can specify that they'd like to perform a `full` validation.
   on the `RecordStore` and `SortedDataInterface` of each index in the `ValidateState` object.
     + We choose a read timestamp (`ReadSource`) based on the validation mode and node configuration:
       |                |  Standalone  | Replica Set  |
-      |----------------|:------------:|--------------|
+      | -------------- | :----------: | ------------ |
       | **Foreground** | kNoTimestamp | kNoTimestamp |
       | **Background** | kNoTimestamp | kNoOverlap   |
 * Traverses the `RecordStore` using the `ValidateAdaptor` object.
@@ -1135,7 +1178,7 @@ consistency problem if secondary replica set members querying the oplog of their
 unknowingly read past these holes and miss the data therein.
 
 | Op       | Action             | Result                                       |
-|----------|--------------------|----------------------------------------------|
+| -------- | ------------------ | -------------------------------------------- |
 | Writer A | open transaction   | assigned commit timestamp T5                 |
 | Writer B | open transaction   | assigned commit timestamp T6                 |
 | Writer B | commit transation  | T1,T2,T3,T4,T6 are visible to new readers    |
@@ -1207,6 +1250,10 @@ unclean shutdown.
 representation, from lower memory addresses to higher addresses, is the same as the defined ordering
 for that type. For example, ASCII strings are binary comparable, but double precision floating point
 numbers and little-endian integers are not.
+
+**DDL**: Acronym for Data Description Language or Data Definition Language used generally in the
+context of relational databases. DDL operations in the MongoDB context include index and collection
+creation or drop, as well as `collMod` operations.
 
 **ident**: An ident is a unique identifier given to a storage engine resource. Collections and
 indexes map application-layer names to storage engine idents. In WiredTiger, idents are implemented
