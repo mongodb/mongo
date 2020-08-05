@@ -65,7 +65,6 @@ moveChunkHangAtStep5FailPoint.off();
 moveChunkThread.join();
 
 metadataRefreshFailPoint.wait();
-testColl.drop();
 
 jsTest.log("Verify that the donor has the migration coordinator doc and range deletion task doc");
 assert.eq(1, getNumMigrationCoordinatorDocs(donorShard, ns));
@@ -74,6 +73,7 @@ assert.eq(1, getNumRangeDeletionDocs(donorShard, ns));
 jsTest.log("Verify that the recipient has the range deletion task doc");
 assert.eq(1, getNumRangeDeletionDocs(recipientShard, ns));
 
+testColl.drop();
 metadataRefreshFailPoint.off();
 
 jsTest.log("Wait for the recipient to delete the range deletion task doc");

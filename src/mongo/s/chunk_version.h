@@ -139,7 +139,7 @@ public:
      * Indicates that the shard version checking must be skipped but StaleShardVersion error
      * must be thrown if the metadata is not loaded
      */
-    void canThrowSSVOnIgnored() {
+    void setToThrowSSVOnIgnored() {
         _canThrowSSVOnIgnored = true;
     }
 

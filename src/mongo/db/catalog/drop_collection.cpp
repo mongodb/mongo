@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view_catalog.h"
@@ -179,6 +180,10 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
         // Take an exclusive lock to finish the collection drop.
         autoDb.emplace(opCtx, startingNss.db(), MODE_IX);
         collLock.emplace(opCtx, dbAndUUID, MODE_X);
+
+        // Serialize the drop with refreshes to prevent dropping a collection and creating the same
+        // nss as a view while refreshing.
+        CollectionShardingState::get(opCtx, startingNss)->checkShardVersionOrThrow(opCtx);
 
         // Abandon the snapshot as the index catalog will compare the in-memory state to the
         // disk state, which may have changed when we released the collection lock temporarily.

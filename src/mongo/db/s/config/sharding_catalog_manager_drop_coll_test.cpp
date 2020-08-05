@@ -107,11 +107,39 @@ public:
             operationContext(), ChunkType::ConfigNS, chunkDocBuilder.obj()));
     }
 
-    void expectDrop(const ShardType& shard) {
+    void expectStaleConfig(const ShardType& shard) {
         onCommand([this, shard](const RemoteCommandRequest& request) {
+            BSONObjBuilder builder;
+            builder.append("drop", _dropNS.coll());
+            auto ignoredShardVersion = ChunkVersion::IGNORED();
+            ignoredShardVersion.setToThrowSSVOnIgnored();
+            ignoredShardVersion.appendToCommand(&builder);
+
             ASSERT_EQ(HostAndPort(shard.getHost()), request.target);
             ASSERT_EQ(_dropNS.db(), request.dbname);
-            ASSERT_BSONOBJ_EQ(BSON("drop" << _dropNS.coll()), request.cmdObj);
+            ASSERT_BSONOBJ_EQ(builder.obj(), request.cmdObj);
+
+            StaleConfigInfo sci(
+                _dropNS, ignoredShardVersion, boost::none, ShardId(shard.getName()));
+            BSONObjBuilder responseBuilder;
+            responseBuilder.append("ok", 0);
+            responseBuilder.append("code", ErrorCodes::StaleShardVersion);
+            sci.serialize(&responseBuilder);
+            return responseBuilder.obj();
+        });
+    }
+
+    void expectDrop(const ShardType& shard) {
+        onCommand([this, shard](const RemoteCommandRequest& request) {
+            BSONObjBuilder builder;
+            builder.append("drop", _dropNS.coll());
+            auto ignoredShardVersion = ChunkVersion::IGNORED();
+            ignoredShardVersion.setToThrowSSVOnIgnored();
+            ignoredShardVersion.appendToCommand(&builder);
+
+            ASSERT_EQ(HostAndPort(shard.getHost()), request.target);
+            ASSERT_EQ(_dropNS.db(), request.dbname);
+            ASSERT_BSONOBJ_EQ(builder.obj(), request.cmdObj);
 
             ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
@@ -166,6 +194,7 @@ public:
         return _shard2;
     }
 
+protected:
 private:
     const NamespaceString _dropNS{"test.user"};
     ShardType _shard1;
@@ -196,9 +225,15 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
     auto future = launchAsync([this] { doDrop(); });
 
     onCommand([this](const RemoteCommandRequest& request) {
+        BSONObjBuilder builder;
+        builder.append("drop", dropNS().coll());
+        auto ignoredShardVersion = ChunkVersion::IGNORED();
+        ignoredShardVersion.setToThrowSSVOnIgnored();
+        ignoredShardVersion.appendToCommand(&builder);
+
         ASSERT_EQ(HostAndPort(shard1().getHost()), request.target);
         ASSERT_EQ(dropNS().db(), request.dbname);
-        ASSERT_BSONOBJ_EQ(BSON("drop" << dropNS().coll()), request.cmdObj);
+        ASSERT_BSONOBJ_EQ(builder.obj(), request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
@@ -207,9 +242,15 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
     });
 
     onCommand([this](const RemoteCommandRequest& request) {
+        BSONObjBuilder builder;
+        builder.append("drop", dropNS().coll());
+        auto ignoredShardVersion = ChunkVersion::IGNORED();
+        ignoredShardVersion.setToThrowSSVOnIgnored();
+        ignoredShardVersion.appendToCommand(&builder);
+
         ASSERT_EQ(HostAndPort(shard2().getHost()), request.target);
         ASSERT_EQ(dropNS().db(), request.dbname);
-        ASSERT_BSONOBJ_EQ(BSON("drop" << dropNS().coll()), request.cmdObj);
+        ASSERT_BSONOBJ_EQ(builder.obj(), request.cmdObj);
 
         ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
@@ -479,5 +520,36 @@ TEST_F(DropColl2ShardTest, AfterFailedSSVRetryWillStillSendDropSSV) {
     expectNoTagDocs();
     expectNoTagDocs();
 }
+
+TEST_F(DropColl2ShardTest, SSVisRetried) {
+    auto dropFuture = launchAsync([this] { doDrop(); });
+
+    expectStaleConfig(shard1());
+    expectDrop(shard1());
+    expectDrop(shard2());
+
+    expectSetShardVersionZero(shard1());
+    expectSetShardVersionZero(shard2());
+
+    dropFuture.default_timed_get();
+
+    expectCollectionDocMarkedAsDropped();
+    expectNoChunkDocs();
+    expectNoTagDocs();
+    expectNoTagDocs();
+}
+
+TEST_F(DropColl2ShardTest, maxSSVRetries) {
+    auto dropFuture = launchAsync([this] {
+        ASSERT_THROWS_CODE(doDrop(), AssertionException, ErrorCodes::StaleShardVersion);
+    });
+
+    for (int i = 0; i < 10; ++i) {
+        expectStaleConfig(shard1());
+    }
+
+    dropFuture.default_timed_get();
+}
+
 }  // unnamed namespace
 }  // namespace mongo

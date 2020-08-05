@@ -89,6 +89,7 @@ MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeCommit);
 namespace {
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
+static constexpr int kMaxNumStaleShardVersionRetries = 10;
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 const char kWriteConcernField[] = "writeConcern";
 
@@ -317,36 +318,57 @@ void sendDropCollectionToAllShards(OperationContext* opCtx, const NamespaceStrin
                            opCtx->getWriteConcern().toBSON());
         }
 
+        auto ignoredShardVersion = ChunkVersion::IGNORED();
+        ignoredShardVersion.setToThrowSSVOnIgnored();
+        ignoredShardVersion.appendToCommand(&builder);
         return builder.obj();
     }();
 
     auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     for (const auto& shardEntry : allShards) {
-        const auto& shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardEntry.getName()));
+        bool keepTrying;
+        size_t numStaleShardVersionAttempts = 0;
+        do {
+            const auto& shard =
+                uassertStatusOK(shardRegistry->getShard(opCtx, shardEntry.getName()));
 
-        auto swDropResult = shard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            nss.db().toString(),
-            dropCommandBSON,
-            Shard::RetryPolicy::kIdempotent);
+            auto swDropResult = shard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                nss.db().toString(),
+                dropCommandBSON,
+                Shard::RetryPolicy::kIdempotent);
 
-        const std::string dropCollectionErrMsg = str::stream()
-            << "Error dropping collection on shard " << shardEntry.getName();
+            const std::string dropCollectionErrMsg = str::stream()
+                << "Error dropping collection on shard " << shardEntry.getName();
 
-        auto dropResult = uassertStatusOKWithContext(swDropResult, dropCollectionErrMsg);
-        uassertStatusOKWithContext(dropResult.writeConcernStatus, dropCollectionErrMsg);
+            auto dropResult = uassertStatusOKWithContext(swDropResult, dropCollectionErrMsg);
+            uassertStatusOKWithContext(dropResult.writeConcernStatus, dropCollectionErrMsg);
 
-        auto dropCommandStatus = std::move(dropResult.commandStatus);
-        if (dropCommandStatus.code() == ErrorCodes::NamespaceNotFound) {
-            // The dropCollection command on the shard is not idempotent, and can return
-            // NamespaceNotFound. We can ignore NamespaceNotFound since we have already asserted
-            // that there is no writeConcern error.
-            continue;
-        }
+            auto dropCommandStatus = std::move(dropResult.commandStatus);
 
-        uassertStatusOKWithContext(dropCommandStatus, dropCollectionErrMsg);
+            if (dropCommandStatus.code() == ErrorCodes::NamespaceNotFound) {
+                // The dropCollection command on the shard is not idempotent, and can return
+                // NamespaceNotFound. We can ignore NamespaceNotFound since we have already asserted
+                // that there is no writeConcern error.
+                keepTrying = false;
+            } else if (ErrorCodes::isStaleShardVersionError(dropCommandStatus.code())) {
+                numStaleShardVersionAttempts++;
+                if (numStaleShardVersionAttempts == kMaxNumStaleShardVersionRetries) {
+                    uassertStatusOKWithContext(dropCommandStatus,
+                                               str::stream() << dropCollectionErrMsg
+                                                             << " due to exceeded retry attempts");
+                }
+                // No need to refresh cache, the command was sent with ChunkVersion::IGNORED and the
+                // shard is allowed to throw, which means that the drop will serialize behind a
+                // refresh.
+                keepTrying = true;
+            } else {
+                uassertStatusOKWithContext(dropCommandStatus, dropCollectionErrMsg);
+                keepTrying = false;
+            }
+        } while (keepTrying);
     }
 }
 
