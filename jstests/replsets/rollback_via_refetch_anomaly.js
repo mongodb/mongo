@@ -128,11 +128,11 @@ let testDB = P1.getDB(jsTestName());
 const testColl = testDB.getCollection("test");
 
 let reply = assert.commandWorked(testColl.insert({_id: 0}, {"writeConcern": {"w": "majority"}}));
-jsTestLog(`Inserted _id 0 into P1 ${reply.operationTime}`);
+jsTestLog(`Inserted _id 0 into P1 ${tojson(reply.operationTime)}`);
 
 rollbackTest.transitionToRollbackOperations();
 reply = assert.commandWorked(testColl.insert({_id: 1}, {"writeConcern": {"w": 1}}));
-jsTestLog(`Inserted _id 1 into P1 ${reply.operationTime}`);
+jsTestLog(`Inserted _id 1 into P1 ${tojson(reply.operationTime)}`);
 
 jsTestLog("Isolating P1 from tiebreaker");
 P1.disconnect([T]);
@@ -150,7 +150,7 @@ checkLog.containsJson(P2, 21331);
 jsTestLog("P2 stepped up");
 
 reply = assert.commandWorked(testDB.runCommand({delete: "test", deletes: [{q: {}, limit: 0}]}));
-jsTestLog(`Deleted from P1 at ${reply.operationTime}`);
+jsTestLog(`Deleted from P1 at ${tojson(reply.operationTime)}`);
 
 // Ensure P1's lastApplied > P2's, even if P1's set-up entry was written at the same timestamp as
 // P2's delete timestamp.
@@ -162,7 +162,7 @@ assert.soon(() => {
     }
     const P1applied = lastApplied(P1);
     const P2applied = lastApplied(P2);
-    jsTestLog(`P1 lastApplied ${P1applied}, P2 lastApplied ${P2applied}`);
+    jsTestLog(`P1 lastApplied ${tojson(P1applied)}, P2 lastApplied ${tojson(P2applied)}`);
     return timestampCmp(P1applied, P2applied) > 0;
 }, "P1's lastApplied never surpassed P2's");
 

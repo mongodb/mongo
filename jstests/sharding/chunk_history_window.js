@@ -68,7 +68,7 @@ jsTestLog(`Original chunk: ${tojson(origChunk)}`);
 assert.eq(1, origChunk.history.length, tojson(origChunk));
 let result = mongosDB.runCommand({insert: "test", documents: [{_id: 0}]});
 const insertTS = assert.commandWorked(result).operationTime;
-jsTestLog(`Inserted one document at ${insertTS}`);
+jsTestLog(`Inserted one document at ${tojson(insertTS)}`);
 assert.lte(origChunk.history[0].validAfter, insertTS, `history: ${tojson(origChunk.history)}`);
 
 jsTestLog("Move chunk to shard 1, create second history entry");
@@ -84,7 +84,7 @@ const testMarginMS = 1000;
 // Test that reading from a snapshot at insertTS is valid for up to configHistoryWindowSecs
 // minus the testMarginMS (as a buffer).
 const testWindowMS = configHistoryWindowSecs * 1000 - testMarginMS;
-while (Date.now() - insertTS < testWindowMS) {
+while (Date.now() - 1000 * insertTS.getTime() < testWindowMS) {
     // Test that reading from a snapshot at insertTS is still valid.
     assert.commandWorked(mongosDB.runCommand(
         {find: "test", readConcern: {level: "snapshot", atClusterTime: insertTS}}));

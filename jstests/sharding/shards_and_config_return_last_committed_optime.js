@@ -57,9 +57,10 @@ function assertCmdReturnsLastCommittedOpTime(testDB, cmdObj, connType, expectSuc
         const statusRes = assert.commandWorked(testDB.adminCommand({replSetGetStatus: 1}));
         assert.lte(bsonWoCompare(res.lastCommittedOpTime, statusRes.optimes.lastCommittedOpTime.ts),
                    0,
-                   "lastCommittedOpTime in command response, " + res.lastCommittedOpTime +
+                   "lastCommittedOpTime in command response, " + tojson(res.lastCommittedOpTime) +
                        ", is not <= to the replSetGetStatus lastCommittedOpTime timestamp, " +
-                       statusRes.optimes.lastCommittedOpTime.ts + ", cmd was: " + tojson(cmdObj));
+                       tojson(statusRes.optimes.lastCommittedOpTime.ts) +
+                       ", cmd was: " + tojson(cmdObj));
 
         return true;
     }, "command: " + tojson(cmdObj) + " failed to return correct lastCommittedOpTime", 2);

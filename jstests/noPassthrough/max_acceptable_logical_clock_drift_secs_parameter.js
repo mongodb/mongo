@@ -17,10 +17,6 @@ assert.eq(null, conn, "expected server to reject zero maxAcceptableLogicalClockD
 conn = MongoRunner.runMongod({setParameter: {maxAcceptableLogicalClockDriftSecs: "value"}});
 assert.eq(null, conn, "expected server to reject non-numeric maxAcceptableLogicalClockDriftSecs");
 
-conn = MongoRunner.runMongod(
-    {setParameter: {maxAcceptableLogicalClockDriftSecs: new Timestamp(50, 0)}});
-assert.eq(null, conn, "expected server to reject non-numeric maxAcceptableLogicalClockDriftSecs");
-
 // Any positive number is valid.
 conn = MongoRunner.runMongod({setParameter: {maxAcceptableLogicalClockDriftSecs: 1}});
 assert.neq(null, conn, "failed to start mongod with valid maxAcceptableLogicalClockDriftSecs");

@@ -97,8 +97,8 @@ assert.soon(function() {
     } catch (e) {
         return false;
     }
-    var msg = "ts !=, " + farFutureTS + "(" + tsToDate(farFutureTS) + "), mv:" + tojson(mv) +
-        " - " + tsToDate(mv.ts);
+    var msg = "ts !=, " + tojson(farFutureTS) + "(" + tsToDate(farFutureTS) +
+        "), mv:" + tojson(mv) + " - " + tsToDate(mv.ts);
     assert.eq(farFutureTS, mv.ts, msg);
     return true;
 });

@@ -43,7 +43,7 @@ assert.commandWorked(sessionColl.insert({_id: 2}));
 // timestamp for a storage transaction cannot be older than the oldest timestamp.
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-jsTestLog("Prepared a transaction at timestamp: " + prepareTimestamp);
+jsTestLog("Prepared a transaction at timestamp: " + tojson(prepareTimestamp));
 
 replTest.stop(secondary, undefined, {skipValidation: true});
 secondary = replTest.start(

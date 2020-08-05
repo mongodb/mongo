@@ -135,7 +135,7 @@ function runTest(testCase, testMode, readPreferenceMode) {
                            ` ${tojson(targetChunk1Cmd)} returned ${tojson(res)}`);
 
     const targetChunk1CmdTimestamp = res.cursor.atClusterTime;
-    jsTestLog(`Chunk 1 command replied with timestamp ${targetChunk1CmdTimestamp}`);
+    jsTestLog(`Chunk 1 command replied with timestamp ${tojson(targetChunk1CmdTimestamp)}`);
 
     // Move a chunk from Shard1 to Shard2 outside of the transaction, and update it. This will
     // happen at a later logical time than the read timestamp.

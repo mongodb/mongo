@@ -41,7 +41,7 @@ function checkLogForMsg(node, msg, contains) {
  * specified timestamp.
  */
 function checkLogForGetTimestampMsg(node, timestampName, timestamp, contains) {
-    let msg = "Initial Syncer got the " + timestampName + ": { ts: " + timestamp;
+    let msg = "Initial Syncer got the " + timestampName + ": { ts: " + tojson(timestamp);
 
     checkLogForMsg(node, msg, contains);
 }

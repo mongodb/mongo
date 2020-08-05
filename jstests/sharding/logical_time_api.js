@@ -33,7 +33,7 @@ function containsValidLogicalTimeBson(obj) {
 function isType(val, typeString) {
     assert.eq(Object.prototype.toString.call(val),
               "[object " + typeString + "]",
-              "expected: " + val + ", to be of type: " + typeString);
+              "expected: " + tojson(val) + ", to be of type: " + typeString);
     return true;
 }
 

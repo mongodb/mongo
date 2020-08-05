@@ -34,7 +34,7 @@ const insertTimestamp =
     assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: 0}]}))
         .operationTime;
 const startTime = Date.now();
-jsTestLog(`Inserted one document at ${insertTimestamp}`);
+jsTestLog(`Inserted one document at ${tojson(insertTimestamp)}`);
 let nextId = 1;
 
 // Test snapshot window with 1s margin.

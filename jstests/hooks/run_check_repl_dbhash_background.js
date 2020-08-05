@@ -183,7 +183,7 @@ function checkReplDbhashBackgroundThread(hosts) {
                         return bsonWoCompare(appliedOpTime.ts, clusterTime) >= 0;
                     },
                     "The majority commit point on secondary " + i + " failed to reach " +
-                        clusterTime,
+                        tojson(clusterTime),
                     10 * 60 * 1000);
             }
         }

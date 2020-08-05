@@ -62,7 +62,7 @@ const txnNum = session2.getTxnNumber_forTesting();
 const op = oplog.findOne({"txnNumber": txnNum, "lsid.id": session2.getSessionId().id});
 assert.neq(op, null);
 const beginFetchingTs = op.ts;
-jsTestLog("Expected beginFetchingTimestamp: " + beginFetchingTs);
+jsTestLog("Expected beginFetchingTimestamp: " + tojson(beginFetchingTs));
 
 // Commit the first transaction so that we have an operation that is fetched during initial sync
 // but should not be applied. If this is applied, initial sync will fail because while trying to
@@ -75,7 +75,7 @@ const beginApplyingTimestamp =
     assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp1))
         .operationTime;
 
-jsTestLog("beginApplyingTimestamp/stopTimestamp: " + beginApplyingTimestamp);
+jsTestLog("beginApplyingTimestamp/stopTimestamp: " + tojson(beginApplyingTimestamp));
 
 // Restart the secondary with startClean set to true so that it goes through initial sync. Since
 // we won't be running any operations during collection cloning, the beginApplyingTimestamp and

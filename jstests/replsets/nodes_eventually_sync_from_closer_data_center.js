@@ -84,7 +84,7 @@ const advancedTimestamp =
         .operationTime;
 jsTestLog(
     `Waiting for 'testNode' to receive heartbeats. The target sync source should have advanced its optime to ${
-        advancedTimestamp}`);
+        tojson(advancedTimestamp)}`);
 assert.soon(() => {
     const replSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
 

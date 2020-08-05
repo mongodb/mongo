@@ -56,7 +56,7 @@ const timestampDuringInitialSync =
         .commandWorked(primaryDB.runCommand(
             {insert: collName, documents: [{_id: 1}], writeConcern: {w: "majority"}}))
         .operationTime;
-jsTestLog("timestampDuringInitialSync is " + timestampDuringInitialSync);
+jsTestLog("timestampDuringInitialSync is " + tojson(timestampDuringInitialSync));
 
 // Perform snapshot reads on both the primary and the secondary and test that we can see the
 // majority committed writes.

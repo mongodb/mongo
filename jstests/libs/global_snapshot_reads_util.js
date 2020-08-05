@@ -104,7 +104,7 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
                     const insertTimestamp = res.operationTime;
                     assert(insertTimestamp);
 
-                    jsTestLog(`Inserted 10 documents at timestamp ${insertTimestamp}`);
+                    jsTestLog(`Inserted 10 documents at timestamp ${tojson(insertTimestamp)}`);
                     awaitCommittedFn(db, insertTimestamp);
 
                     // Create a session if useCausalConsistency is true.
@@ -139,7 +139,8 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
                     res = assert.commandWorked(primaryDB.runCommand(
                         {update: collName, updates: [{q: {}, u: {$set: {x: true}}, multi: true}]}));
 
-                    jsTestLog(`Updated collection "${collName}" at timestamp ${res.operationTime}`);
+                    jsTestLog(`Updated collection "${collName}" at timestamp ${
+                        tojson(res.operationTime)}`);
                     awaitCommittedFn(db, res.operationTime);
 
                     // Retrieve the rest of the read command's result set.
@@ -164,7 +165,7 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
                                        [...Array(10).keys()].map((i) => ({"_id": i, "x": true})),
                                        res);
 
-                    jsTestLog(`Reading with original insert timestamp ${insertTimestamp}`);
+                    jsTestLog(`Reading with original insert timestamp ${tojson(insertTimestamp)}`);
                     // Use non-causal database handle.
                     res = assert.commandWorked(
                         db.runCommand(command(20, readPreferenceMode, insertTimestamp)));
@@ -214,7 +215,7 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
                 const insertTimestamp = res.operationTime;
                 assert(insertTimestamp);
 
-                jsTestLog(`Inserted 10 documents at timestamp ${insertTimestamp}`);
+                jsTestLog(`Inserted 10 documents at timestamp ${tojson(insertTimestamp)}`);
                 awaitCommittedFn(db, insertTimestamp);
 
                 // Create a session if useCausalConsistency is true.
@@ -248,7 +249,8 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
                 res = assert.commandWorked(primaryDB.runCommand(
                     {update: collName, updates: [{q: {}, u: {$set: {x: 42}}, multi: true}]}));
 
-                jsTestLog(`Updated collection "${collName}" at timestamp ${res.operationTime}`);
+                jsTestLog(
+                    `Updated collection "${collName}" at timestamp ${tojson(res.operationTime)}`);
                 awaitCommittedFn(db, res.operationTime);
 
                 // This read shows the updated docs.
@@ -259,7 +261,7 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
                 assert.gte(res.atClusterTime, atClusterTime);
                 assert.sameMembers([42], res.values);
 
-                jsTestLog(`Reading with original insert timestamp ${insertTimestamp}`);
+                jsTestLog(`Reading with original insert timestamp ${tojson(insertTimestamp)}`);
                 // Use non-causal database handle.
                 res = assert.commandWorked(
                     db.runCommand(distinctCommand(readPreferenceMode, insertTimestamp)));
@@ -292,7 +294,8 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
             assert.commandWorked(primaryDB.runCommand({insert: coll1, documents: docs}));
             res = assert.commandWorked(primaryDB.runCommand({insert: coll2, documents: docs}));
             const atClusterTimeReadConcern = {level: "snapshot", atClusterTime: res.operationTime};
-            jsTestLog(`Inserted 10 documents on each collection at timestamp ${res.operationTime}`);
+            jsTestLog(`Inserted 10 documents on each collection at timestamp ${
+                tojson(res.operationTime)}`);
             awaitCommittedFn(db, res.operationTime);
 
             const lookup = (readConcern) => {
@@ -343,7 +346,7 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
                 {update: coll1, updates: [{q: {}, u: {$inc: {x: 10}}, multi: true}]}));
             res = assert.commandWorked(primaryDB.runCommand(
                 {update: coll2, updates: [{q: {}, u: {$inc: {x: 10}}, multi: true}]}));
-            jsTestLog(`Updated both collections at timestamp ${res.operationTime}`);
+            jsTestLog(`Updated both collections at timestamp ${tojson(res.operationTime)}`);
             awaitCommittedFn(db, res.operationTime);
 
             // The "from" collection cannot be sharded for $lookup.
@@ -383,7 +386,7 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
 
             let res = assert.commandWorked(primaryDB.runCommand({insert: coll, documents: docs}));
             const atClusterTimeReadConcern = {level: "snapshot", atClusterTime: res.operationTime};
-            jsTestLog(`Inserted 10 documents at timestamp ${res.operationTime}`);
+            jsTestLog(`Inserted 10 documents at timestamp ${tojson(res.operationTime)}`);
             awaitCommittedFn(db, res.operationTime);
 
             const out = (readConcern) => {
@@ -430,7 +433,7 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
 
             res = assert.commandWorked(primaryDB.runCommand(
                 {update: coll, updates: [{q: {}, u: {$inc: {x: 10}}, multi: true}]}));
-            jsTestLog(`Updated collection "${coll}" at timestamp ${res.operationTime}`);
+            jsTestLog(`Updated collection "${coll}" at timestamp ${tojson(res.operationTime)}`);
             awaitCommittedFn(db, res.operationTime);
 
             // The "out" collection cannot be sharded for $out.

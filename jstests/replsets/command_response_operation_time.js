@@ -12,8 +12,9 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 function assertCorrectOperationTime(operationTime, expectedTimestamp, opTimeType) {
     assert.eq(0,
               timestampCmp(operationTime, expectedTimestamp),
-              "operationTime in command response, " + operationTime + ", does not equal the last " +
-                  opTimeType + " timestamp, " + expectedTimestamp);
+              "operationTime in command response, " + tojson(operationTime) +
+                  ", does not equal the last " + opTimeType + " timestamp, " +
+                  tojson(expectedTimestamp));
 }
 
 var name = "command_response_operation_time";

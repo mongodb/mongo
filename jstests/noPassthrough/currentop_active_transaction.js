@@ -44,12 +44,14 @@ function checkCurrentOpFields(currentOp,
                   " instead: " + tojson(transactionDocument));
     assert.gte(transactionDocument.readTimestamp,
                operationTime,
-               "Expected 'readTimestamp' to be at least " + operationTime + " but got " +
-                   transactionDocument.readTimestamp + " instead: " + tojson(transactionDocument));
+               "Expected 'readTimestamp' to be at least " + tojson(operationTime) + " but got " +
+                   tojson(transactionDocument.readTimestamp) +
+                   " instead: " + tojson(transactionDocument));
     assert.gte(ISODate(transactionDocument.startWallClockTime),
                timeBeforeTransactionStarts,
-               "Expected 'startWallClockTime' to be at least" + timeBeforeTransactionStarts +
-                   " but got " + transactionDocument.startWallClockTime +
+               "Expected 'startWallClockTime' to be at least" +
+                   tojson(timeBeforeTransactionStarts) + " but got " +
+                   transactionDocument.startWallClockTime +
                    " instead: " + tojson(transactionDocument));
     const expectedTimeOpen = (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000;
     assert.gt(transactionDocument.timeOpenMicros,

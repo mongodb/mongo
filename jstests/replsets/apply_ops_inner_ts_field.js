@@ -25,7 +25,7 @@ const collNss = primaryColl.getFullName();
 jsTestLog("Do an insert");
 const time =
     assert.commandWorked(primaryColl.runCommand('insert', {documents: [{_id: 0}]})).operationTime;
-jsTestLog("Inserted with time " + time);
+jsTestLog("Inserted with time " + tojson(time));
 assert.commandWorked(primaryColl.insert({_id: 1}));
 
 rst.awaitReplication();

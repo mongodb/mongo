@@ -57,7 +57,7 @@ session.startTransaction();
 assert.commandWorked(sessionColl.insert({x: 1000}));
 
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
-jsTestLog("Prepared a transaction at " + prepareTimestamp);
+jsTestLog("Prepared a transaction at " + tojson(prepareTimestamp));
 
 jsTestLog("Unblocking index build.");
 

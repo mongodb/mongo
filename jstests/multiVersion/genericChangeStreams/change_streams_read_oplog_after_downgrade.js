@@ -170,8 +170,8 @@ function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
     let testStartTime = createSentinelEntryAndGetTimeStamp(testNum);
     const outputChangeStreams = [];
     for (let testCase of testCases) {
-        jsTestLog(
-            `Opening a change stream for '${testCase.testName}' at startTime: ${testStartTime}`);
+        jsTestLog(`Opening a change stream for '${testCase.testName}' at startTime: ${
+            tojson(testStartTime)}`);
 
         // Capture the 'resumeToken' when the sentinel entry is found. We use the token to resume
         // the stream rather than the 'testStartTime' because resuming from a token adds more stages

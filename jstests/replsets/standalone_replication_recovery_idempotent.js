@@ -81,7 +81,7 @@ session.startTransaction();
 const txnNumber = session.getTxnNumber_forTesting();
 assert.commandWorked(sessionColl2.update({_id: 1}, {_id: 1, a: 1}));
 let prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1, j: 1});
-jsTestLog("Prepared a transaction at " + prepareTimestamp);
+jsTestLog("Prepared a transaction at " + tojson(prepareTimestamp));
 assertPrepareConflictColl2(node, 1);
 
 jsTestLog("Test that on restart with just 'recoverFromOplogAsStandalone' set we play recovery.");

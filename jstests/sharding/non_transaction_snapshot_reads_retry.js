@@ -47,7 +47,7 @@ st.shardColl(mongosColl, {_id: 1}, false);
 let result =
     mongosDB.runCommand({insert: "test", documents: [{_id: 0}], writeConcern: {w: "majority"}});
 const insertTS = assert.commandWorked(result).operationTime;
-jsTestLog(`Inserted document at ${insertTS}`);
+jsTestLog(`Inserted document at ${tojson(insertTS)}`);
 
 assert.commandWorked(primaryAdmin.runCommand({
     configureFailPoint: "waitInFindBeforeMakingBatch",
@@ -86,7 +86,7 @@ result = mongosDB.runCommand({
 });
 
 const updateTS = assert.commandWorked(result).operationTime;
-jsTestLog(`Updated document at updateTS ${updateTS}`);
+jsTestLog(`Updated document at updateTS ${tojson(updateTS)}`);
 
 jsTestLog("Sleep until updateTS is older than historyWindowSecs");
 const testMarginMS = 1000;

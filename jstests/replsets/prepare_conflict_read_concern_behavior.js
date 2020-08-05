@@ -149,8 +149,9 @@ function runTest() {
                 {documents: [{_id: 4, in_prepared_txn: false}], writeConcern: {w: "majority"}}))
             .operationTime;
 
-    jsTestLog("prepareTimestamp: " + prepareTimestamp + " clusterTimeBeforePrepare: " +
-              clusterTimeBeforePrepare + " clusterTimeAfterPrepare: " + clusterTimeAfterPrepare);
+    jsTestLog("prepareTimestamp: " + tojson(prepareTimestamp) +
+              " clusterTimeBeforePrepare: " + tojson(clusterTimeBeforePrepare) +
+              " clusterTimeAfterPrepare: " + tojson(clusterTimeAfterPrepare));
 
     assert.gt(prepareTimestamp, clusterTimeBeforePrepare);
     assert.gt(clusterTimeAfterPrepare, prepareTimestamp);

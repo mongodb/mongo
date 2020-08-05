@@ -424,6 +424,10 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     eval_sb.append(
         "load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');")
 
+    eval_sb.append(
+        "(function() { Timestamp.prototype.toString = function() { throw new Error(\"Cannot toString timestamps. Consider using timestampCmp() for comparison or tojson(<variable>) for output.\"); } })();"
+    )
+
     eval_str = "; ".join(eval_sb)
     args.append("--eval")
     args.append(eval_str)

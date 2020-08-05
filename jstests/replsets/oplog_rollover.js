@@ -38,7 +38,7 @@ function doTest(storageEngine) {
             .commandWorked(coll.runCommand(
                 "insert", {documents: [{_id: 0, longString: longString}], writeConcern: {w: 2}}))
             .operationTime;
-    jsTestLog("First insert timestamp: " + firstInsertTimestamp);
+    jsTestLog("First insert timestamp: " + tojson(firstInsertTimestamp));
 
     // Test that oplog entry of the first insert exists on both primary and secondary.
     assert.eq(1, numInsertOplogEntry(primaryOplog));
@@ -50,7 +50,7 @@ function doTest(storageEngine) {
             .commandWorked(coll.runCommand(
                 "insert", {documents: [{_id: 1, longString: longString}], writeConcern: {w: 2}}))
             .operationTime;
-    jsTestLog("Second insert timestamp: " + secondInsertTimestamp);
+    jsTestLog("Second insert timestamp: " + tojson(secondInsertTimestamp));
 
     // Test that oplog entries of both inserts exist on both primary and secondary.
     assert.eq(2, numInsertOplogEntry(primaryOplog));
@@ -75,8 +75,9 @@ function doTest(storageEngine) {
                     assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}))
                         .lastStableRecoveryTimestamp;
                 jsTestLog("Awaiting last stable recovery timestamp " +
-                          `(primary: ${primaryTimestamp}, secondary: ${secondaryTimestamp}) ` +
-                          `target: ${secondInsertTimestamp}`);
+                          `(primary: ${tojson(primaryTimestamp)}, secondary: ${
+                              tojson(secondaryTimestamp)}) ` +
+                          `target: ${tojson(secondInsertTimestamp)}`);
                 return ((timestampCmp(primaryTimestamp, secondInsertTimestamp) >= 0) &&
                         (timestampCmp(secondaryTimestamp, secondInsertTimestamp) >= 0));
             },
@@ -94,7 +95,7 @@ function doTest(storageEngine) {
                     "insert",
                     {documents: [{_id: 2, longString: longString}], writeConcern: {w: 2}}))
                 .operationTime;
-        jsTestLog("Third insert timestamp: " + thirdInsertTimestamp);
+        jsTestLog("Third insert timestamp: " + tojson(thirdInsertTimestamp));
 
         // Test that oplog entry of the initial insert rolls over on both primary and secondary.
         // Use assert.soon to wait for oplog cap maintainer thread to run.
@@ -124,8 +125,8 @@ function doTest(storageEngine) {
                 numInsertOplogEntrySecondary < numInserted)
                 return true;
             jsTestLog("Awaiting oplog truncation: number of oplog entries: " +
-                      `(primary: ${numInsertOplogEntryPrimary}, ` +
-                      `secondary: ${numInsertOplogEntrySecondary}) ` +
+                      `(primary: ${tojson(numInsertOplogEntryPrimary)}, ` +
+                      `secondary: ${tojson(numInsertOplogEntrySecondary)}) ` +
                       `number inserted: ${numInserted}`);
             return false;
         }, "Timeout waiting for oplog to roll over", ReplSetTest.kDefaultTimeoutMS, 1000);

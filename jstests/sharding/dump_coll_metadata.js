@@ -51,7 +51,7 @@ assert(metadata.chunks[0][0]._id + "" == MinKey + "");
 assert(metadata.chunks[0][1]._id == 0);
 assert(metadata.chunks[1][0]._id == 0);
 assert(metadata.chunks[1][1]._id + "" == MaxKey + "");
-assert(metadata.shardVersion + "" == result.global + "");
+assert(tojson(metadata.shardVersion) == tojson(result.global));
 
 st.stop();
 })();

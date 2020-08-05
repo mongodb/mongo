@@ -1,7 +1,7 @@
 // Date and time types
 if (typeof (Timestamp) != "undefined") {
     Timestamp.prototype.tojson = function() {
-        return this.toString();
+        return this.toStringIncomparable();
     };
 
     Timestamp.prototype.getTime = function() {
@@ -13,6 +13,12 @@ if (typeof (Timestamp) != "undefined") {
     };
 
     Timestamp.prototype.toString = function() {
+        // Resmoke overrides `toString` to throw an error to prevent accidental operator
+        // comparisons, e.g: >, -, etc...
+        return this.toStringIncomparable();
+    };
+
+    Timestamp.prototype.toStringIncomparable = function() {
         return "Timestamp(" + this.t + ", " + this.i + ")";
     };
 } else {

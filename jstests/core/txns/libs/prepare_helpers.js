@@ -132,16 +132,17 @@ const PrepareHelpers = (function() {
      * Waits for the oplog entry of the given timestamp to be majority committed.
      */
     function awaitMajorityCommitted(replSet, timestamp) {
-        print(`Waiting for majority commit point to advance past the given timestamp ${timestamp}`);
+        print(`Waiting for majority commit point to advance past the given timestamp ${
+            tojson(timestamp)}`);
         const primary = replSet.getPrimary();
         assert.soon(() => {
             const ts = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}))
                            .optimes.lastCommittedOpTime.ts;
             if (timestampCmp(ts, timestamp) >= 0) {
-                print(`Finished awaiting lastCommittedOpTime.ts, now at ${ts}`);
+                print(`Finished awaiting lastCommittedOpTime.ts, now at ${tojson(ts)}`);
                 return true;
             } else {
-                print(`Awaiting lastCommittedOpTime.ts, now at ${ts}`);
+                print(`Awaiting lastCommittedOpTime.ts, now at ${tojson(ts)}`);
                 return false;
             }
         }, "Timeout waiting for majority commit point", ReplSetTest.kDefaultTimeoutMS, 1000);

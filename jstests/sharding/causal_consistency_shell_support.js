@@ -43,7 +43,7 @@ function commandWorksAndUpdatesOperationTime(cmdObj, db) {
 
     // Verify the response contents and that new operation time is >= passed in time.
     assert(bsonWoCompare(session.getOperationTime(), clusterTimeObj.clusterTime) >= 0,
-           "expected the shell's operationTime to be >= to:" + clusterTimeObj.clusterTime +
+           "expected the shell's operationTime to be >= to:" + tojson(clusterTimeObj.clusterTime) +
                " after running command: " + tojson(cmdObj));
 }
 
@@ -175,12 +175,13 @@ const invalidCmd = {
     find: "foo",
     readConcern: {level: "majority", afterClusterTime: invalidTime}
 };
-assert.commandFailedWithCode(
-    testDB.runCommand(invalidCmd),
-    ErrorCodes.InvalidOptions,
-    "expected command, " + tojson(invalidCmd) + ", to fail with code, " +
-        ErrorCodes.InvalidOptions + ", because the afterClusterTime value, " + invalidTime +
-        ", should not be ahead of the clusterTime, " + session.getClusterTime().clusterTime);
+assert.commandFailedWithCode(testDB.runCommand(invalidCmd),
+                             ErrorCodes.InvalidOptions,
+                             "expected command, " + tojson(invalidCmd) + ", to fail with code, " +
+                                 ErrorCodes.InvalidOptions +
+                                 ", because the afterClusterTime value, " + tojson(invalidTime) +
+                                 ", should not be ahead of the clusterTime, " +
+                                 tojson(session.getClusterTime().clusterTime));
 
 rst.stopSet();
 st.stop();

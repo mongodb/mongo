@@ -22,7 +22,7 @@ const collection = primaryDB[collName];
 const docs = [...Array(10).keys()].map((i) => ({"_id": i}));
 const insertTimestamp =
     assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs})).operationTime;
-jsTestLog("Inserted 10 documents at: " + insertTimestamp);
+jsTestLog("Inserted 10 documents at: " + tojson(insertTimestamp));
 
 // Test find with atClusterTime.
 let cursor = collection.find().readConcern("snapshot", insertTimestamp);
