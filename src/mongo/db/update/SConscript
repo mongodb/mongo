@@ -9,7 +9,8 @@ env.Library(
     source=[
         'field_checker.cpp',
         'log_builder.cpp',
-        'path_support.cpp'
+        'path_support.cpp',
+        'storage_validation.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -36,7 +37,6 @@ env.Library(
         'push_node.cpp',
         'rename_node.cpp',
         'set_node.cpp',
-        'storage_validation.cpp',
         'unset_node.cpp',
         'update_array_node.cpp',
         'update_internal_node.cpp',

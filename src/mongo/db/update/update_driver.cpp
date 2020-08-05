@@ -312,10 +312,7 @@ void UpdateDriver::setCollator(const CollatorInterface* collator) {
 
 bool UpdateDriver::isDocReplacement(const write_ops::UpdateModification& updateMod) {
     return (updateMod.type() == write_ops::UpdateModification::Type::kClassic &&
-            (modifiertable::getType(
-                 updateMod.getUpdateClassic().firstElementFieldNameStringData()) ==
-                 modifiertable::MOD_UNKNOWN &&
-             updateMod.getUpdateClassic().firstElementFieldNameStringData() != "$v"_sd)) ||
+            *updateMod.getUpdateClassic().firstElementFieldName() != '$') ||
         updateMod.type() == write_ops::UpdateModification::Type::kPipeline;
 }
 

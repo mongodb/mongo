@@ -34,12 +34,6 @@ namespace mongo {
 
 class ServiceContext;
 
-/*
- * Returns true if fieldName is one of the reserved $-prefixed words
- * and false if it isn't.
- */
-bool isReservedDollarPrefixedWord(StringData fieldName);
-
 /**
  * Validates that 'doc' is legal for insertion, possibly with some modifications.
  *

@@ -119,7 +119,7 @@ assert.eq(coll.count(), 1);
 // Update with error
 coll.remove({});
 coll.insert({foo: "bar"});
-result = coll.update({foo: "bar"}, {_id: /a/});
+printjson(result = coll.update({foo: "bar"}, {$invalid: "expr"}));
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
 if (coll.getMongo().writeMode() == "commands")

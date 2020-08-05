@@ -4,7 +4,7 @@
  * 'requires_find_command' needed to prevent this test from running with 'compatibility' write mode
  * as pipeline-style update is not supported by OP_UPDATE.
  *
- * @tags: [requires_find_command, requires_non_retryable_writes, requires_fcv_47]
+ * @tags: [requires_find_command, requires_non_retryable_writes]
  */
 (function() {
 "use strict";
@@ -195,9 +195,8 @@ assert.commandFailedWithCode(
         }]),
     ErrorCodes.InvalidOptions);
 
-// Update uses replacement document when supported agg stage is specified outside of pipeline.
-coll.update({_id: 1}, {$addFields: {x: 1}});
-assert.eq([{_id: 1, $addFields: {x: 1}}], coll.find({_id: 1}).toArray());
+// Update fails when supported agg stage is specified outside of pipeline.
+assert.commandFailedWithCode(coll.update({_id: 1}, {$addFields: {x: 1}}), ErrorCodes.FailedToParse);
 
 // The 'arrayFilters' option is not valid for pipeline updates.
 assert.commandFailedWithCode(
@@ -255,12 +254,12 @@ testUpdate({
     nModified: 1
 });
 
-// Test that expressions within constants are treated as field names instead of expressions.
-db.runCommand({
+// Cannot use expressions in constants.
+assert.commandFailedWithCode(db.runCommand({
     update: collName,
     updates: [{q: {_id: 1}, u: [{$set: {x: "$$foo"}}], c: {foo: {$add: [1, 2]}}}]
-});
-assert.eq([{_id: 1, x: {$add: [1, 2]}, foo: "$x"}], coll.find({_id: 1}).toArray());
+}),
+                             ErrorCodes.DollarPrefixedFieldName);
 
 // Cannot use constants with regular updates.
 assert.commandFailedWithCode(

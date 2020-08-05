@@ -33,8 +33,8 @@ assert.commandWorked(testDB.coll.update({_id: 1}, {$set: {a: 2}}, {multi: false}
 // fails on the individual shard.
 assert.commandFailedWithCode(testDB.coll.update({_id: 1}, {$set: {x: 2}}, {multi: false}), 31025);
 assert.commandFailedWithCode(
-    testDB.coll.update({_id: 1}, {$set: {x: 12}, $hello: 1}, {multi: false}),
-    ErrorCodes.FailedToParse);
+    testDB.coll.update({_id: 1}, {$set: {x: 2, $invalidField: 4}}, {multi: false}),
+    ErrorCodes.DollarPrefixedFieldName);
 
 let mongosServerStatus = testDB.adminCommand({serverStatus: 1});
 

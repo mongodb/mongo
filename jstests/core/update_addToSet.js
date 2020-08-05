@@ -71,6 +71,28 @@ t.update({_id: 1}, {$addToSet: {a: {$each: [3, 2, 2, 3, 3]}}});
 o.a.push(3);
 assert.eq(o, t.findOne(), "D4");
 
+// Test that dotted and '$' prefixed field names fail.
+t.drop();
+o = {
+    _id: 1,
+    a: [1, 2]
+};
+assert.commandWorked(t.insert(o));
+
+assert.commandWorked(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
+assert.commandWorked(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
+
+assert.writeError(t.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
+assert.writeError(t.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
+
+assert.commandWorked(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
+
+assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
+assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
+
+assert.writeError(t.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
+assert.writeError(t.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
+
 // Test that nested _id fields are allowed.
 t.drop();
 o = {

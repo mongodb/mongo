@@ -1018,6 +1018,66 @@ TEST_F(SetNodeTest, ApplySetModToEphemeralDocument) {
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 }
 
+TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInsideSetElement) {
+    auto update = fromjson("{$set: {a: {$bad: 1}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a"], expCtx));
+
+    mutablebson::Document doc(fromjson("{a: 5}"));
+    setPathTaken("a");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams()),
+        AssertionException,
+        ErrorCodes::DollarPrefixedFieldName,
+        "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
+}
+
+TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtStartOfPath) {
+    auto update = fromjson("{$set: {'$bad.a': 1}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["$bad.a"], expCtx));
+
+    mutablebson::Document doc(fromjson("{}"));
+    setPathToCreate("$bad.a");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams()),
+        AssertionException,
+        ErrorCodes::DollarPrefixedFieldName,
+        "The dollar ($) prefixed field '$bad' in '$bad' is not valid for storage.");
+}
+
+TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInMiddleOfPath) {
+    auto update = fromjson("{$set: {'a.$bad.b': 1}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.$bad.b"], expCtx));
+
+    mutablebson::Document doc(fromjson("{}"));
+    setPathToCreate("a.$bad.b");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams()),
+        AssertionException,
+        ErrorCodes::DollarPrefixedFieldName,
+        "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
+}
+
+TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtEndOfPath) {
+    auto update = fromjson("{$set: {'a.$bad': 1}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.$bad"], expCtx));
+
+    mutablebson::Document doc(fromjson("{}"));
+    setPathToCreate("a.$bad");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams()),
+        AssertionException,
+        ErrorCodes::DollarPrefixedFieldName,
+        "The dollar ($) prefixed field '$bad' in 'a.$bad' is not valid for storage.");
+}
+
 TEST_F(SetNodeTest, ApplyCanCreateDollarPrefixedFieldNameWhenValidateForStorageIsFalse) {
     auto update = fromjson("{$set: {$bad: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
