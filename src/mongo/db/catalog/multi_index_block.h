@@ -175,7 +175,7 @@ public:
      */
     Status dumpInsertsFromBulk(OperationContext* opCtx);
     Status dumpInsertsFromBulk(OperationContext* opCtx,
-                               IndexAccessMethod::RecordIdHandlerFn&& onDuplicateRecord);
+                               const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord);
     /**
      * For background indexes using an IndexBuildInterceptor to capture inserts during a build,
      * drain these writes into the index. If intent locks are held on the collection, more writes

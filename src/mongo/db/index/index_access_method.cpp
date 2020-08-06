@@ -622,8 +622,8 @@ AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
 Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
                                              BulkBuilder* bulk,
                                              bool dupsAllowed,
-                                             KeyHandlerFn&& onDuplicateKeyInserted,
-                                             RecordIdHandlerFn&& onDuplicateRecord) {
+                                             const KeyHandlerFn& onDuplicateKeyInserted,
+                                             const RecordIdHandlerFn& onDuplicateRecord) {
     Timer timer;
 
     std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->done());
@@ -665,7 +665,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         // Before attempting to insert, perform a duplicate key check.
         bool isDup = (_descriptor->unique()) ? (cmpData == 0) : false;
         if (isDup && !dupsAllowed) {
-            Status status = _handleDuplicateKey(opCtx, data.first, std::move(onDuplicateRecord));
+            Status status = _handleDuplicateKey(opCtx, data.first, onDuplicateRecord);
             if (!status.isOK()) {
                 return status;
             }
@@ -829,7 +829,7 @@ std::string nextFileName() {
 
 Status AbstractIndexAccessMethod::_handleDuplicateKey(OperationContext* opCtx,
                                                       const KeyString::Value& dataKey,
-                                                      RecordIdHandlerFn&& onDuplicateRecord) {
+                                                      const RecordIdHandlerFn& onDuplicateRecord) {
     RecordId recordId = KeyString::decodeRecordIdAtEnd(dataKey.getBuffer(), dataKey.getSize());
     if (onDuplicateRecord) {
         return onDuplicateRecord(recordId);
