@@ -95,6 +95,7 @@ constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
 TopologyVersion appendReplicationInfo(OperationContext* opCtx,
                                       BSONObjBuilder& result,
                                       int level,
+                                      bool useLegacyResponseFields,
                                       boost::optional<TopologyVersion> clientTopologyVersion,
                                       boost::optional<long long> maxAwaitTimeMS) {
     TopologyVersion topologyVersion;
@@ -109,7 +110,7 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
         }
         auto isMasterResponse =
             replCoord->awaitIsMasterResponse(opCtx, horizonParams, clientTopologyVersion, deadline);
-        result.appendElements(isMasterResponse->toBSON());
+        result.appendElements(isMasterResponse->toBSON(useLegacyResponseFields));
         if (level) {
             replCoord->appendSlaveInfoData(&result);
         }
@@ -143,7 +144,7 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
         opCtx->sleepFor(Milliseconds(*maxAwaitTimeMS));
     }
 
-    result.appendBool("ismaster",
+    result.appendBool((useLegacyResponseFields ? "ismaster" : "isWritablePrimary"),
                       ReplicationCoordinator::get(opCtx)->isMasterForReportingPurposes());
 
     if (level) {
@@ -239,9 +240,12 @@ public:
         int level = configElement.numberInt();
 
         BSONObjBuilder result;
+        // TODO SERVER-50219: Change useLegacyResponseFields to false once the serverStatus changes
+        // to remove master-slave terminology are merged.
         appendReplicationInfo(opCtx,
                               result,
                               level,
+                              true /* useLegacyResponseFields */,
                               boost::none /* clientTopologyVersion */,
                               boost::none /* maxAwaitTimeMS */);
 
@@ -340,6 +344,11 @@ public:
         if (cmdObj["forShell"].trueValue()) {
             LastError::get(opCtx->getClient()).disable();
         }
+
+        // Parse the command name, which should be one of the following: hello, isMaster, or
+        // ismaster. If the command is "hello", we must attach an "isWritablePrimary" response field
+        // instead of "ismaster" and "secondaryDelaySecs" response field instead of "slaveDelay".
+        bool useLegacyResponseFields = (cmdObj.firstElementFieldNameStringData() != kHelloString);
 
         transport::Session::TagMask sessionTagsToSet = 0;
         transport::Session::TagMask sessionTagsToUnset = 0;
@@ -483,8 +492,8 @@ public:
         }
 
         auto result = replyBuilder->getBodyBuilder();
-        auto currentTopologyVersion =
-            appendReplicationInfo(opCtx, result, 0, clientTopologyVersion, maxAwaitTimeMS);
+        auto currentTopologyVersion = appendReplicationInfo(
+            opCtx, result, 0, useLegacyResponseFields, clientTopologyVersion, maxAwaitTimeMS);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             const int configServerModeNumber = 2;
