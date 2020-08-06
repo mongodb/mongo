@@ -303,6 +303,7 @@ void startMigration(OperationContext* opCtx, TenantMigrationDonorDocument donorS
 
     if (mtab) {
         // There is already an active migration for the given database prefix.
+        mtab->onCompletion().wait();
         return;
     }
 
