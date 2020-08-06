@@ -31,10 +31,9 @@ const defaultOptions = {
 // TODO SERVER-26792: In the future, we should have a common place from which both the
 // multiversion setup procedure and this test get information about supported major releases.
 const versions = [
-    {binVersion: '3.2', testCollection: 'three_two'},
-    {binVersion: '3.4', testCollection: 'three_four'},
     {binVersion: '3.6', testCollection: 'three_six'},
-    {binVersion: '4.0', testCollection: 'four_zero'}
+    {binVersion: '4.0', testCollection: 'four_zero'},
+    {binVersion: '4.2', testCollection: 'four_two'}
 ];
 
 // Iterate through versions specified in the versions list, and follow the steps outlined at

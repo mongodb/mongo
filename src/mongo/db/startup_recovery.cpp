@@ -441,6 +441,10 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
     // FCV-dependent features are rebuilt properly. Note that we don't try to prevent
     // repairDatabase from repairing this collection again, because it only consists of one
     // document.
+    // If we fail to load the FCV document due to upgrade problems, we need to abort the repair in
+    // order to allow downgrading to older binary versions.
+    auto abortRepairOnFCVErrors = makeGuard(
+        [&] { StorageRepairObserver::get(opCtx->getServiceContext())->onRepairDone(opCtx); });
     if (auto fcvColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
             opCtx, NamespaceString::kServerConfigurationNamespace)) {
         auto databaseHolder = DatabaseHolder::get(opCtx);
@@ -451,6 +455,7 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
     }
     uassertStatusOK(restoreMissingFeatureCompatibilityVersionDocument(opCtx));
     FeatureCompatibilityVersion::initializeForStartup(opCtx);
+    abortRepairOnFCVErrors.dismiss();
 
     // The local database should be repaired before any other replicated collections so we know
     // whether not to rebuild unfinished two-phase index builds if this is a replica set node
