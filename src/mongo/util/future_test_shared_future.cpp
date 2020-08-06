@@ -116,7 +116,7 @@ TEST(SharedFuture_Void, isReady_share_TSAN_OK) {
 TEST(SharedFuture, ModificationsArePrivate) {
     FUTURE_SUCCESS_TEST([] { return 1; },
                         [](/*Future<int>*/ auto&& fut) {
-                            const auto exec = InlineCountingExecutor::make();
+                            const auto exec = InlineQueuedCountingExecutor::make();
                             const auto shared = std::move(fut).share();
 
                             const auto checkFunc = [](int&& i) {
@@ -150,7 +150,7 @@ MONGO_COMPILER_NOINLINE void useALotOfStackSpace() {
 TEST(SharedFuture, NoStackOverflow_Call) {
     FUTURE_SUCCESS_TEST([] {},
                         [](/*Future<void>*/ auto&& fut) {
-                            const auto exec = InlineCountingExecutor::make();
+                            const auto exec = InlineRecursiveCountingExecutor::make();
                             const auto shared = std::move(fut).share();
 
                             std::vector<SemiFuture<void>> collector;
@@ -170,7 +170,7 @@ TEST(SharedFuture, NoStackOverflow_Call) {
 TEST(SharedFuture, NoStackOverflow_Destruction) {
     FUTURE_SUCCESS_TEST([] {},
                         [](/*Future<void>*/ auto&& fut) {
-                            const auto exec = InlineCountingExecutor::make();
+                            const auto exec = InlineRecursiveCountingExecutor::make();
                             const auto shared = std::move(fut).share();
 
                             std::vector<SemiFuture<void>> collector;
@@ -197,7 +197,7 @@ TEST(SharedFuture, ThenChaining_Sync) {
     FUTURE_SUCCESS_TEST(
         [] {},
         [](/*Future<void>*/ auto&& fut) {
-            const auto exec = InlineCountingExecutor::make();
+            const auto exec = InlineQueuedCountingExecutor::make();
 
             auto res = std::move(fut).then([] { return SharedSemiFuture(1); });
 
@@ -214,7 +214,7 @@ TEST(SharedFuture, ThenChaining_Async) {
     FUTURE_SUCCESS_TEST(
         [] {},
         [](/*Future<void>*/ auto&& fut) {
-            const auto exec = InlineCountingExecutor::make();
+            const auto exec = InlineQueuedCountingExecutor::make();
 
             auto res = std::move(fut).then([] { return async([] { return 1; }).share(); });
 
@@ -230,7 +230,7 @@ TEST(SharedFuture, ThenChaining_Async) {
 TEST(SharedFuture, ThenChaining_Async_DoubleShare) {
     FUTURE_SUCCESS_TEST([] {},
                         [](/*Future<void>*/ auto&& fut) {
-                            const auto exec = InlineCountingExecutor::make();
+                            const auto exec = InlineQueuedCountingExecutor::make();
 
                             auto res = std::move(fut).share().thenRunOn(exec).then(
                                 [] { return async([] { return 1; }).share(); });
@@ -242,7 +242,7 @@ TEST(SharedFuture, ThenChaining_Async_DoubleShare) {
 TEST(SharedFuture, AddChild_Get) {
     FUTURE_SUCCESS_TEST([] {},
                         [](/*Future<void>*/ auto&& fut) {
-                            const auto exec = InlineCountingExecutor::make();
+                            const auto exec = InlineQueuedCountingExecutor::make();
                             auto shared = std::move(fut).share();
                             auto fut2 = shared.thenRunOn(exec).then([] {});
                             shared.get();
@@ -253,7 +253,7 @@ TEST(SharedFuture, AddChild_Get) {
 TEST(SharedFuture, InterruptedGet_AddChild_Get) {
     FUTURE_SUCCESS_TEST([] {},
                         [](/*Future<void>*/ auto&& fut) {
-                            const auto exec = InlineCountingExecutor::make();
+                            const auto exec = InlineQueuedCountingExecutor::make();
                             DummyInterruptable dummyInterruptable;
 
                             auto shared = std::move(fut).share();
@@ -281,7 +281,7 @@ TEST(SharedFuture, ConcurrentTest_OneSharedFuture) {
 
         for (int i = 0; i < nThreads; i++) {
             threads[i] = stdx::thread([i, &shared] {
-                auto exec = InlineCountingExecutor::make();
+                auto exec = InlineQueuedCountingExecutor::make();
                 if (i % 5 == 0) {
                     // just wait directly on shared.
                     shared.get();
@@ -325,7 +325,7 @@ TEST(SharedFuture, ConcurrentTest_ManySharedFutures) {
         for (int i = 0; i < nThreads; i++) {
             threads[i] = stdx::thread([i, &promise] {
                 auto shared = promise.getFuture();
-                auto exec = InlineCountingExecutor::make();
+                auto exec = InlineQueuedCountingExecutor::make();
 
                 if (i % 5 == 0) {
                     // just wait directly on shared.

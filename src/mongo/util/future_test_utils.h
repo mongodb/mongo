@@ -149,7 +149,7 @@ void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test)
     }
 
     if constexpr (doExecutorFuture) {  // immediate executor future
-        auto exec = InlineCountingExecutor::make();
+        auto exec = InlineQueuedCountingExecutor::make();
         test(Future<CompletionType>::makeReady(completion()).thenRunOn(exec));
     }
 }
@@ -178,7 +178,7 @@ void FUTURE_SUCCESS_TEST(const CompletionFunc& completion, const TestFunc& test)
 
     if constexpr (doExecutorFuture) {  // immediate executor future
         completion();
-        auto exec = InlineCountingExecutor::make();
+        auto exec = InlineQueuedCountingExecutor::make();
         test(Future<CompletionType>::makeReady().thenRunOn(exec));
     }
 }
@@ -203,7 +203,7 @@ void FUTURE_FAIL_TEST(const TestFunc& test) {
         }));
     }
     if constexpr (doExecutorFuture) {  // immediate executor future
-        auto exec = InlineCountingExecutor::make();
+        auto exec = InlineQueuedCountingExecutor::make();
         test(Future<CompletionType>::makeReady(failStatus()).thenRunOn(exec));
     }
 }
