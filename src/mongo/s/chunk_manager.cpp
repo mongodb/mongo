@@ -720,6 +720,12 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeNew(
 std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
     const std::vector<ChunkType>& changedChunks) {
 
+    // It's possible for there to be one chunk in changedChunks without the routing table having
+    // changed. We skip copying the ChunkMap when this happens.
+    if (changedChunks.size() == 1 && changedChunks[0].getVersion() == getVersion()) {
+        return shared_from_this();
+    }
+
     auto changedChunkInfos = flatten(changedChunks);
     auto chunkMap = _chunkMap.createMerged(changedChunkInfos);
 

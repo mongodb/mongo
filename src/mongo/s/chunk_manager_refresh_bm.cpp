@@ -102,6 +102,27 @@ MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
                                                 ShardId("shard0"));
 }
 
+void BM_IncrementalRefreshWithNoChange(benchmark::State& state) {
+    const int nShards = state.range(0);
+    const int nChunks = state.range(1);
+    auto cm = makeChunkManagerWithOptimalBalancedDistribution(nShards, nChunks);
+
+    auto postMoveVersion = cm->getChunkManager()->getVersion();
+    const auto collName = NamespaceString(cm->getChunkManager()->getns());
+    std::vector<ChunkType> newChunks;
+    newChunks.emplace_back(
+        collName, getRangeForChunk(1, nChunks), postMoveVersion, ShardId("shard0"));
+
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(runIncrementalUpdate(*cm, newChunks));
+    }
+}
+
+BENCHMARK(BM_IncrementalRefreshWithNoChange)
+    ->Args({2, 50000})
+    ->Args({2, 250000})
+    ->Args({2, 500000});
+
 void BM_IncrementalRefreshOfPessimalBalancedDistribution(benchmark::State& state) {
     const int nShards = state.range(0);
     const int nChunks = state.range(1);
