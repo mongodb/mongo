@@ -8,9 +8,6 @@ selector:
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_47
-  exclude_files:
-  # TODO SERVER-46040: Enable when SERVER-46040 is backported
-  - jstests/sharding/drop_indexes_with_stale_config_error.js
 executor:
   config:
     shell_options:

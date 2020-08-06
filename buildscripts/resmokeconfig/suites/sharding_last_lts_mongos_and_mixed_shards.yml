@@ -28,8 +28,6 @@ selector:
   - jstests/sharding/retryable_write_error_labels.js
   # Enable when SERVER-43310 is backported
   - jstests/sharding/cluster_create_indexes_always_routes_through_primary.js
-  # TODO SERVER-46040: Enable when SERVER-46040 is backported
-  - jstests/sharding/drop_indexes_with_stale_config_error.js
   # Enable when SERVER-43614 is backported.
   - jstests/sharding/query/unionWith_current_op.js
   - jstests/sharding/verify_sessions_expiration_sharded.js
