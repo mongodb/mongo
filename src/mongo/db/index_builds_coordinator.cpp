@@ -2232,8 +2232,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         }
 
         // TODO (SERVER-49409): Resume from the collection scan phase.
-        // TODO (SERVER-49408): Resume from the bulk load phase.
-        if (resumeInfo && resumeInfo->getPhase() == IndexBuildPhaseEnum::kDrainWrites) {
+        if (resumeInfo &&
+            (resumeInfo->getPhase() == IndexBuildPhaseEnum::kBulkLoad ||
+             resumeInfo->getPhase() == IndexBuildPhaseEnum::kDrainWrites)) {
             _resumeIndexBuildFromPhase(opCtx, replState, indexBuildOptions, resumeInfo.get());
         } else {
             _buildIndex(opCtx, replState, indexBuildOptions);
@@ -2306,6 +2307,10 @@ void IndexBuildsCoordinator::_resumeIndexBuildFromPhase(
               "Hanging index build due to failpoint 'hangAfterSettingUpResumableIndexBuild'");
         hangAfterSettingUpResumableIndexBuild.pauseWhileSet();
     }
+
+    if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kBulkLoad)
+        _insertSortedKeysIntoIndexForResume(opCtx, replState);
+
     _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     _signalPrimaryForCommitReadiness(opCtx, replState);
     _insertKeysFromSideTablesBlockingWrites(opCtx, replState, indexBuildOptions);
@@ -2346,7 +2351,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
     opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     // The collection scan might read with a kMajorityCommitted read source, but will restore
     // kNoTimestamp afterwards.
-    _scanCollectionAndInsertKeysIntoSorter(opCtx, replState);
+    _scanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
     _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     _signalPrimaryForCommitReadiness(opCtx, replState);
     _insertKeysFromSideTablesBlockingWrites(opCtx, replState, indexBuildOptions);
@@ -2357,7 +2362,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
  * First phase is doing a collection scan and inserting keys into sorter.
  * Second phase is extracting the sorted keys and writing them into the new index table.
  */
-void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
+void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     // Collection scan and insert into index.
     {
@@ -2375,20 +2380,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
-        // Rebuilding system indexes during startup using the IndexBuildsCoordinator is done by all
-        // storage engines if they're missing.
-        invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
-
-        auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, replState->collectionUUID);
-        invariant(nss);
-
-        // Set up the thread's currentOp information to display createIndexes cmd information.
-        updateCurOpOpDescription(opCtx, *nss, replState->indexSpecs);
-
-        // Index builds can safely ignore prepare conflicts and perform writes. On secondaries,
-        // prepare operations wait for index builds to complete.
-        opCtx->recoveryUnit()->setPrepareConflictBehavior(
-            PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+        _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
 
         // The collection object should always exist while an index build is registered.
         auto collection =
@@ -2403,6 +2395,43 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertKeysIntoSorter(
         LOGV2(20665, "Hanging after dumping inserts from bulk builder");
         hangAfterIndexBuildDumpsInsertsFromBulk.pauseWhileSet();
     }
+}
+
+void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    {
+        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
+        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+        Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
+
+        _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
+
+        uassertStatusOK(
+            _indexBuildsManager.resumeBuildingIndexFromBulkLoadPhase(opCtx, replState->buildUUID));
+    }
+
+    if (MONGO_unlikely(hangAfterIndexBuildDumpsInsertsFromBulk.shouldFail())) {
+        LOGV2(4940800, "Hanging after dumping inserts from bulk builder");
+        hangAfterIndexBuildDumpsInsertsFromBulk.pauseWhileSet();
+    }
+}
+
+void IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeysIntoIndex(
+    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    // Rebuilding system indexes during startup using the IndexBuildsCoordinator is done by all
+    // storage engines if they're missing.
+    invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
+
+    auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, replState->collectionUUID);
+    invariant(nss);
+
+    // Set up the thread's currentOp information to display createIndexes cmd information.
+    updateCurOpOpDescription(opCtx, *nss, replState->indexSpecs);
+
+    // Index builds can safely ignore prepare conflicts and perform writes. On secondaries,
+    // prepare operations wait for index builds to complete.
+    opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 }
 
 /*

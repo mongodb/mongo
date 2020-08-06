@@ -1092,6 +1092,21 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
     return status;
 }
 
+Status DurableCatalogImpl::dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
+                                                              RecordId catalogId,
+                                                              const IndexDescriptor* spec,
+                                                              StringData ident,
+                                                              KVPrefix prefix) {
+    auto status = _engine->getEngine()->dropGroupedSortedDataInterface(opCtx, ident);
+    if (!status.isOK())
+        return status;
+
+    status = _engine->getEngine()->createGroupedSortedDataInterface(
+        opCtx, getCollectionOptions(opCtx, catalogId), ident, spec, prefix);
+
+    return status;
+}
+
 boost::optional<UUID> DurableCatalogImpl::getIndexBuildUUID(OperationContext* opCtx,
                                                             RecordId catalogId,
                                                             StringData indexName) const {

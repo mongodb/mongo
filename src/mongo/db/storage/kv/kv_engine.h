@@ -174,6 +174,8 @@ public:
         return createSortedDataInterface(opCtx, collOptions, ident, desc);
     }
 
+    virtual Status dropGroupedSortedDataInterface(OperationContext* opCtx, StringData ident) = 0;
+
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) = 0;
 
     /**

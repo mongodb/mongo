@@ -205,8 +205,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     invariant(_indexes.empty());
 
     // TODO (SERVER-49409): Resume from the collection scan phase.
-    // TODO (SERVER-49408): Resume from the bulk load phase.
-    if (resumeInfo && resumeInfo->getPhase() == IndexBuildPhaseEnum::kDrainWrites) {
+    if (resumeInfo &&
+        (resumeInfo->getPhase() == IndexBuildPhaseEnum::kBulkLoad ||
+         resumeInfo->getPhase() == IndexBuildPhaseEnum::kDrainWrites)) {
         _phase = resumeInfo->getPhase();
     }
 
@@ -269,25 +270,26 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             info = statusWithInfo.getValue();
             indexInfoObjs.push_back(info);
 
+            boost::optional<IndexSorterInfo> sorterInfo;
             IndexToBuild index;
             index.block = std::make_unique<IndexBuildBlock>(
                 collection->getIndexCatalog(), collection->ns(), info, _method, _buildUUID);
             if (resumeInfo) {
                 auto resumeInfoIndexes = resumeInfo->getIndexes();
                 // Find the resume information that corresponds to this spec.
-                auto indexResumeInfo =
-                    std::find_if(resumeInfoIndexes.begin(),
-                                 resumeInfoIndexes.end(),
-                                 [&info](const IndexSorterInfo& indexInfo) {
-                                     return info.woCompare(indexInfo.getSpec()) == 0;
-                                 });
+                sorterInfo = *std::find_if(resumeInfoIndexes.begin(),
+                                           resumeInfoIndexes.end(),
+                                           [&info](const IndexSorterInfo& indexInfo) {
+                                               return info.woCompare(indexInfo.getSpec()) == 0;
+                                           });
 
-                index.block->initForResume(opCtx, collection, *indexResumeInfo);
+                status = index.block->initForResume(
+                    opCtx, collection, *sorterInfo, resumeInfo->getPhase());
             } else {
                 status = index.block->init(opCtx, collection);
-                if (!status.isOK())
-                    return status;
             }
+            if (!status.isOK())
+                return status;
 
             auto indexCleanupGuard = makeGuard([opCtx, &index] {
                 index.block->finalizeTemporaryTables(
@@ -299,7 +301,12 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (!status.isOK())
                 return status;
 
-            index.bulk = index.real->initiateBulk(eachIndexBuildMaxMemoryUsageBytes);
+            index.bulk = index.real->initiateBulk(
+                eachIndexBuildMaxMemoryUsageBytes,
+                // TODO (SERVER-49409): Resume from the collection scan phase.
+                resumeInfo && resumeInfo->getPhase() == IndexBuildPhaseEnum::kBulkLoad
+                    ? sorterInfo
+                    : boost::none);
 
             const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
 
@@ -571,9 +578,11 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
     // insertSingleDocumentForInitialSyncOrRecovery() instead of delegating to
     // insertDocumentsInCollection() to scan and insert the contents of the collection.
     // Therefore, it is possible for the phase of this MultiIndexBlock to be kInitialized
-    // rather than kCollection when this function is called.
-    invariant(_phase == IndexBuildPhaseEnum::kCollectionScan ||
-                  _phase == IndexBuildPhaseEnum::kInitialized,
+    // rather than kCollection when this function is called. The phase will be kBulkLoad when
+    // resuming an index build from the bulk load phase.
+    invariant(_phase == IndexBuildPhaseEnum::kInitialized ||
+                  _phase == IndexBuildPhaseEnum::kCollectionScan ||
+                  _phase == IndexBuildPhaseEnum::kBulkLoad,
               IndexBuildPhase_serializer(_phase).toString());
     _phase = IndexBuildPhaseEnum::kBulkLoad;
 
@@ -855,22 +864,26 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
 
     BSONArrayBuilder indexesArray(builder.subarrayStart("indexes"));
     for (const auto& index : _indexes) {
+        // Persist the data to disk so that we see all of the data that has been inserted into the
+        // Sorter.
+        index.bulk->persistDataForShutdown();
+
         BSONObjBuilder indexInfo(indexesArray.subobjStart());
 
         if (_phase == IndexBuildPhaseEnum::kCollectionScan ||
             _phase == IndexBuildPhaseEnum::kBulkLoad) {
-            auto state = index.bulk->getSorterState();
+            auto state = index.bulk->getPersistedSorterState();
 
-            indexInfo.append("tempDir", state.tempDir);
             indexInfo.append("fileName", state.fileName);
+            indexInfo.append("numKeys", index.bulk->getKeysInserted());
 
             BSONArrayBuilder ranges(indexInfo.subarrayStart("ranges"));
             for (const auto& rangeInfo : state.ranges) {
                 BSONObjBuilder range(ranges.subobjStart());
 
-                range.append("startOffset", rangeInfo.startOffset);
-                range.append("endOffset", rangeInfo.endOffset);
-                range.appendNumber("checksum", static_cast<long long>(rangeInfo.checksum));
+                range.append("startOffset", rangeInfo.getStartOffset());
+                range.append("endOffset", rangeInfo.getEndOffset());
+                range.append("checksum", rangeInfo.getChecksum());
 
                 range.done();
             }
@@ -893,9 +906,6 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
         indexInfo.append("spec", index.block->getSpec());
 
         indexInfo.done();
-
-        // Ensure the data we are referencing has been persisted to disk.
-        index.bulk->persistDataForShutdown();
     }
     indexesArray.done();
 

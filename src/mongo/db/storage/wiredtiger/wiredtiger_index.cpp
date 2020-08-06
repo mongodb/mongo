@@ -236,6 +236,13 @@ int WiredTigerIndex::Create(OperationContext* opCtx,
     return s->create(s, uri.c_str(), config.c_str());
 }
 
+int WiredTigerIndex::Drop(OperationContext* opCtx, const std::string& uri) {
+    WiredTigerSession session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
+    WT_SESSION* s = session.getSession();
+
+    return s->drop(s, uri.c_str(), nullptr);
+}
+
 WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  const std::string& uri,
                                  const IndexDescriptor* desc,

@@ -178,6 +178,11 @@ public:
                                             const IndexDescriptor* desc,
                                             KVPrefix prefix) override;
 
+    /**
+     * Drops the specified ident for resumable index builds.
+     */
+    Status dropGroupedSortedDataInterface(OperationContext* opCtx, StringData ident) override;
+
     std::unique_ptr<SortedDataInterface> getGroupedSortedDataInterface(OperationContext* opCtx,
                                                                        StringData ident,
                                                                        const IndexDescriptor* desc,

@@ -156,6 +156,12 @@ public:
                                 boost::optional<UUID> buildUUID,
                                 bool isBackgroundSecondaryBuild);
 
+    Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
+                                              RecordId catalogId,
+                                              const IndexDescriptor* spec,
+                                              StringData ident,
+                                              KVPrefix prefix);
+
     boost::optional<UUID> getIndexBuildUUID(OperationContext* opCtx,
                                             RecordId catalogId,
                                             StringData indexName) const;

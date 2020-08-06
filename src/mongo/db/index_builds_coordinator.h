@@ -650,12 +650,20 @@ protected:
 
     /**
      * First phase is the collection scan and insertion of the keys into the sorter.
+     * Second phase is extracting the sorted keys and writing them into the new index table.
      */
-    void _scanCollectionAndInsertKeysIntoSorter(OperationContext* opCtx,
-                                                std::shared_ptr<ReplIndexBuildState> replState);
+    void _scanCollectionAndInsertSortedKeysIntoIndex(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
+    /**
+     * Performs the second phase of the index build, for use when resuming from the second phase.
+     */
+    void _insertSortedKeysIntoIndexForResume(OperationContext* opCtx,
+                                             std::shared_ptr<ReplIndexBuildState> replState);
+    void _setUpForScanCollectionAndInsertSortedKeysIntoIndex(
+        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
 
     /**
-     * Second phase is extracting the sorted keys and writing them into the new index table.
+     * Third phase is catching up on all the writes that occurred during the first two phases.
      */
     void _insertKeysFromSideTablesWithoutBlockingWrites(
         OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);

@@ -79,9 +79,10 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
         .addedIndex(opCtx, collection, _indexCatalogEntry->descriptor());
 }
 
-void IndexBuildBlock::initForResume(OperationContext* opCtx,
-                                    Collection* collection,
-                                    const IndexSorterInfo& resumeInfo) {
+Status IndexBuildBlock::initForResume(OperationContext* opCtx,
+                                      Collection* collection,
+                                      const IndexSorterInfo& sorterInfo,
+                                      IndexBuildPhaseEnum phase) {
 
     _indexName = _spec.getStringField("name");
     auto descriptor =
@@ -91,15 +92,30 @@ void IndexBuildBlock::initForResume(OperationContext* opCtx,
     invariant(_indexCatalogEntry);
     invariant(_method == IndexBuildMethod::kHybrid);
 
+    if (phase == IndexBuildPhaseEnum::kBulkLoad) {
+        // A bulk cursor can only be opened on a fresh table, so we drop the table that was created
+        // before shutdown and recreate it.
+        auto status = DurableCatalog::get(opCtx)->dropAndRecreateIndexIdentForResume(
+            opCtx,
+            collection->getCatalogId(),
+            descriptor,
+            _indexCatalogEntry->getIdent(),
+            _indexCatalogEntry->getPrefix());
+        if (!status.isOK())
+            return status;
+    }
+
     _indexBuildInterceptor =
         std::make_unique<IndexBuildInterceptor>(opCtx,
                                                 _indexCatalogEntry,
-                                                resumeInfo.getSideWritesTable(),
-                                                resumeInfo.getDuplicateKeyTrackerTable(),
-                                                resumeInfo.getSkippedRecordTrackerTable());
+                                                sorterInfo.getSideWritesTable(),
+                                                sorterInfo.getDuplicateKeyTrackerTable(),
+                                                sorterInfo.getSkippedRecordTrackerTable());
     _indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
     _completeInit(opCtx, collection);
+
+    return Status::OK();
 }
 
 Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {

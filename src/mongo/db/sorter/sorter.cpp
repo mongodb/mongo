@@ -80,6 +80,13 @@ uint32_t addDataToChecksum(const void* startOfData, size_t sizeOfData, uint32_t 
     return newChecksum;
 }
 
+void checkNoExternalSortOnMongos(const SortOptions& opts) {
+    // This should be checked by consumers, but if it isn't try to fail early.
+    uassert(16947,
+            "Attempting to use external sort from mongos. This is not allowed.",
+            !(isMongos() && opts.extSortAllowed));
+}
+
 }  // namespace
 
 namespace sorter {
@@ -246,7 +253,7 @@ public:
         return Data(std::move(first), std::move(second));
     }
 
-    SorterRangeInfo getRangeInfo() const {
+    SorterRange getRange() const {
         return {_fileStartOffset, _fileEndOffset, _originalChecksum};
     }
 
@@ -531,9 +538,36 @@ public:
         : _comp(comp), _settings(settings), _opts(opts), _memUsed(0) {
         verify(_opts.limit == 0);
         if (_opts.extSortAllowed) {
-            this->_tempDir = _opts.tempDir;
             this->_fileName = _opts.tempDir + "/" + nextFileName();
         }
+    }
+
+    NoLimitSorter(const std::string& fileName,
+                  const std::vector<SorterRange> ranges,
+                  const SortOptions& opts,
+                  const Comparator& comp,
+                  const Settings& settings = Settings())
+        : _comp(comp),
+          _settings(settings),
+          _opts(opts),
+          _nextSortedFileWriterOffset(ranges.back().getEndOffset()),
+          _memUsed(0) {
+        invariant(_opts.extSortAllowed);
+
+        this->_usedDisk = true;
+        this->_fileName = fileName;
+
+        std::transform(ranges.begin(),
+                       ranges.end(),
+                       std::back_inserter(this->_iters),
+                       [this](const SorterRange& range) {
+                           return std::make_shared<sorter::FileIterator<Key, Value>>(
+                               this->_fileName,
+                               range.getStartOffset(),
+                               range.getEndOffset(),
+                               this->_settings,
+                               range.getChecksum());
+                       });
     }
 
     ~NoLimitSorter() {
@@ -701,7 +735,6 @@ public:
         verify(_opts.limit > 1);
 
         if (_opts.extSortAllowed) {
-            this->_tempDir = _opts.tempDir;
             this->_fileName = _opts.tempDir + "/" + nextFileName();
         }
 
@@ -942,12 +975,12 @@ private:
 }  // namespace sorter
 
 template <typename Key, typename Value>
-std::vector<SorterRangeInfo> Sorter<Key, Value>::_getRangeInfos() const {
-    std::vector<SorterRangeInfo> ranges;
+std::vector<SorterRange> Sorter<Key, Value>::_getRanges() const {
+    std::vector<SorterRange> ranges;
     ranges.reserve(_iters.size());
 
     std::transform(_iters.begin(), _iters.end(), std::back_inserter(ranges), [](const auto it) {
-        return it->getRangeInfo();
+        return it->getRange();
     });
 
     return ranges;
@@ -1105,10 +1138,7 @@ template <typename Comparator>
 Sorter<Key, Value>* Sorter<Key, Value>::make(const SortOptions& opts,
                                              const Comparator& comp,
                                              const Settings& settings) {
-    // This should be checked by consumers, but if it isn't try to fail early.
-    uassert(16947,
-            "Attempting to use external sort from mongos. This is not allowed.",
-            !(isMongos() && opts.extSortAllowed));
+    checkNoExternalSortOnMongos(opts);
 
     uassert(17149,
             "Attempting to use external sort without setting SortOptions::tempDir",
@@ -1121,5 +1151,26 @@ Sorter<Key, Value>* Sorter<Key, Value>::make(const SortOptions& opts,
         default:
             return new sorter::TopKSorter<Key, Value, Comparator>(opts, comp, settings);
     }
+}
+
+template <typename Key, typename Value>
+template <typename Comparator>
+Sorter<Key, Value>* Sorter<Key, Value>::makeFromExistingRanges(
+    const std::string& fileName,
+    const std::vector<SorterRange> ranges,
+    const SortOptions& opts,
+    const Comparator& comp,
+    const Settings& settings) {
+    checkNoExternalSortOnMongos(opts);
+
+    invariant(opts.limit == 0,
+              str::stream() << "Creating a Sorter from existing ranges is only availble with the "
+                               "NoLimitSorter (limit 0), but got limit "
+                            << opts.limit);
+
+    invariant(!ranges.empty());
+
+    return new sorter::NoLimitSorter<Key, Value, Comparator>(
+        fileName, ranges, opts, comp, settings);
 }
 }  // namespace mongo

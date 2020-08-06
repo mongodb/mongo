@@ -217,6 +217,15 @@ public:
                                         bool isBackgroundSecondaryBuild) = 0;
 
     /**
+     * Drops the provided ident and recreates it as empty for use in resuming an index build.
+     */
+    virtual Status dropAndRecreateIndexIdentForResume(OperationContext* opCtx,
+                                                      RecordId catalogId,
+                                                      const IndexDescriptor* spec,
+                                                      StringData ident,
+                                                      KVPrefix prefix) = 0;
+
+    /**
      * Returns a UUID if the index is being built with the two-phase index build procedure.
      */
     virtual boost::optional<UUID> getIndexBuildUUID(OperationContext* opCtx,

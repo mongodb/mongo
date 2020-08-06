@@ -55,6 +55,9 @@ sbeEnv.Library(
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/third_party/shim_snappy',
         'query_sbe_plan_stats'
+         ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/sorter/sorter_idl',
          ]
     )
 

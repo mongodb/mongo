@@ -235,9 +235,10 @@ public:
         virtual int64_t getKeysInserted() const = 0;
 
         /**
-         * Returns the current state of this BulkBuilder's underlying Sorter.
+         * Returns the current state of this BulkBuilder's underlying Sorter that has been already
+         * persisted to disk.
          */
-        virtual Sorter::State getSorterState() const = 0;
+        virtual Sorter::PersistedState getPersistedSorterState() const = 0;
 
         /**
          * Persists on disk the keys that have been inserted using this BulkBuilder.
@@ -250,12 +251,16 @@ public:
      * You work on the returned BulkBuilder and then call commitBulk.
      * This can return NULL, meaning bulk mode is not available.
      *
-     * It is only legal to initiate bulk when the index is new and empty.
+     * It is only legal to initiate bulk when the index is new and empty, or when resuming an index
+     * build.
      *
      * maxMemoryUsageBytes: amount of memory consumed before the external sorter starts spilling to
      *                      disk
+     * sorterInfo: the information to use to resume the index build, or boost::none if starting a
+     * new index build.
      */
-    virtual std::unique_ptr<BulkBuilder> initiateBulk(size_t maxMemoryUsageBytes) = 0;
+    virtual std::unique_ptr<BulkBuilder> initiateBulk(
+        size_t maxMemoryUsageBytes, const boost::optional<IndexSorterInfo>& sorterInfo) = 0;
 
     /**
      * Call this when you are ready to finish your bulk work.
@@ -492,7 +497,8 @@ public:
                             Collection* collection,
                             MultikeyPaths paths) final;
 
-    std::unique_ptr<BulkBuilder> initiateBulk(size_t maxMemoryUsageBytes) final;
+    std::unique_ptr<BulkBuilder> initiateBulk(
+        size_t maxMemoryUsageBytes, const boost::optional<IndexSorterInfo>& sorterInfo) final;
 
     Status commitBulk(OperationContext* opCtx,
                       BulkBuilder* bulk,

@@ -99,6 +99,8 @@ public:
                               Collection* collection,
                               const UUID& buildUUID);
 
+    Status resumeBuildingIndexFromBulkLoadPhase(OperationContext* opCtx, const UUID& buildUUID);
+
     /**
      * Iterates through every record in the collection to index it. May also remove documents
      * that are not valid BSON objects, if repair is set to kYes.

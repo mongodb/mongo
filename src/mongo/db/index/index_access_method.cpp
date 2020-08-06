@@ -436,9 +436,11 @@ Status AbstractIndexAccessMethod::compact(OperationContext* opCtx) {
 
 class AbstractIndexAccessMethod::BulkBuilderImpl : public IndexAccessMethod::BulkBuilder {
 public:
-    BulkBuilderImpl(IndexCatalogEntry* indexCatalogEntry,
-                    const IndexDescriptor* descriptor,
-                    size_t maxMemoryUsageBytes);
+    BulkBuilderImpl(IndexCatalogEntry* indexCatalogEntry, size_t maxMemoryUsageBytes);
+
+    BulkBuilderImpl(IndexCatalogEntry* index,
+                    size_t maxMemoryUsageBytes,
+                    const IndexSorterInfo& sorterInfo);
 
     Status insert(OperationContext* opCtx,
                   const BSONObj& obj,
@@ -457,15 +459,17 @@ public:
 
     int64_t getKeysInserted() const final;
 
-    Sorter::State getSorterState() const final;
+    Sorter::PersistedState getPersistedSorterState() const final;
 
     void persistDataForShutdown() final;
 
 private:
     void _addMultikeyMetadataKeysIntoSorter();
 
-    std::unique_ptr<Sorter> _sorter;
+    Sorter::Settings _makeSorterSettings() const;
+
     IndexCatalogEntry* _indexCatalogEntry;
+    std::unique_ptr<Sorter> _sorter;
     int64_t _keysInserted = 0;
 
     // Set to true if any document added to the BulkBuilder causes the index to become multikey.
@@ -482,23 +486,33 @@ private:
 };
 
 std::unique_ptr<IndexAccessMethod::BulkBuilder> AbstractIndexAccessMethod::initiateBulk(
-    size_t maxMemoryUsageBytes) {
-    return std::make_unique<BulkBuilderImpl>(_indexCatalogEntry, _descriptor, maxMemoryUsageBytes);
+    size_t maxMemoryUsageBytes, const boost::optional<IndexSorterInfo>& sorterInfo) {
+    return sorterInfo
+        ? std::make_unique<BulkBuilderImpl>(_indexCatalogEntry, maxMemoryUsageBytes, *sorterInfo)
+        : std::make_unique<BulkBuilderImpl>(_indexCatalogEntry, maxMemoryUsageBytes);
 }
 
 AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(IndexCatalogEntry* index,
-                                                            const IndexDescriptor* descriptor,
                                                             size_t maxMemoryUsageBytes)
-    : _sorter(Sorter::make(
-          SortOptions()
-              .TempDir(storageGlobalParams.dbpath + "/_tmp")
-              .ExtSortAllowed()
-              .MaxMemoryUsageBytes(maxMemoryUsageBytes),
+    : _indexCatalogEntry(index),
+      _sorter(Sorter::make(SortOptions()
+                               .TempDir(storageGlobalParams.dbpath + "/_tmp")
+                               .ExtSortAllowed()
+                               .MaxMemoryUsageBytes(maxMemoryUsageBytes),
+                           BtreeExternalSortComparison(),
+                           _makeSorterSettings())) {}
+
+AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(IndexCatalogEntry* index,
+                                                            size_t maxMemoryUsageBytes,
+                                                            const IndexSorterInfo& sorterInfo)
+    : _indexCatalogEntry(index),
+      _sorter(Sorter::makeFromExistingRanges(
+          sorterInfo.getFileName()->toString(),
+          *sorterInfo.getRanges(),
+          SortOptions().ExtSortAllowed().MaxMemoryUsageBytes(maxMemoryUsageBytes),
           BtreeExternalSortComparison(),
-          std::pair<KeyString::Value::SorterDeserializeSettings,
-                    mongo::NullValue::SorterDeserializeSettings>(
-              {index->accessMethod()->getSortedDataInterface()->getKeyStringVersion()}, {}))),
-      _indexCatalogEntry(index) {}
+          _makeSorterSettings())),
+      _keysInserted(*sorterInfo.getNumKeys()) {}
 
 Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCtx,
                                                           const BSONObj& obj,
@@ -581,9 +595,9 @@ int64_t AbstractIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
     return _keysInserted;
 }
 
-AbstractIndexAccessMethod::BulkBuilder::Sorter::State
-AbstractIndexAccessMethod::BulkBuilderImpl::getSorterState() const {
-    return _sorter->getState();
+AbstractIndexAccessMethod::BulkBuilder::Sorter::PersistedState
+AbstractIndexAccessMethod::BulkBuilderImpl::getPersistedSorterState() const {
+    return _sorter->getPersistedState();
 }
 
 void AbstractIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown() {
@@ -596,6 +610,13 @@ void AbstractIndexAccessMethod::BulkBuilderImpl::_addMultikeyMetadataKeysIntoSor
         _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
     }
+}
+
+AbstractIndexAccessMethod::BulkBuilderImpl::Sorter::Settings
+AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
+    return std::pair<KeyString::Value::SorterDeserializeSettings,
+                     mongo::NullValue::SorterDeserializeSettings>(
+        {_indexCatalogEntry->accessMethod()->getSortedDataInterface()->getKeyStringVersion()}, {});
 }
 
 Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,

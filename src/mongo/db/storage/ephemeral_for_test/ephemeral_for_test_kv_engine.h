@@ -72,6 +72,10 @@ public:
                                              StringData ident,
                                              const IndexDescriptor* desc);
 
+    virtual Status dropGroupedSortedDataInterface(OperationContext* opCtx, StringData ident) {
+        return Status::OK();
+    }
+
     virtual std::unique_ptr<mongo::SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx, StringData ident, const IndexDescriptor* desc);
 

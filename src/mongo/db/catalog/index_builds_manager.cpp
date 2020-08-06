@@ -128,6 +128,11 @@ Status IndexBuildsManager::startBuildingIndex(OperationContext* opCtx,
     return builder->insertAllDocumentsInCollection(opCtx, collection);
 }
 
+Status IndexBuildsManager::resumeBuildingIndexFromBulkLoadPhase(OperationContext* opCtx,
+                                                                const UUID& buildUUID) {
+    return invariant(_getBuilder(buildUUID))->dumpInsertsFromBulk(opCtx);
+}
+
 StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingIndexForRecovery(
     OperationContext* opCtx, NamespaceString ns, const UUID& buildUUID, RepairData repair) {
     auto builder = invariant(_getBuilder(buildUUID));

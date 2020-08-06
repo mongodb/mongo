@@ -1715,6 +1715,11 @@ Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* op
     return wtRCToStatus(WiredTigerIndex::Create(opCtx, _uri(ident), config));
 }
 
+Status WiredTigerKVEngine::dropGroupedSortedDataInterface(OperationContext* opCtx,
+                                                          StringData ident) {
+    return wtRCToStatus(WiredTigerIndex::Drop(opCtx, _uri(ident)));
+}
+
 std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getGroupedSortedDataInterface(
     OperationContext* opCtx, StringData ident, const IndexDescriptor* desc, KVPrefix prefix) {
     if (desc->unique()) {

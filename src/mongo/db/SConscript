@@ -852,7 +852,10 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         '$BUILD_DIR/mongo/idl/idl_parser',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        'sorter/sorter_idl',
+    ],
 )
 
 env.Library(

@@ -54,6 +54,9 @@ sortExecutorEnv.Library(
         '$BUILD_DIR/third_party/shim_snappy',
         'working_set',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/sorter/sorter_idl',
+    ],
 )
 
 env.Library(

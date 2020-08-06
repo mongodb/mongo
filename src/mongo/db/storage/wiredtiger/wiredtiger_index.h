@@ -86,6 +86,11 @@ public:
      */
     static int Create(OperationContext* opCtx, const std::string& uri, const std::string& config);
 
+    /**
+     * Drops the specified WiredTiger table. This should only be used for resuming index builds.
+     */
+    static int Drop(OperationContext* opCtx, const std::string& uri);
+
     WiredTigerIndex(OperationContext* ctx,
                     const std::string& uri,
                     const IndexDescriptor* desc,

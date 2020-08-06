@@ -70,11 +70,14 @@ public:
     Status init(OperationContext* opCtx, Collection* collection);
 
     /**
-     * Makes sure that an entry for the index was created at startup in the IndexCatalog.
+     * Makes sure that an entry for the index was created at startup in the IndexCatalog. Returns
+     * an error status if we are resuming from the bulk load phase and the index ident was unable
+     * to be dropped or recreated in the storage engine.
      */
-    void initForResume(OperationContext* opCtx,
-                       Collection* collection,
-                       const IndexSorterInfo& resumeInfo);
+    Status initForResume(OperationContext* opCtx,
+                         Collection* collection,
+                         const IndexSorterInfo& sorterInfo,
+                         IndexBuildPhaseEnum phase);
 
     /**
      * Marks the state of the index as 'ready' and commits the index to disk.
