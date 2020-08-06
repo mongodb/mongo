@@ -47,6 +47,7 @@ class MongosIsMasterResponse {
 public:
     static constexpr StringData kTopologyVersionFieldName = "topologyVersion"_sd;
     static constexpr StringData kIsMasterFieldName = "ismaster"_sd;
+    static constexpr StringData kIsWritablePrimaryFieldName = "isWritablePrimary"_sd;
     static constexpr StringData kMsgFieldName = "msg"_sd;
 
     /**
@@ -55,9 +56,11 @@ public:
     MongosIsMasterResponse(TopologyVersion topologyVersion);
 
     /**
-     * Appends MongosIsMasterResponse fields to "builder".
+     * Appends MongosIsMasterResponse fields to "builder". When true, "useLegacyResponseFields"
+     * indicates that we are responding to an isMaster command and not a hello command. Attach
+     * the legacy "ismaster" field if true, and the "isWritablePrimary" field otherwise.
      */
-    void appendToBuilder(BSONObjBuilder* builder) const;
+    void appendToBuilder(BSONObjBuilder* builder, bool useLegacyResponseFields) const;
 
     TopologyVersion getTopologyVersion() const {
         return _topologyVersion;

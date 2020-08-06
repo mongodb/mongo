@@ -102,6 +102,11 @@ public:
 
         waitInIsMaster.pauseWhileSet(opCtx);
 
+        // Parse the command name, which should be one of the following: hello, isMaster, or
+        // ismaster. If the command is "hello", we must attach an "isWritablePrimary" response field
+        // instead of "ismaster".
+        bool useLegacyResponseFields = (cmdObj.firstElementFieldNameStringData() != kHelloString);
+
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
         if (!seenIsMaster) {
@@ -170,7 +175,7 @@ public:
         auto mongosIsMasterResponse =
             mongosTopCoord->awaitIsMasterResponse(opCtx, clientTopologyVersion, deadline);
 
-        mongosIsMasterResponse->appendToBuilder(&result);
+        mongosIsMasterResponse->appendToBuilder(&result, useLegacyResponseFields);
         // The isMaster response always includes a topologyVersion.
         auto currentMongosTopologyVersion = mongosIsMasterResponse->getTopologyVersion();
 
