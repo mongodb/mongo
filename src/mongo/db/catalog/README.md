@@ -159,14 +159,54 @@ _Code spelunking starting points:_
   timestamp_](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/storage/storage_engine_impl.cpp#L932-L949)
 
 # Storage Transactions
-Clarify transaction refers to storage engine transactions, not repl or sharding, throughout this document.
 
-Include a discussion on how RecoveryUnit implements isolation and transactional behaviors, including ‘read source’ and how those implement read concern levels.
-Maybe include a discussion of how MongoDB read concerns translate into particular read sources and data views.
+Through the pluggable storage engine API, MongoDB executes reads and writes on its storage engine
+with [snapshot isolation](#glossary).  The structure used to achieve this is the [RecoveryUnit
+class](../storage/recovery_unit.h).
 
-## WiredTiger Snapshot
+## RecoveryUnit
 
-## MongoDB Point-in-Time Read
+Each pluggable storage engine for MongoDB must implement `RecoveryUnit` as one of the base classes
+for the storage engine API.  Typically, storage engines satisfy the `RecoveryUnit` requirements with
+some form of [snapshot isolation](#glossary) with [transactions](#glossary). Such transactions are
+called storage transactions elsewhere in this document, to differentiate them from the higher-level
+_multi-document transactions_ accessible to users of MongoDB.  The RecoveryUnit controls what
+[snapshot](#glossary) a storage engine transaction uses for its reads.  In MongoDB, a snapshot is defined by a
+_timestamp_. A snapshot consists of all data committed with a timestamp less than or equal to the
+snapshot's timestamp.  No uncommitted data is visible in a snapshot, and data changes in storage
+transactions that commit after a snapshot is created, regardless of their timestamps, are also not
+visible.  Generally, one uses a `RecoveryUnit` to perform transactional reads and writes by first
+configuring the `RecoveryUnit` with the desired
+[ReadSource](https://github.com/mongodb/mongo/blob/b2c1fa4f121fdb6cdffa924b802271d68c3367a3/src/mongo/db/storage/recovery_unit.h#L391-L421)
+and then performing the reads and writes using operations on `RecordStore` or `SortedDataInterface`,
+and finally calling `commit()` on the `WriteUnitOfWork` (if performing writes).
+
+## WriteUnitOfWork
+
+A `WriteUnitOfWork` is the mechanism to control how writes are transactionally performed on the
+storage engine.  All the writes (and reads) performed within its scope are part of the same storage
+transaction.  After all writes have been staged, one must call `commit()` in order to atomically
+commit the transaction to the storage engine.  It is illegal to perform writes outside the scope of
+a WriteUnitOfWork since there would be no way to commit them.  If the `WriteUnitOfWork` falls out of
+scope before `commit()` is called, the storage transaction is rolled back and all the staged writes
+are lost.  Reads can be performed outside of a `WriteUnitOfWork` block; storage transactions outside
+of a `WriteUnitOfWork` are always rolled back, since there are no writes to commit.
+
+## Lazy initialization of storage transactions
+
+Note that storage transactions on WiredTiger are not started at the beginning of a `WriteUnitOfWork`
+block.  Instead, the transaction is started implicitly with the first read or write operation.  To
+explicitly start a transaction, one can use `RecoveryUnit::preallocateSnapshot()`.
+
+## Changes
+
+One can register a `Change` on a `RecoveryUnit` while in a `WriteUnitOfWork`.  This allows extra
+actions to be performed based on whether a `WriteUnitOfWork` commits or rolls back.  These actions
+will typically update in-memory state to match what was written in the storage transaction, in a
+transactional way.  Note that `Change`s are not executed until the destruction of the
+`WriteUnitOfWork`, which can be long after the storage engine committed.  Two-phase locking ensures
+that all locks are held while a Change's `commit()` or `rollback()` function runs.
+
 
 # Read Operations
 
@@ -1408,14 +1448,29 @@ creation or drop, as well as `collMod` operations.
 indexes map application-layer names to storage engine idents. In WiredTiger, idents are implemented
 as tables. For example, collection idents have the form: `collection-<counter>-<random number>`.
 
-**oplog hole**: an uncommitted oplog write that can exist with out-of-order writes when a later
+**oplog hole**: An uncommitted oplog write that can exist with out-of-order writes when a later
 timestamped write happens to commit first. Oplog holes can exist in-memory and persisted on disk.
 
-**oplogReadTimestamp**: the timestamp used for WT forward cursor oplog reads in order to avoid
+**oplogReadTimestamp**: The timestamp used for WT forward cursor oplog reads in order to avoid
 advancing past oplog holes. Tracks in-memory oplog holes.
 
-**oplogTruncateAfterPoint**: the timestamp after which oplog entries will be truncated during
+**oplogTruncateAfterPoint**: The timestamp after which oplog entries will be truncated during
 startup recovery after an unclean shutdown. Tracks persisted oplog holes.
+
+**snapshot**: A snapshot consists of a consistent view of data in the database.  In MongoDB, a
+snapshot consists of all data committed with a timestamp less than or equal to the snapshot's
+timestamp.
+
+**snapshot isolation**: A guarantee that all reads in a transaction see the same consistent snapshot
+of the database, and that all writes in a transaction had no conflicts with other concurrent writes,
+if the transaction commits.
+
+**storage transaction**: A concept provided by a pluggable storage engine through which changes to
+data in the database can be performed.  In order to satisfy the MongoDB pluggable storage engine
+requirements for atomicity, consistency, isolation, and durability, storage engines typically use
+some form of transaction. In contrast, a multi-document transaction in MongoDB is a user-facing
+feature providing similar guarantees across many nodes in a sharded cluster; a storage transaction
+only provides guarantees within one node.
 
 [`BSONObj::woCompare`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonobj.h#L460
 [`BSONElement::compareElements`]: https://github.com/mongodb/mongo/blob/v4.4/src/mongo/bson/bsonelement.cpp#L285
