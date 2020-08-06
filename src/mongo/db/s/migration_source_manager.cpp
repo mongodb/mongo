@@ -514,12 +514,6 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
     // scheduling orphan cleanup.
     _cleanup(true);
 
-    LOGV2_DEBUG_OPTIONS(4817403,
-                        2,
-                        {logv2::LogComponent::kShardMigrationPerf},
-                        "Finished critical section",
-                        "migrationId"_attr = _coordinator->getMigrationId());
-
     ShardingLogging::get(_opCtx)->logChange(
         _opCtx,
         "moveChunk.commit",
@@ -677,6 +671,14 @@ void MigrationSourceManager::_cleanup(bool completeMigration) {
         _critSec.reset();
         return std::move(_cloneDriver);
     }();
+
+    if (_state == kCriticalSection || _state == kCloneCompleted || _state == kCommittingOnConfig) {
+        LOGV2_DEBUG_OPTIONS(4817403,
+                            2,
+                            {logv2::LogComponent::kShardMigrationPerf},
+                            "Finished critical section",
+                            "migrationId"_attr = _coordinator->getMigrationId());
+    }
 
     // The cleanup operations below are potentially blocking or acquire other locks, so perform them
     // outside of the collection X lock
