@@ -48,6 +48,19 @@ TopologyDescription::TopologyDescription(SdamConfiguration config)
     }
 }
 
+TopologyDescriptionPtr TopologyDescription::create(SdamConfiguration config) {
+    auto result = std::make_shared<TopologyDescription>(config);
+    TopologyDescription::associateServerDescriptions(result);
+    return result;
+}
+
+TopologyDescriptionPtr TopologyDescription::clone(TopologyDescriptionPtr source) {
+    invariant(source);
+    auto result = std::make_shared<TopologyDescription>(*source);
+    TopologyDescription::associateServerDescriptions(result);
+    return result;
+}
+
 const UUID& TopologyDescription::getId() const {
     return _id;
 }
@@ -116,21 +129,22 @@ boost::optional<ServerDescriptionPtr> TopologyDescription::installServerDescript
         // ServerDescription if the new topologyVersion is >= the old.
         invariant(_servers.size() == 1);
         previousDescription = _servers[0];
-        _servers[0] = std::shared_ptr<ServerDescription>(newServerDescription);
+        _servers[0] = newServerDescription;
     } else {
         for (auto it = _servers.begin(); it != _servers.end(); ++it) {
             const auto& currentDescription = *it;
             if (currentDescription->getAddress() == newServerDescription->getAddress()) {
                 previousDescription = *it;
-                *it = std::shared_ptr<ServerDescription>(newServerDescription);
+                *it = newServerDescription;
                 break;
             }
         }
 
         if (!previousDescription) {
-            _servers.push_back(std::shared_ptr<ServerDescription>(newServerDescription));
+            _servers.push_back(newServerDescription);
         }
     }
+
     newServerDescription->_topologyDescription = shared_from_this();
     checkWireCompatibilityVersions();
     calculateLogicalSessionTimeout();
@@ -272,6 +286,13 @@ std::string TopologyDescription::toString() {
     return toBSON().toString();
 }
 
+void TopologyDescription::associateServerDescriptions(
+    const TopologyDescriptionPtr& topologyDescription) {
+    auto& servers = topologyDescription->_servers;
+    for (auto& server : servers) {
+        server->_topologyDescription = topologyDescription;
+    }
+}
 
 boost::optional<ServerDescriptionPtr> TopologyDescription::getPrimary() {
     if (getType() != TopologyType::kReplicaSetWithPrimary) {

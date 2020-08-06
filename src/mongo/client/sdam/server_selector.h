@@ -111,10 +111,12 @@ private:
                 ? *primaryDescription->getLastWriteDate()
                 : Date_t::min();
 
-            auto result = (serverDescription->getLastUpdateTime() - lastWriteDate) -
-                (primaryDescription->getLastUpdateTime() - primaryLastWriteDate) +
-                _config.getHeartBeatFrequency();
-            return duration_cast<Milliseconds>(result);
+            auto result = durationCount<Milliseconds>(
+                              (serverDescription->getLastUpdateTime() - lastWriteDate)) -
+                durationCount<Milliseconds>(
+                              (primaryDescription->getLastUpdateTime() - primaryLastWriteDate)) +
+                durationCount<Milliseconds>(_config.getHeartBeatFrequency());
+            return Milliseconds{result};
         } else if (topologyDescription->getType() == TopologyType::kReplicaSetNoPrimary) {
             //  SMax.lastWriteDate - S.lastWriteDate + heartbeatFrequencyMS
             Date_t maxLastWriteDate = Date_t::min();
@@ -132,13 +134,19 @@ private:
                 }
             }
 
-            auto result = (maxLastWriteDate - lastWriteDate) + _config.getHeartBeatFrequency();
-            return duration_cast<Milliseconds>(result);
+            auto result = durationCount<Milliseconds>(maxLastWriteDate - lastWriteDate) +
+                durationCount<Milliseconds>(_config.getHeartBeatFrequency());
+            return Milliseconds{result};
         } else {
             // Not a replica set
             return Milliseconds(0);
         }
     }
+
+    void _verifyMaxstalenessLowerBound(TopologyDescriptionPtr topologyDescription,
+                                       Seconds maxStalenessSeconds);
+    void _verifyMaxstalenessWireVersions(TopologyDescriptionPtr topologyDescription,
+                                         Seconds maxStalenessSeconds);
 
     bool recencyFilter(const ReadPreferenceSetting& readPref, const ServerDescriptionPtr& s);
 
@@ -168,6 +176,10 @@ private:
                     s->getType() == ServerType::kRSSecondary) &&
                 recencyFilter(readPref, s);
         };
+    };
+
+    const SelectionFilter shardedFilter = [this](const ReadPreferenceSetting& readPref) {
+        return [&](const ServerDescriptionPtr& s) { return s->getType() == ServerType::kMongos; };
     };
 
     SdamConfiguration _config;
