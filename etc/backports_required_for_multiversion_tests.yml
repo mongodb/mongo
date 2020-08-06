@@ -70,6 +70,8 @@ all:
     test_file: jstests/core/ismaster.js
   - ticket: SERVER-49988
     test_file: jstests/sharding/ismaster.js
+  - ticket: SERVER-49987
+    test_file: jstests/replsets/ismaster1.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
