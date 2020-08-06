@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_serialization.h"
+#include "mongo/db/update/document_diff_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::doc_diff {
@@ -425,59 +426,71 @@ TEST(DiffSerializationTest, ExecptionsWhileDiffBuildingDoesNotLeakMemory) {
 TEST(DiffSerializationTest, UnexpectedFieldsInObjDiff) {
     // Empty field names on top level.
     ASSERT_THROWS_CODE(
-        applyDiff(BSONObj(), fromjson("{d: {f: false}, '' : {}}")), DBException, 4770505);
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{'' : {}}")), DBException, 4770505);
+        applyDiffTestHelper(BSONObj(), fromjson("{d: {f: false}, '' : {}}")), DBException, 4770505);
+    ASSERT_THROWS_CODE(applyDiffTestHelper(BSONObj(), fromjson("{'' : {}}")), DBException, 4770505);
 
     // Expected diff to be non-empty.
     ASSERT_THROWS_CODE(
-        applyDiff(BSONObj(), fromjson("{d: {f: false}, s : {}}")), DBException, 4770500);
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{sa : {}}")), DBException, 4770500);
+        applyDiffTestHelper(BSONObj(), fromjson("{d: {f: false}, s : {}}")), DBException, 4770500);
+    ASSERT_THROWS_CODE(applyDiffTestHelper(BSONObj(), fromjson("{sa : {}}")), DBException, 4770500);
 
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{p : 1}")), DBException, 4770503);
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{u : true}")), DBException, 4770507);
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{d : []}")), DBException, 4770507);
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{i : null}")), DBException, 4770507);
+    ASSERT_THROWS_CODE(applyDiffTestHelper(BSONObj(), fromjson("{p : 1}")), DBException, 4770503);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(BSONObj(), fromjson("{u : true}")), DBException, 4770507);
+    ASSERT_THROWS_CODE(applyDiffTestHelper(BSONObj(), fromjson("{d : []}")), DBException, 4770507);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(BSONObj(), fromjson("{i : null}")), DBException, 4770507);
 
     // If the order of the fields is not obeyed.
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{i : {}, d: {}}")), DBException, 4770503);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(BSONObj(), fromjson("{i : {}, d: {}}")), DBException, 4770503);
 
     ASSERT_THROWS_CODE(
-        applyDiff(BSONObj(), fromjson("{s : {i: {}}, i: {}}")), DBException, 4770514);
-    ASSERT_THROWS_CODE(
-        applyDiff(BSONObj(), fromjson("{sa : {u: {}}, d: {p: false}}")), DBException, 4770514);
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{sa : {u: {}}, sb : {u: {}}, i: {}}")),
+        applyDiffTestHelper(BSONObj(), fromjson("{s : {i: {}}, i: {}}")), DBException, 4770514);
+    ASSERT_THROWS_CODE(applyDiffTestHelper(BSONObj(), fromjson("{sa : {u: {}}, d: {p: false}}")),
                        DBException,
                        4770514);
     ASSERT_THROWS_CODE(
-        applyDiff(BSONObj(), fromjson("{sa : {u: {}}, p: {}}")), DBException, 4770514);
+        applyDiffTestHelper(BSONObj(), fromjson("{sa : {u: {}}, sb : {u: {}}, i: {}}")),
+        DBException,
+        4770514);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(BSONObj(), fromjson("{sa : {u: {}}, p: {}}")), DBException, 4770514);
 
     // Empty deletes object is valid.
-    ASSERT_BSONOBJ_BINARY_EQ(applyDiff(fromjson("{a: 1}"), fromjson("{d : {}}")),
+    ASSERT_BSONOBJ_BINARY_EQ(applyDiffTestHelper(fromjson("{a: 1}"), fromjson("{d : {}}")),
                              fromjson("{a: 1}"));
 }
 
 TEST(DiffSerializationTest, UnexpectedFieldsInArrayDiff) {
-    ASSERT_THROWS_CODE(applyDiff(fromjson("{arr: []}"), fromjson("{sarr: {a: true, '3u' : 1}}")),
-                       DBException,
-                       4770512);
-    ASSERT_THROWS_CODE(applyDiff(fromjson("{arr: []}"), fromjson("{sarr: {a: true, u : true}}")),
-                       DBException,
-                       4770521);
-    ASSERT_THROWS_CODE(applyDiff(fromjson("{arr: []}"), fromjson("{sarr: {a: true, '5' : {}}}")),
-                       DBException,
-                       4770521);
-    ASSERT_THROWS_CODE(applyDiff(fromjson("{arr: []}"), fromjson("{sarr: {a: false, 'u3' : 4}}")),
-                       DBException,
-                       4770520);
-    ASSERT_THROWS_CODE(applyDiff(fromjson("{arr: []}"), fromjson("{sarr: {a: 1, 'u3' : 4}}")),
-                       DBException,
-                       4770519);
-    ASSERT_THROWS_CODE(applyDiff(fromjson("{arr: []}"), fromjson("{sarr: {a: true, 's3' : 4}}")),
-                       DBException,
-                       4770501);
-    ASSERT_THROWS_CODE(applyDiff(fromjson("{arr: []}"), fromjson("{sarr: {a: true, 'd3' : 4}}")),
-                       DBException,
-                       4770502);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(fromjson("{arr: []}"), fromjson("{sarr: {a: true, '3u' : 1}}")),
+        DBException,
+        4770512);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(fromjson("{arr: []}"), fromjson("{sarr: {a: true, u : true}}")),
+        DBException,
+        4770521);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(fromjson("{arr: []}"), fromjson("{sarr: {a: true, '5' : {}}}")),
+        DBException,
+        4770521);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(fromjson("{arr: []}"), fromjson("{sarr: {a: false, 'u3' : 4}}")),
+        DBException,
+        4770520);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(fromjson("{arr: []}"), fromjson("{sarr: {a: 1, 'u3' : 4}}")),
+        DBException,
+        4770519);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(fromjson("{arr: []}"), fromjson("{sarr: {a: true, 's3' : 4}}")),
+        DBException,
+        4770501);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(fromjson("{arr: []}"), fromjson("{sarr: {a: true, 'd3' : 4}}")),
+        DBException,
+        4770502);
 }
 
 }  // namespace

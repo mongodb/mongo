@@ -47,14 +47,7 @@ public:
      */
     explicit DeltaExecutor(doc_diff::Diff diff) : _diff(std::move(diff)) {}
 
-    ApplyResult applyUpdate(ApplyParams applyParams) const final {
-        const auto originalDoc = applyParams.element.getDocument().getObject();
-        auto postImage = doc_diff::applyDiff(originalDoc, _diff);
-        auto postImageHasId = postImage.hasField("_id");
-
-        return ObjectReplaceExecutor::applyReplacementUpdate(
-            applyParams, postImage, postImageHasId);
-    }
+    ApplyResult applyUpdate(ApplyParams applyParams) const final;
 
     Value serialize() const final {
         // Delta updates are only applied internally on secondaries. They are never passed between

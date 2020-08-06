@@ -29,7 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/field_ref.h"
 #include "mongo/db/update/document_diff_applier.h"
+#include "mongo/db/update_index_data.h"
 
 #include "mongo/stdx/variant.h"
 #include "mongo/util/string_map.h"
@@ -100,160 +102,203 @@ DocumentDiffTables buildObjDiffTables(DocumentDiffReader* reader) {
     return out;
 }
 
-// Mutually recursive with applyDiffToObject().
-void applyDiffToArray(const BSONObj& preImage, ArrayDiffReader* reader, BSONArrayBuilder* builder);
+class DiffApplier {
+public:
+    DiffApplier(const UpdateIndexData* indexData) : _indexData(indexData) {}
 
-void applyDiffToObject(const BSONObj& preImage,
-                       DocumentDiffReader* reader,
-                       BSONObjBuilder* builder) {
-    // First build some tables so we can quickly apply the diff. We shouldn't need to examine the
-    // diff again once this is done.
-    const DocumentDiffTables tables = buildObjDiffTables(reader);
+    void applyDiffToObject(const BSONObj& preImage,
+                           FieldRef* path,
+                           DocumentDiffReader* reader,
+                           BSONObjBuilder* builder) {
+        // First build some tables so we can quickly apply the diff. We shouldn't need to examine
+        // the diff again once this is done.
+        const DocumentDiffTables tables = buildObjDiffTables(reader);
 
-    // Keep track of what fields we already appended, so that we can insert the rest at the end.
-    StringDataSet fieldsToSkipInserting;
+        // Keep track of what fields we already appended, so that we can insert the rest at the end.
+        StringDataSet fieldsToSkipInserting;
 
-    for (auto&& elt : preImage) {
-        auto it = tables.fieldMap.find(elt.fieldNameStringData());
-        if (it == tables.fieldMap.end()) {
-            // Field is not modified, so we append it as is.
-            builder->append(elt);
-            continue;
+        for (auto&& elt : preImage) {
+            auto it = tables.fieldMap.find(elt.fieldNameStringData());
+            if (it == tables.fieldMap.end()) {
+                // Field is not modified, so we append it as is.
+                builder->append(elt);
+                continue;
+            }
+            FieldRef::FieldRefTempAppend tempAppend(*path, elt.fieldNameStringData());
+
+            stdx::visit(
+                visit_helper::Overloaded{
+                    [this, &path](Delete) {
+                        // Do not append anything.
+                        updateIndexesAffected(path);
+                    },
+
+                    [this, &path, &builder, &elt, &fieldsToSkipInserting](const Update& update) {
+                        builder->append(update.newElt);
+                        updateIndexesAffected(path);
+                        fieldsToSkipInserting.insert(elt.fieldNameStringData());
+                    },
+
+                    [](const Insert&) {
+                        // Skip the pre-image version of the field. We'll add it at the end.
+                    },
+
+                    [this, &builder, &elt, &path](const SubDiff& subDiff) {
+                        const auto type = subDiff.type();
+                        if (elt.type() == BSONType::Object && type == DiffType::kDocument) {
+                            BSONObjBuilder subBob(builder->subobjStart(elt.fieldNameStringData()));
+                            auto reader = stdx::get<DocumentDiffReader>(subDiff.reader);
+                            applyDiffToObject(elt.embeddedObject(), path, &reader, &subBob);
+                        } else if (elt.type() == BSONType::Array && type == DiffType::kArray) {
+                            BSONArrayBuilder subBob(
+                                builder->subarrayStart(elt.fieldNameStringData()));
+                            auto reader = stdx::get<ArrayDiffReader>(subDiff.reader);
+                            applyDiffToArray(elt.embeddedObject(), path, &reader, &subBob);
+                        } else {
+                            // There's a type mismatch. The diff was expecting one type but the pre
+                            // image contains a value of a different type. This means we are
+                            // re-applying a diff.
+
+                            // There must be some future operation which changed the type of this
+                            // field from object/array to something else. So we set this field to
+                            // null and expect the future value to overwrite the value here.
+
+                            builder->appendNull(elt.fieldNameStringData());
+                            updateIndexesAffected(path);
+                        }
+
+                        // Note: There's no need to update 'fieldsToSkipInserting' here, because a
+                        // field cannot appear in both the sub-diff and insert section.
+                    },
+                },
+                it->second);
         }
 
+        // Insert remaining fields to the end.
+        for (auto&& elt : tables.fieldsToInsert) {
+            if (!fieldsToSkipInserting.count(elt.fieldNameStringData())) {
+                builder->append(elt);
+                FieldRef::FieldRefTempAppend tempAppend(*path, elt.fieldNameStringData());
+                updateIndexesAffected(path);
+            }
+        }
+    }
+
+    bool indexesAffected() const {
+        return _indexesAffected;
+    }
+
+private:
+    /**
+     * Given an (optional) member of the pre image array and a modification, apply the modification
+     * and add it to the post image array in 'builder'.
+     */
+    void appendNewValueForArrayIndex(boost::optional<BSONElement> preImageValue,
+                                     FieldRef* path,
+                                     const ArrayDiffReader::ArrayModification& modification,
+                                     BSONArrayBuilder* builder) {
         stdx::visit(
             visit_helper::Overloaded{
-                [](Delete) {
-                    // Do nothing.
+                [this, &path, builder](const BSONElement& update) {
+                    builder->append(update);
+                    updateIndexesAffected(path);
                 },
-
-                [&builder, &elt, &fieldsToSkipInserting](const Update& update) {
-                    builder->append(update.newElt);
-                    fieldsToSkipInserting.insert(elt.fieldNameStringData());
-                },
-
-                [](const Insert&) {
-                    // Skip the pre-image version of the field. We'll add it at the end.
-                },
-
-                [&builder, &elt](const SubDiff& subDiff) {
-                    const auto type = subDiff.type();
-                    if (elt.type() == BSONType::Object && type == DiffType::kDocument) {
-                        BSONObjBuilder subBob(builder->subobjStart(elt.fieldNameStringData()));
-                        auto reader = stdx::get<DocumentDiffReader>(subDiff.reader);
-                        applyDiffToObject(elt.embeddedObject(), &reader, &subBob);
-                    } else if (elt.type() == BSONType::Array && type == DiffType::kArray) {
-                        BSONArrayBuilder subBob(builder->subarrayStart(elt.fieldNameStringData()));
-                        auto reader = stdx::get<ArrayDiffReader>(subDiff.reader);
-                        applyDiffToArray(elt.embeddedObject(), &reader, &subBob);
-                    } else {
-                        // There's a type mismatch. The diff was expecting one type but the pre
-                        // image contains a value of a different type. This means we are
-                        // re-applying a diff.
-
-                        // There must be some future operation which changed the type of this field
-                        // from object/array to something else. So we set this field to null field
-                        // and expect the future value to overwrite the value here.
-
-                        builder->appendNull(elt.fieldNameStringData());
+                [this, builder, &preImageValue, &path](auto reader) {
+                    if (!preImageValue) {
+                        // The pre-image's array was shorter than we expected. This means some
+                        // future oplog entry will either re-write the value of this array index
+                        // (or some parent) so we append a null and move on.
+                        builder->appendNull();
+                        updateIndexesAffected(path);
+                        return;
+                    }
+                    if constexpr (std::is_same_v<decltype(reader), ArrayDiffReader>) {
+                        if (preImageValue->type() == BSONType::Array) {
+                            BSONArrayBuilder sub(builder->subarrayStart());
+                            applyDiffToArray(preImageValue->embeddedObject(), path, &reader, &sub);
+                            return;
+                        }
+                    } else if constexpr (std::is_same_v<decltype(reader), DocumentDiffReader>) {
+                        if (preImageValue->type() == BSONType::Object) {
+                            BSONObjBuilder sub(builder->subobjStart());
+                            applyDiffToObject(preImageValue->embeddedObject(), path, &reader, &sub);
+                            return;
+                        }
                     }
 
-                    // Note: There's no need to update 'fieldsToSkipInserting' here, because a
-                    // field cannot appear in both the sub-diff and insert section.
-                },
-            },
-            it->second);
-    }
-
-    // Insert remaining fields to the end.
-    for (auto&& elt : tables.fieldsToInsert) {
-        if (!fieldsToSkipInserting.count(elt.fieldNameStringData())) {
-            builder->append(elt);
-        }
-    }
-}
-
-/**
- * Given an (optional) member of the pre image array and a modification, apply the modification and
- * add it to the post image array in 'builder'.
- */
-void appendNewValueForIndex(boost::optional<BSONElement> preImageValue,
-                            const ArrayDiffReader::ArrayModification& modification,
-                            BSONArrayBuilder* builder) {
-    stdx::visit(
-        visit_helper::Overloaded{
-            [builder](const BSONElement& update) { builder->append(update); },
-            [builder, &preImageValue](auto reader) {
-                if (!preImageValue) {
-                    // The pre-image's array was shorter than we expected. This means some
-                    // future oplog entry will either re-write the value of this array index
-                    // (or some parent) so we append a null and move on.
+                    // The type does not match what we expected. This means some future oplog
+                    // entry will either re-write the value of this array index (or some
+                    // parent) so we append a null and move on.
                     builder->appendNull();
-                    return;
-                }
-
-                if constexpr (std::is_same_v<decltype(reader), ArrayDiffReader>) {
-                    if (preImageValue->type() == BSONType::Array) {
-                        BSONArrayBuilder sub(builder->subarrayStart());
-                        applyDiffToArray(preImageValue->embeddedObject(), &reader, &sub);
-                        return;
-                    }
-                } else if constexpr (std::is_same_v<decltype(reader), DocumentDiffReader>) {
-                    if (preImageValue->type() == BSONType::Object) {
-                        BSONObjBuilder sub(builder->subobjStart());
-                        applyDiffToObject(preImageValue->embeddedObject(), &reader, &sub);
-                        return;
-                    }
-                }
-
-                // The type does not match what we expected. This means some future oplog
-                // entry will either re-write the value of this array index (or some
-                // parent) so we append a null and move on.
-                builder->appendNull();
+                    updateIndexesAffected(path);
+                },
             },
-        },
-        modification);
-}
+            modification);
+    }
 
-void applyDiffToArray(const BSONObj& arrayPreImage,
-                      ArrayDiffReader* reader,
-                      BSONArrayBuilder* builder) {
-    const auto resizeVal = reader->newSize();
-    // Each modification is an optional pair where the first component is the array index and the
-    // second is the modification type.
-    auto nextMod = reader->next();
-    BSONObjIterator preImageIt(arrayPreImage);
+    // Mutually recursive with applyDiffToObject().
+    void applyDiffToArray(const BSONObj& arrayPreImage,
+                          FieldRef* path,
+                          ArrayDiffReader* reader,
+                          BSONArrayBuilder* builder) {
+        const auto resizeVal = reader->newSize();
+        // Each modification is an optional pair where the first component is the array index and
+        // the second is the modification type.
+        auto nextMod = reader->next();
+        BSONObjIterator preImageIt(arrayPreImage);
 
-    size_t idx = 0;
-    for (; preImageIt.more() && (!resizeVal || idx < *resizeVal); ++idx, ++preImageIt) {
-        if (nextMod && idx == nextMod->first) {
-            appendNewValueForIndex(*preImageIt, nextMod->second, builder);
-            nextMod = reader->next();
-        } else {
-            // This index is not in the diff so we keep the value in the pre image.
-            builder->append(*preImageIt);
+        // If there is a resize of array, check if indexes are affected by the array modification.
+        if (resizeVal) {
+            updateIndexesAffected(path);
+        }
+
+        size_t idx = 0;
+        for (; preImageIt.more() && (!resizeVal || idx < *resizeVal); ++idx, ++preImageIt) {
+            auto idxAsStr = std::to_string(idx);
+            FieldRef::FieldRefTempAppend tempAppend(*path, idxAsStr);
+            if (nextMod && idx == nextMod->first) {
+                appendNewValueForArrayIndex(*preImageIt, path, nextMod->second, builder);
+                nextMod = reader->next();
+            } else {
+                // This index is not in the diff so we keep the value in the pre image.
+                builder->append(*preImageIt);
+            }
+        }
+
+        // Deal with remaining fields in the diff if the pre image was too short.
+        for (; (resizeVal && idx < *resizeVal) || nextMod; ++idx) {
+            auto idxAsStr = std::to_string(idx);
+            FieldRef::FieldRefTempAppend tempAppend(*path, idxAsStr);
+            if (nextMod && idx == nextMod->first) {
+                appendNewValueForArrayIndex(boost::none, path, nextMod->second, builder);
+                nextMod = reader->next();
+            } else {
+                // This field is not mentioned in the diff so we pad the post image with null.
+                updateIndexesAffected(path);
+                builder->appendNull();
+            }
+        }
+
+        invariant(!resizeVal || *resizeVal == idx);
+    }
+
+    void updateIndexesAffected(FieldRef* path) {
+        if (_indexData) {
+            _indexesAffected = _indexesAffected || _indexData->mightBeIndexed(*path);
         }
     }
 
-    // Deal with remaining fields in the diff if the pre image was too short.
-    for (; (resizeVal && idx < *resizeVal) || nextMod; ++idx) {
-        if (nextMod && idx == nextMod->first) {
-            appendNewValueForIndex(boost::none, nextMod->second, builder);
-            nextMod = reader->next();
-        } else {
-            // This field is not mentioned in the diff so we pad the post image with null.
-            builder->appendNull();
-        }
-    }
-
-    invariant(!resizeVal || *resizeVal == idx);
-}
+    const UpdateIndexData* _indexData;
+    bool _indexesAffected = false;
+};
 }  // namespace
 
-BSONObj applyDiff(const BSONObj& pre, const Diff& diff) {
+ApplyDiffOutput applyDiff(const BSONObj& pre, const Diff& diff, const UpdateIndexData* indexData) {
     DocumentDiffReader reader(diff);
     BSONObjBuilder out;
-    applyDiffToObject(pre, &reader, &out);
-    return out.obj();
+    DiffApplier applier(indexData);
+    FieldRef path;
+    applier.applyDiffToObject(pre, &path, &reader, &out);
+    return {out.obj(), applier.indexesAffected()};
 }
 }  // namespace mongo::doc_diff

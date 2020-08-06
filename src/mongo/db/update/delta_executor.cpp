@@ -27,24 +27,26 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/update/document_diff_serialization.h"
-#include "mongo/db/update_index_data.h"
+#include "mongo/db/update/delta_executor.h"
+
+#include "mongo/bson/mutable/document.h"
+#include "mongo/db/update/object_replace_executor.h"
 
 namespace mongo {
-namespace doc_diff {
 
-struct ApplyDiffOutput {
-    BSONObj postImage;
-    bool indexesAffected;
-};
+DeltaExecutor::ApplyResult DeltaExecutor::applyUpdate(
+    UpdateExecutor::ApplyParams applyParams) const {
+    const auto originalDoc = applyParams.element.getDocument().getObject();
 
-/**
- * Applies the diff to 'pre' and returns the post image. Throws if the diff is invalid. The
- * indexData' parameter is optional, if provided computes whether the indexes are affected.
- */
-ApplyDiffOutput applyDiff(const BSONObj& pre, const Diff& diff, const UpdateIndexData* indexData);
-}  // namespace doc_diff
+    auto applyDiffOutput = doc_diff::applyDiff(originalDoc, _diff, applyParams.indexData);
+    const auto& postImage = applyDiffOutput.postImage;
+    auto postImageHasId = postImage.hasField("_id");
+
+    auto result = ObjectReplaceExecutor::applyReplacementUpdate(
+        std::move(applyParams), postImage, postImageHasId);
+    result.indexesAffected = applyDiffOutput.indexesAffected;
+    return result;
+}
 }  // namespace mongo

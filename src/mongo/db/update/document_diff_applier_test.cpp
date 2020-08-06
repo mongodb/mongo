@@ -34,6 +34,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_serialization.h"
+#include "mongo/db/update/document_diff_test_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 
@@ -43,14 +44,14 @@ namespace {
  * Checks that applying the diff (once or twice) to 'preImage' produces the expected post image.
  */
 void checkDiff(const BSONObj& preImage, const BSONObj& expectedPost, const Diff& diff) {
-    BSONObj postImage = applyDiff(preImage, diff);
+    BSONObj postImage = applyDiffTestHelper(preImage, diff);
 
     // This *MUST* check for binary equality, which is what we enforce between replica set
     // members. Logical equality (through woCompare() or ASSERT_BSONOBJ_EQ) is not enough to show
     // that the applier actually works.
     ASSERT_BSONOBJ_BINARY_EQ(postImage, expectedPost);
 
-    BSONObj postImageAgain = applyDiff(postImage, diff);
+    BSONObj postImageAgain = applyDiffTestHelper(postImage, diff);
     ASSERT_BSONOBJ_BINARY_EQ(postImageAgain, expectedPost);
 }
 
@@ -350,41 +351,48 @@ TEST(DiffApplierTest, UpdateArrayOfObjectsWithUpdateOperationNonContiguous) {
 
 TEST(DiffApplierTest, DiffWithDuplicateFields) {
     BSONObj diff = fromjson("{d: {dupField: false}, u: {dupField: 'new value'}}");
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), diff), DBException, 4728000);
+    ASSERT_THROWS_CODE(applyDiffTestHelper(BSONObj(), diff), DBException, 4728000);
 }
 
 TEST(DiffApplierTest, EmptyDiff) {
     BSONObj emptyDiff;
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), emptyDiff), DBException, 4770500);
+    ASSERT_THROWS_CODE(applyDiffTestHelper(BSONObj(), emptyDiff), DBException, 4770500);
 }
 
 TEST(DiffApplierTest, ArrayDiffAtTop) {
     BSONObj arrDiff = fromjson("{a: true, l: 5, 'd0': false}");
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), arrDiff), DBException, 4770503);
+    ASSERT_THROWS_CODE(applyDiffTestHelper(BSONObj(), arrDiff), DBException, 4770503);
 }
 
 TEST(DiffApplierTest, DuplicateFieldNames) {
     // Within the same update type.
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{d: {a: false, b: false, a: false}}")),
-                       DBException,
-                       4728000);
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{u: {f1: 3, f1: 4}}")), DBException, 4728000);
     ASSERT_THROWS_CODE(
-        applyDiff(BSONObj(), fromjson("{i: {a: {}, a: null}}")), DBException, 4728000);
+        applyDiffTestHelper(BSONObj(), fromjson("{d: {a: false, b: false, a: false}}")),
+        DBException,
+        4728000);
     ASSERT_THROWS_CODE(
-        applyDiff(BSONObj(), fromjson("{sa: {d: {p: false}}, sa: {a: true, d: {p: false}}}")),
+        applyDiffTestHelper(BSONObj(), fromjson("{u: {f1: 3, f1: 4}}")), DBException, 4728000);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(BSONObj(), fromjson("{i: {a: {}, a: null}}")), DBException, 4728000);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(BSONObj(),
+                            fromjson("{sa: {d: {p: false}}, sa: {a: true, d: {p: false}}}")),
         DBException,
         4728000);
 
     // Across update types.
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{d: {b: false}, i: {a: {}, b: null}}")),
-                       DBException,
-                       4728000);
-    ASSERT_THROWS_CODE(applyDiff(BSONObj(), fromjson("{u: {b: false}, i: {a: {}, b: null}}")),
-                       DBException,
-                       4728000);
     ASSERT_THROWS_CODE(
-        applyDiff(BSONObj(), fromjson("{u: {a: {}}, sa: {d : {k: false}}}")), DBException, 4728000);
+        applyDiffTestHelper(BSONObj(), fromjson("{d: {b: false}, i: {a: {}, b: null}}")),
+        DBException,
+        4728000);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(BSONObj(), fromjson("{u: {b: false}, i: {a: {}, b: null}}")),
+        DBException,
+        4728000);
+    ASSERT_THROWS_CODE(
+        applyDiffTestHelper(BSONObj(), fromjson("{u: {a: {}}, sa: {d : {k: false}}}")),
+        DBException,
+        4728000);
 }
 
 }  // namespace

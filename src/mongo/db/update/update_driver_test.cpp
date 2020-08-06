@@ -562,12 +562,14 @@ TEST_F(CreateFromQuery, NotFullShardKeyRepl) {
 
 class ModifiedPathsTestFixture : public mongo::unittest::Test {
 public:
-    std::string getModifiedPaths(mutablebson::Document* doc,
-                                 BSONObj updateSpec,
-                                 StringData matchedField = StringData(),
-                                 std::vector<BSONObj> arrayFilterSpec = {}) {
+    void runUpdate(mutablebson::Document* doc,
+                   const write_ops::UpdateModification& updateSpec,
+                   StringData matchedField = StringData(),
+                   std::vector<BSONObj> arrayFilterSpec = {},
+                   bool fromOplog = false,
+                   UpdateIndexData* indexData = nullptr) {
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        UpdateDriver driver(expCtx);
+        _driver = std::make_unique<UpdateDriver>(expCtx);
         std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
         for (const auto& filter : arrayFilterSpec) {
@@ -576,89 +578,139 @@ public:
             ASSERT(expr->getPlaceholder());
             arrayFilters[expr->getPlaceholder().get()] = std::move(expr);
         }
-        driver.parse(updateSpec, arrayFilters);
+        _driver->setFromOplogApplication(fromOplog);
+        _driver->refreshIndexKeys(indexData);
+        _driver->parse(updateSpec, arrayFilters);
 
         const bool validateForStorage = true;
         const FieldRefSet emptyImmutablePaths;
         const bool isInsert = false;
         FieldRefSetWithStorage modifiedPaths;
-        ASSERT_OK(driver.update(expCtx->opCtx,
-                                matchedField,
-                                doc,
-                                validateForStorage,
-                                emptyImmutablePaths,
-                                isInsert,
-                                nullptr,
-                                nullptr,
-                                &modifiedPaths));
+        ASSERT_OK(_driver->update(
+            expCtx->opCtx,
+            matchedField,
+            doc,
+            validateForStorage,
+            emptyImmutablePaths,
+            isInsert,
+            nullptr,
+            nullptr,
+            (_driver->type() == UpdateDriver::UpdateType::kOperator) ? &modifiedPaths : nullptr));
 
-        return modifiedPaths.toString();
+        _modifiedPaths = modifiedPaths.toString();
     }
-};
 
-TEST_F(ModifiedPathsTestFixture, ReplaceFullDocumentReturnsEmptySet) {
-    BSONObj spec = fromjson("{a: 1, b: 1}}");
-    mutablebson::Document doc(fromjson("{a: 0, b: 0}"));
-    ASSERT_EQ(getModifiedPaths(&doc, spec), "{}");
-}
+    std::unique_ptr<UpdateDriver> _driver;
+    std::string _modifiedPaths;
+};
 
 TEST_F(ModifiedPathsTestFixture, SetFieldInRoot) {
     BSONObj spec = fromjson("{$set: {a: 1}}");
     mutablebson::Document doc(fromjson("{a: 0}"));
-    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
+    runUpdate(&doc, spec);
+    ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, IncFieldInRoot) {
     BSONObj spec = fromjson("{$inc: {a: 1}}");
     mutablebson::Document doc(fromjson("{a: 0}"));
-    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
+    runUpdate(&doc, spec);
+    ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UnsetFieldInRoot) {
     BSONObj spec = fromjson("{$unset: {a: ''}}");
     mutablebson::Document doc(fromjson("{a: 0}"));
-    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
+    runUpdate(&doc, spec);
+    ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UpdateArrayElement) {
     BSONObj spec = fromjson("{$set: {'a.0.b': 1}}");
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
-    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a.0.b}");
+    runUpdate(&doc, spec);
+    ASSERT_EQ(_modifiedPaths, "{a.0.b}");
 }
 
 TEST_F(ModifiedPathsTestFixture, SetBeyondTheEndOfArrayShouldReturnPathToArray) {
     BSONObj spec = fromjson("{$set: {'a.1.b': 1}}");
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
-    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
+    runUpdate(&doc, spec);
+    ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, InsertingAndUpdatingArrayShouldReturnPathToArray) {
     BSONObj spec = fromjson("{$set: {'a.0.b': 1, 'a.1.c': 2}}");
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
-    ASSERT_EQ(getModifiedPaths(&doc, spec), "{a}");
+    runUpdate(&doc, spec);
+    ASSERT_EQ(_modifiedPaths, "{a}");
 
     spec = fromjson("{$set: {'a.10.b': 1, 'a.1.c': 2}}");
     mutablebson::Document doc2(fromjson("{a: [{b: 0}, {b: 0}]}"));
-    ASSERT_EQ(getModifiedPaths(&doc2, spec), "{a}");
+    runUpdate(&doc2, spec);
+    ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UpdateWithPositionalOperator) {
     BSONObj spec = fromjson("{$set: {'a.$': 1}}");
     mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
-    ASSERT_EQ(getModifiedPaths(&doc, spec, "0"_sd), "{a.0}");
+    runUpdate(&doc, spec, "0"_sd);
+    ASSERT_EQ(_modifiedPaths, "{a.0}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UpdateWithPositionalOperatorToNestedField) {
     BSONObj spec = fromjson("{$set: {'a.$.b': 1}}");
     mutablebson::Document doc(fromjson("{a: [{b: 1}, {b: 2}]}"));
-    ASSERT_EQ(getModifiedPaths(&doc, spec, "1"_sd), "{a.1.b}");
+    runUpdate(&doc, spec, "1"_sd);
+    ASSERT_EQ(_modifiedPaths, "{a.1.b}");
 }
 
 TEST_F(ModifiedPathsTestFixture, ArrayFilterThatMatchesNoElements) {
     BSONObj spec = fromjson("{$set: {'a.$[i]': 1}}");
     BSONObj arrayFilter = fromjson("{i: 0}");
     mutablebson::Document doc(fromjson("{a: [1, 2, 3]}"));
-    ASSERT_EQ(getModifiedPaths(&doc, spec, ""_sd, {arrayFilter}), "{a}");
+    runUpdate(&doc, spec, ""_sd, {arrayFilter});
+    ASSERT_EQ(_modifiedPaths, "{a}");
+}
+
+
+TEST_F(ModifiedPathsTestFixture, ReplaceFullDocumentAlwaysAffectsIndex) {
+    BSONObj spec = fromjson("{a: 1, b: 1}}");
+    mutablebson::Document doc(fromjson("{a: 0, b: 0}"));
+    runUpdate(&doc, spec);
+    ASSERT_EQ(_modifiedPaths, "{}");
+}
+
+
+TEST_F(ModifiedPathsTestFixture, PipelineUpdatesAlwaysAffectsIndex) {
+    BSONObj spec = fromjson("{$set: {'a.1.b': 1}}");
+    mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
+    runUpdate(&doc, std::vector<BSONObj>{spec});
+    ASSERT(_driver->modsAffectIndices());
+}
+
+TEST_F(ModifiedPathsTestFixture, DeltaUpdateNotAffectingIndex) {
+    BSONObj spec = fromjson("{d: {a: false}}");
+    mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
+    runUpdate(&doc, write_ops::UpdateModification(spec, {}), ""_sd, {}, true /* fromOplog */);
+    ASSERT(!_driver->modsAffectIndices());
+
+    UpdateIndexData indexData;
+    indexData.addPath(FieldRef("p"));
+    runUpdate(
+        &doc, write_ops::UpdateModification(spec, {}), ""_sd, {}, true /* fromOplog */, &indexData);
+    ASSERT(!_driver->modsAffectIndices());
+}
+
+TEST_F(ModifiedPathsTestFixture, DeltaUpdateAffectingIndex) {
+    BSONObj spec = fromjson("{u: {a: 1}}");
+    mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
+    UpdateIndexData indexData;
+    indexData.addPath(FieldRef("q"));
+    indexData.addPath(FieldRef("a.p"));
+    runUpdate(
+        &doc, write_ops::UpdateModification(spec, {}), ""_sd, {}, true /* fromOplog */, &indexData);
+    ASSERT(_driver->modsAffectIndices());
 }
 
 }  // namespace

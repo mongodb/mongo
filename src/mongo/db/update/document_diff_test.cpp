@@ -33,7 +33,6 @@
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/document_diff_test_helpers.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -116,11 +115,11 @@ void runTest(std::vector<BSONObj> documents, size_t numSimulations) {
 
             ASSERT(diff);
             diffs.push_back(*diff);
-            const auto postObj = applyDiff(preDoc, *diff);
+            const auto postObj = applyDiffTestHelper(preDoc, *diff);
             ASSERT_BSONOBJ_BINARY_EQ(documents[i], postObj);
 
             // Applying the diff the second time also generates the same object.
-            ASSERT_BSONOBJ_BINARY_EQ(postObj, applyDiff(postObj, *diff));
+            ASSERT_BSONOBJ_BINARY_EQ(postObj, applyDiffTestHelper(postObj, *diff));
 
             preDoc = documents[i];
         }
@@ -130,7 +129,7 @@ void runTest(std::vector<BSONObj> documents, size_t numSimulations) {
         for (size_t start = 0; start < diffs.size(); ++start) {
             auto endObj = documents.back();
             for (size_t i = start; i < diffs.size(); ++i) {
-                endObj = applyDiff(endObj, diffs[i]);
+                endObj = applyDiffTestHelper(endObj, diffs[i]);
             }
             ASSERT_BSONOBJ_BINARY_EQ(endObj, documents.back());
         }

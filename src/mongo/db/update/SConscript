@@ -54,6 +54,7 @@ env.Library(
 env.Library(
     target='update',
     source=[
+        'delta_executor.cpp',
         'document_diff_applier.cpp',
         'document_diff_calculator.cpp',
         'document_diff_serialization.cpp',
@@ -81,6 +82,15 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='update_test_helpers',
+    source=[
+        'document_diff_test_helpers.cpp',
+    ],
+    LIBDEPS=[
+        'update',
+    ],
+)
 env.CppUnitTest(
     target='db_update_test',
     source=[
@@ -89,6 +99,7 @@ env.CppUnitTest(
         'bit_node_test.cpp',
         'compare_node_test.cpp',
         'current_date_node_test.cpp',
+        'delta_executor_test.cpp',
         'document_diff_calculator_test.cpp',
         'document_diff_serialization_test.cpp',
         'document_diff_applier_test.cpp',
@@ -125,5 +136,6 @@ env.CppUnitTest(
         'update',
         'update_common',
         'update_driver',
+        'update_test_helpers',
     ],
 )

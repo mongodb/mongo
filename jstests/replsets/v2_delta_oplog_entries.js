@@ -25,16 +25,12 @@ const secondary = rst.getSecondary();
 const secondaryColl = secondary.getDB("test").coll;
 
 // Used for padding documents, in order to make full replacements expensive.
-function makeGiantStr() {
-    let s = "";
-    for (let i = 0; i < 1024; i++) {
-        s += "_";
-    }
-    return s;
-}
-
-const kGiantStr = makeGiantStr();
+const kGiantStr = "_".repeat(100);
 const kMediumLengthStr = "zzzzzzzzzzzzzzzzzzzzzzzzzz";
+
+// Create indexes on all the fields used through out the tests, so we can verify that the index
+// data is correctly updated on all the nodes.
+primaryColl.createIndex({padding: 1, 'x.1': 1, 'a.1': -1, 'subObj.a': 1});
 
 let idGenGlob = 0;
 function generateId() {
@@ -110,9 +106,9 @@ let id;
 // Removing fields.
 id = generateId();
 testUpdateReplicates({
-    preImage: {_id: id, x: 3, y: 3, giantStr: kGiantStr},
+    preImage: {_id: id, x: 3, y: 3, padding: kGiantStr},
     pipeline: [{$unset: ["x", "y"]}],
-    postImage: {_id: id, giantStr: kGiantStr},
+    postImage: {_id: id, padding: kGiantStr},
     expectedOplogEntry: kExpectDeltaEntry
 });
 
@@ -166,9 +162,9 @@ testUpdateReplicates({
 // Adding a field to a sub object while removing a top level field.
 id = generateId();
 testUpdateReplicates({
-    preImage: {_id: id, subObj: {a: 1, b: 2}, toRemove: "foo", giantStr: kGiantStr},
-    pipeline: [{$project: {subObj: 1, giantStr: 1}}, {$set: {"subObj.c": "foo"}}],
-    postImage: {_id: id, subObj: {a: 1, b: 2, c: "foo"}, giantStr: kGiantStr},
+    preImage: {_id: id, subObj: {a: 1, b: 2}, toRemove: "foo", padding: kGiantStr},
+    pipeline: [{$project: {subObj: 1, padding: 1}}, {$set: {"subObj.c": "foo"}}],
+    postImage: {_id: id, subObj: {a: 1, b: 2, c: "foo"}, padding: kGiantStr},
     expectedOplogEntry: kExpectDeltaEntry
 });
 
@@ -184,9 +180,9 @@ testUpdateReplicates({
 // Inclusion projection dropping a subfield (subObj.toRemove).
 id = generateId();
 testUpdateReplicates({
-    preImage: {_id: id, x: "foo", subObj: {a: 1, toRemove: 2}, giantStr: kGiantStr},
-    pipeline: [{$project: {subObj: {a: 1}, giantStr: 1}}],
-    postImage: {_id: id, subObj: {a: 1}, giantStr: kGiantStr},
+    preImage: {_id: id, x: "foo", subObj: {a: 1, toRemove: 2}, padding: kGiantStr},
+    pipeline: [{$project: {subObj: {a: 1}, padding: 1}}],
+    postImage: {_id: id, subObj: {a: 1}, padding: kGiantStr},
     expectedOplogEntry: kExpectDeltaEntry
 });
 
@@ -203,9 +199,9 @@ testUpdateReplicates({
 // delta oplog entries instead of doing a full replacement.
 id = generateId();
 testUpdateReplicates({
-    preImage: {_id: id, x: "foo", subObj: {a: 1, b: 2}, giantStr: kGiantStr},
-    pipeline: [{$replaceRoot: {newRoot: {x: "bar", subObj: {a: 1, b: 2}, giantStr: kGiantStr}}}],
-    postImage: {_id: id, x: "bar", subObj: {a: 1, b: 2}, giantStr: kGiantStr},
+    preImage: {_id: id, x: "foo", subObj: {a: 1, b: 2}, padding: kGiantStr},
+    pipeline: [{$replaceRoot: {newRoot: {x: "bar", subObj: {a: 1, b: 2}, padding: kGiantStr}}}],
+    postImage: {_id: id, x: "bar", subObj: {a: 1, b: 2}, padding: kGiantStr},
     expectedOplogEntry: kExpectDeltaEntry
 });
 
@@ -234,9 +230,9 @@ testUpdateReplicates({
 // Setting a sub object inside an array.
 id = generateId();
 testUpdateReplicates({
-    preImage: {_id: id, x: kGiantStr, arrField: [{x: 1}, {x: 2}]},
+    preImage: {_id: id, padding: kGiantStr, arrField: [{x: 1}, {x: 2}]},
     pipeline: [{$set: {"arrField.x": 5}}],
-    postImage: {_id: id, x: kGiantStr, arrField: [{x: 5}, {x: 5}]},
+    postImage: {_id: id, padding: kGiantStr, arrField: [{x: 5}, {x: 5}]},
     expectedOplogEntry: kExpectDeltaEntry
 });
 
@@ -261,9 +257,9 @@ testUpdateReplicates({
 // Similar case of reordering fields.
 id = generateId();
 testUpdateReplicates({
-    preImage: {_id: id, p: kGiantStr, a: 1, b: 1, c: 1, d: 1},
-    pipeline: [{$replaceRoot: {newRoot: {_id: id, p: kGiantStr, a: 1, c: 1, b: 1, d: 1}}}],
-    postImage: {_id: id, p: kGiantStr, a: 1, c: 1, b: 1, d: 1},
+    preImage: {_id: id, padding: kGiantStr, a: 1, b: 1, c: 1, d: 1},
+    pipeline: [{$replaceRoot: {newRoot: {_id: id, padding: kGiantStr, a: 1, c: 1, b: 1, d: 1}}}],
+    postImage: {_id: id, padding: kGiantStr, a: 1, c: 1, b: 1, d: 1},
     expectedOplogEntry: kExpectDeltaEntry
 });
 
@@ -338,7 +334,7 @@ function generateDeepObj(depth, maxDepth, value) {
     };
 }
 
-// Verify that diffing the deepest objects allowed by the js client, can produce a delta op-log
+// Verify that diffing the deepest objects allowed by the JS client can produce delta op-log
 // entries.
 id = generateId();
 let path = "subObj.".repeat(146) + "subObj";
