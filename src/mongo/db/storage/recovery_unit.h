@@ -242,7 +242,6 @@ public:
      *  - when using ReadSource::kNoOverlap, the timestamp chosen by the storage engine.
      *  - when using ReadSource::kAllDurableSnapshot, the timestamp chosen using the storage
      * engine's all_durable timestamp.
-     *  - when using ReadSource::kLastApplied, the timestamp chosen using the storage engine's last
      * applied timestamp. Can return boost::none if no timestamp has been established.
      *  - when using ReadSource::kMajorityCommitted, the majority committed timestamp chosen by the
      * storage engine after a transaction has been opened or after a call to
@@ -386,8 +385,7 @@ public:
          */
         kNoOverlap,
         /**
-         * Read from the last applied timestamp. New transactions start at the most up-to-date
-         * timestamp.
+         * Read from the lastApplied timestamp.
          */
         kLastApplied,
         /**

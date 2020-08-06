@@ -758,6 +758,12 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             setInitialDataTimestamp(_recoveryTimestamp);
             setOldestTimestamp(_recoveryTimestamp, false);
             setStableTimestamp(_recoveryTimestamp, false);
+
+            _sessionCache->snapshotManager().setLastApplied(_recoveryTimestamp);
+            {
+                stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
+                _highestSeenDurableTimestamp = _recoveryTimestamp.asULL();
+            }
         }
 
         _checkpointThread =

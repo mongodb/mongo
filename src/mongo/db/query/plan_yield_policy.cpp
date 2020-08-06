@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
@@ -208,6 +209,16 @@ void PlanYieldPolicy::_yieldAllLocks(OperationContext* opCtx,
     }
 
     locker->restoreLockState(opCtx, snapshot);
+
+    // After yielding and reacquiring locks, the preconditions that were used to select our
+    // ReadSource initially need to be checked again. Queries hold an AutoGetCollectionForRead RAII
+    // lock for their lifetime, which may select a ReadSource based on state (e.g. replication
+    // state). After a query yields its locks, this state may have changed, invalidating our current
+    // choice of ReadSource. Using the same preconditions, change our ReadSource if necessary.
+    auto newReadSource = SnapshotHelper::getNewReadSource(opCtx, planExecNS);
+    if (newReadSource) {
+        opCtx->recoveryUnit()->setTimestampReadSource(*newReadSource);
+    }
 }
 
 }  // namespace mongo

@@ -896,10 +896,10 @@ void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(
     notifyOplogMetadataWaiters(newCommitPoint);
 }
 
-void ReplicationCoordinatorExternalStateImpl::updateLocalSnapshot(const OpTime& optime) {
+void ReplicationCoordinatorExternalStateImpl::updateLastAppliedSnapshot(const OpTime& optime) {
     auto manager = _service->getStorageEngine()->getSnapshotManager();
     if (manager) {
-        manager->setLocalSnapshot(optime.getTimestamp());
+        manager->setLastApplied(optime.getTimestamp());
     }
 }
 

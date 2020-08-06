@@ -853,6 +853,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                                          boost::optional<Lock::CollectionLock>* collLock) {
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
 
     // Index builds can safely ignore prepare conflicts and perform writes. On secondaries, prepare
     // operations wait for index builds to complete.

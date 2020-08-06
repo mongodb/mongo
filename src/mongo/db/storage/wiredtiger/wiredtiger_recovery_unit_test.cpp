@@ -156,11 +156,14 @@ public:
         clientAndCtx2 = makeClientAndOpCtx(harnessHelper.get(), "reader");
         ru1 = checked_cast<WiredTigerRecoveryUnit*>(clientAndCtx1.second->recoveryUnit());
         ru2 = checked_cast<WiredTigerRecoveryUnit*>(clientAndCtx2.second->recoveryUnit());
+        snapshotManager = dynamic_cast<WiredTigerSnapshotManager*>(
+            harnessHelper->getEngine()->getSnapshotManager());
     }
 
     std::unique_ptr<WiredTigerRecoveryUnitHarnessHelper> harnessHelper;
     ClientAndCtx clientAndCtx1, clientAndCtx2;
     WiredTigerRecoveryUnit *ru1, *ru2;
+    WiredTigerSnapshotManager* snapshotManager;
 
 private:
     const char* wt_uri = "table:prepare_transaction";
@@ -171,6 +174,86 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, SetReadSource) {
     ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, Timestamp(1, 1));
     ASSERT_EQ(RecoveryUnit::ReadSource::kProvided, ru1->getTimestampReadSource());
     ASSERT_EQ(Timestamp(1, 1), ru1->getPointInTimeReadTimestamp());
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
+    OperationContext* opCtx1 = clientAndCtx1.second.get();
+    std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx1, "a.b"));
+
+    const std::string str = str::stream() << "test";
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 2};
+
+    RecordId rid1;
+    {
+        WriteUnitOfWork wuow(opCtx1);
+        StatusWith<RecordId> res = rs->insertRecord(opCtx1, str.c_str(), str.size() + 1, ts1);
+        ASSERT_OK(res);
+        wuow.commit();
+        rid1 = res.getValue();
+        snapshotManager->setLastApplied(ts1);
+    }
+
+    // Read without a timestamp. The write should be visible.
+    ASSERT_EQ(opCtx1->recoveryUnit()->getTimestampReadSource(), RecoveryUnit::ReadSource::kUnset);
+    RecordData unused;
+    ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
+
+    // Read with kNoOverlap. The write should be visible.
+    opCtx1->recoveryUnit()->abandonSnapshot();
+    opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+    ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
+
+    RecordId rid2, rid3;
+    {
+        // Start, but do not commit a transaction with opCtx2. This sets a timestamp at ts2, which
+        // creates a hole. kNoOverlap, which is a function of all_durable, will only be able to read
+        // at the time immediately before.
+        OperationContext* opCtx2 = clientAndCtx2.second.get();
+        WriteUnitOfWork wuow(opCtx2);
+        StatusWith<RecordId> res =
+            rs->insertRecord(opCtx2, str.c_str(), str.size() + 1, Timestamp());
+        ASSERT_OK(opCtx2->recoveryUnit()->setTimestamp(ts2));
+        ASSERT_OK(res);
+
+        // While holding open a transaction with opCtx2, perform an insert at ts3 with opCtx1. This
+        // creates a "hole".
+        {
+            WriteUnitOfWork wuow(opCtx1);
+            StatusWith<RecordId> res = rs->insertRecord(opCtx1, str.c_str(), str.size() + 1, ts3);
+            ASSERT_OK(res);
+            wuow.commit();
+            rid3 = res.getValue();
+            snapshotManager->setLastApplied(ts3);
+        }
+
+        // Read without a timestamp, and we should see the first and third records.
+        opCtx1->recoveryUnit()->abandonSnapshot();
+        opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+        ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
+        ASSERT_FALSE(rs->findRecord(opCtx1, rid2, &unused));
+        ASSERT_TRUE(rs->findRecord(opCtx1, rid3, &unused));
+
+        // Now read at kNoOverlap. Since the transaction at ts2 has not committed, all_durable is
+        // held back to ts1. LastApplied has advanced to ts3, but because kNoOverlap is the minimum,
+        // we should only see one record.
+        opCtx1->recoveryUnit()->abandonSnapshot();
+        opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+        ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
+        ASSERT_FALSE(rs->findRecord(opCtx1, rid2, &unused));
+        ASSERT_FALSE(rs->findRecord(opCtx1, rid3, &unused));
+
+        wuow.commit();
+        rid2 = res.getValue();
+    }
+
+    // Now that the hole has been closed, kNoOverlap should see all 3 records.
+    opCtx1->recoveryUnit()->abandonSnapshot();
+    opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+    ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
+    ASSERT_TRUE(rs->findRecord(opCtx1, rid2, &unused));
+    ASSERT_TRUE(rs->findRecord(opCtx1, rid3, &unused));
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CreateAndCheckForCachePressure) {

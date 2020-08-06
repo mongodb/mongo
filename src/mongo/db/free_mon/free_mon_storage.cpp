@@ -57,6 +57,8 @@ boost::optional<FreeMonStorageState> FreeMonStorage::read(OperationContext* opCt
 
     auto storageInterface = repl::StorageInterface::get(opCtx);
 
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+
     AutoGetCollectionForRead autoRead(opCtx, NamespaceString::kServerConfigurationNamespace);
 
     auto swObj = storageInterface->findById(
@@ -117,6 +119,8 @@ void FreeMonStorage::deleteState(OperationContext* opCtx) {
 
 boost::optional<BSONObj> FreeMonStorage::readClusterManagerState(OperationContext* opCtx) {
     auto storageInterface = repl::StorageInterface::get(opCtx);
+
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
 
     AutoGetCollectionForRead autoRead(opCtx, NamespaceString::kServerConfigurationNamespace);
 

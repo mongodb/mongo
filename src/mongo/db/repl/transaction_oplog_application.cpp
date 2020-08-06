@@ -484,8 +484,8 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
     }
     // Read the transactions table and the oplog collection without a timestamp.
     // The below DBDirectClient read uses AutoGetCollectionForRead which could implicitly change the
-    // read source to kLastApplied. So we need to explicitly set the read source to kNoTimestamp to
-    // force reads in this scope to be untimestamped.
+    // read source. So we need to explicitly set the read source to kNoTimestamp to force reads in
+    // this scope to be untimestamped.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
 
     DBDirectClient client(opCtx);

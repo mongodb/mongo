@@ -261,8 +261,8 @@ TEST_F(ReadSourceScopeTest, RestoreReadSource) {
         ReadSourceScope scope(opCtx());
         ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kUnset);
 
-        opCtx()->recoveryUnit()->setTimestampReadSource(ReadSource::kLastApplied);
-        ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kLastApplied);
+        opCtx()->recoveryUnit()->setTimestampReadSource(ReadSource::kNoOverlap);
+        ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kNoOverlap);
         ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(), boost::none);
     }
     ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kProvided);

@@ -89,7 +89,7 @@ public:
     virtual void startProducerIfStopped();
     virtual void dropAllSnapshots();
     virtual void updateCommittedSnapshot(const OpTime& newCommitPoint);
-    virtual void updateLocalSnapshot(const OpTime& optime);
+    virtual void updateLastAppliedSnapshot(const OpTime& optime);
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
     boost::optional<OpTime> getEarliestDropPendingOpTime() const final;

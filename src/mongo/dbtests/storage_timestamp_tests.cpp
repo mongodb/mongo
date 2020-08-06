@@ -1509,7 +1509,7 @@ public:
         // This test does not run a real ReplicationCoordinator, so must advance the snapshot
         // manager manually.
         auto storageEngine = cc().getServiceContext()->getStorageEngine();
-        storageEngine->getSnapshotManager()->setLocalSnapshot(presentTs);
+        storageEngine->getSnapshotManager()->setLastApplied(presentTs);
 
         const auto beforeTxnTime = _clock->reserveTicks(1);
         auto beforeTxnTs = beforeTxnTime.asTimestamp();
@@ -2683,7 +2683,7 @@ public:
         // This test does not run a real ReplicationCoordinator, so must advance the snapshot
         // manager manually.
         auto storageEngine = cc().getServiceContext()->getStorageEngine();
-        storageEngine->getSnapshotManager()->setLocalSnapshot(presentTs);
+        storageEngine->getSnapshotManager()->setLastApplied(presentTs);
         const auto beforeTxnTime = _clock->reserveTicks(1);
         beforeTxnTs = beforeTxnTime.asTimestamp();
         commitEntryTs = beforeTxnTime.addTicks(1).asTimestamp();

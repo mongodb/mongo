@@ -151,9 +151,9 @@ public:
         return itCountOn(op);
     }
 
-    int itCountLocal() {
+    int itCountLastApplied() {
         auto op = makeOperation();
-        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
+        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
         return itCountOn(op);
     }
 
@@ -177,14 +177,14 @@ public:
         return std::string(record->data.data());
     }
 
-    boost::optional<Record> readRecordLocal(RecordId id) {
+    boost::optional<Record> readRecordLastApplied(RecordId id) {
         auto op = makeOperation();
-        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
+        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
         return readRecordOn(op, id);
     }
 
-    std::string readStringLocal(RecordId id) {
-        auto record = readRecordLocal(id);
+    std::string readStringLastApplied(RecordId id) {
+        auto record = readRecordLastApplied(id);
         ASSERT(record);
         return std::string(record->data.data());
     }
@@ -361,7 +361,7 @@ TEST_F(SnapshotManagerTests, UpdateAndDelete) {
     ASSERT(!readRecordCommitted(id));
 }
 
-TEST_F(SnapshotManagerTests, InsertAndReadOnLocalSnapshot) {
+TEST_F(SnapshotManagerTests, InsertAndReadOnLastAppliedSnapshot) {
     if (!snapshotManager)
         return;  // This test is only for engines that DO support SnapshotManagers.
 
@@ -370,7 +370,7 @@ TEST_F(SnapshotManagerTests, InsertAndReadOnLocalSnapshot) {
     auto id = insertRecordAndCommit();
     auto afterInsert = fetchAndIncrementTimestamp();
 
-    // Not reading on the last local timestamp returns the most recent data.
+    // Not reading on the last applied timestamp returns the most recent data.
     auto op = makeOperation();
     auto ru = op->recoveryUnit();
     ru->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
@@ -380,18 +380,18 @@ TEST_F(SnapshotManagerTests, InsertAndReadOnLocalSnapshot) {
     deleteRecordAndCommit(id);
     auto afterDelete = fetchAndIncrementTimestamp();
 
-    // Reading at the local snapshot timestamps returns data in order.
-    snapshotManager->setLocalSnapshot(beforeInsert);
-    ASSERT_EQ(itCountLocal(), 0);
-    ASSERT(!readRecordLocal(id));
+    // Reading at the last applied snapshot timestamps returns data in order.
+    snapshotManager->setLastApplied(beforeInsert);
+    ASSERT_EQ(itCountLastApplied(), 0);
+    ASSERT(!readRecordLastApplied(id));
 
-    snapshotManager->setLocalSnapshot(afterInsert);
-    ASSERT_EQ(itCountLocal(), 1);
-    ASSERT(readRecordLocal(id));
+    snapshotManager->setLastApplied(afterInsert);
+    ASSERT_EQ(itCountLastApplied(), 1);
+    ASSERT(readRecordLastApplied(id));
 
-    snapshotManager->setLocalSnapshot(afterDelete);
-    ASSERT_EQ(itCountLocal(), 0);
-    ASSERT(!readRecordLocal(id));
+    snapshotManager->setLastApplied(afterDelete);
+    ASSERT_EQ(itCountLastApplied(), 0);
+    ASSERT(!readRecordLastApplied(id));
 }
 
 TEST_F(SnapshotManagerTests, UpdateAndDeleteOnLocalSnapshot) {
@@ -417,20 +417,20 @@ TEST_F(SnapshotManagerTests, UpdateAndDeleteOnLocalSnapshot) {
     deleteRecordAndCommit(id);
     auto afterDelete = fetchAndIncrementTimestamp();
 
-    snapshotManager->setLocalSnapshot(beforeInsert);
-    ASSERT_EQ(itCountLocal(), 0);
-    ASSERT(!readRecordLocal(id));
+    snapshotManager->setLastApplied(beforeInsert);
+    ASSERT_EQ(itCountLastApplied(), 0);
+    ASSERT(!readRecordLastApplied(id));
 
-    snapshotManager->setLocalSnapshot(afterInsert);
-    ASSERT_EQ(itCountLocal(), 1);
-    ASSERT_EQ(readStringLocal(id), "Aardvark");
+    snapshotManager->setLastApplied(afterInsert);
+    ASSERT_EQ(itCountLastApplied(), 1);
+    ASSERT_EQ(readStringLastApplied(id), "Aardvark");
 
-    snapshotManager->setLocalSnapshot(afterUpdate);
-    ASSERT_EQ(itCountLocal(), 1);
-    ASSERT_EQ(readStringLocal(id), "Blue spotted stingray");
+    snapshotManager->setLastApplied(afterUpdate);
+    ASSERT_EQ(itCountLastApplied(), 1);
+    ASSERT_EQ(readStringLastApplied(id), "Blue spotted stingray");
 
-    snapshotManager->setLocalSnapshot(afterDelete);
-    ASSERT_EQ(itCountLocal(), 0);
-    ASSERT(!readRecordLocal(id));
+    snapshotManager->setLastApplied(afterDelete);
+    ASSERT_EQ(itCountLastApplied(), 0);
+    ASSERT(!readRecordLastApplied(id));
 }
 }  // namespace mongo
