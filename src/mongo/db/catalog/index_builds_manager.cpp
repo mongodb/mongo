@@ -343,7 +343,10 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanupForRollback(OperationConte
           "Index build aborted without cleanup for rollback",
           "buildUUID"_attr = buildUUID);
 
-    builder.getValue()->abortWithoutCleanupForRollback(opCtx);
+    if (auto resumeInfo = builder.getValue()->abortWithoutCleanupForRollback(opCtx)) {
+        _resumeInfos.push_back(std::move(*resumeInfo));
+    }
+
     return true;
 }
 
@@ -460,6 +463,14 @@ StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(OperationContext* 
             wuow.commit();
             return docSize;
         });
+}
+
+std::vector<ResumeIndexInfo> IndexBuildsManager::getResumeInfos() const {
+    return std::move(_resumeInfos);
+}
+
+void IndexBuildsManager::clearResumeInfos() {
+    _resumeInfos.clear();
 }
 
 }  // namespace mongo

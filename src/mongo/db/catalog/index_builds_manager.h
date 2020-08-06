@@ -185,6 +185,17 @@ public:
      */
     void verifyNoIndexBuilds_forTestOnly();
 
+    /**
+     * Returns the information to resume each resumable index build that was aborted for rollback.
+     */
+    std::vector<ResumeIndexInfo> getResumeInfos() const;
+
+    /**
+     * Clears the vector that was used to store the information to resume each resumable index
+     * build after rollback.
+     */
+    void clearResumeInfos();
+
 private:
     /**
      * Creates and registers a new builder in the _builders map, mapped by the provided buildUUID.
@@ -202,6 +213,9 @@ private:
     // Map of index builders by build UUID. Allows access to the builders so that actions can be
     // taken on and information passed to and from index builds.
     std::map<UUID, std::unique_ptr<MultiIndexBlock>> _builders;
+
+    // The information to resume each resumable index build that was aborted for rollback.
+    std::vector<ResumeIndexInfo> _resumeInfos;
 
     /**
      * Deletes record containing duplicate keys and insert it into a local lost and found collection

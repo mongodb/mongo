@@ -711,8 +711,9 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void MultiIndexBlock::abortWithoutCleanupForRollback(OperationContext* opCtx) {
-    _abortWithoutCleanup(opCtx, false /* shutdown */);
+boost::optional<ResumeIndexInfo> MultiIndexBlock::abortWithoutCleanupForRollback(
+    OperationContext* opCtx) {
+    return _abortWithoutCleanup(opCtx, false /* shutdown */);
 }
 
 void MultiIndexBlock::abortWithoutCleanupForShutdown(OperationContext* opCtx) {
@@ -792,7 +793,8 @@ void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {
     _method = indexBuildMethod;
 }
 
-void MultiIndexBlock::_abortWithoutCleanup(OperationContext* opCtx, bool shutdown) {
+boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(OperationContext* opCtx,
+                                                                       bool shutdown) {
     invariant(!_buildIsCleanedUp);
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     // Lock if it's not already locked, to ensure storage engine cannot be destructed out from
@@ -803,10 +805,19 @@ void MultiIndexBlock::_abortWithoutCleanup(OperationContext* opCtx, bool shutdow
     }
 
     auto action = TemporaryRecordStore::FinalizationAction::kDelete;
+    boost::optional<ResumeIndexInfo> resumeInfo;
 
-    if (_shouldWriteStateToDisk(opCtx, shutdown)) {
-        _writeStateToDisk(opCtx);
-        action = TemporaryRecordStore::FinalizationAction::kKeep;
+    if (_isResumable(opCtx)) {
+        if (shutdown) {
+            _writeStateToDisk(opCtx);
+
+            // TODO (SERVER-48419): Keep the temporary tables unconditionally of shutdown once
+            // rollback uses the resume information.
+            action = TemporaryRecordStore::FinalizationAction::kKeep;
+        } else {
+            resumeInfo = ResumeIndexInfo::parse(
+                IDLParserErrorContext("MultiIndexBlock::getResumeInfo"), _constructStateObject());
+        }
     }
 
     for (auto& index : _indexes) {
@@ -814,10 +825,12 @@ void MultiIndexBlock::_abortWithoutCleanup(OperationContext* opCtx, bool shutdow
     }
 
     _buildIsCleanedUp = true;
+
+    return resumeInfo;
 }
 
-bool MultiIndexBlock::_shouldWriteStateToDisk(OperationContext* opCtx, bool shutdown) const {
-    return shutdown && _buildUUID && !_buildIsCleanedUp && _method == IndexBuildMethod::kHybrid &&
+bool MultiIndexBlock::_isResumable(OperationContext* opCtx) const {
+    return _buildUUID && !_buildIsCleanedUp && _method == IndexBuildMethod::kHybrid &&
         opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds();
 }
 

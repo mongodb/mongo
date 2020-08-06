@@ -268,9 +268,12 @@ public:
      * not perform any storage engine writes. May delete internal tables, but this is not
      * transactional.
      *
+     * If the indexes being built were resumable, returns the information to resume them.
+     * Otherwise, returns boost::none.
+     *
      * This should only be used during rollback.
      */
-    void abortWithoutCleanupForRollback(OperationContext* opCtx);
+    boost::optional<ResumeIndexInfo> abortWithoutCleanupForRollback(OperationContext* opCtx);
 
     /**
      * May be called at any time after construction but before a successful commit(). Suppresses
@@ -302,9 +305,15 @@ private:
         InsertDeleteOptions options;
     };
 
-    void _abortWithoutCleanup(OperationContext* opCtx, bool shutdown);
+    /**
+     * This function should be used for shutdown and rollback. When called for shutdown, writes the
+     * resumable index build state to disk if resuamble index builds are supported. When called for
+     * rollback, returns the information to resume the index build if resuamble index builds are
+     * supported.
+     */
+    boost::optional<ResumeIndexInfo> _abortWithoutCleanup(OperationContext* opCtx, bool shutdown);
 
-    bool _shouldWriteStateToDisk(OperationContext* opCtx, bool shutdown) const;
+    bool _isResumable(OperationContext* opCtx) const;
 
     void _writeStateToDisk(OperationContext* opCtx) const;
 
