@@ -314,3 +314,12 @@ server_parameters:
         default: 3
         validator:
             gt: 0
+
+    disableSplitHorizonIPCheck:
+        description: >-
+            If true, disable check for IP addresses in split horizon configurations. As per the
+            definition of SNI laid out in RFC6066, literal IP addresses are not allowed as server names.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: disableSplitHorizonIPCheck
+        default: false

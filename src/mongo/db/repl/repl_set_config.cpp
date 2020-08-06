@@ -40,6 +40,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
@@ -65,6 +66,11 @@ const Milliseconds ReplSetConfig::kDefaultCatchUpTakeoverDelay(30000);
 namespace {
 
 const std::string kStepDownCheckWriteConcernModeName = "$stepDownCheck";
+
+bool isValidCIDRRange(StringData host) {
+    return CIDR::parse(host).isOK();
+}
+
 }  // namespace
 
 /* static */
@@ -197,6 +203,27 @@ Status ReplSetConfig::validate() const {
     std::map<HostAndPort, int> horizonHostNameCounts;
     for (size_t i = 0; i < getMembers().size(); ++i) {
         const MemberConfig& memberI = getMembers()[i];
+
+        // Check that no horizon mappings contain IP addresses
+        if (!disableSplitHorizonIPCheck) {
+            for (auto&& mapping : memberI.getHorizonMappings()) {
+                // Ignore the default horizon -- this can be an IP
+                if (mapping.first == SplitHorizon::kDefaultHorizon) {
+                    continue;
+                }
+
+                // Anything which can be parsed as a valid CIDR range will cause failure
+                if (isValidCIDRRange(mapping.second.host())) {
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  str::stream() << "Found split horizon configuration using IP "
+                                                   "address, which is disallowed: "
+                                                << kMembersFieldName << "." << i << "."
+                                                << MemberConfig::kHorizonsFieldName
+                                                << " contains entry {\"" << mapping.first
+                                                << "\": \"" << mapping.second.toString() << "\"}");
+                }
+            }
+        }
 
         // Check the replica set configuration for errors in horizon specification:
         //   * Check that all members have the same set of horizon names
