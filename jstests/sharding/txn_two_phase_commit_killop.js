@@ -121,19 +121,32 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
                      failpointData.numTimesShouldBeHit);
 
     jsTest.log("Going to find coordinator opCtx ids");
-    let coordinatorOps = coordinator.getDB("admin")
-                             .aggregate([
-                                 {$currentOp: {'allUsers': true, 'idleConnections': true}},
-                                 {$match: {desc: "TransactionCoordinator"}}
-                             ])
-                             .toArray();
+    let coordinatorOpsToKill = [];
+    assert.soon(() => {
+        coordinatorOpsToKill = coordinator.getDB("admin")
+                                   .aggregate([
+                                       {$currentOp: {'allUsers': true, 'idleConnections': true}},
+                                       {$match: {desc: "TransactionCoordinator"}}
+                                   ])
+                                   .toArray();
+
+        for (let x = 0; x < coordinatorOpsToKill.length; x++) {
+            if (!coordinatorOpsToKill[x].opid) {
+                print("Retrying currentOp because op doesn't have opId: " +
+                      tojson(coordinatorOpsToKill[x]));
+                return false;
+            }
+        }
+
+        return true;
+    }, 'timed out trying to fetch coordinator ops', undefined /* timeout */, 1000 /* interval */);
 
     // Use "greater than or equal to" since, for failpoints that pause the coordinator while
     // it's sending prepare or sending the decision, there might be one additional thread that's
     // doing the "send" to the local participant (or that thread might have already completed).
-    assert.gte(coordinatorOps.length, failpointData.numTimesShouldBeHit);
+    assert.gte(coordinatorOpsToKill.length, failpointData.numTimesShouldBeHit);
 
-    coordinatorOps.forEach(function(coordinatorOp) {
+    coordinatorOpsToKill.forEach(function(coordinatorOp) {
         coordinator.getDB("admin").killOp(coordinatorOp.opid);
     });
     assert.commandWorked(coordinator.adminCommand({
