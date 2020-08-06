@@ -51,10 +51,54 @@ TEST(ExecutorTest, RejectingExecutor) {
     }
 }
 
-TEST(ExecutorTest, InlineCountingExecutor) {
+TEST(ExecutorTest, InlineQueuedCountingExecutor) {
     // Verify that the executor accepts every time and keeps an accurate count.
-    const auto execA = InlineCountingExecutor::make();
-    const auto execB = InlineCountingExecutor::make();
+    const auto execA = InlineQueuedCountingExecutor::make();
+    const auto execB = InlineQueuedCountingExecutor::make();
+
+    // Using prime numbers so there is no chance of multiple traps
+    static constexpr size_t kCountA = 1013;
+    static constexpr size_t kCountB = 1511;
+
+    // Schedule kCountA tasks one at a time.
+    for (size_t i = 0; i < kCountA; ++i) {
+        execA->schedule([&](Status status) {
+            ASSERT_OK(status);
+            ASSERT_EQ(execA->tasksRun.load(), (i + 1));
+        });
+    }
+
+    {
+        // Schedule kCountB tasks recursively.
+        size_t i = 0;
+        std::function<void(Status)> recurseExec;
+        bool inTask = false;
+
+        recurseExec = [&](Status status) {
+            ASSERT(!std::exchange(inTask, true));
+            ASSERT_OK(status);
+
+            auto tasksRun = execB->tasksRun.load();
+            ASSERT_EQ(tasksRun, ++i);
+            if (tasksRun < kCountB) {
+                execB->schedule(recurseExec);
+            }
+
+            ASSERT(std::exchange(inTask, false));
+        };
+
+        execB->schedule(recurseExec);
+    }
+
+    // Verify that running executors together didn't change the expected counts.
+    ASSERT_EQ(execA->tasksRun.load(), kCountA);
+    ASSERT_EQ(execB->tasksRun.load(), kCountB);
+}
+
+TEST(ExecutorTest, InlineRecursiveCountingExecutor) {
+    // Verify that the executor accepts every time and keeps an accurate count.
+    const auto execA = InlineRecursiveCountingExecutor::make();
+    const auto execB = InlineRecursiveCountingExecutor::make();
 
     // Using prime numbers so there is no chance of multiple traps
     static constexpr size_t kCountA = 1013;
@@ -112,7 +156,7 @@ DEATH_TEST(ExecutorTest,
 
 TEST(ExecutorTest, GuaranteedExecutor_MainInvalid_FallbackAccepts) {
     // If we only have a fallback, then everything runs on it.
-    const auto countExec = InlineCountingExecutor::make();
+    const auto countExec = InlineQueuedCountingExecutor::make();
     const auto gwarExec = makeGuaranteedExecutor({}, countExec);
 
     static constexpr size_t kCount = 1000;
@@ -143,7 +187,7 @@ DEATH_TEST(ExecutorTest,
 TEST(ExecutorTest, GuaranteedExecutor_MainRejects_FallbackAccepts) {
     // If the main rejects and the fallback accepts, then run on the fallback.
     const auto rejectExec = RejectingExecutor::make();
-    const auto countExec = InlineCountingExecutor::make();
+    const auto countExec = InlineQueuedCountingExecutor::make();
     const auto gwarExec = makeGuaranteedExecutor(rejectExec, countExec);
 
     static constexpr size_t kCount = 1000;
@@ -156,7 +200,7 @@ TEST(ExecutorTest, GuaranteedExecutor_MainRejects_FallbackAccepts) {
 
 TEST(ExecutorTest, GuaranteedExecutor_MainAccepts_FallbackInvalid) {
     // If the main accepts and we don't have a fallback, then run on the main.
-    const auto countExec = InlineCountingExecutor::make();
+    const auto countExec = InlineQueuedCountingExecutor::make();
     const auto gwarExec = makeGuaranteedExecutor(countExec, {});
 
     static constexpr size_t kCount = 1000;
@@ -169,7 +213,7 @@ TEST(ExecutorTest, GuaranteedExecutor_MainAccepts_FallbackInvalid) {
 
 TEST(ExecutorTest, GuaranteedExecutor_MainAccepts_FallbackRejects) {
     // If the main accepts and the fallback would reject, then run on the main.
-    const auto countExec = InlineCountingExecutor::make();
+    const auto countExec = InlineQueuedCountingExecutor::make();
     const auto rejectExec = RejectingExecutor::make();
     const auto gwarExec = makeGuaranteedExecutor(countExec, rejectExec);
 
@@ -184,8 +228,8 @@ TEST(ExecutorTest, GuaranteedExecutor_MainAccepts_FallbackRejects) {
 
 TEST(ExecutorTest, GuaranteedExecutor_MainAccepts_FallbackAccepts) {
     // If both executor accepts, then run on the main.
-    const auto countExecA = InlineCountingExecutor::make();
-    const auto countExecB = InlineCountingExecutor::make();
+    const auto countExecA = InlineQueuedCountingExecutor::make();
+    const auto countExecB = InlineQueuedCountingExecutor::make();
     const auto gwarExec = makeGuaranteedExecutor(countExecA, countExecB);
 
     static constexpr size_t kCount = 1000;
