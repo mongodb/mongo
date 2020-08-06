@@ -277,8 +277,8 @@ public:
     virtual Status commitBulk(OperationContext* opCtx,
                               BulkBuilder* bulk,
                               bool dupsAllowed,
-                              KeyHandlerFn&& onDuplicateKeyInserted,
-                              RecordIdHandlerFn&& onDuplicateRecord) = 0;
+                              const KeyHandlerFn& onDuplicateKeyInserted,
+                              const RecordIdHandlerFn& onDuplicateRecord) = 0;
 
     /**
      * Specifies whether getKeys should relax the index constraints or not, in order of most
@@ -529,8 +529,8 @@ public:
     Status commitBulk(OperationContext* opCtx,
                       BulkBuilder* bulk,
                       bool dupsAllowed,
-                      KeyHandlerFn&& onDuplicateKeyInserted,
-                      RecordIdHandlerFn&& onDuplicateRecord) final;
+                      const KeyHandlerFn& onDuplicateKeyInserted,
+                      const RecordIdHandlerFn& onDuplicateRecord) final;
 
     void getKeys(const BSONObj& obj,
                  GetKeysMode mode,
@@ -599,7 +599,7 @@ private:
      */
     Status _handleDuplicateKey(OperationContext* opCtx,
                                const KeyString::Value& dataKey,
-                               RecordIdHandlerFn&& onDuplicateRecord);
+                               const RecordIdHandlerFn& onDuplicateRecord);
 
     const std::unique_ptr<SortedDataInterface> _newInterface;
 };

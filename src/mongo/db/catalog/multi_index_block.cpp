@@ -601,7 +601,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx) {
 }
 
 Status MultiIndexBlock::dumpInsertsFromBulk(
-    OperationContext* opCtx, IndexAccessMethod::RecordIdHandlerFn&& onDuplicateRecord) {
+    OperationContext* opCtx, const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord) {
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
     for (size_t i = 0; i < _indexes.size(); i++) {
@@ -645,7 +645,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                             return Status::OK();
                         });
                 },
-                std::move(onDuplicateRecord));
+                onDuplicateRecord);
 
             if (!status.isOK()) {
                 return status;
