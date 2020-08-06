@@ -10,10 +10,12 @@
  * needs to pick a read timestamp that is not derived from the commit point, but rather from the
  * 'lastApplied' optime on the primary.
  *
+ * Requires fcv_47 because parameter minSnapshotHistoryWindowInSeconds has been introduced in 4.7
+ *
  * @tags: [
  *   uses_transactions,
  *   requires_find_command,
- *   need_fixing_for_47
+ *   requires_fcv_47
  * ]
  */
 

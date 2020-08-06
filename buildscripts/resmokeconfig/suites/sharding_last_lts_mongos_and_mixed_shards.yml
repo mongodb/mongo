@@ -8,7 +8,6 @@ selector:
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_47
-  - need_fixing_for_47
   exclude_files:
   # Requires fix to SERVER-31689
   - jstests/sharding/query/aggregation_currentop.js
@@ -21,15 +20,6 @@ selector:
   - jstests/sharding/query/merge_stale_on_fields.js
   - jstests/sharding/refresh_sessions.js
   - jstests/sharding/query/lookup.js
-  # Enable when 4.4 becomes last-lts
-  - jstests/sharding/query/out_fails_to_replace_sharded_collection.js
-  - jstests/sharding/merge_from_stale_mongos.js
-  - jstests/sharding/migration_coordinator_basic.js
-  - jstests/sharding/migration_coordinator_killop_in_critical_section.js
-  - jstests/sharding/migration_coordinator_shutdown_in_critical_section.js
-  - jstests/sharding/test_stacked_migration_cleanup.js
-  - jstests/sharding/kill_pinned_cursor.js
-  - jstests/sharding/killop.js
   # Enable when 5.0 becomes last-lts
   - jstests/sharding/mongos_dataSize.js
   # Enable when SERVER-44733 is backported

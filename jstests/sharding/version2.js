@@ -1,8 +1,3 @@
-/**
- * @tags: [
- *   need_fixing_for_47
- * ]
- */
 (function() {
 'use strict';
 /**
