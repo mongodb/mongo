@@ -104,11 +104,11 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithNonDottedHashedFieldSuccee
     // document source has 2 chunks. So we can assert on the returned values.
     auto next = pipeline->getNext();
     ASSERT_EQUALS(next.get().getField("a").getInt(), 5);
-    ASSERT_EQUALS(next.get().getField("b").getLong(), -6548868637522515075);
+    ASSERT_EQUALS(next.get().getField("b").getLong(), -6548868637522515075LL);
     ASSERT(next.get().getField("x").missing());
     next = pipeline->getNext();
     ASSERT_EQUALS(next.get().getField("a").getInt(), 15);
-    ASSERT_EQUALS(next.get().getField("b").getLong(), 2598032665634823220);
+    ASSERT_EQUALS(next.get().getField("b").getLong(), 2598032665634823220LL);
     ASSERT(next.get().getField("x").missing());
     ASSERT(!pipeline->getNext());
 }
@@ -149,10 +149,10 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedHashedFieldSucceeds)
     // document source has 2 chunks. So we can assert on the returned values.
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.get().toBson(),
-                      BSON("a" << BSON("b" << 10 << "c" << -6548868637522515075) << "c" << 5));
+                      BSON("a" << BSON("b" << 10 << "c" << -6548868637522515075LL) << "c" << 5));
     next = pipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.get().toBson(),
-                      BSON("a" << BSON("b" << 20 << "c" << 2598032665634823220) << "c" << 1));
+                      BSON("a" << BSON("b" << 20 << "c" << 2598032665634823220LL) << "c" << 1));
     ASSERT(!pipeline->getNext());
 }
 
