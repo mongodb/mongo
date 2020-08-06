@@ -280,11 +280,6 @@ struct ServerGlobalParams {
             return version != kLatest && version != kLastContinuous && version != kLastLTS;
         }
 
-        // This function is to be used for generic FCV references only, and not for FCV-gating.
-        bool isUpgradingOrDowngrading(Version version) {
-            return version != kLatest && version != kLastContinuous && version != kLastLTS;
-        }
-
     private:
         AtomicWord<Version> _version{Version::kUnsetDefault44Behavior};
 
