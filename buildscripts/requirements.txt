@@ -1,5 +1,7 @@
 # Jira integration
-cryptography >= 2.0.0
+lazy-object-proxy == 1.4.1
+boto3 == 1.5.27
+cryptography >= 2.0.0,<=2.3.1
 jira == 1.0.10
 pyjwt == 1.5.3
 # Other
