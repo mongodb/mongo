@@ -5097,6 +5097,15 @@ tasks:
       resmoke_args: --suites=aggregation_sharded_collections_causally_consistent_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: aggregation_slot_based_execution
+  tags: ["aggregation", "sbe"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation_sbe --storageEngine=wiredTiger
+
+- <<: *task_template
   name: audit
   commands:
   - func: "do setup"
