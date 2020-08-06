@@ -80,20 +80,23 @@ constexpr auto kHelloString = "hello"_sd;
 constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
 constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
 
-void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int level) {
+void appendReplicationInfo(OperationContext* opCtx,
+                           BSONObjBuilder& result,
+                           int level,
+                           bool useLegacyResponseFields) {
     ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().usingReplSets()) {
         const auto& horizonParams = SplitHorizon::getParameters(opCtx->getClient());
         IsMasterResponse isMasterResponse;
         replCoord->fillIsMasterForReplSet(&isMasterResponse, horizonParams);
-        result.appendElements(isMasterResponse.toBSON());
+        result.appendElements(isMasterResponse.toBSON(useLegacyResponseFields));
         if (level) {
             replCoord->appendSlaveInfoData(&result);
         }
         return;
     }
 
-    result.appendBool("ismaster",
+    result.appendBool((useLegacyResponseFields ? "ismaster" : "isWritablePrimary"),
                       ReplicationCoordinator::get(opCtx)->isMasterForReportingPurposes());
 
     if (level) {
@@ -175,7 +178,10 @@ public:
         int level = configElement.numberInt();
 
         BSONObjBuilder result;
-        appendReplicationInfo(opCtx, result, level);
+
+        // TODO SERVER-50219: Change useLegacyResponseFields to false once the serverStatus changes
+        // to remove master-slave terminology are merged.
+        appendReplicationInfo(opCtx, result, level, true /* useLegacyResponseFields */);
 
         auto rbid = ReplicationProcess::get(opCtx)->getRollbackID();
         if (ReplicationProcess::kUninitializedRollbackId != rbid) {
@@ -243,6 +249,11 @@ public:
         if (cmdObj["forShell"].trueValue()) {
             LastError::get(opCtx->getClient()).disable();
         }
+
+        // Parse the command name, which should be one of the following: hello, isMaster, or
+        // ismaster. If the command is "hello", we must attach an "isWritablePrimary" response field
+        // instead of "ismaster" and "secondaryDelaySecs" response field instead of "slaveDelay".
+        bool useLegacyResponseFields = (cmdObj.firstElementFieldName() != kHelloString);
 
         transport::Session::TagMask sessionTagsToSet = 0;
         transport::Session::TagMask sessionTagsToUnset = 0;
@@ -352,7 +363,7 @@ public:
                 });
         }
 
-        appendReplicationInfo(opCtx, result, 0);
+        appendReplicationInfo(opCtx, result, 0, useLegacyResponseFields);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             const int configServerModeNumber = 2;
