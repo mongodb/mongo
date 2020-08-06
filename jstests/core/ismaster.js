@@ -14,11 +14,16 @@ function checkResponseFields(commandString) {
         "maxMessageSizeBytes possibly missing:" + tojson(res));
     assert(res.maxWriteBatchSize && isNumber(res.maxWriteBatchSize) && res.maxWriteBatchSize > 0,
            "maxWriteBatchSize possibly missing:" + tojson(res));
-    assert.eq("boolean", typeof res.ismaster, "ismaster field is not a boolean" + tojson(res));
 
-    // TODO SERVER-49987: Check for res.isWritablePrimary instead of res.ismaster if a hello command
-    // was executed.
-    assert(res.ismaster === true, "ismaster field is false" + tojson(res));
+    if (commandString === "hello") {
+        assert.eq("boolean",
+                  typeof res.isWritablePrimary,
+                  "isWritablePrimary field is not a boolean" + tojson(res));
+        assert(res.isWritablePrimary === true, "isWritablePrimary field is false" + tojson(res));
+    } else {
+        assert.eq("boolean", typeof res.ismaster, "ismaster field is not a boolean" + tojson(res));
+        assert(res.ismaster === true, "ismaster field is false" + tojson(res));
+    }
     assert(res.localTime, "localTime possibly missing:" + tojson(res));
 
     if (!testingReplication) {
@@ -31,9 +36,10 @@ function checkResponseFields(commandString) {
             "passives",
             "arbiters",
             "primary",
-            "aribterOnly",
+            "arbiterOnly",
             "passive",
             "slaveDelay",
+            "secondaryDelaySecs",
             "hidden",
             "tags",
             "buildIndexes",
@@ -55,8 +61,6 @@ function checkResponseFields(commandString) {
     }
 }
 
-// TODO SERVER-49987: add the "hello" command test back in once mongod response fields are
-// appropriately changed.
-// checkResponseFields("hello");
+checkResponseFields("hello");
 checkResponseFields("ismaster");
 checkResponseFields("isMaster");
