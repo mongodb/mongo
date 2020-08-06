@@ -207,6 +207,7 @@ executor:
       wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
       set_parameters:
         enableTestCommands: 1
+        enableElectionHandoff: 0
         logComponentVerbosity:
           replication:
             heartbeats: 2
