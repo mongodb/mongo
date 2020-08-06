@@ -42,6 +42,8 @@ all:
     test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
   - ticket: SERVER-49986
     test_file: jstests/core/ismaster.js
+  - ticket: SERVER-49987
+    test_file: jstests/replsets/ismaster1.js
   - ticket: SERVER-49986
     test_file: jstests/core/views/views_all_commands.js
   - ticket: SERVER-49986
