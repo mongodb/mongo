@@ -1,0 +1,74 @@
+{
+  "topology_description": {
+    "type": "ReplicaSetNoPrimary",
+    "servers": [
+      {
+        "address": "a:27017",
+        "type": "RSSecondary",
+        "avg_rtt_ms": 50,
+        "lastUpdateTime": 0,
+        "maxWireVersion": 5,
+        "lastWrite": {
+          "lastWriteDate": {
+            "$numberLong": "1000001"
+          }
+        }
+      },
+      {
+        "address": "b:27017",
+        "type": "RSSecondary",
+        "avg_rtt_ms": 5,
+        "lastUpdateTime": 0,
+        "maxWireVersion": 5,
+        "lastWrite": {
+          "lastWriteDate": {
+            "$numberLong": "1"
+          }
+        }
+      }
+    ]
+  },
+  "read_preference": {
+    "mode": "Nearest"
+  },
+  "suitable_servers": [
+    {
+      "address": "a:27017",
+      "type": "RSSecondary",
+      "avg_rtt_ms": 50,
+      "lastUpdateTime": 0,
+      "maxWireVersion": 5,
+      "lastWrite": {
+        "lastWriteDate": {
+          "$numberLong": "1000001"
+        }
+      }
+    },
+    {
+      "address": "b:27017",
+      "type": "RSSecondary",
+      "avg_rtt_ms": 5,
+      "lastUpdateTime": 0,
+      "maxWireVersion": 5,
+      "lastWrite": {
+        "lastWriteDate": {
+          "$numberLong": "1"
+        }
+      }
+    }
+  ],
+  "in_latency_window": [
+    {
+      "address": "b:27017",
+      "type": "RSSecondary",
+      "avg_rtt_ms": 5,
+      "lastUpdateTime": 0,
+      "maxWireVersion": 5,
+      "lastWrite": {
+        "lastWriteDate": {
+          "$numberLong": "1"
+        }
+      }
+    }
+  ]
+}

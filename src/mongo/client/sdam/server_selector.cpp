@@ -32,6 +32,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 #include "mongo/client/sdam/topology_description.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/fail_point.h"
@@ -76,9 +77,13 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
     }
 
     switch (criteria.pref) {
-        case ReadPreference::Nearest:
-            *result = topologyDescription->findServers(nearestFilter(criteria));
+        case ReadPreference::Nearest: {
+            auto filter = (topologyDescription->getType() != TopologyType::kSharded)
+                ? nearestFilter(criteria)
+                : shardedFilter(criteria);
+            *result = topologyDescription->findServers(filter);
             break;
+        }
 
         case ReadPreference::SecondaryOnly:
             *result = topologyDescription->findServers(secondaryFilter(criteria));
@@ -134,11 +139,25 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
 
 boost::optional<std::vector<ServerDescriptionPtr>> SdamServerSelector::selectServers(
     const TopologyDescriptionPtr topologyDescription, const ReadPreferenceSetting& criteria) {
+    ReadPreferenceSetting effectiveCriteria = [&criteria](TopologyType topologyType) {
+        if (topologyType != TopologyType::kSharded) {
+            return criteria;
+        } else {
+            // Topology type Sharded should ignore read preference fields
+            return ReadPreferenceSetting(ReadPreference::Nearest);
+        };
+    }(topologyDescription->getType());
+
 
     // If the topology wire version is invalid, raise an error
     if (!topologyDescription->isWireVersionCompatible()) {
         uasserted(ErrorCodes::IncompatibleServerVersion,
                   *topologyDescription->getWireVersionCompatibleError());
+    }
+
+    if (criteria.maxStalenessSeconds.count()) {
+        _verifyMaxstalenessLowerBound(topologyDescription, effectiveCriteria.maxStalenessSeconds);
+        _verifyMaxstalenessWireVersions(topologyDescription, effectiveCriteria.maxStalenessSeconds);
     }
 
     if (topologyDescription->getType() == TopologyType::kUnknown) {
@@ -153,7 +172,7 @@ boost::optional<std::vector<ServerDescriptionPtr>> SdamServerSelector::selectSer
     }
 
     std::vector<ServerDescriptionPtr> results;
-    _getCandidateServers(&results, topologyDescription, criteria);
+    _getCandidateServers(&results, topologyDescription, effectiveCriteria);
 
     if (results.size()) {
         if (MONGO_unlikely(sdamServerSelectorIgnoreLatencyWindow.shouldFail())) {
@@ -253,6 +272,33 @@ bool SdamServerSelector::recencyFilter(const ReadPreferenceSetting& readPref,
     return result;
 }
 
+void SdamServerSelector::_verifyMaxstalenessLowerBound(TopologyDescriptionPtr topologyDescription,
+                                                       Seconds maxStalenessSeconds) {
+    static const auto kIdleWritePeriodMs = Milliseconds{10000};
+    auto topologyType = topologyDescription->getType();
+    if (topologyType == TopologyType::kReplicaSetWithPrimary ||
+        topologyType == TopologyType::kReplicaSetNoPrimary) {
+        const auto lowerBoundMs =
+            sdamHeartBeatFrequencyMs + durationCount<Milliseconds>(kIdleWritePeriodMs);
+
+        if (durationCount<Milliseconds>(maxStalenessSeconds) < lowerBoundMs) {
+            // using if to avoid creating the string if there's no error
+            std::stringstream ss;
+            ss << "Parameter maxStalenessSeconds cannot be less than "
+               << durationCount<Seconds>(Milliseconds{lowerBoundMs});
+            uassert(ErrorCodes::MaxStalenessOutOfRange, ss.str(), false);
+        }
+    }
+}
+
+void SdamServerSelector::_verifyMaxstalenessWireVersions(TopologyDescriptionPtr topologyDescription,
+                                                         Seconds maxStalenessSeconds) {
+    for (auto& server : topologyDescription->getServers()) {
+        uassert(ErrorCodes::IncompatibleServerVersion,
+                "Incompatible wire version",
+                server->getMaxWireVersion() >= WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+    }
+}
 
 void LatencyWindow::filterServers(std::vector<ServerDescriptionPtr>* servers) {
     servers->erase(std::remove_if(servers->begin(),

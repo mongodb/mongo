@@ -47,6 +47,8 @@ protected:
     static inline const auto kSetName = std::string("mySetName");
 
     static inline const std::vector<HostAndPort> kOneServer{HostAndPort("foo:1234")};
+    static inline const std::vector<HostAndPort> kThreeServers{
+        HostAndPort("foo:1234"), HostAndPort("bar:1234"), HostAndPort("baz:1234")};
 
     static BSONObjBuilder okBuilder() {
         return std::move(BSONObjBuilder().append("ok", 1));
@@ -59,6 +61,17 @@ protected:
         okBuilder().append("topologyVersion", TopologyVersion(OID::max(), 0).toBSON()).obj();
     static inline const auto kBsonTopologyVersionHigh =
         okBuilder().append("topologyVersion", TopologyVersion(OID::max(), 1).toBSON()).obj();
+    static inline const auto kBsonRsPrimary = okBuilder()
+                                                  .append("ismaster", true)
+                                                  .append("setName", kSetName)
+                                                  .append("minWireVersion", 2)
+                                                  .append("maxWireVersion", 10)
+                                                  .appendArray("hosts",
+                                                               BSON_ARRAY("foo:1234"
+                                                                          << "bar:1234"
+                                                                          << "baz:1234"))
+
+                                                  .obj();
 };
 
 TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
@@ -89,6 +102,33 @@ TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
     newServerDescription = topologyDescription->getServers()[0];
     ASSERT_BSONOBJ_EQ(newServerDescription->getTopologyVersion()->toBSON(),
                       kBsonTopologyVersionHigh.getObjectField("topologyVersion"));
+}
+
+TEST_F(TopologyManagerTestFixture,
+       ShouldUpdateServerDescriptionsTopologyDescriptionPtrWhenTopologyDescriptionIsInstalled) {
+    auto checkServerTopologyDescriptionMatches = [](TopologyDescriptionPtr topologyDescription) {
+        auto rawTopologyDescPtr = topologyDescription.get();
+        for (auto server : topologyDescription->getServers()) {
+            auto rawServerTopologyDescPtr = (*server->getTopologyDescription()).get();
+            ASSERT(server->getTopologyDescription());
+            ASSERT(rawServerTopologyDescPtr == rawTopologyDescPtr);
+        }
+    };
+
+    auto config = SdamConfiguration(kThreeServers);
+    TopologyManager topologyManager(config, clockSource);
+    checkServerTopologyDescriptionMatches(topologyManager.getTopologyDescription());
+
+    auto topologyDescription = topologyManager.getTopologyDescription();
+    auto firstServer = *topologyDescription->getServers()[0];
+    auto host = firstServer.getAddress();
+    auto isMasterOutcome =
+        IsMasterOutcome(host, kBsonRsPrimary, duration_cast<IsMasterRTT>(mongo::Milliseconds{40}));
+    topologyManager.onServerDescription(isMasterOutcome);
+    checkServerTopologyDescriptionMatches(topologyManager.getTopologyDescription());
+
+    topologyManager.onServerRTTUpdated(host, Milliseconds{40});
+    checkServerTopologyDescriptionMatches(topologyManager.getTopologyDescription());
 }
 
 TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnErrorIfSent) {

@@ -1,0 +1,21 @@
+{
+  "topology_description": {
+    "type": "ReplicaSetNoPrimary",
+    "servers": [
+      {
+        "address": "a:27017",
+        "type": "Unknown"
+      },
+      {
+        "address": "b:27017",
+        "type": "Unknown"
+      }
+    ]
+  },
+  "read_preference": {
+    "mode": "Nearest",
+    "maxStalenessSeconds": 90
+  },
+  "suitable_servers": [],
+  "in_latency_window": []
+}
