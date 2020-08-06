@@ -51,6 +51,7 @@ const allCommands = {
     _configsvrUpdateZoneKeyRange: {skip: isPrimaryOnly},
     _flushDatabaseCacheUpdates: {skip: isPrimaryOnly},
     _flushRoutingTableCacheUpdates: {skip: isPrimaryOnly},
+    _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: isPrimaryOnly},
     _getNextSessionMods: {skip: isPrimaryOnly},
     _getUserCacheGeneration: {skip: isNotAUserDataRead},
     _hashBSONElement: {skip: isNotAUserDataRead},

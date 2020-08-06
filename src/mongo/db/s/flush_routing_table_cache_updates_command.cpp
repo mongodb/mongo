@@ -53,16 +53,9 @@
 namespace mongo {
 namespace {
 
-class FlushRoutingTableCacheUpdatesCmd final
-    : public TypedCommand<FlushRoutingTableCacheUpdatesCmd> {
+template <typename Derived>
+class FlushRoutingTableCacheUpdatesCmdBase : public TypedCommand<Derived> {
 public:
-    using Request = _flushRoutingTableCacheUpdates;
-
-    // Support deprecated name 'forceRoutingTableRefresh' for backwards compatibility with 3.6.0.
-    FlushRoutingTableCacheUpdatesCmd()
-        : TypedCommand<FlushRoutingTableCacheUpdatesCmd>(Request::kCommandName,
-                                                         "forceRoutingTableRefresh") {}
-
     std::string help() const override {
         return "Internal command which waits for any pending routing table cache updates for a "
                "particular namespace to be written locally. The operationTime returned in the "
@@ -76,20 +69,21 @@ public:
         return true;
     }
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+    Command::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return Command::AllowedOnSecondary::kNever;
     }
 
-    class Invocation final : public InvocationBase {
+    class Invocation final : public TypedCommand<Derived>::InvocationBase {
     public:
-        using InvocationBase::InvocationBase;
+        using Base = typename TypedCommand<Derived>::InvocationBase;
+        using Base::Base;
 
         bool supportsWriteConcern() const override {
-            return false;
+            return Derived::supportsWriteConcern();
         }
 
         NamespaceString ns() const override {
-            return request().getCommandParameter();
+            return Base::request().getCommandParameter();
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -132,7 +126,7 @@ public:
 
             oss.waitForMigrationCriticalSectionSignal(opCtx);
 
-            if (request().getSyncFromConfig()) {
+            if (Base::request().getSyncFromConfig()) {
                 LOGV2_DEBUG(21982,
                             1,
                             "Forcing remote routing table refresh for {namespace}",
@@ -146,8 +140,30 @@ public:
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }
     };
+};
+
+class FlushRoutingTableCacheUpdatesCmd
+    : public FlushRoutingTableCacheUpdatesCmdBase<FlushRoutingTableCacheUpdatesCmd> {
+public:
+    using Request = _flushRoutingTableCacheUpdates;
+
+    static bool supportsWriteConcern() {
+        return false;
+    }
 
 } _flushRoutingTableCacheUpdatesCmd;
+
+class FlushRoutingTableCacheUpdatesCmdWithWriteConcern
+    : public FlushRoutingTableCacheUpdatesCmdBase<
+          FlushRoutingTableCacheUpdatesCmdWithWriteConcern> {
+public:
+    using Request = _flushRoutingTableCacheUpdatesWithWriteConcern;
+
+    static bool supportsWriteConcern() {
+        return true;
+    }
+
+} _flushRoutingTableCacheUpdatesWithWriteConcernCmd;
 
 }  // namespace
 }  // namespace mongo

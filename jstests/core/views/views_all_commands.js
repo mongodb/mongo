@@ -102,6 +102,7 @@ let viewsCommandTests = {
     _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
     _flushDatabaseCacheUpdates: {skip: isUnrelated},
     _flushRoutingTableCacheUpdates: {skip: isUnrelated},
+    _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: isUnrelated},
     _getNextSessionMods: {skip: isAnInternalCommand},
     _getUserCacheGeneration: {skip: isAnInternalCommand},
     _hashBSONElement: {skip: isAnInternalCommand},

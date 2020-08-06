@@ -45,3 +45,13 @@ commands:
                 type: bool
                 description: "If true, forces a refresh of the cache entry from the config server before waiting for updates to be persist"
                 default: true
+    _flushRoutingTableCacheUpdatesWithWriteConcern:
+        description: "The same behavior as _flushRoutingTableCacheUpdates but accepts writeConcern." 
+        strict: true
+        namespace: type
+        type: namespacestring
+        fields:
+            syncFromConfig:
+                type: bool
+                description: "If true, forces a refresh of the cache entry from the config server before waiting for updates to be persist"
+                default: true

@@ -60,6 +60,7 @@ let testCases = {
     _configsvrShardCollection: {skip: "primary only"},
     _configsvrUpdateZoneKeyRange: {skip: "primary only"},
     _flushRoutingTableCacheUpdates: {skip: "does not return user data"},
+    _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: "does not return user data"},
     _getUserCacheGeneration: {skip: "does not return user data"},
     _hashBSONElement: {skip: "does not return user data"},
     _isSelf: {skip: "does not return user data"},
