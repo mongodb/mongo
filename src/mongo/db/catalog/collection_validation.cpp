@@ -203,7 +203,10 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
     {
         ValidateResults tempValidateResults;
         BSONObjBuilder tempBuilder;
-        indexValidator->traverseRecordStore(opCtx, &tempValidateResults, &tempBuilder);
+        ValidateResultsMap tempIndexResultsMap;
+
+        indexValidator->traverseRecordStore(
+            opCtx, &tempValidateResults, &tempBuilder, &tempIndexResultsMap);
     }
 
     LOGV2_OPTIONS(
@@ -500,12 +503,12 @@ Status validate(OperationContext* opCtx,
                       "uuid"_attr = uuidString);
 
         IndexConsistency indexConsistency(opCtx, &validateState);
-        ValidateAdaptor indexValidator(&indexConsistency, &validateState, &indexNsResultsMap);
+        ValidateAdaptor indexValidator(&indexConsistency, &validateState);
 
         // In traverseRecordStore(), the index validator keeps track the records in the record
         // store so that _validateIndexes() can confirm that the index entries match the records in
         // the collection.
-        indexValidator.traverseRecordStore(opCtx, results, output);
+        indexValidator.traverseRecordStore(opCtx, results, output, &indexNsResultsMap);
 
         // Pause collection validation while a lock is held and between collection and index data
         // validation.

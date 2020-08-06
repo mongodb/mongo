@@ -2263,9 +2263,7 @@ public:
 
             ASSERT_EQ(false, results.valid);
             ASSERT_EQ(false, results.repaired);
-            // TODO SERVER-50088: Avoid double checking multikey errors when there are index
-            // inconsistencies.
-            ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
             ASSERT_EQ(static_cast<size_t>(1), results.warnings.size());
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(2), results.missingIndexEntries.size());

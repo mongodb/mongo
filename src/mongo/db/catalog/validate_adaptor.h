@@ -47,12 +47,9 @@ class ValidateAdaptor {
 
 public:
     ValidateAdaptor(IndexConsistency* indexConsistency,
-                    CollectionValidation::ValidateState* validateState,
-                    ValidateResultsMap* irm)
+                    CollectionValidation::ValidateState* validateState)
 
-        : _indexConsistency(indexConsistency),
-          _validateState(validateState),
-          _indexNsResultsMap(irm) {}
+        : _indexConsistency(indexConsistency), _validateState(validateState) {}
 
     /**
      * Validates the record data and traverses through its key set to keep track of the
@@ -62,7 +59,8 @@ public:
                                   const RecordId& recordId,
                                   const RecordData& record,
                                   size_t* dataSize,
-                                  ValidateResults* results);
+                                  ValidateResults* results,
+                                  ValidateResultsMap* indexNsResultsMap);
 
     /**
      * Traverses the index getting index entries to validate them and keep track of the index keys
@@ -79,7 +77,8 @@ public:
      */
     void traverseRecordStore(OperationContext* opCtx,
                              ValidateResults* results,
-                             BSONObjBuilder* output);
+                             BSONObjBuilder* output,
+                             ValidateResultsMap* indexNsResultsMap);
 
     /**
      * Validates that the number of document keys matches the number of index keys previously
@@ -90,7 +89,6 @@ public:
 private:
     IndexConsistency* _indexConsistency;
     CollectionValidation::ValidateState* _validateState;
-    ValidateResultsMap* _indexNsResultsMap;
 
     // Saves the record count from the record store traversal to be used later to validate the index
     // entries count. Reset every time traverseRecordStore() is called.
