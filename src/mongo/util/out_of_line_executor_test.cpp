@@ -122,7 +122,7 @@ TEST(ExecutorTest, InlineRecursiveCountingExecutor) {
             ASSERT(!std::exchange(inTask, true));
             ASSERT_OK(status);
 
-            auto tasksRun = execB->tasksRun.load();
+            auto tasksRun = size_t(execB->tasksRun.load());
             ASSERT_EQ(tasksRun, ++i);
             if (tasksRun < kCountB) {
                 execB->schedule(recurseExec);
