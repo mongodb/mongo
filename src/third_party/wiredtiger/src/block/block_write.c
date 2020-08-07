@@ -41,9 +41,9 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
      * backups, stops all block truncation unnecessarily). We may want a
      * more targeted solution at some point.
      */
-    if (!conn->hot_backup) {
+    if (conn->hot_backup_start == 0) {
         __wt_readlock(session, &conn->hot_backup_lock);
-        if (!conn->hot_backup)
+        if (conn->hot_backup_start == 0)
             ret = __wt_ftruncate(session, block->fh, len);
         __wt_readunlock(session, &conn->hot_backup_lock);
     }

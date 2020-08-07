@@ -256,19 +256,24 @@ __ckpt_compare_order(const void *a, const void *b)
  *     Load all available checkpoint information for a file.
  */
 int
-__wt_meta_ckptlist_get(WT_SESSION_IMPL *session, const char *fname, WT_CKPT **ckptbasep)
+__wt_meta_ckptlist_get(
+  WT_SESSION_IMPL *session, const char *fname, bool update, WT_CKPT **ckptbasep)
 {
     WT_CKPT *ckpt, *ckptbase;
     WT_CONFIG ckptconf;
     WT_CONFIG_ITEM k, v;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
     size_t allocated, slot;
+    time_t secs;
+    uint64_t most_recent;
     char *config;
 
     *ckptbasep = NULL;
 
     ckptbase = NULL;
+    conn = S2C(session);
     allocated = slot = 0;
     config = NULL;
 
@@ -301,6 +306,27 @@ __wt_meta_ckptlist_get(WT_SESSION_IMPL *session, const char *fname, WT_CKPT **ck
 
     /* Sort in creation-order. */
     __wt_qsort(ckptbase, slot, sizeof(WT_CKPT), __ckpt_compare_order);
+
+    if (update) {
+        /*
+         * We're updating the time value here instead of in the "set" helper because this needs to
+         * happen first in order to figure out what checkpoints we can safely remove.
+         */
+        ckpt = &ckptbase[slot];
+        __wt_seconds(session, &secs);
+        ckpt->sec = (uint64_t)secs;
+        /*
+         * Update time value for most recent checkpoint, not letting it move backwards. It is
+         * possible to race here, so use atomic CAS. This code relies on the fact that anyone we
+         * race with will only increase (never decrease) the most recent checkpoint time value.
+         */
+        for (;;) {
+            WT_ORDERED_READ(most_recent, conn->ckpt_most_recent);
+            if (ckpt->sec <= most_recent ||
+              __wt_atomic_cas64(&conn->ckpt_most_recent, most_recent, ckpt->sec))
+                break;
+        }
+    }
 
     /* Return the array to our caller. */
     *ckptbasep = ckptbase;
@@ -380,7 +406,6 @@ __wt_meta_ckptlist_set(
     WT_CKPT *ckpt;
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
-    time_t secs;
     int64_t maxorder;
     const char *sep;
     bool has_lsn;
@@ -419,13 +444,6 @@ __wt_meta_ckptlist_set(
             /* Set the order and timestamp. */
             if (F_ISSET(ckpt, WT_CKPT_ADD))
                 ckpt->order = ++maxorder;
-
-            /*
-             * XXX Assumes a time_t fits into a uintmax_t, which isn't guaranteed, a time_t has to
-             * be an arithmetic type, but not an integral type.
-             */
-            __wt_seconds(session, &secs);
-            ckpt->sec = (uintmax_t)secs;
         }
         if (strcmp(ckpt->name, WT_CHECKPOINT) == 0)
             WT_ERR(__wt_buf_catfmt(session, buf,

@@ -1853,8 +1853,9 @@ struct __wt_session {
 	 * one of the following keys: \c "from=all" to drop all checkpoints\, \c "from=<checkpoint>"
 	 * to drop all checkpoints after and including the named checkpoint\, or \c
 	 * "to=<checkpoint>" to drop all checkpoints before and including the named checkpoint.
-	 * Checkpoints cannot be dropped while a hot backup is in progress or if open in a cursor.,
-	 * a list of strings; default empty.}
+	 * Checkpoints cannot be dropped if open in a cursor.  While a hot backup is in progress\,
+	 * checkpoints created prior to the start of the backup cannot be dropped., a list of
+	 * strings; default empty.}
 	 * @config{force, if false (the default)\, checkpoints may be skipped if the underlying
 	 * object has not been modified\, if true\, this option forces the checkpoint., a boolean
 	 * flag; default \c false.}

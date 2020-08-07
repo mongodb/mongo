@@ -698,7 +698,7 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
          * prevents us from removing a file that hot backup already
          * knows about.
          */
-        if (S2C(session)->hot_backup)
+        if (S2C(session)->hot_backup_start != 0)
             break;
 
         /*

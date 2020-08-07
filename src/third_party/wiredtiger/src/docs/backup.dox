@@ -56,10 +56,9 @@ aggregate the file names from the cursor and then list the file names as
 arguments to a file archiver such as the system tar utility.
 
 During the period the backup cursor is open, database checkpoints can
-be created, but no checkpoints can be deleted.  This may result in
-significant file growth.  Additionally while the backup cursor is open
-automatic log file archiving, even if enabled, will not reclaim any
-log files.
+be created, but checkpoints created prior to the backup cursor cannot
+be deleted. Additionally while the backup cursor is open automatic log
+file archiving, even if enabled, will not reclaim any log files.
 
 Additionally, if a crash occurs during the period the backup cursor is
 open and logging is disabled (in other words, when depending on

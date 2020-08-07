@@ -1380,8 +1380,9 @@ methods = {
         including the named checkpoint, or
         \c "to=<checkpoint>" to drop all checkpoints before and
         including the named checkpoint.  Checkpoints cannot be
-        dropped while a hot backup is in progress or if open in
-        a cursor''', type='list'),
+        dropped if open in a cursor.  While a hot backup is in
+        progress, checkpoints created prior to the start of the
+        backup cannot be dropped''', type='list'),
     Config('force', 'false', r'''
         if false (the default), checkpoints may be skipped if the underlying object has not been
         modified, if true, this option forces the checkpoint''',

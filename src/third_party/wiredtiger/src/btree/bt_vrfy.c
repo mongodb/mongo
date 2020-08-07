@@ -171,7 +171,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
         goto done;
 
     /* Get a list of the checkpoints for this file. */
-    WT_ERR(__wt_meta_ckptlist_get(session, btree->dhandle->name, &ckptbase));
+    WT_ERR(__wt_meta_ckptlist_get(session, btree->dhandle->name, false, &ckptbase));
 
     /* Inform the underlying block manager we're verifying. */
     WT_ERR(bm->verify_start(bm, session, ckptbase, cfg));

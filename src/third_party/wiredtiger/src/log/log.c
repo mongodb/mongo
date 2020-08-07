@@ -1220,9 +1220,9 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
      * can copy the files in any way they choose, and a log file rename might confuse things.
      */
     create_log = true;
-    if (conn->log_prealloc > 0 && !conn->hot_backup) {
+    if (conn->log_prealloc > 0 && conn->hot_backup_start == 0) {
         __wt_readlock(session, &conn->hot_backup_lock);
-        if (conn->hot_backup)
+        if (conn->hot_backup_start != 0)
             __wt_readunlock(session, &conn->hot_backup_lock);
         else {
             ret = __log_alloc_prealloc(session, log->fileid);
@@ -1253,7 +1253,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
          * not using pre-allocated log files during backup
          * (see comment above).
          */
-        if (!conn->hot_backup)
+        if (conn->hot_backup_start == 0)
             log->prep_missed++;
         WT_RET(__wt_log_allocfile(session, log->fileid, WT_LOG_FILENAME));
     }
@@ -1441,9 +1441,9 @@ __log_truncate_file(WT_SESSION_IMPL *session, WT_FH *log_fh, wt_off_t offset)
     conn = S2C(session);
     log = conn->log;
 
-    if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP) && !conn->hot_backup) {
+    if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP) && conn->hot_backup_start == 0) {
         __wt_readlock(session, &conn->hot_backup_lock);
-        if (conn->hot_backup)
+        if (conn->hot_backup_start != 0)
             __wt_readunlock(session, &conn->hot_backup_lock);
         else {
             ret = __wt_ftruncate(session, log_fh, offset);
