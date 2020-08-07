@@ -35,10 +35,9 @@ namespace mongo {
 /**
  * An "OutOfLineExecutor" that actually runs on the same thread of execution
  * This executor is not thread-safe, and accessing it by multiple threads is prohibited.
- * Multi-threaded accesses to instances of "InlineQueuedCountingExecutor" result in undefined
- * behavior.
+ * Multi-threaded accesses to instances of "InlineCountingExecutor" result in undefined behavior.
  */
-class InlineQueuedCountingExecutor : public OutOfLineExecutor {
+class InlineCountingExecutor : public OutOfLineExecutor {
 public:
     void schedule(Task task) override {
         // Add the task to our queue
@@ -69,29 +68,13 @@ public:
     }
 
     static auto make() {
-        return std::make_shared<InlineQueuedCountingExecutor>();
+        return std::make_shared<InlineCountingExecutor>();
     }
 
     bool inSchedule;
 
     std::deque<Task> taskQueue;
     std::atomic<uint32_t> tasksRun{0};  // NOLINT
-};
-
-class InlineRecursiveCountingExecutor final : public OutOfLineExecutor {
-public:
-    void schedule(Task task) noexcept override {
-        // Relaxed to avoid adding synchronization where there otherwise wouldn't be. That would
-        // cause a false negative from TSAN.
-        tasksRun.fetch_add(1, std::memory_order_relaxed);
-        task(Status::OK());
-    }
-
-    static auto make() {
-        return std::make_shared<InlineRecursiveCountingExecutor>();
-    }
-
-    std::atomic<int32_t> tasksRun{0};  // NOLINT
 };
 
 class RejectingExecutor final : public OutOfLineExecutor {
