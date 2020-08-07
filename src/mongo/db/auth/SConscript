@@ -56,8 +56,11 @@ env.Library(
         'user.cpp',
     ],
     LIBDEPS=[
-        'authprivilege',
         '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        'authentication_restriction',
+        'authprivilege',
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
     ],
 )
@@ -138,7 +141,6 @@ env.Library(
     LIBDEPS=[
         'address_restriction',
         'auth',
-        'authentication_restriction',
         'authorization_manager_global',
         'authprivilege',
         'role_graph',

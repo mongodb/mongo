@@ -336,7 +336,6 @@ Status V2UserDocumentParser::parseRoleVector(const BSONArray& rolesArray,
 
 Status V2UserDocumentParser::initializeAuthenticationRestrictionsFromUserDocument(
     const BSONObj& privDoc, User* user) const {
-    RestrictionDocuments::sequence_type restrictionVector;
 
     // Restrictions on the user
     const auto authenticationRestrictions = privDoc[AUTHENTICATION_RESTRICTIONS_FIELD_NAME];
@@ -352,7 +351,9 @@ Status V2UserDocumentParser::initializeAuthenticationRestrictionsFromUserDocumen
             return restrictions.getStatus();
         }
 
-        restrictionVector.push_back(restrictions.getValue());
+        if (user) {
+            user->setRestrictions(RestrictionDocuments({std::move(restrictions.getValue())}));
+        }
     }
 
     // Restrictions from roles
@@ -363,6 +364,7 @@ Status V2UserDocumentParser::initializeAuthenticationRestrictionsFromUserDocumen
                           "'inheritedAuthenticationRestrictions' field must be an array");
         }
 
+        RestrictionDocuments::sequence_type authRest;
         for (const auto& roleRestriction : BSONArray(inherited.Obj())) {
             if (roleRestriction.type() != Array) {
                 return Status(ErrorCodes::UnsupportedFormat,
@@ -375,12 +377,14 @@ Status V2UserDocumentParser::initializeAuthenticationRestrictionsFromUserDocumen
                 return roleRestrictionDoc.getStatus();
             }
 
-            restrictionVector.push_back(roleRestrictionDoc.getValue());
+            if (user) {
+                authRest.push_back(std::move(roleRestrictionDoc.getValue()));
+            }
         }
-    }
 
-    if (user) {
-        user->setRestrictions(RestrictionDocuments(restrictionVector));
+        if (user) {
+            user->setIndirectRestrictions(RestrictionDocuments(std::move(authRest)));
+        }
     }
 
     return Status::OK();

@@ -132,14 +132,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
 
     auto user = std::move(swUser.getValue());
 
-    const auto& restrictionSet = user->getRestrictions();
-    if (opCtx->getClient() == nullptr) {
-        return Status(ErrorCodes::AuthenticationFailed,
-                      "Unable to evaluate restrictions, OperationContext has no Client");
-    }
-
-    Status restrictionStatus =
-        restrictionSet.validate(RestrictionEnvironment::get(*opCtx->getClient()));
+    auto restrictionStatus = user->validateRestrictions(opCtx);
     if (!restrictionStatus.isOK()) {
         LOGV2(20240,
               "Failed to acquire user because of unmet authentication restrictions",
@@ -758,11 +751,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                 case ErrorCodes::OK: {
                     updatedUser = std::move(swUser.getValue());
                     try {
-                        const auto& restrictionSet =
-                            updatedUser->getRestrictions();  // Owned by updatedUser
-                        invariant(opCtx->getClient());
-                        Status restrictionStatus = restrictionSet.validate(
-                            RestrictionEnvironment::get(*opCtx->getClient()));
+                        auto restrictionStatus = updatedUser->validateRestrictions(opCtx);
                         if (!restrictionStatus.isOK()) {
                             LOGV2(20242,
                                   "Removed user with unmet authentication restrictions from "

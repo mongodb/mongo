@@ -227,7 +227,23 @@ public:
     const RestrictionDocuments& getRestrictions() const& noexcept {
         return _restrictions;
     }
-    void getRestrictions() && = delete;
+
+    /**
+     * Replaces any existing authentication restrictions with "restrictions".
+     */
+    void setIndirectRestrictions(RestrictionDocuments restrictions) &;
+
+    /**
+     * Gets any set authentication restrictions.
+     */
+    const RestrictionDocuments& getIndirectRestrictions() const& noexcept {
+        return _indirectRestrictions;
+    }
+
+    /**
+     * Process both direct and indirect authentication restrictions.
+     */
+    Status validateRestrictions(OperationContext* opCtx) const;
 
 private:
     // Unique ID (often UUID) for this user. May be empty for legacy users.
@@ -253,6 +269,9 @@ private:
 
     // Restrictions which must be met by a Client in order to authenticate as this user.
     RestrictionDocuments _restrictions;
+
+    // Indirect restrictions inherited via roles.
+    RestrictionDocuments _indirectRestrictions;
 };
 
 /**

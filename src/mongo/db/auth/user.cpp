@@ -158,4 +158,27 @@ void User::setRestrictions(RestrictionDocuments restrictions) & {
     _restrictions = std::move(restrictions);
 }
 
+void User::setIndirectRestrictions(RestrictionDocuments restrictions) & {
+    _indirectRestrictions = std::move(restrictions);
+}
+
+Status User::validateRestrictions(OperationContext* opCtx) const {
+    const auto& env = RestrictionEnvironment::get(*(opCtx->getClient()));
+    auto status = _restrictions.validate(env);
+    if (!status.isOK()) {
+        return {status.code(),
+                str::stream() << "Evaluation of direct authentication restrictions failed: "
+                              << status.reason()};
+    }
+
+    status = _indirectRestrictions.validate(env);
+    if (!status.isOK()) {
+        return {status.code(),
+                str::stream() << "Evaluation of indirect authentication restrictions failed: "
+                              << status.reason()};
+    }
+
+    return Status::OK();
+}
+
 }  // namespace mongo
