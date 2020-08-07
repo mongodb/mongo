@@ -83,8 +83,6 @@ sharding_multiversion:
   test_file: jstests/sharding/retryable_writes.js
 - ticket: SERVER-31368
   test_file: jstests/sharding/log_remote_op_wait.js
-- ticket: SERVER-48993
-  test_file: jstests/core/explode_for_sort_collation.js
 
 sharding_jscore_multiversion_passthrough:
 - ticket: SERVER-46196
