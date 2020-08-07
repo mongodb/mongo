@@ -42,6 +42,7 @@ function getLastCommittedOpTime(conn) {
 }
 
 const firstCommitPoint = getLastCommittedOpTime(primary);
+jsTestLog(`First commit point: ${firstCommitPoint}`);
 
 // Disconnect the non-voting secondary from the other nodes so that it won't update its commit point
 // from the other nodes' heartbeats.
@@ -80,6 +81,7 @@ rst.awaitLastOpCommitted(undefined, [primary, secondary]);
 
 const secondCommitPointPrimary = getLastCommittedOpTime(primary);
 const secondCommitPointSecondary = getLastCommittedOpTime(secondary);
+jsTestLog(`Second commit point: ${secondCommitPointPrimary}`);
 
 // Verify that the commit point has advanced on the primary and secondary.
 assert.eq(1, rs.compareOpTimes(secondCommitPointPrimary, firstCommitPoint));
@@ -87,7 +89,10 @@ assert.eq(1, rs.compareOpTimes(secondCommitPointSecondary, firstCommitPoint));
 
 // Verify that the commit point has *NOT* advanced on the non-voting secondary.
 let commitPointNonVotingSecondary = getLastCommittedOpTime(nonVotingSecondary);
-assert.eq(rs.compareOpTimes(commitPointNonVotingSecondary, secondCommitPointPrimary), -1);
+assert.eq(rs.compareOpTimes(commitPointNonVotingSecondary, secondCommitPointPrimary),
+          -1,
+          `commit point on the non-voting secondary should not have been advanced: ${
+              commitPointNonVotingSecondary}`);
 
 // Allow the node to proceed to the oplog applying phase of initial sync and ensure that the oplog
 // fetcher thread is still running.
@@ -103,6 +108,7 @@ rst.awaitLastOpCommitted(undefined, [primary, secondary]);
 
 const thirdCommitPointPrimary = getLastCommittedOpTime(primary);
 const thirdCommitPointSecondary = getLastCommittedOpTime(secondary);
+jsTestLog(`Third commit point: ${thirdCommitPointPrimary}`);
 
 // Verify that the commit point has advanced on the primary and secondary.
 assert.eq(1, rs.compareOpTimes(thirdCommitPointPrimary, secondCommitPointPrimary));
@@ -110,7 +116,10 @@ assert.eq(1, rs.compareOpTimes(thirdCommitPointSecondary, secondCommitPointSecon
 
 // Verify that the commit point has *NOT* advanced on the non-voting secondary.
 commitPointNonVotingSecondary = getLastCommittedOpTime(nonVotingSecondary);
-assert.eq(rs.compareOpTimes(commitPointNonVotingSecondary, thirdCommitPointPrimary), -1);
+assert.eq(rs.compareOpTimes(commitPointNonVotingSecondary, thirdCommitPointPrimary),
+          -1,
+          `commit point on the non-voting secondary should not have been advanced: ${
+              commitPointNonVotingSecondary}`);
 
 // Allow the initial sync node to complete oplog fetching but hang it before it completes initial
 // sync.
@@ -120,7 +129,12 @@ hangBeforeFinish.wait();
 // Verify that the initial sync node receives the commit point from the primary via oplog fetching.
 // We only assert that it is greater than or equal to the second commit point because it is possible
 // for the commit point to not yet be advanced by the primary when we fetch the oplog entry.
-assert.gte(rs.compareOpTimes(getLastCommittedOpTime(initialSyncNode), secondCommitPointPrimary), 0);
+const commitPointInitialSyncNode = getLastCommittedOpTime(initialSyncNode);
+assert.gte(
+    rs.compareOpTimes(commitPointInitialSyncNode, secondCommitPointPrimary),
+    0,
+    `commit point on initial sync node should be at least as up-to-date as the second commit point: ${
+        commitPointInitialSyncNode}`);
 
 // Verify that the non-voting secondary has received the updated commit point via heartbeats from
 // the initial sync node.
