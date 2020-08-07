@@ -49,33 +49,34 @@ class AuthzManagerExternalStateMongos : public AuthzManagerExternalState {
 
 public:
     AuthzManagerExternalStateMongos();
-    ~AuthzManagerExternalStateMongos() override;
+    ~AuthzManagerExternalStateMongos() final;
 
-    Status initialize(OperationContext* opCtx) override;
+    Status initialize(OperationContext* opCtx) final;
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
-        AuthorizationManager* authzManager) override;
+        AuthorizationManager* authzManager) final;
     Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
+    Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) final;
     Status getUserDescription(OperationContext* opCtx,
                               const UserRequest& user,
-                              BSONObj* result) override;
+                              BSONObj* result) final;
     Status getRoleDescription(OperationContext* opCtx,
                               const RoleName& roleName,
                               PrivilegeFormat showPrivileges,
                               AuthenticationRestrictionsFormat,
-                              BSONObj* result) override;
+                              BSONObj* result) final;
     Status getRolesDescription(OperationContext* opCtx,
                                const std::vector<RoleName>& roles,
                                PrivilegeFormat showPrivileges,
                                AuthenticationRestrictionsFormat,
-                               BSONObj* result) override;
+                               BSONObj* result) final;
     Status getRoleDescriptionsForDB(OperationContext* opCtx,
                                     StringData dbname,
                                     PrivilegeFormat showPrivileges,
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,
-                                    std::vector<BSONObj>* result) override;
+                                    std::vector<BSONObj>* result) final;
 
-    bool hasAnyPrivilegeDocuments(OperationContext* opCtx) override;
+    bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;
 };
 
 }  // namespace mongo

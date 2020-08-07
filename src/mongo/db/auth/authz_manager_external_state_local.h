@@ -62,6 +62,7 @@ public:
     Status getUserDescription(OperationContext* opCtx,
                               const UserRequest& user,
                               BSONObj* result) override;
+    Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) override;
     Status getRoleDescription(OperationContext* opCtx,
                               const RoleName& roleName,
                               PrivilegeFormat showPrivileges,
@@ -100,6 +101,13 @@ public:
                            const NamespaceString& collectionName,
                            const BSONObj& query,
                            BSONObj* result) = 0;
+
+    /**
+     * Checks for the existance of a document matching "query" in "collectionName".
+     */
+    virtual bool hasOne(OperationContext* opCtx,
+                        const NamespaceString& collectionName,
+                        const BSONObj& query) = 0;
 
     /**
      * Finds all documents matching "query" in "collectionName".  For each document returned,

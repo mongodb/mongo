@@ -416,6 +416,11 @@ Status AuthorizationManagerImpl::getUserDescription(OperationContext* opCtx,
     return _externalState->getUserDescription(opCtx, UserRequest(userName, boost::none), result);
 }
 
+Status AuthorizationManagerImpl::rolesExist(OperationContext* opCtx,
+                                            const std::vector<RoleName>& roleNames) {
+    return _externalState->rolesExist(opCtx, roleNames);
+}
+
 Status AuthorizationManagerImpl::getRoleDescription(OperationContext* opCtx,
                                                     const RoleName& roleName,
                                                     PrivilegeFormat privileges,

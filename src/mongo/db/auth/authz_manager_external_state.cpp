@@ -46,4 +46,21 @@ std::unique_ptr<AuthzManagerExternalState> AuthzManagerExternalState::create() {
 AuthzManagerExternalState::AuthzManagerExternalState() = default;
 AuthzManagerExternalState::~AuthzManagerExternalState() = default;
 
+Status AuthzManagerExternalState::makeRoleNotFoundStatus(
+    const stdx::unordered_set<RoleName>& unknownRoles) {
+    dassert(unknownRoles.size());
+
+    char delim = ':';
+    StringBuilder sb;
+    sb << "Could not find role";
+    if (unknownRoles.size() > 1) {
+        sb << 's';
+    }
+    for (const auto& unknownRole : unknownRoles) {
+        sb << delim << ' ' << unknownRole.toString();
+        delim = ',';
+    }
+    return {ErrorCodes::RoleNotFound, sb.str()};
+}
+
 }  // namespace mongo

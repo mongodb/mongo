@@ -882,11 +882,7 @@ void CmdUMCTyped<CreateUserCommand, void>::Invocation::typedRun(OperationContext
     uassertStatusOK(V2UserDocumentParser().checkValidUserDocument(userObj));
 
     // Role existence has to be checked after acquiring the update lock
-    for (const auto& role : cmd.getRoles()) {
-        BSONObj ignored;
-        uassertStatusOK(
-            authzManager->getRoleDescription(opCtx, role.getRoleName(dbname), &ignored));
-    }
+    uassertStatusOK(authzManager->rolesExist(opCtx, resolvedRoles));
 
     // Audit this event.
     auto optCustomData = cmd.getCustomData();
@@ -988,11 +984,8 @@ void CmdUMCTyped<UpdateUserCommand, void>::Invocation::typedRun(OperationContext
 
     // Role existence has to be checked after acquiring the update lock
     if (auto roles = cmd.getRoles()) {
-        for (const auto& role : roles.get()) {
-            BSONObj ignored;
-            uassertStatusOK(
-                authzManager->getRoleDescription(opCtx, role.getRoleName(dbname), &ignored));
-        }
+        auto resolvedRoles = auth::resolveRoleNames(roles.get(), dbname);
+        uassertStatusOK(authzManager->rolesExist(opCtx, resolvedRoles));
     }
 
     // Audit this event.
@@ -1094,9 +1087,8 @@ void CmdUMCTyped<GrantRolesToUserCommand, void>::Invocation::typedRun(OperationC
     uassertStatusOK(getCurrentUserRoles(opCtx, authzManager, userName, &userRoles));
 
     auto resolvedRoleNames = auth::resolveRoleNames(cmd.getRoles(), dbname);
+    uassertStatusOK(authzManager->rolesExist(opCtx, resolvedRoleNames));
     for (const auto& role : resolvedRoleNames) {
-        BSONObj roleDoc;
-        uassertStatusOK(authzManager->getRoleDescription(opCtx, role, &roleDoc));
         userRoles.insert(role);
     }
 
@@ -1130,9 +1122,8 @@ void CmdUMCTyped<RevokeRolesFromUserCommand, void>::Invocation::typedRun(Operati
     uassertStatusOK(getCurrentUserRoles(opCtx, authzManager, userName, &userRoles));
 
     auto resolvedUserRoles = auth::resolveRoleNames(cmd.getRoles(), dbname);
+    uassertStatusOK(authzManager->rolesExist(opCtx, resolvedUserRoles));
     for (const auto& role : resolvedUserRoles) {
-        BSONObj roleDoc;
-        uassertStatusOK(authzManager->getRoleDescription(opCtx, role, &roleDoc));
         userRoles.erase(role);
     }
 
@@ -1400,8 +1391,7 @@ void CmdUMCTyped<UpdateRoleCommand, void>::Invocation::typedRun(OperationContext
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     // Role existence has to be checked after acquiring the update lock
-    BSONObj ignored;
-    uassertStatusOK(authzManager->getRoleDescription(opCtx, roleName, &ignored));
+    uassertStatusOK(authzManager->rolesExist(opCtx, {roleName}));
 
     if (optRoles) {
         uassertStatusOK(checkOkayToGrantRolesToRole(opCtx, roleName, *optRoles, authzManager));
@@ -1660,8 +1650,7 @@ void CmdUMCTyped<DropRoleCommand, void>::Invocation::typedRun(OperationContext* 
     auto* authzManager = AuthorizationManager::get(serviceContext);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
-    BSONObj roleDoc;
-    uassertStatusOK(authzManager->getRoleDescription(opCtx, roleName, &roleDoc));
+    uassertStatusOK(authzManager->rolesExist(opCtx, {roleName}));
 
     // From here on, we always want to invalidate the user cache before returning.
     auto invalidateGuard = makeGuard([&] {

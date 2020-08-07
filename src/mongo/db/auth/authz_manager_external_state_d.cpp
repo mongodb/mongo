@@ -88,6 +88,13 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
                                 << query);
 }
 
+bool AuthzManagerExternalStateMongod::hasOne(OperationContext* opCtx,
+                                             const NamespaceString& collectionName,
+                                             const BSONObj& query) {
+    AutoGetCollectionForReadCommand ctx(opCtx, collectionName);
+    return !Helpers::findOne(opCtx, ctx.getCollection(), query, false).isNull();
+}
+
 namespace {
 
 std::unique_ptr<AuthzManagerExternalState> authzManagerExternalStateCreateImpl() {

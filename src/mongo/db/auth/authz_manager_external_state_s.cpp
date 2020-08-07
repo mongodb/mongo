@@ -192,6 +192,57 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
     }
 }
 
+Status AuthzManagerExternalStateMongos::rolesExist(OperationContext* opCtx,
+                                                   const std::vector<RoleName>& roleNames) try {
+    // Marshall role names into a set before querying so that we don't get a false-negative
+    // from repeated roles only providing one result at the end.
+    stdx::unordered_set<RoleName> roleNameSet(roleNames.cbegin(), roleNames.cend());
+
+    BSONObjBuilder rolesInfoCmd;
+
+    {
+        BSONArrayBuilder rolesArray(rolesInfoCmd.subarrayStart("rolesInfo"));
+        for (const auto& roleName : roleNameSet) {
+            roleName.serializeToBSON(&rolesArray);
+        }
+        rolesArray.doneFast();
+    }
+
+    BSONObjBuilder resultBuilder;
+    if (!Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
+            opCtx, "admin", rolesInfoCmd.obj(), &resultBuilder)) {
+        return {ErrorCodes::OperationFailed, "Failed running rolesInfo command on mongod"};
+    }
+
+    auto result = resultBuilder.obj();
+    auto cmdStatus = getStatusFromCommandResult(result);
+    if (!cmdStatus.isOK()) {
+        return {cmdStatus.code(),
+                str::stream() << "Failed running rolesInfo command on mongod: "
+                              << cmdStatus.reason()};
+    }
+
+    auto roles = result["roles"];
+    if (roles.type() != Array) {
+        return {ErrorCodes::OperationFailed,
+                "Received invalid response from rolesInfo command on mongod"};
+    }
+
+    if (static_cast<std::size_t>(roles.Obj().nFields()) != roleNameSet.size()) {
+        // One or more missing roles, cross out the ones that do exist, and return error.
+        for (const auto& roleObj : roles.Obj()) {
+            auto roleName = RoleName::parseFromBSON(roleObj);
+            roleNameSet.erase(roleName);
+        }
+
+        return makeRoleNotFoundStatus(roleNameSet);
+    }
+
+    return Status::OK();
+} catch (const AssertionException& ex) {
+    return ex.toStatus();
+}
+
 Status AuthzManagerExternalStateMongos::getRoleDescription(
     OperationContext* opCtx,
     const RoleName& roleName,

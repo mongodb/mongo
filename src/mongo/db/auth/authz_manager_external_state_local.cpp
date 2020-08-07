@@ -293,6 +293,25 @@ Status AuthzManagerExternalStateLocal::_getUserDocument(OperationContext* opCtx,
     return status;
 }
 
+Status AuthzManagerExternalStateLocal::rolesExist(OperationContext* opCtx,
+                                                  const std::vector<RoleName>& roleNames) {
+    // Perform DB queries for user-defined roles (skipping builtin roles).
+    stdx::unordered_set<RoleName> unknownRoles;
+    for (const auto& roleName : roleNames) {
+        if (!RoleGraph::isBuiltinRole(roleName) &&
+            !hasOne(opCtx, AuthorizationManager::rolesCollectionNamespace, roleName.toBSON())) {
+            unknownRoles.insert(roleName);
+        }
+    }
+
+    // If anything remains, raise it as an unknown role error.
+    if (!unknownRoles.empty()) {
+        return makeRoleNotFoundStatus(unknownRoles);
+    }
+
+    return Status::OK();
+}
+
 Status AuthzManagerExternalStateLocal::getRoleDescription(
     OperationContext* opCtx,
     const RoleName& roleName,

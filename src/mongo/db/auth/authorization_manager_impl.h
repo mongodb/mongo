@@ -72,6 +72,8 @@ public:
                               const UserName& userName,
                               BSONObj* result) override;
 
+    Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) override;
+
     Status getRoleDescription(OperationContext* opCtx,
                               const RoleName& roleName,
                               PrivilegeFormat privilegeFormat,

@@ -100,6 +100,11 @@ public:
                                       BSONObj* result) = 0;
 
     /**
+     * Checks to see if the named roles exist.
+     */
+    virtual Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) = 0;
+
+    /**
      * Writes into "result" a document describing the named role and returns Status::OK(). If
      * showPrivileges is kOmit or kShowPrivileges, the description includes the roles which the
      * named role is a member of, including those memberships held implicitly through other roles
@@ -173,6 +178,11 @@ public:
 
 protected:
     AuthzManagerExternalState();  // This class should never be instantiated directly.
+
+    /**
+     * Construct a Status about one or more unknown roles.
+     */
+    static Status makeRoleNotFoundStatus(const stdx::unordered_set<RoleName>&);
 };
 
 }  // namespace mongo

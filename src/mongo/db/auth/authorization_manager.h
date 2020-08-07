@@ -214,6 +214,11 @@ public:
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
      */
+    virtual Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) = 0;
+
+    /**
+     * Delegates method call to the underlying AuthzManagerExternalState.
+     */
     virtual Status getRoleDescription(OperationContext* opCtx,
                                       const RoleName& roleName,
                                       PrivilegeFormat privilegeFormat,

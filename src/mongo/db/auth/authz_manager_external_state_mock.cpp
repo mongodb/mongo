@@ -127,6 +127,14 @@ Status AuthzManagerExternalStateMock::findOne(OperationContext* opCtx,
     return Status::OK();
 }
 
+
+bool AuthzManagerExternalStateMock::hasOne(OperationContext* opCtx,
+                                           const NamespaceString& collectionName,
+                                           const BSONObj& query) {
+    BSONObjCollection::iterator iter;
+    return _findOneIter(opCtx, collectionName, query, &iter).isOK();
+}
+
 Status AuthzManagerExternalStateMock::query(
     OperationContext* opCtx,
     const NamespaceString& collectionName,

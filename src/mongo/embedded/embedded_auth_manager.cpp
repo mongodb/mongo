@@ -74,6 +74,10 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
+    Status rolesExist(OperationContext*, const std::vector<RoleName>&) override {
+        UASSERT_NOT_IMPLEMENTED;
+    }
+
     Status getRoleDescription(OperationContext*,
                               const RoleName&,
                               PrivilegeFormat,
