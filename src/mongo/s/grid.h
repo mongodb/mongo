@@ -30,9 +30,9 @@
 #pragma once
 
 #include <functional>
-#include <memory>
 
 #include "mongo/db/repl/optime.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
@@ -47,9 +47,7 @@ class OperationContext;
 class ServiceContext;
 
 namespace executor {
-struct ConnectionPoolStats;
 class NetworkInterface;
-class TaskExecutorPool;
 }  // namespace executor
 
 /**

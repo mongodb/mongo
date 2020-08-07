@@ -242,15 +242,14 @@ private:
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
 
+    // The epoch of the collection being migrated and its UUID, as of the time the migration
+    // started. Values are boost::optional up until the constructor runs, because UUID doesn't have
+    // a default constructor.
+    boost::optional<OID> _collectionEpoch;
+    boost::optional<UUID> _collectionUUID;
+
     // The version of the chunk at the time the migration started.
     ChunkVersion _chunkVersion;
-
-    // The version of the collection at the time migration started.
-    OID _collectionEpoch;
-
-    // The UUID of the the collection whose chunks are being moved. Default to empty if the
-    // collection doesn't have UUID.
-    boost::optional<UUID> _collectionUuid;
 
     // Contains logic for ensuring the donor's and recipient's config.rangeDeletions entries are
     // correctly updated based on whether the migration committed or aborted.

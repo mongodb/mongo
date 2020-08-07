@@ -29,16 +29,14 @@
 
 #pragma once
 
-#include <memory>
 #include <vector>
 
+#include "mongo/executor/connection_pool_stats.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 namespace executor {
-
-struct ConnectionPoolStats;
-class TaskExecutor;
 
 /**
  * Represents a pool of TaskExecutors. Work which requires a TaskExecutor can ask for an executor
