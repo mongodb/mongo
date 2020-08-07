@@ -636,6 +636,13 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             conn_strs.append(self.initial_sync_node.get_internal_connection_string())
         return self.replset_name + "/" + ",".join(conn_strs)
 
+    def get_node_info(self):
+        """Return a list of dicts of NodeInfo objects."""
+        output = []
+        for node in self.nodes:
+            output += node.get_node_info()
+        return output
+
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
         if self.replset_name is None:

@@ -242,6 +242,15 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         """Return the driver connection URL."""
         return "mongodb://" + self.get_internal_connection_string()
 
+    def get_node_info(self):
+        """Return a list of dicts of NodeInfo objects."""
+        output = []
+        for shard in self.shards:
+            output += shard.get_node_info()
+        for mongos in self.mongos:
+            output += mongos.get_node_info()
+        return output + self.configsvr.get_node_info()
+
     def _new_configsvr(self):
         """Return a replicaset.ReplicaSetFixture configured as the config server."""
 
@@ -493,3 +502,8 @@ class _MongoSFixture(interface.Fixture):
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
         return "mongodb://" + self.get_internal_connection_string()
+
+    def get_node_info(self):
+        """Return a list of NodeInfo objects."""
+        info = interface.NodeInfo(name=self.logger.name, port=self.port, pid=self.mongos.pid)
+        return [info]

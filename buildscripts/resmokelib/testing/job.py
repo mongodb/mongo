@@ -3,12 +3,14 @@
 import sys
 import time
 from collections import namedtuple
+from collections import defaultdict
 
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing import testcases
 from buildscripts.resmokelib.testing.hooks import stepdown
 from buildscripts.resmokelib.testing.testcases import fixture as _fixture
+from buildscripts.resmokelib.testing.fixtures.interface import create_fixture_table
 from buildscripts.resmokelib.utils import queue as _queue
 
 
@@ -164,6 +166,7 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
 
         test.configure(self.fixture, config.NUM_CLIENTS_PER_FIXTURE)
         self._run_hooks_before_tests(test)
+        self.report.logging_prefix = create_fixture_table(self.fixture)
 
         test(self.report)
         try:

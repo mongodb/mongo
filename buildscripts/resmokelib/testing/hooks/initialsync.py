@@ -130,6 +130,7 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
 
         self.logger.info("Starting the initial sync node back up again...")
         sync_node.setup()
+        self.logger.info(fixture_interface.create_fixture_table(self.fixture))
         sync_node.await_ready()
 
 

@@ -193,6 +193,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             # Start the 'secondary' mongod back up as part of the replica set and wait for it to
             # reach state SECONDARY.
             secondary.setup()
+            self.logger.info(fixture.create_fixture_table(self.fixture))
             secondary.await_ready()
             self._await_secondary_state(secondary)
 
@@ -208,6 +209,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
         try:
             self.fixture.setup()
+            self.logger.info(fixture.create_fixture_table(self.fixture))
             self.fixture.await_ready()
         finally:
             for (i, node) in enumerate(self.fixture.nodes):
@@ -250,6 +252,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
         self.logger.info("Starting the fixture back up again with no data...")
         self.fixture.setup()
+        self.logger.info(fixture.create_fixture_table(self.fixture))
         self.fixture.await_ready()
 
     def _check_invariants_as_standalone(self, secondary):  # pylint: disable=too-many-locals
@@ -262,6 +265,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
         try:
             secondary.setup()
+            self.logger.info(fixture.create_fixture_table(self.fixture))
             secondary.await_ready()
 
             client = secondary.mongo_client()

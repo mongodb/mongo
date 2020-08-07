@@ -89,7 +89,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self._stepdown_thread = _StepdownThread(
             self.logger, self._mongos_fixtures, self._rs_fixtures, self._stepdown_interval_secs,
             self._terminate, self._kill, lifecycle, self._wait_for_mongos_retarget,
-            self._stepdown_via_heartbeats, self._background_reconfig)
+            self._stepdown_via_heartbeats, self._background_reconfig, self._fixture)
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
@@ -343,7 +343,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs, terminate, kill,
             stepdown_lifecycle, wait_for_mongos_retarget, stepdown_via_heartbeats,
-            background_reconfig):
+            background_reconfig, fixture):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
@@ -361,6 +361,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         self._should_wait_for_mongos_retarget = wait_for_mongos_retarget
         self._stepdown_via_heartbeats = stepdown_via_heartbeats
         self._background_reconfig = background_reconfig
+        self._fixture = fixture
 
         self._last_exec = time.time()
         # Event set when the thread has been stopped using the 'stop()' method.
@@ -585,6 +586,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             primary.preserve_dbpath = True
             try:
                 primary.setup()
+                self.logger.info(fixture_interface.create_fixture_table(self._fixture))
                 primary.await_ready()
             finally:
                 primary.preserve_dbpath = original_preserve_dbpath
