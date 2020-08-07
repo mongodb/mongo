@@ -149,6 +149,14 @@ CatalogCache::CatalogCache(ServiceContext* const service, CatalogCacheLoader& ca
     _executor->startup();
 }
 
+CatalogCache::~CatalogCache() {
+    // The executor is used by the Database and Collection caches,
+    // so it must be joined, before these caches are destroyed,
+    // per the contract of ReadThroughCache.
+    _executor->shutdown();
+    _executor->join();
+}
+
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName) {
     invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked(),

@@ -220,7 +220,7 @@ class CatalogCache {
 
 public:
     CatalogCache(ServiceContext* service, CatalogCacheLoader& cacheLoader);
-    ~CatalogCache() = default;
+    ~CatalogCache();
 
     /**
      * Blocking method that ensures the specified database is in the cache, loading it if necessary,
@@ -569,14 +569,14 @@ private:
 
     std::shared_ptr<ThreadPool> _executor;
 
-    using CollectionInfoMap = StringMap<std::shared_ptr<CollectionRoutingInfoEntry>>;
-    using CollectionsByDbMap = StringMap<CollectionInfoMap>;
 
     DatabaseCache _databaseCache;
 
     // Mutex to serialize access to the collection cache
     mutable Mutex _mutex = MONGO_MAKE_LATCH("CatalogCache::_mutex");
     // Map from full collection name to the routing info for that collection, grouped by database
+    using CollectionInfoMap = StringMap<std::shared_ptr<CollectionRoutingInfoEntry>>;
+    using CollectionsByDbMap = StringMap<CollectionInfoMap>;
     CollectionsByDbMap _collectionsByDb;
 };
 
