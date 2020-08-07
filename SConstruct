@@ -2927,7 +2927,8 @@ def doConfigure(myenv):
             # appropriate build variants in etc/evergreen.yml
             asan_options = "check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1"
             lsan_options = "detect_leaks=1:report_objects=1:suppressions=%s" % myenv.File("#etc/lsan.suppressions").abspath
-            env['ENV']['ASAN_OPTIONS'] = asan_options + ":" + lsan_options
+            env['ENV']['ASAN_OPTIONS'] = asan_options
+            env['ENV']['LSAN_OPTIONS'] = lsan_options
 
         if using_tsan:
 
