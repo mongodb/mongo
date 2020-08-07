@@ -86,7 +86,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
 SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext,
                                                   const NamespaceString nss,
                                                   bool runRecover) {
-    return ExecutorFuture<void>(migrationutil::getMigrationUtilExecutor())
+    return ExecutorFuture<void>(Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor())
         .then([=] {
             ThreadClient tc("RecoverRefreshThread", serviceContext);
             {
@@ -153,9 +153,6 @@ void onShardVersionMismatch(OperationContext* opCtx,
         std::shared_ptr<Notification<void>> critSecSignal;
         boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
 
-        // Flag set to true if a recovery needs to be eventually performed
-        bool runRecover;
-
         // Flag indicating wether the current thread has triggered a recover/refresh
         bool triggeredRecoverRefresh = false;
 
@@ -186,7 +183,8 @@ void onShardVersionMismatch(OperationContext* opCtx,
                     }
                 }
 
-                runRecover = collDesc ? false : true;
+                // If the shard doesn't yet know its filtering metadata, recovery needs to be run
+                const bool runRecover = collDesc ? false : true;
 
                 // If the critical section is not busy and no recover/refresh is ongoing,
                 // initialize the RecoverRefreshThread thread and associate it to the CSR.
@@ -240,14 +238,17 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
                                            Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
 
             auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
+
             inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(_opCtx);
             critSecSignal =
                 csr->getCriticalSectionSignal(_opCtx, ShardingMigrationCriticalSection::kWrite);
+
             if (!inRecoverOrRefresh && !critSecSignal) {
                 auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
                 inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(_opCtx);
                 critSecSignal =
                     csr->getCriticalSectionSignal(_opCtx, ShardingMigrationCriticalSection::kWrite);
+
                 if (!inRecoverOrRefresh && !critSecSignal) {
                     CollectionShardingRuntime::get(_opCtx, _nss)
                         ->enterCriticalSectionCatchUpPhase(csrLock);
