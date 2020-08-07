@@ -570,32 +570,21 @@ TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeRunQ
 }
 
 TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownAfterRunQueryScheduled) {
-    // Tests shutting down after _runQuery is scheduled (but not while blocked on the network).
+    // Tests shutting down after _runQuery is scheduled.
 
     ShutdownState shutdownState;
-
-    auto waitForCallbackScheduledFailPoint =
-        globalFailPointRegistry().find("hangAfterOplogFetcherCallbackScheduled");
-    auto timesEnteredFailPoint = waitForCallbackScheduledFailPoint->setMode(FailPoint::alwaysOn, 0);
 
     // This will also ensure that _runQuery was scheduled before returning.
     auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
 
-    waitForCallbackScheduledFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
-
-    // Only call shutdown once we have confirmed that the callback is paused at the fail point.
     oplogFetcher->shutdown();
-
-    // Unpause the oplog fetcher.
-    waitForCallbackScheduledFailPoint->setMode(FailPoint::off);
 
     oplogFetcher->join();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
 }
 
-TEST_F(OplogFetcherTest,
-       OplogFetcherReturnsHostUnreachableIfShutdownAfterRunQueryScheduledWhileBlockedOnCall) {
+TEST_F(OplogFetcherTest, OplogFetcherShutsDownConnectionIfShutdownWhileBlockedOnCall) {
     // Tests that shutting down while the connection is blocked on call successfully shuts down the
     // connection as well.
 
@@ -614,8 +603,10 @@ TEST_F(OplogFetcherTest,
 
     oplogFetcher->join();
 
-    // This is the error that the connection throws if shutdown while blocked on the network.
-    ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState.getStatus());
+    // This is the error message that the connection throws if shutdown while blocked on the
+    // network.
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
+    ASSERT_STRING_CONTAINS(shutdownState.getStatus().reason(), "Socket was shut down");
 }
 
 TEST_F(OplogFetcherTest,
@@ -1513,7 +1504,7 @@ TEST_F(OplogFetcherTest, OplogFetcherShouldExcludeFirstDocumentInFirstBatchWhenE
     ASSERT_EQUALS(unittest::assertGet(OpTime::parseFromOplogEntry(thirdEntry)),
                   lastEnqueuedDocumentsInfo.lastDocument);
 
-    ASSERT_EQUALS(ErrorCodes::HostUnreachable, shutdownState->getStatus());
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState->getStatus());
 }
 
 TEST_F(OplogFetcherTest,
