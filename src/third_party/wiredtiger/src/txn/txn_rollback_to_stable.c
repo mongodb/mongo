@@ -169,7 +169,7 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
     uint8_t type;
     int cmp;
     char ts_string[4][WT_TS_INT_STRING_SIZE];
-    bool is_owner, valid_update_found;
+    bool valid_update_found;
 #ifdef HAVE_DIAGNOSTIC
     bool first_record;
 #endif
@@ -180,7 +180,7 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
     hs_btree_id = S2BT(session)->id;
     session_flags = 0;
     WT_CLEAR(full_value);
-    is_owner = valid_update_found = false;
+    valid_update_found = false;
 #ifdef HAVE_DIAGNOSTIC
     first_record = true;
 #endif
@@ -200,7 +200,7 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
     newer_hs_durable_ts = unpack->tw.durable_start_ts;
 
     /* Open a history store table cursor. */
-    WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
+    WT_ERR(__wt_hs_cursor_open(session, &session_flags));
     hs_cursor = session->hs_cursor;
     cbt = (WT_CURSOR_BTREE *)hs_cursor;
 
@@ -395,7 +395,7 @@ err:
     __wt_scr_free(session, &hs_value);
     __wt_scr_free(session, &key);
     __wt_buf_free(session, &full_value);
-    WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
+    WT_TRET(__wt_hs_cursor_close(session, session_flags));
     return (ret);
 }
 
@@ -990,18 +990,16 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
     uint32_t hs_btree_id, session_flags;
     int exact;
     char ts_string[WT_TS_INT_STRING_SIZE];
-    bool is_owner;
 
     hs_cursor = NULL;
     WT_CLEAR(key);
     hs_upd = NULL;
     session_flags = 0;
-    is_owner = false;
 
     WT_RET(__wt_scr_alloc(session, 0, &hs_key));
 
     /* Open a history store table cursor. */
-    WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
+    WT_ERR(__wt_hs_cursor_open(session, &session_flags));
     hs_cursor = session->hs_cursor;
     cbt = (WT_CURSOR_BTREE *)hs_cursor;
 
@@ -1050,7 +1048,7 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
 err:
     __wt_scr_free(session, &hs_key);
     __wt_free(session, hs_upd);
-    WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
+    WT_TRET(__wt_hs_cursor_close(session, session_flags));
 
     return (ret);
 }

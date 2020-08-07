@@ -15,8 +15,8 @@ static const char *const __stats_dsrc_desc[] = {
   "block-manager: file bytes available for reuse", "block-manager: file magic number",
   "block-manager: file major version number", "block-manager: file size in bytes",
   "block-manager: minor version number", "btree: btree checkpoint generation",
-  "btree: column-store fixed-size leaf pages", "btree: column-store internal pages",
-  "btree: column-store variable-size RLE encoded values",
+  "btree: btree clean tree checkpoint expiration time", "btree: column-store fixed-size leaf pages",
+  "btree: column-store internal pages", "btree: column-store variable-size RLE encoded values",
   "btree: column-store variable-size deleted values",
   "btree: column-store variable-size leaf pages", "btree: fixed-record size",
   "btree: maximum internal page key size", "btree: maximum internal page size",
@@ -186,6 +186,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->block_size = 0;
     stats->block_minor = 0;
     /* not clearing btree_checkpoint_generation */
+    /* not clearing btree_clean_checkpoint_timer */
     stats->btree_column_fix = 0;
     stats->btree_column_internal = 0;
     stats->btree_column_rle = 0;
@@ -387,6 +388,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     if (from->block_minor > to->block_minor)
         to->block_minor = from->block_minor;
     to->btree_checkpoint_generation += from->btree_checkpoint_generation;
+    to->btree_clean_checkpoint_timer += from->btree_clean_checkpoint_timer;
     to->btree_column_fix += from->btree_column_fix;
     to->btree_column_internal += from->btree_column_internal;
     to->btree_column_rle += from->btree_column_rle;
@@ -589,6 +591,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     if ((v = WT_STAT_READ(from, block_minor)) > to->block_minor)
         to->block_minor = v;
     to->btree_checkpoint_generation += WT_STAT_READ(from, btree_checkpoint_generation);
+    to->btree_clean_checkpoint_timer += WT_STAT_READ(from, btree_clean_checkpoint_timer);
     to->btree_column_fix += WT_STAT_READ(from, btree_column_fix);
     to->btree_column_internal += WT_STAT_READ(from, btree_column_internal);
     to->btree_column_rle += WT_STAT_READ(from, btree_column_rle);

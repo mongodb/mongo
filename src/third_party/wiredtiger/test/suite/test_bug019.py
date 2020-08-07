@@ -37,6 +37,7 @@ class test_bug019(wttest.WiredTigerTestCase):
     conn_config = 'log=(enabled,file_max=100K),statistics=(fast)'
     uri = "table:bug019"
     entries = 5000
+    max_initial_entries = 50000
     max_prealloc = 1
 
     # Modify rows so we write log records. We're writing a lot more than a
@@ -51,15 +52,20 @@ class test_bug019(wttest.WiredTigerTestCase):
     def populate(self, nentries):
         c = self.session.open_cursor(self.uri, None, None)
         for i in range(0, nentries):
-            # Make the values about 200 bytes. That's about 1MB of data for
-            # 5000 records, generating 10 log files used plus more for overhead.
-            c[i] = "abcde" * 40
-            if i % 500 == 0:
+            # Make the values about 2000 bytes. When called with 5000 records
+            # that's about 10MB of data, generating 100 log files used plus more for overhead.
+            # Typically the huge traffic causes the preallocation statistic to
+            # increase.  We'll quit when it does, as that's our goal here.
+            # For the initial populate, we'll insert up to 10x as many records,
+            # so up to 1000 log files.
+            c[i] = "abcde" * 400
+            if i % 50 == 0:
                 prealloc = self.get_prealloc_stat()
                 if prealloc > self.max_prealloc:
-                    self.pr("Updating max_prealloc from " + str(self.max_prealloc))
-                    self.pr("    to new prealloc " + str(prealloc))
+                    self.pr("Updating max_prealloc from {} to {} after {} inserts".
+                            format(self.max_prealloc, prealloc, i))
                     self.max_prealloc = prealloc
+                    break
         c.close()
 
     # Wait for a log file to be pre-allocated. Avoid timing problems, but
@@ -75,10 +81,14 @@ class test_bug019(wttest.WiredTigerTestCase):
     # There was a bug where pre-allocated log files accumulated on
     # Windows systems due to an issue with the directory list code.
     def test_bug019(self):
-        # Create a table just to write something into the log.
-        self.session.create(self.uri, 'key_format=i,value_format=S')
         start_prealloc = self.get_prealloc_stat()
-        self.populate(self.entries)
+        self.max_prealloc = start_prealloc
+
+        # Populate a new table to generate log traffic.  This typically
+        # increase the max number of log files preallocated, as indicated by
+        # the statistic.
+        self.session.create(self.uri, 'key_format=i,value_format=S')
+        self.populate(self.max_initial_entries)
         self.session.checkpoint()
         if self.max_prealloc <= start_prealloc:
             self.pr("FAILURE: max_prealloc " + str(self.max_prealloc))

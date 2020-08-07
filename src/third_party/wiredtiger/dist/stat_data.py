@@ -728,6 +728,7 @@ dsrc_stats = [
     # Btree statistics
     ##########################################
     BtreeStat('btree_checkpoint_generation', 'btree checkpoint generation', 'no_clear,no_scale'),
+    BtreeStat('btree_clean_checkpoint_timer', 'btree clean tree checkpoint expiration time', 'no_clear,no_scale'),
     BtreeStat('btree_column_deleted', 'column-store variable-size deleted values', 'no_scale,tree_walk'),
     BtreeStat('btree_column_fix', 'column-store fixed-size leaf pages', 'no_scale,tree_walk'),
     BtreeStat('btree_column_internal', 'column-store internal pages', 'no_scale,tree_walk'),

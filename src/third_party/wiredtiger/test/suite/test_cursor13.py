@@ -65,16 +65,18 @@ class test_cursor13_base(wttest.WiredTigerTestCase):
         if expect_change:
             self.assertGreater(stats[0], self.stat_cursor_cache)
             self.stat_cursor_cache = stats[0]
-        else:
-            self.assertEqual(stats[0], self.stat_cursor_cache)
+        # Stats may change due to background operations in history store cursor
+        #else:
+        #    self.assertEqual(stats[0], self.stat_cursor_cache)
 
     def assert_cursor_reopened(self, expect_change):
         stats = self.caching_stats()
         if expect_change:
             self.assertGreater(stats[1], self.stat_cursor_reopen)
             self.stat_cursor_reopen = stats[1]
-        else:
-            self.assertEqual(stats[1], self.stat_cursor_reopen)
+        # Stats may change due to background operations in history store cursor
+        #else:
+        #    self.assertEqual(stats[1], self.stat_cursor_reopen)
 
     def cursor_stats_init(self):
         stats = self.caching_stats()
@@ -447,8 +449,11 @@ class test_cursor13_big(test_cursor13_big_base):
         #self.tty('opens = ' + str(self.opencount) + \
         #         ', closes = ' + str(self.closecount))
         #self.tty('stats after = ' + str(end_stats))
-        self.assertEquals(end_stats[0] - begin_stats[0], self.closecount)
-        self.assertEquals(end_stats[1] - begin_stats[1], self.opencount)
+
+        # Stats won't be exact because they may include operations triggered by other
+        # threads (e.g., eviction) opening and closing history store cursors.
+        self.assertGreaterEqual(end_stats[0] - begin_stats[0], self.closecount)
+        self.assertGreaterEqual(end_stats[1] - begin_stats[1], self.opencount)
 
 class test_cursor13_sweep(test_cursor13_big_base):
     # Set dhandle sweep configuration so that dhandles should be closed within
@@ -507,7 +512,7 @@ class test_cursor13_sweep(test_cursor13_big_base):
         #         ', closes = ' + str(self.closecount))
         #self.tty('stats after = ' + str(end_stats))
         #self.tty('sweep stats after = ' + str(end_sweep_stats))
-        self.assertEquals(end_stats[0] - begin_stats[0], self.closecount)
+        self.assertGreaterEqual(end_stats[0] - begin_stats[0], self.closecount)
         swept = end_sweep_stats[3] - begin_sweep_stats[3]
 
         # Although this is subject to tuning parameters, we know that

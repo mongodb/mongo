@@ -755,13 +755,11 @@ extern int __wt_hs_config(WT_SESSION_IMPL *session, const char **cfg)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_create(WT_SESSION_IMPL *session, const char **cfg)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_hs_cursor(WT_SESSION_IMPL *session, uint32_t *session_flags, bool *is_owner)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_hs_cursor_close(WT_SESSION_IMPL *session, uint32_t session_flags, bool is_owner)
+extern int __wt_hs_cursor_close(WT_SESSION_IMPL *session, uint32_t session_flags)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_cursor_next(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_hs_cursor_open(WT_SESSION_IMPL *session)
+extern int __wt_hs_cursor_open(WT_SESSION_IMPL *session, uint32_t *session_flags)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_hs_cursor_position(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t btree_id,
   const WT_ITEM *key, wt_timestamp_t timestamp, WT_ITEM *user_srch_key)

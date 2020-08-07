@@ -96,7 +96,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     WT_PAGE *page;
     uint64_t time_start, time_stop;
     uint32_t session_flags;
-    bool clean_page, closing, force_evict_hs, inmem_split, is_owner, local_gen, tree_dead;
+    bool clean_page, closing, force_evict_hs, inmem_split, local_gen, tree_dead;
 
     conn = S2C(session);
     page = ref->page;
@@ -134,8 +134,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
       session->hs_cursor == NULL && !F_ISSET(session, WT_SESSION_NO_RECONCILE) &&
       session != conn->default_session) {
         session_flags = 0; /* [-Werror=maybe-uninitialized] */
-        WT_RET(__wt_hs_cursor(session, &session_flags, &is_owner));
-        WT_RET(__wt_hs_cursor_close(session, session_flags, is_owner));
+        WT_RET(__wt_hs_cursor_open(session, &session_flags));
+        WT_RET(__wt_hs_cursor_close(session, session_flags));
     }
 
     /*

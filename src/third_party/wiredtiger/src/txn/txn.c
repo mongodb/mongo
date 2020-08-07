@@ -915,13 +915,13 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     WT_UPDATE *fix_upd, *tombstone, *upd;
     size_t not_used;
     uint32_t hs_btree_id, session_flags;
-    bool is_owner, upd_appended;
+    bool upd_appended;
 
     hs_cursor = NULL;
     txn = session->txn;
     fix_upd = tombstone = NULL;
     session_flags = 0;
-    is_owner = upd_appended = false;
+    upd_appended = false;
 
     WT_RET(__txn_search_prepared_op(session, op, cursorp, &upd));
 
@@ -953,9 +953,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         cbt = (WT_CURSOR_BTREE *)(*cursorp);
         hs_btree_id = S2BT(session)->id;
         /* Open a history store table cursor. */
-        WT_ERR(__wt_hs_cursor(session, &session_flags, &is_owner));
-        /* We must be the owner of the history store cursor. */
-        WT_ASSERT(session, is_owner);
+        WT_ERR(__wt_hs_cursor_open(session, &session_flags));
         hs_cursor = session->hs_cursor;
 
         /*
@@ -1045,7 +1043,8 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         WT_ERR(__txn_fixup_prepared_update(session, hs_cursor, fix_upd, commit));
 
 err:
-    WT_TRET(__wt_hs_cursor_close(session, session_flags, is_owner));
+    if (hs_cursor != NULL)
+        WT_TRET(__wt_hs_cursor_close(session, session_flags));
     if (!upd_appended)
         __wt_free(session, fix_upd);
     __wt_free(session, tombstone);
