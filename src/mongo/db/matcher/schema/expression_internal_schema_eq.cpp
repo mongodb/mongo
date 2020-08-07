@@ -39,11 +39,13 @@ namespace mongo {
 
 constexpr StringData InternalSchemaEqMatchExpression::kName;
 
-InternalSchemaEqMatchExpression::InternalSchemaEqMatchExpression(StringData path, BSONElement rhs)
+InternalSchemaEqMatchExpression::InternalSchemaEqMatchExpression(
+    StringData path, BSONElement rhs, clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_EQ,
                           path,
                           ElementPath::LeafArrayBehavior::kNoTraversal,
-                          ElementPath::NonLeafArrayBehavior::kTraverse),
+                          ElementPath::NonLeafArrayBehavior::kTraverse,
+                          std::move(annotation)),
       _rhsElem(rhs) {
     invariant(_rhsElem);
 }
@@ -83,7 +85,8 @@ bool InternalSchemaEqMatchExpression::equivalent(const MatchExpression* other) c
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaEqMatchExpression::shallowClone() const {
-    auto clone = std::make_unique<InternalSchemaEqMatchExpression>(path(), _rhsElem);
+    auto clone =
+        std::make_unique<InternalSchemaEqMatchExpression>(path(), _rhsElem, _errorAnnotation);
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }

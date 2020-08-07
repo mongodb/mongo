@@ -71,7 +71,8 @@ bool InternalSchemaRootDocEqMatchExpression::equivalent(const MatchExpression* o
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaRootDocEqMatchExpression::shallowClone() const {
-    auto clone = std::make_unique<InternalSchemaRootDocEqMatchExpression>(_rhsObj.copy());
+    auto clone =
+        std::make_unique<InternalSchemaRootDocEqMatchExpression>(_rhsObj.copy(), _errorAnnotation);
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }

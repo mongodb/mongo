@@ -538,7 +538,7 @@ TEST(LogicalMatchExpression, BasicNor) {
     BSONObj expectedError =
         BSON("operatorName"
              << "$nor"
-             << "clausesNotSatisfied"
+             << "clausesSatisfied"
              << BSON_ARRAY(BSON("index" << 1 << "details"
                                         << BSON("operatorName"
                                                 << "$lt"
@@ -556,7 +556,7 @@ TEST(LogicalMatchExpression, NorAllSuccessfulClauses) {
     BSONObj expectedError = BSON(
         "operatorName"
         << "$nor"
-        << "clausesNotSatisfied"
+        << "clausesSatisfied"
         << BSON_ARRAY(BSON("index" << 0 << "details"
                                    << BSON("operatorName"
                                            << "$lt"
@@ -599,7 +599,7 @@ TEST(LogicalMatchExpression, NotOverImplicitAnd) {
              << "details"
              << BSON("operatorName"
                      << "$and"
-                     << "clausesNotSatisfied"
+                     << "clausesSatisfied"
                      << BSON_ARRAY(
                             BSON("index" << 0 << "details"
                                          << BSON("operatorName"
@@ -703,7 +703,7 @@ TEST(LogicalMatchExpression, NestedAndOrNorOneSuccessfulClause) {
         "'clausesNotSatisfied': ["
         "   {'index': 1, 'details': "
         "   {'operatorName': '$nor',"
-        "   'clausesNotSatisfied': ["
+        "   'clausesSatisfied': ["
         "       {'index': 1, 'details':"
         "           {'operatorName': '$lt',"
         "           'specifiedAs': {'qty': {'$lt': 20}},"
@@ -726,7 +726,7 @@ TEST(LogicalMatchExpression, NestedAndOrNorNotOneFailingClause) {
         "'clausesNotSatisfied': ["
         "   {'index': 1, 'details': "
         "   {'operatorName': '$nor',"
-        "   'clausesNotSatisfied': ["
+        "   'clausesSatisfied': ["
         "       {'index': 1, 'details':"
         "           {'operatorName': '$not',"
         "            'details':             "
@@ -844,7 +844,7 @@ TEST(MiscellaneousMatchExpression, NorExpr) {
     BSONObj document = BSON("a" << 1 << "b" << 1);
     BSONObj expectedError = BSON("operatorName"
                                  << "$nor"
-                                 << "clausesNotSatisfied"
+                                 << "clausesSatisfied"
                                  << BSON_ARRAY(BSON(
                                         "index" << 0 << "details"
                                                 << BSON("operatorName"

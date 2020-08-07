@@ -49,6 +49,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_str_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 
 namespace mongo::doc_validation_error {
 namespace {
@@ -84,10 +85,13 @@ struct ValidationErrorFrame {
         // nodes when generating an error. For instance, when generating an error for an AND in a
         // normal context, we need to discern which of its clauses failed.
         kErrorNeedChildrenInfo,
+        // This node contributes to error generation, but none of its children will contribute to
+        // the error output.
+        kErrorIgnoreChildren,
     };
 
-    ValidationErrorFrame(RuntimeState runtimeState, BSONObj currentDoc)
-        : runtimeState(runtimeState), currentDoc(std::move(currentDoc)) {}
+    ValidationErrorFrame(RuntimeState runtimeState, BSONObj currentDoc, InvertError inversion)
+        : runtimeState(runtimeState), currentDoc(std::move(currentDoc)), inversion(inversion) {}
 
     // BSONBuilders which construct the generated error.
     BSONObjBuilder objBuilder;
@@ -98,6 +102,8 @@ struct ValidationErrorFrame {
     RuntimeState runtimeState;
     // Tracks the current subdocument that an error should be generated over.
     BSONObj currentDoc;
+    // Tracks whether the generated error should be described normally or in an inverted context.
+    InvertError inversion;
 };
 
 using RuntimeState = ValidationErrorFrame::RuntimeState;
@@ -113,35 +119,39 @@ struct ValidationErrorContext {
      */
     void pushNewFrame(const MatchExpression& expr, const BSONObj& subDoc) {
         // Clear the last error that was generated.
-        latestCompleteError = BSONObj();
+        latestCompleteError = std::monostate();
 
         // If this is the first frame, then we know that we've failed validation, so we must be
         // generating an error.
         if (frames.empty()) {
-            frames.emplace(RuntimeState::kError, subDoc);
+            frames.emplace(RuntimeState::kError, subDoc, InvertError::kNormal);
             return;
         }
 
         auto parentRuntimeState = getCurrentRuntimeState();
+        auto inversion = getCurrentInversion();
 
         // If we've determined at runtime or at parse time that this node shouldn't contribute to
         // error generation, then push a frame indicating that this node should not produce an
         // error and return.
         if (parentRuntimeState == RuntimeState::kNoError ||
+            parentRuntimeState == RuntimeState::kErrorIgnoreChildren ||
             expr.getErrorAnnotation()->mode == AnnotationMode::kIgnore) {
-            frames.emplace(RuntimeState::kNoError, subDoc);
+            frames.emplace(RuntimeState::kNoError, subDoc, inversion);
             return;
         }
+
         // If our parent needs more information, call 'matches()' to determine whether we are
         // contributing to error output.
         if (parentRuntimeState == RuntimeState::kErrorNeedChildrenInfo) {
             bool generateErrorValue = expr.matchesBSON(subDoc) ? inversion == InvertError::kInverted
                                                                : inversion == InvertError::kNormal;
             frames.emplace(generateErrorValue ? RuntimeState::kError : RuntimeState::kNoError,
-                           subDoc);
+                           subDoc,
+                           inversion);
             return;
         }
-        frames.emplace(RuntimeState::kError, subDoc);
+        frames.emplace(RuntimeState::kError, subDoc, inversion);
     }
     void popFrame() {
         invariant(!frames.empty());
@@ -186,8 +196,43 @@ struct ValidationErrorContext {
         }
         return rootDoc;
     }
-    BSONObj getLatestCompleteError() const {
-        return latestCompleteError;
+    InvertError getCurrentInversion() const {
+        invariant(!frames.empty());
+        return frames.top().inversion;
+    }
+    void setCurrentInversion(InvertError inversion) {
+        invariant(!frames.empty());
+        frames.top().inversion = inversion;
+    }
+
+    bool haveLatestCompleteError() {
+        return !std::holds_alternative<std::monostate>(latestCompleteError);
+    }
+
+    /**
+     * Appends the latest complete error to 'builder'.
+     */
+    void appendLatestCompleteError(BSONObjBuilder* builder) {
+        std::visit(
+            visit_helper::Overloaded{
+                [&](const auto& details) -> void { builder->append("details", details); },
+                [&](const std::monostate& arr) -> void { MONGO_UNREACHABLE }},
+            latestCompleteError);
+    }
+
+    /**
+     * Returns the latest complete error generated as an object. Should only be called when the
+     * caller expects an object.
+     */
+    BSONObj getLatestCompleteErrorObject() const {
+        return std::get<BSONObj>(latestCompleteError);
+    }
+
+    /**
+     * Returns whether 'expr' will produce an array as an error.
+     */
+    bool producesArray(const MatchExpression& expr) {
+        return expr.getErrorAnnotation()->operatorName == "_internalSubschema";
     }
 
     /**
@@ -196,7 +241,11 @@ struct ValidationErrorContext {
      */
     void finishCurrentError(const MatchExpression* expr) {
         if (shouldGenerateError(*expr)) {
-            latestCompleteError = getCurrentObjBuilder().obj();
+            if (producesArray(*expr)) {
+                latestCompleteError = getCurrentArrayBuilder().arr();
+            } else {
+                latestCompleteError = getCurrentObjBuilder().obj();
+            }
         }
         popFrame();
     }
@@ -205,8 +254,8 @@ struct ValidationErrorContext {
      * Sets 'inversion' to the opposite of its current value.
      */
     void flipInversion() {
-        inversion =
-            inversion == InvertError::kNormal ? InvertError::kInverted : InvertError::kNormal;
+        getCurrentInversion() == InvertError::kNormal ? setCurrentInversion(InvertError::kInverted)
+                                                      : setCurrentInversion(InvertError::kNormal);
     }
 
     /**
@@ -221,12 +270,18 @@ struct ValidationErrorContext {
     // to generate an error for one node. As such, each node must call 'pushNewFrame' as part of
     // its pre-visit and 'popFrame' as part of its post-visit.
     std::stack<ValidationErrorFrame> frames;
-    // Tracks the most recently completed error. The final error will be stored here.
-    BSONObj latestCompleteError;
+    // Tracks the most recently completed error. The error can be one of three types:
+    // - std::monostate indicates that no error was produced.
+    // - BSONArray indicates multiple errors produced by an expression which does not correspond
+    // to a user-facing operator. For example, consider the subschema {minimum: 2, multipleOf: 2}.
+    // Both schema operators can fail and produce errors, but the schema that they belong to
+    // doesn't correspond to an operator that the user specified. As such, the errors are stored
+    // in an array and passed to the parent expression.
+    // - Finally, BSONObj indicates the most common case of an error: a detailed object which
+    // describes the reasons for failure. The final error will be of this type.
+    std::variant<std::monostate, BSONObj, BSONArray> latestCompleteError = std::monostate();
     // Document which failed to match against the collection's validator.
     const BSONObj& rootDoc;
-    // Tracks whether the generated error should be described normally or in an inverted context.
-    InvertError inversion = InvertError::kNormal;
 };
 
 /**
@@ -235,19 +290,23 @@ struct ValidationErrorContext {
  */
 void finishLogicalOperatorChildError(const ListOfMatchExpression* expr,
                                      ValidationErrorContext* ctx) {
-    BSONObj childError = ctx->latestCompleteError;
-    if (!childError.isEmpty() && ctx->shouldGenerateError(*expr)) {
+    if (ctx->shouldGenerateError(*expr) &&
+        ctx->getCurrentRuntimeState() != RuntimeState::kErrorIgnoreChildren) {
         auto operatorName = expr->getErrorAnnotation()->operatorName;
-
-        // Only provide the indexes of non-matching clauses for explicit $and/$or/$nor in the
+        // Only provide the indexes of non-matching clauses for certain named operators in the
         // user's query.
-        if (operatorName == "$and" || operatorName == "$or" || operatorName == "$nor") {
-            BSONObjBuilder subBuilder = ctx->getCurrentArrayBuilder().subobjStart();
-            subBuilder.appendNumber("index", ctx->getCurrentChildIndex());
-            subBuilder.append("details", childError);
-            subBuilder.done();
-        } else {
-            ctx->getCurrentArrayBuilder().append(childError);
+        static const stdx::unordered_set<std::string> operatorsWithOrderedClauses = {
+            "$and", "$or", "$nor", "allOf", "anyOf", "oneOf"};
+        if (ctx->haveLatestCompleteError()) {
+            if (operatorsWithOrderedClauses.find(operatorName) !=
+                operatorsWithOrderedClauses.end()) {
+                BSONObjBuilder subBuilder = ctx->getCurrentArrayBuilder().subobjStart();
+                subBuilder.appendNumber("index", ctx->getCurrentChildIndex());
+                ctx->appendLatestCompleteError(&subBuilder);
+                subBuilder.done();
+            } else {
+                ctx->getCurrentArrayBuilder().append(ctx->getLatestCompleteErrorObject());
+            }
         }
     }
     ctx->incrementCurrentChildIndex();
@@ -267,14 +326,25 @@ public:
     }
     void visit(const AndMatchExpression* expr) final {
         // $all is treated as a leaf operator.
-        if (expr->getErrorAnnotation()->operatorName == "$all") {
-            processAll(*expr);
+        auto operatorName = expr->getErrorAnnotation()->operatorName;
+        if (operatorName == "$all") {
+            static constexpr auto kNormalReason = "array did not contain all specified values";
+            static constexpr auto kInvertedReason = "array did contain all specified values";
+            generateLogicalLeafError(*expr, kNormalReason, kInvertedReason);
         } else {
             preVisitTreeOperator(expr);
             // An AND needs its children to call 'matches' in a normal context to discern which
             // clauses failed.
-            if (_context->inversion == InvertError::kNormal) {
+            if (_context->getCurrentInversion() == InvertError::kNormal) {
                 _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
+            }
+            // If this is the root of a $jsonSchema and we're in an inverted context, do not attempt
+            // to provide a detailed error.
+            if (operatorName == "$jsonSchema" &&
+                _context->getCurrentInversion() == InvertError::kInverted) {
+                _context->setCurrentRuntimeState(RuntimeState::kErrorIgnoreChildren);
+                static constexpr auto kInvertedReason = "schema matched";
+                appendErrorReason("", kInvertedReason);
             }
         }
     }
@@ -300,25 +370,26 @@ public:
         generateComparisonError(expr);
     }
     void visit(const ExistsMatchExpression* expr) final {
-        static constexpr auto normalReason = "path does not exist";
-        static constexpr auto invertedReason = "path does exist";
+        static constexpr auto kNormalReason = "path does not exist";
+        static constexpr auto kInvertedReason = "path does exist";
         _context->pushNewFrame(*expr, _context->getCurrentDocument());
         if (_context->shouldGenerateError(*expr)) {
             appendErrorDetails(*expr);
-            appendErrorReason(*expr, normalReason, invertedReason);
+            appendErrorReason(kNormalReason, kInvertedReason);
         }
     }
     void visit(const ExprMatchExpression* expr) final {
-        static constexpr auto normalReason = "$expr did not match";
-        static constexpr auto invertedReason = "$expr did match";
+        static constexpr auto kNormalReason = "$expr did not match";
+        static constexpr auto kInvertedReason = "$expr did match";
         _context->pushNewFrame(*expr, _context->getCurrentDocument());
         if (_context->shouldGenerateError(*expr)) {
             appendErrorDetails(*expr);
-            appendErrorReason(*expr, normalReason, invertedReason);
+            appendErrorReason(kNormalReason, kInvertedReason);
             BSONObjBuilder& bob = _context->getCurrentObjBuilder();
             // Append the result of $expr's aggregate expression. The result of the
             // aggregate expression can be determined from the current inversion.
-            bob.append("expressionResult", _context->inversion == InvertError::kInverted);
+            bob.append("expressionResult",
+                       _context->getCurrentInversion() == InvertError::kInverted);
         }
     }
     void visit(const GTEMatchExpression* expr) final {
@@ -362,6 +433,8 @@ public:
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
         static constexpr auto kNormalReason = "encrypted value has wrong type";
+        // This node will never generate an error in the inverted case.
+        static constexpr auto kInvertedReason = "";
         _context->pushNewFrame(*expr, _context->getCurrentDocument());
         if (_context->shouldGenerateError(*expr)) {
             ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
@@ -373,10 +446,10 @@ public:
             // encrypted, in the inverted case, this node's sibling expression will generate an
             // appropriate error.
             if (elem.type() == BSONType::BinData && elem.binDataType() == BinDataType::Encrypt &&
-                _context->inversion == InvertError::kNormal) {
+                _context->getCurrentInversion() == InvertError::kNormal) {
                 auto& builder = _context->getCurrentObjBuilder();
                 appendOperatorName(*expr->getErrorAnnotation(), &builder);
-                builder.append("reason", kNormalReason);
+                appendErrorReason(kNormalReason, kInvertedReason);
             } else {
                 _context->setCurrentRuntimeState(RuntimeState::kNoError);
             }
@@ -389,7 +462,7 @@ public:
         if (_context->shouldGenerateError(*expr)) {
             auto& builder = _context->getCurrentObjBuilder();
             appendOperatorName(*expr->getErrorAnnotation(), &builder);
-            appendErrorReason(*expr, kNormalReason, kInvertedReason);
+            appendErrorReason(kNormalReason, kInvertedReason);
         }
     }
     void visit(const InternalSchemaCondMatchExpression* expr) final {}
@@ -456,7 +529,34 @@ public:
         generateTypeError(expr, LeafArrayBehavior::kNoTraversal);
     }
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {}
-    void visit(const InternalSchemaXorMatchExpression* expr) final {}
+    void visit(const InternalSchemaXorMatchExpression* expr) final {
+        preVisitTreeOperator(expr);
+        _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
+        if (_context->shouldGenerateError(*expr)) {
+            auto currentDoc = _context->getCurrentDocument();
+
+            // If 'oneOf' has more than one matching subschema, then the generated error should
+            // be in terms of the subschemas which matched, not the ones which failed to match.
+            std::vector<int> matchingClauses;
+            for (size_t childIndex = 0; childIndex < expr->numChildren(); ++childIndex) {
+                auto child = expr->getChild(childIndex);
+                if (child->matchesBSON(currentDoc)) {
+                    matchingClauses.push_back(childIndex);
+                }
+            }
+            if (!matchingClauses.empty()) {
+                _context->flipInversion();
+                _context->setCurrentRuntimeState(RuntimeState::kErrorIgnoreChildren);
+                auto& builder = _context->getCurrentObjBuilder();
+                // We only report the matching schema reason in an inverted context, so there is
+                // no need for a reason string in the normal case.
+                static constexpr auto kNormalReason = "";
+                static constexpr auto kInvertedReason = "more than one subschema matched";
+                appendErrorReason(kNormalReason, kInvertedReason);
+                builder.append("matchingSchemaIndexes", matchingClauses);
+            }
+        }
+    }
     void visit(const LTEMatchExpression* expr) final {
         generateComparisonError(expr);
     }
@@ -476,7 +576,7 @@ public:
         preVisitTreeOperator(expr);
         // A NOR needs its children to call 'matches' in a normal context to discern which
         // clauses matched.
-        if (_context->inversion == InvertError::kNormal) {
+        if (_context->getCurrentInversion() == InvertError::kNormal) {
             _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
         }
         _context->flipInversion();
@@ -484,13 +584,28 @@ public:
     void visit(const NotMatchExpression* expr) final {
         preVisitTreeOperator(expr);
         _context->flipInversion();
+        // If this is a $jsonSchema not, then expr's children will not contribute to the error
+        // output.
+        if (_context->shouldGenerateError(*expr) &&
+            expr->getErrorAnnotation()->operatorName == "not") {
+            static constexpr auto kInvertedReason = "child expression matched";
+            appendErrorReason("", kInvertedReason);
+            _context->setCurrentRuntimeState(RuntimeState::kErrorIgnoreChildren);
+        }
     }
     void visit(const OrMatchExpression* expr) final {
-        preVisitTreeOperator(expr);
-        // An OR needs its children to call 'matches' in an inverted context to discern which
-        // clauses matched.
-        if (_context->inversion == InvertError::kInverted) {
-            _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
+        // The jsonSchema keyword 'enum' is treated as a leaf operator.
+        if (expr->getErrorAnnotation()->operatorName == "enum") {
+            static constexpr auto kNormalReason = "value was not found in enum";
+            static constexpr auto kInvertedReason = "value was found in enum";
+            generateLogicalLeafError(*expr, kNormalReason, kInvertedReason);
+        } else {
+            preVisitTreeOperator(expr);
+            // An OR needs its children to call 'matches' in an inverted context to discern which
+            // clauses matched.
+            if (_context->getCurrentInversion() == InvertError::kInverted) {
+                _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
+            }
         }
     }
     void visit(const RegexMatchExpression* expr) final {
@@ -542,6 +657,9 @@ private:
     }
 
     BSONArray createValuesArray(const ElementPath& path) {
+        // Empty path means that the match is against the root document.
+        if (path.fieldRef().empty())
+            return BSON_ARRAY(_context->rootDoc);
         BSONMatchableDocument doc(_context->getCurrentDocument());
         MatchableDocument::IteratorHolder cursor(&doc, &path);
         BSONArrayBuilder bab;
@@ -555,6 +673,7 @@ private:
         }
         return bab.arr();
     }
+
     /**
      * Appends a missing field error if 'arr' is empty.
      */
@@ -593,14 +712,22 @@ private:
             bob.append("expectedTypes", types);
         }
     }
-    void appendErrorReason(const MatchExpression& expr,
-                           const std::string& normalReason,
-                           const std::string& invertedReason) {
+
+    /**
+     * Given 'normalReason' and 'invertedReason' strings, appends the reason for failure to the
+     * current object builder tracked by 'ctx'.
+     */
+    void appendErrorReason(const std::string& normalReason, const std::string& invertedReason) {
+        if (normalReason.empty()) {
+            invariant(_context->getCurrentInversion() == InvertError::kInverted);
+        } else if (invertedReason.empty()) {
+            invariant(_context->getCurrentInversion() == InvertError::kNormal);
+        }
         BSONObjBuilder& bob = _context->getCurrentObjBuilder();
         if (bob.hasField("reason")) {
             return;  // there's already a reason for failure
         }
-        if (_context->inversion == InvertError::kNormal) {
+        if (_context->getCurrentInversion() == InvertError::kNormal) {
             bob.append("reason", normalReason);
         } else {
             bob.append("reason", invertedReason);
@@ -655,18 +782,18 @@ private:
         if (_context->shouldGenerateError(expr)) {
             appendErrorDetails(expr);
             ElementPath path(expr.path(), leafArrayBehavior);
-            BSONArray arr = createValuesArray(path);
+            auto arr = createValuesArray(path);
             appendMissingField(arr);
             appendTypeMismatch(arr, expectedTypes);
-            appendErrorReason(expr, normalReason, invertedReason);
+            appendErrorReason(normalReason, invertedReason);
             appendConsideredValues(arr);
         }
     }
 
     void generateComparisonError(const ComparisonMatchExpression* expr) {
-        static constexpr auto normalReason = "comparison failed";
-        static constexpr auto invertedReason = "comparison succeeded";
-        generatePathError(*expr, normalReason, invertedReason);
+        static constexpr auto kNormalReason = "comparison failed";
+        static constexpr auto kInvertedReason = "comparison succeeded";
+        generatePathError(*expr, kNormalReason, kInvertedReason);
     }
 
     void generateElemMatchError(const ArrayMatchingMatchExpression* expr) {
@@ -693,11 +820,12 @@ private:
             ElementPath path(expr->path(), behavior);
             BSONArray arr = createValuesArray(path);
             appendMissingField(arr);
-            appendErrorReason(*expr, kNormalReason, kInvertedReason);
+            appendErrorReason(kNormalReason, kInvertedReason);
             appendConsideredValues(arr);
             appendConsideredTypes(arr);
         }
     }
+
     /**
      * Generates a document validation error for a bit test expression 'expr'.
      */
@@ -716,31 +844,35 @@ private:
      * Performs the setup necessary to generate an error for 'expr'.
      */
     void preVisitTreeOperator(const MatchExpression* expr) {
-        invariant(expr->numChildren() > 0);
+        invariant(expr->getCategory() == MatchExpression::MatchCategory::kLogical);
         _context->pushNewFrame(*expr, _context->getCurrentDocument());
         if (_context->shouldGenerateError(*expr)) {
             auto annotation = expr->getErrorAnnotation();
-            appendOperatorName(*annotation, &_context->getCurrentObjBuilder());
+            // Only append the operator name if it will produce an object error corresponding to
+            // a user-facing operator.
+            if (!_context->producesArray(*expr))
+                appendOperatorName(*annotation, &_context->getCurrentObjBuilder());
             _context->getCurrentObjBuilder().appendElements(annotation->annotation);
         }
     }
     /**
-     * Utility to generate an error for $all. Though $all is internally translated to an 'AND'
-     * over some child expressions, it is treated as a leaf operator for the purposes of error
-     * reporting.
+     * Utility to generate an error for logical operators which are treated like leaves for the
+     * purposes of error reporting.
      */
-    void processAll(const AndMatchExpression& expr) {
+    void generateLogicalLeafError(const ListOfMatchExpression& expr,
+                                  const std::string& normalReason,
+                                  const std::string& invertedReason) {
         _context->pushNewFrame(expr, _context->getCurrentDocument());
         if (_context->shouldGenerateError(expr)) {
+            // $all with no children should not translate to an 'AndMatchExpression' and 'enum'
+            // must have non-zero children.
             invariant(expr.numChildren() > 0);
             appendErrorDetails(expr);
             auto childExpr = expr.getChild(0);
-            static constexpr auto kNormalReason = "array did not contain all specified values";
-            static constexpr auto kInvertedReason = "array did contain all specified values";
             ElementPath path(childExpr->path(), LeafArrayBehavior::kNoTraversal);
             auto arr = createValuesArray(path);
             appendMissingField(arr);
-            appendErrorReason(expr, kNormalReason, kInvertedReason);
+            appendErrorReason(normalReason, invertedReason);
             appendConsideredValues(arr);
         }
     }
@@ -757,14 +889,14 @@ private:
             // to generate an error for 'expr' if it evaluates to false in a normal context or
             // if it evaluates to true an inverted context.
             if (expr.isTriviallyFalse()) {
-                invariant(_context->inversion == InvertError::kNormal);
+                invariant(_context->getCurrentInversion() == InvertError::kNormal);
             } else {
-                invariant(_context->inversion == InvertError::kInverted);
+                invariant(_context->getCurrentInversion() == InvertError::kInverted);
             }
             appendErrorDetails(expr);
             static constexpr auto kNormalReason = "expression always evaluates to false";
             static constexpr auto kInvertedReason = "expression always evaluates to true";
-            appendErrorReason(expr, kNormalReason, kInvertedReason);
+            appendErrorReason(kNormalReason, kInvertedReason);
         }
     }
 
@@ -825,7 +957,14 @@ public:
     void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {}
     void visit(const InternalSchemaTypeExpression* expr) final {}
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {}
-    void visit(const InternalSchemaXorMatchExpression* expr) final {}
+    void visit(const InternalSchemaXorMatchExpression* expr) final {
+        // Only check for child errors when we're in a normal context, that is, when none of expr's
+        // subschemas matched, as opposed to the inverted context, where more than one subschema
+        // matched.
+        if (_context->getCurrentInversion() == InvertError::kNormal) {
+            inVisitTreeOperator(expr);
+        }
+    }
     void visit(const LTEMatchExpression* expr) final {}
     void visit(const LTMatchExpression* expr) final {}
     void visit(const ModMatchExpression* expr) final {}
@@ -874,22 +1013,33 @@ public:
     }
     void visit(const AndMatchExpression* expr) final {
         auto operatorName = expr->getErrorAnnotation()->operatorName;
-        // Clean up the frame for this node if we're finishing the error for an $all or this node
-        // shouldn't generate an error.
-        if (operatorName == "$all" || !_context->shouldGenerateError(*expr)) {
+        auto inversion = _context->getCurrentInversion();
+        // Clean up the frame for this node if we're finishing the error for an $all, an inverted
+        // $jsonSchema, or this node shouldn't generate an error.
+        if (operatorName == "$all" ||
+            (operatorName == "$jsonSchema" && inversion == InvertError::kInverted) ||
+            !_context->shouldGenerateError(*expr)) {
             _context->finishCurrentError(expr);
             return;
         }
-        // Specify a different details string based on the operatorName. Note that if our node
-        // doesn't have an operator name specified, the default reason string is 'details'.
-        static const StringMap<std::string> detailsStringMap = {
-            {"$and", "clausesNotSatisfied"},
-            {"properties", "propertiesNotSatisfied"},
-            {"$jsonSchema", "schemaRulesNotSatisfied"},
-            {"", "details"}};
-        auto detailsString = detailsStringMap.find(operatorName);
-        invariant(detailsString != detailsStringMap.end());
-        postVisitTreeOperator(expr, detailsString->second);
+        // Specify a different details string based on the operatorName in expr's annotation where
+        // the first entry is the details string in the normal case and the second is the string
+        // for the inverted case.
+        static const StringMap<std::pair<std::string, std::string>> detailsStringMap = {
+            {"$and", {"clausesNotSatisfied", "clausesSatisfied"}},
+            {"allOf", {"schemasNotSatisfied", ""}},
+            {"properties", {"propertiesNotSatisfied", ""}},
+            {"$jsonSchema", {"schemaRulesNotSatisfied", ""}},
+            {"_internalSubschema", {"", ""}},
+            {"", {"details", ""}}};
+        auto detailsStringPair = detailsStringMap.find(operatorName);
+        invariant(detailsStringPair != detailsStringMap.end());
+        auto&& stringPair = detailsStringPair->second;
+        if (inversion == InvertError::kNormal) {
+            postVisitTreeOperator(expr, stringPair.first);
+        } else {
+            postVisitTreeOperator(expr, stringPair.second);
+        }
     }
     void visit(const BitsAllClearMatchExpression* expr) final {
         _context->finishCurrentError(expr);
@@ -966,7 +1116,15 @@ public:
         _context->finishCurrentError(expr);
     }
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {}
-    void visit(const InternalSchemaXorMatchExpression* expr) final {}
+    void visit(const InternalSchemaXorMatchExpression* expr) final {
+        static constexpr auto normalDetailString = "schemasNotSatisfied";
+        if (_context->getCurrentInversion() == InvertError::kNormal) {
+            postVisitTreeOperator(expr, normalDetailString);
+        } else {
+            // In the inverted case, we treat 'oneOf' as a leaf.
+            _context->finishCurrentError(expr);
+        }
+    }
     void visit(const LTEMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
@@ -977,20 +1135,45 @@ public:
         _context->finishCurrentError(expr);
     }
     void visit(const NorMatchExpression* expr) final {
-        _context->flipInversion();
-        static constexpr auto detailsString = "clausesNotSatisfied";
-        postVisitTreeOperator(expr, detailsString);
+        static constexpr auto kNormalDetailsString = "clausesNotSatisfied";
+        static constexpr auto kInvertedDetailsString = "clausesSatisfied";
+        if (_context->getCurrentInversion() == InvertError::kNormal) {
+            postVisitTreeOperator(expr, kNormalDetailsString);
+        } else {
+            postVisitTreeOperator(expr, kInvertedDetailsString);
+        }
     }
     void visit(const NotMatchExpression* expr) final {
-        _context->flipInversion();
-        if (_context->shouldGenerateError(*expr)) {
-            _context->getCurrentObjBuilder().append("details", _context->getLatestCompleteError());
+        // In the case of a $jsonSchema "not", we do not report any error details
+        // explaining why the subschema did match.
+        if (_context->shouldGenerateError(*expr) &&
+            expr->getErrorAnnotation()->operatorName != "not") {
+            _context->appendLatestCompleteError(&_context->getCurrentObjBuilder());
         }
         _context->finishCurrentError(expr);
     }
     void visit(const OrMatchExpression* expr) final {
-        static constexpr auto detailsString = "clausesNotSatisfied";
-        postVisitTreeOperator(expr, detailsString);
+        auto operatorName = expr->getErrorAnnotation()->operatorName;
+        // Clean up the frame for this node if we're finishing the error for an 'enum' or this node
+        // shouldn't generate an error.
+        if (operatorName == "enum" || !_context->shouldGenerateError(*expr)) {
+            _context->finishCurrentError(expr);
+            return;
+        }
+        // Specify a different details string based on the operatorName in expr's annotation where
+        // the first entry is the details string in the normal case and the second is the string
+        // for the inverted case.
+        static const StringMap<std::pair<std::string, std::string>> detailsStringMap = {
+            {"$or", {"clausesNotSatisfied", "clausesSatisfied"}},
+            {"anyOf", {"schemasNotSatisfied", ""}}};
+        auto detailsStringPair = detailsStringMap.find(operatorName);
+        invariant(detailsStringPair != detailsStringMap.end());
+        auto stringPair = detailsStringPair->second;
+        if (_context->getCurrentInversion() == InvertError::kNormal) {
+            postVisitTreeOperator(expr, stringPair.first);
+        } else {
+            postVisitTreeOperator(expr, stringPair.second);
+        }
     }
     void visit(const RegexMatchExpression* expr) final {
         _context->finishCurrentError(expr);
@@ -1019,7 +1202,10 @@ private:
     void postVisitTreeOperator(const ListOfMatchExpression* expr,
                                const std::string& detailsString) {
         finishLogicalOperatorChildError(expr, _context);
-        if (_context->shouldGenerateError(*expr)) {
+        // Append the result of the current array builder to the current object builder under the
+        // field name 'detailsString' unless this node produces an array (i.e. in the case of a
+        // subschema).
+        if (_context->shouldGenerateError(*expr) && !_context->producesArray(*expr)) {
             auto failedClauses = _context->getCurrentArrayBuilder().arr();
             _context->getCurrentObjBuilder().append(detailsString, failedClauses);
         }
@@ -1090,7 +1276,9 @@ BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc) 
     objBuilder.appendAs(objectIdElement, "failingDocumentId"_sd);
 
     // Add errors from match expressions.
-    objBuilder.append("details"_sd, context.getLatestCompleteError());
+    auto error = context.getLatestCompleteErrorObject();
+    invariant(!error.isEmpty());
+    objBuilder.append("details"_sd, std::move(error));
     return objBuilder.obj();
 }
 

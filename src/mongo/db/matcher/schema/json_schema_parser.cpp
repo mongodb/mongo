@@ -372,7 +372,8 @@ StatusWithMatchExpression parseLogicalKeyword(const boost::intrusive_ptr<Express
                               << "' must be a non-empty array"};
     }
 
-    std::unique_ptr<T> listOfExpr = std::make_unique<T>();
+    std::unique_ptr<T> listOfExpr = std::make_unique<T>(doc_validation_error::createAnnotation(
+        expCtx, logicalElement.fieldNameStringData().toString(), BSONObj()));
     for (const auto& elem : logicalElementObj) {
         if (elem.type() != BSONType::Object) {
             return {ErrorCodes::TypeMismatch,
@@ -393,7 +394,9 @@ StatusWithMatchExpression parseLogicalKeyword(const boost::intrusive_ptr<Express
     return {std::move(listOfExpr)};
 }
 
-StatusWithMatchExpression parseEnum(StringData path, BSONElement enumElement) {
+StatusWithMatchExpression parseEnum(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    StringData path,
+                                    BSONElement enumElement) {
     if (enumElement.type() != BSONType::Array) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaEnumKeyword
@@ -408,7 +411,8 @@ StatusWithMatchExpression parseEnum(StringData path, BSONElement enumElement) {
                               << "' cannot be an empty array"};
     }
 
-    auto orExpr = std::make_unique<OrMatchExpression>();
+    auto orExpr = std::make_unique<OrMatchExpression>(doc_validation_error::createAnnotation(
+        expCtx, enumElement.fieldNameStringData().toString(), enumElement.wrap()));
     UnorderedFieldsBSONElementComparator eltComp;
     BSONEltSet eqSet = eltComp.makeBSONEltSet();
     for (auto&& arrayElem : enumArray) {
@@ -425,19 +429,23 @@ StatusWithMatchExpression parseEnum(StringData path, BSONElement enumElement) {
             // objects, not scalars or arrays.
             if (arrayElem.type() == BSONType::Object) {
                 auto rootDocEq = std::make_unique<InternalSchemaRootDocEqMatchExpression>(
-                    arrayElem.embeddedObject());
+                    arrayElem.embeddedObject(),
+                    doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
                 orExpr->add(rootDocEq.release());
             }
         } else {
-            auto eqExpr = std::make_unique<InternalSchemaEqMatchExpression>(path, arrayElem);
-
+            auto eqExpr = std::make_unique<InternalSchemaEqMatchExpression>(
+                path,
+                arrayElem,
+                doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
             orExpr->add(eqExpr.release());
         }
     }
 
     // Make sure that the OR expression has at least 1 child.
     if (orExpr->numChildren() == 0) {
-        return {std::make_unique<AlwaysFalseMatchExpression>()};
+        return {std::make_unique<AlwaysFalseMatchExpression>(doc_validation_error::createAnnotation(
+            expCtx, enumElement.fieldNameStringData().toString(), enumElement.wrap()))};
     }
 
     return {std::move(orExpr)};
@@ -1136,12 +1144,14 @@ Status translateLogicalKeywords(StringMap<BSONElement>& keywordMap,
             return parsedExpr.getStatus();
         }
 
-        auto notMatchExpr = std::make_unique<NotMatchExpression>(parsedExpr.getValue().release());
+        auto notMatchExpr = std::make_unique<NotMatchExpression>(
+            parsedExpr.getValue().release(),
+            doc_validation_error::createAnnotation(expCtx, "not", BSONObj()));
         andExpr->add(notMatchExpr.release());
     }
 
     if (auto enumElt = keywordMap[JSONSchemaParser::kSchemaEnumKeyword]) {
-        auto enumExpr = parseEnum(path, enumElt);
+        auto enumExpr = parseEnum(expCtx, path, enumElt);
         if (!enumExpr.isOK()) {
             return enumExpr.getStatus();
         }
@@ -1645,8 +1655,12 @@ StatusWithMatchExpression _parse(const boost::intrusive_ptr<ExpressionContext>& 
             doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
     }
 
+    // All schemas are tagged with an operator name of '_internalSubschema' to indicate during
+    // error generation that 'andExpr' logically corresponds to a subschema. If this is a top
+    // level schema corresponding to '$jsonSchema', the caller is responsible for providing this
+    // information by overwriting this annotation.
     auto andExpr = std::make_unique<AndMatchExpression>(
-        doc_validation_error::createAnnotation(expCtx, "$jsonSchema", BSONObj()));
+        doc_validation_error::createAnnotation(expCtx, "_internalSubschema", BSONObj()));
 
     auto translationStatus =
         translateScalarKeywords(expCtx, keywordMap, path, typeExpr.get(), andExpr.get());
@@ -1766,6 +1780,14 @@ StatusWithMatchExpression JSONSchemaParser::parse(
                         "Translated schema match expression: {expression}",
                         "Translated schema match expression",
                         "expression"_attr = translation.getValue()->debugString());
+        }
+        // Tag the top level MatchExpression as '$jsonSchema' if necessary.
+        if (translation.isOK()) {
+            if (auto topLevelAnnotation = translation.getValue()->getErrorAnnotation()) {
+                auto oldAnnotation = topLevelAnnotation->annotation;
+                translation.getValue()->setErrorAnnotation(
+                    doc_validation_error::createAnnotation(expCtx, "$jsonSchema", oldAnnotation));
+            }
         }
         return translation;
     } catch (const DBException& ex) {

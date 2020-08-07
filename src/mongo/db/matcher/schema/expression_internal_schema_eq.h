@@ -48,7 +48,9 @@ class InternalSchemaEqMatchExpression final : public LeafMatchExpression {
 public:
     static constexpr StringData kName = "$_internalSchemaEq"_sd;
 
-    InternalSchemaEqMatchExpression(StringData path, BSONElement rhs);
+    InternalSchemaEqMatchExpression(StringData path,
+                                    BSONElement rhs,
+                                    clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
