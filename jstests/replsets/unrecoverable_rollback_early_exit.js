@@ -66,14 +66,7 @@ failpoint.off();
 rollbackTest.setAwaitSecondaryNodesForRollbackTimeout(5 * 1000);
 
 // We will detect an unrecoverable rollback here.
-// This will cause an assert.soon() in ReplSetTest to fail. This normally triggers the hang
-// analyzer, but since we do not want to run it on expected timeouts, we temporarily disable it.
-MongoRunner.runHangAnalyzer.disable();
-try {
-    rollbackTest.transitionToSteadyStateOperations();
-} finally {
-    MongoRunner.runHangAnalyzer.enable();
-}
+rollbackTest.transitionToSteadyStateOperations();
 
 rollbackTest.stop();
 })();

@@ -713,7 +713,9 @@ var ReplSetTest = function(opts) {
         timeout, slaves, connToCheckForUnrecoverableRollback, retryIntervalMS) {
         retryIntervalMS = retryIntervalMS || 200;
         try {
+            MongoRunner.runHangAnalyzer.disable();
             this.awaitSecondaryNodes(timeout, slaves, retryIntervalMS);
+            MongoRunner.runHangAnalyzer.enable();
         } catch (originalEx) {
             // There is a special case where we expect the (rare) possibility of unrecoverable
             // rollbacks with EMRC:false in rollback suites with unclean shutdowns.
@@ -739,6 +741,7 @@ var ReplSetTest = function(opts) {
                             "remote oplog does not contain entry with optime matching our required optime",
                             120 * 1000);
                     } catch (checkLogEx) {
+                        MongoRunner.runHangAnalyzer.enable();
                         throw originalEx;
                     }
                     // Add this info to the original exception.
@@ -746,6 +749,7 @@ var ReplSetTest = function(opts) {
                 }
             }
             // Re-throw the original exception in all cases.
+            MongoRunner.runHangAnalyzer.enable();
             throw originalEx;
         }
     };
