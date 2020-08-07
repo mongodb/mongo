@@ -85,6 +85,7 @@ public:
                              << "for correctness.\nThis is a slow operation.\n"
                              << "\tAdd {full: true} option to do a more thorough check.\n"
                              << "\tAdd {background: true} to validate in the background.\n"
+                             << "\tAdd {repair: true} to run repair mode.\n"
                              << "Cannot specify both {full: true, background: true}.";
     }
 
@@ -147,13 +148,34 @@ public:
                                     << " and { enforceFastCount: true } is not supported.");
         }
 
+        const bool repair = cmdObj["repair"].trueValue();
+        if (background && repair) {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream() << "Running the validate command with both {background: true }"
+                                    << " and { repair: true } is not supported.");
+        }
+        if (enforceFastCount && repair) {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream()
+                          << "Running the validate command with both {enforceFastCount: true }"
+                          << " and { repair: true } is not supported.");
+        }
+        repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
+        if (repair && replCoord->isReplEnabled()) {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream()
+                          << "Running the validate command with { repair: true } can only be"
+                          << " performed in standalone mode.");
+        }
+
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20514,
                   "CMD: validate",
                   "namespace"_attr = nss,
                   "background"_attr = background,
                   "full"_attr = fullValidate,
-                  "enforceFastCount"_attr = enforceFastCount);
+                  "enforceFastCount"_attr = enforceFastCount,
+                  "repair"_attr = repair);
         }
 
         // Only one validation per collection can be in progress, the rest wait.
@@ -190,9 +212,14 @@ public:
             return CollectionValidation::ValidateMode::kForeground;
         }();
 
-        // External users cannot run validate with repair as there is no way yet for users to invoke
-        // it. It is only to be used by startup repair.
-        auto repairMode = CollectionValidation::RepairMode::kNone;
+        auto repairMode = repair ? CollectionValidation::RepairMode::kRepair
+                                 : CollectionValidation::RepairMode::kNone;
+
+        if (repair) {
+            opCtx->recoveryUnit()->setPrepareConflictBehavior(
+                PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+        }
+
         ValidateResults validateResults;
         Status status =
             CollectionValidation::validate(opCtx, nss, mode, repairMode, &validateResults, &result);

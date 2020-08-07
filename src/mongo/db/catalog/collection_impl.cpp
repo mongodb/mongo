@@ -103,6 +103,9 @@ MONGO_FAIL_POINT_DEFINE(failAfterBulkLoadDocInsert);
 // will not (and cannot) be enforced but it will be persisted.
 MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
 
+// This fail point introduces corruption to documents during insert.
+MONGO_FAIL_POINT_DEFINE(corruptDocumentOnInsert);
+
 /**
  * Checks the 'failCollectionInserts' fail point at the beginning of an insert operation to see if
  * the insert should fail. Returns Status::OK if The function should proceed with the insertion.
@@ -633,6 +636,15 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     timestamps.reserve(count);
 
     for (auto it = begin; it != end; it++) {
+        if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
+            char copyBuffer[it->doc.objsize()];
+            std::memcpy(copyBuffer, it->doc.objdata(), it->doc.objsize());
+            copyBuffer[5] = 0x90;
+
+            records.emplace_back(Record{RecordId(), RecordData(copyBuffer, it->doc.objsize())});
+            timestamps.emplace_back(it->oplogSlot.getTimestamp());
+            continue;
+        }
         records.emplace_back(Record{RecordId(), RecordData(it->doc.objdata(), it->doc.objsize())});
         timestamps.emplace_back(it->oplogSlot.getTimestamp());
     }

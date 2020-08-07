@@ -602,7 +602,7 @@ struct ValidateResults {
 
         if (repaired || debugging) {
             resultObj.appendNumber("numRemovedCorruptRecords", numRemovedCorruptRecords);
-            resultObj.appendNumber("numRremovedExtraIndexEntries", numRemovedExtraIndexEntries);
+            resultObj.appendNumber("numRemovedExtraIndexEntries", numRemovedExtraIndexEntries);
             resultObj.appendNumber("numInsertedMissingIndexEntries",
                                    numInsertedMissingIndexEntries);
         }
