@@ -313,6 +313,12 @@ Milliseconds OplogFetcher::_getRetriedFindMaxTime() const {
 
 void OplogFetcher::_finishCallback(Status status) {
     invariant(isActive());
+    // If the oplog fetcher is shutting down, consolidate return code to CallbackCanceled.
+    if (_isShuttingDown() && status != ErrorCodes::CallbackCanceled) {
+        status = Status(ErrorCodes::CallbackCanceled,
+                        str::stream() << "Got error: \"" << status.toString()
+                                      << "\" while oplog fetcher is shutting down");
+    }
     _onShutdownCallbackFn(status, _requiredRBID);
 
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
