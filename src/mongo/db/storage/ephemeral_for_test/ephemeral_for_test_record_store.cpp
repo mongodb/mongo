@@ -51,7 +51,7 @@ namespace mongo {
 namespace ephemeral_for_test {
 namespace {
 Ordering allAscending = Ordering::make(BSONObj());
-auto const version = KeyString::Version::V1;
+auto const version = KeyString::Version::kLatestVersion;
 BSONObj const sample = BSON(""
                             << "s"
                             << "" << (int64_t)0);
