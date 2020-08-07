@@ -21,7 +21,7 @@ const mongod = MongoRunner.runMongod({
 copyCertificateFile("jstests/libs/trusted-ca.pem", dbPath + "/ca-test.pem");
 copyCertificateFile("jstests/libs/trusted-server.pem", dbPath + "/server-test.pem");
 
-assert.commandWorked(mongod.adminCommand({rotateCertificates: 1}));
+assert.commandWorked(mongod.getDB("test").rotateCertificates("Rotated!"));
 // make sure that mongo is still connected after rotation
 assert.commandWorked(mongod.adminCommand({connectionStatus: 1}));
 

@@ -13,6 +13,14 @@ if (DB === undefined) {
     };
 }
 
+/**
+ * Rotate certificates, CRLs, and CA files.
+ * @param {String} message optional message for server to log at rotation time
+ */
+DB.prototype.rotateCertificates = function(message) {
+    return this._adminCommand({rotateCertificates: 1, message: message});
+};
+
 DB.prototype.getMongo = function() {
     assert(this._mongo, "why no mongo!");
     return this._mongo;
@@ -561,6 +569,8 @@ DB.prototype.help = function() {
     print("\tdb.printShardingStatus()");
     print("\tdb.printSlaveReplicationInfo()");
     print("\tdb.resetError()");
+    print(
+        "\tdb.rotateCertificates(message) - rotates certificates, CRLs, and CA files and logs an optional message");
     print(
         "\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into {cmdObj: 1}");
     print("\tdb.serverStatus()");
