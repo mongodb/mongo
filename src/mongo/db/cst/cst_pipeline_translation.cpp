@@ -48,7 +48,6 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_skip.h"
-#include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_trigonometric.h"
@@ -444,57 +443,20 @@ auto translateLimit(const CNode& cst, const boost::intrusive_ptr<ExpressionConte
 }
 
 /**
- * Unwrap a sample stage CNode and produce a DocumentSourceSample.
+ * Unwrap a sample stage CNode and produce a DocumentSourceMatch.
  */
 auto translateSample(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return DocumentSourceSample::create(expCtx, translateNumToLong(cst.objectChildren()[0].second));
 }
 
 /**
- * Unwrap a match stage CNode and produce a DocumentSourceMatch.
+ * Unwrap a match stage CNode and produce a DocumentSourceSample.
  */
 auto translateMatch(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // TODO SERVER-48790, Implement CST to MatchExpression/Query command translation.
     // And add corresponding tests in cst_pipeline_translation_test.cpp.
     auto placeholder = fromjson("{}");
     return DocumentSourceMatch::create(placeholder, expCtx);
-}
-
-/**
- * Unwrap an unwind stage CNode and produce a DocumentSourceUnwind.
- */
-auto translateUnwind(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return stdx::visit(
-        visit_helper::Overloaded{
-            // $unwind accepts either a nested document with extra options or the legacy
-            // "{$unwind: '$path'}" syntax.
-            [&](const CNode::ObjectChildren& object) -> boost::intrusive_ptr<DocumentSource> {
-                dassert(verifyFieldnames({KeyFieldname::pathArg,
-                                          KeyFieldname::includeArrayIndexArg,
-                                          KeyFieldname::preserveNullAndEmptyArraysArg},
-                                         object));
-                auto&& prefixedUnwindPath = object[0].second.getString();
-                auto unwindPath = Expression::removeFieldPrefix(prefixedUnwindPath);
-                auto preserveNullAndEmptyArrays = stdx::visit(
-                    visit_helper::Overloaded{[](const UserBoolean& userBool) { return userBool; },
-                                             [](const KeyValue&) { return false; },
-                                             [](auto &&) -> UserBoolean { MONGO_UNREACHABLE; }},
-                    object[2].second.payload);
-                auto indexPath = stdx::visit(
-                    visit_helper::Overloaded{
-                        [](const UserString& str) { return boost::optional<UserString>(str); },
-                        [](const KeyValue&) { return boost::optional<UserString>(); },
-                        [](auto &&) -> boost::optional<UserString> { MONGO_UNREACHABLE; }},
-                    object[1].second.payload);
-                return DocumentSourceUnwind::create(
-                    expCtx, unwindPath, preserveNullAndEmptyArrays, indexPath);
-            },
-            [&](const UserString& fieldPath) -> boost::intrusive_ptr<DocumentSource> {
-                return DocumentSourceUnwind::create(
-                    expCtx, Expression::removeFieldPrefix(fieldPath), false, boost::none);
-            },
-            [](auto &&) -> boost::intrusive_ptr<DocumentSource> { MONGO_UNREACHABLE; }},
-        cst.payload);
 }
 
 /**
@@ -513,8 +475,6 @@ boost::intrusive_ptr<DocumentSource> translateSource(
             return translateLimit(cst.objectChildren()[0].second, expCtx);
         case KeyFieldname::sample:
             return translateSample(cst.objectChildren()[0].second, expCtx);
-        case KeyFieldname::unwind:
-            return translateUnwind(cst.objectChildren()[0].second, expCtx);
         default:
             MONGO_UNREACHABLE;
     }

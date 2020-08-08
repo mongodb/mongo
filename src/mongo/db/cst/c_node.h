@@ -76,22 +76,6 @@ struct CNode {
         return CNode{ObjectChildren{}};
     }
 
-    /*
-     * Produce the payload of this CNode representing a string. Throws a fatal exception if this
-     * CNode does not represent a string.
-     */
-    auto& getString() const {
-        return stdx::get<UserString>(payload);
-    }
-
-    /*
-     * Produce the payload of this CNode representing a boolean. Throws a fatal exception if this
-     * CNode does not represent a boolean.
-     */
-    auto& getBool() const {
-        return stdx::get<UserBoolean>(payload);
-    }
-
     /**
      * Produce a string formatted with tabs and endlines that describes the CST underneath this
      * CNode.
