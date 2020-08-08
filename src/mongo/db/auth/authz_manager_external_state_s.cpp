@@ -243,75 +243,25 @@ Status AuthzManagerExternalStateMongos::rolesExist(OperationContext* opCtx,
     return ex.toStatus();
 }
 
-Status AuthzManagerExternalStateMongos::getRoleDescription(
-    OperationContext* opCtx,
-    const RoleName& roleName,
-    PrivilegeFormat showPrivileges,
-    AuthenticationRestrictionsFormat showRestrictions,
-    BSONObj* result) {
-    BSONObjBuilder rolesInfoCmd;
-    rolesInfoCmd.append(
-        "rolesInfo",
-        BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                        << roleName.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME
-                        << roleName.getDB())));
-    addShowToBuilder(&rolesInfoCmd, showPrivileges, showRestrictions);
-
-    BSONObjBuilder builder;
-    const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-        opCtx, "admin", rolesInfoCmd.obj(), &builder);
-    BSONObj cmdResult = builder.obj();
-    if (!ok) {
-        return getStatusFromCommandResult(cmdResult);
-    }
-
-    std::vector<BSONElement> foundRoles = cmdResult[rolesFieldName(showPrivileges)].Array();
-    if (foundRoles.size() == 0) {
-        return Status(ErrorCodes::RoleNotFound, "Role \"" + roleName.toString() + "\" not found");
-    }
-
-    if (foundRoles.size() > 1) {
-        return Status(ErrorCodes::RoleDataInconsistent,
-                      str::stream() << "Found multiple roles on the \"" << roleName.getDB()
-                                    << "\" database with name \"" << roleName.getRole() << "\"");
-    }
-    *result = foundRoles[0].Obj().getOwned();
-    return Status::OK();
+using ResolvedRoleData = AuthzManagerExternalState::ResolvedRoleData;
+StatusWith<ResolvedRoleData> AuthzManagerExternalStateMongos::resolveRoles(
+    OperationContext* opCtx, const std::vector<RoleName>& roleNames, ResolveRoleOption option) {
+    // mongos never calls into resolveRoles().
+    // That's done exclusively by mongod's User acquisition and user management commands.
+    dassert(false);
+    return {ErrorCodes::NotImplemented, "AuthzManagerExternalStateMongos::resolveRoles"};
 }
+
 Status AuthzManagerExternalStateMongos::getRolesDescription(
     OperationContext* opCtx,
     const std::vector<RoleName>& roles,
     PrivilegeFormat showPrivileges,
     AuthenticationRestrictionsFormat showRestrictions,
     BSONObj* result) {
-    BSONArrayBuilder rolesInfoCmdArray;
-
-    for (const RoleName& roleName : roles) {
-        rolesInfoCmdArray << BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                  << roleName.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME
-                                  << roleName.getDB());
-    }
-
-    BSONObjBuilder rolesInfoCmd;
-    rolesInfoCmd.append("rolesInfo", rolesInfoCmdArray.arr());
-    addShowToBuilder(&rolesInfoCmd, showPrivileges, showRestrictions);
-
-    BSONObjBuilder builder;
-    const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-        opCtx, "admin", rolesInfoCmd.obj(), &builder);
-    BSONObj cmdResult = builder.obj();
-    if (!ok) {
-        return getStatusFromCommandResult(cmdResult);
-    }
-
-    std::vector<BSONElement> foundRoles = cmdResult[rolesFieldName(showPrivileges)].Array();
-    if (foundRoles.size() == 0) {
-        return Status(ErrorCodes::RoleNotFound, "Roles not found");
-    }
-
-    *result = foundRoles[0].Obj().getOwned();
-
-    return Status::OK();
+    // mongos never calls into resolveRoles().
+    // That's done exclusively by mongod's User acquisition and user management commands.
+    dassert(false);
+    return {ErrorCodes::NotImplemented, "AuthzManagerExternalStateMongos::resolveRoles"};
 }
 Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(
     OperationContext* opCtx,
@@ -319,24 +269,11 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(
     PrivilegeFormat showPrivileges,
     AuthenticationRestrictionsFormat showRestrictions,
     bool showBuiltinRoles,
-    std::vector<BSONObj>* result) {
-    BSONObjBuilder rolesInfoCmd;
-    rolesInfoCmd << "rolesInfo" << 1 << "showBuiltinRoles" << showBuiltinRoles;
-    addShowToBuilder(&rolesInfoCmd, showPrivileges, showRestrictions);
-
-    BSONObjBuilder builder;
-    const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-        opCtx, dbname.toString(), rolesInfoCmd.obj(), &builder);
-    BSONObj cmdResult = builder.obj();
-    if (!ok) {
-        return getStatusFromCommandResult(cmdResult);
-    }
-
-    for (BSONObjIterator it(cmdResult[rolesFieldName(showPrivileges)].Obj()); it.more();
-         it.next()) {
-        result->push_back((*it).Obj().getOwned());
-    }
-    return Status::OK();
+    BSONArrayBuilder* result) {
+    // mongos never calls into resolveRoles().
+    // That's done exclusively by mongod's User acquisition and user management commands.
+    dassert(false);
+    return {ErrorCodes::NotImplemented, "AuthzManagerExternalStateMongos::resolveRoles"};
 }
 
 bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* opCtx) {

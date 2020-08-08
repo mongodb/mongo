@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
@@ -104,25 +105,15 @@ public:
      */
     virtual Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) = 0;
 
+    using ResolveRoleOption = AuthorizationManager::ResolveRoleOption;
+    using ResolvedRoleData = AuthorizationManager::ResolvedRoleData;
+
     /**
-     * Writes into "result" a document describing the named role and returns Status::OK(). If
-     * showPrivileges is kOmit or kShowPrivileges, the description includes the roles which the
-     * named role is a member of, including those memberships held implicitly through other roles
-     * (indirect roles). If "showPrivileges" is kShowPrivileges, then the description documents
-     * will also include a full list of the role's privileges. If "showPrivileges" is
-     * kShowAsUserFragment, then the description returned will take the form of a partial user
-     * document, describing a hypothetical user which possesses the provided and implicit roles,
-     * and all inherited privileges. In the event that some of this information is inconsistent,
-     * the document will contain a "warnings" array, with std::string messages describing
-     * inconsistencies.
-     *
-     * If the role does not exist, returns ErrorCodes::RoleNotFound.
+     * Collects (in)direct roles, privileges, and restrictions for a set of start roles.
      */
-    virtual Status getRoleDescription(OperationContext* opCtx,
-                                      const RoleName& roleName,
-                                      PrivilegeFormat showPrivileges,
-                                      AuthenticationRestrictionsFormat,
-                                      BSONObj* result) = 0;
+    virtual StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
+                                                      const std::vector<RoleName>& roleNames,
+                                                      ResolveRoleOption option) = 0;
 
     /**
      * Writes into "result" a document describing the named role is and returns Status::OK(). If
@@ -160,7 +151,7 @@ public:
                                             PrivilegeFormat showPrivileges,
                                             AuthenticationRestrictionsFormat,
                                             bool showBuiltinRoles,
-                                            std::vector<BSONObj>* result) = 0;
+                                            BSONArrayBuilder* result) = 0;
 
     /**
      * Returns true if there exists at least one privilege document in the system.

@@ -421,12 +421,9 @@ Status AuthorizationManagerImpl::rolesExist(OperationContext* opCtx,
     return _externalState->rolesExist(opCtx, roleNames);
 }
 
-Status AuthorizationManagerImpl::getRoleDescription(OperationContext* opCtx,
-                                                    const RoleName& roleName,
-                                                    PrivilegeFormat privileges,
-                                                    AuthenticationRestrictionsFormat restrictions,
-                                                    BSONObj* result) {
-    return _externalState->getRoleDescription(opCtx, roleName, privileges, restrictions, result);
+StatusWith<AuthorizationManager::ResolvedRoleData> AuthorizationManagerImpl::resolveRoles(
+    OperationContext* opCtx, const std::vector<RoleName>& roleNames, ResolveRoleOption option) {
+    return _externalState->resolveRoles(opCtx, roleNames, option);
 }
 
 Status AuthorizationManagerImpl::getRolesDescription(OperationContext* opCtx,
@@ -444,7 +441,7 @@ Status AuthorizationManagerImpl::getRoleDescriptionsForDB(
     PrivilegeFormat privileges,
     AuthenticationRestrictionsFormat restrictions,
     bool showBuiltinRoles,
-    std::vector<BSONObj>* result) {
+    BSONArrayBuilder* result) {
     return _externalState->getRoleDescriptionsForDB(
         opCtx, dbname, privileges, restrictions, showBuiltinRoles, result);
 }

@@ -664,54 +664,96 @@ void addInternalRolePrivileges(PrivilegeVector* privileges) {
     RoleGraph::generateUniversalPrivileges(privileges);
 }
 
+class BuiltinRoleDefinition {
+public:
+    BuiltinRoleDefinition() = delete;
+
+    using AddPrivilegesFn = void (*)(PrivilegeVector*);
+    BuiltinRoleDefinition(bool adminOnly, AddPrivilegesFn fn)
+        : _adminOnly(adminOnly), _addPrivileges(fn) {}
+
+    using AddPrivilegesWithDBFn = void (*)(PrivilegeVector*, StringData);
+    BuiltinRoleDefinition(bool adminOnly, AddPrivilegesWithDBFn fn)
+        : _adminOnly(adminOnly), _addPrivilegesWithDB(fn) {}
+
+    bool adminOnly() const {
+        return _adminOnly;
+    }
+
+    void operator()(PrivilegeVector* result, StringData dbname) const {
+        if (_addPrivileges) {
+            dassert(!_addPrivilegesWithDB);
+            _addPrivileges(result);
+        } else {
+            dassert(_addPrivilegesWithDB);
+            _addPrivilegesWithDB(result, dbname);
+        }
+    }
+
+private:
+    bool _adminOnly;
+    AddPrivilegesFn _addPrivileges = nullptr;
+    AddPrivilegesWithDBFn _addPrivilegesWithDB = nullptr;
+};
+
+const std::map<StringData, BuiltinRoleDefinition> kBuiltinRoles({
+    // All DBs.
+    {BUILTIN_ROLE_READ, {false, addReadOnlyDbPrivileges}},
+    {BUILTIN_ROLE_READ_WRITE, {false, addReadWriteDbPrivileges}},
+    {BUILTIN_ROLE_USER_ADMIN, {false, addUserAdminDbPrivileges}},
+    {BUILTIN_ROLE_DB_ADMIN, {false, addDbAdminDbPrivileges}},
+    {BUILTIN_ROLE_DB_OWNER, {false, addDbOwnerPrivileges}},
+    {BUILTIN_ROLE_ENABLE_SHARDING, {false, addEnableShardingPrivileges}},
+    // Admin Only.
+    {BUILTIN_ROLE_READ_ANY_DB, {true, addReadOnlyAnyDbPrivileges}},
+    {BUILTIN_ROLE_READ_WRITE_ANY_DB, {true, addReadWriteAnyDbPrivileges}},
+    {BUILTIN_ROLE_USER_ADMIN_ANY_DB, {true, addUserAdminAnyDbPrivileges}},
+    {BUILTIN_ROLE_DB_ADMIN_ANY_DB, {true, addDbAdminAnyDbPrivileges}},
+    {BUILTIN_ROLE_CLUSTER_MONITOR, {true, addClusterMonitorPrivileges}},
+    {BUILTIN_ROLE_HOST_MANAGEMENT, {true, addHostManagerPrivileges}},
+    {BUILTIN_ROLE_CLUSTER_MANAGEMENT, {true, addClusterManagerPrivileges}},
+    {BUILTIN_ROLE_CLUSTER_ADMIN, {true, addClusterAdminPrivileges}},
+    {BUILTIN_ROLE_QUERYABLE_BACKUP, {true, addQueryableBackupPrivileges}},
+    {BUILTIN_ROLE_BACKUP, {true, addBackupPrivileges}},
+    {BUILTIN_ROLE_RESTORE, {true, addRestorePrivileges}},
+    {BUILTIN_ROLE_ROOT, {true, addRootRolePrivileges}},
+    {BUILTIN_ROLE_INTERNAL, {true, addInternalRolePrivileges}},
+});
+
 }  // namespace
 
-bool RoleGraph::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeVector* result) {
-    const bool isAdminDB = (roleName.getDB() == ADMIN_DBNAME);
+stdx::unordered_set<RoleName> RoleGraph::getBuiltinRoleNamesForDB(StringData dbname) {
+    const bool isAdmin = dbname == ADMIN_DBNAME;
 
-    if (roleName.getRole() == BUILTIN_ROLE_READ) {
-        addReadOnlyDbPrivileges(result, roleName.getDB());
-    } else if (roleName.getRole() == BUILTIN_ROLE_READ_WRITE) {
-        addReadWriteDbPrivileges(result, roleName.getDB());
-    } else if (roleName.getRole() == BUILTIN_ROLE_USER_ADMIN) {
-        addUserAdminDbPrivileges(result, roleName.getDB());
-    } else if (roleName.getRole() == BUILTIN_ROLE_DB_ADMIN) {
-        addDbAdminDbPrivileges(result, roleName.getDB());
-    } else if (roleName.getRole() == BUILTIN_ROLE_DB_OWNER) {
-        addDbOwnerPrivileges(result, roleName.getDB());
-    } else if (roleName.getRole() == BUILTIN_ROLE_ENABLE_SHARDING) {
-        addEnableShardingPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_READ_ANY_DB) {
-        addReadOnlyAnyDbPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_READ_WRITE_ANY_DB) {
-        addReadWriteAnyDbPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_USER_ADMIN_ANY_DB) {
-        addUserAdminAnyDbPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_DB_ADMIN_ANY_DB) {
-        addDbAdminAnyDbPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_MONITOR) {
-        addClusterMonitorPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_HOST_MANAGEMENT) {
-        addHostManagerPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_MANAGEMENT) {
-        addClusterManagerPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
-        addClusterAdminPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_QUERYABLE_BACKUP) {
-        addQueryableBackupPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_BACKUP) {
-        addBackupPrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_RESTORE) {
-        addRestorePrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_ROOT) {
-        addRootRolePrivileges(result);
-    } else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_INTERNAL) {
-        addInternalRolePrivileges(result);
-    } else {
+    stdx::unordered_set<RoleName> roleNames;
+    for (const auto& [role, def] : kBuiltinRoles) {
+        if (isAdmin || !def.adminOnly()) {
+            roleNames.insert(RoleName(role, dbname));
+        }
+    }
+    return roleNames;
+}
+
+bool RoleGraph::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeVector* result) {
+    auto role = roleName.getRole();
+    auto dbname = roleName.getDB();
+
+    if (!NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow) ||
+        dbname == "$external") {
         return false;
     }
 
-    // One of the roles has matched, otherwise we would have returned already.
+    auto it = kBuiltinRoles.find(role);
+    if (it == kBuiltinRoles.end()) {
+        return false;
+    }
+    const auto& def = it->second;
+
+    if (def.adminOnly() && (dbname != ADMIN_DBNAME)) {
+        return false;
+    }
+
+    def(result, dbname);
     return true;
 }
 
@@ -722,78 +764,28 @@ void RoleGraph::generateUniversalPrivileges(PrivilegeVector* privileges) {
 }
 
 bool RoleGraph::isBuiltinRole(const RoleName& role) {
-    if (!NamespaceString::validDBName(role.getDB(),
-                                      NamespaceString::DollarInDbNameBehavior::Allow) ||
-        role.getDB() == "$external") {
+    auto dbname = role.getDB();
+    if (!NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow) ||
+        dbname == "$external") {
         return false;
     }
 
-    bool isAdminDB = role.getDB() == ADMIN_DBNAME;
-
-    if (role.getRole() == BUILTIN_ROLE_READ) {
-        return true;
-    } else if (role.getRole() == BUILTIN_ROLE_READ_WRITE) {
-        return true;
-    } else if (role.getRole() == BUILTIN_ROLE_USER_ADMIN) {
-        return true;
-    } else if (role.getRole() == BUILTIN_ROLE_DB_ADMIN) {
-        return true;
-    } else if (role.getRole() == BUILTIN_ROLE_DB_OWNER) {
-        return true;
-    } else if (role.getRole() == BUILTIN_ROLE_ENABLE_SHARDING) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_READ_ANY_DB) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_READ_WRITE_ANY_DB) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_USER_ADMIN_ANY_DB) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_DB_ADMIN_ANY_DB) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_CLUSTER_MONITOR) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_HOST_MANAGEMENT) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_CLUSTER_MANAGEMENT) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_BACKUP) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_RESTORE) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_ROOT) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_INTERNAL) {
-        return true;
-    } else if (isAdminDB && role.getRole() == BUILTIN_ROLE_QUERYABLE_BACKUP) {
-        return true;
+    const auto it = kBuiltinRoles.find(role.getRole());
+    if (it == kBuiltinRoles.end()) {
+        return false;
     }
-    return false;
+
+    return !it->second.adminOnly() || (dbname == ADMIN_DBNAME);
 }
 
 void RoleGraph::_createBuiltinRolesForDBIfNeeded(StringData dbname) {
-    _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_READ, dbname));
-    _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_READ_WRITE, dbname));
-    _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_USER_ADMIN, dbname));
-    _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_DB_ADMIN, dbname));
-    _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_DB_OWNER, dbname));
-    _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_ENABLE_SHARDING, dbname));
+    const bool isAdmin = dbname == ADMIN_DBNAME;
 
-    if (dbname == "admin") {
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_READ_ANY_DB, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_READ_WRITE_ANY_DB, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_USER_ADMIN_ANY_DB, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_DB_ADMIN_ANY_DB, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_CLUSTER_MONITOR, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_HOST_MANAGEMENT, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_CLUSTER_MANAGEMENT, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_CLUSTER_ADMIN, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_BACKUP, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_RESTORE, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_ROOT, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_INTERNAL, dbname));
-        _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_QUERYABLE_BACKUP, dbname));
+    for (const auto& [rolename, def] : kBuiltinRoles) {
+        if (def.adminOnly() && !isAdmin) {
+            continue;
+        }
+        _createBuiltinRoleIfNeeded(RoleName(rolename, dbname));
     }
 }
 

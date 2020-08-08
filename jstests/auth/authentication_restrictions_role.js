@@ -35,7 +35,7 @@ function testRestrictionCreationAndEnforcement(
         createRole: "role2",
         roles: [],
         privileges: [],
-        authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
+        authenticationRestrictions: [{clientSource: ["127.0.0.1/32"]}]
     }));
     assert(Object.keys(admin.system.roles.findOne({role: "role2"}))
                .includes("authenticationRestrictions"));

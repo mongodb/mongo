@@ -217,21 +217,54 @@ public:
     virtual Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) = 0;
 
     /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
+     * Options for what data resolveRoles() should mine from the role tree.
+     *
+     * kRoles:        Collect RoleNames in the "roles" field in each role document for subordinates.
+     * kPrivileges:   Examine the "privileges" field in each role document and
+     *                merge "actions" for identicate "resource" patterns.
+     * kRestrictions: Collect the "authenticationRestrictions" field in each role document.
+     *
+     * kDirectOnly:   If specified, only the RoleNames explicitly supplied to resolveRoles()
+     *                will be examined.
+     *                If not specified, then resolveRoles() will continue examining all
+     *                subordinate roles until the tree has been exhausted.
+     *
+     * kAll, kDirectRoles, kDirectPrivileges, kDirectRestrictions, and kDirectAll
+     * exist as convenience aliases for combinations of the above flags.
      */
-    virtual Status getRoleDescription(OperationContext* opCtx,
-                                      const RoleName& roleName,
-                                      PrivilegeFormat privilegeFormat,
-                                      AuthenticationRestrictionsFormat,
-                                      BSONObj* result) = 0;
+    enum ResolveRoleOption : std::uint8_t {
+
+        kRoles = 0x01,
+        kPrivileges = 0x02,
+        kRestrictions = 0x04,
+        kAll = kRoles | kPrivileges | kRestrictions,
+
+        // Only collect from the first pass.
+        kDirectOnly = 0x10,
+
+        kDirectRoles = kRoles | kDirectOnly,
+        kDirectPrivileges = kPrivileges | kDirectOnly,
+        kDirectRestrictions = kRestrictions | kDirectOnly,
+        kDirectAll = kAll | kDirectOnly,
+    };
 
     /**
-     * Convenience wrapper for getRoleDescription() defaulting formats to kOmit.
+     * Return type for resolveRoles().
+     * Each member will be populated ONLY IF their corresponding Option flag was specifed.
+     * Otherwise, they will be equal to boost::none.
      */
-    Status getRoleDescription(OperationContext* ctx, const RoleName& roleName, BSONObj* result) {
-        return getRoleDescription(
-            ctx, roleName, PrivilegeFormat::kOmit, AuthenticationRestrictionsFormat::kOmit, result);
-    }
+    struct ResolvedRoleData {
+        boost::optional<stdx::unordered_set<RoleName>> roles;
+        boost::optional<PrivilegeVector> privileges;
+        boost::optional<RestrictionDocuments> restrictions;
+    };
+
+    /**
+     * Delegates method call to the underlying AuthzManagerExternalState.
+     */
+    virtual StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
+                                                      const std::vector<RoleName>& roleNames,
+                                                      ResolveRoleOption option) = 0;
 
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
@@ -250,7 +283,7 @@ public:
                                             PrivilegeFormat privilegeFormat,
                                             AuthenticationRestrictionsFormat,
                                             bool showBuiltinRoles,
-                                            std::vector<BSONObj>* result) = 0;
+                                            BSONArrayBuilder* result) = 0;
 
     /**
      * Returns a Status or UserHandle for the given userName. If the user cache already has a

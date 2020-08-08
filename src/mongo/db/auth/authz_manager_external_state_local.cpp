@@ -38,6 +38,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/user_document_parser.h"
@@ -50,6 +51,7 @@
 namespace mongo {
 
 using std::vector;
+using ResolveRoleOption = AuthzManagerExternalStateLocal::ResolveRoleOption;
 
 Status AuthzManagerExternalStateLocal::initialize(OperationContext* opCtx) {
     Status status = _initializeRoleGraph(opCtx);
@@ -144,6 +146,101 @@ void addAuthenticationRestrictionObjectsToArrayElement(
         fassert(40560, restrictionsElement.appendArray("", r->toBSON()));
     }
 }
+
+void serializeResolvedRoles(BSONObjBuilder* user,
+                            const AuthzManagerExternalState::ResolvedRoleData& data,
+                            const BSONObj& roleDoc) {
+    BSONArrayBuilder rolesBuilder(user->subarrayStart("inheritedRoles"));
+    for (const auto& roleName : data.roles.get()) {
+        roleName.serializeToBSON(&rolesBuilder);
+    }
+    rolesBuilder.doneFast();
+
+    if (data.privileges) {
+        BSONArrayBuilder privsBuilder(user->subarrayStart("inheritedPrivileges"));
+        for (const auto& privilege : data.privileges.get()) {
+            privsBuilder.append(privilege.toBSON());
+        }
+        privsBuilder.doneFast();
+    }
+
+    if (data.restrictions) {
+        BSONArrayBuilder arBuilder(user->subarrayStart("inheritedAuthenticationRestrictions"));
+        if (auto ar = roleDoc["authenticationRestrictions"];
+            (ar.type() == Array) && (ar.Obj().nFields() > 0)) {
+            arBuilder.append(ar);
+        }
+        if (auto ar = data.restrictions->toBSON(); ar.nFields() > 0) {
+            arBuilder.append(ar);
+        }
+        arBuilder.doneFast();
+    }
+}
+
+/**
+ * Make sure the roleDoc as retreived from storage matches expectations for options.
+ */
+constexpr auto kRolesFieldName = "roles"_sd;
+constexpr auto kPrivilegesFieldName = "privileges"_sd;
+constexpr auto kAuthenticationRestrictionFieldName = "authenticationRestrictions"_sd;
+
+std::vector<RoleName> filterAndMapRole(BSONObjBuilder* builder,
+                                       BSONObj role,
+                                       ResolveRoleOption option) {
+    std::vector<RoleName> subRoles;
+    bool sawRestrictions = false;
+
+    for (const auto& elem : role) {
+        if (elem.fieldNameStringData() == kRolesFieldName) {
+            uassert(
+                ErrorCodes::BadValue, "Invalid roles field, expected array", elem.type() == Array);
+            for (const auto& roleName : elem.Obj()) {
+                subRoles.push_back(RoleName::parseFromBSON(roleName));
+            }
+            if ((option & ResolveRoleOption::kRoles) == 0) {
+                continue;
+            }
+        }
+
+        if ((elem.fieldNameStringData() == kPrivilegesFieldName) &&
+            ((option & ResolveRoleOption::kPrivileges) == 0)) {
+            continue;
+        }
+
+        if (elem.fieldNameStringData() == kAuthenticationRestrictionFieldName) {
+            sawRestrictions = true;
+            if (option & ResolveRoleOption::kRestrictions) {
+                BSONArrayBuilder arBuilder(
+                    builder->subarrayStart(kAuthenticationRestrictionFieldName));
+                arBuilder.append(elem);
+                arBuilder.doneFast();
+            }
+            continue;
+        }
+
+        builder->append(elem);
+    }
+
+    if (!sawRestrictions && (option & ResolveRoleOption::kRestrictions)) {
+        builder->append(kAuthenticationRestrictionFieldName, BSONArray());
+    }
+
+    return subRoles;
+}
+
+ResolveRoleOption makeResolveRoleOption(PrivilegeFormat showPrivileges,
+                                        AuthenticationRestrictionsFormat showRestrictions) {
+    auto option = ResolveRoleOption::kRoles;
+    if (showPrivileges != PrivilegeFormat::kOmit) {
+        option = static_cast<ResolveRoleOption>(option | ResolveRoleOption::kPrivileges);
+    }
+    if (showRestrictions != AuthenticationRestrictionsFormat::kOmit) {
+        option = static_cast<ResolveRoleOption>(option | ResolveRoleOption::kRestrictions);
+    }
+
+    return option;
+}
+
 }  // namespace
 
 bool AuthzManagerExternalStateLocal::_checkHasAnyPrivilegeDocuments(OperationContext* opCtx) {
@@ -312,142 +409,164 @@ Status AuthzManagerExternalStateLocal::rolesExist(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status AuthzManagerExternalStateLocal::getRoleDescription(
-    OperationContext* opCtx,
-    const RoleName& roleName,
-    PrivilegeFormat showPrivileges,
-    AuthenticationRestrictionsFormat showRestrictions,
-    BSONObj* result) {
-    if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
-        mutablebson::Document resultDoc;
-        mutablebson::Element rolesElement = resultDoc.makeElementArray("roles");
-        fassert(40273, resultDoc.root().pushBack(rolesElement));
-        addRoleNameObjectsToArrayElement(
-            rolesElement, makeRoleNameIteratorForContainer(std::vector<RoleName>{roleName}));
-        resolveUserRoles(&resultDoc, {roleName});
-        *result = resultDoc.getObject();
-        return Status::OK();
+using ResolvedRoleData = AuthzManagerExternalState::ResolvedRoleData;
+StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
+    OperationContext* opCtx, const std::vector<RoleName>& roleNames, ResolveRoleOption option) try {
+    using RoleNameSet = typename decltype(ResolvedRoleData::roles)::value_type;
+    const bool processRoles = option & ResolveRoleOption::kRoles;
+    const bool processPrivs = option & ResolveRoleOption::kPrivileges;
+    const bool processRests = option & ResolveRoleOption::kRestrictions;
+    const bool walkIndirect = (option & ResolveRoleOption::kDirectOnly) == 0;
+
+    RoleNameSet inheritedRoles;
+    PrivilegeVector inheritedPrivileges;
+    RestrictionDocuments::sequence_type inheritedRestrictions;
+
+    RoleNameSet frontier(roleNames.cbegin(), roleNames.cend());
+    RoleNameSet visited;
+    while (!frontier.empty()) {
+        RoleNameSet nextFrontier;
+        for (const auto& role : frontier) {
+            visited.insert(role);
+
+            if (RoleGraph::isBuiltinRole(role)) {
+                if (processPrivs) {
+                    RoleGraph::addPrivilegesForBuiltinRole(role, &inheritedPrivileges);
+                }
+                continue;
+            }
+
+            BSONObj roleDoc;
+            auto status = findOne(
+                opCtx, AuthorizationManager::rolesCollectionNamespace, role.toBSON(), &roleDoc);
+            if (!status.isOK()) {
+                if (status.code() == ErrorCodes::NoMatchingDocument) {
+                    return {ErrorCodes::RoleNotFound,
+                            str::stream() << "Role '" << role.getFullName() << "' does not exist"};
+                }
+                return status;
+            }
+
+            BSONElement elem;
+            if ((processRoles || walkIndirect) && (elem = roleDoc["roles"])) {
+                if (elem.type() != Array) {
+                    return {ErrorCodes::BadValue,
+                            str::stream()
+                                << "Invalid 'roles' field in role document '" << role.getFullName()
+                                << "', expected an array but found " << typeName(elem.type())};
+                }
+                for (const auto& subroleElem : elem.Obj()) {
+                    auto subrole = RoleName::parseFromBSON(subroleElem);
+                    if (visited.count(subrole) || nextFrontier.count(subrole)) {
+                        continue;
+                    }
+                    if (walkIndirect) {
+                        nextFrontier.insert(subrole);
+                    }
+                    if (processRoles) {
+                        inheritedRoles.insert(std::move(subrole));
+                    }
+                }
+            }
+
+            if (processPrivs && (elem = roleDoc["privileges"])) {
+                if (elem.type() != Array) {
+                    return {ErrorCodes::BadValue,
+                            str::stream() << "Invalid 'privileges' field in role document '"
+                                          << role.getFullName() << "'"};
+                }
+                for (const auto& privElem : elem.Obj()) {
+                    auto priv = Privilege::fromBSON(privElem);
+                    Privilege::addPrivilegeToPrivilegeVector(&inheritedPrivileges, priv);
+                }
+            }
+
+            if (processRests && (elem = roleDoc["authenticationRestrictions"])) {
+                if (elem.type() != Array) {
+                    return {ErrorCodes::BadValue,
+                            str::stream()
+                                << "Invalid 'authenticationRestrictions' field in role document '"
+                                << role.getFullName() << "'"};
+                }
+                inheritedRestrictions.push_back(
+                    uassertStatusOK(parseAuthenticationRestriction(BSONArray(elem.Obj()))));
+            }
+        }
+        frontier = std::move(nextFrontier);
     }
-    stdx::lock_guard<Latch> lk(_roleGraphMutex);
-    return _getRoleDescription_inlock(roleName, showPrivileges, showRestrictions, result);
+
+    ResolvedRoleData ret;
+    if (processRoles) {
+        ret.roles = std::move(inheritedRoles);
+    }
+    if (processPrivs) {
+        ret.privileges = std::move(inheritedPrivileges);
+    }
+    if (processRests) {
+        ret.restrictions = RestrictionDocuments(std::move(inheritedRestrictions));
+    }
+
+    return ret;
+} catch (const AssertionException& ex) {
+    return ex.toStatus();
 }
 
 Status AuthzManagerExternalStateLocal::getRolesDescription(
     OperationContext* opCtx,
-    const std::vector<RoleName>& roles,
+    const std::vector<RoleName>& roleNames,
     PrivilegeFormat showPrivileges,
     AuthenticationRestrictionsFormat showRestrictions,
     BSONObj* result) {
+    auto option = makeResolveRoleOption(showPrivileges, showRestrictions);
+
     if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
-        mutablebson::Document resultDoc;
-        mutablebson::Element rolesElement = resultDoc.makeElementArray("roles");
-        fassert(40274, resultDoc.root().pushBack(rolesElement));
-        addRoleNameObjectsToArrayElement(rolesElement, makeRoleNameIteratorForContainer(roles));
-        resolveUserRoles(&resultDoc, roles);
-        *result = resultDoc.getObject();
+        BSONObjBuilder fragment;
+
+        BSONArrayBuilder rolesBuilder(fragment.subarrayStart("roles"));
+        for (const auto& roleName : roleNames) {
+            roleName.serializeToBSON(&rolesBuilder);
+        }
+        rolesBuilder.doneFast();
+
+        auto swData = resolveRoles(opCtx, roleNames, option);
+        if (!swData.isOK()) {
+            return swData.getStatus();
+        }
+        auto data = std::move(swData.getValue());
+        data.roles->insert(roleNames.cbegin(), roleNames.cend());
+        serializeResolvedRoles(&fragment, data, BSONObj());
+        *result = fragment.obj();
         return Status::OK();
     }
 
-    stdx::lock_guard<Latch> lk(_roleGraphMutex);
-    BSONArrayBuilder resultBuilder;
-    for (const RoleName& role : roles) {
-        BSONObj roleDoc;
-        Status status =
-            _getRoleDescription_inlock(role, showPrivileges, showRestrictions, &roleDoc);
-        if (!status.isOK()) {
-            if (status.code() == ErrorCodes::RoleNotFound) {
-                continue;
+    BSONArrayBuilder rolesBuilder;
+    for (const RoleName& role : roleNames) {
+        try {
+            BSONObj roleDoc;
+            auto status = findOne(
+                opCtx, AuthorizationManager::rolesCollectionNamespace, role.toBSON(), &roleDoc);
+            if (!status.isOK()) {
+                if (status.code() == ErrorCodes::NoMatchingDocument) {
+                    continue;
+                }
+                uassertStatusOK(status);  // throws
             }
-            return status;
-        }
-        resultBuilder << roleDoc;
-    }
-    *result = resultBuilder.arr();
-    return Status::OK();
-}
 
-Status AuthzManagerExternalStateLocal::_getRoleDescription_inlock(
-    const RoleName& roleName,
-    PrivilegeFormat showPrivileges,
-    AuthenticationRestrictionsFormat showRestrictions,
-    BSONObj* result) {
-    if (!_roleGraph.roleExists(roleName))
-        return Status(ErrorCodes::RoleNotFound, "No role named " + roleName.toString());
+            BSONObjBuilder roleBuilder(rolesBuilder.subobjStart());
+            auto subRoles = filterAndMapRole(&roleBuilder, roleDoc, option);
+            auto data = uassertStatusOK(resolveRoles(opCtx, subRoles, option));
+            data.roles->insert(subRoles.cbegin(), subRoles.cend());
+            serializeResolvedRoles(&roleBuilder, data, roleDoc);
 
-    mutablebson::Document resultDoc;
-    fassert(17162,
-            resultDoc.root().appendString(AuthorizationManager::ROLE_NAME_FIELD_NAME,
-                                          roleName.getRole()));
-    fassert(
-        17163,
-        resultDoc.root().appendString(AuthorizationManager::ROLE_DB_FIELD_NAME, roleName.getDB()));
-    fassert(17267, resultDoc.root().appendBool("isBuiltin", _roleGraph.isBuiltinRole(roleName)));
-
-    auto warningsElement = resultDoc.makeElementArray("warnings");
-
-    auto rolesElement = resultDoc.makeElementArray("roles");
-    fassert(17164, resultDoc.root().pushBack(rolesElement));
-    addRoleNameObjectsToArrayElement(rolesElement, _roleGraph.getDirectSubordinates(roleName));
-
-    auto inheritedRolesElement = resultDoc.makeElementArray("inheritedRoles");
-    fassert(17165, resultDoc.root().pushBack(inheritedRolesElement));
-
-    auto privilegesElement = resultDoc.makeElementArray("privileges");
-    if (showPrivileges == PrivilegeFormat::kShowSeparate) {
-        fassert(17166, resultDoc.root().pushBack(privilegesElement));
-    }
-
-    if (showRestrictions == AuthenticationRestrictionsFormat::kShow) {
-        auto authenticationRestrictionsElement =
-            resultDoc.makeElementArray("authenticationRestrictions");
-        fassert(40559, resultDoc.root().pushBack(authenticationRestrictionsElement));
-
-        const auto& restrictions = _roleGraph.getDirectAuthenticationRestrictions(roleName);
-        if (restrictions.get()) {
-            fassert(40561,
-                    authenticationRestrictionsElement.appendArray("", restrictions->toBSON()));
+            roleBuilder.doneFast();
+        } catch (const AssertionException& ex) {
+            return {ex.code(),
+                    str::stream() << "Failed fetching role '" << role.getFullName()
+                                  << "': " << ex.reason()};
         }
     }
 
-    if (_roleGraphState == roleGraphStateConsistent) {
-        addRoleNameObjectsToArrayElement(inheritedRolesElement,
-                                         _roleGraph.getIndirectSubordinates(roleName));
-
-        if (showPrivileges == PrivilegeFormat::kShowSeparate) {
-            auto inheritedPrivilegesElement = resultDoc.makeElementArray("inheritedPrivileges");
-            addPrivilegeObjectsOrWarningsToArrayElement(
-                privilegesElement, warningsElement, _roleGraph.getDirectPrivileges(roleName));
-
-            addPrivilegeObjectsOrWarningsToArrayElement(
-                inheritedPrivilegesElement, warningsElement, _roleGraph.getAllPrivileges(roleName));
-
-            fassert(17323, resultDoc.root().pushBack(inheritedPrivilegesElement));
-        }
-
-        if (showRestrictions == AuthenticationRestrictionsFormat::kShow) {
-            auto inheritedAuthenticationRestrictionsElement =
-                resultDoc.makeElementArray("inheritedAuthenticationRestrictions");
-            fassert(40563, resultDoc.root().pushBack(inheritedAuthenticationRestrictionsElement));
-
-            for (const auto& restrictions : _roleGraph.getAllAuthenticationRestrictions(roleName)) {
-                fassert(40562,
-                        inheritedAuthenticationRestrictionsElement.appendArray(
-                            "", restrictions->toBSON()));
-            }
-        }
-    } else if (showPrivileges == PrivilegeFormat::kShowSeparate) {
-        addPrivilegeObjectsOrWarningsToArrayElement(
-            privilegesElement, warningsElement, _roleGraph.getDirectPrivileges(roleName));
-        fassert(40557,
-                warningsElement.appendString("",
-                                             "Role graph state inconsistent; only direct "
-                                             "privileges and restrictions available."));
-    }
-
-    if (warningsElement.hasChildren()) {
-        fassert(17167, resultDoc.root().pushBack(warningsElement));
-    }
-    *result = resultDoc.getObject();
+    *result = rolesBuilder.arr();
     return Status::OK();
 }
 
@@ -457,26 +576,70 @@ Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
     PrivilegeFormat showPrivileges,
     AuthenticationRestrictionsFormat showRestrictions,
     bool showBuiltinRoles,
-    vector<BSONObj>* result) {
+    BSONArrayBuilder* result) {
+    auto option = makeResolveRoleOption(showPrivileges, showRestrictions);
+
     if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
-        return Status(ErrorCodes::IllegalOperation,
-                      "Cannot get user fragment for all roles in a database");
+        return {ErrorCodes::IllegalOperation,
+                "Cannot get user fragment for all roles in a database"};
     }
 
-    stdx::lock_guard<Latch> lk(_roleGraphMutex);
-    for (RoleNameIterator it = _roleGraph.getRolesForDatabase(dbname); it.more(); it.next()) {
-        if (!showBuiltinRoles && _roleGraph.isBuiltinRole(it.get())) {
-            continue;
+    if (showBuiltinRoles) {
+        for (const auto& roleName : RoleGraph::getBuiltinRoleNamesForDB(dbname)) {
+            BSONObjBuilder roleBuilder(result->subobjStart());
+
+            roleBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName.getRole());
+            roleBuilder.append(AuthorizationManager::ROLE_DB_FIELD_NAME, roleName.getDB());
+            roleBuilder.append("isBuiltin", true);
+
+            roleBuilder.append("roles", BSONArray());
+            roleBuilder.append("inheritedRoles", BSONArray());
+
+            if (showPrivileges == PrivilegeFormat::kShowSeparate) {
+                BSONArrayBuilder privsBuilder(roleBuilder.subarrayStart("privileges"));
+                PrivilegeVector privs;
+                RoleGraph::addPrivilegesForBuiltinRole(roleName, &privs);
+                for (const auto& privilege : privs) {
+                    privsBuilder.append(privilege.toBSON());
+                }
+                privsBuilder.doneFast();
+
+                // Builtin roles have identival privs/inheritedPrivs
+                BSONArrayBuilder ipBuilder(roleBuilder.subarrayStart("inheritedPrivileges"));
+                for (const auto& privilege : privs) {
+                    ipBuilder.append(privilege.toBSON());
+                }
+                ipBuilder.doneFast();
+            }
+
+            if (showRestrictions == AuthenticationRestrictionsFormat::kShow) {
+                roleBuilder.append("authenticationRestrictions", BSONArray());
+                roleBuilder.append("inheritedAuthenticationRestrictions", BSONArray());
+            }
+
+            roleBuilder.doneFast();
         }
-        BSONObj roleDoc;
-        Status status =
-            _getRoleDescription_inlock(it.get(), showPrivileges, showRestrictions, &roleDoc);
-        if (!status.isOK()) {
-            return status;
-        }
-        result->push_back(roleDoc);
     }
-    return Status::OK();
+
+    return query(opCtx,
+                 AuthorizationManager::rolesCollectionNamespace,
+                 BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname),
+                 BSONObj(),
+                 [&](const BSONObj& roleDoc) {
+                     try {
+                         BSONObjBuilder roleBuilder(result->subobjStart());
+
+                         auto subRoles = filterAndMapRole(&roleBuilder, roleDoc, option);
+                         roleBuilder.append("isBuiltin", false);
+                         auto data = uassertStatusOK(resolveRoles(opCtx, subRoles, option));
+                         data.roles->insert(subRoles.cbegin(), subRoles.cend());
+                         serializeResolvedRoles(&roleBuilder, data, roleDoc);
+                         roleBuilder.doneFast();
+                         return Status::OK();
+                     } catch (const AssertionException& ex) {
+                         return ex.toStatus();
+                     }
+                 });
 }
 
 namespace {

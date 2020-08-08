@@ -84,6 +84,12 @@ BSONObj Privilege::toBSON() const {
     return pp.toBSON();
 }
 
+Privilege Privilege::fromBSON(const BSONElement elem) {
+    uassert(
+        ErrorCodes::BadValue, "Privilege documents must be of type object", elem.type() == Object);
+    return fromBSON(elem.Obj());
+}
+
 Privilege Privilege::fromBSON(BSONObj obj) {
     ParsedPrivilege pp;
     std::string errmsg;

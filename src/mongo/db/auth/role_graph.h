@@ -73,6 +73,11 @@ public:
      */
     static bool addPrivilegesForBuiltinRole(const RoleName& role, PrivilegeVector* privileges);
 
+    /**
+     * Ennumerate all builtin RoleNames for the given database.
+     */
+    static stdx::unordered_set<RoleName> getBuiltinRoleNamesForDB(StringData dbname);
+
     // Swaps the contents of this RoleGraph with those of "other"
     void swap(RoleGraph& other);
 

@@ -53,12 +53,12 @@ namespace auth {
 
 std::vector<RoleName> resolveRoleNames(const std::vector<RoleNameOrString>& possibleRoles,
                                        StringData dbname) {
-    std::vector<RoleName> roles;
-    std::transform(possibleRoles.cbegin(),
-                   possibleRoles.cend(),
-                   std::back_inserter(roles),
-                   [dbname](const auto& possibleRole) { return possibleRole.getRoleName(dbname); });
-    return roles;
+    // De-duplicate as we resolve names by using a set.
+    stdx::unordered_set<RoleName> roles;
+    for (const auto& possibleRole : possibleRoles) {
+        roles.insert(possibleRole.getRoleName(dbname));
+    }
+    return std::vector<RoleName>(roles.cbegin(), roles.cend());
 }
 
 Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,

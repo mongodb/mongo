@@ -59,11 +59,9 @@ public:
     Status getUserDescription(OperationContext* opCtx,
                               const UserRequest& user,
                               BSONObj* result) final;
-    Status getRoleDescription(OperationContext* opCtx,
-                              const RoleName& roleName,
-                              PrivilegeFormat showPrivileges,
-                              AuthenticationRestrictionsFormat,
-                              BSONObj* result) final;
+    StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
+                                              const std::vector<RoleName>& roleNames,
+                                              ResolveRoleOption option) override;
     Status getRolesDescription(OperationContext* opCtx,
                                const std::vector<RoleName>& roles,
                                PrivilegeFormat showPrivileges,
@@ -74,7 +72,7 @@ public:
                                     PrivilegeFormat showPrivileges,
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,
-                                    std::vector<BSONObj>* result) final;
+                                    BSONArrayBuilder* result) final;
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;
 };

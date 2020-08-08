@@ -63,11 +63,9 @@ public:
                               const UserRequest& user,
                               BSONObj* result) override;
     Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) override;
-    Status getRoleDescription(OperationContext* opCtx,
-                              const RoleName& roleName,
-                              PrivilegeFormat showPrivileges,
-                              AuthenticationRestrictionsFormat,
-                              BSONObj* result) override;
+    StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
+                                              const std::vector<RoleName>& roleNames,
+                                              ResolveRoleOption option) override;
     Status getRolesDescription(OperationContext* opCtx,
                                const std::vector<RoleName>& roles,
                                PrivilegeFormat showPrivileges,
@@ -78,7 +76,7 @@ public:
                                     PrivilegeFormat showPrivileges,
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,
-                                    std::vector<BSONObj>* result) override;
+                                    BSONArrayBuilder* result) override;
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final {
         return _hasAnyPrivilegeDocuments.load();
@@ -157,11 +155,6 @@ private:
      * Fetches the user document for "userName" from local storage, and stores it into "result".
      */
     Status _getUserDocument(OperationContext* opCtx, const UserName& userName, BSONObj* result);
-
-    Status _getRoleDescription_inlock(const RoleName& roleName,
-                                      PrivilegeFormat showPrivileges,
-                                      AuthenticationRestrictionsFormat showRestrictions,
-                                      BSONObj* result);
 
     /**
      * Returns true if the auth DB contains any users or roles.
