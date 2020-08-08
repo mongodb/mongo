@@ -636,16 +636,18 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     timestamps.reserve(count);
 
     for (auto it = begin; it != end; it++) {
-        if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
-            char copyBuffer[it->doc.objsize()];
-            std::memcpy(copyBuffer, it->doc.objdata(), it->doc.objsize());
-            copyBuffer[5] = 0x90;
+        const auto& doc = it->doc;
 
-            records.emplace_back(Record{RecordId(), RecordData(copyBuffer, it->doc.objsize())});
+        if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
+            std::string copyBuffer(doc.objdata(), doc.objdata() + doc.objsize() + 1);
+            copyBuffer.data()[5] = char(0x90);
+
+            records.emplace_back(
+                Record{RecordId(), RecordData(copyBuffer.c_str(), copyBuffer.size())});
             timestamps.emplace_back(it->oplogSlot.getTimestamp());
             continue;
         }
-        records.emplace_back(Record{RecordId(), RecordData(it->doc.objdata(), it->doc.objsize())});
+        records.emplace_back(Record{RecordId(), RecordData(doc.objdata(), doc.objsize())});
         timestamps.emplace_back(it->oplogSlot.getTimestamp());
     }
     Status status = _recordStore->insertRecords(opCtx, &records, timestamps);
