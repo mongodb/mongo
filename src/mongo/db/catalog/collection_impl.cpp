@@ -639,7 +639,7 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
         const auto& doc = it->doc;
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
-            std::string copyBuffer(doc.objdata(), doc.objdata() + doc.objsize() + 1);
+            std::string copyBuffer(doc.objdata(), doc.objsize());
             copyBuffer.data()[5] = char(0x90);
 
             records.emplace_back(
