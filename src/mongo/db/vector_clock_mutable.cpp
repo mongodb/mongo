@@ -36,7 +36,6 @@
 #include "mongo/logv2/log.h"
 
 namespace mongo {
-
 namespace {
 
 const auto vectorClockMutableDecoration = ServiceContext::declareDecoration<VectorClockMutable*>();

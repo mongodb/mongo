@@ -34,9 +34,6 @@
 namespace mongo {
 namespace {
 
-/**
- * Vector clock implementation for mongos.
- */
 class VectorClockMongoS : public VectorClock {
     VectorClockMongoS(const VectorClockMongoS&) = delete;
     VectorClockMongoS& operator=(const VectorClockMongoS&) = delete;
@@ -45,7 +42,9 @@ public:
     VectorClockMongoS();
     virtual ~VectorClockMongoS();
 
-protected:
+private:
+    // VectorClock methods implementation
+
     bool _gossipOutInternal(OperationContext* opCtx,
                             BSONObjBuilder* out,
                             const LogicalTimeArray& time) const override;
@@ -58,7 +57,9 @@ protected:
     LogicalTimeArray _gossipInExternal(OperationContext* opCtx,
                                        const BSONObj& in,
                                        bool couldBeUnauthenticated) override;
-    bool _permitRefreshDuringGossipOut() const override;
+    bool _permitRefreshDuringGossipOut() const override {
+        return true;
+    }
 };
 
 const auto vectorClockMongoSDecoration = ServiceContext::declareDecoration<VectorClockMongoS>();
@@ -106,10 +107,6 @@ VectorClock::LogicalTimeArray VectorClockMongoS::_gossipInExternal(OperationCont
     LogicalTimeArray newTime;
     _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
     return newTime;
-}
-
-bool VectorClockMongoS::_permitRefreshDuringGossipOut() const {
-    return true;
 }
 
 }  // namespace

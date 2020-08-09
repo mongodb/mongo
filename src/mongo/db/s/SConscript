@@ -159,7 +159,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
-        '$BUILD_DIR/mongo/db/vector_clock_mutable',
+        '$BUILD_DIR/mongo/db/vector_clock_mongod',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/grid',
         'sharding_api_d',
@@ -249,11 +249,11 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
+        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
         '$BUILD_DIR/mongo/db/snapshot_window_options',
-        '$BUILD_DIR/mongo/db/vector_clock_mutable',
+        '$BUILD_DIR/mongo/db/vector_clock_mongod',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
     ],
 )
 
@@ -304,6 +304,7 @@ env.Library(
         'split_vector_command.cpp',
         'txn_two_phase_commit_cmds.cpp',
         'unset_sharding_command.cpp',
+        'vector_clock_persist_command.cpp',
         'wait_for_ongoing_chunk_splits_command.cpp',
     ],
     LIBDEPS_PRIVATE=[

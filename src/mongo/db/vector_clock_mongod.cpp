@@ -43,9 +43,6 @@
 namespace mongo {
 namespace {
 
-/**
- * Vector clock implementation for mongod.
- */
 class VectorClockMongoD : public VectorClockMutable,
                           public ReplicaSetAwareService<VectorClockMongoD> {
     VectorClockMongoD(const VectorClockMongoD&) = delete;
@@ -63,9 +60,9 @@ public:
     SharedSemiFuture<void> recover() override;
     void waitForVectorClockToBeRecovered() override;
 
-    void _tickTo(Component component, LogicalTime newTime) override;
+private:
+    // VectorClock methods implementation
 
-protected:
     bool _gossipOutInternal(OperationContext* opCtx,
                             BSONObjBuilder* out,
                             const LogicalTimeArray& time) const override;
@@ -78,11 +75,17 @@ protected:
     LogicalTimeArray _gossipInExternal(OperationContext* opCtx,
                                        const BSONObj& in,
                                        bool couldBeUnauthenticated) override;
-    bool _permitRefreshDuringGossipOut() const override;
+    bool _permitRefreshDuringGossipOut() const override {
+        return false;
+    }
+
+    // VectorClockMutable methods implementation
 
     LogicalTime _tick(Component component, uint64_t nTicks) override;
+    void _tickTo(Component component, LogicalTime newTime) override;
 
-private:
+    // ReplicaSetAwareService methods implementation
+
     void onStartup(OperationContext* opCtx) override {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override {}
     void onStepUpComplete(OperationContext* opCtx, long long term) override {}
@@ -381,10 +384,6 @@ VectorClock::LogicalTimeArray VectorClockMongoD::_gossipInExternal(OperationCont
     LogicalTimeArray newTime;
     _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
     return newTime;
-}
-
-bool VectorClockMongoD::_permitRefreshDuringGossipOut() const {
-    return false;
 }
 
 LogicalTime VectorClockMongoD::_tick(Component component, uint64_t nTicks) {

@@ -44,6 +44,7 @@ public:
     // clock implementation.
     static VectorClockMutable* get(ServiceContext* service);
     static VectorClockMutable* get(OperationContext* ctx);
+
     static void registerVectorClockOnServiceContext(ServiceContext* service,
                                                     VectorClockMutable* vectorClockMutable);
 
@@ -59,7 +60,7 @@ public:
     }
     LogicalTime tickTopologyTime(uint64_t nTicks) {
         return _tick(Component::TopologyTime, nTicks);
-    };
+    }
 
     /**
      * Authoritatively ticks the current time of the specified component to newTime.
@@ -91,16 +92,16 @@ protected:
     LogicalTime _advanceComponentTimeByTicks(Component component, uint64_t nTicks);
 
     /**
-     * Returns the next time value for the component, and provides a guarantee that any future call
-     * to tick() will return a value at least 'nTicks' ticks in the future from the current time.
-     */
-    virtual LogicalTime _tick(Component component, uint64_t nTicks) = 0;
-
-    /**
      * Called by sublclasses in order to actually tickTo a Component time, once they have determined
      * that doing so is permissible.
      */
     void _advanceComponentTimeTo(Component component, LogicalTime&& newTime);
+
+    /**
+     * Returns the next time value for the component, and provides a guarantee that any future call
+     * to tick() will return a value at least 'nTicks' ticks in the future from the current time.
+     */
+    virtual LogicalTime _tick(Component component, uint64_t nTicks) = 0;
 
     /**
      * Authoritatively ticks the current time of the Component to newTime.

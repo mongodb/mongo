@@ -45,10 +45,8 @@ public:
     VectorClockTrivial();
     virtual ~VectorClockTrivial();
 
-    void _tickTo(Component component, LogicalTime newTime) override;
-
-protected:
-    LogicalTime _tick(Component component, uint64_t nTicks) override;
+private:
+    // VectorClock methods implementation
 
     bool _gossipOutInternal(OperationContext* opCtx,
                             BSONObjBuilder* out,
@@ -62,7 +60,14 @@ protected:
     LogicalTimeArray _gossipInExternal(OperationContext* opCtx,
                                        const BSONObj& in,
                                        bool couldBeUnauthenticated) override;
-    bool _permitRefreshDuringGossipOut() const override;
+    bool _permitRefreshDuringGossipOut() const override {
+        return false;
+    }
+
+    // VectorClockMutable methods implementation
+
+    LogicalTime _tick(Component component, uint64_t nTicks) override;
+    void _tickTo(Component component, LogicalTime newTime) override;
 };
 
 const auto vectorClockTrivialDecoration = ServiceContext::declareDecoration<VectorClockTrivial>();
@@ -106,10 +111,6 @@ VectorClock::LogicalTimeArray VectorClockTrivial::_gossipInExternal(OperationCon
                                                                     bool couldBeUnauthenticated) {
     // Clocks are not gossipped in trivial (non-distributed) environments.
     return {};
-}
-
-bool VectorClockTrivial::_permitRefreshDuringGossipOut() const {
-    return false;
 }
 
 LogicalTime VectorClockTrivial::_tick(Component component, uint64_t nTicks) {

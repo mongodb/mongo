@@ -166,9 +166,9 @@ public:
     // The _id value of the vector clock singleton document.
     static constexpr StringData kDocIdKey = "vectorClockState"_sd;
 
-    // Methods used for unit-testing only
-
-    void resetVectorClock_forTest();
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // The group of methods below is only used for unit-testing
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     void advanceClusterTime_forTest(LogicalTime newTime) {
         _advanceTime_forTest(Component::ClusterTime, newTime);
@@ -181,6 +181,8 @@ public:
     void advanceTopologyTime_forTest(LogicalTime newTime) {
         _advanceTime_forTest(Component::TopologyTime, newTime);
     }
+
+    void resetVectorClock_forTest();
 
 protected:
     class ComponentFormat {
@@ -311,21 +313,26 @@ protected:
      */
     void _advanceTime(LogicalTimeArray&& newTime);
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // The group of methods below is only used for unit-testing
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     void _advanceTime_forTest(Component component, LogicalTime newTime);
 
     // Initialised only once, when the specific vector clock instance gets instantiated on the
     // service context
     ServiceContext* _service{nullptr};
 
-    // The mutex protects _vectorTime and _isEnabled.
+    // Protects the fields below
     //
     // Note that ConfigTime is advanced under the ReplicationCoordinator mutex, so to avoid
     // potential deadlocks the ReplicationCoordator mutex should never be acquired whilst the
     // VectorClock mutex is held.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("VectorClock::_mutex");
 
-    LogicalTimeArray _vectorTime;
     bool _isEnabled{true};
+
+    LogicalTimeArray _vectorTime;
 
 private:
     class PlainComponentFormat;

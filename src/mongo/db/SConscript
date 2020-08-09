@@ -1630,19 +1630,18 @@ env.Library(
 env.Library(
     target='vector_clock_mongod',
     source=[
-        'vector_clock_persist_command.cpp',
         'vector_clock_mongod.cpp',
     ],
     LIBDEPS=[
         'vector_clock_mutable',
     ],
     LIBDEPS_PRIVATE=[
-        'dbdirectclient',
-        'rw_concern_d',
-        'repl/replica_set_aware_service',
-        'server_options_core',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/s/grid',
+        'dbdirectclient',
+        'repl/replica_set_aware_service',
+        'rw_concern_d',
+        'server_options_core',
     ],
 )
 

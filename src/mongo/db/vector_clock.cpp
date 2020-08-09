@@ -40,7 +40,6 @@
 #include "mongo/util/static_immortal.h"
 
 namespace mongo {
-
 namespace {
 
 const auto vectorClockDecoration = ServiceContext::declareDecoration<VectorClock*>();

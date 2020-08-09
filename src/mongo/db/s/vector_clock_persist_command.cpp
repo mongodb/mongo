@@ -31,10 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <set>
-
 #include "mongo/db/commands.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/vector_clock.h"
 
 namespace mongo {
@@ -51,7 +48,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
@@ -63,11 +60,9 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname_unused,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        auto sc = opCtx->getServiceContext();
-        auto vc = VectorClock::get(sc);
-
-        vc->persist().get(opCtx);
+             BSONObjBuilder& result) override {
+        auto* const vectorClock = VectorClock::get(opCtx->getServiceContext());
+        vectorClock->persist().get(opCtx);
 
         return true;
     }
