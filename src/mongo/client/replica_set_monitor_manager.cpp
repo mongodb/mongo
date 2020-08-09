@@ -198,6 +198,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const
         newMonitor = StreamableReplicaSetMonitor::make(uri, getExecutor(), _getConnectionManager());
     }
     _monitors[setName] = newMonitor;
+    _numMonitorsCreated++;
     return newMonitor;
 }
 
@@ -286,6 +287,8 @@ void ReplicaSetMonitorManager::report(BSONObjBuilder* builder, bool forFTDC) {
     // ShardRegistry's mutex due to the ReplicaSetMonitor's AsynchronousConfigChangeHook
     // potentially calling ShardRegistry::updateConfigServerConnectionString.
     auto setNames = getAllSetNames();
+
+    builder->appendNumber("numReplicaSetMonitorsCreated", _numMonitorsCreated);
 
     BSONObjBuilder setStats(
         builder->subobjStart(forFTDC ? "replicaSetPingTimesMillis" : "replicaSets"));

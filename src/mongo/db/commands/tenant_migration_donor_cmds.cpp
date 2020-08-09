@@ -30,6 +30,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 
@@ -47,6 +48,15 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             const RequestType& requestBody = request();
+
+            // TODO (SERVER-50483): Make donorStartMigration command check that the donor's host
+            // is not present in 'recipientConnectionString'
+            const auto donorConnectionString =
+                repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
+            uassert(ErrorCodes::InvalidOptions,
+                    "recipient must be different from donor",
+                    donorConnectionString.toString() !=
+                        requestBody.getRecipientConnectionString().toString());
 
             const auto donorStateDoc =
                 TenantMigrationDonorDocument(requestBody.getMigrationId(),

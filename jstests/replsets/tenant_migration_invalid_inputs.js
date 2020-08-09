@@ -1,6 +1,7 @@
 /**
- * Tests that the donorStartMigration command does not allow users to provide a 'databasePrefix'
- * that is unsupported. The unsupported prefixes are: '', 'admin', 'local', 'config'.
+ * Tests that the donorStartMigration command throws a error if the provided database prefix
+ * is unsupported (i.e. '', 'admin', 'local' or 'config') or if the recipient connection string
+ * matches the donor's connection string.
  *
  * @tags: [requires_fcv_47]
  */
@@ -8,37 +9,34 @@
 (function() {
 "use strict";
 
-const runDonorStartMigrationCommand =
-    (primaryConnection, migrationId, recipientConnectionString, dbPrefix, readPreference) => {
-        return primaryConnection.adminCommand({
-            donorStartMigration: 1,
-            migrationId,
-            recipientConnectionString,
-            databasePrefix: dbPrefix,
-            readPreference
-        });
-    };
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
+const primary = rst.getPrimary();
 
-const primaryConnection = rst.getPrimary();
-
-const migrationId = new UUID();
-const recipientConnectionString = 'placeholderURI';
-const readPreference = {
-    mode: "primary"
-};
-
+// Test unsupported database prefixes.
 const unsupportedDBPrefixes = ['', 'admin', 'local', 'config'];
 
-jsTest.log('Attempting donorStartMigration with unsupported databasePrefixes.');
 unsupportedDBPrefixes.forEach((dbPrefix) => {
-    assert.commandFailedWithCode(
-        runDonorStartMigrationCommand(
-            primaryConnection, migrationId, recipientConnectionString, dbPrefix, readPreference),
-        ErrorCodes.BadValue);
+    assert.commandFailedWithCode(primary.adminCommand({
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: "testRecipientConnString",
+        databasePrefix: dbPrefix,
+        readPreference: {mode: "primary"}
+    }),
+                                 ErrorCodes.BadValue);
 });
+
+// Test migrating a database to the donor itself.
+assert.commandFailedWithCode(primary.adminCommand({
+    donorStartMigration: 1,
+    migrationId: UUID(),
+    recipientConnectionString: rst.getURL(),
+    databasePrefix: "testDbPrefix",
+    readPreference: {mode: "primary"}
+}),
+                             ErrorCodes.InvalidOptions);
 
 rst.stopSet();
 })();

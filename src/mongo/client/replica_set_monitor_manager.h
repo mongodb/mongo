@@ -174,6 +174,8 @@ private:
     // Needs to be after `_taskExecutor`, so that it will be destroyed before the `_taskExecutor`.
     ReplicaSetMonitorsMap _monitors;
 
+    int _numMonitorsCreated;
+
     void _setupTaskExecutorInLock();
 
     // set to true when shutdown has been called.
