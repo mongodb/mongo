@@ -937,7 +937,7 @@ buildvariants:
     - mongo-tools
     - enterprise
     - genny
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   expansions: &compile-expansions
     platform: linux
     project_dir: &project_dir dsi
@@ -962,7 +962,7 @@ buildvariants:
   modules:
   - mongo-tools
   - enterprise
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   expansions:
     <<: *compile-expansions
     compile_flags: >-
@@ -1033,7 +1033,7 @@ buildvariants:
 
 - name: linux-standalone
   display_name: Linux Standalone
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: standalone
@@ -1095,7 +1095,7 @@ buildvariants:
 
 - name: linux-1-node-replSet-fle
   display_name: Linux 1-Node ReplSet FLE
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: single-replica-fle
@@ -1120,7 +1120,7 @@ buildvariants:
 
 - name: linux-1-node-replSet-cwrwc
   display_name: Linux 1-Node ReplSet CWRWC
-  batchtime: 2880  # 48 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: single-replica-cwrwc
@@ -1144,7 +1144,7 @@ buildvariants:
 
 - name: linux-1-node-replSet-ese-cbc
   display_name: Linux 1-Node ReplSet ESE CBC
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: single-replica-ese-cbc
@@ -1168,7 +1168,7 @@ buildvariants:
 
 - name: linux-1-node-replSet-ese-gcm
   display_name: Linux 1-Node ReplSet ESE GCM
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: single-replica-ese-gcm
@@ -1192,7 +1192,7 @@ buildvariants:
 
 - name: linux-1-node-15gbwtcache
   display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: single-replica-15gbwtcache
@@ -1250,7 +1250,7 @@ buildvariants:
 
 - name: linux-shard-lite
   display_name: Linux Shard Lite Cluster
-  batchtime: 2880  # 48 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: shard-lite
@@ -1315,7 +1315,7 @@ buildvariants:
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: replica
@@ -1423,7 +1423,7 @@ buildvariants:
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
-  batchtime: 1440 # 24 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: replica-2node
@@ -1476,7 +1476,7 @@ buildvariants:
 #######################################
 - name: atlas-like-M60
   display_name: M60-Like 3-Node ReplSet
-  batchtime: 2880  # 48 hours
+  batchtime: 10080 # 7 days
   modules: *modules
   expansions:
     setup: atlas-like-replica
