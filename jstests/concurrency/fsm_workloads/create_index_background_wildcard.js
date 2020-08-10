@@ -3,8 +3,7 @@
 /**
  * Executes the create_index_background.js workload, but with a wildcard index.
  *
- * SERVER-36709: Disabled for ephemeralForTest due to excessive memory usage
- * @tags: [creates_background_indexes, incompatible_with_eft]
+ * @tags: [creates_background_indexes]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');               // For extendWorkload.
 load('jstests/concurrency/fsm_workloads/create_index_background.js');  // For $config.

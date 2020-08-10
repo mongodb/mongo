@@ -1,6 +1,4 @@
 // Test sanity of geo queries with a lot of points
-// SERVER-36709: Disabled for ephemeralForTest due to excessive memory usage
-// @tags: [incompatible_with_eft]
 
 (function() {
 "use strict";

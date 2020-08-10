@@ -5,8 +5,7 @@
  *
  * Creates multiple unique background indexes in parallel, on capped collections.
  *
- * SERVER-36709: Disabled for ephemeralForTest due to excessive memory usage
- * @tags: [creates_background_indexes, requires_capped, incompatible_with_eft]
+ * @tags: [creates_background_indexes, requires_capped]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');                      // for extendWorkload

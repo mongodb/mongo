@@ -7,8 +7,7 @@
  * active. The problem is that this is timing dependent and the current test setup
  * tries to achieve this by inserting insane amount of documents.
  *
- * SERVER-36709: Disabled for ephemeralForTest due to excessive memory usage
- * @tags: [requires_replication, incompatible_with_eft]
+ * @tags: [requires_replication]
  */
 
 /**

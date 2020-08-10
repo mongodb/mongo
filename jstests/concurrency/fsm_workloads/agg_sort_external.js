@@ -7,9 +7,6 @@
  * by a $sort on a field containing a random float.
  *
  * The data returned by the $match is greater than 100MB, which should force an external sort.
- *
- * SERVER-36709: Disabled for ephemeralForTest due to excessive memory usage
- * @tags: [incompatible_with_eft]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/agg_base.js');    // for $config

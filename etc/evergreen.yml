@@ -11889,11 +11889,10 @@ buildvariants:
   - name: .auth !.multiversion !.audit !.sharding
   - name: .misc_js
   - name: concurrency
-  # SERVER-36709: Disabled due to excessive memory usage
-  # concurrency_replication
-  # concurrency_replication_causal_consistency
-  # concurrency_simultaneous
-  # concurrency_simultaneous_replication
+  - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
+  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: .integration !.audit
   - name: .jscore .common !.txns !.decimal
   - name: jsCore_op_query

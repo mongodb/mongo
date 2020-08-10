@@ -12,9 +12,6 @@
  * trying to remove the same document from the queue.
  *
  * This workload was designed to reproduce SERVER-21434.
- *
- * SERVER-36709: Disabled for ephemeralForTest due to excessive memory usage
- * @tags: [incompatible_with_eft]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js');  // for $config
