@@ -41,6 +41,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/net/hostandport.h"
@@ -115,7 +116,8 @@ public:
      * components of the replication system to start up whatever threads and do whatever
      * initialization they need.
      */
-    virtual void startup(OperationContext* opCtx) = 0;
+    virtual void startup(OperationContext* opCtx,
+                         LastStorageEngineShutdownState lastStorageEngineShutdownState) = 0;
 
     /**
      * Start terminal shutdown.  This causes the topology coordinator to refuse to vote in any

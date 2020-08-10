@@ -102,7 +102,8 @@ public:
 
     // ================== Members of public ReplicationCoordinator API ===================
 
-    virtual void startup(OperationContext* opCtx) override;
+    virtual void startup(OperationContext* opCtx,
+                         LastStorageEngineShutdownState lastStorageEngineShutdownState) override;
 
     virtual void enterTerminalShutdown() override;
 
@@ -976,8 +977,12 @@ private:
      * was no local config at all or it was invalid in some way, and false if there was a valid
      * config detected but more work is needed to set it as the local config (which will be
      * handled by the callback to _finishLoadLocalConfig).
+     *
+     * Increments the rollback ID if the lastStorageEngineShutdownState indicates that the server
+     * was shut down uncleanly.
      */
-    bool _startLoadLocalConfig(OperationContext* opCtx);
+    bool _startLoadLocalConfig(OperationContext* opCtx,
+                               LastStorageEngineShutdownState lastStorageEngineShutdownState);
 
     /**
      * Callback that finishes the work started in _startLoadLocalConfig and sets _rsConfigState
