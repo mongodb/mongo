@@ -70,6 +70,7 @@ a notice will be included in
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
 [ocspbuilder]: https://github.com/wbond/ocspbuilder
 [ocspresponder]: https://github.com/threema-ch/ocspresponder
+[peglib]: https://github.com/yhirose/cpp-peglib
 [Pcre]: http://www.pcre.org/
 [S2]: https://github.com/google/s2geometry
 [SafeInt]: https://github.com/dcleblanc/SafeInt
