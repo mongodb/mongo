@@ -69,6 +69,11 @@ public:
 
     static void set(ServiceContext* service, std::unique_ptr<FlowControl> flowControl);
 
+    /**
+     * Shuts down the flow control job and removes it from the ServiceContext.
+     */
+    static void shutdown(ServiceContext* service);
+
     /*
      * Typical API call.
      *

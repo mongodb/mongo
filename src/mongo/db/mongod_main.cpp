@@ -1318,6 +1318,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
     LatchAnalyzer::get(serviceContext).dump();
 #endif
+
+    FlowControl::shutdown(serviceContext);
 }
 
 }  // namespace
