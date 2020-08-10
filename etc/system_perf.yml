@@ -680,7 +680,7 @@ modules:
 - name: dsi
   repo: git@github.com:10gen/dsi.git
   prefix: dsi
-  branch: master
+  branch: legacy
 
 - name: workloads
   repo: git@github.com:10gen/workloads.git

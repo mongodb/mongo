@@ -51,7 +51,7 @@ modules:
 
 - name: dsi
   repo: git@github.com:10gen/dsi.git
-  branch: master
+  branch: legacy
 
 - name: mongo-perf
   repo: git@github.com:mongodb/mongo-perf.git
