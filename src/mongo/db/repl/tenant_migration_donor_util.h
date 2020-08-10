@@ -44,9 +44,9 @@ namespace mongo {
 namespace tenant_migration_donor {
 
 /**
- * Starts a tenant migration as defined in the given donor's state document.
+ * Creates a task executor to be used for a tenant migration.
  */
-void startMigration(OperationContext* opCtx, TenantMigrationDonorDocument donorStateDoc);
+std::unique_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(ServiceContext* serviceContext);
 
 /**
  * Updates the TenantMigrationAccessBlocker for the tenant migration represented by the given

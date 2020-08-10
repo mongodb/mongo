@@ -36,23 +36,23 @@ const ServiceContext::Decoration<TenantMigrationAccessBlockerByPrefix>
     TenantMigrationAccessBlockerByPrefix::get =
         ServiceContext::declareDecoration<TenantMigrationAccessBlockerByPrefix>();
 
-/**
- * Invariants that no entry for dbPrefix exists and then adds the entry for (dbPrefix, mtab)
- */
 void TenantMigrationAccessBlockerByPrefix::add(StringData dbPrefix,
                                                std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
     stdx::lock_guard<Latch> lg(_mutex);
 
+    // Assume that all tenant ids (i.e. 'dbPrefix') have equal length.
     auto it = _tenantMigrationAccessBlockers.find(dbPrefix);
-    invariant(it == _tenantMigrationAccessBlockers.end());
+
+    if (it != _tenantMigrationAccessBlockers.end()) {
+        uasserted(ErrorCodes::ConflictingOperationInProgress,
+                  str::stream() << "Found active migration for database prefix \"" << it->first
+                                << "\" which conflicts with the specified database prefix \""
+                                << dbPrefix << "\"");
+    }
 
     _tenantMigrationAccessBlockers.emplace(dbPrefix, mtab);
 }
 
-
-/**
- * Invariants that an entry for dbPrefix exists, and then removes the entry for (dbPrefix, mtab)
- */
 void TenantMigrationAccessBlockerByPrefix::remove(StringData dbPrefix) {
     stdx::lock_guard<Latch> lg(_mutex);
 
@@ -62,25 +62,19 @@ void TenantMigrationAccessBlockerByPrefix::remove(StringData dbPrefix) {
     _tenantMigrationAccessBlockers.erase(it);
 }
 
-
-/**
- * Iterates through each of the TenantMigrationAccessBlockers and
- * returns the first TenantMigrationAccessBlocker it finds whose dbPrefix is a prefix for dbName.
- */
 std::shared_ptr<TenantMigrationAccessBlocker>
 TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlocker(StringData dbName) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    auto doesDBNameStartWithPrefix =
+    // TODO (SERVER-50440): Make TenantMigrationAccessBlockerByPrefix include '_' when doing lookup.
+    auto it = std::find_if(
+        _tenantMigrationAccessBlockers.begin(),
+        _tenantMigrationAccessBlockers.end(),
         [dbName](
             const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
             StringData dbPrefix = blocker.first;
             return dbName.startsWith(dbPrefix);
-        };
-
-    auto it = std::find_if(_tenantMigrationAccessBlockers.begin(),
-                           _tenantMigrationAccessBlockers.end(),
-                           doesDBNameStartWithPrefix);
+        });
 
     if (it == _tenantMigrationAccessBlockers.end()) {
         return nullptr;
@@ -89,10 +83,6 @@ TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlocker(StringData
     }
 }
 
-/**
- * Iterates through each of the TenantMigrationAccessBlockers stored by the mapping
- * and appends the server status of each blocker to the BSONObjBuilder.
- */
 void TenantMigrationAccessBlockerByPrefix::appendInfoForServerStatus(BSONObjBuilder* builder) {
     std::for_each(
         _tenantMigrationAccessBlockers.begin(),

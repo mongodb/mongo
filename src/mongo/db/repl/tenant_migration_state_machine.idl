@@ -58,6 +58,9 @@ structs:
             recipientConnectionString:
                 type: string
                 description: "The URI string that the donor will utilize to create a connection with the recipient."
+            readPreference:
+                type: readPreference
+                description: "The read preference setting that the recipient will use to determine which node in the donor replica set to clone from."
             databasePrefix:
                 type: string
                 description: "The database prefix for the migration."

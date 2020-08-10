@@ -112,6 +112,7 @@
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
@@ -123,6 +124,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
@@ -296,6 +298,13 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
 
     MirrorMaestro::init(serviceContext);
     CommandInvocationHooks::set(serviceContext, std::make_shared<MongodCommandInvocationHooks>());
+}
+
+void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
+    auto registry = repl::PrimaryOnlyServiceRegistry::get(serviceContext);
+    std::unique_ptr<TenantMigrationDonorService> tenantMigrationDonorService =
+        std::make_unique<TenantMigrationDonorService>(serviceContext);
+    registry->registerService(std::move(tenantMigrationDonorService));
 }
 
 MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);
@@ -969,6 +978,10 @@ void setUpReplication(ServiceContext* serviceContext) {
     repl::setOplogCollectionName(serviceContext);
 
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
+
+    // Register primary-only services here so that the services are started up when the replication
+    // coordinator starts up.
+    registerPrimaryOnlyServices(serviceContext);
 }
 
 void setUpObservers(ServiceContext* serviceContext) {
@@ -1092,6 +1105,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     LOGV2_OPTIONS(4784902, {LogComponent::kSharding}, "Shutting down the WaitForMajorityService");
     WaitForMajorityService::get(serviceContext).shutDown();
+
+    LOGV2_OPTIONS(
+        5006600, {LogComponent::kReplication}, "Shutting down the PrimaryOnlyServiceRegistry");
+    repl::PrimaryOnlyServiceRegistry::get(serviceContext)->shutdown();
 
     // Join the logical session cache before the transport layer.
     if (auto lsc = LogicalSessionCache::get(serviceContext)) {

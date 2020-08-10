@@ -120,7 +120,14 @@ void PrimaryOnlyServiceRegistry::onStartup(OperationContext* opCtx) {
 }
 
 void PrimaryOnlyServiceRegistry::onStepUpComplete(OperationContext* opCtx, long long term) {
-    const auto stepUpOpTime = ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
+    auto replCoord = ReplicationCoordinator::get(opCtx);
+
+    if (!replCoord || !replCoord->isReplEnabled()) {
+        // Unit tests may not have replication coordinator set up.
+        return;
+    }
+
+    const auto stepUpOpTime = replCoord->getMyLastAppliedOpTime();
     invariant(term == stepUpOpTime.getTerm(),
               str::stream() << "Term from last optime (" << stepUpOpTime.getTerm()
                             << ") doesn't match the term we're stepping up in (" << term << ")");

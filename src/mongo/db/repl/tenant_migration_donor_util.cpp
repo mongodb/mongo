@@ -34,14 +34,7 @@
 
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 
-#include "mongo/client/connection_string.h"
-#include "mongo/client/remote_command_targeter_rs.h"
-#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
@@ -57,49 +50,9 @@ namespace tenant_migration_donor {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(abortTenantMigrationAfterBlockingStarts);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterBlockingStarts);
-
 const char kThreadNamePrefix[] = "TenantMigrationWorker-";
 const char kPoolName[] = "TenantMigrationWorkerThreadPool";
 const char kNetName[] = "TenantMigrationWorkerNetwork";
-
-/**
- * Creates a task executor to be used for tenant migration.
- */
-std::unique_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(
-    ServiceContext* serviceContext) {
-    ThreadPool::Options tpOptions;
-    tpOptions.threadNamePrefix = kThreadNamePrefix;
-    tpOptions.poolName = kPoolName;
-    tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
-
-    return std::make_unique<executor::ThreadPoolTaskExecutor>(
-        std::make_unique<ThreadPool>(tpOptions),
-        executor::makeNetworkInterface(kNetName, nullptr, nullptr));
-}
-
-/**
- * Creates a TenantMigrationAccessBlocker, and makes it start blocking writes. Then adds it to
- * the TenantMigrationAccessBlockerByPrefix.
- */
-std::shared_ptr<TenantMigrationAccessBlocker> startBlockingWritesForTenant(
-    OperationContext* opCtx, const TenantMigrationDonorDocument& donorStateDoc) {
-    invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
-    auto serviceContext = opCtx->getServiceContext();
-
-    auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
-        serviceContext,
-        makeTenantMigrationExecutor(serviceContext),
-        donorStateDoc.getDatabasePrefix().toString());
-
-    mtab->startBlockingWrites();
-
-    auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(serviceContext);
-    mtabByPrefix.add(donorStateDoc.getDatabasePrefix(), mtab);
-
-    return mtab;
-}
 
 /**
  * Updates the TenantMigrationAccessBlocker when the tenant migration transitions to the blocking
@@ -160,183 +113,18 @@ void onTransitionToAborted(OperationContext* opCtx, TenantMigrationDonorDocument
     mtab->abort(donorStateDoc.getCommitOrAbortOpTime().get());
 }
 
-/**
- * Inserts the provided donor's state document to config.tenantMigrationDonors and waits for
- * majority write concern.
- */
-void insertDonorStateDocument(OperationContext* opCtx,
-                              const TenantMigrationDonorDocument& donorStateDoc) {
-    PersistentTaskStore<TenantMigrationDonorDocument> store(
-        NamespaceString::kTenantMigrationDonorsNamespace);
-    try {
-        store.add(opCtx, donorStateDoc);
-    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
-        uasserted(
-            4917300,
-            str::stream()
-                << "While attempting to persist the donor's state machine for tenant migration"
-                << ", found another document with the same migration id. Attempted migration: "
-                << donorStateDoc.toBSON());
-    }
-}
-
-/**
- * Updates the given donor's state document to have the given state. Then, persists the updated
- * document by reserving an oplog slot beforehand and using it as the blockTimestamp or
- * commitOrAbortTimestamp depending on the state.
- */
-void updateDonorStateDocument(OperationContext* opCtx,
-                              TenantMigrationDonorDocument& donorStateDoc,
-                              const TenantMigrationDonorStateEnum nextState) {
-    uassertStatusOK(writeConflictRetry(
-        opCtx,
-        "updateDonorStateDoc",
-        NamespaceString::kTenantMigrationDonorsNamespace.ns(),
-        [&]() -> Status {
-            AutoGetCollection autoCollection(
-                opCtx, NamespaceString::kTenantMigrationDonorsNamespace, MODE_IX);
-            Collection* collection = autoCollection.getCollection();
-
-            if (!collection) {
-                return Status(ErrorCodes::NamespaceNotFound,
-                              str::stream() << NamespaceString::kTenantMigrationDonorsNamespace.ns()
-                                            << " does not exist");
-            }
-            WriteUnitOfWork wuow(opCtx);
-
-            const auto originalDonorStateDoc = donorStateDoc.toBSON();
-            const auto originalRecordId = Helpers::findOne(
-                opCtx, collection, originalDonorStateDoc, false /* requireIndex */);
-            const auto originalSnapshot =
-                Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(), originalDonorStateDoc);
-            invariant(!originalRecordId.isNull());
-
-            // Reserve an opTime for the write.
-            auto oplogSlot = repl::LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
-
-            donorStateDoc.setState(nextState);
-            switch (nextState) {
-                case TenantMigrationDonorStateEnum::kBlocking:
-                    donorStateDoc.setBlockTimestamp(oplogSlot.getTimestamp());
-                    break;
-                case TenantMigrationDonorStateEnum::kCommitted:
-                case TenantMigrationDonorStateEnum::kAborted:
-                    donorStateDoc.setCommitOrAbortOpTime(oplogSlot);
-                    break;
-                default:
-                    MONGO_UNREACHABLE;
-            }
-            const auto updatedDonorStateDoc = donorStateDoc.toBSON();
-
-            CollectionUpdateArgs args;
-            args.criteria = BSON("_id" << donorStateDoc.getId());
-            args.oplogSlot = oplogSlot;
-            args.update = updatedDonorStateDoc;
-
-            collection->updateDocument(opCtx,
-                                       originalRecordId,
-                                       originalSnapshot,
-                                       updatedDonorStateDoc,
-                                       false,
-                                       nullptr /* OpDebug* */,
-                                       &args);
-            wuow.commit();
-            return Status::OK();
-        }));
-}
-
-void sendRecipientSyncDataCommand(OperationContext* opCtx,
-                                  const TenantMigrationDonorDocument& donorStateDoc) {
-    const ConnectionString recipientConnectionString =
-        ConnectionString(donorStateDoc.getRecipientConnectionString().toString(),
-                         ConnectionString::ConnectionType::SET);
-    auto dataSyncExecutor = makeTenantMigrationExecutor(opCtx->getServiceContext());
-    dataSyncExecutor->startup();
-
-    auto removeReplicaSetMonitorForRecipientGuard =
-        makeGuard([&] { ReplicaSetMonitor::remove(recipientConnectionString.getSetName()); });
-
-    // Create the command BSON for the recipientSyncData request.
-    BSONObj cmdObj = BSONObj([&]() {
-        const auto donorConnectionString =
-            repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString().toString();
-
-        RecipientSyncData request(donorStateDoc.getId(),
-                                  donorConnectionString,
-                                  donorStateDoc.getDatabasePrefix().toString(),
-                                  ReadPreferenceSetting());
-        request.setReturnAfterReachingOpTime(donorStateDoc.getBlockTimestamp());
-        return request.toBSON(BSONObj());
-    }());
-
-    // Find the host and port of the recipient's primary.
-    HostAndPort recipientHost([&]() {
-        auto targeter = RemoteCommandTargeterRS(recipientConnectionString.getSetName(),
-                                                recipientConnectionString.getServers());
-        return uassertStatusOK(targeter.findHost(opCtx, ReadPreferenceSetting()));
-    }());
-
-    executor::RemoteCommandRequest request(recipientHost,
-                                           NamespaceString::kAdminDb.toString(),
-                                           std::move(cmdObj),
-                                           rpc::makeEmptyMetadata(),
-                                           nullptr,
-                                           Seconds(30));
-
-    executor::RemoteCommandResponse response =
-        Status(ErrorCodes::InternalError, "Internal error running command");
-
-    executor::TaskExecutor::CallbackHandle cbHandle =
-        uassertStatusOK(dataSyncExecutor->scheduleRemoteCommand(
-            request, [&response](const auto& args) { response = args.response; }));
-
-    dataSyncExecutor->wait(cbHandle, opCtx);
-    uassertStatusOK(getStatusFromCommandResult(response.data));
-}
 }  // namespace
 
-void startMigration(OperationContext* opCtx, TenantMigrationDonorDocument donorStateDoc) {
-    invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
+std::unique_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(
+    ServiceContext* serviceContext) {
+    ThreadPool::Options tpOptions;
+    tpOptions.threadNamePrefix = kThreadNamePrefix;
+    tpOptions.poolName = kPoolName;
+    tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
 
-    auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
-    auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(donorStateDoc.getDatabasePrefix());
-
-    if (mtab) {
-        // There is already an active migration for the given database prefix.
-        mtab->onCompletion().wait();
-        return;
-    }
-
-    try {
-        // Enter "dataSync" state.
-        insertDonorStateDocument(opCtx, donorStateDoc);
-
-        sendRecipientSyncDataCommand(opCtx, donorStateDoc);
-
-        // Enter "blocking" state.
-        mtab = startBlockingWritesForTenant(opCtx, donorStateDoc);
-
-        updateDonorStateDocument(opCtx, donorStateDoc, TenantMigrationDonorStateEnum::kBlocking);
-
-        sendRecipientSyncDataCommand(opCtx, donorStateDoc);
-
-        pauseTenantMigrationAfterBlockingStarts.pauseWhileSet(opCtx);
-
-        if (abortTenantMigrationAfterBlockingStarts.shouldFail()) {
-            uasserted(ErrorCodes::InternalError, "simulate a tenant migration error");
-        }
-    } catch (DBException&) {
-        // Enter "abort" state.
-        updateDonorStateDocument(opCtx, donorStateDoc, TenantMigrationDonorStateEnum::kAborted);
-        if (mtab) {
-            mtab->onCompletion().get();
-        }
-        throw;
-    }
-
-    // Enter "commit" state.
-    updateDonorStateDocument(opCtx, donorStateDoc, TenantMigrationDonorStateEnum::kCommitted);
-    mtab->onCompletion().get();
+    return std::make_unique<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(tpOptions),
+        executor::makeNetworkInterface(kNetName, nullptr, nullptr));
 }
 
 void onDonorStateTransition(OperationContext* opCtx, const BSONObj& donorStateDoc) {

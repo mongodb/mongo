@@ -29,6 +29,8 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
+#include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 
 namespace mongo {
@@ -42,18 +44,27 @@ public:
 
     public:
         using InvocationBase::InvocationBase;
+
         void typedRun(OperationContext* opCtx) {
             const RequestType& requestBody = request();
 
-            const TenantMigrationDonorDocument donorStateDoc(
-                requestBody.getMigrationId(),
-                requestBody.getRecipientConnectionString().toString(),
-                requestBody.getDatabasePrefix().toString(),
-                TenantMigrationDonorStateEnum::kDataSync);
+            const auto donorStateDoc =
+                TenantMigrationDonorDocument(requestBody.getMigrationId(),
+                                             requestBody.getRecipientConnectionString().toString(),
+                                             requestBody.getReadPreference(),
+                                             requestBody.getDatabasePrefix().toString(),
+                                             TenantMigrationDonorStateEnum::kDataSync)
+                    .toBSON();
 
-            tenant_migration_donor::startMigration(opCtx, donorStateDoc);
+            auto donorService =
+                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                    ->lookupServiceByName(TenantMigrationDonorService::kServiceName);
+            auto donor =
+                TenantMigrationDonorService::Instance::getOrCreate(donorService, donorStateDoc);
+            uassertStatusOK(donor->checkIfOptionsConflict(donorStateDoc));
+
+            donor->onCompletion().get();
         }
-
 
         void doCheckAuthorization(OperationContext* opCtx) const {}
 

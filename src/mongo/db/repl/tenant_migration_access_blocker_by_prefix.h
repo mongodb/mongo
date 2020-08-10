@@ -44,11 +44,30 @@ public:
     TenantMigrationAccessBlockerByPrefix() = default;
     static const ServiceContext::Decoration<TenantMigrationAccessBlockerByPrefix> get;
 
-    void appendInfoForServerStatus(BSONObjBuilder* builder);
+    /**
+     * Adds an entry for (dbPrefix, mtab). Throws ConflictingOperationInProgress if an entry for
+     * dbPrefix already exists.
+     */
     void add(StringData dbPrefix, std::shared_ptr<TenantMigrationAccessBlocker> mtab);
+
+    /**
+     * Invariants that an entry for dbPrefix exists, and then removes the entry for (dbPrefix, mtab)
+     */
     void remove(StringData dbPrefix);
+
+    /**
+     * Iterates through each of the TenantMigrationAccessBlockers and
+     * returns the first TenantMigrationAccessBlocker it finds whose dbPrefix is a prefix for
+     * dbName.
+     */
     std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlocker(
         StringData dbName);
+
+    /**
+     * Iterates through each of the TenantMigrationAccessBlockers stored by the mapping
+     * and appends the server status of each blocker to the BSONObjBuilder.
+     */
+    void appendInfoForServerStatus(BSONObjBuilder* builder);
 
 private:
     using TenantMigrationAccessBlockersMap =

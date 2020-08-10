@@ -1264,6 +1264,17 @@ env.Library(
 )
 
 env.Library(
+    target='tenant_migration_donor_service',
+    source=[
+        'tenant_migration_donor_service.cpp',
+    ],
+    LIBDEPS=[
+        'primary_only_service',
+        'tenant_migration_donor'
+    ],
+)
+
+env.Library(
     target="serveronly_repl",
     source=[
         'noop_writer.cpp',
