@@ -58,7 +58,7 @@ private:
     std::unique_ptr<PeriodicJobAnchor> _job;
 
     Mutex _mutex = MONGO_MAKE_LATCH("CertificateExpirationMonitor::_mutex");
-    Date_t _certExpiration;
+    Date_t _certExpiration{Date_t::max()};
 };
 
 }  // namespace mongo
