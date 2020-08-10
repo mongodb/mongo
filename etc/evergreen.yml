@@ -5171,6 +5171,15 @@ tasks:
       fallback_num_sub_suites: 4
 
 - <<: *task_template
+  name: change_streams_update_v2_oplog
+  tags: ["change_streams"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_update_v2_oplog --storageEngine=wiredTiger
+
+- <<: *task_template
   name: change_streams_mongos_sessions_passthrough
   tags: ["change_streams"]
   depends_on:
