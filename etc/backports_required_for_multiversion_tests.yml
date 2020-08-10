@@ -40,6 +40,8 @@ replica_sets_multiversion:
   test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
 - ticket: SERVER-48518
   test_file: jstests/replsets/rollback_via_refetch_anomaly.js
+- ticket: SERVER-50140
+  test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
 
 replica_sets_jscore_multiversion_passthrough:
 - ticket: SERVER-47773

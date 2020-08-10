@@ -66,7 +66,8 @@ public:
 
     virtual ~ReplicationCoordinatorMock();
 
-    virtual void startup(OperationContext* opCtx);
+    virtual void startup(OperationContext* opCtx,
+                         LastStorageEngineShutdownState lastStorageEngineShutdownState);
 
     virtual void enterTerminalShutdown();
 

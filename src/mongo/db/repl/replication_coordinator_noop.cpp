@@ -37,7 +37,8 @@ namespace repl {
 ReplicationCoordinatorNoOp::ReplicationCoordinatorNoOp(ServiceContext* service)
     : _service(service) {}
 
-void ReplicationCoordinatorNoOp::startup(OperationContext* opCtx) {}
+void ReplicationCoordinatorNoOp::startup(
+    OperationContext* opCtx, LastStorageEngineShutdownState lastStorageEngineShutdownState) {}
 
 void ReplicationCoordinatorNoOp::enterTerminalShutdown() {}
 

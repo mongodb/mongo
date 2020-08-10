@@ -179,7 +179,7 @@ void ReplCoordTest::start() {
     }
 
     const auto opCtx = makeOperationContext();
-    _repl->startup(opCtx.get());
+    _repl->startup(opCtx.get(), LastStorageEngineShutdownState::kClean);
     _repl->waitForStartUpComplete_forTest();
     // _rsConfig should be written down at this point, so populate _memberData accordingly.
     _topo->populateAllMembersConfigVersionAndTerm_forTest();

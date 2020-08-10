@@ -594,7 +594,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Cannot use queryableBackupMode in a replica set",
                 !replCoord->isReplEnabled());
-        replCoord->startup(startupOpCtx.get());
+        replCoord->startup(startupOpCtx.get(), lastStorageEngineShutdownState);
     }
 
     if (!storageGlobalParams.readOnly) {
@@ -645,7 +645,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext)->startup();
         }
 
-        replCoord->startup(startupOpCtx.get());
+        replCoord->startup(startupOpCtx.get(), lastStorageEngineShutdownState);
         if (getReplSetMemberInStandaloneMode(serviceContext)) {
             LOGV2_WARNING_OPTIONS(
                 20547,
