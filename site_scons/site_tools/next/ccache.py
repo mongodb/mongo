@@ -138,6 +138,16 @@ def generate(env):
             env["ENV"]["CCACHE_CPP2"] = "1"
             env.AppendUnique(CCFLAGS=["-fdirectives-only"])
 
+    # Ensure ccache accounts for any extra files in use that affects the generated object
+    # file. This can be used for situations where a file is passed as an argument to a
+    # compiler parameter and differences in the file need to be accounted for in the
+    # hash result to prevent erroneous cache hits.
+    if "CCACHE_EXTRAFILES" in env and env["CCACHE_EXTRAFILES"]:
+        env["ENV"]["CCACHE_EXTRAFILES"] = ":".join([
+            blackfile.path
+            for blackfile in env["CCACHE_EXTRAFILES"]
+        ])
+
     # Make a generator to expand to CCACHE in the case where we are
     # not a conftest. We don't want to use ccache for configure tests
     # because we don't want to use icecream for configure tests, but
