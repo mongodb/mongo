@@ -55,3 +55,11 @@ structs:
         requests to use behaviors deprecated in V in the current MongoDB release"
         type: bool 
         optional: true
+
+server_parameters:
+  requireApiVersion:
+    description: "Require clients to pass the 'apiVersion' parameter with all commands"
+    set_at: ["startup", "runtime"]
+    cpp_vartype: 'AtomicWord<bool>'
+    cpp_varname: "gRequireApiVersion"
+    default: false
