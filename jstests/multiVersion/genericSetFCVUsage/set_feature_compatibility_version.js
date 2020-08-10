@@ -47,6 +47,62 @@ function runStandaloneTest(downgradeVersion) {
         adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, unknown: 1}));
 
     jsTestLog(
+        "EXPECTED TO FAIL: setFeatureCompatibilityVersion only accepts downgradeOnDiskChanges " +
+        " parameter when downgrading to last-continuous FCV");
+    assert.commandFailedWithCode(
+        adminDB.runCommand(
+            {setFeatureCompatibilityVersion: latestFCV, downgradeOnDiskChanges: true}),
+        ErrorCodes.IllegalOperation);
+
+    assert.commandFailedWithCode(
+        adminDB.runCommand(
+            {setFeatureCompatibilityVersion: latestFCV, downgradeOnDiskChanges: false}),
+        ErrorCodes.IllegalOperation);
+
+    if (downgradeFCV === lastLTSFCV && lastContinuousFCV != lastLTSFCV) {
+        assert.commandFailedWithCode(
+            adminDB.runCommand(
+                {setFeatureCompatibilityVersion: downgradeFCV, downgradeOnDiskChanges: true}),
+            ErrorCodes.IllegalOperation);
+        assert.commandFailedWithCode(
+            adminDB.runCommand(
+                {setFeatureCompatibilityVersion: downgradeFCV, downgradeOnDiskChanges: false}),
+            ErrorCodes.IllegalOperation);
+    } else {
+        jsTestLog(
+            "Test that setFeatureCompatibilityVersion succeeds with downgradeOnDiskChanges parameter when FCV is last-continuous");
+        assert.commandWorked(adminDB.runCommand(
+            {setFeatureCompatibilityVersion: downgradeFCV, downgradeOnDiskChanges: true}));
+        checkFCV(adminDB, downgradeFCV);
+        checkLog.contains(conn, "Downgrading on-disk format");
+        assert.commandWorked(adminDB.runCommand({clearLog: 'global'}));
+
+        // Upgrade still fails with downgradeOnDiskChanges: true.
+        assert.commandFailedWithCode(
+            adminDB.runCommand(
+                {setFeatureCompatibilityVersion: latestFCV, downgradeOnDiskChanges: true}),
+            ErrorCodes.IllegalOperation);
+
+        // Set the FCV back to 'latest'.
+        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+        checkFCV(adminDB, latestFCV);
+
+        assert.commandWorked(adminDB.runCommand(
+            {setFeatureCompatibilityVersion: downgradeFCV, downgradeOnDiskChanges: false}));
+        checkFCV(adminDB, downgradeFCV);
+
+        // Upgrade still fails with downgradeOnDiskChanges: false.
+        assert.commandFailedWithCode(
+            adminDB.runCommand(
+                {setFeatureCompatibilityVersion: latestFCV, downgradeOnDiskChanges: false}),
+            ErrorCodes.IllegalOperation);
+
+        // Set the FCV back to 'latest'.
+        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+        checkFCV(adminDB, latestFCV);
+    }
+
+    jsTestLog(
         "EXPECTED TO FAIL: setFeatureCompatibilityVersion can only be run on the admin database");
     assert.commandFailed(
         conn.getDB("test").runCommand({setFeatureCompatibilityVersion: downgradeFCV}));

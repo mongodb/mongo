@@ -186,3 +186,11 @@ types:
         serializer: mongo::NamespaceString::toString
         deserializer: mongo::NamespaceString
 
+    fcv_string:
+        bson_serialization_type: string
+        description: >-
+            Ensures that the version strings in featureCompatibilityVersion documents
+            serialize/deserialize to a fixed set of string values
+        cpp_type: "ServerGlobalParams::FeatureCompatibility::Version"
+        serializer: "::mongo::FeatureCompatibilityVersionParser::serializeVersion"
+        deserializer: "mongo::FeatureCompatibilityVersionParser::parseVersion"

@@ -120,6 +120,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/commands/write_commands_common',
         '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/set_feature_compatibility_version_idl',
         '$BUILD_DIR/mongo/db/commands/shutdown_idl',
         '$BUILD_DIR/mongo/db/commands/rename_collection_idl',
         '$BUILD_DIR/mongo/db/ftdc/ftdc_server',

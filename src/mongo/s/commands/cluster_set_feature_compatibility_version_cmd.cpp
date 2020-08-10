@@ -31,9 +31,9 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
+#include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -53,67 +53,72 @@ namespace {
  *   setFeatureCompatibilityVersion: <string version>
  * }
  */
-class SetFeatureCompatibilityVersionCmd : public BasicCommand {
+class SetFeatureCompatibilityVersionCmd final
+    : public TypedCommand<SetFeatureCompatibilityVersionCmd> {
 public:
-    SetFeatureCompatibilityVersionCmd() : BasicCommand("setFeatureCompatibilityVersion") {}
+    using Request = SetFeatureCompatibilityVersion;
+    using FCVP = FeatureCompatibilityVersionParser;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 
-    virtual bool adminOnly() const {
-        return true;
-    }
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool adminOnly() const override {
         return true;
     }
 
     std::string help() const override {
-        using FCVP = FeatureCompatibilityVersionParser;
-        return str::stream()
-            << "Set the featureCompatibilityVersion used by this cluster. If set to '"
-            << FCVP::kVersion44 << "', then " << FCVP::kVersion47
-            << " features are disabled. If set to '" << FCVP::kVersion47 << "', then "
-            << FCVP::kVersion47
-            << " features are enabled, and all nodes in the cluster must be binary version "
-            << FCVP::kVersion47 << ". See "
-            << feature_compatibility_version_documentation::kCompatibilityLink << ".";
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(),
-                ActionType::setFeatureCompatibilityVersion)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        std::stringstream h;
+        h << "Set the featureCompatibilityVersion used by this cluster. If set to '"
+          << FCVP::kLastLTS << "', then features introduced in versions greater than '"
+          << FCVP::kLastLTS << "' will be disabled";
+        if (FCVP::kLastContinuous != FCVP::kLastLTS) {
+            h << " If set to '" << FCVP::kLastContinuous << "', then features introduced in '"
+              << FCVP::kLatest << "' will be disabled.";
         }
-        return Status::OK();
+        h << " If set to '" << FCVP::kLatest << "', then '" << FCVP::kLatest
+          << "' features are enabled, and all nodes in the cluster must be binary version "
+          << FCVP::kLatest << ". See "
+          << feature_compatibility_version_documentation::kCompatibilityLink << ".";
+        return h.str();
     }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        const auto version = uassertStatusOK(
-            FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
 
-        // Forward to config shard, which will forward to all shards.
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            dbname,
-            CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendPassthroughFields(
-                    cmdObj, BSON("setFeatureCompatibilityVersion" << version)),
-                opCtx->getWriteConcern()),
-            Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(response.commandStatus);
+        void typedRun(OperationContext* opCtx) {
+            const auto& cmd = request();
 
-        return true;
-    }
+            // Forward to config shard, which will forward to all shards.
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                std::string(cmd.getDbName()),
+                CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}),
+                                                           opCtx->getWriteConcern()),
+                Shard::RetryPolicy::kIdempotent));
+            uassertStatusOK(response.commandStatus);
+        }
+
+        NamespaceString ns() const override {
+            return NamespaceString();
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(
+                ErrorCodes::Unauthorized,
+                "Unauthorized",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::setFeatureCompatibilityVersion));
+        }
+
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+    };
 
 } clusterSetFeatureCompatibilityVersionCmd;
 

@@ -80,7 +80,6 @@ env.Library(
     target="feature_compatibility_parsers",
     source=[
         "feature_compatibility_version_parser.cpp",
-        "feature_compatibility_version_command_parser.cpp",
         env.Idlc('feature_compatibility_version_document.idl')[0],
     ],
     LIBDEPS=[
@@ -372,6 +371,17 @@ env.Library(
 )
 
 env.Library(
+    target='set_feature_compatibility_version_idl',
+    source=[
+        env.Idlc('set_feature_compatibility_version.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'feature_compatibility_parsers',
+    ],
+)
+
+env.Library(
     target='shutdown_idl',
     source=[
         'shutdown.cpp',
@@ -457,6 +467,7 @@ env.Library(
         'server_status',
         'servers',
         'set_index_commit_quorum_idl',
+        'set_feature_compatibility_version_idl',
         'shell_protocol',
         'shutdown_idl',
         'standalone',

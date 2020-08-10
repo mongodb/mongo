@@ -5255,7 +5255,7 @@ var authCommandsLib = {
         },
         {
           testname: "setFeatureCompatibilityVersion",
-          command: {setFeatureCompatibilityVersion: "x"},
+          command: {setFeatureCompatibilityVersion: latestFCV},
           testcases: [
               {
                 runOnDb: adminDbName,

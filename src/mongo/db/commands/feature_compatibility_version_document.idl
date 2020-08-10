@@ -34,16 +34,6 @@ global:
 imports:
   - "mongo/idl/basic_types.idl"
 
-types:
-  version_string:
-    bson_serialization_type: string
-    description: >-
-      Ensures that the version strings in featureCompatibilityVersion documents
-      serialize/deserialize to a fixed set of string values
-    cpp_type: "ServerGlobalParams::FeatureCompatibility::Version"
-    serializer: "::mongo::FeatureCompatibilityVersionParser::serializeVersion"
-    deserializer: "mongo::FeatureCompatibilityVersionParser::parseVersion"
-
 structs:
   featureCompatibilityVersionDocument:
     description: "featureCompatibilityVersion on-disk document format"
@@ -54,16 +44,16 @@ structs:
         default: '"featureCompatibilityVersion"'
       version:
         description: "Effective featureCompatibilityVersion"
-        type: version_string
+        type: fcv_string
       targetVersion:
         description: "Target featureCompatibilityVersion for upgrade/downgrade"
-        type: version_string
+        type: fcv_string
         optional: true
       previousVersion:
         description: >-
           Previous featureCompatibilityVersion for downgrading states, will always be kLatest when
           present
-        type: version_string
+        type: fcv_string
         optional: true
         validator:
           callback: "FeatureCompatibilityVersionParser::validatePreviousVersionField"

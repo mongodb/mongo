@@ -48,8 +48,11 @@ def is_primitive_scalar_type(cpp_type):
     Primitive scalar types need to have a default value to prevent warnings from Coverity.
     """
     cpp_type = cpp_type.replace(' ', '')
+    # TODO (SERVER-50101): Remove 'FeatureCompatibility::Version' once IDL supports a commmand
+    # cpp_type of C++ enum.
     return cpp_type in [
-        'bool', 'double', 'std::int32_t', 'std::uint32_t', 'std::uint64_t', 'std::int64_t'
+        'bool', 'double', 'ServerGlobalParams::FeatureCompatibility::Version', 'std::int32_t',
+        'std::uint32_t', 'std::uint64_t', 'std::int64_t'
     ]
 
 
@@ -64,6 +67,10 @@ def get_primitive_scalar_type_default_value(cpp_type):
     assert is_primitive_scalar_type(cpp_type)
     if cpp_type == 'bool':
         return 'false'
+    # TODO (SERVER-50101): Remove 'FeatureCompatibility::Version' once IDL supports a command
+    # cpp_type of C++ enum.
+    if cpp_type == 'ServerGlobalParams::FeatureCompatibility::Version':
+        return 'ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault44Behavior'
     return '-1'
 
 
