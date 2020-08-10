@@ -1392,7 +1392,7 @@ rs.help = function() {
     print();
     print("\trs.printReplicationInfo()                  check oplog size and time range");
     print(
-        "\trs.printSlaveReplicationInfo()             check replica set members and replication lag");
+        "\trs.printSecondaryReplicationInfo()             check replica set members and replication lag");
     print("\tdb.isMaster()                              check who is primary");
     print("\tdb.hello()                              check who is primary");
     print();
@@ -1422,7 +1422,12 @@ rs.initiate = function(c) {
     return db._adminCommand({replSetInitiate: c});
 };
 rs.printSlaveReplicationInfo = function() {
-    return db.printSlaveReplicationInfo();
+    print(
+        "WARNING: printSlaveReplicationInfo is deprecated and may be removed in the next major release. Please use printSecondaryReplicationInfo instead.");
+    return db.printSecondaryReplicationInfo();
+};
+rs.printSecondaryReplicationInfo = function() {
+    return db.printSecondaryReplicationInfo();
 };
 rs.printReplicationInfo = function() {
     return db.printReplicationInfo();
