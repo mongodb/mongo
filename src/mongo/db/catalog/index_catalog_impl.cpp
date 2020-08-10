@@ -1470,8 +1470,8 @@ Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
 
     iam->prepareUpdate(opCtx, index, oldDoc, newDoc, recordId, options, &updateTicket);
 
-    int64_t keysInserted;
-    int64_t keysDeleted;
+    int64_t keysInserted = 0;
+    int64_t keysDeleted = 0;
 
     auto status = Status::OK();
     if (index->isHybridBuilding() || !index->isReady(opCtx)) {
