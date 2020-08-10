@@ -232,6 +232,8 @@ create_database(const char *home, WT_CONNECTION **connp)
         CONFIG_APPEND(p, ",aggressive_sweep");
     if (g.c_timing_stress_checkpoint)
         CONFIG_APPEND(p, ",checkpoint_slow");
+    if (g.c_timing_stress_checkpoint_prepare)
+        CONFIG_APPEND(p, ",prepare_checkpoint_delay");
     if (g.c_timing_stress_hs_checkpoint_delay)
         CONFIG_APPEND(p, ",history_store_checkpoint_delay");
     if (g.c_timing_stress_hs_sweep)

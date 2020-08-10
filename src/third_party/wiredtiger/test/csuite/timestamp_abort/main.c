@@ -78,7 +78,7 @@ static const char *const uri_shadow = "shadow";
 
 static const char *const ckpt_file = "checkpoint_done";
 
-static bool compat, inmem, use_ts;
+static bool compat, inmem, stress, use_ts;
 static volatile uint64_t global_ts = 1;
 
 #define ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
@@ -87,11 +87,12 @@ static volatile uint64_t global_ts = 1;
     "debug_mode=(table_logging=true,checkpoint_retention=5)," \
     "eviction_updates_trigger=95,eviction_updates_target=80," \
     "log=(archive=true,file_max=10M,enabled),session_max=%d," \
-    "statistics=(fast),statistics_log=(wait=1,json=true),"
+    "statistics=(fast),statistics_log=(wait=1,json=true)"
 #define ENV_CONFIG_TXNSYNC \
     ENV_CONFIG_DEF         \
-    "transaction_sync=(enabled,method=none)"
+    ",transaction_sync=(enabled,method=none)"
 #define ENV_CONFIG_REC "log=(archive=false,recover=on)"
+#define ENV_CONFIG_STRESS ",timing_stress_for_test=[prepare_checkpoint_delay]"
 
 typedef struct {
     uint64_t absent_key; /* Last absent key */
@@ -423,6 +424,8 @@ run_workload(uint32_t nth)
         testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, SESSION_MAX));
     if (compat)
         strcat(envconf, ENV_CONFIG_COMPAT);
+    if (stress)
+        strcat(envconf, ENV_CONFIG_STRESS);
 
     testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
@@ -549,7 +552,7 @@ main(int argc, char *argv[])
 
     (void)testutil_set_progname(argv);
 
-    compat = inmem = false;
+    compat = inmem = stress = false;
     use_ts = true;
     nth = MIN_TH;
     rand_th = rand_time = true;
@@ -557,7 +560,7 @@ main(int argc, char *argv[])
     verify_only = false;
     working_dir = "WT_TEST.timestamp-abort";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "Ch:LmT:t:vz")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "Ch:LmsT:t:vz")) != EOF)
         switch (ch) {
         case 'C':
             compat = true;
@@ -570,6 +573,9 @@ main(int argc, char *argv[])
             break;
         case 'm':
             inmem = true;
+            break;
+        case 's':
+            stress = true;
             break;
         case 'T':
             rand_th = false;
@@ -626,12 +632,14 @@ main(int argc, char *argv[])
         }
 
         printf(
-          "Parent: compatibility: %s, "
-          "in-mem log sync: %s, timestamp in use: %s\n",
-          compat ? "true" : "false", inmem ? "true" : "false", use_ts ? "true" : "false");
+          "Parent: compatibility: %s, in-mem log sync: %s, add timing stress: %s, "
+          "timestamp in use: %s\n",
+          compat ? "true" : "false", inmem ? "true" : "false", stress ? "true" : "false",
+          use_ts ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
-          compat ? " -C" : "", inmem ? " -m" : "", !use_ts ? " -z" : "", working_dir, nth, timeout);
+        printf("CONFIG: %s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
+          compat ? " -C" : "", inmem ? " -m" : "", stress ? " -s" : "", !use_ts ? " -z" : "",
+          working_dir, nth, timeout);
         /*
          * Fork a child to insert as many items. We will then randomly kill the child, run recovery
          * and make sure all items we wrote exist after recovery runs.

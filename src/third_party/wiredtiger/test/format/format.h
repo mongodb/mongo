@@ -215,6 +215,7 @@ typedef struct {
     uint32_t c_timing_stress_checkpoint;
     uint32_t c_timing_stress_hs_checkpoint_delay;
     uint32_t c_timing_stress_hs_sweep;
+    uint32_t c_timing_stress_checkpoint_prepare;
     uint32_t c_timing_stress_split_1;
     uint32_t c_timing_stress_split_2;
     uint32_t c_timing_stress_split_3;

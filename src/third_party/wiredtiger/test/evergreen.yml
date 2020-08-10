@@ -224,22 +224,29 @@ functions:
         set -o verbose
 
         for i in $(seq ${times|1}); do
-          # Run the various combinations of args.  Let time and threads be random.
+          # Run the various combinations of args. Let time and threads be random. Add a
+          # timing stress to test_timestamp_abort every other run.
+          if [ $(( $i % 2 )) -eq 0 ]; then
+            test_timestamp_abort_args=-s
+          else
+            test_timestamp_abort_args=
+          fi
+
           # Run current version with write-no-sync txns.
           ${test_env_vars|} ./test_random_abort 2>&1
-          ${test_env_vars|} ./test_timestamp_abort 2>&1
+          ${test_env_vars|} ./test_timestamp_abort $test_timestamp_abort_args 2>&1
 
           # Current version with memory-based txns (MongoDB usage).
           ${test_env_vars|} ./test_random_abort -m 2>&1
-          ${test_env_vars|} ./test_timestamp_abort -m 2>&1
+          ${test_env_vars|} ./test_timestamp_abort -m $test_timestamp_abort_args 2>&1
 
           # V1 log compatibility mode with write-no-sync txns.
           ${test_env_vars|} ./test_random_abort -C 2>&1
-          ${test_env_vars|} ./test_timestamp_abort -C 2>&1
+          ${test_env_vars|} ./test_timestamp_abort -C $test_timestamp_abort_args 2>&1
 
           # V1 log compatibility mode with memory-based txns.
           ${test_env_vars|} ./test_random_abort -C -m 2>&1
-          ${test_env_vars|} ./test_timestamp_abort -C -m 2>&1
+          ${test_env_vars|} ./test_timestamp_abort -C -m $test_timestamp_abort_args 2>&1
 
           ${test_env_vars|} ./test_truncated_log ${truncated_log_args|} 2>&1
 
@@ -893,6 +900,21 @@ tasks:
             set -o verbose
 
             ${test_env_vars|} $(pwd)/../test/csuite/timestamp_abort/smoke.sh 2>&1
+
+  - name: csuite-timestamp-abort-stress-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/../test/csuite/timestamp_abort/smoke.sh -s 2>&1
 
   - name: csuite-scope-test
     tags: ["pull_request"]
@@ -1631,7 +1653,7 @@ tasks:
             ulimit -c unlimited
             largescale/run-million-collection-test.sh .
 
-  - name: compatibility-test-for-releases-full
+  - name: compatibility-test-for-newer-releases
     commands:
       - func: "get project"
       - command: shell.exec
@@ -1640,9 +1662,9 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            test/evergreen/compatibility_test_for_releases.sh -l
+            test/evergreen/compatibility_test_for_releases.sh -n
 
-  - name: compatibility-test-for-releases
+  - name: compatibility-test-for-older-releases
     commands:
       - func: "get project"
       - command: shell.exec
@@ -1651,7 +1673,18 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            test/evergreen/compatibility_test_for_releases.sh
+            test/evergreen/compatibility_test_for_releases.sh -o
+
+  - name: compatibility-test-for-wt-standalone-releases
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            test/evergreen/compatibility_test_for_releases.sh -w
 
   - name: generate-datafile-little-endian
     depends_on:
@@ -2481,20 +2514,21 @@ buildvariants:
   tasks:
     - name: million-collection-test
 
-- name: compatibility-tests-full
-  display_name: Compatibility tests full
+- name: compatibility-tests-less-frequent
+  display_name: Compatibility tests (less frequent)
   batchtime: 10080 # 7 days
   run_on:
   - ubuntu1804-test
   tasks:
-    - name: compatibility-test-for-releases-full
+    - name: compatibility-test-for-older-releases
+    - name: compatibility-test-for-wt-standalone-releases
 
 - name: compatibility-tests
   display_name: Compatibility tests
   run_on:
   - ubuntu1804-test
   tasks:
-    - name: compatibility-test-for-releases
+    - name: compatibility-test-for-newer-releases
 
 - name: windows-64
   display_name: "! Windows 64-bit"
