@@ -7,6 +7,10 @@
  * will mock many system components, and sometimes will mock behaviors that don't necessarily match
  * true system behavior i.e. mocking an oplog entry with an incorrect format. So, this integration
  * test provides an additional verification of rollback's correctness within a real replica set.
+ *
+ * TODO(SERVER-50183): Unblacklist this test from EMRC=false variants once RollbackTestDeluxe
+ * supports RVR.
+ * @tags: [requires_majority_read_concern]
  */
 
 (function() {
