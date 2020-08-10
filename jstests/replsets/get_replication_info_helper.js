@@ -1,4 +1,6 @@
-// Tests the output of db.getReplicationInfo() and tests db.printSlaveReplicationInfo().
+// Tests the output of db.getReplicationInfo(), db.printSlaveReplicationInfo(), and the latter's
+// alias, db.printSecondaryReplicationInfo().
+// @tags: [requires_fcv_47]
 
 (function() {
 "use strict";
@@ -40,7 +42,18 @@ for (i in replSet._slaves) {
 }
 assert.commandWorked(primary.getDB('admin').runCommand({replSetStepDown: 120, force: true}));
 
+// printSlaveReplicationInfo is deprecated and aliased to printSecondaryReplicationInfo, but ensure
+// it still works for backwards compatibility.
 mongo = startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
+mongo();
+assert(rawMongoProgramOutput().match("behind the freshest"));
+
+clearRawMongoProgramOutput();
+assert.eq(rawMongoProgramOutput().match("behind the freshest"), null);
+
+// Ensure that the new helper, printSecondaryReplicationInfo works the same.
+mongo =
+    startParallelShell("db.getSiblingDB('admin').printSecondaryReplicationInfo();", primary.port);
 mongo();
 assert(rawMongoProgramOutput().match("behind the freshest"));
 
