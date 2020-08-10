@@ -73,6 +73,13 @@ modifiertable::ModifierType validateMod(BSONElement mod) {
                           << " not {" << mod << "}",
             mod.type() == BSONType::Object);
 
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "'" << mod.fieldName()
+                          << "' is empty. You must specify a field like so: "
+                             "{"
+                          << mod.fieldName() << ": {<field>: ...}}",
+            !mod.embeddedObject().isEmpty());
+
     return modType;
 }
 
