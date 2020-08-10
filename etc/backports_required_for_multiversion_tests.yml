@@ -91,6 +91,8 @@ all:
     test_file: jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
   - ticket: SERVER-49986
     test_file: jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
+  - ticket: SERVER-49991
+    test_file: jstests/replsets/get_replication_info_helper.js
 
 suites:
 
