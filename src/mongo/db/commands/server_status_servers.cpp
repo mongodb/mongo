@@ -33,6 +33,8 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_executor_fixed.h"
+#include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/util/net/hostname_canonicalization.h"
 #include "mongo/util/net/socket_utils.h"
@@ -78,16 +80,27 @@ public:
         return true;
     }
 
-    // TODO: need to track connections in server stats (see SERVER-49109)
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder b;
         networkCounter.append(b);
         appendMessageCompressionStats(&b);
-        auto executor = transport::ServiceExecutorSynchronous::get(opCtx->getServiceContext());
-        if (executor) {
-            BSONObjBuilder section(b.subobjStart("serviceExecutorTaskStats"));
-            executor->appendStats(&section);
+
+        {
+            BSONObjBuilder section = b.subobjStart("serviceExecutors");
+
+            auto svcCtx = opCtx->getServiceContext();
+            if (auto executor = transport::ServiceExecutorSynchronous::get(svcCtx)) {
+                executor->appendStats(&section);
+            }
+
+            if (auto executor = transport::ServiceExecutorReserved::get(svcCtx)) {
+                executor->appendStats(&section);
+            }
+
+            if (auto executor = transport::ServiceExecutorFixed::get(svcCtx)) {
+                executor->appendStats(&section);
+            }
         }
 
         return b.obj();

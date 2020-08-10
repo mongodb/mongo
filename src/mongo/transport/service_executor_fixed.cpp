@@ -49,9 +49,12 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeServiceExecutorFixedLastExecutorThreadReturns)
 
 namespace transport {
 namespace {
-constexpr auto kThreadsRunning = "threadsRunning"_sd;
-constexpr auto kExecutorLabel = "executor"_sd;
 constexpr auto kExecutorName = "fixed"_sd;
+
+constexpr auto kThreadsRunning = "threadsRunning"_sd;
+constexpr auto kClientsInTotal = "clientsInTotal"_sd;
+constexpr auto kClientsRunning = "clientsRunning"_sd;
+constexpr auto kClientsWaiting = "clientsWaitingForData"_sd;
 
 const auto getServiceExecutorFixed =
     ServiceContext::declareDecoration<std::shared_ptr<ServiceExecutorFixed>>();
@@ -158,7 +161,7 @@ ServiceExecutorFixed::~ServiceExecutorFixed() {
 
     invariant(_threadsRunning() == 0);
     invariant(_tasksRunning() == 0);
-    invariant(_waiters.empty());
+    invariant(_tasksWaiting() == 0);
 }
 
 Status ServiceExecutorFixed::start() {
@@ -400,6 +403,8 @@ void ServiceExecutorFixed::runOnDataAvailable(const SessionHandle& session,
         }
 
         it = _waiters.emplace(_waiters.end(), std::move(waiter));
+
+        _stats.waitersStarted.fetchAndAdd(1);
     }
 
     session->asyncWaitForData()
@@ -411,6 +416,8 @@ void ServiceExecutorFixed::runOnDataAvailable(const SessionHandle& session,
                 auto lk = stdx::unique_lock(_mutex);
                 waiter = std::exchange(*it, {});
                 _waiters.erase(it);
+
+                _stats.waitersEnded.fetchAndAdd(1);
             }
 
             waiter.onCompletionCallback(std::move(status));
@@ -418,8 +425,13 @@ void ServiceExecutorFixed::runOnDataAvailable(const SessionHandle& session,
 }
 
 void ServiceExecutorFixed::appendStats(BSONObjBuilder* bob) const {
-    *bob << kExecutorLabel << kExecutorName << kThreadsRunning
-         << static_cast<int>(_threadsRunning());
+    // The ServiceExecutorFixed schedules Clients temporarily onto its threads and waits
+    // asynchronously.
+    BSONObjBuilder subbob = bob->subobjStart(kExecutorName);
+    subbob.append(kThreadsRunning, static_cast<int>(_threadsRunning()));
+    subbob.append(kClientsInTotal, static_cast<int>(_tasksTotal()));
+    subbob.append(kClientsRunning, static_cast<int>(_tasksRunning()));
+    subbob.append(kClientsWaiting, static_cast<int>(_tasksWaiting()));
 }
 
 int ServiceExecutorFixed::getRecursionDepthForExecutorThread() const {

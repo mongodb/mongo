@@ -20,17 +20,34 @@ function verifyStats({exemptCount, normalCount}) {
     // Verify that we have updated serverStatus.
     assert.soon(() => {
         const serverStatus = getStats();
-
-        const readyAdminThreads = serverStatus.connections.adminConnections.readyThreads;
-        if (readyAdminThreads < configuredReadyAdminThreads) {
-            print(`Not enough admin threads yet: ${readyAdminThreads} vs ${
-                configuredReadyAdminThreads}`);
-            return false;
-        }
+        const executors = serverStatus.network.serviceExecutors;
 
         const currentCount = serverStatus.connections.current;
         if (currentCount != totalCount) {
-            print(`Not yet at the expected count of connections: ${currentCount} vs ${totalCount}`);
+            print(`Not yet at the expected count of connections: ${currentCount} != ${totalCount}`);
+            return false;
+        }
+
+        const readyAdminThreads =
+            executors.reserved.threadsRunning - executors.reserved.clientsRunning;
+        if (readyAdminThreads < configuredReadyAdminThreads) {
+            print("Not enough admin threads yet: " +
+                  `${readyAdminThreads} < ${configuredReadyAdminThreads}`);
+            return false;
+        }
+
+        const threadedCount = serverStatus.connections.threaded;
+        const threadedExecutorCount =
+            executors.passthrough.clientsInTotal + executors.reserved.clientsInTotal;
+        if (threadedCount != threadedExecutorCount) {
+            print("Not enough running threaded clients yet: " +
+                  `${threadedCount} != ${threadedExecutorCount}`);
+            return false;
+        }
+
+        const totalExecutorCount = threadedExecutorCount + executors.fixed.clientsInTotal;
+        if (totalCount != totalExecutorCount) {
+            print(`Not enough running clients yet: ${totalCount} != ${totalExecutorCount}`);
             return false;
         }
 
@@ -39,14 +56,19 @@ function verifyStats({exemptCount, normalCount}) {
 
     const serverStatus = getStats();
     const connectionsStatus = serverStatus.connections;
-    const reservedExecutorStatus = connectionsStatus.adminConnections;
-    const executorStatus = serverStatus.network.serviceExecutorTaskStats;
+    const reservedExecutorStatus = serverStatus.network.serviceExecutors.reserved;
+    const fixedExecutorStatus = serverStatus.network.serviceExecutors.fixed;
+    const executorStatus = serverStatus.network.serviceExecutors.passthrough;
 
     // Log these serverStatus sections so we can debug this easily.
     const filteredSections = {
         connections: connectionsStatus,
         network: {
-            serviceExecutorTaskStats: executorStatus,
+            serviceExecutors: {
+                passthrough: executorStatus,
+                fixed: fixedExecutorStatus,
+                reserved: reservedExecutorStatus
+            }
         }
     };
     print(`serverStatus: ${tojson(filteredSections)}`);
@@ -61,18 +83,23 @@ function verifyStats({exemptCount, normalCount}) {
     // All connections on an exempt CIDR should be marked as limitExempt.
     assert.eq(connectionsStatus["limitExempt"], exemptCount);
 
-    // Without a borrowing executor, all connections are threaded.
-    assert.eq(connectionsStatus["threaded"], totalCount);
+    // The normal serviceExecutor should only be running at most maxConns number of threads.
+    assert.lte(executorStatus["threadsRunning"], configuredMaxConns);
 
-    if (totalCount > configuredMaxConns) {
-        // The normal serviceExecutor should only be running at most maxConns number of threads.
-        assert.eq(executorStatus["threadsRunning"], configuredMaxConns);
-    } else {
-        assert.eq(executorStatus["threadsRunning"], totalCount);
-    }
+    // Clients on the normal executor own their thread and cannot wait asynchronously.
+    assert.eq(executorStatus["clientsRunning"], executorStatus["clientsInTotal"]);
+    assert.eq(executorStatus["clientsRunning"], executorStatus["threadsRunning"]);
+    assert.eq(executorStatus["clientsWaitingForData"], 0);
 
-    // We should have all excess connections on the reserved executor.
-    assert.gt(reservedExecutorStatus["threadsRunning"], totalCount - configuredMaxConns);
+    // Clients on the reserved executor run on a thread and cannot wait asynchronously.
+    assert.eq(reservedExecutorStatus["clientsRunning"], reservedExecutorStatus["clientsInTotal"]);
+    assert.lte(reservedExecutorStatus["clientsRunning"], reservedExecutorStatus["threadsRunning"]);
+    assert.eq(reservedExecutorStatus["clientsWaitingForData"], 0);
+
+    // Clients on the fixed executor borrow one thread and can wait asynchronously
+    assert.lte(fixedExecutorStatus["clientsRunning"], fixedExecutorStatus["clientsInTotal"]);
+    assert.lte(fixedExecutorStatus["clientsRunning"], fixedExecutorStatus["threadsRunning"]);
+    assert.lte(fixedExecutorStatus["clientsWaitingForData"], fixedExecutorStatus["clientsInTotal"]);
 }
 
 // Use the external ip to avoid our exempt CIDR.

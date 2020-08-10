@@ -45,11 +45,12 @@ namespace mongo {
 namespace transport {
 namespace {
 
-constexpr auto kThreadsRunning = "threadsRunning"_sd;
-constexpr auto kExecutorLabel = "executor"_sd;
 constexpr auto kExecutorName = "reserved"_sd;
-constexpr auto kReadyThreads = "readyThreads"_sd;
-constexpr auto kStartingThreads = "startingThreads"_sd;
+
+constexpr auto kThreadsRunning = "threadsRunning"_sd;
+constexpr auto kClientsInTotal = "clientsInTotal"_sd;
+constexpr auto kClientsRunning = "clientsRunning"_sd;
+constexpr auto kClientsWaiting = "clientsWaitingForData"_sd;
 
 const auto getServiceExecutorReserved =
     ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorReserved>>();
@@ -214,11 +215,29 @@ Status ServiceExecutorReserved::scheduleTask(Task task, ScheduleFlags flags) {
 }
 
 void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
-    stdx::lock_guard<Latch> lk(_mutex);
-    *bob << kExecutorLabel << kExecutorName << kThreadsRunning
-         << static_cast<int>(_numRunningWorkerThreads.loadRelaxed()) << kReadyThreads
-         << static_cast<int>(_numReadyThreads) << kStartingThreads
-         << static_cast<int>(_numStartingThreads);
+    // The ServiceExecutorReserved loans a thread to one client for its lifetime and waits
+    // synchronously on thread.
+    struct Statlet {
+        int threads;
+        int total;
+        int running;
+        int waiting;
+    };
+
+    auto statlet = [&] {
+        stdx::lock_guard lk(_mutex);
+        auto threads = static_cast<int>(_numRunningWorkerThreads.loadRelaxed());
+        auto total = static_cast<int>(threads - _numReadyThreads - _numStartingThreads);
+        auto running = total;
+        auto waiting = 0;
+        return Statlet{threads, total, running, waiting};
+    }();
+
+    BSONObjBuilder subbob = bob->subobjStart(kExecutorName);
+    subbob.append(kThreadsRunning, statlet.threads);
+    subbob.append(kClientsInTotal, statlet.total);
+    subbob.append(kClientsRunning, statlet.running);
+    subbob.append(kClientsWaiting, statlet.waiting);
 }
 
 void ServiceExecutorReserved::runOnDataAvailable(const SessionHandle& session,

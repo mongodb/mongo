@@ -333,11 +333,6 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
                 static_cast<int>(IsMasterMetrics::get(_svcCtx)->getNumExhaustIsMaster()));
     bob->append("awaitingTopologyChanges",
                 static_cast<int>(IsMasterMetrics::get(_svcCtx)->getNumAwaitingTopologyChanges()));
-
-    if (auto adminExec = transport::ServiceExecutorReserved::get(_svcCtx)) {
-        BSONObjBuilder section(bob->subobjStart("adminConnections"));
-        adminExec->appendStats(&section);
-    }
 }
 
 }  // namespace mongo

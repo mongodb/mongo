@@ -99,15 +99,31 @@ private:
     void _schedule(OutOfLineExecutor::Task task) noexcept;
 
     auto _threadsRunning() const {
-        return _stats.threadsStarted.load() - _stats.threadsEnded.loadRelaxed();
+        auto ended = _stats.threadsEnded.load();
+        auto started = _stats.threadsStarted.loadRelaxed();
+        return started - ended;
     }
 
     auto _tasksRunning() const {
-        return _stats.tasksStarted.load() - _stats.tasksEnded.loadRelaxed();
+        auto ended = _stats.tasksEnded.load();
+        auto started = _stats.tasksStarted.loadRelaxed();
+        return started - ended;
     }
 
     auto _tasksLeft() const {
-        return _stats.tasksScheduled.load() - _stats.tasksEnded.loadRelaxed();
+        auto ended = _stats.tasksEnded.load();
+        auto scheduled = _stats.tasksScheduled.loadRelaxed();
+        return scheduled - ended;
+    }
+
+    auto _tasksWaiting() const {
+        auto ended = _stats.waitersEnded.load();
+        auto started = _stats.waitersStarted.loadRelaxed();
+        return started - ended;
+    }
+
+    auto _tasksTotal() const {
+        return _tasksRunning() + _tasksWaiting();
     }
 
     struct Stats {
@@ -117,6 +133,9 @@ private:
         AtomicWord<size_t> tasksScheduled{0};
         AtomicWord<size_t> tasksStarted{0};
         AtomicWord<size_t> tasksEnded{0};
+
+        AtomicWord<size_t> waitersStarted{0};
+        AtomicWord<size_t> waitersEnded{0};
     };
     Stats _stats;
 
