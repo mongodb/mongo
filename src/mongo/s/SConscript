@@ -309,6 +309,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
+        '$BUILD_DIR/mongo/util/caching',
         'client/shard_interface',
         'query/cluster_cursor_manager',
         'sharding_routing_table',
