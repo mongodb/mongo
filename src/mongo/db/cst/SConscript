@@ -24,6 +24,7 @@ env.CppUnitTest(
     target='cst_test',
     source=[
         'bson_lexer_test.cpp',
+        'cst_error_test.cpp',
         'cst_expression_test.cpp',
         'cst_test.cpp',
     ],

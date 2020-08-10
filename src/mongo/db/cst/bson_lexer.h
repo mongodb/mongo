@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/cst/bson_location.h"
 #include "mongo/db/cst/pipeline_parser_gen.hpp"
 
 namespace mongo {
@@ -63,20 +64,43 @@ public:
         return _tokens[offset];
     }
 
+    /**
+     * Scoped struct which pushes a location prefix for subsequently generated tokens. Pops the
+     * prefix off the stack upon destruction.
+     */
+    struct ScopedLocationTracker {
+        ScopedLocationTracker(BSONLexer* lexer, BSONLocation::LocationPrefix prefix)
+            : _lexer(lexer) {
+            _lexer->_locationPrefixes.emplace_back(prefix);
+        }
+
+        ~ScopedLocationTracker() {
+            _lexer->_locationPrefixes.pop_back();
+        }
+
+        BSONLexer* _lexer{nullptr};
+    };
+
 private:
     // Tokenizes the given BSONElement, traversing its children if necessary. If the field name
     // should not be considered, set 'includeFieldName' to false.
     void tokenize(BSONElement elem, bool includeFieldName);
 
-    PipelineParserGen::location_type getNextLoc() {
-        auto loc = PipelineParserGen::location_type{nullptr, _position, _position};
+    template <class LocationType, class... Args>
+    void pushToken(LocationType name, Args&&... args) {
+        auto token = PipelineParserGen::symbol_type(
+            std::forward<Args>(args)..., BSONLocation{std::move(name), _locationPrefixes});
+        _tokens.emplace_back(std::move(token));
         _position++;
-        return loc;
     }
 
     // Track the position of the input, both during construction of the list of tokens as well as
     // during parse.
-    int _position = 0;
+    unsigned int _position = 0;  // note: counter_type is only available on 3.5+
+
+    // A set of prefix strings that describe the current location in the lexer. As we walk the input
+    // BSON, this will change depending on the context that we're parsing.
+    std::vector<BSONLocation::LocationPrefix> _locationPrefixes;
 
     std::vector<PipelineParserGen::symbol_type> _tokens;
 };

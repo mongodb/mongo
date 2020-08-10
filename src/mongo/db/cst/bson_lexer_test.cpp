@@ -105,9 +105,9 @@ TEST(BSONLexerTest, MidRuleActionToSortNestedObject) {
     // arbitrary string field names with *not* get sorted.
     lexer.sortObjTokens();
     auto expected = {PipelineParserGen::token::START_OBJECT,
-                     PipelineParserGen::token::COLL_ARG,
+                     PipelineParserGen::token::ARG_COLL,
                      PipelineParserGen::token::STRING,
-                     PipelineParserGen::token::PIPELINE_ARG,
+                     PipelineParserGen::token::ARG_PIPELINE,
                      PipelineParserGen::token::DOUBLE_NON_ZERO,
                      PipelineParserGen::token::END_OBJECT,
                      PipelineParserGen::token::END_ARRAY};
@@ -127,9 +127,9 @@ TEST(BSONLexerTest, MidRuleActionToSortDoesNotSortNestedObjects) {
     lexer.sortObjTokens();
     auto expected = {
         PipelineParserGen::token::START_OBJECT,
-        PipelineParserGen::token::COLL_ARG,
+        PipelineParserGen::token::ARG_COLL,
         PipelineParserGen::token::STRING,        // coll: 'outer'
-        PipelineParserGen::token::PIPELINE_ARG,  // inner pipeline
+        PipelineParserGen::token::ARG_PIPELINE,  // inner pipeline
         PipelineParserGen::token::START_ARRAY,
         PipelineParserGen::token::START_OBJECT,
         // The nested pipeline does *not* get sorted, meaning '$unionWith' stays before 'a'.
@@ -159,7 +159,7 @@ TEST(BSONLexerTest, MultipleNestedObjectsAreReorderedCorrectly) {
     lexer.sortObjTokens();
     auto expected = {
         PipelineParserGen::token::START_OBJECT,
-        PipelineParserGen::token::COLL_ARG,
+        PipelineParserGen::token::ARG_COLL,
         PipelineParserGen::token::START_ARRAY,
         PipelineParserGen::token::START_OBJECT,
         // The nested pipeline does *not* get sorted, meaning '$unionWith' stays before 'a'.
@@ -170,7 +170,7 @@ TEST(BSONLexerTest, MultipleNestedObjectsAreReorderedCorrectly) {
         PipelineParserGen::token::END_OBJECT,
         PipelineParserGen::token::END_ARRAY,
         // Coll nested object ends here.
-        PipelineParserGen::token::PIPELINE_ARG,  // inner pipeline
+        PipelineParserGen::token::ARG_PIPELINE,  // inner pipeline
         PipelineParserGen::token::START_ARRAY,
         PipelineParserGen::token::START_OBJECT,
         // The nested pipeline does *not* get sorted, meaning '$unionWith' stays before 'a'.
@@ -199,9 +199,9 @@ TEST(BSONLexerTest, MultiLevelBSONDoesntSortChildren) {
     lexer.sortObjTokens();
     auto expected = {
         PipelineParserGen::token::START_OBJECT,
-        PipelineParserGen::token::COLL_ARG,
+        PipelineParserGen::token::ARG_COLL,
         PipelineParserGen::token::STRING,        // coll: 'outer'
-        PipelineParserGen::token::PIPELINE_ARG,  // inner pipeline
+        PipelineParserGen::token::ARG_PIPELINE,  // inner pipeline
         // First nested object
         PipelineParserGen::token::START_ARRAY,
         PipelineParserGen::token::START_OBJECT,

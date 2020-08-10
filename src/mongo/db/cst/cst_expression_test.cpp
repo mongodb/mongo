@@ -56,9 +56,9 @@ TEST(CstExpressionTest, ParsesProjectWithAnd) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { andExpr: [ "
-        "\"<UserInt 4>\", { andExpr: [ \"<UserInt 7>\", \"<UserInt 8>\" ] } ] }, b: { andExpr: [ "
-        "\"<UserInt 2>\", \"<UserInt -3>\" ] } } }");
+        "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { andExpr: [ { "
+        "andExpr: [ \"<UserInt 8>\", \"<UserInt 7>\" ] }, \"<UserInt 4>\" ] }, b: { andExpr: "
+        "[ \"<UserInt -3>\", \"<UserInt 2>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesProjectWithOr) {
@@ -71,11 +71,11 @@ TEST(CstExpressionTest, ParsesProjectWithOr) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(
-        stages[0].toBson().toString(),
-        "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { orExpr: [ "
-        "\"<UserInt 4>\", { orExpr: [ \"<UserInt 7>\", \"<UserInt 8>\" ] } ] }, b: { orExpr: [ "
-        "\"<UserInt 2>\", \"<UserInt -3>\" ] } } }");
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { orExpr: [ "
+              "{ orExpr: "
+              "[ \"<UserInt 8>\", \"<UserInt 7>\" ] }, \"<UserInt 4>\" ] }, b: { orExpr: [ "
+              "\"<UserInt -3>\", \"<UserInt 2>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesProjectWithNot) {
@@ -91,8 +91,8 @@ TEST(CstExpressionTest, ParsesProjectWithNot) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
               "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { notExpr: [ "
-              "\"<UserInt 4>\" ] }, b: { andExpr: [ \"<UserDouble 1.000000>\", { notExpr: [ "
-              "\"<UserBoolean 1>\" ] } ] } } }");
+              "\"<UserInt 4>\" ] }, b: { andExpr: [ { notExpr: [ \"<UserBoolean 1>\" ] }, "
+              "\"<UserDouble 1.000000>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesComparisonExpressions) {

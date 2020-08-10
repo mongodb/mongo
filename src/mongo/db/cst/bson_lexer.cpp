@@ -29,11 +29,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/cst/bson_lexer.h"
 #include "mongo/db/cst/pipeline_parser_gen.hpp"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+
+using namespace std::string_literals;
 
 namespace {
 
@@ -46,11 +49,11 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"$limit", PipelineParserGen::token::STAGE_LIMIT},
     {"$project", PipelineParserGen::token::STAGE_PROJECT},
     {"$sample", PipelineParserGen::token::STAGE_SAMPLE},
-    {"size", PipelineParserGen::token::SIZE_ARG},
+    {"size", PipelineParserGen::token::ARG_SIZE},
     {"$skip", PipelineParserGen::token::STAGE_SKIP},
     {"$unionWith", PipelineParserGen::token::STAGE_UNION_WITH},
-    {"coll", PipelineParserGen::token::COLL_ARG},
-    {"pipeline", PipelineParserGen::token::PIPELINE_ARG},
+    {"coll", PipelineParserGen::token::ARG_COLL},
+    {"pipeline", PipelineParserGen::token::ARG_PIPELINE},
     // Expressions
     {"$add", PipelineParserGen::token::ADD},
     {"$atan2", PipelineParserGen::token::ATAN2},
@@ -67,10 +70,10 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"$lte", PipelineParserGen::token::LTE},
     {"$ne", PipelineParserGen::token::NE},
     {"$convert", PipelineParserGen::token::CONVERT},
-    {"input", PipelineParserGen::token::INPUT_ARG},
-    {"to", PipelineParserGen::token::TO_ARG},
-    {"onError", PipelineParserGen::token::ON_ERROR_ARG},
-    {"onNull", PipelineParserGen::token::ON_NULL_ARG},
+    {"input", PipelineParserGen::token::ARG_INPUT},
+    {"to", PipelineParserGen::token::ARG_TO},
+    {"onError", PipelineParserGen::token::ARG_ON_ERROR},
+    {"onNull", PipelineParserGen::token::ARG_ON_NULL},
     {"$toBool", PipelineParserGen::token::TO_BOOL},
     {"$toDate", PipelineParserGen::token::TO_DATE},
     {"$toDecimal", PipelineParserGen::token::TO_DECIMAL},
@@ -117,15 +120,15 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"$toLower", PipelineParserGen::token::TO_LOWER},
     {"$trim", PipelineParserGen::token::TRIM},
     {"$toUpper", PipelineParserGen::token::TO_UPPER},
-    {"dateString", PipelineParserGen::token::DATE_STRING_ARG},
-    {"format", PipelineParserGen::token::FORMAT_ARG},
-    {"timezone", PipelineParserGen::token::TIMEZONE_ARG},
-    {"date", PipelineParserGen::token::DATE_ARG},
-    {"chars", PipelineParserGen::token::CHARS_ARG},
-    {"regex", PipelineParserGen::token::REGEX_ARG},
-    {"options", PipelineParserGen::token::OPTIONS_ARG},
-    {"find", PipelineParserGen::token::FIND_ARG},
-    {"replacement", PipelineParserGen::token::REPLACEMENT_ARG},
+    {"dateString", PipelineParserGen::token::ARG_DATE_STRING},
+    {"format", PipelineParserGen::token::ARG_FORMAT},
+    {"timezone", PipelineParserGen::token::ARG_TIMEZONE},
+    {"date", PipelineParserGen::token::ARG_DATE},
+    {"chars", PipelineParserGen::token::ARG_CHARS},
+    {"regex", PipelineParserGen::token::ARG_REGEX},
+    {"options", PipelineParserGen::token::ARG_OPTIONS},
+    {"find", PipelineParserGen::token::ARG_FIND},
+    {"replacement", PipelineParserGen::token::ARG_REPLACEMENT},
 };
 bool isCompound(PipelineParserGen::symbol_type token) {
     return token.type_get() == static_cast<int>(PipelineParserGen::token::START_OBJECT) ||
@@ -202,120 +205,122 @@ void BSONLexer::sortObjTokens() {
 }
 
 void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
+    boost::optional<ScopedLocationTracker> context;
     // Skipped when we are tokenizing arrays.
     if (includeFieldName) {
         if (auto it = reservedKeyLookup.find(elem.fieldNameStringData());
             it != reservedKeyLookup.end()) {
             // Place the token expected by the parser if this is a reserved keyword.
-            _tokens.emplace_back(it->second, getNextLoc());
+            pushToken(elem.fieldNameStringData(), it->second);
+            context.emplace(this, elem.fieldNameStringData());
         } else {
             // If we don't care about the keyword, then it's treated as a generic fieldname.
-            _tokens.emplace_back(PipelineParserGen::make_FIELDNAME(elem.fieldName(), getNextLoc()));
+            pushToken(
+                elem.fieldNameStringData(), PipelineParserGen::token::FIELDNAME, elem.fieldName());
         }
     }
 
     switch (elem.type()) {
-        case BSONType::Array:
-            _tokens.emplace_back(PipelineParserGen::token::START_ARRAY, getNextLoc());
+        case BSONType::Array: {
+            pushToken("start array", PipelineParserGen::token::START_ARRAY);
+            auto index = 0;
             for (auto&& nestedElem : elem.Array()) {
+                ScopedLocationTracker arrayCtx{this, index++};
                 // For arrays, do not tokenize the field names.
                 tokenize(nestedElem, false);
             }
-            _tokens.emplace_back(PipelineParserGen::token::END_ARRAY, getNextLoc());
+            pushToken("end array", PipelineParserGen::token::END_ARRAY);
             break;
+        }
         case BSONType::Object:
-            _tokens.emplace_back(PipelineParserGen::token::START_OBJECT, getNextLoc());
+            pushToken("start object", PipelineParserGen::token::START_OBJECT);
             for (auto&& nestedElem : elem.embeddedObject()) {
                 tokenize(nestedElem, true);
             }
-            _tokens.emplace_back(PipelineParserGen::token::END_OBJECT, getNextLoc());
+            pushToken("end object", PipelineParserGen::token::END_OBJECT);
             break;
         case NumberDouble:
             if (elem.numberDouble() == 0.0)
-                _tokens.emplace_back(PipelineParserGen::token::DOUBLE_ZERO, getNextLoc());
+                pushToken(elem, PipelineParserGen::token::DOUBLE_ZERO);
             else
-                _tokens.emplace_back(
-                    PipelineParserGen::make_DOUBLE_NON_ZERO(elem.numberDouble(), getNextLoc()));
+                pushToken(elem, PipelineParserGen::token::DOUBLE_NON_ZERO, elem.numberDouble());
             break;
         case BSONType::String:
-            _tokens.emplace_back(PipelineParserGen::make_STRING(elem.String(), getNextLoc()));
+            pushToken(elem.valueStringData(), PipelineParserGen::token::STRING, elem.String());
             break;
         case BSONType::BinData: {
             int len;
             auto data = elem.binData(len);
-            _tokens.emplace_back(PipelineParserGen::make_BINARY(
-                BSONBinData{data, len, elem.binDataType()}, getNextLoc()));
+            pushToken(
+                elem, PipelineParserGen::token::BINARY, BSONBinData{data, len, elem.binDataType()});
             break;
         }
         case BSONType::Undefined:
-            _tokens.emplace_back(PipelineParserGen::make_UNDEFINED(UserUndefined{}, getNextLoc()));
+            pushToken(elem, PipelineParserGen::token::UNDEFINED, UserUndefined{});
             break;
         case BSONType::jstOID:
-            _tokens.emplace_back(PipelineParserGen::make_OBJECT_ID(elem.OID(), getNextLoc()));
+            pushToken(elem, PipelineParserGen::token::OBJECT_ID, elem.OID());
             break;
         case Bool:
-            _tokens.emplace_back(elem.boolean() ? PipelineParserGen::token::BOOL_TRUE
-                                                : PipelineParserGen::token::BOOL_FALSE,
-                                 getNextLoc());
+            pushToken(elem,
+                      elem.boolean() ? PipelineParserGen::token::BOOL_TRUE
+                                     : PipelineParserGen::token::BOOL_FALSE);
             break;
         case BSONType::Date:
-            _tokens.emplace_back(PipelineParserGen::make_DATE_LITERAL(elem.date(), getNextLoc()));
+            pushToken(elem, PipelineParserGen::token::DATE_LITERAL, elem.date());
             break;
         case BSONType::jstNULL:
-            _tokens.emplace_back(PipelineParserGen::make_JSNULL(UserNull{}, getNextLoc()));
+            pushToken(elem, PipelineParserGen::token::JSNULL, UserNull{});
             break;
         case BSONType::RegEx:
-            _tokens.emplace_back(PipelineParserGen::make_REGEX(
-                BSONRegEx{elem.regex(), elem.regexFlags()}, getNextLoc()));
+            pushToken(
+                elem, PipelineParserGen::token::REGEX, BSONRegEx{elem.regex(), elem.regexFlags()});
             break;
         case BSONType::DBRef:
-            _tokens.emplace_back(PipelineParserGen::make_DB_POINTER(
-                BSONDBRef{elem.dbrefNS(), elem.dbrefOID()}, getNextLoc()));
+            pushToken(elem,
+                      PipelineParserGen::token::DB_POINTER,
+                      BSONDBRef{elem.dbrefNS(), elem.dbrefOID()});
             break;
         case BSONType::Code:
-            _tokens.emplace_back(
-                PipelineParserGen::make_JAVASCRIPT(BSONCode{elem.valueStringData()}, getNextLoc()));
+            pushToken(elem, PipelineParserGen::token::JAVASCRIPT, BSONCode{elem.valueStringData()});
             break;
         case BSONType::Symbol:
-            _tokens.emplace_back(
-                PipelineParserGen::make_SYMBOL(BSONSymbol{elem.valueStringData()}, getNextLoc()));
+            pushToken(elem, PipelineParserGen::token::SYMBOL, BSONSymbol{elem.valueStringData()});
             break;
         case BSONType::CodeWScope: {
             auto code = StringData{elem.codeWScopeCode(),
                                    static_cast<size_t>(elem.codeWScopeCodeLen()) - 1ull};
-            _tokens.emplace_back(PipelineParserGen::make_JAVASCRIPT_W_SCOPE(
-                BSONCodeWScope{code, elem.codeWScopeObject()}, getNextLoc()));
+            pushToken(elem,
+                      PipelineParserGen::token::JAVASCRIPT_W_SCOPE,
+                      BSONCodeWScope{code, elem.codeWScopeObject()});
             break;
         }
         case NumberInt:
             if (elem.numberInt() == 0)
-                _tokens.emplace_back(PipelineParserGen::token::INT_ZERO, getNextLoc());
+                pushToken(elem, PipelineParserGen::token::INT_ZERO);
             else
-                _tokens.emplace_back(
-                    PipelineParserGen::make_INT_NON_ZERO(elem.numberInt(), getNextLoc()));
+                pushToken(elem, PipelineParserGen::token::INT_NON_ZERO, elem.numberInt());
             break;
         case BSONType::bsonTimestamp:
-            _tokens.emplace_back(PipelineParserGen::make_TIMESTAMP(elem.timestamp(), getNextLoc()));
+            pushToken(elem, PipelineParserGen::token::TIMESTAMP, elem.timestamp());
             break;
         case NumberLong:
             if (elem.numberLong() == 0ll)
-                _tokens.emplace_back(PipelineParserGen::token::LONG_ZERO, getNextLoc());
+                pushToken(elem, PipelineParserGen::token::LONG_ZERO);
             else
-                _tokens.emplace_back(
-                    PipelineParserGen::make_LONG_NON_ZERO(elem.numberLong(), getNextLoc()));
+                pushToken(elem, PipelineParserGen::token::LONG_NON_ZERO, elem.numberLong());
             break;
         case NumberDecimal:
             if (elem.numberDecimal() == Decimal128::kNormalizedZero)
-                _tokens.emplace_back(PipelineParserGen::token::DECIMAL_ZERO, getNextLoc());
+                pushToken(elem, PipelineParserGen::token::DECIMAL_ZERO);
             else
-                _tokens.emplace_back(
-                    PipelineParserGen::make_DECIMAL_NON_ZERO(elem.numberDecimal(), getNextLoc()));
+                pushToken(elem, PipelineParserGen::token::DECIMAL_NON_ZERO, elem.numberDecimal());
             break;
         case BSONType::MinKey:
-            _tokens.emplace_back(PipelineParserGen::make_MIN_KEY(UserMinKey{}, getNextLoc()));
+            pushToken(elem, PipelineParserGen::token::MIN_KEY, UserMinKey{});
             break;
         case BSONType::MaxKey:
-            _tokens.emplace_back(PipelineParserGen::make_MAX_KEY(UserMaxKey{}, getNextLoc()));
+            pushToken(elem, PipelineParserGen::token::MAX_KEY, UserMaxKey{});
             break;
         default:
             MONGO_UNREACHABLE;
@@ -323,17 +328,17 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
 }
 
 BSONLexer::BSONLexer(BSONObj obj, PipelineParserGen::token_type startingToken) {
-
-    _tokens.emplace_back(startingToken, getNextLoc());
-    _tokens.emplace_back(PipelineParserGen::token::START_OBJECT, getNextLoc());
+    ScopedLocationTracker matchCtx{this, "filter"};
+    pushToken("start", startingToken);
+    pushToken("start object", PipelineParserGen::token::START_OBJECT);
     for (auto&& elem : obj) {
         // Include field names in the object.
         tokenize(elem, true);
     }
-    _tokens.emplace_back(PipelineParserGen::token::END_OBJECT, getNextLoc());
+    pushToken("end object", PipelineParserGen::token::END_OBJECT);
 
     // Final token must indicate EOF.
-    _tokens.emplace_back(PipelineParserGen::make_END_OF_FILE(getNextLoc()));
+    pushToken("EOF", PipelineParserGen::token::END_OF_FILE);
 
     // Reset the position to use in yylex().
     _position = 0;
@@ -341,17 +346,19 @@ BSONLexer::BSONLexer(BSONObj obj, PipelineParserGen::token_type startingToken) {
 
 BSONLexer::BSONLexer(std::vector<BSONElement> pipeline,
                      PipelineParserGen::token_type startingToken) {
-
-    _tokens.emplace_back(startingToken, getNextLoc());
-    _tokens.emplace_back(PipelineParserGen::token::START_ARRAY, getNextLoc());
+    ScopedLocationTracker pipelineCtx{this, "pipeline"};
+    pushToken("start", startingToken);
+    pushToken("start array", PipelineParserGen::token::START_ARRAY);
+    auto index = 0;
     for (auto&& elem : pipeline) {
+        ScopedLocationTracker stageCtx{this, index++};
         // Don't include field names for stages of the pipeline (aka indexes of the pipeline array).
         tokenize(elem, false);
     }
-    _tokens.emplace_back(PipelineParserGen::token::END_ARRAY, getNextLoc());
+    pushToken("end array", PipelineParserGen::token::END_ARRAY);
 
     // Final token must indicate EOF.
-    _tokens.emplace_back(PipelineParserGen::make_END_OF_FILE(getNextLoc()));
+    pushToken("EOF", PipelineParserGen::token::END_OF_FILE);
 
     // Reset the position to use in yylex().
     _position = 0;

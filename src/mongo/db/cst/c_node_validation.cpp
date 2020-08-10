@@ -65,7 +65,7 @@ StatusWith<IsInclusion> processAdditionalFieldsInclusionConfirmed(const Iter& it
                 return processAdditionalFieldsInclusionConfirmed(std::next(iter), isEnd);
             else
                 return Status{ErrorCodes::FailedToParse,
-                              "$project containing inclusion and/or computed fields must"
+                              "$project containing inclusion and/or computed fields must "
                               "contain no exclusion fields"};
         }
     } else {
@@ -82,7 +82,7 @@ StatusWith<IsInclusion> processAdditionalFieldsExclusionConfirmed(const Iter& it
         } else {
             if (isInclusionField(iter->second))
                 return Status{ErrorCodes::FailedToParse,
-                              "$project containing exclusion fields must contain no"
+                              "$project containing exclusion fields must contain no "
                               "inclusion and/or computed fields"};
             else
                 return processAdditionalFieldsExclusionConfirmed(std::next(iter), isEnd);

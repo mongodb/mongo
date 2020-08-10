@@ -60,11 +60,12 @@
 
 // Track locations of symbols.
 %locations
-%define api.location.file "location_gen.h"
+%define api.location.type {mongo::BSONLocation}
 %define parse.error verbose
 
 // Header only.
 %code requires {
+    #include "mongo/db/cst/bson_location.h"
     #include "mongo/db/cst/c_node.h"
 
     // Forward declare any parameters needed for lexing/parsing.
@@ -90,13 +91,14 @@
         // Mandatory error function.
         void PipelineParserGen::error (const PipelineParserGen::location_type& loc,
                                        const std::string& msg) {
-            uasserted(ErrorCodes::FailedToParse, str::stream() << msg <<
-                    " at location " <<
-                    loc.begin.line << ":" << loc.begin.column <<
-                    " of input BSON. Lexer produced token of type " <<
-                    lexer[loc.begin.column].type_get() << "." );
+            uasserted(ErrorCodes::FailedToParse, str::stream() << msg << " at element " << loc);
         }
     }  // namespace mongo
+
+    // Default location for actions, called each time a rule is matched but before the action is 
+    // run. Also called when bison encounters a syntax ambiguity, which should not be relevant for
+    // mongo.
+    #define YYLLOC_DEFAULT(newPos, rhsPositions, nRhs)
 }
 
 // Parsing parameters, funneled through yyparse() to yylex().
@@ -109,47 +111,57 @@
 //
 
 // If adding to this list, keep in alphabetical order since some rules expect a strict sorted order
-// of tokens based on their enum value.
+// of tokens based on their enum value. The appended strings are used to generate user-friendly 
+// error messages.
 %token 
     ABS
     ADD
     AND
+    ARG_CHARS "chars argument"
+    ARG_COLL "coll argument"
+    ARG_DATE "date argument"
+    ARG_DATE_STRING "dateString argument"
+    ARG_FIND "find argument"
+    ARG_FORMAT "format argument"
+    ARG_INPUT "input argument"
+    ARG_ON_ERROR "onError argument"
+    ARG_ON_NULL "onNull argument"
+    ARG_OPTIONS "options argument"
+    ARG_PIPELINE "pipeline argument"
+    ARG_REGEX "regex argument"
+    ARG_REPLACEMENT "replacement argument"
+    ARG_SIZE "size argument"
+    ARG_TIMEZONE "timezone argument"
+    ARG_TO "to argument"
     ATAN2
-    BOOL_FALSE
-    BOOL_TRUE
+    BOOL_FALSE "false"
+    BOOL_TRUE "true"
     CEIL
-    CHARS_ARG
     CMP
-    COLL_ARG
     CONCAT
     CONST_EXPR
     CONVERT
-    DATE_ARG
     DATE_FROM_STRING
-    DATE_STRING_ARG
     DATE_TO_STRING
-    DECIMAL_ZERO
+    DECIMAL_ZERO "zero (decimal)"
     DIVIDE
-    DOUBLE_ZERO
-    END_ARRAY
-    END_OBJECT
+    DOUBLE_ZERO "zero (double)"
+    END_ARRAY "end of array"
+    END_OBJECT "end of object"
     EQ
     EXPONENT
-    FIND_ARG
     FLOOR
-    FORMAT_ARG
     GT
     GTE
     ID
     INDEX_OF_BYTES
     INDEX_OF_CP
-    INPUT_ARG
-    INT_ZERO
+    INT_ZERO "zero (int)"
     LITERAL
     LN
     LOG
     LOGTEN
-    LONG_ZERO
+    LONG_ZERO "zero (long)"
     LT
     LTE
     LTRIM
@@ -157,22 +169,15 @@
     MULTIPLY
     NE
     NOT
-    ON_ERROR_ARG
-    ON_NULL_ARG
-    OPTIONS_ARG
     OR
-    PIPELINE_ARG
     POW
-    REGEX_ARG
     REGEX_FIND
     REGEX_FIND_ALL
     REGEX_MATCH
     REPLACE_ALL
     REPLACE_ONE
-    REPLACEMENT_ARG
     ROUND
     RTRIM
-    SIZE_ARG
     SPLIT
     SQRT
     STAGE_INHIBIT_OPTIMIZATION
@@ -181,8 +186,8 @@
     STAGE_SAMPLE
     STAGE_SKIP
     STAGE_UNION_WITH
-    START_ARRAY
-    START_OBJECT
+    START_ARRAY "array"
+    START_OBJECT "object"
     STR_CASE_CMP
     STR_LEN_BYTES
     STR_LEN_CP
@@ -190,8 +195,6 @@
     SUBSTR_BYTES
     SUBSTR_CP
     SUBTRACT
-    TIMEZONE_ARG
-    TO_ARG
     TO_BOOL
     TO_DATE
     TO_DECIMAL
@@ -209,25 +212,25 @@
     END_OF_FILE 0 "EOF"
 ;
 
-%token <std::string> FIELDNAME
-%token <std::string> STRING
-%token <BSONBinData> BINARY
-%token <UserUndefined> UNDEFINED
-%token <OID> OBJECT_ID
-%token <Date_t> DATE_LITERAL
-%token <UserNull> JSNULL
-%token <BSONRegEx> REGEX
-%token <BSONDBRef> DB_POINTER
-%token <BSONCode> JAVASCRIPT
-%token <BSONSymbol> SYMBOL
-%token <BSONCodeWScope> JAVASCRIPT_W_SCOPE
-%token <int> INT_NON_ZERO
-%token <Timestamp> TIMESTAMP
-%token <long long> LONG_NON_ZERO
-%token <double> DOUBLE_NON_ZERO
-%token <Decimal128> DECIMAL_NON_ZERO
-%token <UserMinKey> MIN_KEY
-%token <UserMaxKey> MAX_KEY
+%token <std::string> FIELDNAME "fieldname"
+%token <std::string> STRING "string"
+%token <BSONBinData> BINARY "BinData"
+%token <UserUndefined> UNDEFINED "undefined"
+%token <OID> OBJECT_ID "ObjectID"
+%token <Date_t> DATE_LITERAL "Date"
+%token <UserNull> JSNULL "null"
+%token <BSONRegEx> REGEX "regex"
+%token <BSONDBRef> DB_POINTER "dbPointer"
+%token <BSONCode> JAVASCRIPT "Code"
+%token <BSONSymbol> SYMBOL "Symbol"
+%token <BSONCodeWScope> JAVASCRIPT_W_SCOPE "CodeWScope"
+%token <int> INT_NON_ZERO "non-zero integer"
+%token <long long> LONG_NON_ZERO "non-zero long"
+%token <double> DOUBLE_NON_ZERO "non-zero double"
+%token <Decimal128> DECIMAL_NON_ZERO "non-zero decimal"
+%token <Timestamp> TIMESTAMP "Timestamp"
+%token <UserMinKey> MIN_KEY "minKey"
+%token <UserMaxKey> MAX_KEY "maxKey"
 %token START_PIPELINE START_MATCH
 
 //
@@ -301,7 +304,7 @@ stage:
     inhibitOptimization | unionWith | skip | limit | project | sample
 ;
 
-sample: STAGE_SAMPLE START_OBJECT SIZE_ARG num END_OBJECT {
+sample: STAGE_SAMPLE START_OBJECT ARG_SIZE num END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::sample, 
                 CNode{CNode::ObjectChildren{
                     {KeyFieldname::sizeArg, $num},
@@ -317,7 +320,7 @@ inhibitOptimization:
 ;
 
 unionWith:
-    STAGE_UNION_WITH START_ORDERED_OBJECT COLL_ARG string PIPELINE_ARG double END_OBJECT {
+    STAGE_UNION_WITH START_ORDERED_OBJECT ARG_COLL string ARG_PIPELINE double END_OBJECT {
     auto pipeline = $double;
     $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::unionWith,
         CNode{CNode::ObjectChildren{
@@ -351,8 +354,8 @@ project:
                                                        KeyFieldname::projectExclusion,
                                                        std::move(fields)}}};
         else
-            // TODO SERVER-48810: Convert error string to Bison error with BSON location.
-            uassertStatusOK(inclusion);
+            // Pass the location of the $project token to the error reporting function.
+            error(@1, inclusion.getStatus().reason());
     }
 ;
 
@@ -493,52 +496,52 @@ argAsUserFieldname:
     // Here we need to list all keys representing args passed to operators so they can be converted
     // back to string in contexts where they're not special. It's laborious but this is the
     // perennial Bison way.
-    COLL_ARG {
+    ARG_COLL {
         $$ = UserFieldname{"coll"};
     }
-    | PIPELINE_ARG {
+    | ARG_PIPELINE {
         $$ = UserFieldname{"pipeline"};
     }
-    | SIZE_ARG {
+    | ARG_SIZE {
         $$ = UserFieldname{"size"};
     }
-    | INPUT_ARG {
+    | ARG_INPUT {
         $$ = UserFieldname{"input"};
     }
-    | TO_ARG {
+    | ARG_TO {
         $$ = UserFieldname{"to"};
     }
-    | ON_ERROR_ARG {
+    | ARG_ON_ERROR {
         $$ = UserFieldname{"onError"};
     }
-    | ON_NULL_ARG {
+    | ARG_ON_NULL {
         $$ = UserFieldname{"onNull"};
     }
-    | DATE_STRING_ARG {
+    | ARG_DATE_STRING {
         $$ = UserFieldname{"dateString"};
     }
-    | FORMAT_ARG {
+    | ARG_FORMAT {
         $$ = UserFieldname{"format"};
     }
-    | TIMEZONE_ARG {
+    | ARG_TIMEZONE {
         $$ = UserFieldname{"timezone"};
     }
-    | DATE_ARG {
+    | ARG_DATE {
         $$ = UserFieldname{"date"};
     }
-    | CHARS_ARG {
+    | ARG_CHARS {
         $$ = UserFieldname{"chars"};
     }
-    | REGEX_ARG {
+    | ARG_REGEX {
         $$ = UserFieldname{"regex"};
     }
-    | OPTIONS_ARG {
+    | ARG_OPTIONS {
         $$ = UserFieldname{"options"};
     }
-    | FIND_ARG {
+    | ARG_FIND {
         $$ = UserFieldname{"find"};
     }
-    | REPLACEMENT_ARG {
+    | ARG_REPLACEMENT {
         $$ = UserFieldname{"replacement"};
     }
 ;
@@ -957,12 +960,9 @@ maths:
 ;
 
 add:
-    START_OBJECT ADD START_ARRAY expression[expr1] expression[expr2] expressions END_ARRAY END_OBJECT {
+    START_OBJECT ADD expressionArray END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::add,
-                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
-        auto&& others = $expressions;
-        auto&& array = $$.objectChildren()[0].second.arrayChildren();
-        array.insert(array.end(), others.begin(), others.end());
+                                          $expressionArray}}};
     }
 ;
 
@@ -1063,22 +1063,16 @@ boolExps:
 ;
 
 and:
-    START_OBJECT AND START_ARRAY expression[expr1] expression[expr2] expressions END_ARRAY END_OBJECT {
+    START_OBJECT AND expressionArray END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::andExpr,
-                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
-        auto&& others = $expressions;
-        auto&& array = $$.objectChildren()[0].second.arrayChildren();
-        array.insert(array.end(), others.begin(), others.end());
+                                          $expressionArray}}};
     }
 ;
 
 or:
-    START_OBJECT OR START_ARRAY expression[expr1] expression[expr2] expressions END_ARRAY END_OBJECT {
+    START_OBJECT OR expressionArray END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::orExpr,
-                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
-        auto&& others = $expressions;
-        auto&& array = $$.objectChildren()[0].second.arrayChildren();
-        array.insert(array.end(), others.begin(), others.end());
+                                          $expressionArray}}};
     }
 ;
 
@@ -1109,7 +1103,7 @@ formatArg:
     %empty {
         $$ = std::pair{KeyFieldname::formatArg, CNode{KeyValue::absentKey}};
     }
-    | FORMAT_ARG expression {
+    | ARG_FORMAT expression {
         $$ = std::pair{KeyFieldname::formatArg, $expression};
     }
 ;
@@ -1118,13 +1112,13 @@ timezoneArg:
     %empty {
         $$ = std::pair{KeyFieldname::timezoneArg, CNode{KeyValue::absentKey}};
     }
-    | TIMEZONE_ARG expression {
+    | ARG_TIMEZONE expression {
         $$ = std::pair{KeyFieldname::timezoneArg, $expression};
     }
 ;
 
 dateFromString:
-    START_OBJECT DATE_FROM_STRING START_ORDERED_OBJECT DATE_STRING_ARG expression formatArg timezoneArg 
+    START_OBJECT DATE_FROM_STRING START_ORDERED_OBJECT ARG_DATE_STRING expression formatArg timezoneArg 
             onErrorArg onNullArg END_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dateFromString, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::dateStringArg, $expression},
@@ -1133,7 +1127,7 @@ dateFromString:
 ;
 
 dateToString:
-    START_OBJECT DATE_TO_STRING START_ORDERED_OBJECT DATE_ARG expression formatArg timezoneArg onNullArg 
+    START_OBJECT DATE_TO_STRING START_ORDERED_OBJECT ARG_DATE expression formatArg timezoneArg onNullArg 
             END_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dateToString, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::dateArg, $expression},
@@ -1179,13 +1173,13 @@ charsArg:
     %empty {
         $$ = std::pair{KeyFieldname::charsArg, CNode{KeyValue::absentKey}};
     }
-    | CHARS_ARG expression {
+    | ARG_CHARS expression {
         $$ = std::pair{KeyFieldname::charsArg, $expression};
     }
 ;
 
 ltrim:
-    START_OBJECT LTRIM START_ORDERED_OBJECT charsArg INPUT_ARG expression END_OBJECT END_OBJECT {
+    START_OBJECT LTRIM START_ORDERED_OBJECT charsArg ARG_INPUT expression END_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::ltrim, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::inputArg, $expression},
                                          $charsArg}}}}};
@@ -1193,7 +1187,7 @@ ltrim:
 ;
 
 rtrim:
-    START_OBJECT RTRIM START_ORDERED_OBJECT charsArg INPUT_ARG expression END_OBJECT END_OBJECT {
+    START_OBJECT RTRIM START_ORDERED_OBJECT charsArg ARG_INPUT expression END_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::rtrim, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::inputArg, $expression},
                                          $charsArg}}}}};
@@ -1201,7 +1195,7 @@ rtrim:
 ;
 
 trim:
-    START_OBJECT TRIM START_ORDERED_OBJECT charsArg INPUT_ARG expression END_OBJECT END_OBJECT {
+    START_OBJECT TRIM START_ORDERED_OBJECT charsArg ARG_INPUT expression END_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::trim, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::inputArg, $expression},
                                          $charsArg}}}}};
@@ -1212,12 +1206,12 @@ optionsArg:
     %empty {
         $$ = std::pair{KeyFieldname::optionsArg, CNode{KeyValue::absentKey}};
     }
-    | OPTIONS_ARG expression {
+    | ARG_OPTIONS expression {
         $$ = std::pair{KeyFieldname::optionsArg, $expression};
     }
 ;
 
-regexArgs: START_ORDERED_OBJECT INPUT_ARG expression[input] optionsArg REGEX_ARG expression[regex] END_OBJECT {
+regexArgs: START_ORDERED_OBJECT ARG_INPUT expression[input] optionsArg ARG_REGEX expression[regex] END_OBJECT {
     // Note that the order of these arguments must match the constructor for the regex expression.
     $$ = CNode{CNode::ObjectChildren{
                  {KeyFieldname::inputArg, $input},
@@ -1244,8 +1238,8 @@ regexMatch:
 ;
 
 replaceOne:
-    START_OBJECT REPLACE_ONE START_ORDERED_OBJECT FIND_ARG expression[find] INPUT_ARG expression[input]
-        REPLACEMENT_ARG expression[replace] END_OBJECT END_OBJECT {
+    START_OBJECT REPLACE_ONE START_ORDERED_OBJECT ARG_FIND expression[find] ARG_INPUT expression[input]
+        ARG_REPLACEMENT expression[replace] END_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::replaceOne, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::inputArg, $input},
                                          {KeyFieldname::findArg, $find},
@@ -1254,8 +1248,8 @@ replaceOne:
 ;
 
 replaceAll:
-    START_OBJECT REPLACE_ALL START_ORDERED_OBJECT FIND_ARG expression[find] INPUT_ARG expression[input]
-        REPLACEMENT_ARG expression[replace] END_OBJECT END_OBJECT {
+    START_OBJECT REPLACE_ALL START_ORDERED_OBJECT ARG_FIND expression[find] ARG_INPUT expression[input]
+        ARG_REPLACEMENT expression[replace] END_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::replaceAll, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::inputArg, $input},
                                          {KeyFieldname::findArg, $find},
@@ -1454,7 +1448,7 @@ onErrorArg:
     %empty {
         $$ = std::pair{KeyFieldname::onErrorArg, CNode{KeyValue::absentKey}};
     }
-    | ON_ERROR_ARG expression {
+    | ARG_ON_ERROR expression {
         $$ = std::pair{KeyFieldname::onErrorArg, $expression};
     }
 ;
@@ -1464,14 +1458,14 @@ onNullArg:
     %empty {
         $$ = std::pair{KeyFieldname::onNullArg, CNode{KeyValue::absentKey}};
     }
-    | ON_NULL_ARG expression {
+    | ARG_ON_NULL expression {
         $$ = std::pair{KeyFieldname::onNullArg, $expression};
     }
 ;
 
 convert:
-    START_OBJECT CONVERT START_ORDERED_OBJECT INPUT_ARG expression[input] onErrorArg onNullArg
-        TO_ARG expression[to] END_OBJECT END_OBJECT {
+    START_OBJECT CONVERT START_ORDERED_OBJECT ARG_INPUT expression[input] onErrorArg onNullArg
+        ARG_TO expression[to] END_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::convert, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::inputArg, $input},
                                          {KeyFieldname::toArg, $to},

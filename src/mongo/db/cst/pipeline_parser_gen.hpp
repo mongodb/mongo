@@ -46,6 +46,7 @@
 // "%code requires" blocks.
 #line 67 "src/mongo/db/cst/pipeline_grammar.yy"
 
+#include "mongo/db/cst/bson_location.h"
 #include "mongo/db/cst/c_node.h"
 
 // Forward declare any parameters needed for lexing/parsing.
@@ -58,7 +59,7 @@ class BSONLexer;
 #pragma warning(disable : 4065)
 #endif
 
-#line 62 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 63 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 #include <cassert>
 #include <cstdlib>  // std::abort
@@ -103,7 +104,7 @@ class BSONLexer;
 #else
 #define YY_CONSTEXPR
 #endif
-#include "location_gen.h"
+
 #include <typeinfo>
 #ifndef YY_ASSERT
 #include <cassert>
@@ -189,7 +190,7 @@ class BSONLexer;
 
 #line 58 "src/mongo/db/cst/pipeline_grammar.yy"
 namespace mongo {
-#line 197 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 198 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 
 /// A Bison parser.
@@ -354,22 +355,22 @@ public:
 
         /// An auxiliary type to compute the largest semantic type.
         union union_type {
-            // BINARY
+            // "BinData"
             char dummy1[sizeof(BSONBinData)];
 
-            // JAVASCRIPT
+            // "Code"
             char dummy2[sizeof(BSONCode)];
 
-            // JAVASCRIPT_W_SCOPE
+            // "CodeWScope"
             char dummy3[sizeof(BSONCodeWScope)];
 
-            // DB_POINTER
+            // "dbPointer"
             char dummy4[sizeof(BSONDBRef)];
 
-            // REGEX
+            // "regex"
             char dummy5[sizeof(BSONRegEx)];
 
-            // SYMBOL
+            // "Symbol"
             char dummy6[sizeof(BSONSymbol)];
 
             // dbPointer
@@ -498,37 +499,37 @@ public:
             // valueFieldname
             char dummy8[sizeof(CNode::Fieldname)];
 
-            // DATE_LITERAL
+            // "Date"
             char dummy9[sizeof(Date_t)];
 
-            // DECIMAL_NON_ZERO
+            // "non-zero decimal"
             char dummy10[sizeof(Decimal128)];
 
-            // OBJECT_ID
+            // "ObjectID"
             char dummy11[sizeof(OID)];
 
-            // TIMESTAMP
+            // "Timestamp"
             char dummy12[sizeof(Timestamp)];
 
-            // MAX_KEY
+            // "maxKey"
             char dummy13[sizeof(UserMaxKey)];
 
-            // MIN_KEY
+            // "minKey"
             char dummy14[sizeof(UserMinKey)];
 
-            // JSNULL
+            // "null"
             char dummy15[sizeof(UserNull)];
 
-            // UNDEFINED
+            // "undefined"
             char dummy16[sizeof(UserUndefined)];
 
-            // DOUBLE_NON_ZERO
+            // "non-zero double"
             char dummy17[sizeof(double)];
 
-            // INT_NON_ZERO
+            // "non-zero integer"
             char dummy18[sizeof(int)];
 
-            // LONG_NON_ZERO
+            // "non-zero long"
             char dummy19[sizeof(long long)];
 
             // projectField
@@ -543,8 +544,8 @@ public:
             // optionsArg
             char dummy20[sizeof(std::pair<CNode::Fieldname, CNode>)];
 
-            // FIELDNAME
-            // STRING
+            // "fieldname"
+            // "string"
             char dummy21[sizeof(std::string)];
 
             // expressions
@@ -572,7 +573,7 @@ public:
     typedef YYSTYPE semantic_type;
 #endif
     /// Symbol locations.
-    typedef location location_type;
+    typedef mongo::BSONLocation location_type;
 
     /// Syntax errors thrown from user actions.
     struct syntax_error : std::runtime_error {
@@ -593,84 +594,84 @@ public:
             ABS = 3,
             ADD = 4,
             AND = 5,
-            ATAN2 = 6,
-            BOOL_FALSE = 7,
-            BOOL_TRUE = 8,
-            CEIL = 9,
-            CHARS_ARG = 10,
-            CMP = 11,
-            COLL_ARG = 12,
-            CONCAT = 13,
-            CONST_EXPR = 14,
-            CONVERT = 15,
-            DATE_ARG = 16,
-            DATE_FROM_STRING = 17,
-            DATE_STRING_ARG = 18,
-            DATE_TO_STRING = 19,
-            DECIMAL_ZERO = 20,
-            DIVIDE = 21,
-            DOUBLE_ZERO = 22,
-            END_ARRAY = 23,
-            END_OBJECT = 24,
-            EQ = 25,
-            EXPONENT = 26,
-            FIND_ARG = 27,
-            FLOOR = 28,
-            FORMAT_ARG = 29,
-            GT = 30,
-            GTE = 31,
-            ID = 32,
-            INDEX_OF_BYTES = 33,
-            INDEX_OF_CP = 34,
-            INPUT_ARG = 35,
-            INT_ZERO = 36,
-            LITERAL = 37,
-            LN = 38,
-            LOG = 39,
-            LOGTEN = 40,
-            LONG_ZERO = 41,
-            LT = 42,
-            LTE = 43,
-            LTRIM = 44,
-            MOD = 45,
-            MULTIPLY = 46,
-            NE = 47,
-            NOT = 48,
-            ON_ERROR_ARG = 49,
-            ON_NULL_ARG = 50,
-            OPTIONS_ARG = 51,
-            OR = 52,
-            PIPELINE_ARG = 53,
-            POW = 54,
-            REGEX_ARG = 55,
-            REGEX_FIND = 56,
-            REGEX_FIND_ALL = 57,
-            REGEX_MATCH = 58,
-            REPLACE_ALL = 59,
-            REPLACE_ONE = 60,
-            REPLACEMENT_ARG = 61,
-            ROUND = 62,
-            RTRIM = 63,
-            SIZE_ARG = 64,
-            SPLIT = 65,
-            SQRT = 66,
-            STAGE_INHIBIT_OPTIMIZATION = 67,
-            STAGE_LIMIT = 68,
-            STAGE_PROJECT = 69,
-            STAGE_SAMPLE = 70,
-            STAGE_SKIP = 71,
-            STAGE_UNION_WITH = 72,
-            START_ARRAY = 73,
-            START_OBJECT = 74,
-            STR_CASE_CMP = 75,
-            STR_LEN_BYTES = 76,
-            STR_LEN_CP = 77,
-            SUBSTR = 78,
-            SUBSTR_BYTES = 79,
-            SUBSTR_CP = 80,
-            SUBTRACT = 81,
-            TIMEZONE_ARG = 82,
-            TO_ARG = 83,
+            ARG_CHARS = 6,
+            ARG_COLL = 7,
+            ARG_DATE = 8,
+            ARG_DATE_STRING = 9,
+            ARG_FIND = 10,
+            ARG_FORMAT = 11,
+            ARG_INPUT = 12,
+            ARG_ON_ERROR = 13,
+            ARG_ON_NULL = 14,
+            ARG_OPTIONS = 15,
+            ARG_PIPELINE = 16,
+            ARG_REGEX = 17,
+            ARG_REPLACEMENT = 18,
+            ARG_SIZE = 19,
+            ARG_TIMEZONE = 20,
+            ARG_TO = 21,
+            ATAN2 = 22,
+            BOOL_FALSE = 23,
+            BOOL_TRUE = 24,
+            CEIL = 25,
+            CMP = 26,
+            CONCAT = 27,
+            CONST_EXPR = 28,
+            CONVERT = 29,
+            DATE_FROM_STRING = 30,
+            DATE_TO_STRING = 31,
+            DECIMAL_ZERO = 32,
+            DIVIDE = 33,
+            DOUBLE_ZERO = 34,
+            END_ARRAY = 35,
+            END_OBJECT = 36,
+            EQ = 37,
+            EXPONENT = 38,
+            FLOOR = 39,
+            GT = 40,
+            GTE = 41,
+            ID = 42,
+            INDEX_OF_BYTES = 43,
+            INDEX_OF_CP = 44,
+            INT_ZERO = 45,
+            LITERAL = 46,
+            LN = 47,
+            LOG = 48,
+            LOGTEN = 49,
+            LONG_ZERO = 50,
+            LT = 51,
+            LTE = 52,
+            LTRIM = 53,
+            MOD = 54,
+            MULTIPLY = 55,
+            NE = 56,
+            NOT = 57,
+            OR = 58,
+            POW = 59,
+            REGEX_FIND = 60,
+            REGEX_FIND_ALL = 61,
+            REGEX_MATCH = 62,
+            REPLACE_ALL = 63,
+            REPLACE_ONE = 64,
+            ROUND = 65,
+            RTRIM = 66,
+            SPLIT = 67,
+            SQRT = 68,
+            STAGE_INHIBIT_OPTIMIZATION = 69,
+            STAGE_LIMIT = 70,
+            STAGE_PROJECT = 71,
+            STAGE_SAMPLE = 72,
+            STAGE_SKIP = 73,
+            STAGE_UNION_WITH = 74,
+            START_ARRAY = 75,
+            START_OBJECT = 76,
+            STR_CASE_CMP = 77,
+            STR_LEN_BYTES = 78,
+            STR_LEN_CP = 79,
+            SUBSTR = 80,
+            SUBSTR_BYTES = 81,
+            SUBSTR_CP = 82,
+            SUBTRACT = 83,
             TO_BOOL = 84,
             TO_DATE = 85,
             TO_DECIMAL = 86,
@@ -697,10 +698,10 @@ public:
             SYMBOL = 107,
             JAVASCRIPT_W_SCOPE = 108,
             INT_NON_ZERO = 109,
-            TIMESTAMP = 110,
-            LONG_NON_ZERO = 111,
-            DOUBLE_NON_ZERO = 112,
-            DECIMAL_NON_ZERO = 113,
+            LONG_NON_ZERO = 110,
+            DOUBLE_NON_ZERO = 111,
+            DECIMAL_NON_ZERO = 112,
+            TIMESTAMP = 113,
             MIN_KEY = 114,
             MAX_KEY = 115,
             START_PIPELINE = 116,
@@ -928,27 +929,27 @@ public:
 
             // Type destructor.
             switch (yytype) {
-                case 99:  // BINARY
+                case 99:  // "BinData"
                     value.template destroy<BSONBinData>();
                     break;
 
-                case 106:  // JAVASCRIPT
+                case 106:  // "Code"
                     value.template destroy<BSONCode>();
                     break;
 
-                case 108:  // JAVASCRIPT_W_SCOPE
+                case 108:  // "CodeWScope"
                     value.template destroy<BSONCodeWScope>();
                     break;
 
-                case 105:  // DB_POINTER
+                case 105:  // "dbPointer"
                     value.template destroy<BSONDBRef>();
                     break;
 
-                case 104:  // REGEX
+                case 104:  // "regex"
                     value.template destroy<BSONRegEx>();
                     break;
 
-                case 107:  // SYMBOL
+                case 107:  // "Symbol"
                     value.template destroy<BSONSymbol>();
                     break;
 
@@ -1080,47 +1081,47 @@ public:
                     value.template destroy<CNode::Fieldname>();
                     break;
 
-                case 102:  // DATE_LITERAL
+                case 102:  // "Date"
                     value.template destroy<Date_t>();
                     break;
 
-                case 113:  // DECIMAL_NON_ZERO
+                case 112:  // "non-zero decimal"
                     value.template destroy<Decimal128>();
                     break;
 
-                case 101:  // OBJECT_ID
+                case 101:  // "ObjectID"
                     value.template destroy<OID>();
                     break;
 
-                case 110:  // TIMESTAMP
+                case 113:  // "Timestamp"
                     value.template destroy<Timestamp>();
                     break;
 
-                case 115:  // MAX_KEY
+                case 115:  // "maxKey"
                     value.template destroy<UserMaxKey>();
                     break;
 
-                case 114:  // MIN_KEY
+                case 114:  // "minKey"
                     value.template destroy<UserMinKey>();
                     break;
 
-                case 103:  // JSNULL
+                case 103:  // "null"
                     value.template destroy<UserNull>();
                     break;
 
-                case 100:  // UNDEFINED
+                case 100:  // "undefined"
                     value.template destroy<UserUndefined>();
                     break;
 
-                case 112:  // DOUBLE_NON_ZERO
+                case 111:  // "non-zero double"
                     value.template destroy<double>();
                     break;
 
-                case 109:  // INT_NON_ZERO
+                case 109:  // "non-zero integer"
                     value.template destroy<int>();
                     break;
 
-                case 111:  // LONG_NON_ZERO
+                case 110:  // "non-zero long"
                     value.template destroy<long long>();
                     break;
 
@@ -1137,8 +1138,8 @@ public:
                     value.template destroy<std::pair<CNode::Fieldname, CNode>>();
                     break;
 
-                case 97:  // FIELDNAME
-                case 98:  // STRING
+                case 97:  // "fieldname"
+                case 98:  // "string"
                     value.template destroy<std::string>();
                     break;
 
@@ -1222,36 +1223,36 @@ public:
         symbol_type(int tok, location_type l) : super_type(token_type(tok), std::move(l)) {
             YY_ASSERT(
                 tok == token::END_OF_FILE || tok == token::ABS || tok == token::ADD ||
-                tok == token::AND || tok == token::ATAN2 || tok == token::BOOL_FALSE ||
-                tok == token::BOOL_TRUE || tok == token::CEIL || tok == token::CHARS_ARG ||
-                tok == token::CMP || tok == token::COLL_ARG || tok == token::CONCAT ||
-                tok == token::CONST_EXPR || tok == token::CONVERT || tok == token::DATE_ARG ||
-                tok == token::DATE_FROM_STRING || tok == token::DATE_STRING_ARG ||
+                tok == token::AND || tok == token::ARG_CHARS || tok == token::ARG_COLL ||
+                tok == token::ARG_DATE || tok == token::ARG_DATE_STRING || tok == token::ARG_FIND ||
+                tok == token::ARG_FORMAT || tok == token::ARG_INPUT || tok == token::ARG_ON_ERROR ||
+                tok == token::ARG_ON_NULL || tok == token::ARG_OPTIONS ||
+                tok == token::ARG_PIPELINE || tok == token::ARG_REGEX ||
+                tok == token::ARG_REPLACEMENT || tok == token::ARG_SIZE ||
+                tok == token::ARG_TIMEZONE || tok == token::ARG_TO || tok == token::ATAN2 ||
+                tok == token::BOOL_FALSE || tok == token::BOOL_TRUE || tok == token::CEIL ||
+                tok == token::CMP || tok == token::CONCAT || tok == token::CONST_EXPR ||
+                tok == token::CONVERT || tok == token::DATE_FROM_STRING ||
                 tok == token::DATE_TO_STRING || tok == token::DECIMAL_ZERO ||
                 tok == token::DIVIDE || tok == token::DOUBLE_ZERO || tok == token::END_ARRAY ||
                 tok == token::END_OBJECT || tok == token::EQ || tok == token::EXPONENT ||
-                tok == token::FIND_ARG || tok == token::FLOOR || tok == token::FORMAT_ARG ||
-                tok == token::GT || tok == token::GTE || tok == token::ID ||
+                tok == token::FLOOR || tok == token::GT || tok == token::GTE || tok == token::ID ||
                 tok == token::INDEX_OF_BYTES || tok == token::INDEX_OF_CP ||
-                tok == token::INPUT_ARG || tok == token::INT_ZERO || tok == token::LITERAL ||
-                tok == token::LN || tok == token::LOG || tok == token::LOGTEN ||
-                tok == token::LONG_ZERO || tok == token::LT || tok == token::LTE ||
-                tok == token::LTRIM || tok == token::MOD || tok == token::MULTIPLY ||
-                tok == token::NE || tok == token::NOT || tok == token::ON_ERROR_ARG ||
-                tok == token::ON_NULL_ARG || tok == token::OPTIONS_ARG || tok == token::OR ||
-                tok == token::PIPELINE_ARG || tok == token::POW || tok == token::REGEX_ARG ||
-                tok == token::REGEX_FIND || tok == token::REGEX_FIND_ALL ||
-                tok == token::REGEX_MATCH || tok == token::REPLACE_ALL ||
-                tok == token::REPLACE_ONE || tok == token::REPLACEMENT_ARG || tok == token::ROUND ||
-                tok == token::RTRIM || tok == token::SIZE_ARG || tok == token::SPLIT ||
-                tok == token::SQRT || tok == token::STAGE_INHIBIT_OPTIMIZATION ||
-                tok == token::STAGE_LIMIT || tok == token::STAGE_PROJECT ||
-                tok == token::STAGE_SAMPLE || tok == token::STAGE_SKIP ||
-                tok == token::STAGE_UNION_WITH || tok == token::START_ARRAY ||
-                tok == token::START_OBJECT || tok == token::STR_CASE_CMP ||
-                tok == token::STR_LEN_BYTES || tok == token::STR_LEN_CP || tok == token::SUBSTR ||
-                tok == token::SUBSTR_BYTES || tok == token::SUBSTR_CP || tok == token::SUBTRACT ||
-                tok == token::TIMEZONE_ARG || tok == token::TO_ARG || tok == token::TO_BOOL ||
+                tok == token::INT_ZERO || tok == token::LITERAL || tok == token::LN ||
+                tok == token::LOG || tok == token::LOGTEN || tok == token::LONG_ZERO ||
+                tok == token::LT || tok == token::LTE || tok == token::LTRIM || tok == token::MOD ||
+                tok == token::MULTIPLY || tok == token::NE || tok == token::NOT ||
+                tok == token::OR || tok == token::POW || tok == token::REGEX_FIND ||
+                tok == token::REGEX_FIND_ALL || tok == token::REGEX_MATCH ||
+                tok == token::REPLACE_ALL || tok == token::REPLACE_ONE || tok == token::ROUND ||
+                tok == token::RTRIM || tok == token::SPLIT || tok == token::SQRT ||
+                tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_LIMIT ||
+                tok == token::STAGE_PROJECT || tok == token::STAGE_SAMPLE ||
+                tok == token::STAGE_SKIP || tok == token::STAGE_UNION_WITH ||
+                tok == token::START_ARRAY || tok == token::START_OBJECT ||
+                tok == token::STR_CASE_CMP || tok == token::STR_LEN_BYTES ||
+                tok == token::STR_LEN_CP || tok == token::SUBSTR || tok == token::SUBSTR_BYTES ||
+                tok == token::SUBSTR_CP || tok == token::SUBTRACT || tok == token::TO_BOOL ||
                 tok == token::TO_DATE || tok == token::TO_DECIMAL || tok == token::TO_DOUBLE ||
                 tok == token::TO_INT || tok == token::TO_LONG || tok == token::TO_LOWER ||
                 tok == token::TO_OBJECT_ID || tok == token::TO_STRING || tok == token::TO_UPPER ||
@@ -1262,36 +1263,36 @@ public:
         symbol_type(int tok, const location_type& l) : super_type(token_type(tok), l) {
             YY_ASSERT(
                 tok == token::END_OF_FILE || tok == token::ABS || tok == token::ADD ||
-                tok == token::AND || tok == token::ATAN2 || tok == token::BOOL_FALSE ||
-                tok == token::BOOL_TRUE || tok == token::CEIL || tok == token::CHARS_ARG ||
-                tok == token::CMP || tok == token::COLL_ARG || tok == token::CONCAT ||
-                tok == token::CONST_EXPR || tok == token::CONVERT || tok == token::DATE_ARG ||
-                tok == token::DATE_FROM_STRING || tok == token::DATE_STRING_ARG ||
+                tok == token::AND || tok == token::ARG_CHARS || tok == token::ARG_COLL ||
+                tok == token::ARG_DATE || tok == token::ARG_DATE_STRING || tok == token::ARG_FIND ||
+                tok == token::ARG_FORMAT || tok == token::ARG_INPUT || tok == token::ARG_ON_ERROR ||
+                tok == token::ARG_ON_NULL || tok == token::ARG_OPTIONS ||
+                tok == token::ARG_PIPELINE || tok == token::ARG_REGEX ||
+                tok == token::ARG_REPLACEMENT || tok == token::ARG_SIZE ||
+                tok == token::ARG_TIMEZONE || tok == token::ARG_TO || tok == token::ATAN2 ||
+                tok == token::BOOL_FALSE || tok == token::BOOL_TRUE || tok == token::CEIL ||
+                tok == token::CMP || tok == token::CONCAT || tok == token::CONST_EXPR ||
+                tok == token::CONVERT || tok == token::DATE_FROM_STRING ||
                 tok == token::DATE_TO_STRING || tok == token::DECIMAL_ZERO ||
                 tok == token::DIVIDE || tok == token::DOUBLE_ZERO || tok == token::END_ARRAY ||
                 tok == token::END_OBJECT || tok == token::EQ || tok == token::EXPONENT ||
-                tok == token::FIND_ARG || tok == token::FLOOR || tok == token::FORMAT_ARG ||
-                tok == token::GT || tok == token::GTE || tok == token::ID ||
+                tok == token::FLOOR || tok == token::GT || tok == token::GTE || tok == token::ID ||
                 tok == token::INDEX_OF_BYTES || tok == token::INDEX_OF_CP ||
-                tok == token::INPUT_ARG || tok == token::INT_ZERO || tok == token::LITERAL ||
-                tok == token::LN || tok == token::LOG || tok == token::LOGTEN ||
-                tok == token::LONG_ZERO || tok == token::LT || tok == token::LTE ||
-                tok == token::LTRIM || tok == token::MOD || tok == token::MULTIPLY ||
-                tok == token::NE || tok == token::NOT || tok == token::ON_ERROR_ARG ||
-                tok == token::ON_NULL_ARG || tok == token::OPTIONS_ARG || tok == token::OR ||
-                tok == token::PIPELINE_ARG || tok == token::POW || tok == token::REGEX_ARG ||
-                tok == token::REGEX_FIND || tok == token::REGEX_FIND_ALL ||
-                tok == token::REGEX_MATCH || tok == token::REPLACE_ALL ||
-                tok == token::REPLACE_ONE || tok == token::REPLACEMENT_ARG || tok == token::ROUND ||
-                tok == token::RTRIM || tok == token::SIZE_ARG || tok == token::SPLIT ||
-                tok == token::SQRT || tok == token::STAGE_INHIBIT_OPTIMIZATION ||
-                tok == token::STAGE_LIMIT || tok == token::STAGE_PROJECT ||
-                tok == token::STAGE_SAMPLE || tok == token::STAGE_SKIP ||
-                tok == token::STAGE_UNION_WITH || tok == token::START_ARRAY ||
-                tok == token::START_OBJECT || tok == token::STR_CASE_CMP ||
-                tok == token::STR_LEN_BYTES || tok == token::STR_LEN_CP || tok == token::SUBSTR ||
-                tok == token::SUBSTR_BYTES || tok == token::SUBSTR_CP || tok == token::SUBTRACT ||
-                tok == token::TIMEZONE_ARG || tok == token::TO_ARG || tok == token::TO_BOOL ||
+                tok == token::INT_ZERO || tok == token::LITERAL || tok == token::LN ||
+                tok == token::LOG || tok == token::LOGTEN || tok == token::LONG_ZERO ||
+                tok == token::LT || tok == token::LTE || tok == token::LTRIM || tok == token::MOD ||
+                tok == token::MULTIPLY || tok == token::NE || tok == token::NOT ||
+                tok == token::OR || tok == token::POW || tok == token::REGEX_FIND ||
+                tok == token::REGEX_FIND_ALL || tok == token::REGEX_MATCH ||
+                tok == token::REPLACE_ALL || tok == token::REPLACE_ONE || tok == token::ROUND ||
+                tok == token::RTRIM || tok == token::SPLIT || tok == token::SQRT ||
+                tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_LIMIT ||
+                tok == token::STAGE_PROJECT || tok == token::STAGE_SAMPLE ||
+                tok == token::STAGE_SKIP || tok == token::STAGE_UNION_WITH ||
+                tok == token::START_ARRAY || tok == token::START_OBJECT ||
+                tok == token::STR_CASE_CMP || tok == token::STR_LEN_BYTES ||
+                tok == token::STR_LEN_CP || tok == token::SUBSTR || tok == token::SUBSTR_BYTES ||
+                tok == token::SUBSTR_CP || tok == token::SUBTRACT || tok == token::TO_BOOL ||
                 tok == token::TO_DATE || tok == token::TO_DECIMAL || tok == token::TO_DOUBLE ||
                 tok == token::TO_INT || tok == token::TO_LONG || tok == token::TO_LOWER ||
                 tok == token::TO_OBJECT_ID || tok == token::TO_STRING || tok == token::TO_UPPER ||
@@ -1571,6 +1572,150 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_CHARS(location_type l) {
+        return symbol_type(token::ARG_CHARS, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_CHARS(const location_type& l) {
+        return symbol_type(token::ARG_CHARS, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_COLL(location_type l) {
+        return symbol_type(token::ARG_COLL, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_COLL(const location_type& l) {
+        return symbol_type(token::ARG_COLL, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_DATE(location_type l) {
+        return symbol_type(token::ARG_DATE, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_DATE(const location_type& l) {
+        return symbol_type(token::ARG_DATE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_DATE_STRING(location_type l) {
+        return symbol_type(token::ARG_DATE_STRING, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_DATE_STRING(const location_type& l) {
+        return symbol_type(token::ARG_DATE_STRING, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_FIND(location_type l) {
+        return symbol_type(token::ARG_FIND, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_FIND(const location_type& l) {
+        return symbol_type(token::ARG_FIND, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_FORMAT(location_type l) {
+        return symbol_type(token::ARG_FORMAT, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_FORMAT(const location_type& l) {
+        return symbol_type(token::ARG_FORMAT, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_INPUT(location_type l) {
+        return symbol_type(token::ARG_INPUT, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_INPUT(const location_type& l) {
+        return symbol_type(token::ARG_INPUT, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_ON_ERROR(location_type l) {
+        return symbol_type(token::ARG_ON_ERROR, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_ON_ERROR(const location_type& l) {
+        return symbol_type(token::ARG_ON_ERROR, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_ON_NULL(location_type l) {
+        return symbol_type(token::ARG_ON_NULL, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_ON_NULL(const location_type& l) {
+        return symbol_type(token::ARG_ON_NULL, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_OPTIONS(location_type l) {
+        return symbol_type(token::ARG_OPTIONS, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_OPTIONS(const location_type& l) {
+        return symbol_type(token::ARG_OPTIONS, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_PIPELINE(location_type l) {
+        return symbol_type(token::ARG_PIPELINE, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_PIPELINE(const location_type& l) {
+        return symbol_type(token::ARG_PIPELINE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_REGEX(location_type l) {
+        return symbol_type(token::ARG_REGEX, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_REGEX(const location_type& l) {
+        return symbol_type(token::ARG_REGEX, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_REPLACEMENT(location_type l) {
+        return symbol_type(token::ARG_REPLACEMENT, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_REPLACEMENT(const location_type& l) {
+        return symbol_type(token::ARG_REPLACEMENT, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_SIZE(location_type l) {
+        return symbol_type(token::ARG_SIZE, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_SIZE(const location_type& l) {
+        return symbol_type(token::ARG_SIZE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_TIMEZONE(location_type l) {
+        return symbol_type(token::ARG_TIMEZONE, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_TIMEZONE(const location_type& l) {
+        return symbol_type(token::ARG_TIMEZONE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_TO(location_type l) {
+        return symbol_type(token::ARG_TO, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_TO(const location_type& l) {
+        return symbol_type(token::ARG_TO, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_ATAN2(location_type l) {
         return symbol_type(token::ATAN2, std::move(l));
     }
@@ -1607,30 +1752,12 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_CHARS_ARG(location_type l) {
-        return symbol_type(token::CHARS_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_CHARS_ARG(const location_type& l) {
-        return symbol_type(token::CHARS_ARG, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_CMP(location_type l) {
         return symbol_type(token::CMP, std::move(l));
     }
 #else
     static symbol_type make_CMP(const location_type& l) {
         return symbol_type(token::CMP, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_COLL_ARG(location_type l) {
-        return symbol_type(token::COLL_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_COLL_ARG(const location_type& l) {
-        return symbol_type(token::COLL_ARG, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1661,30 +1788,12 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_DATE_ARG(location_type l) {
-        return symbol_type(token::DATE_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_DATE_ARG(const location_type& l) {
-        return symbol_type(token::DATE_ARG, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_DATE_FROM_STRING(location_type l) {
         return symbol_type(token::DATE_FROM_STRING, std::move(l));
     }
 #else
     static symbol_type make_DATE_FROM_STRING(const location_type& l) {
         return symbol_type(token::DATE_FROM_STRING, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_DATE_STRING_ARG(location_type l) {
-        return symbol_type(token::DATE_STRING_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_DATE_STRING_ARG(const location_type& l) {
-        return symbol_type(token::DATE_STRING_ARG, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1760,30 +1869,12 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_FIND_ARG(location_type l) {
-        return symbol_type(token::FIND_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_FIND_ARG(const location_type& l) {
-        return symbol_type(token::FIND_ARG, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_FLOOR(location_type l) {
         return symbol_type(token::FLOOR, std::move(l));
     }
 #else
     static symbol_type make_FLOOR(const location_type& l) {
         return symbol_type(token::FLOOR, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_FORMAT_ARG(location_type l) {
-        return symbol_type(token::FORMAT_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_FORMAT_ARG(const location_type& l) {
-        return symbol_type(token::FORMAT_ARG, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1829,15 +1920,6 @@ public:
 #else
     static symbol_type make_INDEX_OF_CP(const location_type& l) {
         return symbol_type(token::INDEX_OF_CP, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_INPUT_ARG(location_type l) {
-        return symbol_type(token::INPUT_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_INPUT_ARG(const location_type& l) {
-        return symbol_type(token::INPUT_ARG, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -1958,33 +2040,6 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_ON_ERROR_ARG(location_type l) {
-        return symbol_type(token::ON_ERROR_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_ON_ERROR_ARG(const location_type& l) {
-        return symbol_type(token::ON_ERROR_ARG, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_ON_NULL_ARG(location_type l) {
-        return symbol_type(token::ON_NULL_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_ON_NULL_ARG(const location_type& l) {
-        return symbol_type(token::ON_NULL_ARG, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_OPTIONS_ARG(location_type l) {
-        return symbol_type(token::OPTIONS_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_OPTIONS_ARG(const location_type& l) {
-        return symbol_type(token::OPTIONS_ARG, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_OR(location_type l) {
         return symbol_type(token::OR, std::move(l));
     }
@@ -1994,30 +2049,12 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_PIPELINE_ARG(location_type l) {
-        return symbol_type(token::PIPELINE_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_PIPELINE_ARG(const location_type& l) {
-        return symbol_type(token::PIPELINE_ARG, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_POW(location_type l) {
         return symbol_type(token::POW, std::move(l));
     }
 #else
     static symbol_type make_POW(const location_type& l) {
         return symbol_type(token::POW, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_REGEX_ARG(location_type l) {
-        return symbol_type(token::REGEX_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_REGEX_ARG(const location_type& l) {
-        return symbol_type(token::REGEX_ARG, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2066,15 +2103,6 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_REPLACEMENT_ARG(location_type l) {
-        return symbol_type(token::REPLACEMENT_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_REPLACEMENT_ARG(const location_type& l) {
-        return symbol_type(token::REPLACEMENT_ARG, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_ROUND(location_type l) {
         return symbol_type(token::ROUND, std::move(l));
     }
@@ -2090,15 +2118,6 @@ public:
 #else
     static symbol_type make_RTRIM(const location_type& l) {
         return symbol_type(token::RTRIM, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_SIZE_ARG(location_type l) {
-        return symbol_type(token::SIZE_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_SIZE_ARG(const location_type& l) {
-        return symbol_type(token::SIZE_ARG, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2252,24 +2271,6 @@ public:
 #else
     static symbol_type make_SUBTRACT(const location_type& l) {
         return symbol_type(token::SUBTRACT, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_TIMEZONE_ARG(location_type l) {
-        return symbol_type(token::TIMEZONE_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_TIMEZONE_ARG(const location_type& l) {
-        return symbol_type(token::TIMEZONE_ARG, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_TO_ARG(location_type l) {
-        return symbol_type(token::TO_ARG, std::move(l));
-    }
-#else
-    static symbol_type make_TO_ARG(const location_type& l) {
-        return symbol_type(token::TO_ARG, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2507,15 +2508,6 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_TIMESTAMP(Timestamp v, location_type l) {
-        return symbol_type(token::TIMESTAMP, std::move(v), std::move(l));
-    }
-#else
-    static symbol_type make_TIMESTAMP(const Timestamp& v, const location_type& l) {
-        return symbol_type(token::TIMESTAMP, v, l);
-    }
-#endif
-#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_LONG_NON_ZERO(long long v, location_type l) {
         return symbol_type(token::LONG_NON_ZERO, std::move(v), std::move(l));
     }
@@ -2540,6 +2532,15 @@ public:
 #else
     static symbol_type make_DECIMAL_NON_ZERO(const Decimal128& v, const location_type& l) {
         return symbol_type(token::DECIMAL_NON_ZERO, v, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_TIMESTAMP(Timestamp v, location_type l) {
+        return symbol_type(token::TIMESTAMP, std::move(v), std::move(l));
+    }
+#else
+    static symbol_type make_TIMESTAMP(const Timestamp& v, const location_type& l) {
+        return symbol_type(token::TIMESTAMP, v, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2853,7 +2854,7 @@ private:
     /// Constants.
     enum {
         yyeof_ = 0,
-        yylast_ = 899,    ///< Last index in yytable_.
+        yylast_ = 971,    ///< Last index in yytable_.
         yynnts_ = 140,    ///< Number of nonterminal symbols.
         yyfinal_ = 8,     ///< Termination state number.
         yyntokens_ = 118  ///< Number of tokens.
@@ -2875,27 +2876,27 @@ template <typename Base>
 PipelineParserGen::basic_symbol<Base>::basic_symbol(basic_symbol&& that)
     : Base(std::move(that)), value(), location(std::move(that.location)) {
     switch (this->type_get()) {
-        case 99:  // BINARY
+        case 99:  // "BinData"
             value.move<BSONBinData>(std::move(that.value));
             break;
 
-        case 106:  // JAVASCRIPT
+        case 106:  // "Code"
             value.move<BSONCode>(std::move(that.value));
             break;
 
-        case 108:  // JAVASCRIPT_W_SCOPE
+        case 108:  // "CodeWScope"
             value.move<BSONCodeWScope>(std::move(that.value));
             break;
 
-        case 105:  // DB_POINTER
+        case 105:  // "dbPointer"
             value.move<BSONDBRef>(std::move(that.value));
             break;
 
-        case 104:  // REGEX
+        case 104:  // "regex"
             value.move<BSONRegEx>(std::move(that.value));
             break;
 
-        case 107:  // SYMBOL
+        case 107:  // "Symbol"
             value.move<BSONSymbol>(std::move(that.value));
             break;
 
@@ -3027,47 +3028,47 @@ PipelineParserGen::basic_symbol<Base>::basic_symbol(basic_symbol&& that)
             value.move<CNode::Fieldname>(std::move(that.value));
             break;
 
-        case 102:  // DATE_LITERAL
+        case 102:  // "Date"
             value.move<Date_t>(std::move(that.value));
             break;
 
-        case 113:  // DECIMAL_NON_ZERO
+        case 112:  // "non-zero decimal"
             value.move<Decimal128>(std::move(that.value));
             break;
 
-        case 101:  // OBJECT_ID
+        case 101:  // "ObjectID"
             value.move<OID>(std::move(that.value));
             break;
 
-        case 110:  // TIMESTAMP
+        case 113:  // "Timestamp"
             value.move<Timestamp>(std::move(that.value));
             break;
 
-        case 115:  // MAX_KEY
+        case 115:  // "maxKey"
             value.move<UserMaxKey>(std::move(that.value));
             break;
 
-        case 114:  // MIN_KEY
+        case 114:  // "minKey"
             value.move<UserMinKey>(std::move(that.value));
             break;
 
-        case 103:  // JSNULL
+        case 103:  // "null"
             value.move<UserNull>(std::move(that.value));
             break;
 
-        case 100:  // UNDEFINED
+        case 100:  // "undefined"
             value.move<UserUndefined>(std::move(that.value));
             break;
 
-        case 112:  // DOUBLE_NON_ZERO
+        case 111:  // "non-zero double"
             value.move<double>(std::move(that.value));
             break;
 
-        case 109:  // INT_NON_ZERO
+        case 109:  // "non-zero integer"
             value.move<int>(std::move(that.value));
             break;
 
-        case 111:  // LONG_NON_ZERO
+        case 110:  // "non-zero long"
             value.move<long long>(std::move(that.value));
             break;
 
@@ -3084,8 +3085,8 @@ PipelineParserGen::basic_symbol<Base>::basic_symbol(basic_symbol&& that)
             value.move<std::pair<CNode::Fieldname, CNode>>(std::move(that.value));
             break;
 
-        case 97:  // FIELDNAME
-        case 98:  // STRING
+        case 97:  // "fieldname"
+        case 98:  // "string"
             value.move<std::string>(std::move(that.value));
             break;
 
@@ -3105,27 +3106,27 @@ template <typename Base>
 PipelineParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
     : Base(that), value(), location(that.location) {
     switch (this->type_get()) {
-        case 99:  // BINARY
+        case 99:  // "BinData"
             value.copy<BSONBinData>(YY_MOVE(that.value));
             break;
 
-        case 106:  // JAVASCRIPT
+        case 106:  // "Code"
             value.copy<BSONCode>(YY_MOVE(that.value));
             break;
 
-        case 108:  // JAVASCRIPT_W_SCOPE
+        case 108:  // "CodeWScope"
             value.copy<BSONCodeWScope>(YY_MOVE(that.value));
             break;
 
-        case 105:  // DB_POINTER
+        case 105:  // "dbPointer"
             value.copy<BSONDBRef>(YY_MOVE(that.value));
             break;
 
-        case 104:  // REGEX
+        case 104:  // "regex"
             value.copy<BSONRegEx>(YY_MOVE(that.value));
             break;
 
-        case 107:  // SYMBOL
+        case 107:  // "Symbol"
             value.copy<BSONSymbol>(YY_MOVE(that.value));
             break;
 
@@ -3257,47 +3258,47 @@ PipelineParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
             value.copy<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case 102:  // DATE_LITERAL
+        case 102:  // "Date"
             value.copy<Date_t>(YY_MOVE(that.value));
             break;
 
-        case 113:  // DECIMAL_NON_ZERO
+        case 112:  // "non-zero decimal"
             value.copy<Decimal128>(YY_MOVE(that.value));
             break;
 
-        case 101:  // OBJECT_ID
+        case 101:  // "ObjectID"
             value.copy<OID>(YY_MOVE(that.value));
             break;
 
-        case 110:  // TIMESTAMP
+        case 113:  // "Timestamp"
             value.copy<Timestamp>(YY_MOVE(that.value));
             break;
 
-        case 115:  // MAX_KEY
+        case 115:  // "maxKey"
             value.copy<UserMaxKey>(YY_MOVE(that.value));
             break;
 
-        case 114:  // MIN_KEY
+        case 114:  // "minKey"
             value.copy<UserMinKey>(YY_MOVE(that.value));
             break;
 
-        case 103:  // JSNULL
+        case 103:  // "null"
             value.copy<UserNull>(YY_MOVE(that.value));
             break;
 
-        case 100:  // UNDEFINED
+        case 100:  // "undefined"
             value.copy<UserUndefined>(YY_MOVE(that.value));
             break;
 
-        case 112:  // DOUBLE_NON_ZERO
+        case 111:  // "non-zero double"
             value.copy<double>(YY_MOVE(that.value));
             break;
 
-        case 109:  // INT_NON_ZERO
+        case 109:  // "non-zero integer"
             value.copy<int>(YY_MOVE(that.value));
             break;
 
-        case 111:  // LONG_NON_ZERO
+        case 110:  // "non-zero long"
             value.copy<long long>(YY_MOVE(that.value));
             break;
 
@@ -3314,8 +3315,8 @@ PipelineParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
             value.copy<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
             break;
 
-        case 97:  // FIELDNAME
-        case 98:  // STRING
+        case 97:  // "fieldname"
+        case 98:  // "string"
             value.copy<std::string>(YY_MOVE(that.value));
             break;
 
@@ -3340,27 +3341,27 @@ template <typename Base>
 void PipelineParserGen::basic_symbol<Base>::move(basic_symbol& s) {
     super_type::move(s);
     switch (this->type_get()) {
-        case 99:  // BINARY
+        case 99:  // "BinData"
             value.move<BSONBinData>(YY_MOVE(s.value));
             break;
 
-        case 106:  // JAVASCRIPT
+        case 106:  // "Code"
             value.move<BSONCode>(YY_MOVE(s.value));
             break;
 
-        case 108:  // JAVASCRIPT_W_SCOPE
+        case 108:  // "CodeWScope"
             value.move<BSONCodeWScope>(YY_MOVE(s.value));
             break;
 
-        case 105:  // DB_POINTER
+        case 105:  // "dbPointer"
             value.move<BSONDBRef>(YY_MOVE(s.value));
             break;
 
-        case 104:  // REGEX
+        case 104:  // "regex"
             value.move<BSONRegEx>(YY_MOVE(s.value));
             break;
 
-        case 107:  // SYMBOL
+        case 107:  // "Symbol"
             value.move<BSONSymbol>(YY_MOVE(s.value));
             break;
 
@@ -3492,47 +3493,47 @@ void PipelineParserGen::basic_symbol<Base>::move(basic_symbol& s) {
             value.move<CNode::Fieldname>(YY_MOVE(s.value));
             break;
 
-        case 102:  // DATE_LITERAL
+        case 102:  // "Date"
             value.move<Date_t>(YY_MOVE(s.value));
             break;
 
-        case 113:  // DECIMAL_NON_ZERO
+        case 112:  // "non-zero decimal"
             value.move<Decimal128>(YY_MOVE(s.value));
             break;
 
-        case 101:  // OBJECT_ID
+        case 101:  // "ObjectID"
             value.move<OID>(YY_MOVE(s.value));
             break;
 
-        case 110:  // TIMESTAMP
+        case 113:  // "Timestamp"
             value.move<Timestamp>(YY_MOVE(s.value));
             break;
 
-        case 115:  // MAX_KEY
+        case 115:  // "maxKey"
             value.move<UserMaxKey>(YY_MOVE(s.value));
             break;
 
-        case 114:  // MIN_KEY
+        case 114:  // "minKey"
             value.move<UserMinKey>(YY_MOVE(s.value));
             break;
 
-        case 103:  // JSNULL
+        case 103:  // "null"
             value.move<UserNull>(YY_MOVE(s.value));
             break;
 
-        case 100:  // UNDEFINED
+        case 100:  // "undefined"
             value.move<UserUndefined>(YY_MOVE(s.value));
             break;
 
-        case 112:  // DOUBLE_NON_ZERO
+        case 111:  // "non-zero double"
             value.move<double>(YY_MOVE(s.value));
             break;
 
-        case 109:  // INT_NON_ZERO
+        case 109:  // "non-zero integer"
             value.move<int>(YY_MOVE(s.value));
             break;
 
-        case 111:  // LONG_NON_ZERO
+        case 110:  // "non-zero long"
             value.move<long long>(YY_MOVE(s.value));
             break;
 
@@ -3549,8 +3550,8 @@ void PipelineParserGen::basic_symbol<Base>::move(basic_symbol& s) {
             value.move<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(s.value));
             break;
 
-        case 97:  // FIELDNAME
-        case 98:  // STRING
+        case 97:  // "fieldname"
+        case 98:  // "string"
             value.move<std::string>(YY_MOVE(s.value));
             break;
 
@@ -3595,7 +3596,7 @@ inline int PipelineParserGen::by_type::type_get() const YY_NOEXCEPT {
 
 #line 58 "src/mongo/db/cst/pipeline_grammar.yy"
 }  // namespace mongo
-#line 4527 "src/mongo/db/cst/pipeline_parser_gen.hpp"
+#line 4528 "src/mongo/db/cst/pipeline_parser_gen.hpp"
 
 
 #endif  // !YY_YY_SRC_MONGO_DB_CST_PIPELINE_PARSER_GEN_HPP_INCLUDED

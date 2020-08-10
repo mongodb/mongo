@@ -74,34 +74,6 @@ TEST(CstGrammarTest, EmptyPipeline) {
     ASSERT_EQ(0, stdx::get_if<CNode::ArrayChildren>(&output.payload)->size());
 }
 
-TEST(CstGrammarTest, InvalidPipelineSpec) {
-    {
-        CNode output;
-        auto input = fromjson("{pipeline: [{}]}");
-        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
-        auto parseTree = PipelineParserGen(lexer, &output);
-        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
-    }
-    {
-        CNode output;
-        auto input = fromjson("{pipeline: [{$unknownStage: {}}]}");
-        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
-        auto parseTree = PipelineParserGen(lexer, &output);
-        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
-    }
-    {
-        ASSERT_THROWS_CODE(
-            [] {
-                CNode output;
-                auto input = fromjson("{pipeline: 'not an array'}");
-                BSONLexer lexer(input["pipeline"].Array(),
-                                PipelineParserGen::token::START_PIPELINE);
-            }(),
-            AssertionException,
-            13111);
-    }
-}
-
 TEST(CstGrammarTest, ParsesInternalInhibitOptimization) {
     {
         CNode output;
@@ -305,13 +277,26 @@ TEST(CstGrammarTest, ParsesProject) {
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
                   "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { add: [ "
-                  "\"<UserInt 4>\", \"<UserInt 5>\", { add: [ \"<UserInt 6>\", \"<UserInt 7>\", "
-                  "\"<UserInt 8>\" ] } ] }, b: { atan2: [ \"<UserDouble 1.000000>\", { add: [ "
-                  "\"<UserInt 2>\", \"<UserInt -3>\" ] } ] } } }");
+                  "{ add: [ "
+                  "\"<UserInt 8>\", \"<UserInt 7>\", \"<UserInt 6>\" ] }, \"<UserInt 5>\", "
+                  "\"<UserInt 4>\" ] }, b: { atan2: [ \"<UserDouble 1.000000>\", { add: [ "
+                  "\"<UserInt -3>\", \"<UserInt 2>\" ] } ] } } }");
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: {a: {$add: [6]}}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ projectInclusion: { a: { add: [ \"<UserInt 6>\" ] } } }");
     }
 }
 
-TEST(CstGrammarTest, FailsTOParseMixedProject) {
+TEST(CstGrammarTest, FailsToParseMixedProject) {
     {
         CNode output;
         auto input = fromjson("{pipeline: [{$project: {a: 1, b: 0.0}}]}");
