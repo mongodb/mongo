@@ -214,6 +214,9 @@ if (typeof _threadInject != "undefined") {
 
             // Can fail if isMaster takes too long on a loaded machine.
             "dbadmin.js",
+
+            // Other tests will fail while the requireApiVersion server parameter is set.
+            "require_api_version.js",
         ]);
 
         // The following tests cannot run when shell readMode is legacy.
