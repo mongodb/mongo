@@ -61,6 +61,7 @@
 namespace mongo {
 namespace {
 
+#ifdef MONGO_CONFIG_SSL
 // Construct a simple, structured X509 name equivalent to "CN=mongodb.com"
 SSLX509Name buildX509Name() {
     return SSLX509Name(std::vector<std::vector<SSLX509Name::Entry>>(
@@ -71,6 +72,8 @@ void setX509PeerInfo(const transport::SessionHandle& session, SSLPeerInfo info) 
     auto& sslPeerInfo = SSLPeerInfo::forSession(session);
     sslPeerInfo = info;
 }
+
+#endif
 
 class AuthorizationManagerTest : public ServiceContextTest {
 public:
@@ -193,7 +196,6 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     ASSERT(privilegeIt != privileges.end());
     ASSERT(privilegeIt->second.includesAction(ActionType::insert));
 }
-#endif
 
 TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
     setX509PeerInfo(session,
@@ -211,6 +213,8 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
     ASSERT_NOT_OK(authzManager->acquireUser(opCtx.get(), UserName("CN=mongodb.com", "$external"))
                       .getStatus());
 }
+
+#endif
 
 /**
  * An implementation of AuthzManagerExternalStateMock that overrides the getUserDescription method

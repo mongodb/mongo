@@ -452,6 +452,7 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
 
     UserRequest request(userName, boost::none);
 
+#ifdef MONGO_CONFIG_SSL
     // Clients connected via TLS may present an X.509 certificate which contains an authorization
     // grant. If this is the case, the roles must be provided to the external state, for expansion
     // into privileges.
@@ -464,6 +465,7 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
                   sslPeerInfo.roles.end(),
                   std::inserter(*request.roles, request.roles->begin()));
     }
+#endif
 
     auto cachedUser = _userCache.acquire(opCtx, request);
     invariant(cachedUser);
