@@ -2948,29 +2948,53 @@ def doConfigure(myenv):
         supportedBlackfiles = []
         blackfilesTestEnv = myenv.Clone()
         for blackfile in blackfiles:
-            if AddToCCFLAGSIfSupported(blackfilesTestEnv, "-fsanitize-blacklist=%s" % blackfile):
+            if AddToCCFLAGSIfSupported(blackfilesTestEnv, f"-fsanitize-blacklist={blackfile}"):
                 supportedBlackfiles.append(blackfile)
         blackfilesTestEnv = None
-        blackfiles = sorted(supportedBlackfiles)
+        supportedBlackfiles = sorted(supportedBlackfiles)
 
         # If we ended up with any blackfiles after the above filters,
         # then expand them into compiler flag arguments, and use a
         # generator to return at command line expansion time so that
         # we can change the signature if the file contents change.
-        if blackfiles:
+        if supportedBlackfiles:
             # Unconditionally using the full path can affect SCons cached builds, so we only do
             # this in cases where we know it's going to matter.
-            blackfile_paths = [
-                blackfile.get_abspath() if ('ICECC' in env and env['ICECC']) else blackfile.path
-                for blackfile in blackfiles
-            ]
-            # Make these files available to remote icecream builds if requested
-            blacklist_options=[f"-fsanitize-blacklist={file_path}" for file_path in blackfile_paths]
-            env.AppendUnique(ICECC_CREATE_ENV_ADDFILES=blackfile_paths)
+            if 'ICECC' in env and env['ICECC']:
+                # Make these files available to remote icecream builds if requested.
+                # These paths *must* be absolute to match the paths in the remote
+                # toolchain archive.
+                blacklist_options=[
+                    f"-fsanitize-blacklist={blackfile.get_abspath()}"
+                    for blackfile in supportedBlackfiles
+                ]
+                # If a sanitizer is in use with a blacklist file, we have to ensure they get
+                # added to the toolchain package that gets sent to the remote hosts so they
+                # can be found by the remote compiler.
+                env.Append(ICECC_CREATE_ENV_ADDFILES=supportedBlackfiles)
+            else:
+                blacklist_options=[
+                    f"-fsanitize-blacklist={blackfile.path}"
+                    for blackfile in supportedBlackfiles
+                ]
+
+            if 'CCACHE' in env and env['CCACHE']:
+                # Work around the fact that some versions of ccache either don't yet support
+                # -fsanitize-blacklist at all or only support one instance of it. This will
+                # work on any version of ccache because the point is only to ensure that the
+                # resulting hash for any compiled object is guaranteed to take into account
+                # the effect of any sanitizer blacklist files used as part of the build.
+                # TODO: This will no longer be required when the following pull requests/
+                # issues have been merged and deployed.
+                # https://github.com/ccache/ccache/pull/258
+                # https://github.com/ccache/ccache/issues/318
+                env.Append(CCACHE_EXTRAFILES=supportedBlackfiles)
+
             def SanitizerBlacklistGenerator(source, target, env, for_signature):
                 if for_signature:
-                    return [f.get_csig() for f in blackfiles]
+                    return [f.get_csig() for f in supportedBlackfiles]
                 return blacklist_options
+
             myenv.AppendUnique(
                 SANITIZER_BLACKLIST_GENERATOR=SanitizerBlacklistGenerator,
                 CCFLAGS="${SANITIZER_BLACKLIST_GENERATOR}",
