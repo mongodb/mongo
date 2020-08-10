@@ -43,9 +43,12 @@
 namespace mongo {
 namespace transport {
 namespace {
-constexpr auto kThreadsRunning = "threadsRunning"_sd;
-constexpr auto kExecutorLabel = "executor"_sd;
 constexpr auto kExecutorName = "passthrough"_sd;
+
+constexpr auto kThreadsRunning = "threadsRunning"_sd;
+constexpr auto kClientsInTotal = "clientsInTotal"_sd;
+constexpr auto kClientsRunning = "clientsRunning"_sd;
+constexpr auto kClientsWaiting = "clientsWaitingForData"_sd;
 
 const auto getServiceExecutorSynchronous =
     ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorSynchronous>>();
@@ -152,8 +155,14 @@ Status ServiceExecutorSynchronous::scheduleTask(Task task, ScheduleFlags flags) 
 }
 
 void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
-    *bob << kExecutorLabel << kExecutorName << kThreadsRunning
-         << static_cast<int>(_numRunningWorkerThreads.loadRelaxed());
+    // The ServiceExecutorSynchronous has one client per thread and waits synchronously on thread.
+    auto threads = static_cast<int>(_numRunningWorkerThreads.loadRelaxed());
+
+    BSONObjBuilder subbob = bob->subobjStart(kExecutorName);
+    subbob.append(kThreadsRunning, threads);
+    subbob.append(kClientsInTotal, threads);
+    subbob.append(kClientsRunning, threads);
+    subbob.append(kClientsWaiting, 0);
 }
 
 void ServiceExecutorSynchronous::runOnDataAvailable(const SessionHandle& session,

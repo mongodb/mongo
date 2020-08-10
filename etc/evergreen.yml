@@ -13071,6 +13071,8 @@ buildvariants:
   - name: .concurrency .common !.kill_terminate
   - name: .integration !.audit
   - name: .jscore .common
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs

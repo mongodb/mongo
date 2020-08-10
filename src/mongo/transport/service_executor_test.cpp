@@ -301,37 +301,6 @@ TEST_F(ServiceExecutorFixedFixture, ShutdownTimeLimit) {
     mayReturn->emplaceValue();
 }
 
-TEST_F(ServiceExecutorFixedFixture, Stats) {
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
-    auto rendezvousBarrier = std::make_shared<unittest::Barrier>(kNumExecutorThreads + 1);
-    auto returnBarrier = std::make_shared<unittest::Barrier>(kNumExecutorThreads + 1);
-
-    auto task = [rendezvousBarrier, returnBarrier]() mutable {
-        rendezvousBarrier->countDownAndWait();
-        // Executor threads wait here for the main thread to test "executor->appendStats()".
-        returnBarrier->countDownAndWait();
-    };
-
-    for (auto i = 0; i < kNumExecutorThreads; i++) {
-        ASSERT_OK(executorHandle->scheduleTask(task, ServiceExecutor::kEmptyFlags));
-    }
-
-    // The main thread waits for the executor threads to bump up "threadsRunning" while picking up a
-    // task to execute. Once all executor threads are running (rendezvous) and the main thread is
-    // done testing the stats, the main thread will unblock them through "returnBarrier".
-    rendezvousBarrier->countDownAndWait();
-
-    BSONObjBuilder bob;
-    executorHandle->appendStats(&bob);
-    auto obj = bob.obj();
-    ASSERT(obj.hasField("threadsRunning"));
-    auto threadsRunning = obj.getIntField("threadsRunning");
-    ASSERT_EQ(threadsRunning, static_cast<int>(ServiceExecutorFixedFixture::kNumExecutorThreads));
-
-    returnBarrier->countDownAndWait();
-}
-
-
 TEST_F(ServiceExecutorFixedFixture, ScheduleSucceedsBeforeShutdown) {
     ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
 
