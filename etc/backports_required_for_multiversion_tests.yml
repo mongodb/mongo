@@ -72,6 +72,8 @@ all:
     test_file: jstests/sharding/ismaster.js
   - ticket: SERVER-49987
     test_file: jstests/replsets/ismaster1.js
+  - ticket: SERVER-49991
+    test_file: jstests/replsets/get_replication_info_helper.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

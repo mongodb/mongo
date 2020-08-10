@@ -603,7 +603,7 @@ DB.prototype.help = function() {
     print("\tdb.printCollectionStats()");
     print("\tdb.printReplicationInfo()");
     print("\tdb.printShardingStatus()");
-    print("\tdb.printSlaveReplicationInfo()");
+    print("\tdb.printSecondaryReplicationInfo()");
     print("\tdb.resetError()");
     print(
         "\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into {cmdObj: 1}");
@@ -1065,8 +1065,8 @@ DB.prototype.printReplicationInfo = function() {
             print("cannot provide replication status from an arbiter.");
             return;
         } else if (!isMaster.ismaster) {
-            print("this is a slave, printing slave replication info.");
-            this.printSlaveReplicationInfo();
+            print("this is a secondary, printing secondary replication info.");
+            this.printSecondaryReplicationInfo();
             return;
         }
         print(tojson(result));
@@ -1080,6 +1080,12 @@ DB.prototype.printReplicationInfo = function() {
 };
 
 DB.prototype.printSlaveReplicationInfo = function() {
+    print(
+        "WARNING: printSlaveReplicationInfo is deprecated and may be removed in the next major release. Please use printSecondaryReplicationInfo instead.");
+    this.printSecondaryReplicationInfo();
+};
+
+DB.prototype.printSecondaryReplicationInfo = function() {
     var startOptimeDate = null;
     var primary = null;
 
@@ -1097,7 +1103,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
         print("\t" + Math.round(ago) + " secs (" + hrs + " hrs) behind the " + suffix);
     }
 
-    function getMaster(members) {
+    function getPrimary(members) {
         for (i in members) {
             var row = members[i];
             if (row.state === 1) {
@@ -1109,7 +1115,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
     }
 
     function g(x) {
-        assert(x, "how could this be null (printSlaveReplicationInfo gx)");
+        assert(x, "how could this be null (printSecondaryReplicationInfo gx)");
         print("source: " + x.host);
         if (x.syncedTo) {
             var st = new Date(DB.tsToSeconds(x.syncedTo) * 1000);
@@ -1120,7 +1126,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
     }
 
     function r(x) {
-        assert(x, "how could this be null (printSlaveReplicationInfo rx)");
+        assert(x, "how could this be null (printSecondaryReplicationInfo rx)");
         if (x.state == 1 || x.state == 7) {  // ignore primaries (1) and arbiters (7)
             return;
         }
@@ -1137,7 +1143,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
 
     if (L.system.replset.count() != 0) {
         var status = this.adminCommand({'replSetGetStatus': 1});
-        primary = getMaster(status.members);
+        primary = getPrimary(status.members);
         if (primary) {
             startOptimeDate = primary.optimeDate;
         }
