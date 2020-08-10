@@ -356,7 +356,7 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "the 'temp' field is an invalid option",
                     opCtx->getClient()->isInDirectClient() ||
-                        (opCtx->getClient()->session()->getTags() |
+                        (opCtx->getClient()->session()->getTags() &
                          transport::Session::kInternalClient));
         }
 
