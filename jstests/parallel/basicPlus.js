@@ -1,6 +1,4 @@
 // perform basic js tests in parallel & some other tasks as well
-// SERVER-49673: Incompatible with ephemeralForTest
-// @tags: [incompatible_with_eft]
 load('jstests/libs/parallelTester.js');
 
 var c = db.jstests_parallel_basicPlus;
