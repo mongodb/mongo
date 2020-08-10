@@ -214,7 +214,6 @@ public:
 
     std::unique_ptr<PlanStageStats> getStats() const {
         auto ret = std::make_unique<PlanStageStats>(_commonStats);
-        ret->children.emplace_back(_children[0]->getStats());
         return ret;
     }
 

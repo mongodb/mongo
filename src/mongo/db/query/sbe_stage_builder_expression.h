@@ -58,4 +58,10 @@ generateExpression(OperationContext* opCtx,
                    sbe::value::SlotId inputVar,
                    sbe::value::SlotVector* relevantSlots = nullptr);
 
+/**
+ * Generate an EExpression that converts a value (contained in a variable bound to 'branchRef') that
+ * can be of any type to a Boolean value based on MQL's definition of truth for the branch of any
+ * logical expression.
+ */
+std::unique_ptr<sbe::EExpression> generateExpressionForLogicBranch(sbe::EVariable branchRef);
 }  // namespace mongo::stage_builder

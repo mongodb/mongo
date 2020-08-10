@@ -70,6 +70,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
@@ -637,7 +638,8 @@ public:
         unsupportedExpression(expr);
     }
     void visit(const NotMatchExpression* expr) final {
-        unsupportedExpression(expr);
+        invariant(expr->numChildren() == 1);
+        _context->nestedLogicalExprs.push({expr, expr->numChildren()});
     }
     void visit(const OrMatchExpression* expr) final {
         _context->nestedLogicalExprs.push({expr, expr->numChildren()});
@@ -682,30 +684,39 @@ public:
     void visit(const AlwaysFalseMatchExpression* expr) final {
         generateAlwaysBoolean(_context, false);
     }
+
     void visit(const AlwaysTrueMatchExpression* expr) final {
         generateAlwaysBoolean(_context, true);
     }
+
     void visit(const AndMatchExpression* expr) final {
+        invariant(!_context->nestedLogicalExprs.empty());
         _context->nestedLogicalExprs.pop();
         generateLogicalAnd(_context, expr);
     }
+
     void visit(const BitsAllClearMatchExpression* expr) final {}
     void visit(const BitsAllSetMatchExpression* expr) final {}
     void visit(const BitsAnyClearMatchExpression* expr) final {}
     void visit(const BitsAnySetMatchExpression* expr) final {}
     void visit(const ElemMatchObjectMatchExpression* expr) final {}
     void visit(const ElemMatchValueMatchExpression* expr) final {}
+
     void visit(const EqualityMatchExpression* expr) final {
         generateTraverseForComparisonPredicate(_context, expr, sbe::EPrimBinary::eq);
     }
+
     void visit(const ExistsMatchExpression* expr) final {}
     void visit(const ExprMatchExpression* expr) final {}
+
     void visit(const GTEMatchExpression* expr) final {
         generateTraverseForComparisonPredicate(_context, expr, sbe::EPrimBinary::greaterEq);
     }
+
     void visit(const GTMatchExpression* expr) final {
         generateTraverseForComparisonPredicate(_context, expr, sbe::EPrimBinary::greater);
     }
+
     void visit(const GeoMatchExpression* expr) final {}
     void visit(const GeoNearMatchExpression* expr) final {}
     void visit(const InMatchExpression* expr) final {}
@@ -729,12 +740,15 @@ public:
     void visit(const InternalSchemaTypeExpression* expr) final {}
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {}
     void visit(const InternalSchemaXorMatchExpression* expr) final {}
+
     void visit(const LTEMatchExpression* expr) final {
         generateTraverseForComparisonPredicate(_context, expr, sbe::EPrimBinary::lessEq);
     }
+
     void visit(const LTMatchExpression* expr) final {
         generateTraverseForComparisonPredicate(_context, expr, sbe::EPrimBinary::less);
     }
+
     void visit(const ModMatchExpression* expr) final {
         // The mod function returns the result of the mod operation between the operand and given
         // divisor, so construct an expression to then compare the result of the operation to the
@@ -753,9 +767,28 @@ public:
 
         generateTraverse(_context, expr, std::move(makeEExprFn));
     }
+
     void visit(const NorMatchExpression* expr) final {}
-    void visit(const NotMatchExpression* expr) final {}
+
+    void visit(const NotMatchExpression* expr) final {
+        invariant(!_context->nestedLogicalExprs.empty());
+        invariant(!_context->predicateVars.empty());
+        _context->nestedLogicalExprs.pop();
+
+        auto filter = sbe::makeE<sbe::EPrimUnary>(
+            sbe::EPrimUnary::logicNot,
+            generateExpressionForLogicBranch(sbe::EVariable{_context->predicateVars.top()}));
+        _context->predicateVars.pop();
+
+        _context->predicateVars.push(_context->slotIdGenerator->generate());
+        _context->inputStage = sbe::makeProjectStage(
+            std::move(_context->inputStage), _context->predicateVars.top(), std::move(filter));
+
+        checkForShortCircuitFromLogicalAnd(_context);
+    }
+
     void visit(const OrMatchExpression* expr) final {
+        invariant(!_context->nestedLogicalExprs.empty());
         _context->nestedLogicalExprs.pop();
         generateLogicalOr(_context, expr);
     }
@@ -765,16 +798,6 @@ public:
             auto regex = RegexMatchExpression::makeRegex(expr->getString(), expr->getFlags());
             auto ownedRegexVal = sbe::value::bitcastFrom(regex.release());
 
-            // The "regexMatch" function returns Nothing when given any non-string input, so we need
-            // an explicit string check in the expression in order to capture the MQL semantics of
-            // regex returning false for non-strings. We generate the following expression:
-            //
-            //                    and
-            //    +----------------+----------------+
-            //  isString                       regexMatch
-            //    |                    +------------+----------+
-            //   var (inputSlot)   constant (regex)    var (inputSlot)
-            //
             // TODO: In the future, this needs to account for the fact that the regex match
             // expression matches strings, but also matches stored regexes. For example,
             // {$match: {a: /foo/}} matches the document {a: /foo/} in addition to {a: "foobar"}.
@@ -795,6 +818,7 @@ public:
     void visit(const TextMatchExpression* expr) final {}
     void visit(const TextNoOpMatchExpression* expr) final {}
     void visit(const TwoDPtInAnnulusExpression* expr) final {}
+
     void visit(const TypeMatchExpression* expr) final {
         auto makeEExprFn = [expr](sbe::value::SlotId inputSlot) {
             const MatcherTypeSet& ts = expr->typeSet();
@@ -803,6 +827,7 @@ public:
         };
         generateTraverse(_context, expr, std::move(makeEExprFn));
     }
+
     void visit(const WhereMatchExpression* expr) final {}
     void visit(const WhereNoOpMatchExpression* expr) final {}
 
@@ -820,10 +845,12 @@ public:
 
     void visit(const AlwaysFalseMatchExpression* expr) final {}
     void visit(const AlwaysTrueMatchExpression* expr) final {}
+
     void visit(const AndMatchExpression* expr) final {
         invariant(_context->nestedLogicalExprs.top().first == expr);
         _context->nestedLogicalExprs.top().second--;
     }
+
     void visit(const BitsAllClearMatchExpression* expr) final {}
     void visit(const BitsAllSetMatchExpression* expr) final {}
     void visit(const BitsAnyClearMatchExpression* expr) final {}
@@ -863,10 +890,12 @@ public:
     void visit(const ModMatchExpression* expr) final {}
     void visit(const NorMatchExpression* expr) final {}
     void visit(const NotMatchExpression* expr) final {}
+
     void visit(const OrMatchExpression* expr) final {
         invariant(_context->nestedLogicalExprs.top().first == expr);
         _context->nestedLogicalExprs.top().second--;
     }
+
     void visit(const RegexMatchExpression* expr) final {}
     void visit(const SizeMatchExpression* expr) final {}
     void visit(const TextMatchExpression* expr) final {}

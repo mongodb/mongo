@@ -188,44 +188,6 @@ struct ExpressionVisitorContext {
     const TimeZoneDatabase* timeZoneDB;
 };
 
-/**
- * Generate an EExpression that converts a value (contained in a variable bound to 'branchRef') that
- * can be of any type to a Boolean value based on MQL's definition of truth for the branch of any
- * logical expression.
- */
-std::unique_ptr<sbe::EExpression> generateExpressionForLogicBranch(sbe::EVariable branchRef) {
-    // Make an expression that compares the value in 'branchRef' to the result of evaluating the
-    // 'valExpr' expression. The comparison uses cmp3w, so that can handle comparisons between
-    // values with different types.
-    auto makeNeqCheck = [&branchRef](std::unique_ptr<sbe::EExpression> valExpr) {
-        return sbe::makeE<sbe::EPrimBinary>(
-            sbe::EPrimBinary::neq,
-            sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::cmp3w, branchRef.clone(), std::move(valExpr)),
-            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0));
-    };
-
-    // If any of these are false, the branch is considered false for the purposes of the
-    // any logical expression.
-    auto checkExists = sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(branchRef.clone()));
-    auto checkNotNull = sbe::makeE<sbe::EPrimUnary>(
-        sbe::EPrimUnary::logicNot,
-        sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(branchRef.clone())));
-    auto checkNotFalse =
-        makeNeqCheck(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, false));
-    auto checkNotZero =
-        makeNeqCheck(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0));
-
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::logicAnd,
-        std::move(checkExists),
-        sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
-                                     std::move(checkNotNull),
-                                     sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
-                                                                  std::move(checkNotFalse),
-                                                                  std::move(checkNotZero))));
-}
-
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverseHelper(
     std::unique_ptr<sbe::PlanStage> inputStage,
     sbe::value::SlotId inputSlot,
@@ -1645,6 +1607,39 @@ private:
     ExpressionVisitor* _postVisitor;
 };
 }  // namespace
+
+std::unique_ptr<sbe::EExpression> generateExpressionForLogicBranch(sbe::EVariable branchRef) {
+    // Make an expression that compares the value in 'branchRef' to the result of evaluating the
+    // 'valExpr' expression. The comparison uses cmp3w, so that can handle comparisons between
+    // values with different types.
+    auto makeNeqCheck = [&branchRef](std::unique_ptr<sbe::EExpression> valExpr) {
+        return sbe::makeE<sbe::EPrimBinary>(
+            sbe::EPrimBinary::neq,
+            sbe::makeE<sbe::EPrimBinary>(
+                sbe::EPrimBinary::cmp3w, branchRef.clone(), std::move(valExpr)),
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0));
+    };
+
+    // If any of these are false, the branch is considered false for the purposes of the
+    // any logical expression.
+    auto checkExists = sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(branchRef.clone()));
+    auto checkNotNull = sbe::makeE<sbe::EPrimUnary>(
+        sbe::EPrimUnary::logicNot,
+        sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(branchRef.clone())));
+    auto checkNotFalse =
+        makeNeqCheck(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, false));
+    auto checkNotZero =
+        makeNeqCheck(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0));
+
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::logicAnd,
+        std::move(checkExists),
+        sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
+                                     std::move(checkNotNull),
+                                     sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
+                                                                  std::move(checkNotFalse),
+                                                                  std::move(checkNotZero))));
+}
 
 std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::PlanStage>>
 generateExpression(OperationContext* opCtx,
