@@ -148,7 +148,7 @@ TEST(CstExpressionTest, FailsToParseInvalidComparisonExpressions) {
 TEST(CstExpressionTest, FailsToParseInvalidConvertExpressions) {
     {
         CNode output;
-        auto input = fromjson("{pipeline: [{$project: {a: {$convert: {input: 'x', to: true}}}}]}");
+        auto input = fromjson("{pipeline: [{$project: {a: {$convert: 'x'}}}]}");
         BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
         auto parseTree = PipelineParserGen(lexer, &output);
         ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
@@ -221,6 +221,231 @@ TEST(CstExpressionTest, ParsesConvertExpressionsWithOptArgs) {
         "absentKey>\" } }, b: { convert: { inputArg: \"<UserBoolean 1>\", toArg: "
         "\"<UserString double>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
         "\"<UserInt 0>\" } } } }");
+}
+
+TEST(CstExpressionTest, ParsesIndexOf) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "b: { $indexOfBytes: ['ABC', 'B']}, "
+        "c: { $indexOfCP: [ 'cafeteria', 'e' ] }, "
+        "d: { $indexOfBytes: [ 'foo.bar.fi', '.', 5, 7 ] }}}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ projectInclusion: { b: { indexOfBytes: [ \"<UserString ABC>\", \"<UserString B>\" "
+              "] }, c: "
+              "{ indexOfCP: [ \"<UserString cafeteria>\", \"<UserString e>\" ] }, d: { "
+              "indexOfBytes: [ \"<UserString foo.bar.fi>\", \"<UserString .>\", \"<UserInt 5>\", "
+              "\"<UserInt 7>\" ] } } }");
+}
+
+TEST(CstExpressionTest, ParsesDateFromString) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { m: { $dateFromString: { dateString: '2017-02-08T12:10:40.787', "
+        "timezone: 'America/New_York' } } }}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ projectInclusion: { m: { dateFromString: { dateStringArg: \"<UserString "
+              "2017-02-08T12:10:40.787>\", formatArg: \"<KeyValue absentKey>\", timezoneArg: "
+              "\"<UserString America/New_York>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
+              "\"<KeyValue absentKey>\" } } } }");
+}
+
+TEST(CstExpressionTest, ParsesDateToString) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { m: { $dateToString: { date: '$date', "
+        "format: '%Y-%m-%d' } } } } ] }");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { m: { dateToString: { dateArg: \"<UserString $date>\", formatArg: "
+        "\"<UserString %Y-%m-%d>\", timezoneArg: \"<KeyValue absentKey>\", onNullArg: "
+        "\"<KeyValue absentKey>\" } } } }");
+}
+
+TEST(CstExpressionTest, ParsesReplaceStringExpressions) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "h: { $replaceOne: { input: '$name', find: 'Cafe', replacement: 'CAFE' } }, "
+        "i: { $replaceAll: { input: 'cafeSeattle', find: 'cafe', replacement: 'CAFE' } } }}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ projectInclusion: { h: { replaceOne: { inputArg: \"<UserString $name>\", findArg: "
+              "\"<UserString Cafe>\", replacementArg: \"<UserString CAFE>\" } }, i: { replaceAll: "
+              "{ inputArg: \"<UserString cafeSeattle>\", findArg: \"<UserString cafe>\", "
+              "replacementArg: \"<UserString CAFE>\" } } } }");
+}
+
+TEST(CstExpressionTest, ParsesTrim) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "d: { $ltrim: { input: ' ggggoodbyeeeee' } }, "
+        "e: { $rtrim: { input: 'ggggoodbyeeeee   '} }, "
+        "f: { $trim: { input: '    ggggoodbyeeeee', chars: ' ge' } } }}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { d: { ltrim: { inputArg: \"<UserString  ggggoodbyeeeee>\", charsArg: "
+        "\"<KeyValue absentKey>\" } }, e: { rtrim: { inputArg: \"<UserString ggggoodbyeeeee  "
+        " >\", charsArg: \"<KeyValue absentKey>\" } }, f: { trim: { inputArg: \"<UserString  "
+        "   ggggoodbyeeeee>\", charsArg: \"<UserString  ge>\" } } } }");
+}
+
+TEST(CstExpressionTest, ParsesToUpperAndLower) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "g: { $toUpper: 'abc' }, "
+        "v: { $toLower: 'ABC' }}}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { g: { toUpper: \"<UserString abc>\" }, v: { toLower: \"<UserString "
+        "ABC>\" } } }");
+}
+
+TEST(CstExpressionTest, ParsesRegexExpressions) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "j: { $regexFind: { input: '$details', regex: /^[a-z0-9_.+-]/, options: 'i' } }, "
+        "k: { $regexFindAll: { input: '$fname', regex: /(C(ar)*)ol/ } }, "
+        "l: { $regexMatch: { input: '$description', regex: /lin(e|k)/ } } }}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { j: { regexFind: { inputArg: \"<UserString $details>\", regexArg: "
+        "\"<UserRegex /^[a-z0-9_.+-]/>\", optionsArg: \"<UserString i>\" } }, k: { regexFindAll: { "
+        "inputArg: \"<UserString $fname>\", regexArg: \"<UserRegex /(C(ar)*)ol/>\", optionsArg: "
+        "\"<KeyValue absentKey>\" } }, l: { regexMatch: { inputArg: \"<UserString $description>\", "
+        "regexArg: \"<UserRegex /lin(e|k)/>\", optionsArg: \"<KeyValue absentKey>\" } } } }");
+}
+
+TEST(CstExpressionTest, ParsesSubstrExpressions) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "s: { $substr: [ '$quarter', 2, -1 ] }, "
+        "t: { $substrBytes: [ '$name', 0, 3 ] }, "
+        "u: { $substrCP: [ 'Hello World!', 6, 5 ] }}}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { s: { substr: [ \"<UserString $quarter>\", \"<UserInt 2>\", "
+        "\"<UserInt -1>\" "
+        "] }, t: { substrBytes: [ \"<UserString $name>\", \"<UserInt 0>\", \"<UserInt 3>\" ] }, u: "
+        "{ substrCP: [ \"<UserString Hello World!>\", \"<UserInt 6>\", \"<UserInt 5>\" ] } } }");
+}
+
+TEST(CstExpressionTest, ParsesStringLengthExpressions) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "p: { $strLenBytes: 'cafeteria' }, "
+        "q: { $strLenCP: 'Hello World!' }}}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { p: { strLenBytes: \"<UserString cafeteria>\" }, q: { strLenCP: "
+        "\"<UserString Hello World!>\" } } }");
+}
+
+TEST(CstExpressionTest, ParsesSplit) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "o: { $split: [ {$toUpper: 'abc'}, '-' ] }}}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ projectInclusion: { o: { split: [ { toUpper: \"<UserString abc>\" }, "
+              "\"<UserString ->\" ] } } }");
+}
+
+TEST(CstExpressionTest, ParsesStrCaseCmp) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "r: { $strcasecmp: [ '$quarter', '13q4' ] }}}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ projectInclusion: { r: { strcasecmp: [ \"<UserString $quarter>\", \"<UserString "
+              "13q4>\" ] } } }");
+}
+
+TEST(CstExpressionTest, ParsesConcat) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "a: { $concat: [ 'item', ' - ', '$description' ]}}}]}");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { a: { concat: [ \"<UserString $description>\", \"<UserString  - >\", "
+        "\"<UserString item>\" ] } } }");
 }
 
 }  // namespace

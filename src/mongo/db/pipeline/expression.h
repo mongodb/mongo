@@ -1038,6 +1038,8 @@ class ExpressionConcat final : public ExpressionVariadic<ExpressionConcat> {
 public:
     explicit ExpressionConcat(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionConcat>(expCtx) {}
+    ExpressionConcat(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionVariadic<ExpressionConcat>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1091,6 +1093,13 @@ private:
 
 class ExpressionDateFromString final : public Expression {
 public:
+    ExpressionDateFromString(ExpressionContext* const expCtx,
+                             boost::intrusive_ptr<Expression> dateString,
+                             boost::intrusive_ptr<Expression> timeZone,
+                             boost::intrusive_ptr<Expression> format,
+                             boost::intrusive_ptr<Expression> onNull,
+                             boost::intrusive_ptr<Expression> onError);
+
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1107,13 +1116,6 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
-    ExpressionDateFromString(ExpressionContext* const expCtx,
-                             boost::intrusive_ptr<Expression> dateString,
-                             boost::intrusive_ptr<Expression> timeZone,
-                             boost::intrusive_ptr<Expression> format,
-                             boost::intrusive_ptr<Expression> onNull,
-                             boost::intrusive_ptr<Expression> onError);
-
     boost::intrusive_ptr<Expression>& _dateString;
     boost::intrusive_ptr<Expression>& _timeZone;
     boost::intrusive_ptr<Expression>& _format;
@@ -1237,6 +1239,11 @@ private:
 
 class ExpressionDateToString final : public Expression {
 public:
+    ExpressionDateToString(ExpressionContext* const expCtx,
+                           boost::intrusive_ptr<Expression> format,
+                           boost::intrusive_ptr<Expression> date,
+                           boost::intrusive_ptr<Expression> timeZone,
+                           boost::intrusive_ptr<Expression> onNull);
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1253,12 +1260,6 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
-    ExpressionDateToString(ExpressionContext* const expCtx,
-                           boost::intrusive_ptr<Expression> format,
-                           boost::intrusive_ptr<Expression> date,
-                           boost::intrusive_ptr<Expression> timeZone,
-                           boost::intrusive_ptr<Expression> onNull);
-
     boost::intrusive_ptr<Expression>& _format;
     boost::intrusive_ptr<Expression>& _date;
     boost::intrusive_ptr<Expression>& _timeZone;
@@ -1580,6 +1581,8 @@ class ExpressionIndexOfBytes final : public ExpressionRangedArity<ExpressionInde
 public:
     explicit ExpressionIndexOfBytes(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionIndexOfBytes, 2, 4>(expCtx) {}
+    ExpressionIndexOfBytes(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionRangedArity<ExpressionIndexOfBytes, 2, 4>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1597,6 +1600,8 @@ class ExpressionIndexOfCP final : public ExpressionRangedArity<ExpressionIndexOf
 public:
     explicit ExpressionIndexOfCP(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionIndexOfCP, 2, 4>(expCtx) {}
+    ExpressionIndexOfCP(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionRangedArity<ExpressionIndexOfCP, 2, 4>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1658,7 +1663,7 @@ class ExpressionLn final : public ExpressionSingleNumericArg<ExpressionLn> {
 public:
     explicit ExpressionLn(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionLn>(expCtx) {}
-    explicit ExpressionLn(ExpressionContext* const expCtx, ExpressionVector&& children)
+    ExpressionLn(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionLn>(expCtx, std::move(children)) {}
 
     Value evaluateNumericArg(const Value& numericArg) const final;
@@ -1673,7 +1678,7 @@ class ExpressionLog final : public ExpressionFixedArity<ExpressionLog, 2> {
 public:
     explicit ExpressionLog(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionLog, 2>(expCtx) {}
-    explicit ExpressionLog(ExpressionContext* const expCtx, ExpressionVector&& children)
+    ExpressionLog(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionLog, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1688,7 +1693,7 @@ class ExpressionLog10 final : public ExpressionSingleNumericArg<ExpressionLog10>
 public:
     explicit ExpressionLog10(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionLog10>(expCtx) {}
-    explicit ExpressionLog10(ExpressionContext* const expCtx, ExpressionVector&& children)
+    ExpressionLog10(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionLog10>(expCtx, std::move(children)) {}
 
     Value evaluateNumericArg(const Value& numericArg) const final;
@@ -1799,7 +1804,7 @@ class ExpressionMod final : public ExpressionFixedArity<ExpressionMod, 2> {
 public:
     explicit ExpressionMod(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionMod, 2>(expCtx) {}
-    explicit ExpressionMod(ExpressionContext* const expCtx, ExpressionVector&& children)
+    ExpressionMod(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionMod, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1815,7 +1820,7 @@ class ExpressionMultiply final : public ExpressionVariadic<ExpressionMultiply> {
 public:
     explicit ExpressionMultiply(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionMultiply>(expCtx) {}
-    explicit ExpressionMultiply(ExpressionContext* const expCtx, ExpressionVector&& children)
+    ExpressionMultiply(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionVariadic<ExpressionMultiply>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1954,7 +1959,7 @@ class ExpressionPow final : public ExpressionFixedArity<ExpressionPow, 2> {
 public:
     explicit ExpressionPow(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionPow, 2>(expCtx) {}
-    explicit ExpressionPow(ExpressionContext* const expCtx, ExpressionVector&& children)
+    ExpressionPow(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionPow, 2>(expCtx, std::move(children)) {}
 
     static boost::intrusive_ptr<Expression> create(ExpressionContext* const expCtx,
@@ -2264,7 +2269,7 @@ class ExpressionRound final : public ExpressionRangedArity<ExpressionRound, 1, 2
 public:
     explicit ExpressionRound(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx) {}
-    explicit ExpressionRound(ExpressionContext* const expCtx, ExpressionVector&& children)
+    ExpressionRound(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -2279,6 +2284,8 @@ class ExpressionSplit final : public ExpressionFixedArity<ExpressionSplit, 2> {
 public:
     explicit ExpressionSplit(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSplit, 2>(expCtx) {}
+    ExpressionSplit(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionSplit, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2293,7 +2300,7 @@ class ExpressionSqrt final : public ExpressionSingleNumericArg<ExpressionSqrt> {
 public:
     explicit ExpressionSqrt(ExpressionContext* const expCtx)
         : ExpressionSingleNumericArg<ExpressionSqrt>(expCtx) {}
-    explicit ExpressionSqrt(ExpressionContext* const expCtx, ExpressionVector&& children)
+    ExpressionSqrt(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionSingleNumericArg<ExpressionSqrt>(expCtx, std::move(children)) {}
 
     Value evaluateNumericArg(const Value& numericArg) const final;
@@ -2309,6 +2316,8 @@ class ExpressionStrcasecmp final : public ExpressionFixedArity<ExpressionStrcase
 public:
     explicit ExpressionStrcasecmp(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx) {}
+    ExpressionStrcasecmp(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2323,6 +2332,8 @@ class ExpressionSubstrBytes final : public ExpressionFixedArity<ExpressionSubstr
 public:
     explicit ExpressionSubstrBytes(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx) {}
+    ExpressionSubstrBytes(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const;
@@ -2337,6 +2348,8 @@ class ExpressionSubstrCP final : public ExpressionFixedArity<ExpressionSubstrCP,
 public:
     explicit ExpressionSubstrCP(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSubstrCP, 3>(expCtx) {}
+    ExpressionSubstrCP(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionSubstrCP, 3>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2351,6 +2364,9 @@ class ExpressionStrLenBytes final : public ExpressionFixedArity<ExpressionStrLen
 public:
     explicit ExpressionStrLenBytes(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionStrLenBytes, 1>(expCtx) {}
+
+    ExpressionStrLenBytes(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionStrLenBytes, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2379,6 +2395,8 @@ class ExpressionStrLenCP final : public ExpressionFixedArity<ExpressionStrLenCP,
 public:
     explicit ExpressionStrLenCP(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionStrLenCP, 1>(expCtx) {}
+    ExpressionStrLenCP(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionStrLenCP, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2393,7 +2411,7 @@ class ExpressionSubtract final : public ExpressionFixedArity<ExpressionSubtract,
 public:
     explicit ExpressionSubtract(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx) {}
-    explicit ExpressionSubtract(ExpressionContext* const expCtx, ExpressionVector&& children)
+    ExpressionSubtract(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSubtract, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -2442,6 +2460,9 @@ public:
     explicit ExpressionToLower(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionToLower, 1>(expCtx) {}
 
+    ExpressionToLower(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionToLower, 1>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -2456,6 +2477,9 @@ public:
     explicit ExpressionToUpper(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionToUpper, 1>(expCtx) {}
 
+    ExpressionToUpper(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionToUpper, 1>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -2469,14 +2493,12 @@ public:
  * This class is used to implement all three trim expressions: $trim, $ltrim, and $rtrim.
  */
 class ExpressionTrim final : public Expression {
-private:
+public:
     enum class TrimType {
         kBoth,
         kLeft,
         kRight,
     };
-
-public:
     ExpressionTrim(ExpressionContext* const expCtx,
                    TrimType trimType,
                    StringData name,
@@ -2540,7 +2562,7 @@ class ExpressionTrunc final : public ExpressionRangedArity<ExpressionTrunc, 1, 2
 public:
     explicit ExpressionTrunc(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx) {}
-    explicit ExpressionTrunc(ExpressionContext* const expCtx, ExpressionVector&& children)
+    ExpressionTrunc(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx, std::move(children)) {}
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
@@ -2604,9 +2626,9 @@ public:
 
 class ExpressionIsoWeekYear final : public DateExpressionAcceptingTimeZone<ExpressionIsoWeekYear> {
 public:
-    explicit ExpressionIsoWeekYear(ExpressionContext* const expCtx,
-                                   boost::intrusive_ptr<Expression> date,
-                                   boost::intrusive_ptr<Expression> timeZone = nullptr)
+    ExpressionIsoWeekYear(ExpressionContext* const expCtx,
+                          boost::intrusive_ptr<Expression> date,
+                          boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionIsoWeekYear>(
               expCtx, "$isoWeekYear", std::move(date), std::move(timeZone)) {}
 

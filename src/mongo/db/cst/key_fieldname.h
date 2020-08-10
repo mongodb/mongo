@@ -88,7 +88,38 @@
     ENUMIFY(toLong)              \
     ENUMIFY(toObjectId)          \
     ENUMIFY(toString)            \
-    ENUMIFY(type)
+    ENUMIFY(type)                \
+    ENUMIFY(concat)              \
+    ENUMIFY(dateFromString)      \
+    ENUMIFY(dateToString)        \
+    ENUMIFY(formatArg)           \
+    ENUMIFY(timezoneArg)         \
+    ENUMIFY(dateStringArg)       \
+    ENUMIFY(dateArg)             \
+    ENUMIFY(regexArg)            \
+    ENUMIFY(findArg)             \
+    ENUMIFY(replacementArg)      \
+    ENUMIFY(optionsArg)          \
+    ENUMIFY(charsArg)            \
+    ENUMIFY(indexOfBytes)        \
+    ENUMIFY(indexOfCP)           \
+    ENUMIFY(ltrim)               \
+    ENUMIFY(rtrim)               \
+    ENUMIFY(trim)                \
+    ENUMIFY(regexFind)           \
+    ENUMIFY(regexFindAll)        \
+    ENUMIFY(regexMatch)          \
+    ENUMIFY(replaceOne)          \
+    ENUMIFY(replaceAll)          \
+    ENUMIFY(split)               \
+    ENUMIFY(strLenBytes)         \
+    ENUMIFY(strLenCP)            \
+    ENUMIFY(strcasecmp)          \
+    ENUMIFY(substr)              \
+    ENUMIFY(substrBytes)         \
+    ENUMIFY(substrCP)            \
+    ENUMIFY(toLower)             \
+    ENUMIFY(toUpper)
 
 MAKE_PRINTABLE_ENUM(KeyFieldname, KEYFIELDNAMES);
 MAKE_PRINTABLE_ENUM_STRING_ARRAY(key_fieldname, KeyFieldname, KEYFIELDNAMES);

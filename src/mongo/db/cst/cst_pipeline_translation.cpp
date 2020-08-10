@@ -253,6 +253,120 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
         case KeyFieldname::toString:
             return ExpressionConvert::create(
                 expCtx.get(), std::move(expressions[0]), BSONType::String);
+        case KeyFieldname::concat:
+            return make_intrusive<ExpressionConcat>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::dateFromString:
+            dassert(verifyFieldnames({KeyFieldname::dateStringArg,
+                                      KeyFieldname::formatArg,
+                                      KeyFieldname::timezoneArg,
+                                      KeyFieldname::onErrorArg,
+                                      KeyFieldname::onNullArg},
+                                     object[0].second.objectChildren()));
+            return make_intrusive<ExpressionDateFromString>(expCtx.get(),
+                                                            std::move(expressions[0]),
+                                                            std::move(expressions[1]),
+                                                            std::move(expressions[2]),
+                                                            std::move(expressions[3]),
+                                                            std::move(expressions[4]));
+        case KeyFieldname::dateToString:
+            dassert(verifyFieldnames({KeyFieldname::dateArg,
+                                      KeyFieldname::formatArg,
+                                      KeyFieldname::timezoneArg,
+                                      KeyFieldname::onNullArg},
+                                     object[0].second.objectChildren()));
+            return make_intrusive<ExpressionDateToString>(expCtx.get(),
+                                                          std::move(expressions[0]),
+                                                          std::move(expressions[1]),
+                                                          std::move(expressions[2]),
+                                                          std::move(expressions[3]));
+        case KeyFieldname::indexOfBytes:
+            return make_intrusive<ExpressionIndexOfBytes>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::indexOfCP:
+            return make_intrusive<ExpressionIndexOfCP>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::replaceOne:
+            dassert(verifyFieldnames(
+                {KeyFieldname::inputArg, KeyFieldname::findArg, KeyFieldname::replacementArg},
+                object[0].second.objectChildren()));
+            return make_intrusive<ExpressionReplaceOne>(expCtx.get(),
+                                                        std::move(expressions[0]),
+                                                        std::move(expressions[1]),
+                                                        std::move(expressions[2]));
+        case KeyFieldname::replaceAll:
+            dassert(verifyFieldnames(
+                {KeyFieldname::inputArg, KeyFieldname::findArg, KeyFieldname::replacementArg},
+                object[0].second.objectChildren()));
+            return make_intrusive<ExpressionReplaceAll>(expCtx.get(),
+                                                        std::move(expressions[0]),
+                                                        std::move(expressions[1]),
+                                                        std::move(expressions[2]));
+        case KeyFieldname::regexFind:
+            dassert(verifyFieldnames(
+                {KeyFieldname::inputArg, KeyFieldname::regexArg, KeyFieldname::optionsArg},
+                object[0].second.objectChildren()));
+            return make_intrusive<ExpressionRegexFind>(expCtx.get(),
+                                                       std::move(expressions[0]),
+                                                       std::move(expressions[1]),
+                                                       std::move(expressions[2]),
+                                                       "$regexFind");
+        case KeyFieldname::regexFindAll:
+            dassert(verifyFieldnames(
+                {KeyFieldname::inputArg, KeyFieldname::regexArg, KeyFieldname::optionsArg},
+                object[0].second.objectChildren()));
+            return make_intrusive<ExpressionRegexFindAll>(expCtx.get(),
+                                                          std::move(expressions[0]),
+                                                          std::move(expressions[1]),
+                                                          std::move(expressions[2]),
+                                                          "$regexFindAll");
+        case KeyFieldname::regexMatch:
+            dassert(verifyFieldnames(
+                {KeyFieldname::inputArg, KeyFieldname::regexArg, KeyFieldname::optionsArg},
+                object[0].second.objectChildren()));
+            return make_intrusive<ExpressionRegexMatch>(expCtx.get(),
+                                                        std::move(expressions[0]),
+                                                        std::move(expressions[1]),
+                                                        std::move(expressions[2]),
+                                                        "$regexMatch");
+        case KeyFieldname::ltrim:
+            dassert(verifyFieldnames({KeyFieldname::inputArg, KeyFieldname::charsArg},
+                                     object[0].second.objectChildren()));
+            return make_intrusive<ExpressionTrim>(expCtx.get(),
+                                                  ExpressionTrim::TrimType::kLeft,
+                                                  "$ltrim",
+                                                  std::move(expressions[0]),
+                                                  std::move(expressions[1]));
+        case KeyFieldname::rtrim:
+            dassert(verifyFieldnames({KeyFieldname::inputArg, KeyFieldname::charsArg},
+                                     object[0].second.objectChildren()));
+            return make_intrusive<ExpressionTrim>(expCtx.get(),
+                                                  ExpressionTrim::TrimType::kRight,
+                                                  "$rtrim",
+                                                  std::move(expressions[0]),
+                                                  std::move(expressions[1]));
+        case KeyFieldname::trim:
+            dassert(verifyFieldnames({KeyFieldname::inputArg, KeyFieldname::charsArg},
+                                     object[0].second.objectChildren()));
+            return make_intrusive<ExpressionTrim>(expCtx.get(),
+                                                  ExpressionTrim::TrimType::kBoth,
+                                                  "$trim",
+                                                  std::move(expressions[0]),
+                                                  std::move(expressions[1]));
+        case KeyFieldname::split:
+            return make_intrusive<ExpressionSplit>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::strcasecmp:
+            return make_intrusive<ExpressionStrcasecmp>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::strLenCP:
+            return make_intrusive<ExpressionStrLenCP>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::strLenBytes:
+            return make_intrusive<ExpressionStrLenBytes>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::substr:
+        case KeyFieldname::substrBytes:
+            return make_intrusive<ExpressionSubstrBytes>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::substrCP:
+            return make_intrusive<ExpressionSubstrCP>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::toLower:
+            return make_intrusive<ExpressionToLower>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::toUpper:
+            return make_intrusive<ExpressionToUpper>(expCtx.get(), std::move(expressions));
         case KeyFieldname::type:
             return make_intrusive<ExpressionType>(expCtx.get(), std::move(expressions));
         case KeyFieldname::abs:
