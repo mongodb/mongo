@@ -285,6 +285,11 @@ public:
     bool isConfigDotCacheDotChunks() const;
 
     /**
+     * Returns whether the specified namespace is <database>.system.resharding.<>.
+     */
+    bool isTemporaryReshardingCollection() const;
+
+    /**
      * Returns whether a namespace is replicated, based only on its string value. One notable
      * omission is that map reduce `tmp.mr` collections may or may not be replicated. Callers must
      * decide how to handle that case separately.

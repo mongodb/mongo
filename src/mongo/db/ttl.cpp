@@ -206,6 +206,12 @@ private:
                 continue;
             }
 
+            if (nss->isTemporaryReshardingCollection()) {
+                // For resharding, the donor shard primary is responsible for performing the TTL
+                // deletions.
+                continue;
+            }
+
             AutoGetCollection autoColl(&opCtx, *nss, MODE_IS);
             Collection* coll = autoColl.getCollection();
             // The collection with `uuid` might be renamed before the lock and the wrong

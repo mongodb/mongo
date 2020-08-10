@@ -127,6 +127,10 @@ bool NamespaceString::isLegalClientSystemNS() const {
         return true;
     if (coll() == kSystemDotViewsCollectionName)
         return true;
+    if (isTemporaryReshardingCollection()) {
+        // Permit integration testing on resharding collections.
+        return true;
+    }
 
     return false;
 }
@@ -239,6 +243,10 @@ bool NamespaceString::isNamespaceAlwaysUnsharded() const {
 
 bool NamespaceString::isConfigDotCacheDotChunks() const {
     return db() == "config" && coll().startsWith("cache.chunks.");
+}
+
+bool NamespaceString::isTemporaryReshardingCollection() const {
+    return coll().startsWith("system.resharding.");
 }
 
 bool NamespaceString::isReplicated() const {
