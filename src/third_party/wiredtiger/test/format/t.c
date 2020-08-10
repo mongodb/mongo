@@ -165,6 +165,8 @@ main(int argc, char *argv[])
 
     format_process_env();
 
+    __wt_random_init_seed(NULL, &g.rnd); /* Initialize the RNG. */
+
     /* Set values from the command line. */
     home = NULL;
     one_flag = quiet_flag = false;
@@ -256,8 +258,6 @@ main(int argc, char *argv[])
      */
     ops_seconds = g.c_timer == 0 ? 0 : ((g.c_timer * 60) - 15) / FORMAT_OPERATION_REPS;
 
-    __wt_random_init_seed(NULL, &g.rnd); /* Initialize the RNG. */
-
     testutil_check(__wt_thread_str(g.tidbuf, sizeof(g.tidbuf)));
 
     while (++g.run_cnt <= g.c_runs || g.c_runs == 0) {
@@ -269,6 +269,7 @@ main(int argc, char *argv[])
         if (g.reopen) {
             config_final();
             wts_open(g.home, &g.wts_conn, &g.wts_session, true);
+            set_oldest_timestamp();
         } else {
             wts_create(g.home);
             config_final();

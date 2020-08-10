@@ -917,9 +917,12 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
 {
     WT_TIME_WINDOW tw;
     WT_UPDATE *prepare_upd;
-    bool have_stop_tw;
-    prepare_upd = NULL;
+    bool have_stop_tw, retry;
 
+    prepare_upd = NULL;
+    retry = true;
+
+retry:
     WT_RET(__wt_txn_read_upd_list(session, cbt, upd, &prepare_upd));
     if (WT_UPDATE_DATA_VALUE(cbt->upd_value) ||
       (cbt->upd_value->type == WT_UPDATE_MODIFY && cbt->upd_value->skip_buf))
@@ -1003,9 +1006,23 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint
      */
     if (prepare_upd != NULL) {
         WT_ASSERT(session, F_ISSET(prepare_upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS));
-        if (prepare_upd->txnid == WT_TXN_ABORTED ||
-          prepare_upd->prepare_state == WT_PREPARE_RESOLVED)
-            return (WT_RESTART);
+        if (retry && (prepare_upd->txnid == WT_TXN_ABORTED ||
+                       prepare_upd->prepare_state == WT_PREPARE_RESOLVED)) {
+            retry = false;
+            /* Clean out any stale value before performing the retry. */
+            __wt_upd_value_clear(cbt->upd_value);
+            WT_STAT_CONN_INCR(session, txn_read_race_prepare_update);
+            WT_STAT_DATA_INCR(session, txn_read_race_prepare_update);
+
+            /*
+             * When a prepared update/insert is rollback or committed, retrying it again should fix
+             * concurrent modification of a prepared update. Other than prepared insert rollback,
+             * rest of the cases, the history store update is either added to the end of the update
+             * chain or modified to set proper stop timestamp. In all the scenarios, retrying again
+             * will work to return a proper update.
+             */
+            goto retry;
+        }
     }
 
     /* Return invalid not tombstone if nothing is found in history store. */
@@ -1251,10 +1268,10 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE 
     if (!rollback && upd == NULL && cbt != NULL && CUR2BT(cbt)->type != BTREE_COL_FIX &&
       cbt->ins == NULL) {
         __wt_read_cell_time_window(cbt, cbt->ref, &tw);
-        if (tw.stop_txn != WT_TXN_MAX && tw.stop_ts != WT_TS_MAX)
-            rollback = !__wt_txn_visible(session, tw.stop_txn, tw.stop_ts);
+        if (WT_TIME_WINDOW_HAS_STOP(&tw))
+            rollback = !__wt_txn_tw_stop_visible(session, &tw);
         else
-            rollback = !__wt_txn_visible(session, tw.start_txn, tw.start_ts);
+            rollback = !__wt_txn_tw_start_visible(session, &tw);
     }
 
     if (rollback) {

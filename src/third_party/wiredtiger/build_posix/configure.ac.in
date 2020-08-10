@@ -15,8 +15,8 @@ AM_INIT_AUTOMAKE([1.11.6 foreign parallel-tests subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
 
 # If CFLAGS/CXXFLAGS were not set on entry, default to "-O3 -g"
-: ${CFLAGS=-O3 -g}
-: ${CXXFLAGS=-O3 -g}
+: ${CFLAGS=-O3 -g ${ADD_CFLAGS}}
+: ${CXXFLAGS=-O3 -g ${ADD_CFLAGS}}
 
 AC_PROG_CC(cc gcc)
 AC_PROG_CXX(c++ g++)

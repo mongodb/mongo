@@ -709,7 +709,7 @@ __wt_rec_row_leaf(
     WT_UPDATE *upd;
     WT_UPDATE_SELECT upd_select;
     uint64_t slvg_skip;
-    uint32_t i;
+    uint32_t i, session_flags;
     bool dictionary, key_onpage_ovfl, ovfl_key;
     void *copy;
 
@@ -887,9 +887,19 @@ __wt_rec_row_leaf(
                 if (tw.durable_stop_ts == WT_TS_NONE && F_ISSET(S2C(session), WT_CONN_HS_OPEN) &&
                   !WT_IS_HS(btree)) {
                     WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
-                    /* Start from WT_TS_NONE to delete all the history store content of the key. */
-                    WT_ERR(__wt_hs_delete_key_from_ts(session, btree->id, tmpkey, WT_TS_NONE));
-                    WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
+                    /*
+                     * Start from WT_TS_NONE to delete all the history store content of the key.
+                     *
+                     * Some code paths, such as schema removal, involve deleting keys in metadata
+                     * and assert that they shouldn't open new dhandles. In those cases we won't
+                     * ever need to blow away history store content, so we can skip this.
+                     */
+                    if (!F_ISSET(session, WT_SESSION_NO_DATA_HANDLES)) {
+                        WT_ERR(__wt_hs_cursor_open(session, &session_flags));
+                        WT_ERR(__wt_hs_delete_key_from_ts(session, btree->id, tmpkey, WT_TS_NONE));
+                        WT_ERR(__wt_hs_cursor_close(session, session_flags));
+                        WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
+                    }
                 }
 
                 /*

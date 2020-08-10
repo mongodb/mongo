@@ -300,9 +300,12 @@ connection_stats = [
     CacheStat('cache_hazard_walks', 'hazard pointer check entries walked'),
     CacheStat('cache_hs_insert', 'history store table insert calls'),
     CacheStat('cache_hs_insert_restart', 'history store table insert calls that returned restart'),
-    CacheStat('cache_hs_key_truncate_onpage_removal', 'history store key truncation due to the key being removed from the data page'),
-    CacheStat('cache_hs_key_truncate_mix_ts', 'history store key truncation due to mixed timestamps'),
-    CacheStat('cache_hs_key_truncate_mix_ts_restart', 'history store key truncation calls that returned restart'),
+    CacheStat('cache_hs_key_truncate', 'history store table truncation to remove an update'),
+    CacheStat('cache_hs_key_truncate_mix_ts', 'history store table truncation to remove range of updates due to mixed timestamps'),
+    CacheStat('cache_hs_key_truncate_mix_ts_restart', 'history store table truncation due to mixed timestamps that returned restart'),
+    CacheStat('cache_hs_key_truncate_onpage_removal', 'history store table truncation to remove range of updates due to key being removed from the data page during reconciliation'),
+    CacheStat('cache_hs_key_truncate_rts', 'history store table truncation by rollback to stable to remove an update'),
+    CacheStat('cache_hs_key_truncate_rts_unstable', 'history store table truncation by rollback to stable to remove an unstable update'),
     CacheStat('cache_hs_ondisk', 'history store table on-disk size', 'no_clear,no_scale,size'),
     CacheStat('cache_hs_ondisk_max', 'history store table max on-disk size', 'no_clear,no_scale,size'),
     CacheStat('cache_hs_order_fixup_insert', 'history store table out-of-order updates that were fixed up during insertion'),
@@ -311,7 +314,6 @@ connection_stats = [
     CacheStat('cache_hs_read', 'history store table reads'),
     CacheStat('cache_hs_read_miss', 'history store table reads missed'),
     CacheStat('cache_hs_read_squash', 'history store table reads requiring squashed modifies'),
-    CacheStat('cache_hs_remove_key_truncate', 'history store table remove calls due to key truncation'),
     CacheStat('cache_hs_score', 'history store score', 'no_clear,no_scale'),
     CacheStat('cache_hs_write_squash', 'history store table writes requiring squashed modifies'),
     CacheStat('cache_inmem_split', 'in-memory page splits'),
@@ -654,6 +656,7 @@ connection_stats = [
     TxnStat('txn_prepare_rollback', 'prepared transactions rolled back'),
     TxnStat('txn_prepared_updates_count', 'Number of prepared updates'),
     TxnStat('txn_query_ts', 'query timestamp calls'),
+    TxnStat('txn_read_race_prepare_update', 'race to read prepared update retry'),
     TxnStat('txn_read_queue_empty', 'read timestamp queue insert to empty'),
     TxnStat('txn_read_queue_head', 'read timestamp queue inserts to head'),
     TxnStat('txn_read_queue_inserts', 'read timestamp queue inserts total'),
@@ -725,6 +728,7 @@ dsrc_stats = [
     # Btree statistics
     ##########################################
     BtreeStat('btree_checkpoint_generation', 'btree checkpoint generation', 'no_clear,no_scale'),
+    BtreeStat('btree_clean_checkpoint_timer', 'btree clean tree checkpoint expiration time', 'no_clear,no_scale'),
     BtreeStat('btree_column_deleted', 'column-store variable-size deleted values', 'no_scale,tree_walk'),
     BtreeStat('btree_column_fix', 'column-store fixed-size leaf pages', 'no_scale,tree_walk'),
     BtreeStat('btree_column_internal', 'column-store internal pages', 'no_scale,tree_walk'),
@@ -930,6 +934,7 @@ dsrc_stats = [
     ##########################################
     # Transaction statistics
     ##########################################
+    TxnStat('txn_read_race_prepare_update', 'race to read prepared update retry'),
     TxnStat('txn_update_conflict', 'update conflicts'),
 ]
 

@@ -201,7 +201,8 @@ err:
 /*
  * __curjoin_iter_bump --
  *     Called to advance the iterator to the next endpoint, which may in turn advance to the next
- *     entry.
+ *     entry. We cannot skip a call to this at the end of an iteration because we'll need to advance
+ *     the position to the end.
  */
 static int
 __curjoin_iter_bump(WT_CURSOR_JOIN_ITER *iter)
@@ -482,8 +483,14 @@ __curjoin_entry_in_range(
         }
 
         if (!passed) {
-            if (iter != NULL && (iter->is_equal || F_ISSET(end, WT_CURJOIN_END_LT)))
+            if (iter != NULL && (iter->is_equal || F_ISSET(end, WT_CURJOIN_END_LT))) {
+                /*
+                 * Even though this cursor is done, we still need to bump (advance it), to mark the
+                 * iteration as complete.
+                 */
+                WT_RET(__curjoin_iter_bump(iter));
                 return (WT_NOTFOUND);
+            }
             if (!disjunction)
                 return (WT_NOTFOUND);
             iter = NULL;

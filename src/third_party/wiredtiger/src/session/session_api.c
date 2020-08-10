@@ -281,7 +281,10 @@ __session_close(WT_SESSION *wt_session, const char *config)
     if (conn->txn_global.txn_shared_list != NULL)
         __wt_txn_release_snapshot(session);
 
-    /* Close all open cursors. */
+    /*
+     * Close all open cursors. We don't need to explicitly close the session's pointer to the
+     * history store cursor since it will also be included in session's cursor table.
+     */
     WT_TRET(__session_close_cursors(session, &session->cursors));
     WT_TRET(__session_close_cached_cursors(session));
 

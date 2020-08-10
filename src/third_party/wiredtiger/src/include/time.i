@@ -162,6 +162,9 @@ __wt_op_timer_start(WT_SESSION_IMPL *session)
 {
     uint64_t timeout_us;
 
+    if (F_ISSET(session, WT_SESSION_HS_CURSOR))
+        return;
+
     /* Timer can be configured per-transaction, and defaults to per-connection. */
     if (session->txn == NULL || (timeout_us = session->txn->operation_timeout_us) == 0)
         timeout_us = S2C(session)->operation_timeout_us;
@@ -180,6 +183,9 @@ __wt_op_timer_start(WT_SESSION_IMPL *session)
 static inline void
 __wt_op_timer_stop(WT_SESSION_IMPL *session)
 {
+    if (F_ISSET(session, WT_SESSION_HS_CURSOR))
+        return;
+
     session->operation_start_us = session->operation_timeout_us = 0;
 }
 
@@ -192,6 +198,8 @@ __wt_op_timer_fired(WT_SESSION_IMPL *session)
 {
     uint64_t diff, now;
 
+    if (F_ISSET(session, WT_SESSION_HS_CURSOR))
+        return (false);
     if (session->operation_start_us == 0 || session->operation_timeout_us == 0)
         return (false);
 

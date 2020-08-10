@@ -171,8 +171,12 @@ wts_load(void)
             break;
         }
 
-        /* Restart the enclosing transaction every 5K operations so we don't overflow the cache. */
-        if (keyno % 5000 == 0) {
+        /*
+         * When first starting up, restart the enclosing transaction every 10 operations so we never
+         * end up with an empty object. After 5K records, restart the transaction every 5K records
+         * so we don't overflow the cache.
+         */
+        if ((keyno < 5000 && keyno % 10 == 0) || keyno % 5000 == 0) {
             /* Report on progress. */
             track("bulk load", keyno, NULL);
 
@@ -190,6 +194,8 @@ wts_load(void)
      * aren't surprised).
      */
     if (keyno != g.c_rows + 1) {
+        testutil_assert(committed_keyno > 0);
+
         g.rows = committed_keyno;
         g.c_rows = (uint32_t)committed_keyno;
         config_print(false);

@@ -33,8 +33,11 @@
 #define WT_HS_FILE "WiredTigerHS.wt"     /* History store table */
 #define WT_HS_URI "file:WiredTigerHS.wt" /* History store table URI */
 
-#define WT_SYSTEM_PREFIX "system:"             /* System URI prefix */
-#define WT_SYSTEM_CKPT_URI "system:checkpoint" /* Checkpoint URI */
+#define WT_SYSTEM_PREFIX "system:"               /* System URI prefix */
+#define WT_SYSTEM_CKPT_TS "checkpoint_timestamp" /* Checkpoint timestamp name */
+#define WT_SYSTEM_CKPT_URI "system:checkpoint"   /* Checkpoint timestamp URI */
+#define WT_SYSTEM_OLDEST_TS "oldest_timestamp"   /* Oldest timestamp name */
+#define WT_SYSTEM_OLDEST_URI "system:oldest"     /* Oldest timestamp URI */
 
 /*
  * Optimize comparisons against the metafile URI, flag handles that reference the metadata file.
@@ -95,8 +98,9 @@ struct __wt_block_mods {
     uint64_t offset; /* Zero bit offset for bitstring */
     uint64_t granularity;
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_BLOCK_MODS_VALID 0x1u /* Entry is valid */
-                                 /* AUTOMATIC FLAG VALUE GENERATION STOP */
+#define WT_BLOCK_MODS_RENAME 0x1u /* Entry is from a rename */
+#define WT_BLOCK_MODS_VALID 0x2u  /* Entry is valid */
+                                  /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };
 

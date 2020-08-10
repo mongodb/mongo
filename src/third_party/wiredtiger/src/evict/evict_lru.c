@@ -274,7 +274,6 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     WT_DECL_RET;
     uint32_t session_flags;
     bool did_work, was_intr;
-    bool is_owner;
 
     conn = S2C(session);
     cache = conn->cache;
@@ -284,10 +283,10 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
      * busy and then opens a different file (in this case, the HS file), it can deadlock with a
      * thread waiting for the first file to drain from the eviction queue. See WT-5946 for details.
      */
-    if (!F_ISSET(conn, WT_CONN_IN_MEMORY)) {
+    if (session->hs_cursor == NULL && !F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY)) {
         session_flags = 0; /* [-Werror=maybe-uninitialized] */
-        WT_RET(__wt_hs_cursor(session, &session_flags, &is_owner));
-        WT_RET(__wt_hs_cursor_close(session, session_flags, is_owner));
+        WT_RET(__wt_hs_cursor_open(session, &session_flags));
+        WT_RET(__wt_hs_cursor_close(session, session_flags));
     }
 
     if (conn->evict_server_running && __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
@@ -493,7 +492,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
     /*
      * Create the eviction thread group. Set the group size to the maximum allowed sessions.
      */
-    session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_HS | WT_THREAD_PANIC_FAIL;
+    session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
     WT_RET(__wt_thread_group_create(session, &conn->evict_threads, "eviction-server",
       conn->evict_threads_min, conn->evict_threads_max, session_flags, __wt_evict_thread_chk,
       __wt_evict_thread_run, __wt_evict_thread_stop));
@@ -1471,8 +1470,12 @@ retry:
 
         /*
          * Skip files that are configured to stick in cache until we become aggressive.
+         *
+         * If the file is contributing heavily to our cache usage then ignore the "stickiness" of
+         * its pages.
          */
-        if (btree->evict_priority != 0 && !__wt_cache_aggressive(session))
+        if (btree->evict_priority != 0 && !__wt_cache_aggressive(session) &&
+          !__wt_btree_dominating_cache(session, btree))
             continue;
 
         /*

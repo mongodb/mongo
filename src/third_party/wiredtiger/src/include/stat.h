@@ -398,9 +398,6 @@ struct __wt_connection_stats {
     int64_t cache_hazard_checks;
     int64_t cache_hazard_walks;
     int64_t cache_hazard_max;
-    int64_t cache_hs_key_truncate_mix_ts_restart;
-    int64_t cache_hs_key_truncate_mix_ts;
-    int64_t cache_hs_key_truncate_onpage_removal;
     int64_t cache_hs_score;
     int64_t cache_hs_insert;
     int64_t cache_hs_insert_restart;
@@ -412,7 +409,12 @@ struct __wt_connection_stats {
     int64_t cache_hs_read;
     int64_t cache_hs_read_miss;
     int64_t cache_hs_read_squash;
-    int64_t cache_hs_remove_key_truncate;
+    int64_t cache_hs_key_truncate_rts_unstable;
+    int64_t cache_hs_key_truncate_rts;
+    int64_t cache_hs_key_truncate_mix_ts_restart;
+    int64_t cache_hs_key_truncate;
+    int64_t cache_hs_key_truncate_onpage_removal;
+    int64_t cache_hs_key_truncate_mix_ts;
     int64_t cache_hs_write_squash;
     int64_t cache_inmem_splittable;
     int64_t cache_inmem_split;
@@ -716,6 +718,7 @@ struct __wt_connection_stats {
     int64_t txn_prepare_active;
     int64_t txn_prepare_rollback;
     int64_t txn_query_ts;
+    int64_t txn_read_race_prepare_update;
     int64_t txn_read_queue_walked;
     int64_t txn_read_queue_empty;
     int64_t txn_read_queue_head;
@@ -799,6 +802,7 @@ struct __wt_dsrc_stats {
     int64_t block_size;
     int64_t block_minor;
     int64_t btree_checkpoint_generation;
+    int64_t btree_clean_checkpoint_timer;
     int64_t btree_column_fix;
     int64_t btree_column_internal;
     int64_t btree_column_rle;
@@ -956,6 +960,7 @@ struct __wt_dsrc_stats {
     int64_t rec_time_window_stop_ts;
     int64_t rec_time_window_stop_txn;
     int64_t session_compact;
+    int64_t txn_read_race_prepare_update;
     int64_t txn_update_conflict;
 };
 

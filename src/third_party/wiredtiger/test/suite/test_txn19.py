@@ -481,7 +481,13 @@ class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
             closeconn=False)
 
         if expect_fail:
-            self.check_file_contains_one_of(errfile, ['WT_TRY_SALVAGE: database corruption detected'])
+            errmsg = 'WT_TRY_SALVAGE: database corruption detected'
+            if self.filename == 'WiredTigerHS.wt':
+                if self.kind == 'removal':
+                    errmsg = 'hs_exists'
+                elif self.kind == 'truncate':
+                    errmsg = 'file size=0, alloc size=4096'
+            self.check_file_contains_one_of(errfile, [errmsg])
 
     def test_corrupt_meta(self):
         errfile = 'list.err'
