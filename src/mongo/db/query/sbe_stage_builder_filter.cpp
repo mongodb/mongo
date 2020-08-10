@@ -554,9 +554,7 @@ public:
         unsupportedExpression(expr);
     }
     void visit(const EqualityMatchExpression* expr) final {}
-    void visit(const ExistsMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
+    void visit(const ExistsMatchExpression* expr) final {}
     void visit(const ExprMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
@@ -706,7 +704,14 @@ public:
         generateTraverseForComparisonPredicate(_context, expr, sbe::EPrimBinary::eq);
     }
 
-    void visit(const ExistsMatchExpression* expr) final {}
+    void visit(const ExistsMatchExpression* expr) final {
+        auto makeEExprFn = [](sbe::value::SlotId inputSlot) {
+            return sbe::makeE<sbe::EFunction>("exists",
+                                              sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot)));
+        };
+        generateTraverse(_context, expr, std::move(makeEExprFn));
+    }
+
     void visit(const ExprMatchExpression* expr) final {}
 
     void visit(const GTEMatchExpression* expr) final {
