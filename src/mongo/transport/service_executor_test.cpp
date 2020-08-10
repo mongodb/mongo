@@ -36,6 +36,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_executor_fixed.h"
@@ -168,7 +169,7 @@ TEST_F(ServiceExecutorSynchronousFixture, ScheduleFailsBeforeStartup) {
     scheduleBasicTask(executor.get(), false);
 }
 
-class ServiceExecutorFixedFixture : public unittest::Test {
+class ServiceExecutorFixedFixture : public ServiceContextTest {
 public:
     static constexpr auto kNumExecutorThreads = 2;
 
@@ -183,10 +184,9 @@ public:
         ServiceExecutorHandle(ServiceExecutorHandle&&) = delete;
 
         explicit ServiceExecutorHandle(int flags = kNone) : _skipShutdown(flags & kSkipShutdown) {
-            ThreadPool::Options options;
-            options.minThreads = options.maxThreads = kNumExecutorThreads;
-            options.poolName = "Test";
-            _executor = std::make_shared<ServiceExecutorFixed>(std::move(options));
+            ThreadPool::Limits limits;
+            limits.minThreads = limits.maxThreads = kNumExecutorThreads;
+            _executor = std::make_shared<ServiceExecutorFixed>(std::move(limits));
 
             if (flags & kStartExecutor) {
                 ASSERT_OK(_executor->start());
@@ -331,24 +331,42 @@ TEST_F(ServiceExecutorFixedFixture, Stats) {
     returnBarrier->countDownAndWait();
 }
 
-TEST_F(ServiceExecutorFixedFixture, ScheduleFailsAfterShutdown) {
-    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
-    std::unique_ptr<stdx::thread> schedulerThread;
 
+TEST_F(ServiceExecutorFixedFixture, ScheduleSucceedsBeforeShutdown) {
+    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
+
+    auto thread = stdx::thread();
+    auto barrier = std::make_shared<unittest::Barrier>(2);
     {
-        // Spawn a thread to schedule a task, and block it before it can schedule the task with the
-        // underlying thread-pool. Then shutdown the service executor and unblock the scheduler
-        // thread. This order of events must cause "schedule()" to return a non-okay status.
         FailPointEnableBlock failpoint("hangBeforeSchedulingServiceExecutorFixedTask");
-        schedulerThread = std::make_unique<stdx::thread>([executor = *executorHandle] {
-            ASSERT_NOT_OK(
-                executor->scheduleTask([] { MONGO_UNREACHABLE; }, ServiceExecutor::kEmptyFlags));
+
+
+        // The executor accepts the work, but hasn't used the underlying pool yet.
+        thread = stdx::thread([&] {
+            ASSERT_OK(executorHandle->scheduleTask([&, barrier] { barrier->countDownAndWait(); },
+                                                   ServiceExecutor::kEmptyFlags));
         });
         failpoint->waitForTimesEntered(1);
-        ASSERT_OK(executorHandle->shutdown(kShutdownTime));
+
+        // Trigger an immediate shutdown which will not affect the task we have accepted.
+        ASSERT_NOT_OK(executorHandle->shutdown(Milliseconds{0}));
     }
 
-    schedulerThread->join();
+    // Our failpoint has been disabled, so the task can run to completion.
+    barrier->countDownAndWait();
+
+    // Now we can wait for the task to finish and shutdown.
+    ASSERT_OK(executorHandle->shutdown(kShutdownTime));
+
+    thread.join();
+}
+
+TEST_F(ServiceExecutorFixedFixture, ScheduleFailsAfterShutdown) {
+    ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor);
+
+    ASSERT_OK(executorHandle->shutdown(kShutdownTime));
+    ASSERT_NOT_OK(
+        executorHandle->scheduleTask([] { MONGO_UNREACHABLE; }, ServiceExecutor::kEmptyFlags));
 }
 
 TEST_F(ServiceExecutorFixedFixture, RunTaskAfterWaitingForData) {

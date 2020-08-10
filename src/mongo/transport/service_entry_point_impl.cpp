@@ -41,6 +41,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/transport/ismaster_metrics.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/processinfo.h"
@@ -143,15 +144,13 @@ Status ServiceEntryPointImpl::start() {
         }
     }
 
-    // TODO: Reintroduce SEF once it is attached as initial SE in SERVER-49109
-    // if (auto status = transport::ServiceExecutorFixed::get(_svcCtx)->start(); !status.isOK()) {
-    //     return status;
-    // }
+    if (auto status = transport::ServiceExecutorFixed::get(_svcCtx)->start(); !status.isOK()) {
+        return status;
+    }
 
     return Status::OK();
 }
 
-// TODO: explicitly start on the fixed executor
 void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     // Setup the restriction environment on the Session, if the Session has local/remote Sockaddrs
     const auto& remoteAddr = session->remoteAddr();
@@ -221,7 +220,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     });
 
     auto seCtx = transport::ServiceExecutorContext{};
-    seCtx.setThreadingModel(transport::ServiceExecutorContext::ThreadingModel::kDedicated);
+    seCtx.setThreadingModel(transport::ServiceExecutor::getInitialThreadingModel());
     seCtx.setCanUseReserved(canOverrideMaxConns);
     ssm->start(std::move(seCtx));
 }
@@ -284,13 +283,12 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
 
     lk.unlock();
 
-    // TODO: Reintroduce SEF once it is attached as initial SE in SERVER-49109
-    // timeSpent = _svcCtx->getPreciseClockSource()->now() - start;
-    // timeout = std::max(Milliseconds{0}, timeout - timeSpent);
-    // if (auto status = transport::ServiceExecutorFixed::get(_svcCtx)->shutdown(timeout);
-    //     !status.isOK()) {
-    //     LOGV2(4907202, "Failed to shutdown ServiceExecutorFixed", "error"_attr = status);
-    // }
+    timeSpent = _svcCtx->getPreciseClockSource()->now() - start;
+    timeout = std::max(Milliseconds{0}, timeout - timeSpent);
+    if (auto status = transport::ServiceExecutorFixed::get(_svcCtx)->shutdown(timeout);
+        !status.isOK()) {
+        LOGV2(4907202, "Failed to shutdown ServiceExecutorFixed", "error"_attr = status);
+    }
 
     timeSpent = _svcCtx->getPreciseClockSource()->now() - start;
     timeout = std::max(Milliseconds{0}, timeout - timeSpent);

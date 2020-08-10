@@ -38,8 +38,11 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
@@ -50,10 +53,17 @@ namespace transport {
  * This executor always yields before executing scheduled tasks, and never yields before scheduling
  * new tasks (i.e., `ScheduleFlags::kMayYieldBeforeSchedule` is a no-op for this executor).
  */
-class ServiceExecutorFixed : public ServiceExecutor,
-                             public std::enable_shared_from_this<ServiceExecutorFixed> {
+class ServiceExecutorFixed final : public ServiceExecutor,
+                                   public std::enable_shared_from_this<ServiceExecutorFixed> {
+    static constexpr auto kDiagnosticLogLevel = 3;
+
+    static const inline auto kInShutdown =
+        Status(ErrorCodes::ServiceExecutorInShutdown, "ServiceExecutorFixed is not running");
+
 public:
-    explicit ServiceExecutorFixed(ThreadPool::Options options);
+    explicit ServiceExecutorFixed(ServiceContext* ctx, ThreadPool::Limits limits);
+    explicit ServiceExecutorFixed(ThreadPool::Limits limits)
+        : ServiceExecutorFixed(nullptr, std::move(limits)) {}
     virtual ~ServiceExecutorFixed();
 
     static ServiceExecutorFixed* get(ServiceContext* ctx);
@@ -61,6 +71,9 @@ public:
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
     Status scheduleTask(Task task, ScheduleFlags flags) override;
+    void schedule(OutOfLineExecutor::Task task) override {
+        _schedule(std::move(task));
+    }
 
     void runOnDataAvailable(const SessionHandle& session,
                             OutOfLineExecutor::Task onCompletionCallback) override;
@@ -79,57 +92,57 @@ public:
 
 private:
     // Maintains the execution state (e.g., recursion depth) for executor threads
-    class ExecutorThreadContext {
-    public:
-        ExecutorThreadContext(std::weak_ptr<ServiceExecutorFixed> serviceExecutor);
-        ~ExecutorThreadContext();
-
-        ExecutorThreadContext(ExecutorThreadContext&&) = delete;
-        ExecutorThreadContext(const ExecutorThreadContext&) = delete;
-
-        void run(ServiceExecutor::Task task) {
-            // Yield here to improve concurrency, especially when there are more executor threads
-            // than CPU cores.
-            stdx::this_thread::yield();
-            _recursionDepth++;
-            task();
-            _recursionDepth--;
-        }
-
-        int getRecursionDepth() const {
-            return _recursionDepth;
-        }
-
-    private:
-        boost::optional<int> _adjustRunningExecutorThreads(int adjustment) {
-            if (auto executor = _executor.lock()) {
-                return executor->_numRunningExecutorThreads.addAndFetch(adjustment);
-            }
-            return boost::none;
-        }
-
-        int _recursionDepth = 0;
-        std::weak_ptr<ServiceExecutorFixed> _executor;
-    };
+    class ExecutorThreadContext;
 
 private:
-    AtomicWord<size_t> _numRunningExecutorThreads{0};
-    AtomicWord<bool> _canScheduleWork{false};
+    void _checkForShutdown(WithLock);
+    void _schedule(OutOfLineExecutor::Task task) noexcept;
+
+    auto _threadsRunning() const {
+        return _stats.threadsStarted.load() - _stats.threadsEnded.loadRelaxed();
+    }
+
+    auto _tasksRunning() const {
+        return _stats.tasksStarted.load() - _stats.tasksEnded.loadRelaxed();
+    }
+
+    auto _tasksLeft() const {
+        return _stats.tasksScheduled.load() - _stats.tasksEnded.loadRelaxed();
+    }
+
+    struct Stats {
+        AtomicWord<size_t> threadsStarted{0};
+        AtomicWord<size_t> threadsEnded{0};
+
+        AtomicWord<size_t> tasksScheduled{0};
+        AtomicWord<size_t> tasksStarted{0};
+        AtomicWord<size_t> tasksEnded{0};
+    };
+    Stats _stats;
+
+    ServiceContext* const _svcCtx;
 
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ServiceExecutorFixed::_mutex");
     stdx::condition_variable _shutdownCondition;
+    SharedPromise<void> _shutdownComplete;
 
     /**
-     * State transition diagram: kNotStarted ---> kRunning ---> kStopped
-     * The service executor cannot be in "kRunning" when its destructor is invoked.
+     * State transition diagram: kNotStarted ---> kRunning ---> kStopping ---> kStopped
      */
-    enum State { kNotStarted, kRunning, kStopped } _state = kNotStarted;
+    enum State { kNotStarted, kRunning, kStopping, kStopped } _state = kNotStarted;
 
     ThreadPool::Options _options;
-    std::unique_ptr<ThreadPool> _threadPool;
+    std::shared_ptr<ThreadPool> _threadPool;
 
-    static inline thread_local std::unique_ptr<ExecutorThreadContext> _executorContext;
+    struct Waiter {
+        SessionHandle session;
+        OutOfLineExecutor::Task onCompletionCallback;
+    };
+    using WaiterList = std::list<Waiter>;
+    WaiterList _waiters;
+
+    static thread_local std::unique_ptr<ExecutorThreadContext> _executorContext;
 };
 
 }  // namespace transport

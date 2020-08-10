@@ -28,8 +28,18 @@
 
 global:
   cpp_namespace: "mongo::transport"
+  cpp_includes:
+    - "mongo/transport/service_executor.h"
 
 server_parameters:
+  initialServiceExecutorThreadingModel:
+    description: >-
+        Start new client connections using an executor that follows this model.
+    set_at: [ startup ]
+    cpp_vartype: "std::string"
+    cpp_varname: "initialServiceExecutorThreadingModel"
+    on_update: "ServiceExecutor::setInitialThreadingModel"
+    default: "dedicated"
   synchronousServiceExecutorRecursionLimit:
     description: >-
         Tasks may recurse further if their recursion depth is less than this value.
@@ -53,3 +63,14 @@ server_parameters:
     cpp_vartype: 'AtomicWord<int>'
     cpp_varname: reservedServiceExecutorRecursionLimit
     default: 8
+
+  fixedServiceExecutorThreadLimit:
+    description: >-
+        The fixed service executor (thread model "borrowed") can only maintain a count of threads
+        less than this value.
+    set_at: [ startup ]
+    cpp_vartype: "int"
+    cpp_varname: "fixedServiceExecutorThreadLimit"
+    default: 1000
+    validator:
+        gte: 10
