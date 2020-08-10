@@ -267,12 +267,7 @@ class TestTestSelection(_ResmokeSelftest):
 
 class TestSetParameters(_ResmokeSelftest):
     def setUp(self):
-        self.shell_output_file = f"{self.test_dir}/output.json"
-        try:
-            os.remove(self.shell_output_file)
-        except OSError:
-            pass
-
+        self.shell_output_file = None
         super().setUp()
 
     def parse_output_json(self):
@@ -299,12 +294,18 @@ class TestSetParameters(_ResmokeSelftest):
     def generate_suite_and_execute_resmoke(self, suite_template, resmoke_args):
         """Generates a resmoke suite with the appropriate `outputLocation` and runs resmoke against that suite with the `fixture_info` test. Input `resmoke_args` are appended to the run command."""
 
+        self.shell_output_file = f"{self.test_dir}/output.json"
+        try:
+            os.remove(self.shell_output_file)
+        except OSError:
+            pass
+
         suite_file = f"{self.test_dir}/suite.yml"
         self.generate_suite(suite_file, suite_template)
 
         self.logger.info(
-            "Running test. Template suite: {suite_template} Rewritten suite: {self.suite_file} Resmoke Args: {resmoke_args} Test output file: {self.shell_output_file}."
-        )
+            "Running test. Template suite: %s Rewritten suite: %s Resmoke Args: %s Test output file: %s.",
+            suite_template, suite_file, resmoke_args, self.shell_output_file)
 
         resmoke_process = core.programs.make_process(self.logger, [
             sys.executable, "buildscripts/resmoke.py", "run", f"--suites={suite_file}",
@@ -383,4 +384,21 @@ class TestSetParameters(_ResmokeSelftest):
                 f"{self.suites_root}/resmoke_selftest_set_parameters_sharding.yml", [
                     """--mongosSetParameter={"maxTimeMSForHedgedReads": 100}""",
                     """--mongosSetParameter={"maxTimeMSForHedgedReads": 1000}"""
+                ]).wait())
+
+    def test_allow_duplicate_set_parameter_values(self):
+        self.assertEqual(
+            0,
+            self.generate_suite_and_execute_resmoke(
+                f"{self.suites_root}/resmoke_selftest_set_parameters.yml", [
+                    """--mongodSetParameter={"enableFlowControl": false}""",
+                    """--mongodSetParameter={"enableFlowControl": false}"""
+                ]).wait())
+
+        self.assertEqual(
+            0,
+            self.generate_suite_and_execute_resmoke(
+                f"{self.suites_root}/resmoke_selftest_set_parameters.yml", [
+                    """--mongodSetParameter={"mirrorReads": {samplingRate: 1.0}}""",
+                    """--mongodSetParameter={"mirrorReads": {samplingRate: 1.0}}"""
                 ]).wait())
