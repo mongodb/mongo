@@ -100,8 +100,9 @@ public:
     std::string help() const override {
         return "Reshard an already sharded collection on a new shard key.";
     }
+};
 
-} reshardCollectionCmd;
+MONGO_REGISTER_TEST_COMMAND(ReshardCollectionCmd);
 
 }  // namespace
 }  // namespace mongo
