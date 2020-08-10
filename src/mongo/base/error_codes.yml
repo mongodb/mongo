@@ -405,6 +405,8 @@ error_codes:
 
     - {code: 332, name: CannotDowngrade}
 
+    - {code: 333, name: ServiceExecutorInShutdown, categories: [ShutdownError,CancelationError,InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

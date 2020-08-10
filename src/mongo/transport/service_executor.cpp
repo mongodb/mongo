@@ -47,21 +47,42 @@ namespace transport {
 namespace {
 static constexpr auto kDiagnosticLogLevel = 4;
 
+static constexpr auto kThreadingModelDedicatedStr = "dedicated"_sd;
+static constexpr auto kThreadingModelBorrowedStr = "borrowed"_sd;
+
+auto gInitialThreadingModel = ServiceExecutor::ThreadingModel::kDedicated;
+
 auto getServiceExecutorStats =
     ServiceContext::declareDecoration<synchronized_value<ServiceExecutorStats>>();
 auto getServiceExecutorContext =
     Client::declareDecoration<boost::optional<ServiceExecutorContext>>();
 }  // namespace
 
-StringData toString(ServiceExecutorContext::ThreadingModel threadingModel) {
+StringData toString(ServiceExecutor::ThreadingModel threadingModel) {
     switch (threadingModel) {
-        case ServiceExecutorContext::ThreadingModel::kDedicated:
-            return "Dedicated"_sd;
-        case ServiceExecutorContext::ThreadingModel::kBorrowed:
-            return "Borrowed"_sd;
+        case ServiceExecutor::ThreadingModel::kDedicated:
+            return kThreadingModelDedicatedStr;
+        case ServiceExecutor::ThreadingModel::kBorrowed:
+            return kThreadingModelBorrowedStr;
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+Status ServiceExecutor::setInitialThreadingModel(StringData value) noexcept {
+    if (value == kThreadingModelDedicatedStr) {
+        gInitialThreadingModel = ServiceExecutor::ThreadingModel::kDedicated;
+    } else if (value == kThreadingModelBorrowedStr) {
+        gInitialThreadingModel = ServiceExecutor::ThreadingModel::kBorrowed;
+    } else {
+        MONGO_UNREACHABLE;
+    }
+
+    return Status::OK();
+}
+
+auto ServiceExecutor::getInitialThreadingModel() noexcept -> ThreadingModel {
+    return gInitialThreadingModel;
 }
 
 ServiceExecutorStats ServiceExecutorStats::get(ServiceContext* ctx) noexcept {

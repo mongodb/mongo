@@ -51,6 +51,20 @@ namespace transport {
  */
 class ServiceExecutor : public OutOfLineExecutor {
 public:
+    /**
+     * An enum to indicate if a ServiceExecutor should use dedicated or borrowed threading
+     * resources.
+     */
+    enum class ThreadingModel {
+        kBorrowed,
+        kDedicated,
+    };
+
+    friend StringData toString(ThreadingModel threadingModel);
+
+    static Status setInitialThreadingModel(StringData value) noexcept;
+    static ThreadingModel getInitialThreadingModel() noexcept;
+
     virtual ~ServiceExecutor() = default;
     using Task = unique_function<void()>;
     enum ScheduleFlags {
@@ -127,10 +141,7 @@ public:
  */
 class ServiceExecutorContext {
 public:
-    enum ThreadingModel {
-        kBorrowed,
-        kDedicated,
-    };
+    using ThreadingModel = ServiceExecutor::ThreadingModel;
 
     /**
      * Get a pointer to the ServiceExecutorContext for a given client.
@@ -202,8 +213,6 @@ public:
     ServiceExecutor* getServiceExecutor() noexcept;
 
 private:
-    friend StringData toString(ThreadingModel threadingModel);
-
     Client* _client = nullptr;
     ServiceEntryPoint* _sep = nullptr;
 
