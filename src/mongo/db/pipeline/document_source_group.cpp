@@ -131,6 +131,38 @@ const char* DocumentSourceGroup::getSourceName() const {
     return kStageName.rawData();
 }
 
+bool DocumentSourceGroup::MemoryUsageTracker::shouldSpillWithAttemptToSaveMemory(
+    std::function<int()> saveMemory) {
+    if (!allowDiskUse && (memoryUsageBytes > maxMemoryUsageBytes)) {
+        memoryUsageBytes -= saveMemory();
+    }
+
+    if (memoryUsageBytes > maxMemoryUsageBytes) {
+        uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+                "Exceeded memory limit for $group, but didn't allow external sort."
+                " Pass allowDiskUse:true to opt in.",
+                allowDiskUse);
+        memoryUsageBytes = 0;
+        return true;
+    }
+    return false;
+}
+
+int DocumentSourceGroup::freeMemory() {
+    invariant(_groups);
+    int totalMemorySaved = 0;
+    for (auto&& group : *_groups) {
+        for (auto&& groupObj : group.second) {
+            auto prevMemUsage = groupObj->memUsageForSorter();
+            groupObj->reduceMemoryConsumptionIfAble();
+
+            // Update the memory usage for this group.
+            totalMemorySaved += (prevMemUsage - groupObj->memUsageForSorter());
+        }
+    }
+    return totalMemorySaved;
+}
+
 DocumentSource::GetNextResult DocumentSourceGroup::doGetNext() {
     if (!_initialized) {
         const auto initializationResult = initialize();
@@ -342,12 +374,12 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
     : DocumentSource(kStageName, pExpCtx),
       _usedDisk(false),
       _doingMerge(false),
-      _maxMemoryUsageBytes(maxMemoryUsageBytes ? *maxMemoryUsageBytes
-                                               : internalDocumentSourceGroupMaxMemoryBytes.load()),
+      _memoryTracker{pExpCtx->allowDiskUse && !pExpCtx->inMongos,
+                     maxMemoryUsageBytes ? *maxMemoryUsageBytes
+                                         : internalDocumentSourceGroupMaxMemoryBytes.load()},
       _initialized(false),
       _groups(pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
-      _spilled(false),
-      _allowDiskUse(pExpCtx->allowDiskUse && !pExpCtx->inMongos) {
+      _spilled(false) {
     if (!pExpCtx->inMongos && (pExpCtx->allowDiskUse || kDebugBuild)) {
         // We spill to disk in debug mode, regardless of allowDiskUse, to stress the system.
         _fileName = pExpCtx->tempDir + "/" + nextFileName();
@@ -481,14 +513,10 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
 
     // Barring any pausing, this loop exhausts 'pSource' and populates '_groups'.
     GetNextResult input = pSource->getNext();
+
     for (; input.isAdvanced(); input = pSource->getNext()) {
-        if (_memoryUsageBytes > _maxMemoryUsageBytes) {
-            uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-                    "Exceeded memory limit for $group, but didn't allow external sort."
-                    " Pass allowDiskUse:true to opt in.",
-                    _allowDiskUse);
+        if (_memoryTracker.shouldSpillWithAttemptToSaveMemory([this]() { return freeMemory(); })) {
             _sortedFiles.push_back(spill());
-            _memoryUsageBytes = 0;
         }
 
         // We release the result document here so that it does not outlive the end of this loop
@@ -504,7 +532,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         const bool inserted = _groups->size() != oldSize;
 
         if (inserted) {
-            _memoryUsageBytes += id.getApproximateSize();
+            _memoryTracker.memoryUsageBytes += id.getApproximateSize();
 
             // Initialize and add the accumulators
             Value expandedId = expandId(id);
@@ -521,7 +549,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         } else {
             for (auto&& groupObj : group) {
                 // subtract old mem usage. New usage added back after processing.
-                _memoryUsageBytes -= groupObj->memUsageForSorter();
+                _memoryTracker.memoryUsageBytes -= groupObj->memUsageForSorter();
             }
         }
 
@@ -533,15 +561,15 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
                 _accumulatedFields[i].expr.argument->evaluate(rootDocument, &pExpCtx->variables),
                 _doingMerge);
 
-            _memoryUsageBytes += group[i]->memUsageForSorter();
+            _memoryTracker.memoryUsageBytes += group[i]->memUsageForSorter();
         }
 
         if (kDebugBuild && !storageGlobalParams.readOnly) {
             // In debug mode, spill every time we have a duplicate id to stress merge logic.
-            if (!inserted &&                 // is a dup
-                !pExpCtx->inMongos &&        // can't spill to disk in mongos
-                !_allowDiskUse &&            // don't change behavior when testing external sort
-                _sortedFiles.size() < 20) {  // don't open too many FDs
+            if (!inserted &&                     // is a dup
+                !pExpCtx->inMongos &&            // can't spill to disk in mongos
+                !_memoryTracker.allowDiskUse &&  // don't change behavior when testing external sort
+                _sortedFiles.size() < 20) {      // don't open too many FDs
 
                 _sortedFiles.push_back(spill());
             }

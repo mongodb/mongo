@@ -108,4 +108,46 @@ res = runExample("$_id", {
     lang: 'js',
 });
 assert.commandFailedWithCode(res, [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed]);
+
+// Verify that having large number of documents doesn't cause the $accumulator to run out of memory.
+coll.drop();
+assert.commandWorked(coll.insert({groupBy: 1, largeField: "a".repeat(1000)}));
+assert.commandWorked(coll.insert({groupBy: 2, largeField: "a".repeat(1000)}));
+const largeAccumulator = {
+    $accumulator: {
+        init: function() {
+            return "";
+        },
+        accumulateArgs: [{fieldName: "$a"}],
+        accumulate: function(state, args) {
+            return state + "a";
+        },
+        merge: function(state1, state2) {
+            return state1 + state2;
+        },
+        finalize: function(state) {
+            return state.length;
+        }
+    }
+};
+res = coll.aggregate([
+              {$addFields: {a: {$range: [0, 1000000]}}},
+              {$unwind: "$a"},  // Create a number of documents to be executed by the accumulator.
+              {$group: {_id: "$groupBy", count: largeAccumulator}}
+          ])
+          .toArray();
+assert.sameMembers(res, [{_id: 1, count: 1000000}, {_id: 2, count: 1000000}]);
+
+// With $bucket.
+res =
+    coll.aggregate([
+            {$addFields: {a: {$range: [0, 1000000]}}},
+            {$unwind: "$a"},  // Create a number of documents to be executed by the accumulator.
+            {
+                $bucket:
+                    {groupBy: "$groupBy", boundaries: [1, 2, 3], output: {count: largeAccumulator}}
+            }
+        ])
+        .toArray();
+assert.sameMembers(res, [{_id: 1, count: 1000000}, {_id: 2, count: 1000000}]);
 })();
