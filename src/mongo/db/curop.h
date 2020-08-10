@@ -683,15 +683,15 @@ public:
     }
 
     void yielded(int numYields = 1) {
-        _numYields += numYields;
-    }  // Should be _inlock()?
+        _numYields.fetchAndAdd(numYields);
+    }
 
     /**
      * Returns the number of times yielded() was called.  Callers on threads other
      * than the one executing the operation must lock the client.
      */
     int numYields() const {
-        return _numYields;
+        return _numYields.load();
     }
 
     /**
@@ -771,7 +771,7 @@ private:
     std::string _failPointMessage;  // Used to store FailPoint information.
     std::string _message;
     ProgressMeter _progressMeter;
-    int _numYields{0};
+    AtomicWord<int> _numYields{0};
     // A GenericCursor containing information about the active cursor for a getMore operation.
     boost::optional<GenericCursor> _genericCursor;
 
