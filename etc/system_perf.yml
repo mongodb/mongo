@@ -1162,7 +1162,7 @@ buildvariants:
 
 - name: linux-standalone
   display_name: Linux Standalone
-  batchtime: 2880  # 48 hours
+  batchtime: 1440  # 24 hours
   modules: *modules
   expansions:
     setup: standalone
@@ -1323,7 +1323,7 @@ buildvariants:
 
 - name: linux-1-node-15gbwtcache
   display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache
-  batchtime: 2880  # 48 hours
+  batchtime: 14400  # 24 hours
   modules: *modules
   expansions:
     setup: single-replica-15gbwtcache
@@ -1472,7 +1472,7 @@ buildvariants:
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
-  batchtime: 2880  # 48 hours
+  batchtime: 1440  # 24 hours
   modules: *modules
   expansions:
     setup: replica
@@ -1604,7 +1604,7 @@ buildvariants:
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
-  batchtime: 2880  # 48 hours
+  batchtime: 1440  # 48 hours
   modules: *modules
   expansions:
     setup: replica-2node
