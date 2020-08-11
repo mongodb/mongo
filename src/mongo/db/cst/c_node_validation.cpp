@@ -46,7 +46,8 @@ auto isInclusionField(const CNode& project) {
     if (project.isInclusionKeyValue())
         // This is an inclusion Key.
         return true;
-    else if (stdx::holds_alternative<KeyValue>(project.payload))
+    else if (stdx::holds_alternative<KeyValue>(project.payload) ||
+             stdx::holds_alternative<CompoundExclusionKey>(project.payload))
         // This is an exclusion Key.
         return false;
     else

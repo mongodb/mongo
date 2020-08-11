@@ -31,7 +31,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -40,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/cst/compound_key.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
 #include "mongo/platform/decimal128.h"
@@ -49,6 +49,7 @@
 namespace mongo {
 
 using UserFieldname = std::string;
+// These all indicate simple inclusion projection and are used as leaves in CompoundInclusion.
 using NonZeroKey = stdx::variant<int, long long, double, Decimal128>;
 // These are the non-compound types from bsonspec.org.
 using UserDouble = double;
@@ -155,6 +156,7 @@ struct CNode {
      */
     auto isInclusionKeyValue() const {
         return stdx::holds_alternative<NonZeroKey>(payload) ||
+            stdx::holds_alternative<CompoundInclusionKey>(payload) ||
             (stdx::holds_alternative<KeyValue>(payload) &&
              stdx::get<KeyValue>(payload) == KeyValue::trueKey);
     }
@@ -168,6 +170,9 @@ public:
     using ObjectChildren = std::vector<std::pair<Fieldname, CNode>>;
     stdx::variant<ArrayChildren,
                   ObjectChildren,
+                  CompoundInclusionKey,
+                  CompoundExclusionKey,
+                  CompoundInconsistentKey,
                   KeyValue,
                   NonZeroKey,
                   UserDouble,

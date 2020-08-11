@@ -124,6 +124,38 @@ TEST(CstPipelineTranslationTest, TranslatesMultifieldInclusionProjection) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
+TEST(CstPipelineTranslationTest, TranslatesCompoundObjectInclusionProjection) {
+    // [
+    //     { $project: { a: { b: {
+    //         c: true,
+    //         d: 88,
+    //         e: { f: NumberLong(-3) },
+    //     } } } }
+    // ]
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::projectInclusion,
+         CNode{CNode::ObjectChildren{
+             {UserFieldname{"a"},
+              CNode{CompoundInclusionKey{CNode{CNode::ObjectChildren{
+                  {{UserFieldname{"b"},
+                    CNode{CNode::ObjectChildren{
+                        {{UserFieldname{"c"}, CNode{KeyValue::trueKey}},
+                         {UserFieldname{"d"}, CNode{CNode{NonZeroKey{88}}}},
+                         {UserFieldname{"e"},
+                          CNode{CNode::ObjectChildren{
+                              {{UserFieldname{"f"}, CNode{NonZeroKey{-3ll}}}}}}}}}}}}}}}}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("_id" << true << "a"
+                   << BSON("b" << BSON("c" << true << "d" << true << "e" << BSON("f" << true)))) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
 TEST(CstPipelineTranslationTest, TranslatesOneFieldExclusionProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectExclusion,
@@ -153,6 +185,37 @@ TEST(CstPipelineTranslationTest, TranslatesMultifieldExclusionProjection) {
     // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
     ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
         BSON("_id" << false << "a" << false << "b" << false) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesCompoundObjectExclusionProjection) {
+    // [
+    //     { $project: { a: { b: {
+    //         c: false,
+    //         d: 0,
+    //         e: { f: NumberLong(0) },
+    //     } } } }
+    // ]
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::projectExclusion,
+         CNode{CNode::ObjectChildren{
+             {UserFieldname{"a"},
+              CNode{CompoundExclusionKey{CNode{CNode::ObjectChildren{
+                  {{UserFieldname{"b"},
+                    CNode{CNode::ObjectChildren{
+                        {{UserFieldname{"c"}, CNode{KeyValue::falseKey}},
+                         {UserFieldname{"d"}, CNode{CNode{NonZeroKey{0}}}},
+                         {UserFieldname{"e"},
+                          CNode{CNode::ObjectChildren{
+                              {{UserFieldname{"f"}, CNode{NonZeroKey{0ll}}}}}}}}}}}}}}}}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("a" << BSON("b" << BSON("c" << false << "d" << false << "e" << BSON("f" << false)))) ==
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 

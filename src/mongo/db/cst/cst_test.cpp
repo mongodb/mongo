@@ -235,8 +235,9 @@ TEST(CstGrammarTest, InvalidParseLimitArray) {
 TEST(CstGrammarTest, ParsesProject) {
     {
         CNode output;
-        auto input =
-            fromjson("{pipeline: [{$project: {a: 1.0, b: NumberInt(1), _id: NumberLong(1)}}]}");
+        auto input = fromjson(
+            "{pipeline: [{$project: {a: 1.0, b: {c: NumberInt(1), d: NumberDecimal('1.0') }, _id: "
+            "NumberLong(1)}}]}");
         BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
         auto parseTree = PipelineParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
@@ -244,14 +245,14 @@ TEST(CstGrammarTest, ParsesProject) {
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
-                  "{ projectInclusion: { a: \"<NonZeroKey of type double 1.000000>\", b: "
-                  "\"<NonZeroKey of "
-                  "type int 1>\", id: \"<NonZeroKey of type long 1>\" } }");
+                  "{ projectInclusion: { a: \"<NonZeroKey of type double 1.000000>\", b: { "
+                  "<CompoundInclusionKey>: { c: \"<NonZeroKey of type int 1>\", d: \"<NonZeroKey "
+                  "of type decimal 1.0>\" } }, id: \"<NonZeroKey of type long 1>\" } }");
     }
     {
         CNode output;
-        auto input =
-            fromjson("{pipeline: [{$project: {a: 0.0, b: NumberInt(0), c: NumberLong(0)}}]}");
+        auto input = fromjson(
+            "{pipeline: [{$project: {a: 0.0, b: NumberInt(0), c: { d: { e: NumberLong(0)}}}}]}");
         BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
         auto parseTree = PipelineParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
@@ -261,7 +262,7 @@ TEST(CstGrammarTest, ParsesProject) {
         ASSERT_EQ(
             stages[0].toBson().toString(),
             "{ projectExclusion: { a: \"<KeyValue doubleZeroKey>\", b: \"<KeyValue intZeroKey>\", "
-            "c: \"<KeyValue longZeroKey>\" } }");
+            "c: { <CompoundExclusionKey>: { d: { e: \"<KeyValue longZeroKey>\" } } } } }");
     }
     {
         CNode output;
@@ -307,6 +308,23 @@ TEST(CstGrammarTest, FailsToParseMixedProject) {
     {
         CNode output;
         auto input = fromjson("{pipeline: [{$project: {a: 0, b: {$add: [5, 67]}}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstGrammarTest, FailsToParseCompoundMixedProject) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: {a: {b: 1, c: 0.0}}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: {a: {b: {c: {d: NumberLong(0)}, e: 45}}}}]}");
         BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
         auto parseTree = PipelineParserGen(lexer, &output);
         ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);

@@ -71,8 +71,11 @@ template <typename T>
 auto printValue(const T& payload) {
     return stdx::visit(
         visit_helper::Overloaded{
-            [](const CNode::ArrayChildren& children) { return "<Array>"s; },
-            [](const CNode::ObjectChildren& children) { return "<Object>"s; },
+            [](const CNode::ArrayChildren&) { return "<Array>"s; },
+            [](const CNode::ObjectChildren&) { return "<Object>"s; },
+            [](const CompoundInclusionKey&) { return "<CompoundInclusionKey>"s; },
+            [](const CompoundExclusionKey&) { return "<CompoundExclusionKey>"s; },
+            [](const CompoundInconsistentKey&) { return "<CompoundInconsistentKey>"s; },
             [](const KeyValue& value) {
                 return "<KeyValue "s +
                     key_value::toString[static_cast<std::underlying_type_t<KeyValue>>(value)] + ">";
@@ -161,72 +164,86 @@ std::string CNode::toStringHelper(int numTabs) const {
                                        }) +
                     tabs(numTabs) + "}";
             },
+            [numTabs](const CompoundInclusionKey& compoundKey) {
+                return tabs(numTabs) + "<CompoundInclusionKey>\n" +
+                    compoundKey.obj->toStringHelper(numTabs + 1);
+            },
+            [numTabs](const CompoundExclusionKey& compoundKey) {
+                return tabs(numTabs) + "<CompoundExclusionKey>\n" +
+                    compoundKey.obj->toStringHelper(numTabs + 1);
+            },
+            [numTabs](const CompoundInconsistentKey& compoundKey) {
+                return tabs(numTabs) + "<CompoundInconsistentKey>\n" +
+                    compoundKey.obj->toStringHelper(numTabs + 1);
+            },
             [this, numTabs](auto&&) { return tabs(numTabs) + printValue(payload); }},
         payload);
 }
 
 std::pair<BSONObj, bool> CNode::toBsonWithArrayIndicator() const {
+    auto addChild = [](auto&& bson, auto&& fieldname, auto&& child) {
+        // This is a non-compound field. pull the BSONElement out of it's BSONObj shell and add it.
+        if (auto [childBson, isArray] = child.toBsonWithArrayIndicator();
+            !childBson.isEmpty() && childBson.firstElementFieldNameStringData().empty())
+            return bson.addField(
+                childBson
+                    .replaceFieldNames(
+                        BSON(printFieldname(std::forward<decltype(fieldname)>(fieldname)) << ""))
+                    .firstElement());
+        // This field is an array. Reconstruct with BSONArray and add it.
+        else if (isArray)
+            return bson.addField(BSON(printFieldname(std::forward<decltype(fieldname)>(fieldname))
+                                      << BSONArray{childBson})
+                                     .firstElement());
+        // This field is an object. Add it directly.
+        else
+            return bson.addField(
+                BSON(printFieldname(std::forward<decltype(fieldname)>(fieldname)) << childBson)
+                    .firstElement());
+    };
+
     return stdx::visit(
         visit_helper::Overloaded{
             // Build an array which will lose its identity and appear as a BSONObj
-            [](const ArrayChildren& children) {
+            [&](const ArrayChildren& children) {
                 return std::pair{
-                    std::accumulate(
-                        children.cbegin(),
-                        children.cend(),
-                        BSONObj{},
-                        [fieldCount = 0u](auto&& bson, auto&& child) mutable {
-                            // This is a non-compound field. pull the BSONElement out of it's
-                            // BSONObj shell and add it.
-                            if (auto [childBson, isArray] = child.toBsonWithArrayIndicator();
-                                childBson.nFields() > 0 &&
-                                childBson.firstElementFieldNameStringData() == "")
-                                return bson.addField(
-                                    childBson
-                                        .replaceFieldNames(BSON(std::to_string(fieldCount++) << ""))
-                                        .firstElement());
-                            // This field is an array. Reconstruct with BSONArray and add it.
-                            else if (isArray)
-                                return bson.addField(
-                                    BSON(std::to_string(fieldCount++) << BSONArray{childBson})
-                                        .firstElement());
-                            // This field is an object. Add it directly.
-                            else
-                                return bson.addField(
-                                    BSON(std::to_string(fieldCount++) << childBson).firstElement());
-                        }),
+                    std::accumulate(children.cbegin(),
+                                    children.cend(),
+                                    BSONObj{},
+                                    [&, fieldCount = 0u](auto&& bson, auto&& child) mutable {
+                                        return addChild(std::forward<decltype(bson)>(bson),
+                                                        std::to_string(fieldCount++),
+                                                        std::forward<decltype(child)>(child));
+                                    }),
                     true};
             },
             // Build an object in a BSONObj.
-            [](const ObjectChildren& children) {
-                return std::pair{
-                    std::accumulate(
-                        children.cbegin(),
-                        children.cend(),
-                        BSONObj{},
-                        [](auto&& bson, auto&& childPair) {
-                            // This is a non-compound field. pull the BSONElement out of it's
-                            // BSONObj shell and add it.
-                            if (auto [childBson, isArray] =
-                                    childPair.second.toBsonWithArrayIndicator();
-                                childBson.nFields() > 0 &&
-                                childBson.firstElementFieldNameStringData() == "")
-                                return bson.addField(childBson
-                                                         .replaceFieldNames(BSON(
-                                                             printFieldname(childPair.first) << ""))
-                                                         .firstElement());
-                            // This field is an array. Reconstruct with BSONArray and add it.
-                            else if (isArray)
-                                return bson.addField(
-                                    BSON(printFieldname(childPair.first) << BSONArray{childBson})
-                                        .firstElement());
-                            // This field is an object. Add it directly.
-                            else
-                                return bson.addField(
-                                    BSON(printFieldname(childPair.first) << childBson)
-                                        .firstElement());
-                        }),
-                    false};
+            [&](const ObjectChildren& children) {
+                return std::pair{std::accumulate(children.cbegin(),
+                                                 children.cend(),
+                                                 BSONObj{},
+                                                 [&](auto&& bson, auto&& childPair) {
+                                                     return addChild(
+                                                         std::forward<decltype(bson)>(bson),
+                                                         childPair.first,
+                                                         childPair.second);
+                                                 }),
+                                 false};
+            },
+            // Build a compound inclusion key wrapper in a BSONObj.
+            [&](const CompoundInclusionKey& compoundKey) {
+                return std::pair{addChild(BSONObj{}, "<CompoundInclusionKey>", *compoundKey.obj),
+                                 false};
+            },
+            // Build a compound exclusion key wrapper in a BSONObj.
+            [&](const CompoundExclusionKey& compoundKey) {
+                return std::pair{addChild(BSONObj{}, "<CompoundExclusionKey>", *compoundKey.obj),
+                                 false};
+            },
+            // Build a compound exclusion key wrapper in a BSONObj.
+            [&](const CompoundInconsistentKey& compoundKey) {
+                return std::pair{addChild(BSONObj{}, "<CompoundInconsistentKey>", *compoundKey.obj),
+                                 false};
             },
             // Build a non-compound field in a BSONObj shell.
             [this](auto&&) {

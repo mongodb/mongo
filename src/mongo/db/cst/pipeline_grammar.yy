@@ -28,13 +28,13 @@
  */
 
 //
-// This is a grammar file to describe the syntax of the aggregation pipeline language. It is 
+// This is a grammar file to describe the syntax of the aggregation pipeline language. It is
 // ingested by GNU Bison (https://www.gnu.org/software/bison/) to generate native C++ parser code
 // based on the rules provided here.
-// 
-// To manually generate the parser files, run 
+//
+// To manually generate the parser files, run
 // 'bison pipeline_grammar.yy -o pipeline_parser_gen.cpp'.
-// 
+//
 %require "3.5"
 %language "c++"
 
@@ -80,8 +80,9 @@
 }
 
 // Cpp only.
-%code { 
+%code {
     #include "mongo/db/cst/bson_lexer.h"
+    #include "mongo/db/cst/c_node_disambiguation.h"
     #include "mongo/db/cst/c_node_validation.h"
     #include "mongo/db/cst/key_fieldname.h"
     #include "mongo/platform/decimal128.h"
@@ -95,7 +96,7 @@
         }
     }  // namespace mongo
 
-    // Default location for actions, called each time a rule is matched but before the action is 
+    // Default location for actions, called each time a rule is matched but before the action is
     // run. Also called when bison encounters a syntax ambiguity, which should not be relevant for
     // mongo.
     #define YYLLOC_DEFAULT(newPos, rhsPositions, nRhs)
@@ -111,9 +112,9 @@
 //
 
 // If adding to this list, keep in alphabetical order since some rules expect a strict sorted order
-// of tokens based on their enum value. The appended strings are used to generate user-friendly 
+// of tokens based on their enum value. The appended strings are used to generate user-friendly
 // error messages.
-%token 
+%token
     ABS
     ADD
     AND
@@ -244,7 +245,7 @@
 %nterm <std::pair<CNode::Fieldname, CNode>> projectField expressionField valueField filterField
 
 // Literals.
-%nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal 
+%nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal
 %nterm <CNode> minKey maxKey value string binary undefined objectId bool date null regex
 %nterm <CNode> simpleValue compoundValue valueArray valueObject valueFields
 
@@ -257,7 +258,7 @@
 %nterm <CNode> expressionFields maths add atan2 boolExps and or not literalEscapes const literal
 %nterm <CNode> stringExps concat dateFromString dateToString indexOfBytes indexOfCP
 %nterm <CNode> ltrim regexFind regexFindAll regexMatch regexArgs replaceOne replaceAll rtrim
-%nterm <CNode> split strLenBytes strLenCP strcasecmp substr substrBytes substrCP 
+%nterm <CNode> split strLenBytes strLenCP strcasecmp substr substrBytes substrCP
 %nterm <CNode> toLower toUpper trim
 %nterm <CNode> compExprs cmp eq gt gte lt lte ne
 %nterm <CNode> typeExpression convert toBool toDate toDecimal toDouble toInt toLong
@@ -274,7 +275,7 @@
 //
 %%
 
-start: 
+start:
     START_PIPELINE pipeline
     | START_MATCH matchExpression {
         *cst = CNode{$matchExpression};
@@ -290,12 +291,12 @@ pipeline:
 
 stageList:
     %empty { }
-    | START_OBJECT stage END_OBJECT stageList[stagesArg] { 
+    | START_OBJECT stage END_OBJECT stageList[stagesArg] {
         $$ = CNode{CNode::ArrayChildren{$stage}};
     }
 ;
 
-// Special rule to hint to the lexer that the next set of tokens should be sorted. Note that the 
+// Special rule to hint to the lexer that the next set of tokens should be sorted. Note that the
 // sort order is not lexicographical, but rather based on the enum generated from the %token list
 // above.
 START_ORDERED_OBJECT: { lexer.sortObjTokens(); } START_OBJECT;
@@ -305,7 +306,7 @@ stage:
 ;
 
 sample: STAGE_SAMPLE START_OBJECT ARG_SIZE num END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::sample, 
+        $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::sample,
                 CNode{CNode::ObjectChildren{
                     {KeyFieldname::sizeArg, $num},
                 }}
@@ -314,7 +315,7 @@ sample: STAGE_SAMPLE START_OBJECT ARG_SIZE num END_OBJECT {
 ;
 
 inhibitOptimization:
-    STAGE_INHIBIT_OPTIMIZATION START_OBJECT END_OBJECT { 
+    STAGE_INHIBIT_OPTIMIZATION START_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()}}};
     }
 ;
@@ -423,7 +424,12 @@ projection:
     | timestamp
     | minKey
     | maxKey
-    | compoundExpression
+    | compoundExpression {
+        $$ = c_node_disambiguation::disambiguateCompoundProjection($1);
+        if (stdx::holds_alternative<CompoundInconsistentKey>($$.payload))
+            // TODO SERVER-50498: error() instead of uasserting
+            uasserted(ErrorCodes::FailedToParse, "object project field cannot contain both inclusion and exclusion indicators");
+    }
 ;
 
 projectionFieldname:
@@ -734,7 +740,7 @@ aggExprAsUserFieldname:
     }
 ;
 
-// Rules for literal non-terminals. 
+// Rules for literal non-terminals.
 string:
     STRING {
         $$ = CNode{UserString{$1}};
@@ -1085,7 +1091,7 @@ not:
 
 stringExps:
     concat | dateFromString | dateToString | indexOfBytes | indexOfCP | ltrim | regexFind
-    | regexFindAll | regexMatch | replaceOne | replaceAll | rtrim | split | strLenBytes | strLenCP 
+    | regexFindAll | regexMatch | replaceOne | replaceAll | rtrim | split | strLenBytes | strLenCP
     | strcasecmp | substr | substrBytes | substrCP | toLower | trim | toUpper
 ;
 
@@ -1118,7 +1124,7 @@ timezoneArg:
 ;
 
 dateFromString:
-    START_OBJECT DATE_FROM_STRING START_ORDERED_OBJECT ARG_DATE_STRING expression formatArg timezoneArg 
+    START_OBJECT DATE_FROM_STRING START_ORDERED_OBJECT ARG_DATE_STRING expression formatArg timezoneArg
             onErrorArg onNullArg END_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dateFromString, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::dateStringArg, $expression},
@@ -1127,7 +1133,7 @@ dateFromString:
 ;
 
 dateToString:
-    START_OBJECT DATE_TO_STRING START_ORDERED_OBJECT ARG_DATE expression formatArg timezoneArg onNullArg 
+    START_OBJECT DATE_TO_STRING START_ORDERED_OBJECT ARG_DATE expression formatArg timezoneArg onNullArg
             END_OBJECT END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dateToString, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::dateArg, $expression},
@@ -1136,7 +1142,7 @@ dateToString:
 ;
 
 exprZeroToTwo:
-    %empty { 
+    %empty {
         $$ = CNode::ArrayChildren{};
     }
     | expression {
@@ -1148,9 +1154,9 @@ exprZeroToTwo:
 ;
 
 indexOfBytes:
-    START_OBJECT INDEX_OF_BYTES START_ARRAY expression[expr1] expression[expr2] exprZeroToTwo 
+    START_OBJECT INDEX_OF_BYTES START_ARRAY expression[expr1] expression[expr2] exprZeroToTwo
             END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::indexOfBytes, 
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::indexOfBytes,
                     CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
         auto&& others = $exprZeroToTwo;
         auto&& array = $$.objectChildren()[0].second.arrayChildren();
@@ -1159,9 +1165,9 @@ indexOfBytes:
 ;
 
 indexOfCP:
-    START_OBJECT INDEX_OF_CP START_ARRAY expression[expr1] expression[expr2] exprZeroToTwo 
+    START_OBJECT INDEX_OF_CP START_ARRAY expression[expr1] expression[expr2] exprZeroToTwo
             END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::indexOfCP, 
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::indexOfCP,
                     CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
         auto&& others = $exprZeroToTwo;
         auto&& array = $$.objectChildren()[0].second.arrayChildren();
@@ -1279,33 +1285,33 @@ strLenCP:
 ;
 
 strcasecmp:
-    START_OBJECT STR_CASE_CMP START_ARRAY expression[expr1] expression[expr2] 
+    START_OBJECT STR_CASE_CMP START_ARRAY expression[expr1] expression[expr2]
             END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::strcasecmp, 
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::strcasecmp,
                     CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
     }
 ;
 
 substr:
-    START_OBJECT SUBSTR START_ARRAY expression[expr1] expression[expr2] 
+    START_OBJECT SUBSTR START_ARRAY expression[expr1] expression[expr2]
             expression[expr3] END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::substr, 
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::substr,
                     CNode{CNode::ArrayChildren{$expr1, $expr2, $expr3}}}}};
     }
 ;
 
 substrBytes:
-    START_OBJECT SUBSTR_BYTES START_ARRAY expression[expr1] expression[expr2] 
+    START_OBJECT SUBSTR_BYTES START_ARRAY expression[expr1] expression[expr2]
             expression[expr3] END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::substrBytes, 
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::substrBytes,
                     CNode{CNode::ArrayChildren{$expr1, $expr2, $expr3}}}}};
     }
 ;
 
 substrCP:
-    START_OBJECT SUBSTR_CP START_ARRAY expression[expr1] expression[expr2] 
+    START_OBJECT SUBSTR_CP START_ARRAY expression[expr1] expression[expr2]
             expression[expr3] END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::substrCP, 
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::substrCP,
                     CNode{CNode::ArrayChildren{$expr1, $expr2, $expr3}}}}};
     }
 ;

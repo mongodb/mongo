@@ -32,6 +32,9 @@
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
 #include <iterator>
+#include <numeric>
+#include <string>
+#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -41,6 +44,7 @@
 #include "mongo/db/cst/key_value.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -51,9 +55,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_trigonometric.h"
-#include "mongo/db/query/projection.h"
-#include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/visit_helper.h"
 
@@ -413,6 +415,9 @@ Value translateLiteralLeaf(const CNode& cst) {
             // These are illegal since they're non-leaf.
             [](const CNode::ArrayChildren&) -> Value { MONGO_UNREACHABLE; },
             [](const CNode::ObjectChildren&) -> Value { MONGO_UNREACHABLE; },
+            [](const CompoundInclusionKey&) -> Value { MONGO_UNREACHABLE; },
+            [](const CompoundExclusionKey&) -> Value { MONGO_UNREACHABLE; },
+            [](const CompoundInconsistentKey&) -> Value { MONGO_UNREACHABLE; },
             // These are illegal since they're non-literal.
             [](const KeyValue&) -> Value { MONGO_UNREACHABLE; },
             [](const NonZeroKey&) -> Value { MONGO_UNREACHABLE; },
@@ -426,21 +431,52 @@ Value translateLiteralLeaf(const CNode& cst) {
         cst.payload);
 }
 
+enum class ProjectionType : char { inclusion, exclusion, computed };
+
 /**
- * Walk a projection CNode and produce a ProjectionASTNode.
+ * Walk a projection CNode and produce true if inclusion, false if exclusion or none if computed.
  */
-std::unique_ptr<projection_ast::ASTNode> translateProjection(
-    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    using namespace projection_ast;
+auto determineProjectionKeyType(const CNode& cst) {
     if (cst.isInclusionKeyValue())
         // This is an inclusion Key.
-        return std::make_unique<BooleanConstantASTNode>(true);
-    else if (stdx::holds_alternative<KeyValue>(cst.payload))
+        return ProjectionType::inclusion;
+    else if (stdx::holds_alternative<KeyValue>(cst.payload) ||
+             stdx::holds_alternative<CompoundExclusionKey>(cst.payload))
         // This is an exclusion Key.
-        return std::make_unique<BooleanConstantASTNode>(false);
+        return ProjectionType::exclusion;
     else
-        // This is an arbitrary expression to produce a computed field (this counts as inclusion).
-        return std::make_unique<ExpressionASTNode>(translateExpression(cst, expCtx));
+        // This is an arbitrary expression to produce a computed field.
+        return ProjectionType::computed;
+}
+
+/**
+ * Walk a compound projection CNode payload (CompoundInclusionKey or CompoundExclusionKey) and
+ * produce a sequence of paths.
+ */
+template <typename CompoundPayload>
+auto translateCompoundProjection(const CompoundPayload& payload, StringData prefix) {
+    auto path = std::vector<StringData>{};
+    auto resultPaths = std::vector<FieldPath>{};
+    auto translateProjectionObject = [&](auto&& recurse, auto&& children) -> void {
+        for (auto&& child : children) {
+            path.push_back(stdx::get<UserFieldname>(child.first));
+            // In this context we have an object.
+            if (auto recursiveChildren = stdx::get_if<CNode::ObjectChildren>(&child.second.payload))
+                recurse(recurse, *recursiveChildren);
+            // Alternatively we have a key indicating inclusion/exclusion, no other cases need to be
+            // considered.
+            else
+                resultPaths.emplace_back(std::accumulate(
+                    std::next(path.cbegin()),
+                    path.cend(),
+                    std::string{path[0]},
+                    [](auto&& pathString, auto&& element) { return pathString + "." + element; }));
+            path.pop_back();
+        }
+    };
+    path.push_back(prefix);
+    translateProjectionObject(translateProjectionObject, payload.obj->objectChildren());
+    return resultPaths;
 }
 
 /**
@@ -449,23 +485,41 @@ std::unique_ptr<projection_ast::ASTNode> translateProjection(
  */
 auto translateProjectInclusion(const CNode& cst,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    using namespace projection_ast;
-    auto root = ProjectionPathASTNode{};
+    // 'true' indicates that the fast path is enabled, it's harmless to leave it on for all cases.
+    auto executor = std::make_unique<projection_executor::InclusionProjectionExecutor>(
+        expCtx, ProjectionPolicies::aggregateProjectionPolicies(), true);
+    bool sawId = false;
 
-    for (auto&& [name, child] : cst.objectChildren())
+    for (auto&& [name, child] : cst.objectChildren()) {
+        sawId = sawId || CNode::fieldnameIsId(name);
         // If we see a key fieldname, make sure it's _id.
-        if (CNode::fieldnameIsId(name))
-            addNodeAtPath(&root, "_id", translateProjection(child, expCtx));
-        else
-            addNodeAtPath(
-                &root, stdx::get<UserFieldname>(name), translateProjection(child, expCtx));
+        const auto path =
+            CNode::fieldnameIsId(name) ? "_id"_sd : StringData{stdx::get<UserFieldname>(name)};
+        switch (determineProjectionKeyType(child)) {
+            case ProjectionType::inclusion:
+                if (auto payload = stdx::get_if<CompoundInclusionKey>(&child.payload))
+                    for (auto&& compoundPath : translateCompoundProjection(*payload, path))
+                        executor->getRoot()->addProjectionForPath(std::move(compoundPath));
+                else
+                    executor->getRoot()->addProjectionForPath(FieldPath{path});
+                break;
+            case ProjectionType::exclusion:
+                // InclusionProjectionExecutors must contain no exclusion besides _id so we do
+                // nothing here and translate the presence of an _id exclusion node by the absence
+                // of the implicit _id inclusion below.
+                invariant(CNode::fieldnameIsId(name));
+                break;
+            case ProjectionType::computed:
+                executor->getRoot()->addExpressionForPath(FieldPath{path},
+                                                          translateExpression(child, expCtx));
+        }
+    }
 
-    // If we didn't see _id we need to add it in manually for inclusion or projection AST
-    // will incorrectly assume we want it gone.
-    if (!root.getChild("_id"))
-        addNodeAtPath(&root, "_id", std::make_unique<BooleanConstantASTNode>(true));
-    return DocumentSourceProject::create(
-        Projection{root, ProjectType::kInclusion}, expCtx, "$project");
+    // If we didn't see _id we need to add it in manually for inclusion.
+    if (!sawId)
+        executor->getRoot()->addProjectionForPath(FieldPath{"_id"});
+    return make_intrusive<DocumentSourceSingleDocumentTransformation>(
+        expCtx, std::move(executor), "$project", false);
 }
 
 /**
@@ -474,25 +528,34 @@ auto translateProjectInclusion(const CNode& cst,
  */
 auto translateProjectExclusion(const CNode& cst,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    using namespace projection_ast;
-    auto root = ProjectionPathASTNode{};
+    // 'true' indicates that the fast path is enabled, it's harmless to leave it on for all cases.
+    auto executor = std::make_unique<projection_executor::ExclusionProjectionExecutor>(
+        expCtx, ProjectionPolicies::aggregateProjectionPolicies(), true);
 
-    for (auto&& [name, child] : cst.objectChildren())
+    for (auto&& [name, child] : cst.objectChildren()) {
         // If we see a key fieldname, make sure it's _id.
-        if (CNode::fieldnameIsId(name))
-            addNodeAtPath(&root, "_id", translateProjection(child, expCtx));
-        else
-            addNodeAtPath(
-                &root, stdx::get<UserFieldname>(name), translateProjection(child, expCtx));
+        const auto path =
+            CNode::fieldnameIsId(name) ? "_id"_sd : StringData{stdx::get<UserFieldname>(name)};
+        switch (determineProjectionKeyType(child)) {
+            case ProjectionType::inclusion:
+                // ExclusionProjectionExecutors must contain no inclusion besides _id so we do
+                // nothing here since including _id is the default.
+                break;
+            case ProjectionType::exclusion:
+                if (auto payload = stdx::get_if<CompoundExclusionKey>(&child.payload))
+                    for (auto&& compoundPath : translateCompoundProjection(*payload, path))
+                        executor->getRoot()->addProjectionForPath(std::move(compoundPath));
+                else
+                    executor->getRoot()->addProjectionForPath(FieldPath{path});
+                break;
+            case ProjectionType::computed:
+                // Computed fields are disallowed in exclusion projection.
+                MONGO_UNREACHABLE;
+        }
+    }
 
-    // If we saw an inclusion _id for an exclusion projection, we must manually remove it or
-    // projection AST will turn it into an _id exclusion due to a bug.
-    // TODO SERVER-48834: Fix the bug or organize this code to circumvent projection AST.
-    if (auto childPtr = root.getChild("_id"))
-        if (dynamic_cast<BooleanConstantASTNode*>(childPtr)->value())
-            static_cast<void>(root.removeChild("_id"));
-    return DocumentSourceProject::create(
-        Projection{root, ProjectType::kExclusion}, expCtx, "$project");
+    return make_intrusive<DocumentSourceSingleDocumentTransformation>(
+        expCtx, std::move(executor), "$project", false);
 }
 
 /**

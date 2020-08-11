@@ -8,9 +8,11 @@ env.Library(
     target='cst',
     source=[
         'bson_lexer.cpp',
+        'compound_key.cpp',
         'cst_pipeline_translation.cpp',
         'c_node.cpp',
         'c_node_validation.cpp',
+        'c_node_disambiguation.cpp',
         'pipeline_parser_gen.cpp',
     ],
     LIBDEPS=[
