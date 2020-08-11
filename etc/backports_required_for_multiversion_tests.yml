@@ -95,6 +95,8 @@ all:
     test_file: jstests/replsets/get_replication_info_helper.js
   - ticket: SERVER-39621
     test_file: jstests/replsets/step_down_chaining_disabled.js
+  - ticket: SERVER-49990
+    test_file: jstests/replsets/secondaryOk_slaveOk_aliases.js
 
 suites:
 

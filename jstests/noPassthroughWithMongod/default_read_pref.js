@@ -8,7 +8,7 @@ var mongo = db.getMongo();
 try {
     var commandsRan = [];
     db._mongo = {
-        getSlaveOk: function() {
+        getSecondaryOk: function() {
             return false;
         },
         getReadPrefMode: function() {

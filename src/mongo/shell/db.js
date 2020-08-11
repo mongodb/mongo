@@ -558,7 +558,7 @@ DB.prototype.help = function() {
     print("\tdb.getLastErrorObj() - return full status object");
     print("\tdb.getLogComponents()");
     print("\tdb.getMongo() get the server connection object");
-    print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
+    print("\tdb.getMongo().setSecondaryOk() allow queries on a replication secondary server");
     print("\tdb.getName()");
     print("\tdb.getProfilingLevel() - deprecated");
     print("\tdb.getProfilingStatus() - returns if profiling is on and slow threshold");
@@ -1246,20 +1246,32 @@ DB.autocomplete = function(obj) {
 };
 
 DB.prototype.setSlaveOk = function(value) {
-    if (value == undefined)
-        value = true;
-    this._slaveOk = value;
+    print(
+        "WARNING: setSlaveOk() is deprecated and may be removed in the next major release. Please use setSecondaryOk() instead.");
+    this.setSecondaryOk(value);
 };
 
 DB.prototype.getSlaveOk = function() {
-    if (this._slaveOk != undefined)
-        return this._slaveOk;
-    return this._mongo.getSlaveOk();
+    print(
+        "WARNING: getSlaveOk() is deprecated and may be removed in the next major release. Please use getSecondaryOk() instead.");
+    return this.getSecondaryOk();
+};
+
+DB.prototype.setSecondaryOk = function(value) {
+    if (value == undefined)
+        value = true;
+    this._secondaryOk = value;
+};
+
+DB.prototype.getSecondaryOk = function() {
+    if (this._secondaryOk != undefined)
+        return this._secondaryOk;
+    return this._mongo.getSecondaryOk();
 };
 
 DB.prototype.getQueryOptions = function() {
     var options = 0;
-    if (this.getSlaveOk())
+    if (this.getSecondaryOk())
         options |= 4;
     return options;
 };

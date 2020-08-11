@@ -12,7 +12,7 @@ try {
         writeMode: function() {
             return "commands";
         },
-        getSlaveOk: function() {
+        getSecondaryOk: function() {
             return true;
         },
         runCommand: function(db, cmd, opts) {
