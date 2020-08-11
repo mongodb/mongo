@@ -125,6 +125,7 @@
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
+#include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
@@ -303,13 +304,15 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
 
 void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     auto registry = repl::PrimaryOnlyServiceRegistry::get(serviceContext);
-    std::unique_ptr<TenantMigrationDonorService> tenantMigrationDonorService =
-        std::make_unique<TenantMigrationDonorService>(serviceContext);
-    registry->registerService(std::move(tenantMigrationDonorService));
 
-    std::unique_ptr<ReshardingCoordinatorService> reshardingCoordinatorService =
-        std::make_unique<ReshardingCoordinatorService>(serviceContext);
-    registry->registerService(std::move(reshardingCoordinatorService));
+    std::vector<std::unique_ptr<repl::PrimaryOnlyService>> services;
+    services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
+    services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
+    services.push_back(std::make_unique<ReshardingCoordinatorService>(serviceContext));
+
+    for (auto& service : services) {
+        registry->registerService(std::move(service));
+    }
 }
 
 MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);

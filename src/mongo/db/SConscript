@@ -2113,6 +2113,7 @@ env.Library(
         'repl/replication_recovery',
         'repl/serveronly_repl',
         'repl/storage_interface_impl',
+        'repl/tenant_migration_recipient_service',
         'repl/topology_coordinator',
         'repl/wait_for_majority_service',
         's/sessions_collection_config_server',

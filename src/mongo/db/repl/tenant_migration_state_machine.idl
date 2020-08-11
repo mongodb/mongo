@@ -109,9 +109,12 @@ structs:
             startApplyingOpTime:
                 description: "Populated during data sync; the donor's operation time when the data cloning starts."
                 type: optime
+                optional: true
             startFetchingOpTime:
                 description: "Populated during data sync; the donor's operation time of the last open transaction when the data cloning started."
                 type: optime
+                optional: true
             cloneFinishedOptime:
                 description: "Populated during data sync; the recipient operation time when the data cloning finishes."
                 type: optime
+                optional: true

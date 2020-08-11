@@ -1248,13 +1248,56 @@ env.Library(
 )
 
 env.Library(
+    target='tenant_migration_state_machine_idl',
+    source=[
+        env.Idlc('tenant_migration_state_machine.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'optime',
+    ],
+)
+
+env.Library(
+    target='tenant_migration_recipient_utils',
+    source=[
+        "tenant_migration_recipient_entry_helpers.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/catalog_raii",
+        "$BUILD_DIR/mongo/db/dbhelpers",
+        "$BUILD_DIR/mongo/db/namespace_string",
+        '$BUILD_DIR/mongo/db/service_context',
+        "$BUILD_DIR/mongo/db/storage/write_unit_of_work",
+        "tenant_migration_state_machine_idl",
+    ],
+)
+
+env.Library(
+    target='tenant_migration_recipient_service',
+    source= [
+        'tenant_migration_recipient_service.cpp',
+    ],
+    LIBDEPS=[
+        'primary_only_service',
+        'tenant_migration_recipient_utils',
+        'wait_for_majority_service',
+    ],
+    LIBDEPS_PRIVATE=[
+        'tenant_migration_state_machine_idl',
+    ]
+)
+
+env.Library(
     target='tenant_migration_donor',
     source=[
         'tenant_migration_access_blocker.cpp',
         'tenant_migration_access_blocker_by_prefix.cpp',
         'tenant_migration_access_blocker_server_status_section.cpp',
         'tenant_migration_donor_util.cpp',
-        env.Idlc('tenant_migration_state_machine.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1270,7 +1313,8 @@ env.Library(
         'local_oplog_info',
         'optime',
         'repl_coordinator_interface',
-        'tenant_migration_conflict_info'
+        'tenant_migration_conflict_info',
+        'tenant_migration_state_machine_idl'
     ],
 )
 
@@ -1411,6 +1455,7 @@ env.CppUnitTest(
         'tenant_oplog_batcher_test.cpp',
         'vote_requester_test.cpp',
         'wait_for_majority_service_test.cpp',
+        'tenant_migration_recipient_service_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1488,6 +1533,7 @@ env.CppUnitTest(
         'sync_source_selector_mock',
         'task_executor_mock',
         'task_runner',
+        'tenant_migration_recipient_service',
         'tenant_oplog_processing',
         'wait_for_majority_service',
     ],
