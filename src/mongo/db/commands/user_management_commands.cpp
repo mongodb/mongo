@@ -812,11 +812,20 @@ void CmdUMCTyped<CreateUserCommand, void>::Invocation::typedRun(OperationContext
 
 #ifdef MONGO_CONFIG_SSL
     auto configuration = opCtx->getClient()->session()->getSSLConfiguration();
-    uassert(ErrorCodes::BadValue,
-            "Cannot create an x.509 user with a subjectname that would be "
-            "recognized as an internal cluster member",
-            (dbname != "$external") || !configuration ||
-                !configuration->isClusterMember(userName.getUser()));
+
+    if ((dbname == "$external") && configuration &&
+        configuration->isClusterMember(userName.getUser())) {
+        if (gEnforceUserClusterSeparation) {
+            uasserted(ErrorCodes::BadValue,
+                      "Cannot create an x.509 user with a subjectname that would be "
+                      "recognized as an internal cluster member");
+        } else {
+            LOGV2(4593800,
+                  "Creating user which would be considered a cluster member if clusterAuthMode "
+                  "enabled X509 authentication",
+                  "user"_attr = userName);
+        }
+    }
 #endif
 
     // Synthesize a user document
