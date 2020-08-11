@@ -1362,7 +1362,6 @@ env.CppUnitTest(
         'repl_set_heartbeat_response_test.cpp',
         'repl_set_tag_test.cpp',
         'repl_set_write_concern_mode_definitions_test.cpp',
-        'replica_set_aware_service_test.cpp',
         'replication_consistency_markers_impl_test.cpp',
         'replication_process_test.cpp',
         'replication_recovery_test.cpp',
@@ -1439,7 +1438,6 @@ env.CppUnitTest(
         'repl_coordinator_impl',
         'repl_server_parameters',
         'replica_set_messages',
-        'replica_set_aware_service',
         'replication_consistency_markers_impl',
         'replication_process',
         'replication_recovery',
@@ -1518,6 +1516,17 @@ env.CppUnitTest(
         'initial_sync_cloners',
         'initial_sync_shared_data',
         'tenant_migration_cloners'
+    ],
+)
+
+env.CppUnitTest(
+    target='db_repl_set_aware_service_test',
+    source=[
+        'replica_set_aware_service_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'replica_set_aware_service',
     ],
 )
 
