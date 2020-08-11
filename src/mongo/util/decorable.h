@@ -145,4 +145,88 @@ private:
     DecorationContainer<D> _decorations;
 };
 
+template <typename D>
+class DecorableCopyable {
+public:
+    template <typename T>
+    class Decoration {
+    public:
+        Decoration() = delete;
+
+        T& operator()(D& d) const {
+            return static_cast<DecorableCopyable&>(d)._decorations.getDecoration(this->_raw);
+        }
+
+        T& operator()(D* const d) const {
+            return (*this)(*d);
+        }
+
+        const T& operator()(const D& d) const {
+            return static_cast<const DecorableCopyable&>(d)._decorations.getDecoration(this->_raw);
+        }
+
+        const T& operator()(const D* const d) const {
+            return (*this)(*d);
+        }
+
+        const D* owner(const T* const t) const {
+            return static_cast<const D*>(getOwnerImpl(t));
+        }
+
+        D* owner(T* const t) const {
+            return static_cast<D*>(getOwnerImpl(t));
+        }
+
+        const D& owner(const T& t) const {
+            return *owner(&t);
+        }
+
+        D& owner(T& t) const {
+            return *owner(&t);
+        }
+
+    private:
+        const DecorableCopyable* getOwnerImpl(const T* const t) const {
+            return *reinterpret_cast<const DecorableCopyable* const*>(
+                reinterpret_cast<const unsigned char* const>(t) - _raw._raw._index);
+        }
+
+        DecorableCopyable* getOwnerImpl(T* const t) const {
+            return const_cast<DecorableCopyable*>(getOwnerImpl(const_cast<const T*>(t)));
+        }
+
+        friend class DecorableCopyable;
+
+        explicit Decoration(
+            typename DecorationContainer<D>::template DecorationDescriptorWithType<T> raw)
+            : _raw(std::move(raw)) {}
+
+        typename DecorationContainer<D>::template DecorationDescriptorWithType<T> _raw;
+    };
+
+    template <typename T>
+    static Decoration<T> declareDecoration() {
+        return Decoration<T>(getRegistry()->template declareDecorationCopyable<T>());
+    }
+
+protected:
+    DecorableCopyable() : _decorations(this, getRegistry()) {}
+    ~DecorableCopyable() = default;
+
+    DecorableCopyable(const DecorableCopyable& other)
+        : _decorations(this, getRegistry(), other._decorations) {}
+    DecorableCopyable& operator=(const DecorableCopyable& rhs) {
+        getRegistry()->copyAssign(&_decorations, &rhs._decorations);
+        return *this;
+    }
+
+private:
+    static DecorationRegistry<D>* getRegistry() {
+        static DecorationRegistry<D>* theRegistry = new DecorationRegistry<D>();
+        return theRegistry;
+    }
+
+    DecorationContainer<D> _decorations;
+};
+
 }  // namespace mongo

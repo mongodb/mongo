@@ -43,12 +43,22 @@ namespace mongo {
 namespace {
 
 static int numConstructedAs;
+static int numCopyConstructedAs;
+static int numCopyAssignedAs;
 static int numDestructedAs;
 
 class A {
 public:
     A() : value(0) {
         ++numConstructedAs;
+    }
+    A(const A& other) : value(other.value) {
+        ++numCopyConstructedAs;
+    }
+    A& operator=(const A& rhs) {
+        value = rhs.value;
+        ++numCopyAssignedAs;
+        return *this;
     }
     ~A() {
         ++numDestructedAs;
@@ -66,6 +76,7 @@ public:
 };
 
 class MyDecorable : public Decorable<MyDecorable> {};
+class MyCopyableDecorable : public DecorableCopyable<MyCopyableDecorable> {};
 
 TEST(DecorableTest, DecorableType) {
     const auto dd1 = MyDecorable::declareDecoration<A>();
@@ -101,77 +112,101 @@ TEST(DecorableTest, DecorableType) {
 }
 
 TEST(DecorableTest, SimpleDecoration) {
-    numConstructedAs = 0;
-    numDestructedAs = 0;
-    DecorationRegistry<MyDecorable> registry;
-    const auto dd1 = registry.declareDecoration<A>();
-    const auto dd2 = registry.declareDecoration<A>();
-    const auto dd3 = registry.declareDecoration<int>();
+    auto test = [](auto decorable) {
+        using decorable_t = decltype(decorable);
 
-    {
-        DecorationContainer<MyDecorable> decorable1(nullptr, &registry);
-        ASSERT_EQ(2, numConstructedAs);
-        ASSERT_EQ(0, numDestructedAs);
-        DecorationContainer<MyDecorable> decorable2(nullptr, &registry);
-        ASSERT_EQ(4, numConstructedAs);
-        ASSERT_EQ(0, numDestructedAs);
+        numConstructedAs = 0;
+        numDestructedAs = 0;
+        DecorationRegistry<decorable_t> registry;
+        const auto dd1 = registry.template declareDecoration<A>();
+        const auto dd2 = registry.template declareDecoration<A>();
+        const auto dd3 = registry.template declareDecoration<int>();
 
-        ASSERT_EQ(0, decorable1.getDecoration(dd1).value);
-        ASSERT_EQ(0, decorable1.getDecoration(dd2).value);
-        ASSERT_EQ(0, decorable2.getDecoration(dd1).value);
-        ASSERT_EQ(0, decorable2.getDecoration(dd2).value);
-        ASSERT_EQ(0, decorable2.getDecoration(dd3));
-        decorable1.getDecoration(dd1).value = 1;
-        decorable1.getDecoration(dd2).value = 2;
-        decorable2.getDecoration(dd1).value = 3;
-        decorable2.getDecoration(dd2).value = 4;
-        decorable2.getDecoration(dd3) = 5;
-        ASSERT_EQ(1, decorable1.getDecoration(dd1).value);
-        ASSERT_EQ(2, decorable1.getDecoration(dd2).value);
-        ASSERT_EQ(3, decorable2.getDecoration(dd1).value);
-        ASSERT_EQ(4, decorable2.getDecoration(dd2).value);
-        ASSERT_EQ(5, decorable2.getDecoration(dd3));
-    }
-    ASSERT_EQ(4, numDestructedAs);
+        {
+            decorable_t* decorablePtr = nullptr;
+            DecorationContainer<decorable_t> decorable1(decorablePtr, &registry);
+            ASSERT_EQ(2, numConstructedAs);
+            ASSERT_EQ(0, numDestructedAs);
+            DecorationContainer<decorable_t> decorable2(decorablePtr, &registry);
+            ASSERT_EQ(4, numConstructedAs);
+            ASSERT_EQ(0, numDestructedAs);
+
+            ASSERT_EQ(0, decorable1.getDecoration(dd1).value);
+            ASSERT_EQ(0, decorable1.getDecoration(dd2).value);
+            ASSERT_EQ(0, decorable2.getDecoration(dd1).value);
+            ASSERT_EQ(0, decorable2.getDecoration(dd2).value);
+            ASSERT_EQ(0, decorable2.getDecoration(dd3));
+            decorable1.getDecoration(dd1).value = 1;
+            decorable1.getDecoration(dd2).value = 2;
+            decorable2.getDecoration(dd1).value = 3;
+            decorable2.getDecoration(dd2).value = 4;
+            decorable2.getDecoration(dd3) = 5;
+            ASSERT_EQ(1, decorable1.getDecoration(dd1).value);
+            ASSERT_EQ(2, decorable1.getDecoration(dd2).value);
+            ASSERT_EQ(3, decorable2.getDecoration(dd1).value);
+            ASSERT_EQ(4, decorable2.getDecoration(dd2).value);
+            ASSERT_EQ(5, decorable2.getDecoration(dd3));
+        }
+        ASSERT_EQ(4, numDestructedAs);
+    };
+
+    test(MyDecorable());
+    test(MyCopyableDecorable());
 }
 
 TEST(DecorableTest, ThrowingConstructor) {
-    numConstructedAs = 0;
-    numDestructedAs = 0;
+    auto test = [](auto decorable) {
+        using decorable_t = decltype(decorable);
 
-    DecorationRegistry<MyDecorable> registry;
-    registry.declareDecoration<A>();
-    registry.declareDecoration<ThrowA>();
-    registry.declareDecoration<A>();
+        numConstructedAs = 0;
+        numDestructedAs = 0;
 
-    try {
-        DecorationContainer<MyDecorable> d(nullptr, &registry);
-    } catch (const AssertionException& ex) {
-        ASSERT_EQ(ErrorCodes::Unauthorized, ex.code());
-    }
-    ASSERT_EQ(1, numConstructedAs);
-    ASSERT_EQ(1, numDestructedAs);
+        DecorationRegistry<decorable_t> registry;
+        registry.template declareDecoration<A>();
+        registry.template declareDecoration<ThrowA>();
+        registry.template declareDecoration<A>();
+
+        try {
+            decorable_t* decorablePtr = nullptr;
+            DecorationContainer<decorable_t> d(decorablePtr, &registry);
+        } catch (const AssertionException& ex) {
+            ASSERT_EQ(ErrorCodes::Unauthorized, ex.code());
+        }
+        ASSERT_EQ(1, numConstructedAs);
+        ASSERT_EQ(1, numDestructedAs);
+    };
+
+    test(MyDecorable());
+    test(MyCopyableDecorable());
 }
 
 TEST(DecorableTest, Alignment) {
-    DecorationRegistry<MyDecorable> registry;
-    const auto firstChar = registry.declareDecoration<char>();
-    const auto firstInt = registry.declareDecoration<int>();
-    const auto secondChar = registry.declareDecoration<int>();
-    const auto secondInt = registry.declareDecoration<int>();
-    DecorationContainer<MyDecorable> d(nullptr, &registry);
-    ASSERT_EQ(0U,
-              reinterpret_cast<uintptr_t>(&d.getDecoration(firstChar)) %
-                  std::alignment_of<char>::value);
-    ASSERT_EQ(0U,
-              reinterpret_cast<uintptr_t>(&d.getDecoration(secondChar)) %
-                  std::alignment_of<char>::value);
-    ASSERT_EQ(0U,
-              reinterpret_cast<uintptr_t>(&d.getDecoration(firstInt)) %
-                  std::alignment_of<int>::value);
-    ASSERT_EQ(0U,
-              reinterpret_cast<uintptr_t>(&d.getDecoration(secondInt)) %
-                  std::alignment_of<int>::value);
+    auto test = [](auto decorable) {
+        using decorable_t = decltype(decorable);
+
+        DecorationRegistry<decorable_t> registry;
+        const auto firstChar = registry.template declareDecoration<char>();
+        const auto firstInt = registry.template declareDecoration<int>();
+        const auto secondChar = registry.template declareDecoration<int>();
+        const auto secondInt = registry.template declareDecoration<int>();
+        decorable_t* decorablePtr = nullptr;
+        DecorationContainer<decorable_t> d(decorablePtr, &registry);
+        ASSERT_EQ(0U,
+                  reinterpret_cast<uintptr_t>(&d.getDecoration(firstChar)) %
+                      std::alignment_of<char>::value);
+        ASSERT_EQ(0U,
+                  reinterpret_cast<uintptr_t>(&d.getDecoration(secondChar)) %
+                      std::alignment_of<char>::value);
+        ASSERT_EQ(0U,
+                  reinterpret_cast<uintptr_t>(&d.getDecoration(firstInt)) %
+                      std::alignment_of<int>::value);
+        ASSERT_EQ(0U,
+                  reinterpret_cast<uintptr_t>(&d.getDecoration(secondInt)) %
+                      std::alignment_of<int>::value);
+    };
+
+    test(MyDecorable());
+    test(MyCopyableDecorable());
 }
 
 struct DecoratedOwnerChecker : public Decorable<DecoratedOwnerChecker> {
@@ -237,6 +272,34 @@ TEST(DecorableTest, DecorationWithOwner) {
 
     DecorationWithOwner& decoration = DecorationWithOwner::get(owner);
     ASSERT_EQ(&owner, &DecorationWithOwner::get.owner(decoration));
+}
+
+TEST(DecorableTest, DecorableCopyableType) {
+    numCopyConstructedAs = 0;
+    numCopyAssignedAs = 0;
+    const auto dd1 = MyCopyableDecorable::declareDecoration<A>();
+    const auto dd2 = MyCopyableDecorable::declareDecoration<int>();
+    {
+        MyCopyableDecorable decorable1;
+        dd1(decorable1).value = 1;
+        dd2(decorable1) = 2;
+
+        MyCopyableDecorable decorable2(decorable1);
+        ASSERT_EQ(1, numCopyConstructedAs);
+        ASSERT_EQ(0, numCopyAssignedAs);
+        ASSERT_EQ(dd1(decorable1).value, dd1(decorable2).value);
+        ASSERT_EQ(dd2(decorable1), dd2(decorable2));
+
+        MyCopyableDecorable decorable3;
+        ASSERT_NE(dd1(decorable1).value, dd1(decorable3).value);
+        ASSERT_NE(dd2(decorable1), dd2(decorable3));
+
+        decorable3 = decorable1;
+        ASSERT_EQ(1, numCopyConstructedAs);
+        ASSERT_EQ(1, numCopyAssignedAs);
+        ASSERT_EQ(dd1(decorable1).value, dd1(decorable3).value);
+        ASSERT_EQ(dd2(decorable1), dd2(decorable3));
+    }
 }
 
 }  // namespace
