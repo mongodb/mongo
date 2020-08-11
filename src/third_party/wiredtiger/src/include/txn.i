@@ -852,7 +852,7 @@ __wt_txn_read_upd_list(
          * If the cursor is configured to ignore tombstones, copy the timestamps from the tombstones
          * to the stop time window of the update value being returned to the caller. Caller can
          * process the stop time window to decide if there was a tombstone on the update chain. If
-         * the time window already has a stop time set then we must've seen a tombstone prior to
+         * the time window already has a stop time set then we must have seen a tombstone prior to
          * ours in the update list, and therefore don't need to do this again.
          */
         if (type == WT_UPDATE_TOMBSTONE && F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) &&

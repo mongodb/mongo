@@ -266,10 +266,18 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
                 tmp = drealloc(tmp, size);
                 tmp_sz = size;
             }
-            error_sys_check(lseek(rfd, (wt_off_t)offset, SEEK_SET));
+            /*
+             * Don't use the system checker for lseek. The system check macro uses an int which is
+             * often 4 bytes and checks for any negative value. The offset returned from lseek is
+             * 8 bytes and we can have a false positive error check.
+             */
+            if (lseek(rfd, (wt_off_t)offset, SEEK_SET) == -1)
+                testutil_die(errno, "backup-read: lseek");
             error_sys_check(rdsize = read(rfd, tmp, size));
-            error_sys_check(lseek(wfd1, (wt_off_t)offset, SEEK_SET));
-            error_sys_check(lseek(wfd2, (wt_off_t)offset, SEEK_SET));
+            if (lseek(wfd1, (wt_off_t)offset, SEEK_SET) == -1)
+                testutil_die(errno, "backup-write1: lseek");
+            if (lseek(wfd2, (wt_off_t)offset, SEEK_SET) == -1)
+                testutil_die(errno, "backup-write2: lseek");
             /* Use the read size since we may have read less than the granularity. */
             error_sys_check(write(wfd1, tmp, (size_t)rdsize));
             error_sys_check(write(wfd2, tmp, (size_t)rdsize));
