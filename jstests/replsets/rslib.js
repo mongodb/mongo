@@ -172,7 +172,7 @@ waitForAllMembers = function(master, timeout) {
     assert.soon(function() {
         var state = null;
         try {
-            state = master.getSisterDB("admin").runCommand({replSetGetStatus: 1});
+            state = master.getSiblingDB("admin").runCommand({replSetGetStatus: 1});
             failCount = 0;
         } catch (e) {
             // Connection can get reset on replica set failover causing a socket exception

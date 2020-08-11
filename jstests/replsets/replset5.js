@@ -77,7 +77,7 @@ config.members[2].hidden = 1;
 
 master = reconfig(replTest, config);
 
-config = master.getSisterDB("local").system.replset.findOne();
+config = master.getSiblingDB("local").system.replset.findOne();
 assert.eq(config.members[2].hidden, true);
 
 replTest.stopSet();

@@ -109,7 +109,7 @@ assert.soon(function() {
         curOpState = 1;
         // kill all $where
         mine.forEach(function(z) {
-            printjson(dbForTest.getSisterDB("admin").killOp(z.opid));
+            printjson(dbForTest.getSiblingDB("admin").killOp(z.opid));
         });
         killTime = new Date();
     }

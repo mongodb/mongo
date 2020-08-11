@@ -27,7 +27,7 @@ for (var i = 0; i < 10 - 1; i++) {  // 10 chunks total
 sh.disableBalancing(collB);
 
 jsTest.log("Balancing disabled on " + collB);
-printjson(collA.getDB().getSisterDB("config").collections.find().toArray());
+printjson(collA.getDB().getSiblingDB("config").collections.find().toArray());
 
 st.startBalancer();
 

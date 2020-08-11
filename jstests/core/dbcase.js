@@ -1,7 +1,7 @@
 // Check db name duplication constraint SERVER-2111
 
-a = db.getSisterDB("dbcasetest_dbnamea");
-b = db.getSisterDB("dbcasetest_dbnameA");
+a = db.getSiblingDB("dbcasetest_dbnamea");
+b = db.getSiblingDB("dbcasetest_dbnameA");
 
 a.dropDatabase();
 b.dropDatabase();

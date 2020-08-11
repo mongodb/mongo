@@ -45,8 +45,8 @@ assert.neq(gh(a), gh(b), "A2");
 b.insert({_id: 5});
 assert.eq(gh(a), gh(b), "A3");
 
-dba = db.getSisterDB("dbhasha");
-dbb = db.getSisterDB("dbhashb");
+dba = db.getSiblingDB("dbhasha");
+dbb = db.getSiblingDB("dbhashb");
 
 dba.dropDatabase();
 dbb.dropDatabase();

@@ -13,7 +13,7 @@
 (function() {
 'use strict';
 
-const admin = db.getSisterDB('admin');
+const admin = db.getSiblingDB('admin');
 
 // Get current log level.
 let originalLogLevel = assert.commandWorked(admin.setLogLevel(1)).was.verbosity;

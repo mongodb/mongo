@@ -125,7 +125,7 @@ assert(b.fooname.find().itcount() > 0, "count rename");
 // create an index - verify that it is removed
 b.fooname.ensureIndex({q: 1});
 // test roll back (drop) a whole database
-var abc = b.getSisterDB("abc");
+var abc = b.getSiblingDB("abc");
 assert.commandWorked(abc.foo.insert({x: 1}));
 assert.commandWorked(abc.bar.insert({y: 999}));
 

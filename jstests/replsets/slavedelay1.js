@@ -52,7 +52,7 @@ doTest = function(signal) {
     // how about if we add a new server?  will it sync correctly?
     conn = replTest.add();
 
-    config = master.getSisterDB("local").system.replset.findOne();
+    config = master.getSiblingDB("local").system.replset.findOne();
     printjson(config);
     config.version++;
     config.members.push({
@@ -63,7 +63,7 @@ doTest = function(signal) {
     });
 
     master = reconfig(replTest, config);
-    master = master.getSisterDB(name);
+    master = master.getSiblingDB(name);
 
     assert.commandWorked(master.foo.insert(
         {_id: 123, x: 'foo'}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));

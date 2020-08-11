@@ -4,7 +4,7 @@
 
 m = db.getMongo();
 baseName = "jstests_dropdb";
-ddb = db.getSisterDB(baseName);
+ddb = db.getSiblingDB(baseName);
 
 print("initial dbs: " + tojson(m.getDBNames()));
 

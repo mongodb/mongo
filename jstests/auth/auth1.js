@@ -20,8 +20,8 @@ function runTest(m) {
     dbRO = mro.getDB("test");
     tRO = dbRO[baseName];
 
-    db.getSisterDB("admin").createUser({user: "root", pwd: "root", roles: ["root"]});
-    db.getSisterDB("admin").auth("root", "root");
+    db.getSiblingDB("admin").createUser({user: "root", pwd: "root", roles: ["root"]});
+    db.getSiblingDB("admin").auth("root", "root");
 
     t = db[baseName];
     t.drop();
@@ -29,11 +29,11 @@ function runTest(m) {
     db.dropAllUsers();
     db.logout();
 
-    db.getSisterDB("admin").createUser({user: "super", pwd: "super", roles: ["__system"]});
-    db.getSisterDB("admin").auth("super", "super");
+    db.getSiblingDB("admin").createUser({user: "super", pwd: "super", roles: ["__system"]});
+    db.getSiblingDB("admin").auth("super", "super");
     db.createUser({user: "eliot", pwd: "eliot", roles: jsTest.basicUserRoles});
     db.createUser({user: "guest", pwd: "guest", roles: jsTest.readOnlyUserRoles});
-    db.getSisterDB("admin").logout();
+    db.getSiblingDB("admin").logout();
 
     assert.throws(function() {
         t.findOne();

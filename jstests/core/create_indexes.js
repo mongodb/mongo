@@ -41,7 +41,7 @@ var checkImplicitCreate = function(createIndexResult) {
     assert.eq(true, createIndexResult.createdCollectionAutomatically);
 };
 
-var dbTest = db.getSisterDB('create_indexes_db');
+var dbTest = db.getSiblingDB('create_indexes_db');
 dbTest.dropDatabase();
 
 // Database does not exist

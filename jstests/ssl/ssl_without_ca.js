@@ -26,7 +26,7 @@ var exitStatus = runMongoProgram('mongo',
                                  '--port',
                                  conn.port,
                                  '--eval',
-                                 ('quit(db.getSisterDB("$external").auth({' +
+                                 ('quit(db.getSiblingDB("$external").auth({' +
                                   'user: "' + CLIENT_USER + '" ,' +
                                   'mechanism: "MONGODB-X509"}));'));
 

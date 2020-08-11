@@ -24,7 +24,7 @@ assert.soon(function() {
 });
 
 join =
-    startParallelShell("db.getSisterDB('bar').runCommand({compact : 'foo'});", replTest.ports[1]);
+    startParallelShell("db.getSiblingDB('bar').runCommand({compact : 'foo'});", replTest.ports[1]);
 
 print("joining");
 join();

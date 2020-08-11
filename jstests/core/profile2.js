@@ -6,7 +6,7 @@
 //   sbe_incompatible,
 // ]
 
-var coll = db.getSisterDB("profile2").profile2;
+var coll = db.getSiblingDB("profile2").profile2;
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.drop();

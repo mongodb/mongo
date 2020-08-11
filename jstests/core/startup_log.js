@@ -29,11 +29,11 @@ function arrayIsSubset(smallArray, largeArray) {
 }
 
 // Test startup_log
-var stats = db.getSisterDB("local").startup_log.stats();
+var stats = db.getSiblingDB("local").startup_log.stats();
 assert(stats.capped);
 
 var latestStartUpLog =
-    db.getSisterDB("local").startup_log.find().sort({$natural: -1}).limit(1).next();
+    db.getSiblingDB("local").startup_log.find().sort({$natural: -1}).limit(1).next();
 var serverStatus = db._adminCommand("serverStatus");
 var cmdLine = db._adminCommand("getCmdLineOpts").parsed;
 

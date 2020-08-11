@@ -108,7 +108,7 @@ function runBypassDocumentValidationTest(validator) {
 
     // Test the mapReduce command if it is reading from a different database and collection without
     // validation.
-    const otherDb = myDb.getSisterDB("mr_second_input_db");
+    const otherDb = myDb.getSiblingDB("mr_second_input_db");
     const otherDbColl = otherDb.mr_second_input_coll;
     assert.commandWorked(otherDbColl.insert({val: 1}));
     outputColl.drop();

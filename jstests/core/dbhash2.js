@@ -4,7 +4,7 @@
 //   incompatible_with_embedded,
 // ]
 
-mydb = db.getSisterDB("config");
+mydb = db.getSiblingDB("config");
 
 t = mydb.foo;
 t.drop();

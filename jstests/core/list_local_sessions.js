@@ -13,7 +13,7 @@
 (function() {
 'use strict';
 
-const admin = db.getSisterDB('admin');
+const admin = db.getSiblingDB('admin');
 function listLocalSessions() {
     return admin.aggregate([{'$listLocalSessions': {allUsers: false}}]);
 }

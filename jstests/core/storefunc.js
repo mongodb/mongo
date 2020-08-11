@@ -5,7 +5,7 @@
 // ]
 
 // Use a private sister database to avoid conflicts with other tests that use system.js
-var testdb = db.getSisterDB("storefunc");
+var testdb = db.getSiblingDB("storefunc");
 var res;
 
 s = testdb.system.js;

@@ -16,7 +16,7 @@
 "use strict";
 
 // Start with a clean DB.
-var fsyncLockDB = db.getSisterDB('fsyncLockTestDB');
+var fsyncLockDB = db.getSiblingDB('fsyncLockTestDB');
 fsyncLockDB.dropDatabase();
 
 // Tests the db.fsyncLock/fsyncUnlock features.
@@ -36,7 +36,7 @@ db.fsyncUnlock();
 var resFail = fsyncLockDB.runCommand({fsync: 1, lock: 1});
 
 // Start with a clean DB
-var fsyncLockDB = db.getSisterDB('fsyncLockTestDB');
+var fsyncLockDB = db.getSiblingDB('fsyncLockTestDB');
 fsyncLockDB.dropDatabase();
 
 // Test that a single, regular write works as expected.
@@ -54,7 +54,7 @@ assert(db.currentOp().fsyncLock, "Value in db.currentOp incorrect for fsyncLocke
 // Make sure writes are blocked. Spawn a write operation in a separate shell and make sure it
 // is blocked. There is really no way to do that currently, so just check that the write didn't
 // go through.
-var writeOpHandle = startParallelShell("db.getSisterDB('fsyncLockTestDB').coll.insert({x:1});");
+var writeOpHandle = startParallelShell("db.getSiblingDB('fsyncLockTestDB').coll.insert({x:1});");
 sleep(3000);
 
 // Make sure reads can still run even though there is a pending write and also that the write
@@ -90,7 +90,7 @@ assert.commandWorked(currentOp);
 assert(currentOp.fsyncLock, "Value in db.currentOp incorrect for fsyncLocked server");
 
 let shellHandle1 =
-    startParallelShell("db.getSisterDB('fsyncLockTestDB').multipleLock.insert({x:1});");
+    startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
 
 fsyncLockRes = db.fsyncLock();
 assert.commandWorked(fsyncLockRes);
@@ -100,7 +100,7 @@ assert.commandWorked(currentOp);
 assert(currentOp.fsyncLock, "Value in db.currentOp incorrect for fsyncLocked server");
 
 let shellHandle2 =
-    startParallelShell("db.getSisterDB('fsyncLockTestDB').multipleLock.insert({x:1});");
+    startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
 sleep(3000);
 assert.eq(0, fsyncLockDB.multipleLock.find({}).itcount());
 

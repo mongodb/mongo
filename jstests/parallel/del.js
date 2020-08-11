@@ -3,8 +3,8 @@ load('jstests/libs/parallelTester.js');
 N = 1000;
 HOST = db.getMongo().host;
 
-a = db.getSisterDB("fooa");
-b = db.getSisterDB("foob");
+a = db.getSiblingDB("fooa");
+b = db.getSiblingDB("foob");
 a.dropDatabase();
 b.dropDatabase();
 

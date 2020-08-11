@@ -7,7 +7,7 @@
 
 // Test db.loadServerScripts()
 
-var testdb = db.getSisterDB("loadserverscripts");
+var testdb = db.getSiblingDB("loadserverscripts");
 
 jsTest.log("testing db.loadServerScripts()");
 var x;
@@ -52,7 +52,7 @@ assert.eq(x, "myfunc", "Checking that myfunc() returns the correct value");
 
 // Insert value into collection from another process
 var coproc =
-    startParallelShell('db.getSisterDB("loadserverscripts").system.js.insert' +
+    startParallelShell('db.getSiblingDB("loadserverscripts").system.js.insert' +
                        '    ( {_id: "myfunc2", "value": function(){ return "myfunc2"; } } );');
 // wait for results
 coproc();

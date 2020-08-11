@@ -1,7 +1,7 @@
 // @tags: [assumes_against_mongod_not_mongos, requires_getmore, requires_non_retryable_writes]
 
-a = db.getSisterDB("delxa");
-b = db.getSisterDB("delxb");
+a = db.getSiblingDB("delxa");
+b = db.getSiblingDB("delxb");
 
 function setup(mydb) {
     mydb.dropDatabase();

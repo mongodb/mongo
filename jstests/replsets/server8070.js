@@ -12,8 +12,8 @@ load("jstests/replsets/rslib.js");
 // helper to ensure two nodes are at the same place in the oplog
 var waitForSameOplogPosition = function(db1, db2, errmsg) {
     assert.soon(function() {
-        var last1 = db1.getSisterDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
-        var last2 = db2.getSisterDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+        var last1 = db1.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+        var last2 = db2.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
         jsTest.log("primary: " + tojson(last1) + " secondary: " + tojson(last2));
 
         return ((last1.ts.t === last2.ts.t) && (last1.ts.i === last2.ts.i));
@@ -89,7 +89,7 @@ for (var i = 50; i < 75; i++) {
 }
 var primaryCollectionSize = primary.bar.find().itcount();
 jsTest.log("primary collection size: " + primaryCollectionSize);
-var last = primary.getSisterDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+var last = primary.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
 
 jsTest.log("waiting a bit for the secondaries to get the write");
 sleep(10000);
@@ -111,7 +111,7 @@ stopServerReplication(member3.getMongo());
 
 // count documents in member 3
 assert.eq(26,
-          member3.getSisterDB("foo").bar.find().itcount(),
+          member3.getSiblingDB("foo").bar.find().itcount(),
           "collection size incorrect on node 3 before applying ops 25-75");
 
 jsTest.log("Allow 3 to apply ops 25-75");
@@ -119,11 +119,11 @@ assert.commandWorked(member3.runCommand({configureFailPoint: 'rsSyncApplyStop', 
                      "member 3 rsSyncApplyStop admin command failed");
 
 assert.soon(function() {
-    var last3 = member3.getSisterDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+    var last3 = member3.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
     jsTest.log("primary: " + tojson(last, '', true) + " secondary: " + tojson(last3, '', true));
-    jsTest.log("member 3 collection size: " + member3.getSisterDB("foo").bar.find().itcount());
+    jsTest.log("member 3 collection size: " + member3.getSiblingDB("foo").bar.find().itcount());
     jsTest.log("curop: ");
-    printjson(member3.getSisterDB("foo").currentOp(true));
+    printjson(member3.getSiblingDB("foo").currentOp(true));
     return ((last.ts.t === last3.ts.t) && (last.ts.i === last3.ts.i));
 }, "Replication member 3 did not apply ops 25-75");
 

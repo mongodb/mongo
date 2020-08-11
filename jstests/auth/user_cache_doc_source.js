@@ -31,7 +31,7 @@ newConn.close();
 */
 
 var awaitShell = startParallelShell(function() {
-    assert.eq(db.getSisterDB("admin").auth("readOnlyUser", "foobar"), 1);
+    assert.eq(db.getSiblingDB("admin").auth("readOnlyUser", "foobar"), 1);
 }, mongod.port);
 
 const expectedReadOnlyInactive = [

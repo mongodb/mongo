@@ -8,7 +8,7 @@
 
 m = db.getMongo();
 baseName = "jstests_dur_droprace";
-d = db.getSisterDB(baseName);
+d = db.getSiblingDB(baseName);
 t = d.foo;
 
 assert(d.adminCommand({setParameter: 1, syncdelay: 5}).ok);

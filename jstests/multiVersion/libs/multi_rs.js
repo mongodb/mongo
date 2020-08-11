@@ -167,7 +167,7 @@ ReplSetTest.prototype.conf = function() {
         return resp.config;
 
     else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))
-        return admin.getSisterDB("local").system.replset.findOne();
+        return admin.getSiblingDB("local").system.replset.findOne();
 
     throw new Error("Could not retrieve replica set config: " + tojson(resp));
 };

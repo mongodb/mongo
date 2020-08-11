@@ -6,7 +6,7 @@
 
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos()'.
 
-var dbTest = db.getSisterDB("DB_create_collection_fail_cleanup");
+var dbTest = db.getSiblingDB("DB_create_collection_fail_cleanup");
 dbTest.dropDatabase();
 
 let collectionNames = dbTest.getCollectionNames();

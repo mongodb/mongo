@@ -9,7 +9,7 @@ function assertGLEOK(status) {
     assert(status.ok && status.err === null, "Expected OK status object; found " + tojson(status));
 }
 
-db = db.getSisterDB("MapReduceTestDB");
+db = db.getSiblingDB("MapReduceTestDB");
 db.dropDatabase();
 
 var coll = db.getCollection("mrInput");

@@ -9,7 +9,7 @@
 "use strict";
 
 // Use a special db to support running other tests in parallel.
-const profileDB = db.getSisterDB("profile_sampling");
+const profileDB = db.getSiblingDB("profile_sampling");
 const coll = profileDB.profile_sampling;
 
 profileDB.dropDatabase();

@@ -32,11 +32,11 @@ for (var i = 0; i < 1000; i++)
 assert.eq(1000, t.count(), "inserts failed");
 
 d.dropAllUsers();
-d.getSisterDB("admin").createUser({user: "admin", pwd: "admin", roles: jsTest.adminUserRoles});
-d.getSisterDB("admin").auth('admin', 'admin');
+d.getSiblingDB("admin").createUser({user: "admin", pwd: "admin", roles: jsTest.adminUserRoles});
+d.getSiblingDB("admin").auth('admin', 'admin');
 d.createUser({user: "write", pwd: "write", roles: jsTest.basicUserRoles});
 d.createUser({user: "read", pwd: "read", roles: jsTest.readOnlyUserRoles});
-d.getSisterDB("admin").logout();
+d.getSiblingDB("admin").logout();
 
 t.mapReduce(map, red, {out: {inline: 1}});
 
