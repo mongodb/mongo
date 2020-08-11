@@ -19,8 +19,8 @@ env.Library(
     LIBDEPS= ['$BUILD_DIR/mongo/base',
               '$BUILD_DIR/mongo/db/service_context'],
     LIBDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongod_initializers',
-        '$BUILD_DIR/mongo/mongos_initializers',
+        '$BUILD_DIR/mongo/db/mongod_initializers',
+        '$BUILD_DIR/mongo/s/mongos_initializers',
     ],
     LIBDEPS_TAGS=[
         'lint-allow-nonprivate-on-deps-dependents',
