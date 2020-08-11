@@ -41,6 +41,7 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/string_map.h"
 
@@ -156,6 +157,12 @@ public:
      * persisted.
      */
     virtual NamespaceString getStateDocumentsNS() const = 0;
+
+    /**
+     * Returns the limits that should be imposed on the size of the underlying thread pool used for
+     * running Instances of this PrimaryOnlyService.
+     */
+    virtual ThreadPool::Limits getThreadPoolLimits() const = 0;
 
     /**
      * Constructs and starts up _executor.

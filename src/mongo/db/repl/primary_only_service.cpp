@@ -124,7 +124,10 @@ PrimaryOnlyService::PrimaryOnlyService(ServiceContext* serviceContext)
     : _serviceContext(serviceContext) {}
 
 void PrimaryOnlyService::startup(OperationContext* opCtx) {
-    ThreadPool::Options threadPoolOptions;
+    // Initialize the thread pool options with the service-specific limits on pool size.
+    ThreadPool::Options threadPoolOptions(getThreadPoolLimits());
+
+    // Now add the options that are fixed for all PrimaryOnlyServices.
     threadPoolOptions.threadNamePrefix = getServiceName() + "-";
     threadPoolOptions.poolName = getServiceName() + "ThreadPool";
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {

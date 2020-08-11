@@ -85,6 +85,11 @@ ThreadPool::Options cleanUpOptions(ThreadPool::Options&& options) {
 
 }  // namespace
 
+ThreadPool::Options::Options(const ThreadPool::Limits& limits)
+    : minThreads(limits.minThreads),
+      maxThreads(limits.maxThreads),
+      maxIdleThreadAge(limits.maxIdleThreadAge) {}
+
 ThreadPool::ThreadPool(Options options) : _options(cleanUpOptions(std::move(options))) {}
 
 ThreadPool::~ThreadPool() {

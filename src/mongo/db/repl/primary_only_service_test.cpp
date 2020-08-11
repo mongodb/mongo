@@ -80,6 +80,10 @@ public:
         return NamespaceString("admin", "test_service");
     }
 
+    ThreadPool::Limits getThreadPoolLimits() const override {
+        return ThreadPool::Limits();
+    }
+
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) const override {
         return std::make_shared<TestService::Instance>(std::move(initialState));
