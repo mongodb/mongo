@@ -24,21 +24,9 @@ var INTERNAL_USER = 'CN=internal,OU=Kernel,O=MongoDB,L=New York City,ST=New York
 var CLIENT_USER = 'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
 var INVALID_CLIENT_USER = 'CN=invalid,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
 
-function authAndTest(mongo) {
+function authAndTest(mongo, clusterUserSeparationOveride = false) {
     external = mongo.getDB("$external");
     test = mongo.getDB("test");
-
-    // It should be impossible to create users with the same name as the server's subject
-    assert.throws(function() {
-        external.createUser(
-            {user: SERVER_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
-    }, [], "Created user with same name as the server's x.509 subject");
-
-    // It should be impossible to create users with names recognized as cluster members
-    assert.throws(function() {
-        external.createUser(
-            {user: INTERNAL_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
-    }, [], "Created user which would be recognized as a cluster member");
 
     // Add user using localhost exception
     external.createUser({
@@ -48,12 +36,6 @@ function authAndTest(mongo) {
             {'role': 'readWriteAnyDatabase', 'db': 'admin'},
             {'role': 'clusterMonitor', 'db': 'admin'},
         ]
-    });
-
-    // It should be impossible to create users with an internal name
-    assert.throws(function() {
-        external.createUser(
-            {user: SERVER_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
     });
 
     // Localhost exception should not be in place anymore
@@ -80,6 +62,22 @@ function authAndTest(mongo) {
 
     assert(log.some((line) => successRegex.test(line)));
 
+    const overrideDependentTester =
+        clusterUserSeparationOveride ? assert.doesNotThrow : assert.throws;
+    // It should be impossible to create users with the same name as the server's subject,
+    // unless guardrails are explicitly overridden
+    overrideDependentTester(function() {
+        external.createUser(
+            {user: SERVER_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
+    }, [], "Created user with same name as the server's x.509 subject");
+
+    // It should be impossible to create users with names recognized as cluster members,
+    // unless guardrails are explicitly overridden
+    overrideDependentTester(function() {
+        external.createUser(
+            {user: INTERNAL_USER, roles: [{'role': 'userAdminAnyDatabase', 'db': 'admin'}]});
+    }, [], "Created user which would be recognized as a cluster member");
+
     // Check that we can add a user and read data
     test.createUser(
         {user: "test", pwd: "test", roles: [{'role': 'readWriteAnyDatabase', 'db': 'admin'}]});
@@ -91,29 +89,60 @@ function authAndTest(mongo) {
     }, [], "read after logout");
 }
 
-print("1. Testing x.509 auth to mongod");
-var x509_options = {sslMode: "requireSSL", sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT};
+const x509_options = {
+    sslMode: "requireSSL",
+    sslPEMKeyFile: SERVER_CERT,
+    sslCAFile: CA_CERT
+};
 
-var mongo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
+{
+    print("1. Testing x.509 auth to mongod");
+    const mongo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
 
-authAndTest(mongo);
-MongoRunner.stopMongod(mongo);
+    authAndTest(mongo);
+    MongoRunner.stopMongod(mongo);
+}
+{
+    print("1.5. Testing x.509 auth to mongod with cluster/user separation disabled");
+    const mongo = MongoRunner.runMongod(Object.merge(
+        x509_options, {auth: "", setParameter: {enforceUserClusterSeparation: false}}));
 
-print("2. Testing x.509 auth to mongos");
+    authAndTest(mongo, true);
+    MongoRunner.stopMongod(mongo);
+}
 
-// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
-var st = new ShardingTest({
-    shards: 1,
-    mongos: 1,
-    other: {
-        keyFile: 'jstests/libs/key1',
-        configOptions: x509_options,
-        mongosOptions: x509_options,
-        shardOptions: x509_options,
-        useHostname: false,
-        shardAsReplicaSet: false
-    }
-});
+{
+    print("2. Testing x.509 auth to mongos");
+    var st = new ShardingTest({
+        shards: 1,
+        mongos: 1,
+        other: {
+            keyFile: 'jstests/libs/key1',
+            configOptions: x509_options,
+            mongosOptions: x509_options,
+            shardOptions: x509_options,
+            useHostname: false,
+        }
+    });
 
-authAndTest(new Mongo("localhost:" + st.s0.port));
-st.stop();
+    authAndTest(new Mongo("localhost:" + st.s0.port));
+    st.stop();
+}
+{
+    print("2.5 Testing x.509 auth to mongos with cluster/user separation disabled");
+    var st = new ShardingTest({
+        shards: 1,
+        mongos: 1,
+        other: {
+            keyFile: 'jstests/libs/key1',
+            configOptions:
+                Object.merge(x509_options, {setParameter: {enforceUserClusterSeparation: false}}),
+            mongosOptions: x509_options,
+            shardOptions: x509_options,
+            useHostname: false
+        }
+    });
+
+    authAndTest(new Mongo("localhost:" + st.s0.port), true);
+    st.stop();
+}
