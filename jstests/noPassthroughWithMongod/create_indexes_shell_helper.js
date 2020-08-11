@@ -15,7 +15,7 @@
             writeMode: function() {
                 return this._writeMode;
             },
-            getSlaveOk: function() {
+            getSecondaryOk: function() {
                 return true;
             },
             runCommand: function(db, cmd, opts) {

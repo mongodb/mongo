@@ -1364,20 +1364,32 @@ DBCollection.prototype.getSplitKeysForChunks = function(chunkSize) {
 };
 
 DBCollection.prototype.setSlaveOk = function(value) {
-    if (value == undefined)
-        value = true;
-    this._slaveOk = value;
+    print(
+        "WARNING: setSlaveOk() is deprecated and may be removed in the next major release. Please use setSecondaryOk() instead.");
+    this.setSecondaryOk(value);
 };
 
 DBCollection.prototype.getSlaveOk = function() {
-    if (this._slaveOk != undefined)
-        return this._slaveOk;
-    return this._db.getSlaveOk();
+    print(
+        "WARNING: getSlaveOk() is deprecated and may be removed in the next major release. Please use getSecondaryOk() instead.");
+    return this.getSecondaryOk();
+};
+
+DBCollection.prototype.setSecondaryOk = function(value) {
+    if (value === undefined)
+        value = true;
+    this._secondaryOk = value;
+};
+
+DBCollection.prototype.getSecondaryOk = function() {
+    if (this._secondaryOk !== undefined)
+        return this._secondaryOk;
+    return this._db.getSecondaryOk();
 };
 
 DBCollection.prototype.getQueryOptions = function() {
     // inherit this method from DB but use apply so
-    // that slaveOk will be set if is overridden on this DBCollection
+    // that secondaryOk will be set if is overridden on this DBCollection
     return this._db.getQueryOptions.apply(this, arguments);
 };
 
