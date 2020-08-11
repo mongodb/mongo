@@ -41,9 +41,8 @@ namespace {
 static constexpr StringData kRecordIdField = "recordId"_sd;
 }
 
-SkippedRecordTracker::SkippedRecordTracker(IndexCatalogEntry* indexCatalogEntry) {
-    SkippedRecordTracker(nullptr, indexCatalogEntry, boost::none);
-}
+SkippedRecordTracker::SkippedRecordTracker(IndexCatalogEntry* indexCatalogEntry)
+    : SkippedRecordTracker(nullptr, indexCatalogEntry, boost::none) {}
 
 SkippedRecordTracker::SkippedRecordTracker(OperationContext* opCtx,
                                            IndexCatalogEntry* indexCatalogEntry,
