@@ -352,10 +352,10 @@ TEST_F(PrimaryOnlyServiceTest, CreateWithoutID) {
 
 TEST_F(PrimaryOnlyServiceTest, StepDownBeforePersisted) {
     // Prevent the instance from writing its initial state document to the storage engine.
-    TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+    auto timesEntered = TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
 
     auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
-    TestServiceHangDuringInitialization.waitForTimesEntered(1);
+    TestServiceHangDuringInitialization.waitForTimesEntered(++timesEntered);
     stepDown();
     TestServiceHangDuringInitialization.setMode(FailPoint::off);
 
@@ -368,10 +368,10 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforePersisted) {
 
 TEST_F(PrimaryOnlyServiceTest, RecreateInstanceOnStepUp) {
     // Cause the Instance to be interrupted after writing its initial state document in state 1.
-    TestServiceHangDuringStateOne.setMode(FailPoint::alwaysOn);
+    auto stateOneFPTimesEntered = TestServiceHangDuringStateOne.setMode(FailPoint::alwaysOn);
 
     auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
-    TestServiceHangDuringStateOne.waitForTimesEntered(1);
+    TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
 
     ASSERT_EQ(TestService::State::kInitializing, instance->getInitialState());
     ASSERT_EQ(TestService::State::kOne, instance->getState());
@@ -379,25 +379,25 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstanceOnStepUp) {
     stepDown();
 
     TestServiceHangDuringStateOne.setMode(FailPoint::off);
-    TestServiceHangDuringStateTwo.setMode(FailPoint::alwaysOn);
+    auto stateTwoFPTimesEntered = TestServiceHangDuringStateTwo.setMode(FailPoint::alwaysOn);
 
     stepUp();
 
     auto recreatedInstance = TestService::Instance::lookup(_service, BSON("_id" << 0)).get();
     ASSERT_EQ(TestService::State::kOne, recreatedInstance->getInitialState());
-    TestServiceHangDuringStateTwo.waitForTimesEntered(1);
+    TestServiceHangDuringStateTwo.waitForTimesEntered(++stateTwoFPTimesEntered);
     ASSERT_EQ(TestService::State::kTwo, recreatedInstance->getState());
 
     stepDown();
 
     TestServiceHangDuringStateTwo.setMode(FailPoint::off);
-    TestServiceHangDuringCompletion.setMode(FailPoint::alwaysOn);
+    auto completionFPTimesEntered = TestServiceHangDuringCompletion.setMode(FailPoint::alwaysOn);
 
     stepUp();
 
     recreatedInstance = TestService::Instance::lookup(_service, BSON("_id" << 0)).get();
     ASSERT_EQ(TestService::State::kTwo, recreatedInstance->getInitialState());
-    TestServiceHangDuringCompletion.waitForTimesEntered(1);
+    TestServiceHangDuringCompletion.waitForTimesEntered(++completionFPTimesEntered);
     ASSERT_EQ(TestService::State::kDone, recreatedInstance->getState());
 
     TestServiceHangDuringCompletion.setMode(FailPoint::off);
@@ -461,4 +461,58 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforeRebuildingInstances) {
     TestServiceHangDuringStateOne.setMode(FailPoint::off);
 
     instance->waitForCompletion();
+}
+
+TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
+    // Cause the Instance to be interrupted after writing its initial state document in state 1.
+    auto stateOneFPTimesEntered = TestServiceHangDuringStateOne.setMode(FailPoint::alwaysOn);
+
+    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+    TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
+
+    ASSERT_EQ(TestService::State::kInitializing, instance->getInitialState());
+    ASSERT_EQ(TestService::State::kOne, instance->getState());
+
+    stepDown();
+
+    TestServiceHangDuringStateOne.setMode(FailPoint::off);
+    // Make querying the state document collection on stepUp fail
+    PrimaryOnlyServiceFailRebuildingInstances.setMode(FailPoint::alwaysOn);
+
+    stepUp();
+
+    // Now that rebuilding the service on stepUp failed, all subsequent operations on that service
+    // will fail until the next stepDown.
+    ASSERT_THROWS_CODE(TestService::Instance::lookup(_service, BSON("_id" << 0)),
+                       DBException,
+                       ErrorCodes::InternalError);
+    ASSERT_THROWS_CODE(
+        TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0)),
+        DBException,
+        ErrorCodes::InternalError);
+
+    stepDown();
+
+    // After stepping down we are in a consistent state again, but cannot create or lookup instances
+    // because we are not primary.
+    ASSERT_FALSE(TestService::Instance::lookup(_service, BSON("_id" << 0)).is_initialized());
+    ASSERT_THROWS_CODE(
+        TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0)),
+        DBException,
+        ErrorCodes::NotMaster);
+
+    // Allow the next stepUp to succeed.
+    PrimaryOnlyServiceFailRebuildingInstances.setMode(FailPoint::off);
+    stateOneFPTimesEntered = TestServiceHangDuringStateOne.setMode(FailPoint::alwaysOn);
+
+    stepUp();
+    TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
+
+    // Instance should be recreated successfully.
+    instance = TestService::Instance::lookup(_service, BSON("_id" << 0)).get();
+    ASSERT_EQ(TestService::State::kOne, instance->getInitialState());
+    ASSERT_EQ(TestService::State::kOne, instance->getState());
+    TestServiceHangDuringStateOne.setMode(FailPoint::off);
+    instance->waitForCompletion();
+    ASSERT_EQ(TestService::State::kDone, instance->getState());
 }

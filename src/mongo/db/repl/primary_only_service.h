@@ -52,6 +52,7 @@ class ServiceContext;
 namespace repl {
 
 extern FailPoint PrimaryOnlyServiceHangBeforeRebuildingInstances;
+extern FailPoint PrimaryOnlyServiceFailRebuildingInstances;
 
 /**
  * A PrimaryOnlyService is a group of tasks (represented in memory as Instances) that should only
@@ -237,10 +238,15 @@ private:
         kRunning,
         kPaused,
         kRebuilding,
+        kRebuildFailed,
         kShutdown,
     };
 
     State _state = State::kPaused;
+
+    // If reloading the state documents from disk fails, this Status gets set to a non-ok value and
+    // calls to lookup() or getOrCreate() will throw this status until the node steps down.
+    Status _rebuildStatus = Status::OK();
 
     // The term that this service is running under.
     long long _term = OpTime::kUninitializedTerm;

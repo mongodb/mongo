@@ -58,6 +58,7 @@ namespace mongo {
 namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceHangBeforeRebuildingInstances);
+MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceFailRebuildingInstances);
 
 namespace {
 const auto _registryDecoration = ServiceContext::declareDecoration<PrimaryOnlyServiceRegistry>();
@@ -185,6 +186,7 @@ void PrimaryOnlyService::onStepDown() {
         (*_scopedExecutor)->shutdown();
     }
     _state = State::kPaused;
+    _rebuildStatus = Status::OK();
 }
 
 void PrimaryOnlyService::shutdown() {
@@ -225,6 +227,9 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateIns
     while (_state == State::kRebuilding) {
         _rebuildCV.wait(lk);
     }
+    if (_state == State::kRebuildFailed) {
+        uassertStatusOK(_rebuildStatus);
+    }
     uassert(
         ErrorCodes::NotMaster,
         str::stream() << "Not Primary when trying to create a new instance of PrimaryOnlyService "
@@ -255,6 +260,9 @@ boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyServic
         invariant(_instances.empty());
         return boost::none;
     }
+    if (_state == State::kRebuildFailed) {
+        uassertStatusOK(_rebuildStatus);
+    }
     invariant(_state == State::kRunning);
 
 
@@ -272,19 +280,33 @@ void PrimaryOnlyService::_rebuildInstances() noexcept {
         auto opCtx = cc().makeOperationContext();
         DBDirectClient client(opCtx.get());
         try {
+            if (MONGO_unlikely(PrimaryOnlyServiceFailRebuildingInstances.shouldFail())) {
+                uassertStatusOK(
+                    Status(ErrorCodes::InternalError, "Querying state documents failed"));
+            }
+
             auto cursor = client.query(getStateDocumentsNS(), Query());
             while (cursor->more()) {
                 stateDocuments.push_back(cursor->nextSafe().getOwned());
             }
         } catch (const DBException& e) {
-            // TODO: make this failure more obvious, especially to callers of getOrCreateInstance
-            // and lookupInstance.
             LOGV2_ERROR(4923601,
                         "Failed to start PrimaryOnlyService {service} because the query on {ns} "
                         "for state documents failed due to {error}",
                         "ns"_attr = getStateDocumentsNS(),
                         "service"_attr = getServiceName(),
                         "error"_attr = e);
+
+            Status status = e.toStatus();
+            status.addContext(str::stream()
+                              << "Failed to start PrimaryOnlyService \"" << getServiceName()
+                              << "\" because the query for state documents on ns \""
+                              << getStateDocumentsNS() << "\" failed");
+
+            stdx::lock_guard lk(_mutex);
+            _state = State::kRebuildFailed;
+            _rebuildStatus = std::move(status);
+            _rebuildCV.notify_all();
             return;
         }
     }
