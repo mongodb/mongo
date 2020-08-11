@@ -145,6 +145,7 @@ env.Library(
         'traffic_recording_cmds.cpp',
         'user_management_commands_common.cpp',
         env.Idlc('drop_connections.idl')[0],
+        env.Idlc('user_management_commands.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
