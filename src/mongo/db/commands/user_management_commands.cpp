@@ -58,6 +58,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/commands/user_management_commands_common.h"
+#include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
@@ -813,12 +814,18 @@ public:
         }
 
 #ifdef MONGO_CONFIG_SSL
-        if (args.userName.getDB() == "$external" && getSSLManager() &&
+        if (getSSLManager() && dbname == "$external" &&
             getSSLManager()->getSSLConfiguration().isClusterMember(args.userName.getUser())) {
-            uasserted(ErrorCodes::BadValue,
-                      "Cannot create an x.509 user with a subjectname "
-                      "that would be recognized as an internal "
-                      "cluster member.");
+            if (gEnforceUserClusterSeparation) {
+                uasserted(ErrorCodes::BadValue,
+                          "Cannot create an x.509 user with a subjectname that would be "
+                          "recognized as an internal cluster member");
+            } else {
+                LOGV2(4593800,
+                      "Creating user which would be considered a cluster member if clusterAuthMode "
+                      "enabled X509 authentication",
+                      "user"_attr = args.userName);
+            }
         }
 #endif
 
