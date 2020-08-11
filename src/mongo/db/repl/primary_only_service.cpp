@@ -76,23 +76,45 @@ PrimaryOnlyServiceRegistry* PrimaryOnlyServiceRegistry::get(ServiceContext* serv
 }
 
 void PrimaryOnlyServiceRegistry::registerService(std::unique_ptr<PrimaryOnlyService> service) {
+    auto ns = service->getStateDocumentsNS();
     auto name = service->getServiceName();
-    auto [_, inserted] = _services.emplace(name, std::move(service));
+    auto servicePtr = service.get();
+
+    auto [_, inserted] = _servicesByName.emplace(name, std::move(service));
     invariant(inserted,
               str::stream() << "Attempted to register PrimaryOnlyService (" << name
                             << ") that is already registered");
+
+    auto [existingServiceIt, inserted2] = _servicesByNamespace.emplace(ns.toString(), servicePtr);
+    auto existingService = existingServiceIt->second;
+    invariant(inserted2,
+              str::stream() << "Attempted to register PrimaryOnlyService (" << name
+                            << ") with state document namespace \"" << ns
+                            << "\" that is already in use by service "
+                            << existingService->getServiceName());
 }
 
-PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupService(StringData serviceName) {
-    auto it = _services.find(serviceName);
-    invariant(it != _services.end());
+PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupServiceByName(StringData serviceName) {
+    auto it = _servicesByName.find(serviceName);
+    invariant(it != _servicesByName.end());
     auto servicePtr = it->second.get();
     invariant(servicePtr);
     return servicePtr;
 }
 
+PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupServiceByNamespace(
+    const NamespaceString& ns) {
+    auto it = _servicesByNamespace.find(ns.toString());
+    if (it == _servicesByNamespace.end()) {
+        return nullptr;
+    }
+    auto servicePtr = it->second;
+    invariant(servicePtr);
+    return servicePtr;
+}
+
 void PrimaryOnlyServiceRegistry::onStartup(OperationContext* opCtx) {
-    for (auto& service : _services) {
+    for (auto& service : _servicesByName) {
         service.second->startup(opCtx);
     }
 }
@@ -103,19 +125,19 @@ void PrimaryOnlyServiceRegistry::onStepUpComplete(OperationContext* opCtx, long 
               str::stream() << "Term from last optime (" << stepUpOpTime.getTerm()
                             << ") doesn't match the term we're stepping up in (" << term << ")");
 
-    for (auto& service : _services) {
+    for (auto& service : _servicesByName) {
         service.second->onStepUp(stepUpOpTime);
     }
 }
 
 void PrimaryOnlyServiceRegistry::onStepDown() {
-    for (auto& service : _services) {
+    for (auto& service : _servicesByName) {
         service.second->onStepDown();
     }
 }
 
 void PrimaryOnlyServiceRegistry::shutdown() {
-    for (auto& service : _services) {
+    for (auto& service : _servicesByName) {
         service.second->shutdown();
     }
 }
@@ -275,6 +297,16 @@ boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyServic
     }
 
     return it->second;
+}
+
+void PrimaryOnlyService::releaseInstance(const InstanceID& id) {
+    stdx::lock_guard lk(_mutex);
+    _instances.erase(id);
+}
+
+void PrimaryOnlyService::releaseAllInstances() {
+    stdx::lock_guard lk(_mutex);
+    _instances.clear();
 }
 
 void PrimaryOnlyService::_rebuildInstances() noexcept {

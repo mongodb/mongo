@@ -1619,6 +1619,7 @@ env.Library(
     target='primary_only_service',
     source=[
         'primary_only_service.cpp',
+        'primary_only_service_op_observer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

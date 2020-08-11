@@ -111,6 +111,7 @@
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
@@ -981,6 +982,8 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
     }
     opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
+    opObserverRegistry->addObserver(
+        std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
 
     setupFreeMonitoringOpObserver(opObserverRegistry.get());
 
