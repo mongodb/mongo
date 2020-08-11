@@ -99,11 +99,14 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             LOGV2_ERROR_OPTIONS(
                 4615603,
                 {logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)},
-                "Erroneous index key found with reference to non-existent record id "
-                "{recordId}: "
-                "{indexKeyData}. Consider dropping and then re-creating the index with key "
-                "pattern "
-                "{indexKeyPattern} and then running the validate command on the collection.",
+                "Erroneous index key found in {namespace} with reference to non-existent "
+                "record id {recordId}: {indexKeyData}. Consider dropping and then re-creating "
+                "the index with key pattern {indexKeyPattern} and then running the validate "
+                "command on the collection.",
+                "Erroneous index key found with reference to non-existent record id. Consider "
+                "dropping and then re-creating the index and then running the validate command "
+                "on the collection.",
+                "namespace"_attr = ns,
                 "recordId"_attr = member->recordId,
                 "indexKeyData"_attr = logv2::seqLog(
                     boost::make_transform_iterator(member->keyData.begin(), indexKeyEntryToObjFn),
