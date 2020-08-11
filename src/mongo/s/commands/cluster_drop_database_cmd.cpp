@@ -97,8 +97,8 @@ public:
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
             CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendPassthroughFields(cmdObj,
-                                                        BSON("_configsvrDropDatabase" << dbname)),
+                CommandHelpers::appendInternalPassthroughFields(
+                    cmdObj, BSON("_configsvrDropDatabase" << dbname)),
                 opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent));
 

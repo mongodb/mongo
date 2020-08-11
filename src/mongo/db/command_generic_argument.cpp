@@ -44,6 +44,7 @@ namespace {
 struct SpecialArgRecord {
     StringData name;
     bool isGeneric;
+    bool isApiParameter;
     bool stripFromRequest;
     bool stripFromReply;
 };
@@ -54,42 +55,43 @@ struct SpecialArgRecord {
 // clang-format off
 static constexpr std::array<SpecialArgRecord, 34> specials{{
     //                                       /-isGeneric
-    //                                       |  /-stripFromRequest
-    //                                       |  |  /-stripFromReply
-    {"apiVersion"_sd,                        1, 0, 0},
-    {"apiStrict"_sd,                         1, 0, 0},
-    {"apiDeprecationErrors"_sd,              1, 0, 0},
-    {"$audit"_sd,                            1, 1, 0},
-    {"$client"_sd,                           1, 1, 0},
-    {"$configServerState"_sd,                1, 1, 1},
-    {"$db"_sd,                               1, 1, 0},
-    {"allowImplicitCollectionCreation"_sd,   1, 1, 0},
-    {"$oplogQueryData"_sd,                   1, 1, 1},
-    {"$queryOptions"_sd,                     1, 0, 0},
-    {"$readPreference"_sd,                   1, 1, 0},
-    {"$replData"_sd,                         1, 1, 1},
-    {"$clusterTime"_sd,                      1, 1, 1},
-    {"maxTimeMS"_sd,                         1, 0, 0},
-    {"readConcern"_sd,                       1, 0, 0},
-    {"databaseVersion"_sd,                   1, 1, 0},
-    {"shardVersion"_sd,                      1, 1, 0},
-    {"tracking_info"_sd,                     1, 1, 0},
-    {"writeConcern"_sd,                      1, 0, 0},
-    {"lsid"_sd,                              1, 0, 0},
-    {"clientOperationKey"_sd,                1, 0, 0},
-    {"txnNumber"_sd,                         1, 0, 0},
-    {"autocommit"_sd,                        1, 0, 0},
-    {"coordinator"_sd,                       1, 0, 0},
-    {"startTransaction"_sd,                  1, 0, 0},
-    {"stmtId"_sd,                            1, 0, 0},
-    {"$gleStats"_sd,                         0, 0, 1},
-    {"operationTime"_sd,                     0, 0, 1},
-    {"lastCommittedOpTime"_sd,               0, 0, 1},
-    {"readOnly"_sd,                          0, 0, 1},
-    {"comment"_sd,                           1, 0, 0},
-    {"maxTimeMSOpOnly"_sd,                   1, 0, 0},
-    {"$configTime"_sd,                       1, 1, 1},
-    {"$topologyTime"_sd,                     1, 1, 1}}};
+    //                                       |  /-isApiParameter
+    //                                       |  |  /-stripFromRequest
+    //                                       |  |  |  /-stripFromReply
+    {"apiVersion"_sd,                        1, 1, 0, 0},
+    {"apiStrict"_sd,                         1, 1, 0, 0},
+    {"apiDeprecationErrors"_sd,              1, 1, 0, 0},
+    {"$audit"_sd,                            1, 0, 1, 0},
+    {"$client"_sd,                           1, 0, 1, 0},
+    {"$configServerState"_sd,                1, 0, 1, 1},
+    {"$db"_sd,                               1, 0, 1, 0},
+    {"allowImplicitCollectionCreation"_sd,   1, 0, 1, 0},
+    {"$oplogQueryData"_sd,                   1, 0, 1, 1},
+    {"$queryOptions"_sd,                     1, 0, 0, 0},
+    {"$readPreference"_sd,                   1, 0, 1, 0},
+    {"$replData"_sd,                         1, 0, 1, 1},
+    {"$clusterTime"_sd,                      1, 0, 1, 1},
+    {"maxTimeMS"_sd,                         1, 0, 0, 0},
+    {"readConcern"_sd,                       1, 0, 0, 0},
+    {"databaseVersion"_sd,                   1, 0, 1, 0},
+    {"shardVersion"_sd,                      1, 0, 1, 0},
+    {"tracking_info"_sd,                     1, 0, 1, 0},
+    {"writeConcern"_sd,                      1, 0, 0, 0},
+    {"lsid"_sd,                              1, 0, 0, 0},
+    {"clientOperationKey"_sd,                1, 0, 0, 0},
+    {"txnNumber"_sd,                         1, 0, 0, 0},
+    {"autocommit"_sd,                        1, 0, 0, 0},
+    {"coordinator"_sd,                       1, 0, 0, 0},
+    {"startTransaction"_sd,                  1, 0, 0, 0},
+    {"stmtId"_sd,                            1, 0, 0, 0},
+    {"$gleStats"_sd,                         0, 0, 0, 1},
+    {"operationTime"_sd,                     0, 0, 0, 1},
+    {"lastCommittedOpTime"_sd,               0, 0, 0, 1},
+    {"readOnly"_sd,                          0, 0, 0, 1},
+    {"comment"_sd,                           1, 0, 0, 0},
+    {"maxTimeMSOpOnly"_sd,                   1, 0, 0, 0},
+    {"$configTime"_sd,                       1, 0, 1, 1},
+    {"$topologyTime"_sd,                     1, 0, 1, 1}}};
 // clang-format on
 
 template <bool SpecialArgRecord::*pmo>
@@ -110,6 +112,10 @@ bool filteredSpecialsContains(StringData arg) {
 
 bool isGenericArgument(StringData arg) {
     return filteredSpecialsContains<&SpecialArgRecord::isGeneric>(arg);
+}
+
+bool isApiParameter(StringData arg) {
+    return filteredSpecialsContains<&SpecialArgRecord::isApiParameter>(arg);
 }
 
 bool isRequestStripArgument(StringData arg) {

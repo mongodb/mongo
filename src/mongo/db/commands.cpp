@@ -358,17 +358,44 @@ void CommandHelpers::appendCommandWCStatus(BSONObjBuilder& result,
     }
 }
 
-BSONObj CommandHelpers::appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
-                                                const BSONObj& request) {
+namespace {
+
+enum class FilterApiParameters { kPreserveApiParameters, kRemoveApiParameters };
+
+BSONObj _appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
+                                 const BSONObj& request,
+                                 FilterApiParameters filterApiParameters) {
     BSONObjBuilder b;
     b.appendElements(request);
-    for (const auto& elem : filterCommandRequestForPassthrough(cmdObjWithPassthroughFields)) {
+    for (const auto& elem :
+         CommandHelpers::filterCommandRequestForPassthrough(cmdObjWithPassthroughFields)) {
         const auto name = elem.fieldNameStringData();
-        if (isGenericArgument(name) && !request.hasField(name)) {
-            b.append(elem);
+        if (request.hasField(name)) {
+            continue;
         }
+        if (filterApiParameters == FilterApiParameters::kRemoveApiParameters &&
+            isApiParameter(name)) {
+            continue;
+        }
+        if (!isGenericArgument(name)) {
+            continue;
+        }
+        b.append(elem);
     }
     return b.obj();
+}
+}  // namespace
+
+BSONObj CommandHelpers::appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
+                                                const BSONObj& request) {
+    return _appendPassthroughFields(
+        cmdObjWithPassthroughFields, request, FilterApiParameters::kPreserveApiParameters);
+}
+
+BSONObj CommandHelpers::appendInternalPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
+                                                        const BSONObj& request) {
+    return _appendPassthroughFields(
+        cmdObjWithPassthroughFields, request, FilterApiParameters::kRemoveApiParameters);
 }
 
 BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,
