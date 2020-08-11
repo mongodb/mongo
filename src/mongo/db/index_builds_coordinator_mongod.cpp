@@ -58,6 +58,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeInitializingIndexBuild);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterSignalPrimaryForCommitReadiness);
 
 const StringData kMaxNumActiveUserIndexBuildsServerParameterName = "maxNumActiveUserIndexBuilds"_sd;
 
@@ -634,6 +635,11 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
         if (_checkVoteCommitIndexCmdSucceeded(voteCmdResponse, replState->buildUUID)) {
             break;
         }
+    }
+
+    if (MONGO_unlikely(hangIndexBuildAfterSignalPrimaryForCommitReadiness.shouldFail())) {
+        LOGV2(4841707, "Hanging index build after signaling the primary for commit readiness");
+        hangIndexBuildAfterSignalPrimaryForCommitReadiness.pauseWhileSet(opCtx);
     }
     return;
 }

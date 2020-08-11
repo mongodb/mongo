@@ -77,6 +77,7 @@ MONGO_FAIL_POINT_DEFINE(failIndexBuildOnCommit);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeAbortCleanUp);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnStepUp);
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpResumableIndexBuild);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeCommit);
 
 namespace {
 
@@ -2455,7 +2456,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
 
     if (MONGO_unlikely(hangAfterIndexBuildFirstDrain.shouldFail())) {
         LOGV2(20666, "Hanging after index build first drain");
-        hangAfterIndexBuildFirstDrain.pauseWhileSet();
+        hangAfterIndexBuildFirstDrain.pauseWhileSet(opCtx);
     }
 }
 void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
@@ -2495,6 +2496,11 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     IndexBuildAction action,
     const IndexBuildOptions& indexBuildOptions,
     const Timestamp& commitIndexBuildTimestamp) {
+
+    if (MONGO_unlikely(hangIndexBuildBeforeCommit.shouldFail())) {
+        LOGV2(4841706, "Hanging before committing index build");
+        hangIndexBuildBeforeCommit.pauseWhileSet();
+    }
 
     Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
 
