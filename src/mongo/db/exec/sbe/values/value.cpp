@@ -55,7 +55,7 @@ std::pair<TypeTags, Value> makeCopyPcreRegex(const pcrecpp::RE& regex) {
 void releaseValue(TypeTags tag, Value val) noexcept {
     switch (tag) {
         case TypeTags::NumberDecimal:
-            delete getDecimalView(val);
+            delete[] getRawPointerView(val);
             break;
         case TypeTags::Array:
             delete getArrayView(val);

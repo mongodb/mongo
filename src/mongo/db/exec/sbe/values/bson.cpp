@@ -106,11 +106,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
                 return {value::TypeTags::NumberDecimal, value::bitcastFrom(be)};
             }
 
-            uint64_t low = ConstDataView(be).read<LittleEndian<uint64_t>>();
-            uint64_t high = ConstDataView(be + sizeof(uint64_t)).read<LittleEndian<uint64_t>>();
-            auto dec = Decimal128{Decimal128::Value({low, high})};
-
-            return value::makeCopyDecimal(dec);
+            return value::makeCopyDecimal(value::readDecimal128FromMemory(ConstDataView{be}));
         }
         case BSONType::String: {
             if (view) {

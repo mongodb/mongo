@@ -146,7 +146,7 @@ public:
 
     void append(const Decimal128& in) {
         appendValueBufferOffset(TypeTags::NumberDecimal);
-        _valueBufferBuilder->appendStruct(in);
+        _valueBufferBuilder->appendNum(in);
     }
 
     void append(long long in) {

@@ -195,7 +195,7 @@ TEST(SBEKeyStringTest, KeyComponentInclusion) {
     readKeyStringValueIntoAccessors(
         keyString, KeyString::ALL_ASCENDING, &builder, &accessors, indexKeysToInclude);
 
-    ASSERT(std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom(12345)) ==
+    ASSERT(std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{12345})) ==
            accessors[0].getViewOfValue())
         << "Incorrect value from accessor: " << valueDebugString(accessors[0].getViewOfValue());
 

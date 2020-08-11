@@ -440,6 +440,12 @@ T readFromMemory(const unsigned char* memory) noexcept {
     return val;
 }
 
+inline Decimal128 readDecimal128FromMemory(const ConstDataView& view) {
+    uint64_t low = view.read<LittleEndian<long long>>();
+    uint64_t high = view.read<LittleEndian<long long>>(sizeof(long long));
+    return Decimal128{Decimal128::Value{low, high}};
+}
+
 template <typename T>
 size_t writeToMemory(unsigned char* memory, const T val) noexcept {
     memcpy(memory, &val, sizeof(T));
@@ -450,6 +456,16 @@ size_t writeToMemory(unsigned char* memory, const T val) noexcept {
 template <typename T>
 Value bitcastFrom(const T in) noexcept {
     static_assert(sizeof(Value) >= sizeof(T));
+
+    // Callers must not try to store a pointer to a Decimal128 object in an sbe::value::Value. Any
+    // Value with the NumberDecimal TypeTag actually stores a pointer to a NumberDecimal as it would
+    // be represented in a BSONElement: a pair of network-ordered (little-endian) uint64_t values.
+    // These bytes are _not_ guaranteed to be the same as the bytes in a Decimal128_t object.
+    //
+    // To get a NumberDecimal value, either call makeCopyDecimal() or store the value in BSON and
+    // use sbe::bson::convertFrom().
+    static_assert(!std::is_same_v<Decimal128, T>);
+    static_assert(!std::is_same_v<Decimal128*, T>);
 
     // Casting from pointer to integer value is OK.
     if constexpr (std::is_pointer_v<T>) {
@@ -468,9 +484,7 @@ T bitcastTo(const Value in) noexcept {
         return reinterpret_cast<T>(in);
     } else if constexpr (std::is_same_v<Decimal128, T>) {
         static_assert(sizeof(Value) == sizeof(T*));
-        T val;
-        memcpy(&val, getRawPointerView(in), sizeof(T));
-        return val;
+        return readDecimal128FromMemory(ConstDataView{getRawPointerView(in)});
     } else {
         static_assert(sizeof(Value) >= sizeof(T));
         T val;
@@ -572,13 +586,12 @@ inline ObjectIdType* getObjectIdView(Value val) noexcept {
     return reinterpret_cast<ObjectIdType*>(val);
 }
 
-inline Decimal128* getDecimalView(Value val) noexcept {
-    return reinterpret_cast<Decimal128*>(val);
-}
-
 inline std::pair<TypeTags, Value> makeCopyDecimal(const Decimal128& inD) {
-    auto o = new Decimal128(inD);
-    return {TypeTags::NumberDecimal, reinterpret_cast<Value>(o)};
+    auto valueBuffer = new char[2 * sizeof(long long)];
+    DataView decimalView(valueBuffer);
+    decimalView.write<LittleEndian<long long>>(inD.getValue().low64, 0);
+    decimalView.write<LittleEndian<long long>>(inD.getValue().high64, sizeof(long long));
+    return {TypeTags::NumberDecimal, reinterpret_cast<Value>(valueBuffer)};
 }
 
 inline KeyString::Value* getKeyStringView(Value val) noexcept {

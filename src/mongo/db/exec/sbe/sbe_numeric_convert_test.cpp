@@ -182,19 +182,19 @@ TEST_F(SBENumericTest, Int64ToInt32) {
 
 TEST_F(SBENumericTest, Int64ToInt64) {
     assertConversion(int64_t{-2147483648},
-                     int32_t{-2147483648},
+                     int64_t{-2147483648},
                      value::TypeTags::NumberInt64,
                      value::TypeTags::NumberInt64);
     assertConversion(
-        int64_t{-10}, int32_t{-10}, value::TypeTags::NumberInt64, value::TypeTags::NumberInt64);
+        int64_t{-10}, int64_t{-10}, value::TypeTags::NumberInt64, value::TypeTags::NumberInt64);
     assertConversion(
-        int64_t{0}, int32_t{0}, value::TypeTags::NumberInt64, value::TypeTags::NumberInt64);
+        int64_t{0}, int64_t{0}, value::TypeTags::NumberInt64, value::TypeTags::NumberInt64);
     assertConversion(
-        int64_t{-0}, int32_t{-0}, value::TypeTags::NumberInt64, value::TypeTags::NumberInt64);
+        int64_t{-0}, int64_t{-0}, value::TypeTags::NumberInt64, value::TypeTags::NumberInt64);
     assertConversion(
-        int64_t{10}, int32_t{10}, value::TypeTags::NumberInt64, value::TypeTags::NumberInt64);
+        int64_t{10}, int64_t{10}, value::TypeTags::NumberInt64, value::TypeTags::NumberInt64);
     assertConversion(int64_t{2147483647},
-                     int32_t{2147483647},
+                     int64_t{2147483647},
                      value::TypeTags::NumberInt64,
                      value::TypeTags::NumberInt64);
 }
