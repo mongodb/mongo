@@ -394,6 +394,8 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
     LatchAnalyzer::get(serviceContext).dump();
 #endif
+
+    OCSPManager::shutdown(serviceContext);
 }
 
 Status initializeSharding(OperationContext* opCtx) {
@@ -671,7 +673,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     }
 
 #ifdef MONGO_CONFIG_SSL
-    OCSPManager::get()->startThreadPool();
+    OCSPManager::start(serviceContext);
     CertificateExpirationMonitor::get()->start(serviceContext);
 #endif
 

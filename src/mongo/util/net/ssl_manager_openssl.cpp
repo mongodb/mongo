@@ -48,6 +48,7 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
@@ -762,7 +763,7 @@ Future<UniqueOCSPResponse> retrieveOCSPResponse(const std::string& host,
     }
 
     // Query the OCSP responder
-    return OCSPManager::get()
+    return OCSPManager::get(getGlobalServiceContext())
         ->requestStatus(buffer, host, purpose)
         .then([](std::vector<uint8_t> responseData) mutable -> StatusWith<UniqueOCSPResponse> {
             const uint8_t* respDataPtr = responseData.data();

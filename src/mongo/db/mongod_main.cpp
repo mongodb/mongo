@@ -341,7 +341,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     serviceContext->setPeriodicRunner(std::move(runner));
 
 #ifdef MONGO_CONFIG_SSL
-    OCSPManager::get()->startThreadPool();
+    OCSPManager::start(serviceContext);
     CertificateExpirationMonitor::get()->start(serviceContext);
 #endif
 
@@ -1320,6 +1320,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 #endif
 
     FlowControl::shutdown(serviceContext);
+    OCSPManager::shutdown(serviceContext);
 }
 
 }  // namespace

@@ -737,7 +737,7 @@ int mongo_main(int argc, char* argv[]) {
         auto serviceContext = getGlobalServiceContext();
 
 #ifdef MONGO_CONFIG_SSL
-        OCSPManager::get()->startThreadPool();
+        OCSPManager::start(serviceContext);
 #endif
 
         transport::TransportLayerASIO::Options opts;
