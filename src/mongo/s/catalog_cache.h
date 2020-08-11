@@ -37,6 +37,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/database_version_gen.h"
 #include "mongo/util/concurrency/notification.h"
@@ -144,7 +145,83 @@ private:
 
     DatabaseVersion _dbVersion;
     // Locally incremented sequence number that allows to compare two database versions with
-    // different UUIDs. Each new comparableDatabaseVersion will have a grater sequence number then
+    // different UUIDs. Each new comparableDatabaseVersion will have a greater sequence number then
+    // the ones created before.
+    uint64_t _localSequenceNum{0};
+};
+
+/**
+ * Constructed to be used exclusively by the CatalogCache as a vector clock (Time) to drive
+ * CollectionCache's lookups.
+ *
+ * The ChunkVersion class contains an non comparable epoch, which makes impossible to compare two
+ * ChunkVersions when their epochs's differ.
+ *
+ * This class wraps a ChunkVersion object with a node-local sequence number (_localSequenceNum) that
+ * allows the comparision.
+ *
+ * This class should go away once a cluster-wide comparable ChunkVersion is implemented.
+ */
+class ComparableChunkVersion {
+public:
+    static ComparableChunkVersion makeComparableChunkVersion(const ChunkVersion& version);
+
+    ComparableChunkVersion() = default;
+
+    const ChunkVersion& getVersion() const;
+
+    uint64_t getLocalSequenceNum() const;
+
+    BSONObj toBSON() const;
+
+    std::string toString() const;
+
+    bool sameEpoch(const ComparableChunkVersion& other) const {
+        return _chunkVersion.epoch() == other._chunkVersion.epoch();
+    }
+
+    bool operator==(const ComparableChunkVersion& other) const {
+        return sameEpoch(other) &&
+            (_chunkVersion.majorVersion() == other._chunkVersion.majorVersion() &&
+             _chunkVersion.minorVersion() == other._chunkVersion.minorVersion());
+    }
+
+    bool operator!=(const ComparableChunkVersion& other) const {
+        return !(*this == other);
+    }
+
+    bool operator<(const ComparableChunkVersion& other) const {
+        if (sameEpoch(other)) {
+            return _chunkVersion.majorVersion() < other._chunkVersion.majorVersion() ||
+                (_chunkVersion.majorVersion() == other._chunkVersion.majorVersion() &&
+                 _chunkVersion.minorVersion() < other._chunkVersion.minorVersion());
+        } else {
+            return _localSequenceNum < other._localSequenceNum;
+        }
+    }
+
+    bool operator>(const ComparableChunkVersion& other) const {
+        return other < *this;
+    }
+
+    bool operator<=(const ComparableChunkVersion& other) const {
+        return !(*this > other);
+    }
+
+    bool operator>=(const ComparableChunkVersion& other) const {
+        return !(*this < other);
+    }
+
+private:
+    static AtomicWord<uint64_t> _localSequenceNumSource;
+
+    ComparableChunkVersion(const ChunkVersion& version, uint64_t localSequenceNum)
+        : _chunkVersion(version), _localSequenceNum(localSequenceNum) {}
+
+    ChunkVersion _chunkVersion;
+
+    // Locally incremented sequence number that allows to compare two colection versions with
+    // different epochs. Each new comparableChunkVersion will have a greater sequence number than
     // the ones created before.
     uint64_t _localSequenceNum{0};
 };

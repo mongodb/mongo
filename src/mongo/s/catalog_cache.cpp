@@ -861,6 +861,32 @@ DatabaseVersion CachedDatabaseInfo::databaseVersion() const {
     return _dbt.getVersion();
 }
 
+AtomicWord<uint64_t> ComparableChunkVersion::_localSequenceNumSource{1ULL};
+
+ComparableChunkVersion ComparableChunkVersion::makeComparableChunkVersion(
+    const ChunkVersion& version) {
+    return ComparableChunkVersion(version, _localSequenceNumSource.fetchAndAdd(1));
+}
+
+const ChunkVersion& ComparableChunkVersion::getVersion() const {
+    return _chunkVersion;
+}
+
+uint64_t ComparableChunkVersion::getLocalSequenceNum() const {
+    return _localSequenceNum;
+}
+
+BSONObj ComparableChunkVersion::toBSON() const {
+    BSONObjBuilder builder;
+    _chunkVersion.appendToCommand(&builder);
+    builder.append("localSequenceNum", std::to_string(_localSequenceNum));
+    return builder.obj();
+}
+
+std::string ComparableChunkVersion::toString() const {
+    return toBSON().toString();
+}
+
 CachedCollectionRoutingInfo::CachedCollectionRoutingInfo(NamespaceString nss,
                                                          CachedDatabaseInfo db,
                                                          std::shared_ptr<ChunkManager> cm)
