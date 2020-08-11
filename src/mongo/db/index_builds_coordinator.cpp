@@ -2437,7 +2437,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
 
         std::tie(numRecords, dataSize) =
             uassertStatusOK(_indexBuildsManager.startBuildingIndexForRecovery(
-                opCtx, collection->ns(), buildUUID, repair));
+                opCtx, collection, buildUUID, repair));
 
         uassertStatusOK(
             _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
