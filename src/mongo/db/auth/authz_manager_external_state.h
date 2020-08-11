@@ -68,7 +68,9 @@ public:
      * calling other methods.  Object may not be used after this method returns something other
      * than Status::OK().
      */
-    virtual Status initialize(OperationContext* opCtx) = 0;
+    virtual Status initialize(OperationContext* opCtx) {
+        return Status::OK();
+    }
 
     /**
      * Creates an external state manipulator for an AuthorizationSession whose
@@ -99,6 +101,12 @@ public:
     virtual Status getUserDescription(OperationContext* opCtx,
                                       const UserRequest& user,
                                       BSONObj* result) = 0;
+
+    /**
+     * Fetches and/or synthesizes a User object similar to above eliding additional
+     * marshalling of data to BSON and back.
+     */
+    virtual StatusWith<User> getUserObject(OperationContext* opCtx, const UserRequest& userReq) = 0;
 
     /**
      * Checks to see if the named roles exist.
@@ -160,7 +168,7 @@ public:
 
     virtual void logOp(OperationContext* opCtx,
                        AuthorizationManagerImpl* authManager,
-                       const char* op,
+                       StringData op,
                        const NamespaceString& ns,
                        const BSONObj& o,
                        const BSONObj* o2) {}

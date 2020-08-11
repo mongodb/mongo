@@ -71,7 +71,7 @@ MONGO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
     ActionSet allActions;
     allActions.addAllActions();
     PrivilegeVector privileges;
-    RoleGraph::generateUniversalPrivileges(&privileges);
+    auth::generateUniversalPrivileges(&privileges);
     user->addPrivileges(privileges);
 
     if (mongodGlobalParams.whitelistedClusterNetwork) {
@@ -230,62 +230,26 @@ bool loggedCommandOperatesOnAuthzData(const NamespaceString& nss, const BSONObj&
     }
 }
 
-bool appliesToAuthzData(const char* op, const NamespaceString& nss, const BSONObj& o) {
-    switch (*op) {
+bool appliesToAuthzData(StringData op, const NamespaceString& nss, const BSONObj& o) {
+    if (op.empty()) {
+        return true;
+    }
+
+    switch (op[0]) {
         case 'i':
         case 'u':
         case 'd':
-            if (op[1] != '\0')
+            if (op.size() != 1) {
                 return false;  // "db" op type
+            }
             return isAuthzNamespace(nss);
         case 'c':
             return loggedCommandOperatesOnAuthzData(nss, o);
-            break;
         case 'n':
             return false;
         default:
             return true;
     }
-}
-
-/**
- * Parses privDoc and fully initializes the user object (credentials, roles, and privileges) with
- * the information extracted from the privilege document.
- */
-Status initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc) {
-    V2UserDocumentParser parser;
-    std::string userName = parser.extractUserNameFromUserDocument(privDoc);
-    if (userName != user->getName().getUser()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "User name from privilege document \"" << userName
-                                    << "\" doesn't match name of provided User \""
-                                    << user->getName().getUser() << "\"");
-    }
-
-    user->setID(parser.extractUserIDFromUserDocument(privDoc));
-
-    Status status = parser.initializeUserCredentialsFromUserDocument(user, privDoc);
-    if (!status.isOK()) {
-        return status;
-    }
-    status = parser.initializeUserRolesFromUserDocument(privDoc, user);
-    if (!status.isOK()) {
-        return status;
-    }
-    status = parser.initializeUserIndirectRolesFromUserDocument(privDoc, user);
-    if (!status.isOK()) {
-        return status;
-    }
-    status = parser.initializeUserPrivilegesFromUserDocument(privDoc, user);
-    if (!status.isOK()) {
-        return status;
-    }
-    status = parser.initializeAuthenticationRestrictionsFromUserDocument(privDoc, user);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return Status::OK();
 }
 
 /**
@@ -634,7 +598,7 @@ Status AuthorizationManagerImpl::initialize(OperationContext* opCtx) {
 }
 
 void AuthorizationManagerImpl::logOp(OperationContext* opCtx,
-                                     const char* op,
+                                     StringData op,
                                      const NamespaceString& nss,
                                      const BSONObj& o,
                                      const BSONObj* o2) {
@@ -717,14 +681,8 @@ AuthorizationManagerImpl::UserCacheImpl::_lookup(OperationContext* opCtx,
         switch (authzVersion) {
             case schemaVersion28SCRAM:
             case schemaVersion26Final:
-            case schemaVersion26Upgrade: {
-                BSONObj userObj;
-                uassertStatusOK(_externalState->getUserDescription(opCtx, userReq, &userObj));
-
-                User user(userReq.name);
-                uassertStatusOK(initializeUserFromPrivilegeDocument(&user, userObj));
-                return LookupResult(std::move(user));
-            }
+            case schemaVersion26Upgrade:
+                return LookupResult(uassertStatusOK(_externalState->getUserObject(opCtx, userReq)));
             case schemaVersion24:
                 _authSchemaVersionCache->invalidateAll();
 

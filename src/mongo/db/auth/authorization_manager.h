@@ -35,9 +35,9 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -336,7 +336,7 @@ public:
      * to relevant collections.
      */
     virtual void logOp(OperationContext* opCtx,
-                       const char* opstr,
+                       StringData opstr,
                        const NamespaceString& nss,
                        const BSONObj& obj,
                        const BSONObj* patt) = 0;

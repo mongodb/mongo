@@ -63,6 +63,7 @@ public:
     static UserName parseFromBSON(const BSONElement& elem);
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
     void serializeToBSON(BSONArrayBuilder* bob) const;
+    BSONObj toBSON() const;
 
     /**
      * Gets the user part of a UserName.

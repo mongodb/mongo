@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/auth/role_graph.h"
+#include "mongo/db/auth/builtin_roles.h"
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
@@ -282,8 +282,8 @@ void addReadWriteDbPrivileges(PrivilegeVector* privileges, StringData dbName) {
 }
 
 void addUserAdminDbPrivileges(PrivilegeVector* privileges, StringData dbName) {
-    privileges->push_back(
-        Privilege(ResourcePattern::forDatabaseName(dbName), userAdminRoleActions));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges, Privilege(ResourcePattern::forDatabaseName(dbName), userAdminRoleActions));
 }
 
 void addDbAdminDbPrivileges(PrivilegeVector* privileges, StringData dbName) {
@@ -661,7 +661,7 @@ void addRootRolePrivileges(PrivilegeVector* privileges) {
 }
 
 void addInternalRolePrivileges(PrivilegeVector* privileges) {
-    RoleGraph::generateUniversalPrivileges(privileges);
+    auth::generateUniversalPrivileges(privileges);
 }
 
 class BuiltinRoleDefinition {
@@ -722,7 +722,7 @@ const std::map<StringData, BuiltinRoleDefinition> kBuiltinRoles({
 
 }  // namespace
 
-stdx::unordered_set<RoleName> RoleGraph::getBuiltinRoleNamesForDB(StringData dbname) {
+stdx::unordered_set<RoleName> auth::getBuiltinRoleNamesForDB(StringData dbname) {
     const bool isAdmin = dbname == ADMIN_DBNAME;
 
     stdx::unordered_set<RoleName> roleNames;
@@ -734,7 +734,7 @@ stdx::unordered_set<RoleName> RoleGraph::getBuiltinRoleNamesForDB(StringData dbn
     return roleNames;
 }
 
-bool RoleGraph::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeVector* result) {
+bool auth::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeVector* result) {
     auto role = roleName.getRole();
     auto dbname = roleName.getDB();
 
@@ -757,13 +757,14 @@ bool RoleGraph::addPrivilegesForBuiltinRole(const RoleName& roleName, PrivilegeV
     return true;
 }
 
-void RoleGraph::generateUniversalPrivileges(PrivilegeVector* privileges) {
+void auth::generateUniversalPrivileges(PrivilegeVector* privileges) {
     ActionSet allActions;
     allActions.addAllActions();
-    privileges->push_back(Privilege(ResourcePattern::forAnyResource(), allActions));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges, Privilege(ResourcePattern::forAnyResource(), allActions));
 }
 
-bool RoleGraph::isBuiltinRole(const RoleName& role) {
+bool auth::isBuiltinRole(const RoleName& role) {
     auto dbname = role.getDB();
     if (!NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow) ||
         dbname == "$external") {
@@ -776,31 +777,6 @@ bool RoleGraph::isBuiltinRole(const RoleName& role) {
     }
 
     return !it->second.adminOnly() || (dbname == ADMIN_DBNAME);
-}
-
-void RoleGraph::_createBuiltinRolesForDBIfNeeded(StringData dbname) {
-    const bool isAdmin = dbname == ADMIN_DBNAME;
-
-    for (const auto& [rolename, def] : kBuiltinRoles) {
-        if (def.adminOnly() && !isAdmin) {
-            continue;
-        }
-        _createBuiltinRoleIfNeeded(RoleName(rolename, dbname));
-    }
-}
-
-void RoleGraph::_createBuiltinRoleIfNeeded(const RoleName& role) {
-    if (!isBuiltinRole(role) || _roleExistsDontCreateBuiltin(role)) {
-        return;
-    }
-
-    _createRoleDontCheckIfRoleExists(role);
-    PrivilegeVector privileges;
-    fassert(17145, addPrivilegesForBuiltinRole(role, &privileges));
-    for (size_t i = 0; i < privileges.size(); ++i) {
-        _addPrivilegeToRoleNoChecks(role, privileges[i]);
-        _allPrivilegesForRole[role].push_back(privileges[i]);
-    }
 }
 
 }  // namespace mongo

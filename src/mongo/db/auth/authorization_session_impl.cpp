@@ -801,7 +801,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                                   "Could not fetch updated user privilege information for {user}; "
                                   "continuing to use old information. Reason is {error}",
                                   "Could not fetch updated user privilege information, continuing "
-                                  "to use old information"
+                                  "to use old information",
                                   "user"_attr = name,
                                   "error"_attr = redact(status));
                     removeGuard.dismiss();

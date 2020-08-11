@@ -76,10 +76,9 @@ env.Library(
 )
 
 env.Library(
-    target="role_graph",
+    target="builtin_roles",
     source=[
-        'role_graph.cpp',
-        'role_graph_builtin_roles.cpp',
+        'builtin_roles.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -100,8 +99,11 @@ env.Library(
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         'auth',
-        'role_graph_update',
         'user',
+    ],
+    LIBDEPS_PRIVATE=[
+        'address_restriction',
+        'authprivilege',
     ],
 )
 
@@ -112,19 +114,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
-    ],
-)
-
-env.Library(
-    target='role_graph_update',
-    source=[
-        'role_graph_update.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/update/update_driver',
-        'auth',
-        'auth_options',
-        'role_graph',
     ],
 )
 
@@ -157,7 +146,7 @@ env.Library(
         'auth',
         'authorization_manager_global',
         'authprivilege',
-        'role_graph',
+        'builtin_roles',
         'sasl_options',
         'user',
         'user_document_parser',
@@ -391,9 +380,9 @@ env.CppUnitTest(
         'authorization_manager_test.cpp',
         'authorization_session_for_test.cpp',
         'authorization_session_test.cpp',
+        'builtin_roles_test.cpp',
         'privilege_parser_test.cpp',
         'restriction_test.cpp',
-        'role_graph_test.cpp',
         'sasl_authentication_session_test.cpp',
         'sasl_mechanism_registry_test.cpp',
         'sasl_scram_test.cpp',

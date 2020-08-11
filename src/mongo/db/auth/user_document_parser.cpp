@@ -422,6 +422,10 @@ Status V2UserDocumentParser::initializeUserIndirectRolesFromUserDocument(const B
                                                                          User* user) const {
     BSONElement indirectRolesElement = privDoc[INHERITED_ROLES_FIELD_NAME];
 
+    if (!indirectRolesElement) {
+        return Status::OK();
+    }
+
     if (indirectRolesElement.type() != Array) {
         return Status(ErrorCodes::UnsupportedFormat,
                       "User document needs 'inheritedRoles' field to be an array");
@@ -499,6 +503,27 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
     }
     user->setPrivileges(privileges);
     return Status::OK();
+}
+
+Status V2UserDocumentParser::initializeUserFromUserDocument(const BSONObj& privDoc,
+                                                            User* user) const try {
+    auto userName = extractUserNameFromUserDocument(privDoc);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "User name from privilege document \"" << userName
+                          << "\" doesn't match name of provided User \""
+                          << user->getName().getUser() << "\"",
+            userName == user->getName().getUser());
+
+    user->setID(extractUserIDFromUserDocument(privDoc));
+    uassertStatusOK(initializeUserCredentialsFromUserDocument(user, privDoc));
+    uassertStatusOK(initializeUserRolesFromUserDocument(privDoc, user));
+    uassertStatusOK(initializeUserIndirectRolesFromUserDocument(privDoc, user));
+    uassertStatusOK(initializeUserPrivilegesFromUserDocument(privDoc, user));
+    uassertStatusOK(initializeAuthenticationRestrictionsFromUserDocument(privDoc, user));
+
+    return Status::OK();
+} catch (const AssertionException& ex) {
+    return ex.toStatus();
 }
 
 }  // namespace mongo

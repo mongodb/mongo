@@ -81,10 +81,6 @@ AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() = default;
 
 AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() = default;
 
-Status AuthzManagerExternalStateMongos::initialize(OperationContext* opCtx) {
-    return Status::OK();
-}
-
 std::unique_ptr<AuthzSessionExternalState>
 AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
     return std::make_unique<AuthzSessionExternalStateMongos>(authzManager);
@@ -110,6 +106,25 @@ Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationC
     *outVersion = versionElement.numberInt();
 
     return Status::OK();
+}
+
+StatusWith<User> AuthzManagerExternalStateMongos::getUserObject(OperationContext* opCtx,
+                                                                const UserRequest& userReq) {
+    // Marshalling to BSON and back is inevitable since the
+    // source of truth is a system external to mongos.
+    BSONObj userDoc;
+    auto status = getUserDescription(opCtx, userReq, &userDoc);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    User user(userReq.name);
+    status = V2UserDocumentParser().initializeUserFromUserDocument(userDoc, &user);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return std::move(user);
 }
 
 Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opCtx,

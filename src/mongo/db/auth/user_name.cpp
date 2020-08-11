@@ -106,6 +106,12 @@ void UserName::_serializeToSubObj(BSONObjBuilder* sub) const {
          << AuthorizationManager::USER_DB_FIELD_NAME << getDB();
 }
 
+BSONObj UserName::toBSON() const {
+    BSONObjBuilder ret;
+    _serializeToSubObj(&ret);
+    return ret.obj();
+}
+
 std::ostream& operator<<(std::ostream& os, const UserName& name) {
     return os << name.getFullName();
 }

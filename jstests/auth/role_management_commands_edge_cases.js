@@ -120,7 +120,7 @@ function runTest(conn) {
 
         // Try to create role containing itself in its roles array
         assert.throws(function() {
-            db.createRole({role: 'role17', roles: ['role10'], privileges: []});
+            db.createRole({role: 'role17', roles: ['role17'], privileges: []});
         });
 
         assert.eq(3, db.getRoles().length);

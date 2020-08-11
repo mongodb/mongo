@@ -83,7 +83,6 @@ public:
         auto localAuthzManager = std::make_unique<AuthorizationManagerImpl>(
             getServiceContext(), std::move(localExternalState));
         authzManager = localAuthzManager.get();
-        externalState->setAuthorizationManager(authzManager);
         authzManager->setAuthEnabled(true);
         AuthorizationManager::set(getServiceContext(), std::move(localAuthzManager));
 
@@ -299,131 +298,6 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
     actions.removeAction(ActionType::find);
     actions.removeAction(ActionType::insert);
     ASSERT(actions.empty());
-}
-
-// These tests ensure that the AuthorizationManager registers a
-// Change on the RecoveryUnit, when an Op is reported that could
-// modify role data. This Change is might recompute
-// the RoleGraph when executed.
-class AuthorizationManagerLogOpTest : public AuthorizationManagerTest {
-public:
-    class MockRecoveryUnit : public RecoveryUnitNoop {
-    public:
-        MockRecoveryUnit(size_t* registeredChanges) : _registeredChanges(registeredChanges) {}
-
-        void registerChange(std::unique_ptr<Change> change) final {
-            // RecoveryUnitNoop takes ownership of the Change
-            RecoveryUnitNoop::registerChange(std::move(change));
-            ++(*_registeredChanges);
-        }
-
-    private:
-        size_t* _registeredChanges;
-    };
-
-    void setUp() override {
-        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(recoveryUnit),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        AuthorizationManagerTest::setUp();
-    }
-
-    size_t registeredChanges = 0;
-    MockRecoveryUnit* recoveryUnit = new MockRecoveryUnit(&registeredChanges);
-};
-
-TEST_F(AuthorizationManagerLogOpTest, testDropDatabaseAddsRecoveryUnits) {
-    authzManager->logOp(opCtx.get(),
-                        "c",
-                        {"admin", "$cmd"},
-                        BSON("dropDatabase"
-                             << "1"),
-                        nullptr);
-    ASSERT_EQ(size_t(1), registeredChanges);
-}
-
-TEST_F(AuthorizationManagerLogOpTest, testDropAuthCollectionAddsRecoveryUnits) {
-    authzManager->logOp(opCtx.get(),
-                        "c",
-                        {"admin", "$cmd"},
-                        BSON("drop"
-                             << "system.users"),
-                        nullptr);
-    ASSERT_EQ(size_t(1), registeredChanges);
-
-    authzManager->logOp(opCtx.get(),
-                        "c",
-                        {"admin", "$cmd"},
-                        BSON("drop"
-                             << "system.roles"),
-                        nullptr);
-    ASSERT_EQ(size_t(2), registeredChanges);
-
-    authzManager->logOp(opCtx.get(),
-                        "c",
-                        {"admin", "$cmd"},
-                        BSON("drop"
-                             << "system.version"),
-                        nullptr);
-    ASSERT_EQ(size_t(3), registeredChanges);
-
-    authzManager->logOp(opCtx.get(),
-                        "c",
-                        {"admin", "$cmd"},
-                        BSON("drop"
-                             << "system.profile"),
-                        nullptr);
-    ASSERT_EQ(size_t(3), registeredChanges);
-}
-
-TEST_F(AuthorizationManagerLogOpTest, testCreateAnyCollectionAddsNoRecoveryUnits) {
-    authzManager->logOp(opCtx.get(),
-                        "c",
-                        {"admin", "$cmd"},
-                        BSON("create"
-                             << "system.users"),
-                        nullptr);
-
-    authzManager->logOp(opCtx.get(),
-                        "c",
-                        {"admin", "$cmd"},
-                        BSON("create"
-                             << "system.profile"),
-                        nullptr);
-
-    authzManager->logOp(opCtx.get(),
-                        "c",
-                        {"admin", "$cmd"},
-                        BSON("create"
-                             << "system.other"),
-                        nullptr);
-
-    ASSERT_EQ(size_t(0), registeredChanges);
-}
-
-TEST_F(AuthorizationManagerLogOpTest, testRawInsertAddsRecoveryUnits) {
-    authzManager->logOp(opCtx.get(),
-                        "i",
-                        {"admin", "system.profile"},
-                        BSON("_id"
-                             << "admin.user"),
-                        nullptr);
-    ASSERT_EQ(size_t(0), registeredChanges);
-
-    authzManager->logOp(opCtx.get(),
-                        "i",
-                        {"admin", "system.users"},
-                        BSON("_id"
-                             << "admin.user"),
-                        nullptr);
-    ASSERT_EQ(size_t(1), registeredChanges);
-
-    authzManager->logOp(opCtx.get(),
-                        "i",
-                        {"admin", "system.roles"},
-                        BSON("_id"
-                             << "admin.user"),
-                        nullptr);
-    ASSERT_EQ(size_t(2), registeredChanges);
 }
 
 }  // namespace

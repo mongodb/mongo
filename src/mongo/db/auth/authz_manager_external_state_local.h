@@ -34,7 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
-#include "mongo/db/auth/role_graph.h"
+#include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/mutex.h"
@@ -56,9 +56,8 @@ class AuthzManagerExternalStateLocal : public AuthzManagerExternalState {
 public:
     virtual ~AuthzManagerExternalStateLocal() = default;
 
-    Status initialize(OperationContext* opCtx) override;
-
     Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
+    StatusWith<User> getUserObject(OperationContext* opCtx, const UserRequest& userReq) override;
     Status getUserDescription(OperationContext* opCtx,
                               const UserRequest& user,
                               BSONObj* result) override;
@@ -78,15 +77,7 @@ public:
                                     bool showBuiltinRoles,
                                     BSONArrayBuilder* result) override;
 
-    bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final {
-        return _hasAnyPrivilegeDocuments.load();
-    }
-
-    void setHasAnyPrivilegeDocuments() {
-        // HAPD is deliberately only ever promoted to true, never reset to false.
-        // Regaining localhost auth bypass intentionally requires an empty privDB and restart.
-        _hasAnyPrivilegeDocuments.store(true);
-    }
+    bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;
 
     /**
      * Finds a document matching "query" in "collectionName", and store a shared-ownership
@@ -119,65 +110,15 @@ public:
 
     void logOp(OperationContext* opCtx,
                AuthorizationManagerImpl* authManager,
-               const char* op,
+               StringData op,
                const NamespaceString& ns,
                const BSONObj& o,
                const BSONObj* o2) final;
-
-    /**
-     * Takes a user document, and processes it with the RoleGraph, in order to recursively
-     * resolve roles and add the 'inheritedRoles', 'inheritedPrivileges',
-     * and 'warnings' fields.
-     */
-    void resolveUserRoles(mutablebson::Document* userDoc, const std::vector<RoleName>& directRoles);
 
 protected:
     AuthzManagerExternalStateLocal() = default;
 
 private:
-    enum RoleGraphState {
-        roleGraphStateInitial = 0,
-        roleGraphStateConsistent,
-        roleGraphStateHasCycle
-    };
-
-    /**
-     * RecoveryUnit::Change subclass used to commit work for AuthzManager logOp listener.
-     */
-    class AuthzManagerLogOpHandler;
-
-    /**
-     * Initializes the role graph from the contents of the admin.system.roles collection.
-     */
-    Status _initializeRoleGraph(OperationContext* opCtx);
-
-    /**
-     * Fetches the user document for "userName" from local storage, and stores it into "result".
-     */
-    Status _getUserDocument(OperationContext* opCtx, const UserName& userName, BSONObj* result);
-
-    /**
-     * Returns true if the auth DB contains any users or roles.
-     */
-    bool _checkHasAnyPrivilegeDocuments(OperationContext* opCtx);
-
-    /**
-     * Eventually consistent, in-memory representation of all roles in the system (both
-     * user-defined and built-in).  Synchronized via _roleGraphMutex.
-     */
-    RoleGraph _roleGraph;
-
-    /**
-     * State of _roleGraph, one of "initial", "consistent" and "has cycle".  Synchronized via
-     * _roleGraphMutex.
-     */
-    RoleGraphState _roleGraphState = roleGraphStateInitial;
-
-    /**
-     * Guards _roleGraphState and _roleGraph.
-     */
-    Mutex _roleGraphMutex = MONGO_MAKE_LATCH("AuthzManagerExternalStateLocal::_roleGraphMutex");
-
     /**
      * Once *any* privilege document is observed we cache the state forever,
      * even if these collections are emptied/dropped.

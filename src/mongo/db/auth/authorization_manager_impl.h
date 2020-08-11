@@ -114,7 +114,7 @@ public:
     void updatePinnedUsersList(std::vector<UserName> names) override;
 
     void logOp(OperationContext* opCtx,
-               const char* opstr,
+               StringData opstr,
                const NamespaceString& nss,
                const BSONObj& obj,
                const BSONObj* patt) override;

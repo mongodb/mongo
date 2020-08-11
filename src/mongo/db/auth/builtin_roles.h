@@ -29,42 +29,35 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
+namespace auth {
 
-class V2UserDocumentParser {
-    V2UserDocumentParser(const V2UserDocumentParser&) = delete;
-    V2UserDocumentParser& operator=(const V2UserDocumentParser&) = delete;
+/**
+ * Adds to "privileges" the privileges associated with the named built-in role, and returns
+ * true. Returns false if "role" does not name a built-in role, and does not modify
+ * "privileges".  Addition of new privileges is done as with
+ * Privilege::addPrivilegeToPrivilegeVector.
+ */
+bool addPrivilegesForBuiltinRole(const RoleName& role, PrivilegeVector* privileges);
 
-public:
-    V2UserDocumentParser() {}
-    Status checkValidUserDocument(const BSONObj& doc) const;
+/**
+ * Ennumerate all builtin RoleNames for the given database.
+ */
+stdx::unordered_set<RoleName> getBuiltinRoleNamesForDB(StringData dbname);
 
-    /**
-     * Returns Status::OK() iff the given BSONObj describes a valid element from a roles array.
-     */
-    static Status checkValidRoleObject(const BSONObj& roleObject);
+/**
+ * Adds to "privileges" the necessary privileges to do absolutely anything on the system.
+ */
+void generateUniversalPrivileges(PrivilegeVector* privileges);
 
-    static Status parseRoleName(const BSONObj& roleObject, RoleName* result);
+/**
+ * Returns whether the given role corresponds to a built-in role.
+ */
+bool isBuiltinRole(const RoleName& role);
 
-    static Status parseRoleVector(const BSONArray& rolesArray, std::vector<RoleName>* result);
-
-    std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
-    User::UserId extractUserIDFromUserDocument(const BSONObj& doc) const;
-
-    Status initializeUserCredentialsFromUserDocument(User* user, const BSONObj& privDoc) const;
-
-    Status initializeUserRolesFromUserDocument(const BSONObj& doc, User* user) const;
-    Status initializeUserIndirectRolesFromUserDocument(const BSONObj& doc, User* user) const;
-    Status initializeUserPrivilegesFromUserDocument(const BSONObj& doc, User* user) const;
-    Status initializeAuthenticationRestrictionsFromUserDocument(const BSONObj& doc,
-                                                                User* user) const;
-
-    Status initializeUserFromUserDocument(const BSONObj& privDoc, User* user) const;
-};
-
+}  // namespace auth
 }  // namespace mongo

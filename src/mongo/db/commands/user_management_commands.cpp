@@ -1145,29 +1145,23 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auth::UsersInfoArgs args;
-        Status status = auth::parseUsersInfoCommand(cmdObj, dbname, &args);
-        uassertStatusOK(status);
+        uassertStatusOK(auth::parseUsersInfoCommand(cmdObj, dbname, &args));
 
-        AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+        auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
         auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
 
-        if ((args.target != auth::UsersInfoArgs::Target::kExplicitUsers || args.filter) &&
-            (args.showPrivileges ||
-             args.authenticationRestrictionsFormat == AuthenticationRestrictionsFormat::kShow)) {
-            uasserted(ErrorCodes::IllegalOperation,
-                      "Privilege or restriction details require exact-match usersInfo "
-                      "queries.");
-        }
+        BSONArrayBuilder usersArrayBuilder(result.subarrayStart("users"));
+        if (args.showPrivileges ||
+            (args.authenticationRestrictionsFormat == AuthenticationRestrictionsFormat::kShow)) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "Privilege or restriction details require exact-match usersInfo queries",
+                    !args.filter && (args.target == auth::UsersInfoArgs::Target::kExplicitUsers));
 
-        BSONArrayBuilder usersArrayBuilder;
-        if (args.target == auth::UsersInfoArgs::Target::kExplicitUsers &&
-            (args.showPrivileges ||
-             args.authenticationRestrictionsFormat == AuthenticationRestrictionsFormat::kShow)) {
-            // If you want privileges or restrictions you need to call getUserDescription on each
-            // user.
-            for (size_t i = 0; i < args.userNames.size(); ++i) {
+            // If you want privileges or restrictions you need to call getUserDescription
+            // on each user.
+            for (const auto& userName : args.userNames) {
                 BSONObj userDetails;
-                status = authzManager->getUserDescription(opCtx, args.userNames[i], &userDetails);
+                auto status = authzManager->getUserDescription(opCtx, userName, &userDetails);
                 if (status.code() == ErrorCodes::UserNotFound) {
                     continue;
                 }
@@ -1204,6 +1198,7 @@ public:
             // If you don't need privileges, or authenticationRestrictions, you can just do a
             // regular query on system.users
             std::vector<BSONObj> pipeline;
+
             if (args.target == auth::UsersInfoArgs::Target::kGlobal) {
                 // Leave the pipeline unconstrained, we want to return every user.
             } else if (args.target == auth::UsersInfoArgs::Target::kDB) {
@@ -1219,11 +1214,9 @@ public:
                 }
                 pipeline.push_back(BSON("$match" << BSON("$or" << usersMatchArray.arr())));
             }
+
             // Order results by user field then db field, matching how UserNames are ordered
             pipeline.push_back(BSON("$sort" << BSON("user" << 1 << "db" << 1)));
-
-            // Authentication restrictions are only rendered in the single user case.
-            pipeline.push_back(BSON("$project" << BSON("authenticationRestrictions" << false)));
 
             // Rewrite the credentials object into an array of its fieldnames.
             pipeline.push_back(
@@ -1235,9 +1228,14 @@ public:
                                                                          << "in"
                                                                          << "$$cred.k")))));
 
-            // Remove credentials, they're not required in the output
-            if (!args.showCredentials) {
-                pipeline.push_back(BSON("$project" << BSON("credentials" << false)));
+            if (args.showCredentials) {
+                // Authentication restrictions are only rendered in the single user case.
+                pipeline.push_back(BSON("$unset"
+                                        << "authenticationRestrictions"));
+            } else {
+                // Remove credentials as well, they're not required in the output
+                pipeline.push_back(BSON("$unset" << BSON_ARRAY("authenticationRestrictions"
+                                                               << "credentials")));
             }
 
             // Handle a user specified filter.
@@ -1268,7 +1266,8 @@ public:
                 usersArrayBuilder.append(cursor.next());
             }
         }
-        result.append("users", usersArrayBuilder.arr());
+
+        usersArrayBuilder.doneFast();
         return true;
     }
 
@@ -1292,7 +1291,7 @@ void CmdUMCTyped<CreateRoleCommand, void>::Invocation::typedRun(OperationContext
 
     uassert(ErrorCodes::BadValue,
             "Cannot create roles with the same name as a built-in role",
-            !RoleGraph::isBuiltinRole(roleName));
+            !auth::isBuiltinRole(roleName));
 
     BSONObjBuilder roleObjBuilder;
     roleObjBuilder.append("_id", str::stream() << roleName.getDB() << "." << roleName.getRole());
@@ -1416,7 +1415,7 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand, void>::Invocation::typedRun(
 
     uassert(ErrorCodes::BadValue,
             str::stream() << roleName.getFullName() << " is a built-in role and cannot be modified",
-            !RoleGraph::isBuiltinRole(roleName));
+            !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
     auto* serviceContext = client->getServiceContext();
@@ -1466,7 +1465,7 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand, void>::Invocation::typedRun(
 
     uassert(ErrorCodes::BadValue,
             str::stream() << roleName.getFullName() << " is a built-in role and cannot be modified",
-            !RoleGraph::isBuiltinRole(roleName));
+            !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
     auto* serviceContext = client->getServiceContext();
@@ -1520,7 +1519,7 @@ void CmdUMCTyped<GrantRolesToRoleCommand, void>::Invocation::typedRun(OperationC
 
     uassert(ErrorCodes::BadValue,
             str::stream() << roleName.getFullName() << " is a built-in role and cannot be modified",
-            !RoleGraph::isBuiltinRole(roleName));
+            !auth::isBuiltinRole(roleName));
 
     auto rolesToAdd = auth::resolveRoleNames(cmd.getRoles(), dbname);
 
@@ -1560,7 +1559,7 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand, void>::Invocation::typedRun(Operati
 
     uassert(ErrorCodes::BadValue,
             str::stream() << roleName.getFullName() << " is a built-in role and cannot be modified",
-            !RoleGraph::isBuiltinRole(roleName));
+            !auth::isBuiltinRole(roleName));
 
     auto rolesToRemove = auth::resolveRoleNames(cmd.getRoles(), dbname);
 
@@ -1595,7 +1594,7 @@ void CmdUMCTyped<DropRoleCommand, void>::Invocation::typedRun(OperationContext* 
 
     uassert(ErrorCodes::BadValue,
             str::stream() << roleName.getFullName() << " is a built-in role and cannot be modified",
-            !RoleGraph::isBuiltinRole(roleName));
+            !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
     auto* serviceContext = client->getServiceContext();

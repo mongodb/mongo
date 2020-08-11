@@ -128,7 +128,7 @@ public:
     }
 
     void logOp(OperationContext*,
-               const char*,
+               StringData,
                const NamespaceString&,
                const BSONObj&,
                const BSONObj*) override { /* do nothing*/

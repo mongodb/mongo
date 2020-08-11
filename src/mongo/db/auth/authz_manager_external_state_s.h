@@ -51,11 +51,11 @@ public:
     AuthzManagerExternalStateMongos();
     ~AuthzManagerExternalStateMongos() final;
 
-    Status initialize(OperationContext* opCtx) final;
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
         AuthorizationManager* authzManager) final;
     Status getStoredAuthorizationVersion(OperationContext* opCtx, int* outVersion) override;
     Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) final;
+    StatusWith<User> getUserObject(OperationContext* opCtx, const UserRequest& userReq) final;
     Status getUserDescription(OperationContext* opCtx,
                               const UserRequest& user,
                               BSONObj* result) final;

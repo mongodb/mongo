@@ -207,7 +207,7 @@ Status OplogApplicationChecks::checkAuthForCommand(OperationContext* opCtx,
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
     if (validity == OplogApplicationValidity::kNeedsSuperuser) {
         std::vector<Privilege> universalPrivileges;
-        RoleGraph::generateUniversalPrivileges(&universalPrivileges);
+        auth::generateUniversalPrivileges(&universalPrivileges);
         if (!authSession->isAuthorizedForPrivileges(universalPrivileges)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
