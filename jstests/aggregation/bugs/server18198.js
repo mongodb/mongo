@@ -11,7 +11,7 @@ try {
     var commandsRan = [];
     // hook in our patched mongo
     var mockMongo = {
-        getSlaveOk: function() {
+        getSecondaryOk: function() {
             return true;
         },
         runCommand: function(db, cmd, opts) {

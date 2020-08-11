@@ -62,6 +62,8 @@ all:
     test_file: jstests/sharding/explain_cmd.js
   - ticket: SERVER-43889
     test_file: jstests/sharding/retryable_writes.js
+  - ticket: SERVER-49990
+    test_file: jstests/replsets/secondaryOk_slaveOk_aliases.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

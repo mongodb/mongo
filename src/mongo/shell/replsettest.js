@@ -123,7 +123,7 @@ var ReplSetTest = function(opts) {
         var twoPrimaries = false;
         self.nodes.forEach(function(node) {
             try {
-                node.setSlaveOk();
+                node.setSecondaryOk();
                 var n = node.getDB('admin').runCommand({ismaster: 1});
                 self._liveNodes.push(node);
                 if (n.ismaster == true) {
@@ -1560,7 +1560,7 @@ var ReplSetTest = function(opts) {
             print("ReplSetTest awaitReplication: checking secondary #" + secondaryCount + ": " +
                   slaveName);
 
-            slave.getDB("admin").getMongo().setSlaveOk();
+            slave.getDB("admin").getMongo().setSecondaryOk();
 
             var slaveOpTime;
             if (secondaryOpTimeType == ReplSetTest.OpTimeType.LAST_DURABLE) {

@@ -28,13 +28,25 @@ if (typeof mongoInject == "function") {
 }
 
 Mongo.prototype.setSlaveOk = function(value) {
-    if (value == undefined)
-        value = true;
-    this.slaveOk = value;
+    print(
+        "WARNING: setSlaveOk() is deprecated and may be removed in the next major release. Please use setSecondaryOk() instead.");
+    this.setSecondaryOk(value);
 };
 
 Mongo.prototype.getSlaveOk = function() {
-    return this.slaveOk || false;
+    print(
+        "WARNING: getSlaveOk() is deprecated and may be removed in the next major release. Please use getSecondaryOk() instead.");
+    return this.getSecondaryOk();
+};
+
+Mongo.prototype.setSecondaryOk = function(value) {
+    if (value == undefined)
+        value = true;
+    this.secondaryOk = value;
+};
+
+Mongo.prototype.getSecondaryOk = function() {
+    return this.secondaryOk || false;
 };
 
 Mongo.prototype.getDB = function(name) {
