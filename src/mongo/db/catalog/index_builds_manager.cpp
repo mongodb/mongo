@@ -134,11 +134,8 @@ Status IndexBuildsManager::resumeBuildingIndexFromBulkLoadPhase(OperationContext
 }
 
 StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingIndexForRecovery(
-    OperationContext* opCtx, NamespaceString ns, const UUID& buildUUID, RepairData repair) {
+    OperationContext* opCtx, Collection* coll, const UUID& buildUUID, RepairData repair) {
     auto builder = invariant(_getBuilder(buildUUID));
-
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns);
-    auto rs = coll ? coll->getRecordStore() : nullptr;
 
     // Iterate all records in the collection. Validate the records and index them
     // if they are valid.  Delete them (if in repair mode), or crash, if they are not valid.
@@ -153,6 +150,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
             CurOp::get(opCtx)->setProgress_inlock(curopMessage, coll->numRecords(opCtx)));
     }
 
+    auto ns = coll->ns();
+    auto rs = coll->getRecordStore();
     auto cursor = rs->getCursor(opCtx);
     auto record = cursor->next();
     while (record) {

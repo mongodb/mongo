@@ -2698,7 +2698,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
 
         std::tie(numRecords, dataSize) =
             uassertStatusOK(_indexBuildsManager.startBuildingIndexForRecovery(
-                opCtx, collection->ns(), buildUUID, repair));
+                opCtx, collection, buildUUID, repair));
 
         // Since we are holding an exclusive collection lock to stop new writes, do not yield locks
         // while draining.
