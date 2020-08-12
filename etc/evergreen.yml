@@ -810,17 +810,7 @@ functions:
         set -o verbose
         set -o errexit
 
-        # For patch builds determine if we can bypass compile.
-        if [[ "${is_patch}" = "true" && "${task_name}" = "compile" ]]; then
-          ${activate_virtualenv}
-          $python buildscripts/bypass_compile_and_fetch_binaries.py            \
-            --project ${project}                                               \
-            --buildVariant ${build_variant}                                    \
-            --revision ${revision}                                             \
-            --patchFile patch_files.txt                                        \
-            --outFile bypass_compile_expansions.yml                            \
-            --jsonArtifact artifacts.json
-        fi
+        # Do nothing, bypass_compile is disabled.
 
   "send benchmark results" :
     command: json.send
