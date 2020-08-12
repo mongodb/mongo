@@ -595,6 +595,7 @@ Status AuthorizationManager::acquireUserForSessionRefresh(OperationContext* opCt
     }
 
     if (uid != (*user)->getID()) {
+        releaseUser(*user);
         *user = nullptr;
         return {ErrorCodes::UserNotFound,
                 str::stream() << "User id from privilege document '" << userName.toString()
