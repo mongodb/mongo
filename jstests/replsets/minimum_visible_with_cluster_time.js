@@ -2,19 +2,13 @@
  *  Tests that majority reads can complete successfully even when the cluster time is being
  *  increased rapidly while ddl operations are happening.
  *
- *  @tags: [requires_replication]
+ *  @tags: [requires_replication, requires_majority_read_concern]
  */
 (function() {
 'use strict';
-load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
 const rst = new ReplSetTest({nodes: 1});
-if (!startSetIfSupportsReadMajority(rst)) {
-    jsTest.log("skipping test since storage engine doesn't support committed reads");
-    rst.stopSet();
-    return;
-}
-
+rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
 const syncName = 'sync';

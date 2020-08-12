@@ -1,10 +1,9 @@
 /**
  * Tests that writeConcern 'majority' writes succeed and are visible in a replica set that has one
  * data-bearing node and two arbiters.
+ *
+ * @tags: [requires_majority_read_concern]
  */
-
-load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
-
 (function() {
 "use strict";
 
@@ -17,12 +16,7 @@ var name = "read_majority_two_arbs";
 var replTest =
     new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}});
 
-if (!startSetIfSupportsReadMajority(replTest)) {
-    jsTest.log("skipping test since storage engine doesn't support committed reads");
-    replTest.stopSet();
-    return;
-}
-
+replTest.startSet();
 var nodes = replTest.nodeList();
 var config = {
     "_id": name,

@@ -4,21 +4,13 @@
 // We then confirm that a writeConcern majority write will be seen as the lastVisibleOp by a
 // majority read.
 // @tags: [requires_majority_read_concern]
-
-load("jstests/replsets/rslib.js");
-
 (function() {
 "use strict";
 
 var name = 'lastOpVisible';
 var replTest = new ReplSetTest(
     {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}, waitForKeys: true});
-
-if (!startSetIfSupportsReadMajority(replTest)) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    replTest.stopSet();
-    return;
-}
+replTest.startSet();
 replTest.initiate();
 
 var primary = replTest.getPrimary();

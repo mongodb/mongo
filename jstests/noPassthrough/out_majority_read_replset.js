@@ -1,9 +1,8 @@
 // Tests the $out and read concern majority.
-// @tags: [resumable_index_build_incompatible]
+// @tags: [resumable_index_build_incompatible, requires_majority_read_concern]
 (function() {
 "use strict";
 
-load("jstests/replsets/rslib.js");           // For startSetIfSupportsReadMajority.
 load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
 
 // This test create indexes with majority of nodes not avialable for replication. So, disabling
@@ -21,12 +20,7 @@ if (jsTest.options().noJournal &&
     return;
 }
 
-if (!startSetIfSupportsReadMajority(rst)) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    rst.stopSet();
-    return;
-}
-
+rst.startSet();
 rst.initiate();
 
 const name = "out_majority_read";

@@ -5,8 +5,6 @@
 (function() {
 "use strict";
 
-load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
-
 function assertAfterClusterTimeReadFailsWithCode(db, readConcernObj, errorCode) {
     return assert.commandFailedWithCode(
         db.runCommand({find: "foo", readConcern: readConcernObj}),
@@ -28,11 +26,7 @@ const rst = new ReplSetTest({
     }
 });
 
-if (!startSetIfSupportsReadMajority(rst)) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    rst.stopSet();
-    return;
-}
+rst.startSet();
 rst.initiate();
 
 // Start the sharding test and add the majority read concern enabled replica set.

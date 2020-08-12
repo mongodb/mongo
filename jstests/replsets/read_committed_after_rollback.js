@@ -1,22 +1,13 @@
 /**
- *
  * Test read committed functionality following a following a rollback. Currently we require that all
  * snapshots be dropped during rollback, therefore committed reads will block until a new committed
  * snapshot is available.
+ *
+ * @tags: [requires_majority_read_concern]
  */
-
-load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
 (function() {
 "use strict";
-
-function assertCommittedReadsBlock(coll) {
-    var res = coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 3000});
-    assert.commandFailedWithCode(
-        res,
-        ErrorCodes.MaxTimeMSExpired,
-        "Expected read of " + coll.getFullName() + ' on ' + coll.getMongo().host + " to block");
-}
 
 function doCommittedRead(coll) {
     var res = coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 10000});
@@ -34,12 +25,7 @@ function doDirtyRead(coll) {
 var name = "read_committed_after_rollback";
 var replTest = new ReplSetTest(
     {name: name, nodes: 5, useBridge: true, nodeOptions: {enableMajorityReadConcern: ''}});
-
-if (!startSetIfSupportsReadMajority(replTest)) {
-    jsTest.log("skipping test since storage engine doesn't support committed reads");
-    replTest.stopSet();
-    return;
-}
+replTest.startSet();
 
 var nodes = replTest.nodeList();
 var config = {

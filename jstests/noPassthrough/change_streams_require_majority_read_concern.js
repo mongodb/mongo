@@ -1,9 +1,8 @@
 // Tests that the $changeStream requires read concern majority.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
 
-load("jstests/replsets/rslib.js");           // For startSetIfSupportsReadMajority.
 load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
 load("jstests/libs/namespace_utils.js");     // For getCollectionNameFromFullNamespace.
 load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
@@ -18,12 +17,7 @@ if (jsTest.options().noJournal &&
     return;
 }
 
-if (!startSetIfSupportsReadMajority(rst)) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    rst.stopSet();
-    return;
-}
-
+rst.startSet();
 rst.initiate();
 
 const name = "change_stream_require_majority_read_concern";

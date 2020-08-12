@@ -1,13 +1,15 @@
 /*
  * Tests that a node on a stale branch of history won't incorrectly mark its ops as committed even
  * when hearing about a commit point with a higher optime from a new primary.
+ *
+ * @tags: [requires_majority_read_concern]
  */
 (function() {
 'use strict';
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/rslib.js");
+load("jstests/replsets/rslib.js");  // for reconnect.
 
 var name = "readCommittedStaleHistory";
 var dbName = "wMajorityCheck";
@@ -24,12 +26,7 @@ var rst = new ReplSetTest({
     useBridge: true
 });
 
-if (!startSetIfSupportsReadMajority(rst)) {
-    jsTest.log("skipping test since storage engine doesn't support committed reads");
-    rst.stopSet();
-    return;
-}
-
+rst.startSet();
 var nodes = rst.nodes;
 rst.initiate();
 

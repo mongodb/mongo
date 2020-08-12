@@ -1,20 +1,15 @@
 /**
  * Tests mongoD-specific semantics of postBatchResumeToken for $changeStream aggregations.
- * @tags: [uses_transactions]
+ * @tags: [uses_transactions, requires_majority_read_concern]
  */
 (function() {
 "use strict";
 
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/replsets/rslib.js");                 // For startSetIfSupportsReadMajority.
 
 // Create a new single-node replica set, and ensure that it can support $changeStream.
 const rst = new ReplSetTest({nodes: 1});
-if (!startSetIfSupportsReadMajority(rst)) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    rst.stopSet();
-    return;
-}
+rst.startSet();
 rst.initiate();
 
 const db = rst.getPrimary().getDB(jsTestName());

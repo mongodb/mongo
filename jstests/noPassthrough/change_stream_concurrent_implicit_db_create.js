@@ -2,17 +2,12 @@
 // an order that avoids a deadlock.
 // This test was designed to reproduce SERVER-34333.
 // This test uses the WiredTiger storage engine, which does not support running without journaling.
-// @tags: [requires_replication,requires_journaling]
+// @tags: [requires_replication, requires_journaling, requires_majority_read_concern]
 (function() {
 "use strict";
-load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
 const rst = new ReplSetTest({nodes: 1});
-if (!startSetIfSupportsReadMajority(rst)) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    rst.stopSet();
-    return;
-}
+rst.startSet();
 rst.initiate();
 const db = rst.getPrimary().getDB("test");
 

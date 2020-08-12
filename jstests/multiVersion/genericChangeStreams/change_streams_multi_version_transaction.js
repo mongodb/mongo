@@ -2,12 +2,16 @@
 // a change stream after upgrading the replica set to the "latest" mongod, even when the change
 // stream includes multi-statement transactions.
 //
-// @tags: [uses_change_streams, uses_transactions, requires_replication]
+// @tags: [
+//     uses_change_streams,
+//     uses_transactions,
+//     requires_replication,
+//     requires_majority_read_concern
+// ]
 (function() {
 "use strict";
 
 load('jstests/multiVersion/libs/multi_rs.js');  // For upgradeSet.
-load("jstests/replsets/rslib.js");              // For startSetIfSupportsReadMajority.
 
 const dbName = jsTestName();
 const watchedCollName = "change_stream_watched";
@@ -94,13 +98,8 @@ function runTest(downgradeVersion) {
         nodeOptions: {binVersion: downgradeVersion},
     });
 
-    if (!startSetIfSupportsReadMajority(rst)) {
-        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-        rst.stopSet();
-        return;
-    }
-
     jsTestLog("Running test with 'downgradeVersion': " + downgradeVersion);
+    rst.startSet();
     rst.initiate();
 
     rst.getPrimary().getDB(dbName).createCollection(watchedCollName);

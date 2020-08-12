@@ -7,8 +7,6 @@
 (function() {
 "use strict";
 
-load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
-
 function assertCorrectOperationTime(operationTime, expectedTimestamp, opTimeType) {
     assert.eq(0,
               timestampCmp(operationTime, expectedTimestamp),
@@ -21,12 +19,7 @@ var name = "command_response_operation_time";
 
 var replTest = new ReplSetTest(
     {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ""}, waitForKeys: true});
-
-if (!startSetIfSupportsReadMajority(replTest)) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    replTest.stopSet();
-    return;
-}
+replTest.startSet();
 replTest.initiate();
 
 var res, statusRes;

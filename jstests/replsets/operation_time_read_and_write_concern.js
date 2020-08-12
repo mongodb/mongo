@@ -1,6 +1,6 @@
 /**
  * Validates the operationTime value in the command response depends on the read/writeConcern of the
- * the read/write commmand that produced it.
+ * the read/write command that produced it.
  * @tags: [requires_majority_read_concern]
  */
 (function() {
@@ -9,19 +9,13 @@
 // Skip db hash check because replication is stopped on secondaries.
 TestData.skipCheckDBHashes = true;
 
-load("jstests/replsets/rslib.js");           // For startSetIfSupportsReadMajority.
 load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries,
                                              // restartReplicationOnSecondaries
 var name = "operation_time_read_and_write_concern";
 
 var replTest = new ReplSetTest(
     {name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ""}, waitForKeys: true});
-
-if (!startSetIfSupportsReadMajority(replTest)) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    replTest.stopSet();
-    return;
-}
+replTest.startSet();
 replTest.initiate();
 
 var res;

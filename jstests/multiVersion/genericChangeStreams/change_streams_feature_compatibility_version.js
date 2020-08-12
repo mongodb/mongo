@@ -1,12 +1,11 @@
 // Test that a change stream is able to survive an upgrade. This is the most basic test to
 // demonstrate the survival of a stream, presuming the driver will attempt to retry and resume the
 // stream after network errors.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
 
 load("jstests/multiVersion/libs/multi_rs.js");  // For upgradeSet.
-load("jstests/replsets/rslib.js");              // For startSetIfSupportsReadMajority.
 
 function runTest(downgradeVersion) {
     jsTestLog("Running test with 'downgradeVersion': " + downgradeVersion);
@@ -15,12 +14,7 @@ function runTest(downgradeVersion) {
         nodeOptions: {binVersion: downgradeVersion},
     });
 
-    if (!startSetIfSupportsReadMajority(rst)) {
-        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-        rst.stopSet();
-        return;
-    }
-
+    rst.startSet();
     rst.initiate();
 
     let testDB = rst.getPrimary().getDB(jsTestName());

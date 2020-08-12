@@ -2,11 +2,11 @@
  * Tests which commands support causal consistency in the Mongo shell, that for each supported
  * command, the shell properly forwards its operation and cluster time and updates them based on the
  * response, and that the server rejects commands with afterClusterTime ahead of cluster time.
+ *
+ * @tags: [requires_majority_read_concern]
  */
 (function() {
 "use strict";
-
-load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
 // Verifies the command works and properly updates operation or cluster time.
 function runCommandAndCheckLogicalTimes(cmdObj, db, shouldAdvance) {
@@ -59,11 +59,7 @@ const rst = new ReplSetTest({
     }
 });
 
-if (!startSetIfSupportsReadMajority(rst)) {
-    jsTest.log("skipping test since storage engine doesn't support committed reads");
-    rst.stopSet();
-    return;
-}
+rst.startSet();
 rst.initiate();
 
 // Start the sharding test and add the majority readConcern enabled replica set.

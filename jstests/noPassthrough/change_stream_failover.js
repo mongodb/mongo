@@ -1,20 +1,14 @@
 // Test resuming a change stream on a node other than the one it was started on. Accomplishes this
 // by triggering a stepdown.
 // This test uses the WiredTiger storage engine, which does not support running without journaling.
-// @tags: [requires_replication,requires_journaling]
+// @tags: [requires_replication, requires_journaling, requires_majority_read_concern]
 (function() {
 "use strict";
 load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/replsets/rslib.js");                 // For startSetIfSupportsReadMajority.
 
 const rst = new ReplSetTest({nodes: 3});
-if (!startSetIfSupportsReadMajority(rst)) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    rst.stopSet();
-    return;
-}
-
+rst.startSet();
 rst.initiate();
 
 for (let key of Object.keys(ChangeStreamWatchMode)) {

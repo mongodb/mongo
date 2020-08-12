@@ -2,10 +2,9 @@
  * Test basic read committed functionality on a secondary:
  *  - Updates should not be visible until they are in the blessed snapshot.
  *  - Updates should be visible once they are in the blessed snapshot.
+ *
+ * @tags: [requires_majority_read_concern]
  */
-
-load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
-
 (function() {
 "use strict";
 
@@ -32,13 +31,7 @@ function log(arg) {
 var name = "read_committed_on_secondary";
 var replTest =
     new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}});
-
-if (!startSetIfSupportsReadMajority(replTest)) {
-    log("skipping test since storage engine doesn't support committed reads");
-    replTest.stopSet();
-    return;
-}
-
+replTest.startSet();
 var nodes = replTest.nodeList();
 var config = {
     "_id": name,

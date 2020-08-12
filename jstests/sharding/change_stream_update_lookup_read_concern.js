@@ -1,11 +1,10 @@
 // Tests that a change stream's update lookup will use the appropriate read concern. In particular,
 // tests that the update lookup will return a version of the document at least as recent as the
 // change that we're doing the lookup for, and that change will be majority-committed.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
 
-load('jstests/replsets/rslib.js');  // For startSetIfSupportsReadMajority.
 load("jstests/libs/profiler.js");   // For profilerHas*OrThrow() helpers.
 load("jstests/replsets/rslib.js");  // For reconfig().
 
@@ -43,11 +42,7 @@ const rst = new ReplSetTest({
     settings: {chainingAllowed: false},
 });
 
-if (!startSetIfSupportsReadMajority(rst)) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    rst.stopSet();
-    return;
-}
+rst.startSet();
 rst.initiate();
 rst.awaitSecondaryNodes();
 

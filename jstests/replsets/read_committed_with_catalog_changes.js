@@ -20,10 +20,11 @@
  *  - repair database
  *  - reindex collection
  *  - compact collection
+ *
+ * @tags: [requires_majority_read_concern]
  */
 
 load("jstests/libs/parallelTester.js");  // For Thread.
-load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
 
 (function() {
 "use strict";
@@ -213,12 +214,7 @@ var replTest = new ReplSetTest({
     nodeOptions: {enableMajorityReadConcern: '', setParameter: "enableIndexBuildCommitQuorum=false"}
 });
 
-if (!startSetIfSupportsReadMajority(replTest)) {
-    jsTest.log("skipping test since storage engine doesn't support committed reads");
-    replTest.stopSet();
-    return;
-}
-
+replTest.startSet();
 var nodes = replTest.nodeList();
 var config = {
     "_id": name,
