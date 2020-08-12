@@ -2,17 +2,10 @@
 // during cursor establishment.
 // @tags: [
 //   uses_change_streams,
+//   requires_majority_read_concern
 // ]
 (function() {
 'use strict';
-
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 const rsNodeOptions = {
     // Use a higher frequency for periodic noops to speed up the test.

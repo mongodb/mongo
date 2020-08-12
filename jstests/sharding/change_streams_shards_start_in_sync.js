@@ -5,17 +5,9 @@
 // could occur, followed by write 'B' to shard 1, and then the change stream could be established on
 // shard 1, then some third write 'C' could occur.  This test ensures that in that case, both 'A'
 // and 'B' will be seen in the changestream before 'C'.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
-
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 const st = new ShardingTest({
     shards: 2,

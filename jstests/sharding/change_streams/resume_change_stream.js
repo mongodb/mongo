@@ -3,22 +3,13 @@
 // @tags: [
 //   requires_find_command,
 //   uses_change_streams,
+//   requires_majority_read_concern
 // ]
 (function() {
 "use strict";
 
 load('jstests/replsets/rslib.js');           // For getLatestOp.
 load('jstests/libs/change_stream_util.js');  // For ChangeStreamTest.
-
-// For supportsMajorityReadConcern.
-load('jstests/multiVersion/libs/causal_consistency_helpers.js');
-
-// This test only works on storage engines that support committed reads, skip it if the
-// configured engine doesn't support it.
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 const oplogSize = 1;  // size in MB
 const st = new ShardingTest({

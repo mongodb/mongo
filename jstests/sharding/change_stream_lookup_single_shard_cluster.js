@@ -1,19 +1,9 @@
 // Tests that a $changeStream pipeline is split rather than forwarded even in the case where the
 // cluster only has a single shard, and that it can therefore successfully look up a document in a
 // sharded collection.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
-
-// For supportsMajorityReadConcern.
-load('jstests/multiVersion/libs/causal_consistency_helpers.js');
-
-// This test only works on storage engines that support committed reads, skip it if the
-// configured engine doesn't support it.
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 // Create a cluster with only 1 shard.
 const st = new ShardingTest({

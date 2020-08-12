@@ -7,7 +7,6 @@ var getLeastRecentOp;
 var waitForAllMembers;
 var reconfig;
 var awaitOpTime;
-var startSetIfSupportsReadMajority;
 var waitUntilAllNodesCaughtUp;
 var waitForState;
 var reInitiateWithoutThrowingOnAbortedMember;
@@ -503,19 +502,6 @@ waitForState = function(node, state) {
     // happens before or after the replSetTest command above returns is racy, so to ensure that
     // the connection to 'node' is usable after this function returns, reconnect it first.
     reconnect(node);
-};
-
-/**
- * Starts each node in the given replica set if the storage engine supports readConcern
- *'majority'.
- * Returns true if the replica set was started successfully and false otherwise.
- *
- * @param replSetTest - The instance of {@link ReplSetTest} to start
- * @param options - The options passed to {@link ReplSetTest.startSet}
- */
-startSetIfSupportsReadMajority = function(replSetTest, options) {
-    replSetTest.startSet(options);
-    return replSetTest.nodes[0].adminCommand("serverStatus").storageEngine.supportsCommittedReads;
 };
 
 /**

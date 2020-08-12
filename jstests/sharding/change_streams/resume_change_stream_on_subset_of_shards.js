@@ -1,16 +1,8 @@
 // This tests resuming a change stream on a sharded collection where not all shards have a chunk in
 // the collection.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
-
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 // Create a 3-shard cluster. Enable 'writePeriodicNoops' and set 'periodicNoopIntervalSecs' to 1
 // second so that each shard is continually advancing its optime, allowing the

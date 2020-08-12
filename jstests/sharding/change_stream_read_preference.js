@@ -1,20 +1,10 @@
 // Tests that change streams and their update lookups obey the read preference specified by the
 // user.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
 
 load('jstests/libs/profiler.js');  // For various profiler helpers.
-
-// For supportsMajorityReadConcern.
-load('jstests/multiVersion/libs/causal_consistency_helpers.js');
-
-// This test only works on storage engines that support committed reads, skip it if the
-// configured engine doesn't support it.
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 const st = new ShardingTest({
     name: "change_stream_read_pref",

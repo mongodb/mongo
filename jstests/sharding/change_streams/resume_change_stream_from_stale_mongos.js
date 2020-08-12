@@ -1,17 +1,9 @@
 // Tests that resuming a change stream that has become sharded via a mongos that believes the
 // collection is still unsharded will end up targeting the change stream to all shards after getting
 // a stale shard version.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
-
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 // Create a 2-shard cluster. Enable 'writePeriodicNoops' and set 'periodicNoopIntervalSecs' to 1
 // second so that each shard is continually advancing its optime, allowing the

@@ -1,8 +1,8 @@
 /**
  * Helper functions for testing causal consistency.
+ *
+ * @tags: [requires_majority_read_concern]
  */
-
-load('jstests/replsets/rslib.js');  // For startSetIfSupportsReadMajority.
 
 function assertAfterClusterTimeReadFails(db, collName) {
     assert.commandFailed(db.runCommand(
@@ -67,14 +67,4 @@ function assertContainsOperationTime(res, opts) {
             assert.eq(bsonWoCompare(res.operationTime, Timestamp(0, 0)), 0);
         }
     }
-}
-
-function supportsMajorityReadConcern() {
-    const rst = new ReplSetTest({nodes: 1, nodeOptions: {enableMajorityReadConcern: ""}});
-    if (!startSetIfSupportsReadMajority(rst)) {
-        rst.stopSet();
-        return false;
-    }
-    rst.stopSet();
-    return true;
 }

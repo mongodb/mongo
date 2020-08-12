@@ -2,13 +2,6 @@
 // @tags: [requires_majority_read_concern]
 (function() {
 "use strict";
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 const name = "read_concern_majority_getmore_secondaries";
 const replSet = new ReplSetTest({

@@ -1,19 +1,11 @@
 // Tests metadata notifications of change streams on sharded collections.
 // Legacy getMore fails after dropping the database that the original cursor is on.
-// @tags: [requires_find_command]
+// @tags: [requires_find_command, requires_majority_read_concern]
 (function() {
 "use strict";
 
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
-
-// For supportsMajorityReadConcern.
-load('jstests/multiVersion/libs/causal_consistency_helpers.js');
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 const st = new ShardingTest({
     shards: 2,

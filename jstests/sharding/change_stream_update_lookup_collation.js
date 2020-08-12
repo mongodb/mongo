@@ -2,17 +2,9 @@
 // use the collection's default collation once it gets to the shards.
 //
 // Collation is only supported with the find command, not with op query.
-// @tags: [requires_find_command, uses_change_streams]
+// @tags: [requires_find_command, uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
-
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 // Shard key index has collation, which is not compatible with $min/$max
 TestData.skipCheckOrphans = true;

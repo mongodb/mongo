@@ -7,19 +7,12 @@
 //     blacklist_from_rhel_67_s390x,
 //     requires_persistence,
 //     uses_change_streams,
+//     requires_majority_read_concern
 // ]
 (function() {
 "use strict";
 
 load('jstests/libs/change_stream_util.js');  // For ChangeStreamTest.
-
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 // Returns true if the shard is aware that the collection is sharded.
 function isShardAware(shard, coll) {

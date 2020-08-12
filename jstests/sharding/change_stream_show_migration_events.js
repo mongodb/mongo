@@ -1,12 +1,10 @@
 // Tests the undocumented 'showMigrationEvents' option for change streams.
 //
 // This test is connecting directly to a shard, and change streams require the getMore command.
-// @tags: [requires_find_command, uses_change_streams]
+// @tags: [requires_find_command, uses_change_streams, requires_majority_read_concern]
 (function() {
 'use strict';
 
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
 
 function checkEvents(changeStream, expectedEvents) {
@@ -22,11 +20,6 @@ function makeEvent(docId, opType) {
     assert(typeof docId === 'number');
     assert(typeof opType === 'string' && (opType === 'insert' || opType === 'delete'));
     return ({_id: docId, operationType: opType});
-}
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
 }
 
 // TODO WT-3864: Re-enable test for LSM once transaction visibility bug in LSM is resolved.

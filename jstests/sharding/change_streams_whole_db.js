@@ -1,5 +1,5 @@
 // Tests the behavior of a change stream on a whole database in a sharded cluster.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
 
@@ -7,14 +7,6 @@ load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollection
 load('jstests/aggregation/extras/utils.js');       // For assertErrorCode().
 load('jstests/libs/change_stream_util.js');        // For ChangeStreamTest.
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 const st = new ShardingTest({
     shards: 2,

@@ -3,19 +3,11 @@
 // 'documentKey' to include the new shard key, and that a resume token obtained prior to the
 // shardCollection command can be used to resume the stream even after the collection has been
 // sharded.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
 
 load('jstests/libs/change_stream_util.js');  // For ChangeStreamTest.
-
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 const testName = "change_streams_unsharded_becomes_sharded";
 const st = new ShardingTest({

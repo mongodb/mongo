@@ -1,16 +1,8 @@
 // Tests that change stream returns the stream of results continuously and in the right order when
 // it's migrating a chunk to a new shard.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 'use strict';
-
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 // TODO WT-3864: Re-enable test for LSM once transaction visibility bug in LSM is resolved.
 if (jsTest.options().wiredTigerCollectionConfigString === "type=lsm") {

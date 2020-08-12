@@ -7,9 +7,6 @@
 load('jstests/libs/profiler.js');             // For various profiler helpers.
 load("jstests/aggregation/extras/utils.js");  // For arrayEq()
 
-// For supportsMajorityReadConcern.
-load('jstests/multiVersion/libs/causal_consistency_helpers.js');
-
 const st = new ShardingTest({name: "union_with_read_pref", mongos: 1, shards: 2, rs: {nodes: 2}});
 
 // In this test we perform writes which we expect to read on a secondary, so we need to enable

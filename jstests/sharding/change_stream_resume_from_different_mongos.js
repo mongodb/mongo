@@ -1,16 +1,9 @@
 // Test resuming a change stream on a mongos other than the one the change stream was started on.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
-// For supportsMajorityReadConcern().
-load("jstests/multiVersion/libs/causal_consistency_helpers.js");
 load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 const st = new ShardingTest({
     shards: 2,

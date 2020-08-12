@@ -3,19 +3,9 @@
 // so allows the shards to regularly report their advancing optimes in the absence of any new data,
 // which in turn allows the AsyncResultsMerger to return sorted results retrieved from the other
 // shards.
-// @tags: [uses_change_streams]
+// @tags: [uses_change_streams, requires_majority_read_concern]
 (function() {
 "use strict";
-
-// For supportsMajorityReadConcern.
-load('jstests/multiVersion/libs/causal_consistency_helpers.js');
-
-// This test only works on storage engines that support committed reads, skip it if the
-// configured engine doesn't support it.
-if (!supportsMajorityReadConcern()) {
-    jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
-    return;
-}
 
 // Create a 2-shard cluster. Enable 'writePeriodicNoops' and set 'periodicNoopIntervalSecs' to 1
 // second so that each shard is continually advancing its optime, allowing the
