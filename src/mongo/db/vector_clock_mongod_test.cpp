@@ -32,11 +32,8 @@
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_time_validator.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
-#include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/clock_source_mock.h"
@@ -281,138 +278,6 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
     ASSERT_EQ(afterTime2.configTime().asTimestamp(), Timestamp(0, 0));
     ASSERT_EQ(afterTime3.topologyTime().asTimestamp(), Timestamp(0, 0));
-}
-
-class VectorClockMongoDPrimaryTest : public ShardServerTestFixture {
-protected:
-    void setUp() override {
-        ShardServerTestFixture::setUp();
-
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-
-        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
-        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-    }
-
-    void tearDown() override {
-        serverGlobalParams.clusterRole = ClusterRole::None;
-
-        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
-        replCoord->setFollowerMode(repl::MemberState::RS_UNKNOWN).ignore();
-
-        ShardServerTestFixture::tearDown();
-    }
-};
-
-TEST_F(VectorClockMongoDPrimaryTest, PersistVectorClockDocument) {
-    auto sc = getServiceContext();
-    auto opCtx = operationContext();
-
-    auto vc = VectorClockMutable::get(sc);
-    vc->advanceConfigTime_forTest(LogicalTime());
-    vc->advanceTopologyTime_forTest(LogicalTime());
-
-    NamespaceString nss(NamespaceString::kVectorClockNamespace);
-    PersistentTaskStore<VectorClockDocument> store(nss);
-
-    // Check that no vectorClockState document is present
-    ASSERT_EQUALS(store.count(opCtx, VectorClock::stateQuery()), 0);
-
-    // Persist and check that the vectorClockState document has been persisted
-    auto future = vc->persist();
-    future.get();
-    ASSERT_EQUALS(store.count(opCtx, VectorClock::stateQuery()), 1);
-
-    // Check that the vectorClockState document is still one after more persist calls
-    future = vc->persist();
-    vc->waitForInMemoryVectorClockToBePersisted();
-    ASSERT_EQUALS(store.count(opCtx, VectorClock::stateQuery()), 1);
-}
-
-TEST_F(VectorClockMongoDPrimaryTest, RecoverVectorClockDocument) {
-    auto sc = getServiceContext();
-    auto opCtx = operationContext();
-    const auto configTime = LogicalTime(Timestamp(3, 3));
-    const auto topologyTime = LogicalTime(Timestamp(4, 4));
-
-    auto vc = VectorClockMutable::get(sc);
-    vc->advanceConfigTime_forTest(configTime);
-    vc->advanceTopologyTime_forTest(topologyTime);
-
-    // Persist the vector clock, then reset its components
-    auto future = vc->persist();
-    future.get(opCtx);
-    vc->resetVectorClock_forTest();
-
-    NamespaceString nss(NamespaceString::kVectorClockNamespace);
-    PersistentTaskStore<VectorClockDocument> store(nss);
-
-    future = vc->recover();
-    vc->waitForVectorClockToBeRecovered();
-
-    auto time = vc->getTime();
-    auto actualConfTime = time.configTime();
-    auto actualTopologyTime = time.topologyTime();
-
-    ASSERT_EQUALS(actualConfTime, configTime);
-    ASSERT_EQUALS(actualTopologyTime, topologyTime);
-}
-
-TEST_F(VectorClockMongoDPrimaryTest, RecoverNotExistingVectorClockDocument) {
-    auto sc = getServiceContext();
-    auto opCtx = operationContext();
-    auto vc = VectorClockMutable::get(sc);
-
-    const auto configTime = LogicalTime(Timestamp(3, 3));
-    const auto topologyTime = LogicalTime(Timestamp(4, 4));
-    vc->advanceConfigTime_forTest(configTime);
-    vc->advanceTopologyTime_forTest(topologyTime);
-
-    NamespaceString nss(NamespaceString::kVectorClockNamespace);
-    PersistentTaskStore<VectorClockDocument> store(nss);
-
-    // Check that no recovery document is stored and call recovery
-    int nDocuments = store.count(opCtx, VectorClock::stateQuery());
-    ASSERT_EQUALS(nDocuments, 0);
-
-    auto future = vc->recover();
-    vc->waitForVectorClockToBeRecovered();
-
-    // Verify that times didn't change after an unsuccessful recovery
-    auto time = vc->getTime();
-    auto actualConfTime = time.configTime();
-    auto actualTopologyTime = time.topologyTime();
-
-    ASSERT_EQUALS(actualConfTime, configTime);
-    ASSERT_EQUALS(actualTopologyTime, topologyTime);
-}
-
-TEST_F(VectorClockMongoDPrimaryTest, SubsequentPersistRecoverVectorClockDocument) {
-    auto sc = getServiceContext();
-    auto opCtx = operationContext();
-    auto vc = VectorClockMutable::get(sc);
-
-    for (int i = 1; i < 10; i++) {
-        auto newTime = LogicalTime(Timestamp(i, i));
-        vc->advanceClusterTime_forTest(newTime);
-        vc->advanceConfigTime_forTest(newTime);
-        vc->advanceTopologyTime_forTest(newTime);
-
-        // Persist the vector clock, then reset its components
-        auto future = vc->persist();
-        future.get(opCtx);
-        vc->resetVectorClock_forTest();
-
-        future = vc->recover();
-        vc->waitForVectorClockToBeRecovered();
-
-        auto time = vc->getTime();
-        auto actualConfTime = time.configTime();
-        auto actualTopologyTime = time.topologyTime();
-
-        ASSERT_EQUALS(actualConfTime, newTime);
-        ASSERT_EQUALS(actualTopologyTime, newTime);
-    }
 }
 
 }  // namespace

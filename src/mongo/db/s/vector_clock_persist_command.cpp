@@ -32,7 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_mutable.h"
 
 namespace mongo {
 namespace {
@@ -61,8 +61,7 @@ public:
              const std::string& dbname_unused,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto* const vectorClock = VectorClock::get(opCtx->getServiceContext());
-        vectorClock->persist().get(opCtx);
+        VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
 
         return true;
     }

@@ -66,6 +66,26 @@ private:
 
     // VectorClockMutable methods implementation
 
+    SharedSemiFuture<void> waitForDurableConfigTime() override {
+        // VectorClockTrivial does not support persistence
+        MONGO_UNREACHABLE;
+    }
+
+    SharedSemiFuture<void> waitForDurableTopologyTime() override {
+        // VectorClockTrivial does not support persistence
+        MONGO_UNREACHABLE;
+    }
+
+    SharedSemiFuture<void> waitForDurable() override {
+        // VectorClockTrivial does not support persistence
+        MONGO_UNREACHABLE;
+    }
+
+    SharedSemiFuture<void> recover() override {
+        // VectorClockTrivial does not support persistence
+        MONGO_UNREACHABLE;
+    }
+
     LogicalTime _tick(Component component, uint64_t nTicks) override;
     void _tickTo(Component component, LogicalTime newTime) override;
 };

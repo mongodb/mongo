@@ -43,6 +43,9 @@ structs:
                 type: string
                 description: "Key of the VectorClock state singleton document"
                 default: '"vectorClockState"'
-            vectorClock:
-                type: object
-                description: "Current times of persisted VectorClock components"
+            configTime:
+                type: timestamp
+                description: "Persists the configTime component of the vector clock"
+            topologyTime:
+                type: timestamp
+                description: "Persists the topologyTime component of the vector clock"

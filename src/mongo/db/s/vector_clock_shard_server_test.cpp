@@ -32,7 +32,9 @@
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/clock_source_mock.h"
@@ -275,6 +277,95 @@ TEST_F(VectorClockShardServerTest, GossipInExternal) {
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
     ASSERT_EQ(afterTime3.configTime().asTimestamp(), Timestamp(0, 0));
     ASSERT_EQ(afterTime3.topologyTime().asTimestamp(), Timestamp(0, 0));
+}
+
+class VectorClockPersistenceTest : public ShardServerTestFixture {
+protected:
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
+        auto replCoord = repl::ReplicationCoordinator::get(operationContext());
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    }
+};
+
+const Query kVectorClockQuery = QUERY("_id"
+                                      << "vectorClockState");
+
+TEST_F(VectorClockPersistenceTest, PrimaryPersistVectorClockDocument) {
+    auto sc = getServiceContext();
+    auto opCtx = operationContext();
+    auto vc = VectorClockMutable::get(sc);
+
+    // Check that no vectorClockState document is present
+    PersistentTaskStore<VectorClockDocument> store(NamespaceString::kVectorClockNamespace);
+    ASSERT_EQ(store.count(opCtx, kVectorClockQuery), 0);
+
+    // Persist and check that the vectorClockState document has been persisted
+    vc->advanceConfigTime_forTest(LogicalTime(Timestamp(2, 2)));
+    vc->advanceTopologyTime_forTest(LogicalTime(Timestamp(1, 1)));
+    vc->waitForDurableConfigTime().get();
+    ASSERT_EQ(store.count(opCtx, kVectorClockQuery), 1);
+
+    // Check that the vectorClockState document is still one after more persist calls
+    vc->advanceConfigTime_forTest(LogicalTime(Timestamp(10, 10)));
+    vc->advanceTopologyTime_forTest(LogicalTime(Timestamp(1, 1)));
+    vc->waitForDurableConfigTime().get();
+    ASSERT_EQ(store.count(opCtx, kVectorClockQuery), 1);
+}
+
+TEST_F(VectorClockPersistenceTest, PrimaryRecoverWithoutExistingVectorClockDocument) {
+    auto sc = getServiceContext();
+    auto opCtx = operationContext();
+    auto vc = VectorClockMutable::get(sc);
+
+    // Check that no vectorClockState document is present
+    PersistentTaskStore<VectorClockDocument> store(NamespaceString::kVectorClockNamespace);
+    ASSERT_EQ(store.count(opCtx, kVectorClockQuery), 0);
+
+    vc->recover().get();
+
+    auto time = vc->getTime();
+    ASSERT_EQ(Timestamp(0), time.configTime().asTimestamp());
+    ASSERT_EQ(Timestamp(0), time.topologyTime().asTimestamp());
+}
+
+TEST_F(VectorClockPersistenceTest, PrimaryRecoverWithExistingVectorClockDocument) {
+    auto sc = getServiceContext();
+    auto opCtx = operationContext();
+    auto vc = VectorClockMutable::get(sc);
+
+    // Check that no vectorClockState document is present
+    PersistentTaskStore<VectorClockDocument> store(NamespaceString::kVectorClockNamespace);
+    ASSERT_EQ(store.count(opCtx, kVectorClockQuery), 0);
+    store.add(opCtx, VectorClockDocument(Timestamp(100), Timestamp(50)));
+
+    vc->recover().get();
+
+    auto time = vc->getTime();
+    ASSERT_EQ(Timestamp(100), time.configTime().asTimestamp());
+    ASSERT_EQ(Timestamp(50), time.topologyTime().asTimestamp());
+}
+
+TEST_F(VectorClockPersistenceTest, PrimaryRecoverWithIllegalVectorClockDocument) {
+    auto sc = getServiceContext();
+    auto opCtx = operationContext();
+    auto vc = VectorClockMutable::get(sc);
+
+    // Check that no vectorClockState document is present
+    PersistentTaskStore<VectorClockDocument> store(NamespaceString::kVectorClockNamespace);
+    ASSERT_EQ(store.count(opCtx, kVectorClockQuery), 0);
+    DBDirectClient client(opCtx);
+    client.insert(NamespaceString::kVectorClockNamespace.ns(),
+                  BSON("_id"
+                       << "vectorClockState"
+                       << "IllegalKey"
+                       << "IllegalValue"));
+
+    const int kParseErrorCode = 40414;
+    ASSERT_THROWS_CODE(vc->recover().get(), DBException, ErrorCodes::Error(kParseErrorCode));
 }
 
 }  // namespace

@@ -78,6 +78,22 @@ public:
         _tickTo(Component::TopologyTime, newTime);
     }
 
+    /**
+     * These methods ensure that the values of the specified vector clock components as of the time
+     * of the call have been durably persisted to disk, before setting the returned future.
+     * Persisting the vector clock ensures that subsequent calls to `recover()` below will bring the
+     * components to at least the persisted time.
+     */
+    virtual SharedSemiFuture<void> waitForDurableConfigTime() = 0;
+    virtual SharedSemiFuture<void> waitForDurableTopologyTime() = 0;
+    virtual SharedSemiFuture<void> waitForDurable() = 0;
+
+    /**
+     * Ensures that the values of the vector clock are at least equal to those from the last
+     * successfully persisted ones.
+     */
+    virtual SharedSemiFuture<void> recover() = 0;
+
 protected:
     VectorClockMutable();
     virtual ~VectorClockMutable();
