@@ -1073,18 +1073,6 @@ functions:
             --out-file bypass_compile_expansions.yml                           \
             --version-id ${version_id}                                         \
             --json-artifact artifacts.json
-
-        # For patch builds determine if we can bypass compile.
-        elif [[ "${is_patch}" = "true" && "${task_name}" = "compile" ]]; then
-          ${activate_virtualenv}
-          # Evergreen executable is in $HOME, so add that to the path.
-          DESTDIR=${destdir} PATH=$PATH:$HOME $python buildscripts/bypass_compile_and_fetch_binaries.py            \
-            --project ${project}                                               \
-            --build-variant ${build_variant}                                   \
-            --revision ${revision}                                             \
-            --patch-file patch_files.txt                                       \
-            --out-file bypass_compile_expansions.yml                           \
-            --json-artifact artifacts.json
         fi
 
   ### Set expansion macros used in each task.
