@@ -37,10 +37,6 @@ const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody
     auto apiParamsFromClient =
         APIParametersFromClient::parse("APIParametersFromClient"_sd, requestBody);
 
-    if (gRequireApiVersion.load()) {
-        uassert(498870, "Missing apiVersion parameter", apiParamsFromClient.getApiVersion());
-    }
-
     if (apiParamsFromClient.getApiDeprecationErrors() || apiParamsFromClient.getApiStrict()) {
         uassert(4886600,
                 "Provided apiStrict and/or apiDeprecationErrors without passing apiVersion",
