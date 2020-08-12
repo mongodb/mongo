@@ -88,7 +88,7 @@ if not debugBuild:
 if (not debugBuild) or (not env['TARGET_ARCH'] in ['x86_64', 'i386']):
     env.Append(CPPDEFINES=["NO_TCMALLOC_SAMPLES"])
 
-gperftools_root = env.Dir("#/src/third_party/gperftools-2.7")
+gperftools_root = env.Dir("#/src/third_party/gperftools")
 gperftools_platform = gperftools_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
 
 env.Append(CPPPATH=[gperftools_platform.Dir("internal/src"),

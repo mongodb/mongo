@@ -21,7 +21,7 @@ if [[ "$#" -ne 0 ]]; then
 fi
 
 NAME=gperftools
-VERSION=2.7
+VERSION=2.8
 REVISION=$VERSION-mongodb
 
 # If WSL, get Windows temp directory
@@ -52,7 +52,7 @@ git checkout $REVISION
 
 # configure just to generate a Makefile that has the 'make distdir' target.
 ./configure
-DIST_DIR=$NAME-$VERSION
+DIST_DIR=$NAME
 make distdir
 make distclean
 

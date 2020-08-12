@@ -19,7 +19,6 @@ pcreSuffix = "-8.42"
 mozjsSuffix = '-60'
 yamlSuffix = '-0.6.2'
 icuSuffix = '-57.1'
-gperftoolsSuffix = '-2.7'
 timelibSuffix = '-2018.01'
 tomcryptSuffix = '-1.18.2'
 variantSuffix = '-1.4.0'
@@ -531,11 +530,11 @@ if gperftoolsEnv['MONGO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]:
                 thirdPartyEnvironmentModifications['gperftools'][k] = v
         gperftoolsEnv.AddMethod(registerConsumerModifications, 'RegisterConsumerModifications')
         gperftoolsEnv.SConscript(
-            'gperftools' + gperftoolsSuffix + '/SConscript',
+            'gperftools' + '/SConscript',
             exports={'env' : gperftoolsEnv})
         gperftoolsEnv = gperftoolsEnv.Clone(
             LIBDEPS_INTERFACE=[
-                'gperftools' + gperftoolsSuffix + '/tcmalloc_minimal',
+                'gperftools/tcmalloc_minimal',
             ])
 
 gperftoolsEnv.Library(
