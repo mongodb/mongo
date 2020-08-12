@@ -434,7 +434,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
         // Set this in case the application of any ops need to use the prepare timestamp of this
         // transaction. It should be cleared automatically when the transaction finishes.
-        if (mode == repl::OplogApplication::Mode::kRecovering) {
+        if (mode == repl::OplogApplication::Mode::kRecovering ||
+            mode == repl::OplogApplication::Mode::kInitialSync) {
             txnParticipant.setPrepareOpTimeForRecovery(opCtx, entry.getOpTime());
         }
 

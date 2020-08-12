@@ -286,8 +286,12 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
             // application.
             auto recoveryPrepareOpTime = txnParticipant.getPrepareOpTimeForRecovery();
             if (!recoveryPrepareOpTime.isNull()) {
-                auto status =
-                    opCtx->recoveryUnit()->setTimestamp(recoveryPrepareOpTime.getTimestamp());
+                // We might replay a prepared transaction behind the oldest timestamp during initial
+                // sync. So round up to the oldest timestamp for the multikey write if the prepare
+                // timestamp is behind the oldest timestamp.
+                auto status = opCtx->recoveryUnit()->setTimestamp(
+                    std::max(opCtx->getServiceContext()->getStorageEngine()->getOldestTimestamp(),
+                             recoveryPrepareOpTime.getTimestamp()));
                 if (status.code() == ErrorCodes::BadValue) {
                     LOGV2(20352,
                           "Temporarily could not timestamp the multikey catalog write, retrying",

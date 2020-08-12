@@ -132,6 +132,8 @@ public:
 
     virtual void setOldestTimestamp(Timestamp newOldestTimestamp) override;
 
+    virtual Timestamp getOldestTimestamp() const override;
+
     virtual void setOldestActiveTransactionTimestampCallback(
         StorageEngine::OldestActiveTransactionTimestampCallback) override;
 
