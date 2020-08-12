@@ -277,12 +277,20 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (resumeInfo) {
                 auto resumeInfoIndexes = resumeInfo->getIndexes();
                 // Find the resume information that corresponds to this spec.
-                sorterInfo = *std::find_if(resumeInfoIndexes.begin(),
-                                           resumeInfoIndexes.end(),
-                                           [&info](const IndexSorterInfo& indexInfo) {
-                                               return info.woCompare(indexInfo.getSpec()) == 0;
-                                           });
+                auto sorterInfoIt =
+                    std::find_if(resumeInfoIndexes.begin(),
+                                 resumeInfoIndexes.end(),
+                                 [&info](const IndexSorterInfo& indexInfo) {
+                                     return info.woCompare(indexInfo.getSpec()) == 0;
+                                 });
+                uassert(ErrorCodes::NoSuchKey,
+                        str::stream() << "Unable to locate resume information for " << info
+                                      << " due to inconsistent resume information for index build "
+                                      << _buildUUID << " in collection " << ns << "("
+                                      << _collectionUUID << ")",
+                        sorterInfoIt != resumeInfoIndexes.end());
 
+                sorterInfo = *sorterInfoIt;
                 status = index.block->initForResume(
                     opCtx, collection, *sorterInfo, resumeInfo->getPhase());
             } else {
