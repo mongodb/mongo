@@ -880,6 +880,10 @@ void StorageEngineImpl::setOldestTimestamp(Timestamp newOldestTimestamp) {
     _engine->setOldestTimestamp(newOldestTimestamp, force);
 }
 
+Timestamp StorageEngineImpl::getOldestTimestamp() const {
+    return _engine->getOldestTimestamp();
+};
+
 void StorageEngineImpl::setOldestActiveTransactionTimestampCallback(
     StorageEngine::OldestActiveTransactionTimestampCallback callback) {
     _engine->setOldestActiveTransactionTimestampCallback(callback);

@@ -523,6 +523,12 @@ public:
     virtual void setOldestTimestamp(Timestamp timestamp) = 0;
 
     /**
+     * Gets the oldest timestamp for which the storage engine must maintain snapshot history
+     * through.
+     */
+    virtual Timestamp getOldestTimestamp() const = 0;
+
+    /**
      * Sets a callback which returns the timestamp of the oldest oplog entry involved in an
      * active MongoDB transaction. The storage engine calls this function to determine how much
      * oplog it must preserve.

@@ -140,6 +140,9 @@ public:
     }
     void setOldestTimestampFromStable() final {}
     void setOldestTimestamp(Timestamp timestamp) final {}
+    Timestamp getOldestTimestamp() const final {
+        return {};
+    };
     void setOldestActiveTransactionTimestampCallback(
         OldestActiveTransactionTimestampCallback callback) final {}
 
