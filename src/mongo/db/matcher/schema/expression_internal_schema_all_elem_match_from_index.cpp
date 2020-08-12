@@ -52,7 +52,7 @@ std::unique_ptr<MatchExpression> InternalSchemaAllElemMatchFromIndexMatchExpress
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }
-    return std::move(clone);
+    return clone;
 }
 
 bool InternalSchemaAllElemMatchFromIndexMatchExpression::equivalent(

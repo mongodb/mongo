@@ -87,7 +87,7 @@ public:
             pipeline.push_back(elem.embeddedObject().getOwned());
         }
 
-        return std::move(pipeline);
+        return pipeline;
     }
 
 

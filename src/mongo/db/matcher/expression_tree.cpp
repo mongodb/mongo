@@ -151,7 +151,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 // Simplify NOR of exactly one operand to NOT of that operand.
                 auto simplifiedExpression = std::make_unique<NotMatchExpression>(children.front());
                 children.clear();
-                return std::move(simplifiedExpression);
+                return simplifiedExpression;
             }
         }
 

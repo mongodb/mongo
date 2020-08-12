@@ -238,7 +238,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::getNextStandard() {
     if (++groupsIterator == _groups->end())
         dispose();
 
-    return std::move(out);
+    return out;
 }
 
 void DocumentSourceGroup::doDispose() {

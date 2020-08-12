@@ -64,7 +64,7 @@ public:
         if (getTag()) {
             minProperties->setTag(getTag()->clone());
         }
-        return std::move(minProperties);
+        return minProperties;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {

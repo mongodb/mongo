@@ -130,7 +130,7 @@ public:
             clone->setTag(getTag()->clone());
         }
 
-        return std::move(clone);
+        return clone;
     }
 
 protected:

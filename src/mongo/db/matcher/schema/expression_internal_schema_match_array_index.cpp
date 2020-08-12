@@ -91,7 +91,7 @@ std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::s
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }
-    return std::move(clone);
+    return clone;
 }
 
 MatchExpression::ExpressionOptimizerFunc

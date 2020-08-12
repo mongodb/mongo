@@ -54,7 +54,7 @@ public:
         if (getTag()) {
             maxItems->setTag(getTag()->clone());
         }
-        return std::move(maxItems);
+        return maxItems;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {

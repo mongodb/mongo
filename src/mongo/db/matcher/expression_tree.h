@@ -127,7 +127,7 @@ public:
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
-        return std::move(self);
+        return self;
     }
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
@@ -166,7 +166,7 @@ public:
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
-        return std::move(self);
+        return self;
     }
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
@@ -205,7 +205,7 @@ public:
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
-        return std::move(self);
+        return self;
     }
 
     virtual void debugString(StringBuilder& debug, int indentationLevel = 0) const;
@@ -233,7 +233,7 @@ public:
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
-        return std::move(self);
+        return self;
     }
 
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const {

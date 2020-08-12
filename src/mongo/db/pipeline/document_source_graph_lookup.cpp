@@ -614,7 +614,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
                                       maxDepth,
                                       boost::none));
 
-    return std::move(newSource);
+    return newSource;
 }
 
 void DocumentSourceGraphLookUp::addInvolvedCollections(

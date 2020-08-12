@@ -403,7 +403,7 @@ std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
             static_cast<RegexMatchExpression*>(regex->shallowClone().release()));
         next->_regexes.push_back(std::move(clonedRegex));
     }
-    return std::move(next);
+    return next;
 }
 
 bool InMatchExpression::contains(const BSONElement& e) const {
@@ -578,7 +578,7 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
             if (expression->getTag()) {
                 simplifiedExpression->setTag(expression->getTag()->clone());
             }
-            return std::move(simplifiedExpression);
+            return simplifiedExpression;
         } else if (equalitySet.size() == 1 && regexList.empty()) {
             // Simplify IN of exactly one equality to be an EqualityMatchExpression.
             auto simplifiedExpression = std::make_unique<EqualityMatchExpression>(
@@ -588,7 +588,7 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
                 simplifiedExpression->setTag(expression->getTag()->clone());
             }
 
-            return std::move(simplifiedExpression);
+            return simplifiedExpression;
         }
 
         return expression;

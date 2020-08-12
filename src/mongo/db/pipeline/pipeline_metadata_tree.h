@@ -218,7 +218,7 @@ inline std::pair<boost::optional<Stage<T>>, std::function<T(const T&)>> makeTree
                                             stageAndReshapeContents.second,
                                             *source,
                                             propagator);
-    return std::move(stageAndReshapeContents);
+    return stageAndReshapeContents;
 }
 
 template <typename T>

@@ -52,7 +52,7 @@ public:
         if (getTag()) {
             minLen->setTag(getTag()->clone());
         }
-        return std::move(minLen);
+        return minLen;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {

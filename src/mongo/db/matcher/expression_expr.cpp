@@ -121,7 +121,7 @@ std::unique_ptr<MatchExpression> ExprMatchExpression::shallowClone() const {
     if (_rewriteResult) {
         clone->_rewriteResult = _rewriteResult->clone();
     }
-    return std::move(clone);
+    return clone;
 }
 
 MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() const {

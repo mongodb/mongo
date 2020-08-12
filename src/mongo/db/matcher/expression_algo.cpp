@@ -255,7 +255,7 @@ unique_ptr<MatchExpression> createAndOfNodes(std::vector<unique_ptr<MatchExpress
         splitAnd->add(expr.release());
     }
 
-    return std::move(splitAnd);
+    return splitAnd;
 }
 
 /**
@@ -271,7 +271,7 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
         splitNor->add(expr.release());
     }
 
-    return std::move(splitNor);
+    return splitNor;
 }
 
 void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames) {

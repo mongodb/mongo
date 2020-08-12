@@ -117,6 +117,6 @@ unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {
     if (getTag()) {
         e->setTag(getTag()->clone());
     }
-    return std::move(e);
+    return e;
 }
 }  // namespace mongo

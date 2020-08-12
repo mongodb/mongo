@@ -75,7 +75,7 @@ public:
         if (getTag()) {
             expr->setTag(getTag()->clone());
         }
-        return std::move(expr);
+        return expr;
     }
 
     bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const {
@@ -219,7 +219,7 @@ public:
         if (getTag()) {
             expr->setTag(getTag()->clone());
         }
-        return std::move(expr);
+        return expr;
     }
 
     void debugString(StringBuilder& debug, int indentationLevel) const final {

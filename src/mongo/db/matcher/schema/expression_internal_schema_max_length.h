@@ -52,7 +52,7 @@ public:
         if (getTag()) {
             maxLen->setTag(getTag()->clone());
         }
-        return std::move(maxLen);
+        return maxLen;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {

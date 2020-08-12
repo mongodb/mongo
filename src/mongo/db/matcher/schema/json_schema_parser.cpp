@@ -151,7 +151,7 @@ std::unique_ptr<MatchExpression> makeRestriction(const MatcherTypeSet& restricti
     orExpr->add(notExpr.release());
     orExpr->add(restrictionExpr.release());
 
-    return std::move(orExpr);
+    return orExpr;
 }
 
 StatusWith<std::unique_ptr<InternalSchemaTypeExpression>> parseType(
@@ -431,7 +431,7 @@ StatusWith<StringDataSet> parseRequired(BSONElement requiredElt) {
                               << "' cannot be an empty array"};
     }
 
-    return std::move(properties);
+    return properties;
 }
 
 /**

@@ -54,7 +54,7 @@ public:
         if (getTag()) {
             minItems->setTag(getTag()->clone());
         }
-        return std::move(minItems);
+        return minItems;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {

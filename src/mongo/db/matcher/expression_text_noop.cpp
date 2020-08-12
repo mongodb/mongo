@@ -56,7 +56,7 @@ std::unique_ptr<MatchExpression> TextNoOpMatchExpression::shallowClone() const {
     if (getTag()) {
         expr->setTag(getTag()->clone());
     }
-    return std::move(expr);
+    return expr;
 }
 
 }  // namespace mongo

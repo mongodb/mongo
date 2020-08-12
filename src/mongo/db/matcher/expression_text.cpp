@@ -108,7 +108,7 @@ std::unique_ptr<MatchExpression> TextMatchExpression::shallowClone() const {
     if (getTag()) {
         expr->setTag(getTag()->clone());
     }
-    return std::move(expr);
+    return expr;
 }
 
 }  // namespace mongo

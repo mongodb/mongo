@@ -254,7 +254,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         }
     }
 
-    return std::move(csn);
+    return csn;
 }
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
@@ -288,7 +288,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
             ret->addPointMeta = query.metadataDeps()[DocumentMetadataFields::kGeoNearPoint];
             ret->addDistMeta = query.metadataDeps()[DocumentMetadataFields::kGeoNearDist];
 
-            return std::move(ret);
+            return ret;
         } else {
             auto ret = std::make_unique<GeoNear2DSphereNode>(index);
             ret->nq = &nearExpr->getData();
@@ -296,7 +296,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
             ret->addPointMeta = query.metadataDeps()[DocumentMetadataFields::kGeoNearPoint];
             ret->addDistMeta = query.metadataDeps()[DocumentMetadataFields::kGeoNearDist];
 
-            return std::move(ret);
+            return ret;
         }
     } else if (MatchExpression::TEXT == expr->matchType()) {
         // We must not keep the expression node around.
@@ -315,7 +315,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
             ++(ret->numPrefixFields);
         }
 
-        return std::move(ret);
+        return ret;
     } else {
         // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path()
         // because expr might be inside an array operator that provides a path prefix.
@@ -336,7 +336,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
 
         IndexBoundsBuilder::translate(expr, keyElt, index, &isn->bounds.fields[pos], tightnessOut);
 
-        return std::move(isn);
+        return isn;
     }
 }
 
@@ -1135,7 +1135,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         fetch->filter = std::move(clonedRoot);
         // Takes ownership of 'andResult'.
         fetch->children.push_back(andResult.release());
-        return std::move(fetch);
+        return fetch;
     }
 
     // If there are any nodes still attached to the AND, we can't answer them using the
@@ -1302,7 +1302,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
                 auto fetch = std::make_unique<FetchNode>();
                 fetch->filter = std::move(ownedRoot);
                 fetch->children.push_back(soln.release());
-                return std::move(fetch);
+                return fetch;
             }
         } else if (Indexability::arrayUsesIndexOnChildren(root)) {
             std::unique_ptr<QuerySolutionNode> solution;
@@ -1326,7 +1326,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             auto fetch = std::make_unique<FetchNode>();
             fetch->filter = std::move(ownedRoot);
             fetch->children.push_back(solution.release());
-            return std::move(fetch);
+            return fetch;
         }
     }
 

@@ -342,7 +342,7 @@ public:
         ExpressionVector args = parseArguments(expCtx, bsonExpr, vps);
         expr->validateArguments(args);
         expr->_children = std::move(args);
-        return std::move(expr);
+        return expr;
     }
 
 protected:

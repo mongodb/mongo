@@ -64,7 +64,7 @@ public:
         if (getTag()) {
             maxProperties->setTag(getTag()->clone());
         }
-        return std::move(maxProperties);
+        return maxProperties;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {

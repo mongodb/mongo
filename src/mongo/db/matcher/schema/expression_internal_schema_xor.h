@@ -56,7 +56,7 @@ public:
         if (getTag()) {
             xorCopy->setTag(getTag()->clone());
         }
-        return std::move(xorCopy);
+        return xorCopy;
     }
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final;

@@ -97,7 +97,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteAndExpression(
     }
 
     if (andMatch->numChildren() > 0) {
-        return std::move(andMatch);
+        return andMatch;
     }
 
     return nullptr;
@@ -118,7 +118,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteOrExpression(
     }
 
     if (orMatch->numChildren() > 0) {
-        return std::move(orMatch);
+        return orMatch;
     }
 
     return nullptr;
@@ -166,7 +166,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
         std::make_unique<InternalExprEqMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
     eqMatchExpr->setCollator(_collator);
 
-    return std::move(eqMatchExpr);
+    return eqMatchExpr;
 }
 
 bool RewriteExpr::_canRewriteComparison(

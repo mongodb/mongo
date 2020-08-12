@@ -87,7 +87,7 @@ std::unique_ptr<MatchExpression> InternalSchemaEqMatchExpression::shallowClone()
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }
-    return std::move(clone);
+    return clone;
 }
 
 }  //  namespace mongo

@@ -70,6 +70,6 @@ std::unique_ptr<MatchExpression> InternalSchemaUniqueItemsMatchExpression::shall
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }
-    return std::move(clone);
+    return clone;
 }
 }  // namespace mongo

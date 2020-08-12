@@ -209,7 +209,7 @@ public:
             e->setTag(getTag()->clone());
         }
         e->setCollator(_collator);
-        return std::move(e);
+        return e;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -241,7 +241,7 @@ public:
             e->setTag(getTag()->clone());
         }
         e->setCollator(_collator);
-        return std::move(e);
+        return e;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -273,7 +273,7 @@ public:
             e->setTag(getTag()->clone());
         }
         e->setCollator(_collator);
-        return std::move(e);
+        return e;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -305,7 +305,7 @@ public:
             e->setTag(getTag()->clone());
         }
         e->setCollator(_collator);
-        return std::move(e);
+        return e;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -337,7 +337,7 @@ public:
             e->setTag(getTag()->clone());
         }
         e->setCollator(_collator);
-        return std::move(e);
+        return e;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -372,7 +372,7 @@ public:
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return std::move(e);
+        return e;
     }
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
@@ -427,7 +427,7 @@ public:
         if (getTag()) {
             m->setTag(getTag()->clone());
         }
-        return std::move(m);
+        return m;
     }
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
@@ -473,7 +473,7 @@ public:
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return std::move(e);
+        return e;
     }
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
@@ -687,7 +687,7 @@ public:
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
-        return std::move(bitTestMatchExpression);
+        return bitTestMatchExpression;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -725,7 +725,7 @@ public:
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
-        return std::move(bitTestMatchExpression);
+        return bitTestMatchExpression;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -763,7 +763,7 @@ public:
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
-        return std::move(bitTestMatchExpression);
+        return bitTestMatchExpression;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -801,7 +801,7 @@ public:
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
         }
-        return std::move(bitTestMatchExpression);
+        return bitTestMatchExpression;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {

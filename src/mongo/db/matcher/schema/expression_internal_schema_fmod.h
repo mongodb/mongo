@@ -47,7 +47,7 @@ public:
         if (getTag()) {
             m->setTag(getTag()->clone());
         }
-        return std::move(m);
+        return m;
     }
 
     bool matchesSingleElement(const BSONElement& e, MatchDetails* details = nullptr) const final;

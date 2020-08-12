@@ -416,7 +416,7 @@ std::unique_ptr<MatchExpression> GeoMatchExpression::shallowClone() const {
     if (getTag()) {
         next->setTag(getTag()->clone());
     }
-    return std::move(next);
+    return next;
 }
 
 //
@@ -473,6 +473,6 @@ std::unique_ptr<MatchExpression> GeoNearMatchExpression::shallowClone() const {
     if (getTag()) {
         next->setTag(getTag()->clone());
     }
-    return std::move(next);
+    return next;
 }
 }  // namespace mongo

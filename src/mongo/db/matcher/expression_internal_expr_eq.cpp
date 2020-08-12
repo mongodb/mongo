@@ -63,7 +63,7 @@ std::unique_ptr<MatchExpression> InternalExprEqMatchExpression::shallowClone() c
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }
-    return std::move(clone);
+    return clone;
 }
 
 }  //  namespace mongo
