@@ -49,9 +49,6 @@
 namespace mongo {
 namespace {
 
-// Used to generate sequence numbers to assign to each newly created RoutingTableHistory
-AtomicWord<unsigned> nextCMSequenceNumber(0);
-
 bool allElementsAreOfType(BSONType type, const BSONObj& obj) {
     for (auto&& elem : obj) {
         if (elem.type() != type) {
@@ -309,8 +306,7 @@ RoutingTableHistory::RoutingTableHistory(NamespaceString nss,
                                          std::unique_ptr<CollatorInterface> defaultCollator,
                                          bool unique,
                                          ChunkMap chunkMap)
-    : _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
-      _nss(std::move(nss)),
+    : _nss(std::move(nss)),
       _uuid(uuid),
       _shardKeyPattern(shardKeyPattern),
       _defaultCollator(std::move(defaultCollator)),

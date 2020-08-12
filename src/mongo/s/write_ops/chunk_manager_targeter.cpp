@@ -335,24 +335,6 @@ bool isMetadataDifferent(const ChunkManager* managerA,
     return !databaseVersion::equal(dbVersionA, dbVersionB);
 }
 
-/**
- * Whether or not the manager/primary pair was changed or refreshed from a previous version
- * of the metadata.
- */
-bool wasMetadataRefreshed(const ChunkManager* managerA,
-                          const DatabaseVersion dbVersionA,
-                          const ChunkManager* managerB,
-                          const DatabaseVersion dbVersionB) {
-    if (isMetadataDifferent(managerA, dbVersionA, managerB, dbVersionB))
-        return true;
-
-    if (managerA) {
-        return managerA->getSequenceNumber() != managerB->getSequenceNumber();
-    }
-
-    return false;
-}
-
 }  // namespace
 
 ChunkManagerTargeter::ChunkManagerTargeter(OperationContext* opCtx,
@@ -728,7 +710,7 @@ void ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasCha
         // If we couldn't target, we might need to refresh if we haven't remotely refreshed
         // the metadata since we last got it from the cache.
 
-        bool alreadyRefreshed = wasMetadataRefreshed(
+        bool alreadyRefreshed = isMetadataDifferent(
             lastManager, lastDbVersion, _routingInfo->cm(), _routingInfo->db().databaseVersion());
 
         // If didn't already refresh the targeting information, refresh it

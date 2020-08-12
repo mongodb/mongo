@@ -136,6 +136,9 @@ class RoutingTableHistory : public std::enable_shared_from_this<RoutingTableHist
     RoutingTableHistory& operator=(const RoutingTableHistory&) = delete;
 
 public:
+    RoutingTableHistory(RoutingTableHistory&&) = default;
+    RoutingTableHistory& operator=(RoutingTableHistory&&) = default;
+
     /**
      * Makes an instance with a routing table for collection "nss", sharded on
      * "shardKeyPattern".
@@ -164,13 +167,6 @@ public:
      * to the requirements of the routing table update algorithm.
      */
     std::shared_ptr<RoutingTableHistory> makeUpdated(const std::vector<ChunkType>& changedChunks);
-
-    /**
-     * Returns an increasing number of the reload sequence number of this chunk manager.
-     */
-    unsigned long long getSequenceNumber() const {
-        return _sequenceNumber;
-    }
 
     const NamespaceString& getns() const {
         return _nss;
@@ -274,24 +270,20 @@ private:
 
     ChunkVersion _getVersion(const ShardId& shardName, bool throwOnStaleShard) const;
 
-    // The shard versioning mechanism hinges on keeping track of the number of times we reload
-    // ChunkManagers.
-    const unsigned long long _sequenceNumber;
-
     // Namespace to which this routing information corresponds
-    const NamespaceString _nss;
+    NamespaceString _nss;
 
     // The invariant UUID of the collection.  This is optional in 3.6, except in change streams.
-    const boost::optional<UUID> _uuid;
+    boost::optional<UUID> _uuid;
 
     // The key pattern used to shard the collection
-    const ShardKeyPattern _shardKeyPattern;
+    ShardKeyPattern _shardKeyPattern;
 
     // Default collation to use for routing data queries for this collection
-    const std::unique_ptr<CollatorInterface> _defaultCollator;
+    std::unique_ptr<CollatorInterface> _defaultCollator;
 
     // Whether the sharding key is unique
-    const bool _unique;
+    bool _unique;
 
     // Map from the max for each chunk to an entry describing the chunk. The union of all chunks'
     // ranges must cover the complete space from [MinKey, MaxKey).
@@ -313,13 +305,6 @@ class ChunkManager {
 public:
     ChunkManager(std::shared_ptr<RoutingTableHistory> rt, boost::optional<Timestamp> clusterTime)
         : _rt(std::move(rt)), _clusterTime(std::move(clusterTime)) {}
-
-    /**
-     * Returns an increasing number of the reload sequence number of this chunk manager.
-     */
-    unsigned long long getSequenceNumber() const {
-        return _rt->getSequenceNumber();
-    }
 
     const NamespaceString& getns() const {
         return _rt->getns();

@@ -668,9 +668,9 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         setOperationShouldBlockBehindCatalogCacheRefresh(opCtx.get(), false);
 
         // TODO(SERVER-49876): remove clang-tidy NOLINT comments.
-        if (existingRoutingInfo && newRoutingInfo &&     // NOLINT(bugprone-use-after-move)
-            existingRoutingInfo->getSequenceNumber() ==  // NOLINT(bugprone-use-after-move)
-                newRoutingInfo->getSequenceNumber()) {   // NOLINT(bugprone-use-after-move)
+        if (existingRoutingInfo && newRoutingInfo &&  // NOLINT(bugprone-use-after-move)
+            existingRoutingInfo->getVersion() ==      // NOLINT(bugprone-use-after-move)
+                newRoutingInfo->getVersion()) {       // NOLINT(bugprone-use-after-move)
             // If the routingInfo hasn't changed, we need to manually reset stale shards.
             newRoutingInfo->setAllShardsRefreshed();
         }
