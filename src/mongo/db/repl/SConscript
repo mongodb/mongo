@@ -1526,6 +1526,8 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'repl_coordinator_impl',
+        'repl_coordinator_test_fixture',
         'replica_set_aware_service',
     ],
 )
