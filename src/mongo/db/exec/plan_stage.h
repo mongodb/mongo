@@ -270,7 +270,6 @@ public:
             // reattachToOperationContext()
             // directly, since that will assert that '_opCtx' is not set.
             _opCtx = opCtx;
-            invariant(!_opCtx || opCtx == opCtx);
 
             for (auto&& child : _children) {
                 child->dispose(opCtx);
