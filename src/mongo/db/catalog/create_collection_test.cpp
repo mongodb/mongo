@@ -271,4 +271,29 @@ TEST_F(CreateCollectionTest, ValidationOptions) {
     validateValidator("{$expr: {$_internalJsEmit: {eval: 'function() {}', this: {}}}}", 4660801);
     validateValidator("{$where: 'this.a == this.b'}", static_cast<int>(ErrorCodes::BadValue));
 }
+
+// Tests that validator validation is disabled when inserting a document into a
+// <database>.system.resharding.* collection. The primary donor is responsible for validating
+// documents before they are inserted into the recipient's temporary resharding collection.
+TEST_F(CreateCollectionTest, ValidationDisabledForTemporaryReshardingCollection) {
+    NamespaceString reshardingNss("myDb", "system.resharding.yay");
+    auto opCtx = makeOpCtx();
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
+    BSONObj createCmdObj = BSON("create" << reshardingNss.coll() << "validator" << BSON("a" << 5));
+    ASSERT_OK(createCollection(opCtx.get(), reshardingNss.db().toString(), createCmdObj));
+    ASSERT_TRUE(collectionExists(opCtx.get(), reshardingNss));
+
+    AutoGetCollection agc(opCtx.get(), reshardingNss, MODE_X);
+    Collection* collection = agc.getCollection();
+
+    WriteUnitOfWork wuow(opCtx.get());
+    // Ensure a document that violates validator criteria can be inserted into the temporary
+    // resharding collection.
+    auto insertObj = fromjson("{'_id':2, a:1}");
+    auto status =
+        collection->insertDocument(opCtx.get(), InsertStatement(insertObj), nullptr, false);
+    ASSERT_OK(status);
+}
+
 }  // namespace
