@@ -44,6 +44,8 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
@@ -270,6 +272,33 @@ Status dropReadyIndexes(OperationContext* opCtx,
     return Status::OK();
 }
 
+void assertMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& ns) {
+    auto dss = DatabaseShardingState::get(opCtx, ns.db());
+    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+
+    try {
+        const auto collDesc =
+            CollectionShardingState::get(opCtx, ns)->getCollectionDescription();
+        if (!collDesc.isSharded()) {
+            auto mpsm = dss->getMovePrimarySourceManager(dssLock);
+
+            if (mpsm) {
+                LOGV2(
+                    4976500, "assertMovePrimaryInProgress", "movePrimaryNss"_attr = ns.toString());
+
+                uasserted(ErrorCodes::MovePrimaryInProgress,
+                          "movePrimary is in progress for namespace " + ns.toString());
+            }
+        }
+    } catch (const DBException& ex) {
+        if (ex.toStatus() != ErrorCodes::MovePrimaryInProgress) {
+            LOGV2(4976501, "Error when getting colleciton description", "what"_attr = ex.what());
+            return;
+        }
+        throw;
+    }
+}
+
 }  // namespace
 
 Status dropIndexes(OperationContext* opCtx,
@@ -385,6 +414,7 @@ Status dropIndexes(OperationContext* opCtx,
         }
 
         if (!abortAgain) {
+            assertMovePrimaryInProgress(opCtx, nss);
             break;
         }
     }

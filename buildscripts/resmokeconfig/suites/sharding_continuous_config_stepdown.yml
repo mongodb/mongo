@@ -218,6 +218,7 @@ selector:
   # Runs commands on mongos which target the primary configsvr, and then checks the outcome using
   # profiling/logging (on the configsvr primary), so cannot tolerate the configsvr primary changing.
   - jstests/sharding/read_write_concern_defaults_application.js
+  - jstests/sharding/move_primary_with_writes.js
 
 executor:
   config:
