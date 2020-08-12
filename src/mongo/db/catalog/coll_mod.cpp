@@ -77,8 +77,7 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
 
     auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
     try {
-        const auto collDesc =
-            CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
+        const auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription();
         if (!collDesc.isSharded()) {
             auto mpsm = dss->getMovePrimarySourceManager(dssLock);
 
