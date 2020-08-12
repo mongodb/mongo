@@ -3429,8 +3429,23 @@ timeout:
 tasks:
 
 ## compile - build all scons targets except unittests ##
-- name: compile
+- name: compile_no_archive
   depends_on: []
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: >-
+          install-dist-test
+          install-dist-test-debug
+          ${additional_compile_targets|}
+        task_compile_flags: >-
+          --detect-odr-violations
+          --separate-debug
+          PREFIX=dist-test
+
+- name: compile
+  depends_on:
+    - name: compile_no_archive
   commands:
     - func: "scons compile"
       vars:
@@ -3537,6 +3552,8 @@ tasks:
 
 ## compile_all - build all scons targets ##
 - name: compile_all
+  depends_on:
+    - name: compile_no_archive
   commands:
     - func: "scons compile"
       vars:
@@ -3588,6 +3605,8 @@ tasks:
 
 ## unittests - run unittests ##
 - name: unittests
+  depends_on:
+    - name: compile_no_archive
   commands:
     - func: "scons compile"
       vars:
@@ -3657,11 +3676,13 @@ tasks:
         resmoke_args: --suites=server_selection_json_test
 
 ## dbtest ##
-- name: dbtest
+- name: dbtest_no_archive
+  depends_on:
+    - name: compile_no_archive
   commands:
     - func: "scons compile"
       vars:
-        targets: archive-dbtest archive-dbtest-debug
+        targets: install-dbtest install-dbtest-debug
         task_compile_flags: >-
           --detect-odr-violations
           --separate-debug
@@ -3673,6 +3694,18 @@ tasks:
       vars:
         resmoke_args: --suites=dbtest --storageEngine=wiredTiger
         install_dir: build/install/bin
+
+- name: dbtest
+  depends_on:
+    - name: dbtest_no_archive
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: archive-dbtest archive-dbtest-debug
+        task_compile_flags: >-
+          --detect-odr-violations
+          --separate-debug
+        compiling_for_test: true
 
 ## embedded_sdk_build_and_test_* - build the embedded-dev and embedded-test targets only ##
 
@@ -7358,6 +7391,8 @@ tasks:
     - func: "run kitchen"
 
 - name: package
+  depends_on:
+    - name: compile_no_archive
   commands:
     - func: "scons compile"
       vars:
@@ -8203,11 +8238,13 @@ task_groups:
 - <<: *compile_task_group_template
   name: compile_without_package_TG
   tasks:
+  - compile_no_archive
   - compile
 
 - <<: *compile_task_group_template
   name: compile_TG
   tasks:
+  - compile_no_archive
   - compile
   - package
 
@@ -8246,6 +8283,7 @@ task_groups:
 - <<: *compile_task_group_template
   name: dbtest_TG
   tasks:
+  - dbtest_no_archive
   - dbtest
 
 - <<: *compile_task_group_template
@@ -8256,31 +8294,46 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_all_run_unittests_TG
+  max_hosts: 1
   tasks:
+  - compile_no_archive
   - compile
   - unittests
+  - dbtest_no_archive
   - dbtest
   - compile_all
   - package
 
-# This task group is only appropriate for builders that use
-# --link-model=dynamic, and have scons_cache_scope: shared and
+# These `parallel` task groups are only appropriate for builders that
+# use --link-model=dynamic, and have scons_cache_scope: shared and
 # scons_cache_mode: all. Such builders are able to share all build
 # artifacts, and therefore will not repeatedly re-link the same
 # code. In that mode, it makes sense to run all of these tasks
 # concurrently, since they will share state across machines and can
-# complete faster than running them serially. We keep them in a task
-# group so that if they do run on the same machine, they can avoid the
+# complete faster than running them serially. We keep them in task
+# groups so that if they do run on the same machine, they can avoid the
 # cost of re-running the setup tasks.
 - <<: *compile_task_group_template
-  name: compile_all_run_unittests_parallel_TG
-  max_hosts: 5
+  name: compile_parallel_TG
+  max_hosts: 1
   tasks:
+  - compile_no_archive
   - compile
-  - unittests
-  - dbtest
   - compile_all
   - package
+
+- <<: *compile_task_group_template
+  name: unittests_parallel_TG
+  max_hosts: 1
+  tasks:
+  - unittests
+
+- <<: *compile_task_group_template
+  name: dbtest_parallel_TG
+  max_hosts: 1
+  tasks:
+  - dbtest_no_archive
+  - dbtest
 
 - name: clang_tidy_TG
   setup_group_can_fail_task: true
@@ -8425,7 +8478,9 @@ buildvariants:
     max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_all_run_unittests_parallel_TG
+  - name: compile_parallel_TG
+  - name: unittests_parallel_TG
+  - name: dbtest_parallel_TG
   - name: .aggregation !.encrypt
   - name: .auth !.audit !.gle !.multiversion
   - name: bulk_gle_passthrough
@@ -9977,7 +10032,13 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_all_run_unittests_parallel_TG
+  - name: compile_parallel_TG
+    distros:
+      - rhel62-large
+  - name: unittests_parallel_TG
+    distros:
+      - rhel62-large
+  - name: dbtest_parallel_TG
     distros:
     - rhel62-large
   - name: lint_pylinters
@@ -12190,7 +12251,9 @@ buildvariants:
     max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
   tasks:
-  - name: compile_all_run_unittests_parallel_TG
+  - name: compile_parallel_TG
+  - name: unittests_parallel_TG
+  - name: dbtest_parallel_TG
   - name: jsCore
   - name: jsCore_txns
   # Note: {A,UB}SAN has a runtime component that is not fed into Jepsen.
