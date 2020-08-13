@@ -27,68 +27,35 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/commands.h"
-#include "mongo/db/initialize_api_parameters_gen.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/stats/api_version_metrics.h"
 
 namespace mongo {
+namespace {
+static const auto handle = ServiceContext::declareDecoration<ApplicationApiVersionMetrics>();
+}  // namespace
 
-/**
- * Parses a command's API Version parameters from a request and stores the apiVersion, apiStrict,
- * and apiDeprecationErrors fields.
- */
-const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Command* command);
+ApplicationApiVersionMetrics& ApplicationApiVersionMetrics::get(ServiceContext* svc) {
+    return handle(svc);
+}
 
-/**
- * Decorates operation context with methods to retrieve apiVersion, apiStrict, and
- * apiDeprecationErrors.
- */
-class APIParameters {
-
-public:
-    APIParameters();
-    static APIParameters& get(OperationContext* opCtx);
-    static APIParameters fromClient(const APIParametersFromClient& apiParamsFromClient);
-
-    const StringData getAPIVersion() const {
-        return _apiVersion;
+void ApplicationApiVersionMetrics::_addVersionTimestamp(std::string applicationName,
+                                                        const APIParameters& apiParams) {
+    Date_t timestamp = Date_t().now();
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (apiParams.getParamsPassed()) {
+        _appNameVersionTimestamps[applicationName][apiParams.getAPIVersion().toString()] =
+            timestamp;
+    } else {
+        _appNameVersionTimestamps[applicationName]["default"] = timestamp;
     }
+}
 
-    void setAPIVersion(StringData apiVersion) {
-        _apiVersion = apiVersion;
-    }
-
-    const bool getAPIStrict() const {
-        return _apiStrict;
-    }
-
-    void setAPIStrict(bool apiStrict) {
-        _apiStrict = apiStrict;
-    }
-
-    const bool getAPIDeprecationErrors() const {
-        return _apiDeprecationErrors;
-    }
-
-    void setAPIDeprecationErrors(bool apiDeprecationErrors) {
-        _apiDeprecationErrors = apiDeprecationErrors;
-    }
-
-    const bool getParamsPassed() const {
-        return _paramsPassed;
-    }
-
-    void setParamsPassed(bool noParamsPassed) {
-        _paramsPassed = noParamsPassed;
-    }
-
-private:
-    StringData _apiVersion;
-    bool _apiStrict;
-    bool _apiDeprecationErrors;
-    bool _paramsPassed;
-};
+void ApplicationApiVersionMetrics::update(const ClientMetadata& clientMetadata,
+                                          const APIParameters& apiParams) {
+    StringData appName = clientMetadata.getApplicationName();
+    _addVersionTimestamp(appName.toString(), apiParams);
+}
 
 }  // namespace mongo

@@ -60,6 +60,7 @@
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/stats/api_version_metrics.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/vector_clock.h"
@@ -357,9 +358,6 @@ void runCommand(OperationContext* opCtx,
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, opType);
 
-    auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
-    APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
-
     auto osi = initializeOperationSessionInfo(opCtx,
                                               request.body,
                                               command->requiresAuth(),
@@ -373,13 +371,25 @@ void runCommand(OperationContext* opCtx,
 
     auto wc = uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body));
 
+    Client* client = opCtx->getClient();
+    auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
+
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto readConcernParseStatus = [&]() {
         // We must obtain the client lock to set the ReadConcernArgs on the operation
         // context as it may be concurrently read by CurrentOp.
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        stdx::lock_guard<Client> lk(*client);
         return readConcernArgs.initialize(request.body);
+        APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
     }();
+
+    auto& apiParams = APIParameters::get(opCtx);
+    auto& apiVersionMetrics = ApplicationApiVersionMetrics::get(opCtx->getServiceContext());
+    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
+    if (clientMetadata) {
+        apiVersionMetrics.update(clientMetadata.get(), apiParams);
+    }
+
     if (!readConcernParseStatus.isOK()) {
         auto builder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);

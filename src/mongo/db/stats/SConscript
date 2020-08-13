@@ -28,6 +28,20 @@ env.Library(
 )
 
 env.Library(
+    target='api_version_metrics',
+    source=[
+        'api_version_metrics.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/db/shared_request_handling',
+    ]
+)
+
+env.Library(
     target='counters',
     source=[
         'counters.cpp',

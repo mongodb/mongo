@@ -29,66 +29,33 @@
 
 #pragma once
 
-#include "mongo/db/commands.h"
-#include "mongo/db/initialize_api_parameters_gen.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/initialize_api_parameters.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/util/time_support.h"
+
+#include <ctime>
 
 namespace mongo {
 
 /**
- * Parses a command's API Version parameters from a request and stores the apiVersion, apiStrict,
- * and apiDeprecationErrors fields.
+ * A service context decoration that stores metrics related to API Versions used by applications.
  */
-const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Command* command);
-
-/**
- * Decorates operation context with methods to retrieve apiVersion, apiStrict, and
- * apiDeprecationErrors.
- */
-class APIParameters {
-
+class ApplicationApiVersionMetrics {
 public:
-    APIParameters();
-    static APIParameters& get(OperationContext* opCtx);
-    static APIParameters fromClient(const APIParametersFromClient& apiParamsFromClient);
+    static ApplicationApiVersionMetrics& get(ServiceContext* svc);
 
-    const StringData getAPIVersion() const {
-        return _apiVersion;
-    }
+    ApplicationApiVersionMetrics() = default;
 
-    void setAPIVersion(StringData apiVersion) {
-        _apiVersion = apiVersion;
-    }
-
-    const bool getAPIStrict() const {
-        return _apiStrict;
-    }
-
-    void setAPIStrict(bool apiStrict) {
-        _apiStrict = apiStrict;
-    }
-
-    const bool getAPIDeprecationErrors() const {
-        return _apiDeprecationErrors;
-    }
-
-    void setAPIDeprecationErrors(bool apiDeprecationErrors) {
-        _apiDeprecationErrors = apiDeprecationErrors;
-    }
-
-    const bool getParamsPassed() const {
-        return _paramsPassed;
-    }
-
-    void setParamsPassed(bool noParamsPassed) {
-        _paramsPassed = noParamsPassed;
-    }
+    void update(const ClientMetadata& clientMetadata, const APIParameters& apiParams);
 
 private:
-    StringData _apiVersion;
-    bool _apiStrict;
-    bool _apiDeprecationErrors;
-    bool _paramsPassed;
+    void _addVersionTimestamp(std::string applicationName, const APIParameters& apiParams);
+
+    stdx::unordered_map<std::string, stdx::unordered_map<std::string, Date_t>>
+        _appNameVersionTimestamps;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ApplicationApiVersionMetrics::_mutex");
 };
 
 }  // namespace mongo

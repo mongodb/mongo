@@ -82,7 +82,7 @@ APIParameters& APIParameters::get(OperationContext* opCtx) {
 }
 
 APIParameters::APIParameters()
-    : _apiVersion("1"), _apiStrict(false), _apiDeprecationErrors(false) {}
+    : _apiVersion("1"), _apiStrict(false), _apiDeprecationErrors(false), _paramsPassed(false) {}
 
 APIParameters APIParameters::fromClient(const APIParametersFromClient& apiParamsFromClient) {
     APIParameters apiParameters = APIParameters();
@@ -92,6 +92,7 @@ APIParameters APIParameters::fromClient(const APIParametersFromClient& apiParams
 
     if (apiVersion) {
         apiParameters.setAPIVersion(apiVersion.value());
+        apiParameters.setParamsPassed(true);
     }
 
     if (apiStrict) {
