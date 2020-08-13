@@ -118,6 +118,13 @@ private:
         std::vector<boost::intrusive_ptr<AccumulatorState>> _accums;
     };
 
+    struct BucketDetails {
+        int currentBucketNum;
+        long long approxBucketSize = 0;
+        boost::optional<Value> previousMax;
+        boost::optional<std::pair<Value, Document>> currentMin;
+    };
+
     /**
      * Consumes all of the documents from the source in the pipeline and sorts them by their
      * 'groupBy' value. This method might not be able to finish populating the sorter in a single
@@ -126,25 +133,24 @@ private:
      */
     GetNextResult populateSorter();
 
+    void initalizeBucketIteration();
+
     /**
      * Computes the 'groupBy' expression value for 'doc'.
      */
     Value extractKey(const Document& doc);
 
     /**
-     * Calculates the bucket boundaries for the input documents and places them into buckets.
+     * Returns the next bucket if exists. boost::none if none exist.
      */
-    void populateBuckets();
+    boost::optional<Bucket> populateNextBucket();
 
+    boost::optional<std::pair<Value, Document>> adjustBoundariesAndGetMinForNextBucket(
+        Bucket* currentBucket);
     /**
      * Adds the document in 'entry' to 'bucket' by updating the accumulators in 'bucket'.
      */
     void addDocumentToBucket(const std::pair<Value, Document>& entry, Bucket& bucket);
-
-    /**
-     * Adds 'newBucket' to _buckets and updates any boundaries if necessary.
-     */
-    void addBucket(Bucket& newBucket);
 
     /**
      * Makes a document using the information from bucket. This is what is returned when getNext()
@@ -157,14 +163,13 @@ private:
 
     std::vector<AccumulationStatement> _accumulatedFields;
 
-    int _nBuckets;
     uint64_t _maxMemoryUsageBytes;
     bool _populated = false;
-    std::vector<Bucket> _buckets;
-    std::vector<Bucket>::iterator _bucketsIterator;
     boost::intrusive_ptr<Expression> _groupByExpression;
     boost::intrusive_ptr<GranularityRounder> _granularityRounder;
+    int _nBuckets;
     long long _nDocuments = 0;
+    BucketDetails _currentBucketDetails;
 };
 
 }  // namespace mongo

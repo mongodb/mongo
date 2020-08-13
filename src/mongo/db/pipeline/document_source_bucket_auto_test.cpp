@@ -277,6 +277,24 @@ TEST_F(BucketAutoTests, Returns3Of10RequestedBucketsWhen3ValuesInSource) {
     ASSERT_DOCUMENT_EQ(results[2], Document(fromjson("{_id : {min : 2, max : 2}, count : 1}")));
 }
 
+TEST_F(BucketAutoTests, PopulatesLastBucketWithRemainingDocuments) {
+    auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets : 5}}");
+    auto results = getResults(bucketAutoSpec,
+                              {Document{{"x", 0}},
+                               Document{{"x", 1}},
+                               Document{{"x", 2}},
+                               Document{{"x", 3}},
+                               Document{{"x", 4}},
+                               Document{{"x", 5}},
+                               Document{{"x", 6}}});
+    ASSERT_EQUALS(results.size(), 5UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0, max : 1}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 1, max : 2}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[2], Document(fromjson("{_id : {min : 2, max : 3}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[3], Document(fromjson("{_id : {min : 3, max : 4}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[4], Document(fromjson("{_id : {min : 4, max : 6}, count : 3}")));
+}
+
 TEST_F(BucketAutoTests, EvaluatesAccumulatorsInOutputField) {
     auto bucketAutoSpec =
         fromjson("{$bucketAuto : {groupBy : '$x', buckets : 2, output : {avg : {$avg : '$x'}}}}");
@@ -731,6 +749,25 @@ TEST_F(BucketAutoTests, ShouldRoundDownFirstMinimumBoundaryWithGranularitySpecif
     ASSERT_EQUALS(results.size(), 2UL);
     ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min : 0.63, max : 25}, count : 3}")));
     ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 25, max : 63}, count : 2}")));
+}
+
+TEST_F(BucketAutoTests, PopulatesLastBucketWithRemainingDocumentsWithGranularitySpecified) {
+    auto bucketAutoSpec =
+        fromjson("{$bucketAuto : {groupBy : '$x', buckets : 5, granularity : 'R5'}}");
+    auto results = getResults(bucketAutoSpec,
+                              {Document{{"x", 24}},
+                               Document{{"x", 15}},
+                               Document{{"x", 30}},
+                               Document{{"x", 9}},
+                               Document{{"x", 3}},
+                               Document{{"x", 7}},
+                               Document{{"x", 101}}});
+    ASSERT_EQUALS(results.size(), 5UL);
+    ASSERT_DOCUMENT_EQ(results[0], Document(fromjson("{_id : {min: 2.5, max: 4.0}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[1], Document(fromjson("{_id : {min : 4.0, max : 10}, count : 2}")));
+    ASSERT_DOCUMENT_EQ(results[2], Document(fromjson("{_id : {min : 10, max : 16}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[3], Document(fromjson("{_id : {min : 16, max : 25}, count : 1}")));
+    ASSERT_DOCUMENT_EQ(results[4], Document(fromjson("{_id : {min : 25, max : 160}, count : 2}")));
 }
 
 TEST_F(BucketAutoTests, ShouldAbsorbAllValuesSmallerThanAdjustedBoundaryWithGranularitySpecified) {

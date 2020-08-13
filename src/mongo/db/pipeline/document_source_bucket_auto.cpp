@@ -95,18 +95,17 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::doGetNext() {
         }
         invariant(populationResult.isEOF());
 
-        populateBuckets();
-
+        initalizeBucketIteration();
         _populated = true;
-        _bucketsIterator = _buckets.begin();
     }
 
-    if (_bucketsIterator == _buckets.end()) {
-        dispose();
-        return GetNextResult::makeEOF();
+    if (_currentBucketDetails.currentBucketNum++ < _nBuckets) {
+        if (auto bucket = populateNextBucket()) {
+            return makeDocument(*bucket);
+        }
     }
-
-    return makeDocument(*(_bucketsIterator++));
+    dispose();
+    return GetNextResult::makeEOF();
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::optimize() {
@@ -157,7 +156,7 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
     for (; next.isAdvanced(); next = pSource->getNext()) {
         auto nextDoc = next.releaseDocument();
         _sorter->add(extractKey(nextDoc), nextDoc);
-        _nDocuments++;
+        ++_nDocuments;
     }
     return next;
 }
@@ -206,7 +205,8 @@ void DocumentSourceBucketAuto::addDocumentToBucket(const pair<Value, Document>& 
     }
 }
 
-void DocumentSourceBucketAuto::populateBuckets() {
+void DocumentSourceBucketAuto::initalizeBucketIteration() {
+    // Initialize the iterator on '_sorter'.
     invariant(_sorter);
     _sortedInput.reset(_sorter->done());
     _sorter.reset();
@@ -218,112 +218,110 @@ void DocumentSourceBucketAuto::populateBuckets() {
 
     // Calculate the approximate bucket size. We attempt to fill each bucket with this many
     // documents.
-    long long approxBucketSize = std::round(double(_nDocuments) / double(_nBuckets));
+    _currentBucketDetails.approxBucketSize = std::round(double(_nDocuments) / double(_nBuckets));
 
-    if (approxBucketSize < 1) {
-        // If the number of buckets is larger than the number of documents, then we try to make as
-        // many buckets as possible by placing each document in its own bucket.
-        approxBucketSize = 1;
+    if (_currentBucketDetails.approxBucketSize < 1) {
+        // If the number of buckets is larger than the number of documents, then we try to make
+        // as many buckets as possible by placing each document in its own bucket.
+        _currentBucketDetails.approxBucketSize = 1;
     }
+}
 
-    boost::optional<pair<Value, Document>> firstEntryInNextBucket;
+boost::optional<pair<Value, Document>>
+DocumentSourceBucketAuto::adjustBoundariesAndGetMinForNextBucket(Bucket* currentBucket) {
+    auto getNextValIfPresent = [this]() {
+        return _sortedInput->more() ? boost::optional<pair<Value, Document>>(_sortedInput->next())
+                                    : boost::none;
+    };
 
-    // Start creating and populating the buckets.
-    for (int i = 0; i < _nBuckets; i++) {
-        bool isLastBucket = (i == _nBuckets - 1);
+    auto nextValue = getNextValIfPresent();
+    if (_granularityRounder) {
+        Value boundaryValue = _granularityRounder->roundUp(currentBucket->_max);
 
-        // Get the first value to place in this bucket.
-        pair<Value, Document> currentValue;
-        if (firstEntryInNextBucket) {
-            currentValue = *firstEntryInNextBucket;
-            firstEntryInNextBucket = boost::none;
-        } else if (_sortedInput->more()) {
-            currentValue = _sortedInput->next();
+        // If there are any values that now fall into this bucket after we round the
+        // boundary, absorb them into this bucket too.
+        while (nextValue &&
+               pExpCtx->getValueComparator().evaluate(boundaryValue > nextValue->first)) {
+            addDocumentToBucket(*nextValue, *currentBucket);
+            nextValue = getNextValIfPresent();
+        }
+
+        // Handle the special case where the largest value in the first bucket is zero. In this
+        // case, we take the minimum boundary of the next bucket and round it down. We then set the
+        // maximum boundary of the current bucket to be the rounded down value. This maintains that
+        // the maximum boundary of the current bucket is exclusive and the minimum boundary of the
+        // next bucket is inclusive.
+        double currentMax = boundaryValue.coerceToDouble();
+        if (currentMax == 0.0 && nextValue) {
+            currentBucket->_max = _granularityRounder->roundDown(nextValue->first);
         } else {
-            // No more values to process.
-            break;
+            currentBucket->_max = boundaryValue;
+        }
+    } else {
+        // If there are any more values that are equal to the boundary value, then absorb
+        // them into the current bucket too.
+        while (nextValue &&
+               pExpCtx->getValueComparator().evaluate(currentBucket->_max == nextValue->first)) {
+            addDocumentToBucket(*nextValue, *currentBucket);
+            nextValue = getNextValIfPresent();
         }
 
-        // Initialize the current bucket.
-        Bucket currentBucket(pExpCtx, currentValue.first, currentValue.first, _accumulatedFields);
-
-        // Evaluate each initializer against an empty document. Normally the
-        // initializer can refer to the group key, but in $bucketAuto there is no single
-        // group key per bucket.
-        Document emptyDoc;
-        for (size_t k = 0; k < _accumulatedFields.size(); ++k) {
-            Value initializerValue =
-                _accumulatedFields[k].expr.initializer->evaluate(emptyDoc, &pExpCtx->variables);
-            currentBucket._accums[k]->startNewGroup(initializerValue);
+        // If there is a bucket that comes after the current bucket, then the current bucket's max
+        // boundary is updated to the next bucket's min. This makes it so that buckets' min
+        // boundaries are inclusive and max boundaries are exclusive (except for the last bucket,
+        // which has an inclusive max).
+        if (nextValue) {
+            currentBucket->_max = nextValue->first;
         }
+    }
+    return nextValue;
+}
 
-        // Add the first value into the current bucket.
-        addDocumentToBucket(currentValue, currentBucket);
-
-        if (isLastBucket) {
-            // If this is the last bucket allowed, we need to put any remaining documents in
-            // the current bucket.
-            while (_sortedInput->more()) {
-                addDocumentToBucket(_sortedInput->next(), currentBucket);
-            }
-        } else {
-            // We go to approxBucketSize - 1 because we already added the first value in order
-            // to keep track of the minimum value.
-            for (long long j = 0; j < approxBucketSize - 1; j++) {
-                if (_sortedInput->more()) {
-                    addDocumentToBucket(_sortedInput->next(), currentBucket);
-                } else {
-                    // No more values to process.
-                    break;
-                }
-            }
-
-            boost::optional<pair<Value, Document>> nextValue = _sortedInput->more()
-                ? boost::optional<pair<Value, Document>>(_sortedInput->next())
-                : boost::none;
-
-            if (_granularityRounder) {
-                Value boundaryValue = _granularityRounder->roundUp(currentBucket._max);
-                // If there are any values that now fall into this bucket after we round the
-                // boundary, absorb them into this bucket too.
-                while (nextValue &&
-                       pExpCtx->getValueComparator().evaluate(boundaryValue > nextValue->first)) {
-                    addDocumentToBucket(*nextValue, currentBucket);
-                    nextValue = _sortedInput->more()
-                        ? boost::optional<pair<Value, Document>>(_sortedInput->next())
-                        : boost::none;
-                }
-                if (nextValue) {
-                    currentBucket._max = boundaryValue;
-                }
-            } else {
-                // If there are any more values that are equal to the boundary value, then absorb
-                // them into the current bucket too.
-                while (nextValue &&
-                       pExpCtx->getValueComparator().evaluate(currentBucket._max ==
-                                                              nextValue->first)) {
-                    addDocumentToBucket(*nextValue, currentBucket);
-                    nextValue = _sortedInput->more()
-                        ? boost::optional<pair<Value, Document>>(_sortedInput->next())
-                        : boost::none;
-                }
-            }
-            firstEntryInNextBucket = nextValue;
-        }
-
-        // Add the current bucket to the vector of buckets.
-        addBucket(currentBucket);
+boost::optional<DocumentSourceBucketAuto::Bucket> DocumentSourceBucketAuto::populateNextBucket() {
+    // If there was a bucket before this, the 'currentMin' should be populated, or there are no more
+    // documents.
+    if (!_currentBucketDetails.currentMin && !_sortedInput->more()) {
+        return {};
     }
 
-    if (!_buckets.empty() && _granularityRounder) {
-        // If we we have a granularity, we round the first bucket's minimum down and the last
-        // bucket's maximum up. This way all of the bucket boundaries are rounded to numbers in the
-        // granularity specification.
-        Bucket& firstBucket = _buckets.front();
-        Bucket& lastBucket = _buckets.back();
-        firstBucket._min = _granularityRounder->roundDown(firstBucket._min);
-        lastBucket._max = _granularityRounder->roundUp(lastBucket._max);
+    std::pair<Value, Document> currentValue =
+        _currentBucketDetails.currentMin ? *_currentBucketDetails.currentMin : _sortedInput->next();
+
+    Bucket currentBucket(pExpCtx, currentValue.first, currentValue.first, _accumulatedFields);
+
+    // If we have a granularity specified and if there is a bucket that came before the current
+    // bucket being added, then the current bucket's min boundary is updated to be the previous
+    // bucket's max boundary. This makes it so that bucket boundaries follow the granularity, have
+    // inclusive minimums, and have exclusive maximums.
+    if (_granularityRounder) {
+        currentBucket._min = _currentBucketDetails.previousMax.value_or(
+            _granularityRounder->roundDown(currentValue.first));
     }
+
+    // Evaluate each initializer against an empty document. Normally the initializer can refer to
+    // the group key, but in $bucketAuto there is no single group key per bucket.
+    Document emptyDoc;
+    for (size_t k = 0; k < _accumulatedFields.size(); ++k) {
+        Value initializerValue =
+            _accumulatedFields[k].expr.initializer->evaluate(emptyDoc, &pExpCtx->variables);
+        currentBucket._accums[k]->startNewGroup(initializerValue);
+    }
+
+
+    // Add 'approxBucketSize' number of documents to the current bucket. If this is the last bucket,
+    // add all the remaining documents.
+    addDocumentToBucket(currentValue, currentBucket);
+    const auto isLastBucket = (_currentBucketDetails.currentBucketNum == _nBuckets);
+    for (long long i = 1;
+         _sortedInput->more() && (i < _currentBucketDetails.approxBucketSize || isLastBucket);
+         i++) {
+        addDocumentToBucket(_sortedInput->next(), currentBucket);
+    }
+
+    // Modify the bucket details for next bucket.
+    _currentBucketDetails.currentMin = adjustBoundariesAndGetMinForNextBucket(&currentBucket);
+    _currentBucketDetails.previousMax = currentBucket._max;
+    return currentBucket;
 }
 
 DocumentSourceBucketAuto::Bucket::Bucket(
@@ -336,37 +334,6 @@ DocumentSourceBucketAuto::Bucket::Bucket(
     for (auto&& accumulationStatement : accumulationStatements) {
         _accums.push_back(accumulationStatement.makeAccumulator());
     }
-}
-
-void DocumentSourceBucketAuto::addBucket(Bucket& newBucket) {
-    if (!_buckets.empty()) {
-        Bucket& previous = _buckets.back();
-        if (_granularityRounder) {
-            // If we have a granularity specified and if there is a bucket that comes before the new
-            // bucket being added, then the new bucket's min boundary is updated to be the
-            // previous bucket's max boundary. This makes it so that bucket boundaries follow the
-            // granularity, have inclusive minimums, and have exclusive maximums.
-
-            double prevMax = previous._max.coerceToDouble();
-            if (prevMax == 0.0) {
-                // Handle the special case where the largest value in the first bucket is zero. In
-                // this case, we take the minimum boundary of the second bucket and round it down.
-                // We then set the maximum boundary of the first bucket to be the rounded down
-                // value. This maintains that the maximum boundary of the first bucket is exclusive
-                // and the minimum boundary of the second bucket is inclusive.
-                previous._max = _granularityRounder->roundDown(newBucket._min);
-            }
-
-            newBucket._min = previous._max;
-        } else {
-            // If there is a bucket that comes before the new bucket being added, then the previous
-            // bucket's max boundary is updated to the new bucket's min. This makes it so that
-            // buckets' min boundaries are inclusive and max boundaries are exclusive (except for
-            // the last bucket, which has an inclusive max).
-            previous._max = newBucket._min;
-        }
-    }
-    _buckets.push_back(newBucket);
 }
 
 Document DocumentSourceBucketAuto::makeDocument(const Bucket& bucket) {
@@ -389,7 +356,6 @@ Document DocumentSourceBucketAuto::makeDocument(const Bucket& bucket) {
 
 void DocumentSourceBucketAuto::doDispose() {
     _sortedInput.reset();
-    _bucketsIterator = _buckets.end();
 }
 
 Value DocumentSourceBucketAuto::serialize(
@@ -451,11 +417,11 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
     const boost::intrusive_ptr<GranularityRounder>& granularityRounder,
     uint64_t maxMemoryUsageBytes)
     : DocumentSource(kStageName, pExpCtx),
-      _nBuckets(numBuckets),
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
       _groupByExpression(groupByExpression),
-      _granularityRounder(granularityRounder) {
-
+      _granularityRounder(granularityRounder),
+      _nBuckets(numBuckets),
+      _currentBucketDetails{0} {
     invariant(!accumulationStatements.empty());
     for (auto&& accumulationStatement : accumulationStatements) {
         _accumulatedFields.push_back(accumulationStatement);
