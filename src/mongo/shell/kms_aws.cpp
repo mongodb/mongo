@@ -113,7 +113,7 @@ private:
 
 private:
     // SSL Manager
-    std::unique_ptr<SSLManagerInterface> _sslManager;
+    std::shared_ptr<SSLManagerInterface> _sslManager;
 
     // Server to connect to
     HostAndPort _server;
