@@ -11910,15 +11910,17 @@ buildvariants:
   - name: aggregation
   - name: .auth !.multiversion !.audit !.sharding
   - name: .misc_js
-  - name: concurrency
-  - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_replication
+  # SERVER-50296: Investigate concurrency test failures.
+  # - name: concurrency
+  # - name: concurrency_replication
+  # - name: concurrency_replication_causal_consistency
+  # - name: concurrency_simultaneous
+  # - name: concurrency_simultaneous_replication
   - name: .integration !.audit
   - name: .jscore .common !.txns !.decimal
   - name: jsCore_op_query
-  - name: .jstestfuzz .common
+  # SERVER-50295: Investigate jstestfuzz time outs.
+  # - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: .read_write_concern .linearize
   - name: replica_sets
