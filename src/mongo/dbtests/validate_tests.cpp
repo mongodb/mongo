@@ -2018,8 +2018,6 @@ public:
 
             // Insert the key on _id.
             {
-                WriteUnitOfWork wunit(&_opCtx);
-
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod();
@@ -2037,28 +2035,37 @@ public:
                              IndexAccessMethod::kNoopOnSuppressedErrorFn);
                 ASSERT_EQ(1, keys.size());
 
-                int64_t numInserted;
-                auto insertStatus = iam->insertKeys(
-                    &_opCtx,
-                    coll,
-                    {keys.begin(), keys.end()},
-                    {},
-                    MultikeyPaths{},
-                    swRecordId.getValue(),
-                    options,
-                    [this, &interceptor](const KeyString::Value& duplicateKey) {
-                        return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
-                    },
-                    &numInserted);
+                {
+                    WriteUnitOfWork wunit(&_opCtx);
 
-                wunit.commit();
+                    int64_t numInserted;
+                    auto insertStatus = iam->insertKeys(
+                        &_opCtx,
+                        coll,
+                        {keys.begin(), keys.end()},
+                        {},
+                        MultikeyPaths{},
+                        swRecordId.getValue(),
+                        options,
+                        [this, &interceptor](const KeyString::Value& duplicateKey) {
+                            return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                        },
+                        &numInserted);
+
+                    ASSERT_EQUALS(numInserted, 1);
+                    ASSERT_OK(insertStatus);
+
+                    wunit.commit();
+                }
 
                 ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
-                ASSERT_EQUALS(numInserted, 1);
-                ASSERT_OK(insertStatus);
 
-                interceptor->finalizeTemporaryTables(
-                    &_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
+                {
+                    WriteUnitOfWork wunit(&_opCtx);
+                    interceptor->finalizeTemporaryTables(
+                        &_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
+                    wunit.commit();
+                }
             }
 
             // Removing an index entry without removing the document should cause us to have a
@@ -2560,8 +2567,6 @@ public:
 
             // Insert the key on _id.
             {
-                WriteUnitOfWork wunit(&_opCtx);
-
                 auto descriptor = indexCatalog->findIdIndex(&_opCtx);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod();
@@ -2579,41 +2584,47 @@ public:
                              IndexAccessMethod::kNoopOnSuppressedErrorFn);
                 ASSERT_EQ(1, keys.size());
 
-                int64_t numInserted;
-                auto insertStatus = iam->insertKeys(
-                    &_opCtx,
-                    coll,
-                    {keys.begin(), keys.end()},
-                    {},
-                    MultikeyPaths{},
-                    swRecordId.getValue(),
-                    options,
-                    [this, &interceptor](const KeyString::Value& duplicateKey) {
-                        return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
-                    },
-                    &numInserted);
+                {
+                    WriteUnitOfWork wunit(&_opCtx);
 
-                wunit.commit();
+                    int64_t numInserted;
+                    auto insertStatus = iam->insertKeys(
+                        &_opCtx,
+                        coll,
+                        {keys.begin(), keys.end()},
+                        {},
+                        MultikeyPaths{},
+                        swRecordId.getValue(),
+                        options,
+                        [this, &interceptor](const KeyString::Value& duplicateKey) {
+                            return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                        },
+                        &numInserted);
+
+                    ASSERT_EQUALS(numInserted, 1);
+                    ASSERT_OK(insertStatus);
+
+                    wunit.commit();
+                }
 
                 ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
-                ASSERT_EQUALS(numInserted, 1);
-                ASSERT_OK(insertStatus);
 
-                interceptor->finalizeTemporaryTables(
-                    &_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
+                {
+                    WriteUnitOfWork wunit(&_opCtx);
+                    interceptor->finalizeTemporaryTables(
+                        &_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
+                    wunit.commit();
+                }
             }
 
             // Insert the key on "a".
             {
-                WriteUnitOfWork wunit(&_opCtx);
-
                 auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
                 auto entry = const_cast<IndexCatalogEntry*>(indexCatalog->getEntry(descriptor));
                 auto iam = entry->accessMethod();
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
-                int64_t numInserted;
                 iam->getKeys(executionCtx.pooledBufferBuilder(),
                              dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
@@ -2624,27 +2635,38 @@ public:
                              swRecordId.getValue(),
                              IndexAccessMethod::kNoopOnSuppressedErrorFn);
                 ASSERT_EQ(1, keys.size());
-                auto insertStatus = iam->insertKeys(
-                    &_opCtx,
-                    coll,
-                    {keys.begin(), keys.end()},
-                    {},
-                    MultikeyPaths{},
-                    swRecordId.getValue(),
-                    options,
-                    [this, &interceptor](const KeyString::Value& duplicateKey) {
-                        return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
-                    },
-                    &numInserted);
 
-                wunit.commit();
+                {
+                    WriteUnitOfWork wunit(&_opCtx);
+
+                    int64_t numInserted;
+                    auto insertStatus = iam->insertKeys(
+                        &_opCtx,
+                        coll,
+                        {keys.begin(), keys.end()},
+                        {},
+                        MultikeyPaths{},
+                        swRecordId.getValue(),
+                        options,
+                        [this, &interceptor](const KeyString::Value& duplicateKey) {
+                            return interceptor->recordDuplicateKey(&_opCtx, duplicateKey);
+                        },
+                        &numInserted);
+
+                    ASSERT_EQUALS(numInserted, 1);
+                    ASSERT_OK(insertStatus);
+
+                    wunit.commit();
+                }
 
                 ASSERT_NOT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
-                ASSERT_EQUALS(numInserted, 1);
-                ASSERT_OK(insertStatus);
 
-                interceptor->finalizeTemporaryTables(
-                    &_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
+                {
+                    WriteUnitOfWork wunit(&_opCtx);
+                    interceptor->finalizeTemporaryTables(
+                        &_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
+                    wunit.commit();
+                }
             }
 
             releaseDb();
