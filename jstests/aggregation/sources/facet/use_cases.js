@@ -103,7 +103,7 @@ const facetBucketedPrices = facetResult[0].bucketedPrices;
 const facetAutoBucketedPrices = facetResult[0].autoBucketedPrices;
 
 // Then assert they are the same.
-assert.eq(facetManufacturers, mostCommonManufacturers);
-assert.eq(facetBucketedPrices, numTVsBucketedByPriceRange);
-assert.eq(facetAutoBucketedPrices, numTVsAutomaticallyBucketedByPriceRange);
+assert.sameMembers(facetManufacturers, mostCommonManufacturers);
+assert.sameMembers(facetBucketedPrices, numTVsBucketedByPriceRange);
+assert.sameMembers(facetAutoBucketedPrices, numTVsAutomaticallyBucketedByPriceRange);
 }());
