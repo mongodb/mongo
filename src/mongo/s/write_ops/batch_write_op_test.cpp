@@ -69,7 +69,7 @@ write_ops::DeleteOpEntry buildDelete(const BSONObj& query, bool multi) {
 write_ops::UpdateOpEntry buildUpdate(const BSONObj& query, bool multi) {
     write_ops::UpdateOpEntry entry;
     entry.setQ(query);
-    entry.setU(BSONObj());
+    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
     entry.setMulti(multi);
     return entry;
 }
@@ -77,7 +77,7 @@ write_ops::UpdateOpEntry buildUpdate(const BSONObj& query, bool multi) {
 write_ops::UpdateOpEntry buildUpdate(const BSONObj& query, const BSONObj& updateExpr, bool multi) {
     write_ops::UpdateOpEntry entry;
     entry.setQ(query);
-    entry.setU(updateExpr);
+    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(updateExpr));
     entry.setMulti(multi);
     return entry;
 }

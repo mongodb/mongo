@@ -274,7 +274,8 @@ Status updateAuthzDocuments(OperationContext* opCtx,
                               updateOp.setUpdates({[&] {
                                   write_ops::UpdateOpEntry entry;
                                   entry.setQ(query);
-                                  entry.setU(updatePattern);
+                                  entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                                      updatePattern));
                                   entry.setMulti(multi);
                                   entry.setUpsert(upsert);
                                   return entry;

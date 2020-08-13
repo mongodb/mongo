@@ -152,7 +152,7 @@ Status updateConfigDocumentInTxn(OperationContext* opCtx,
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(query);
-            entry.setU(update);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
             entry.setUpsert(upsert);
             entry.setMulti(useMultiUpdate);
             return entry;

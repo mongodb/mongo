@@ -333,9 +333,10 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
         }());
         updateOp.setLet(let);
         updateOp.setRuntimeConstants(rtc);
-        updateOp.setUpdates(std::vector{write_ops::UpdateOpEntry(q,
-                                                                 {BSON("Key"
-                                                                       << "100")})});
+        updateOp.setUpdates(std::vector{write_ops::UpdateOpEntry(
+            q,
+            write_ops::UpdateModification::parseFromClassicUpdate(BSON("Key"
+                                                                       << "100")))});
         return updateOp;
     }());
     updateRequest.setWriteConcern(BSONObj());
@@ -602,8 +603,9 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
-        updateOp.setUpdates(
-            std::vector{write_ops::UpdateOpEntry(BSON("_id" << 100), {BSON("Key" << 100)})});
+        updateOp.setUpdates(std::vector{write_ops::UpdateOpEntry(
+            BSON("_id" << 100),
+            write_ops::UpdateModification::parseFromClassicUpdate(BSON("Key" << 100)))});
         return updateOp;
     }());
     request.setWriteConcern(BSONObj());
@@ -700,9 +702,13 @@ TEST_F(BatchWriteExecTest,
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
-        updateOp.setUpdates(
-            std::vector{write_ops::UpdateOpEntry(BSON("id" << 150), {BSON("x" << 1)}),
-                        write_ops::UpdateOpEntry(BSON("id" << 200), {BSON("y" << 2)})});
+        updateOp.setUpdates(std::vector{
+            write_ops::UpdateOpEntry(
+                BSON("id" << 150),
+                write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << 1))),
+            write_ops::UpdateOpEntry(
+                BSON("id" << 200),
+                write_ops::UpdateModification::parseFromClassicUpdate(BSON("y" << 2)))});
         return updateOp;
     }());
     request.setWriteConcern(BSONObj());
@@ -816,9 +822,13 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
-        updateOp.setUpdates(
-            std::vector{write_ops::UpdateOpEntry(BSON("id" << 150), {BSON("x" << 1)}),
-                        write_ops::UpdateOpEntry(BSON("id" << 200), {BSON("y" << 2)})});
+        updateOp.setUpdates(std::vector{
+            write_ops::UpdateOpEntry(
+                BSON("id" << 150),
+                write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << 1))),
+            write_ops::UpdateOpEntry(
+                BSON("id" << 200),
+                write_ops::UpdateModification::parseFromClassicUpdate(BSON("y" << 2)))});
         return updateOp;
     }());
     request.setWriteConcern(BSONObj());
@@ -943,9 +953,13 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
-        updateOp.setUpdates(
-            std::vector{write_ops::UpdateOpEntry(BSON("id" << 150), {BSON("x" << 1)}),
-                        write_ops::UpdateOpEntry(BSON("id" << 200), {BSON("y" << 2)})});
+        updateOp.setUpdates(std::vector{
+            write_ops::UpdateOpEntry(
+                BSON("id" << 150),
+                write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << 1))),
+            write_ops::UpdateOpEntry(
+                BSON("id" << 200),
+                write_ops::UpdateModification::parseFromClassicUpdate(BSON("y" << 2)))});
         return updateOp;
     }());
     request.setWriteConcern(BSONObj());
@@ -1070,8 +1084,9 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
-        updateOp.setUpdates(
-            std::vector{write_ops::UpdateOpEntry(BSON("_id" << 150), {BSON("x" << 1)})});
+        updateOp.setUpdates(std::vector{write_ops::UpdateOpEntry(
+            BSON("_id" << 150),
+            write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << 1)))});
         return updateOp;
     }());
     request.setWriteConcern(BSONObj());

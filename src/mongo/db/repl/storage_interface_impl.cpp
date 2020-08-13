@@ -975,7 +975,8 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         auto request = UpdateRequest();
         request.setNamespaceString(collection->ns());
         request.setQuery(query);
-        request.setUpdateModification(update);
+        request.setUpdateModification(
+            write_ops::UpdateModification::parseFromClassicUpdate(update));
         request.setUpsert(true);
         invariant(!request.isMulti());  // This follows from using an exact _id query.
         invariant(!request.shouldReturnAnyDocs());
@@ -1025,7 +1026,8 @@ Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
     auto request = UpdateRequest();
     request.setNamespaceString(nss);
     request.setQuery({});
-    request.setUpdateModification(update.obj);
+    request.setUpdateModification(
+        write_ops::UpdateModification::parseFromClassicUpdate(update.obj));
     request.setUpsert(true);
     return _updateWithQuery(opCtx, request, update.timestamp);
 }
@@ -1037,7 +1039,8 @@ Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
     auto request = UpdateRequest();
     request.setNamespaceString(nss);
     request.setQuery(query);
-    request.setUpdateModification(update.obj);
+    request.setUpdateModification(
+        write_ops::UpdateModification::parseFromClassicUpdate(update.obj));
     invariant(!request.isUpsert());
     return _updateWithQuery(opCtx, request, update.timestamp);
 }

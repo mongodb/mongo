@@ -59,7 +59,7 @@ void updatePersistedDefaultRWConcernDocument(OperationContext* opCtx, const RWCo
             write_ops::UpdateOpEntry entry;
             entry.setQ(BSON("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));
             // Note the _id is propagated from the query into the upserted document.
-            entry.setU(rw.toBSON());
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(rw.toBSON()));
             entry.setUpsert(true);
             return entry;
         }()});

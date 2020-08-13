@@ -194,7 +194,8 @@ Status DistLockCatalogImpl::ping(OperationContext* opCtx, StringData processID, 
     auto request =
         FindAndModifyRequest::makeUpdate(_lockPingNS,
                                          BSON(LockpingsType::process() << processID),
-                                         BSON("$set" << BSON(LockpingsType::ping(ping))));
+                                         write_ops::UpdateModification::parseFromClassicUpdate(
+                                             BSON("$set" << BSON(LockpingsType::ping(ping)))));
     request.setUpsert(true);
     request.setWriteConcern(kMajorityWriteConcern);
 
@@ -227,7 +228,7 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* opCtx,
     auto request = FindAndModifyRequest::makeUpdate(
         _locksNS,
         BSON(LocksType::name() << lockID << LocksType::state(LocksType::UNLOCKED)),
-        BSON("$set" << newLockDetails));
+        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << newLockDetails)));
     request.setUpsert(true);
     request.setShouldReturnNew(true);
     request.setWriteConcern(writeConcern);
@@ -282,7 +283,9 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* opCtx,
                                 << LocksType::why() << why));
 
     auto request = FindAndModifyRequest::makeUpdate(
-        _locksNS, BSON("$or" << orQueryBuilder.arr()), BSON("$set" << newLockDetails));
+        _locksNS,
+        BSON("$or" << orQueryBuilder.arr()),
+        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << newLockDetails)));
     request.setShouldReturnNew(true);
     request.setWriteConcern(kMajorityWriteConcern);
 
@@ -315,7 +318,8 @@ Status DistLockCatalogImpl::unlock(OperationContext* opCtx, const OID& lockSessi
     FindAndModifyRequest request = FindAndModifyRequest::makeUpdate(
         _locksNS,
         BSON(LocksType::lockID(lockSessionID)),
-        BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
+        write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED)))));
     request.setWriteConcern(kMajorityWriteConcern);
     return _unlock(opCtx, request);
 }
@@ -326,7 +330,8 @@ Status DistLockCatalogImpl::unlock(OperationContext* opCtx,
     FindAndModifyRequest request = FindAndModifyRequest::makeUpdate(
         _locksNS,
         BSON(LocksType::lockID(lockSessionID) << LocksType::name(name.toString())),
-        BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
+        write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED)))));
     request.setWriteConcern(kMajorityWriteConcern);
     return _unlock(opCtx, request);
 }
@@ -358,7 +363,8 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* opCtx, const std::string
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(BSON(LocksType::process(processID)));
-            entry.setU(BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED)))));
             entry.setUpsert(false);
             entry.setMulti(true);
             return entry;

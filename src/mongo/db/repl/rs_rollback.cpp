@@ -1863,7 +1863,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                     request.setNamespaceString(*nss);
 
                     request.setQuery(pattern);
-                    request.setUpdateModification(idAndDoc.second);
+                    request.setUpdateModification(
+                        write_ops::UpdateModification::parseFromClassicUpdate(idAndDoc.second));
                     request.setGod();
                     request.setUpsert();
 

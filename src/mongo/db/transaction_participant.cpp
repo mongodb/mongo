@@ -2355,7 +2355,8 @@ UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
     auto updateRequest = UpdateRequest();
     updateRequest.setNamespaceString(NamespaceString::kSessionTransactionsTableNamespace);
 
-    updateRequest.setUpdateModification(sessionTxnRecord.toBSON());
+    updateRequest.setUpdateModification(
+        write_ops::UpdateModification::parseFromClassicUpdate(sessionTxnRecord.toBSON()));
     updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName << _sessionId().toBSON()));
     updateRequest.setUpsert(true);
 

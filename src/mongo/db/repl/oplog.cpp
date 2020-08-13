@@ -1196,7 +1196,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     auto request = UpdateRequest();
                     request.setNamespaceString(requestNss);
                     request.setQuery(b.done());
-                    request.setUpdateModification(o);
+                    request.setUpdateModification(
+                        write_ops::UpdateModification::parseFromClassicUpdate(o));
                     request.setUpsert();
                     request.setFromOplogApplication(true);
 

@@ -243,7 +243,9 @@ struct stitch_support_v1_update {
         this->parsedFilters = uassertStatusOK(
             mongo::parsedUpdateArrayFilters(expCtx, arrayFilterVector, mongo::kDummyNamespaceStr));
 
-        updateDriver.parse(this->updateExpr, parsedFilters);
+        updateDriver.parse(
+            mongo::write_ops::UpdateModification::parseFromClassicUpdate(this->updateExpr),
+            parsedFilters);
 
         uassert(51037,
                 "Updates with a positional operator require a matcher object.",

@@ -228,7 +228,7 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(query);
-                entry.setU(builder.obj());
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(builder.obj()));
                 entry.setUpsert(upsert);
                 return entry;
             }()});
@@ -271,7 +271,7 @@ Status updateShardDatabasesEntry(OperationContext* opCtx,
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(query);
-                entry.setU(builder.obj());
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(builder.obj()));
                 entry.setUpsert(upsert);
                 return entry;
             }()});

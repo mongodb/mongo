@@ -119,7 +119,8 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
 
         const bool upsert = b || alwaysUpsert;
 
-        return authSession->checkAuthForUpdate(opCtx, ns, o, o2, upsert);
+        return authSession->checkAuthForUpdate(
+            opCtx, ns, o2, write_ops::UpdateModification::parseFromOplogEntry(o), upsert);
     } else if (opType == "d"_sd) {
 
         return authSession->checkAuthForDelete(opCtx, ns, o);

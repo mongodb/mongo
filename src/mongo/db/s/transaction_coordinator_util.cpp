@@ -145,7 +145,7 @@ repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
             TransactionCoordinatorDocument doc;
             doc.setId(std::move(sessionInfo));
             doc.setParticipants(std::move(participantList));
-            entry.setU(doc.toBSON());
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(doc.toBSON()));
 
             entry.setUpsert(true);
             return entry;
@@ -337,13 +337,13 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
                             << buildParticipantListMatchesConditions(participantList) << "$or"
                             << BSON_ARRAY(noDecision << sameDecision)));
 
-            entry.setU([&] {
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate([&] {
                 TransactionCoordinatorDocument doc;
                 doc.setId(sessionInfo);
                 doc.setParticipants(std::move(participantList));
                 doc.setDecision(decision);
                 return doc.toBSON();
-            }());
+            }()));
 
             return entry;
         }()});

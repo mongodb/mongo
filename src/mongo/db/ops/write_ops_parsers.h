@@ -60,20 +60,27 @@ public:
     enum class Type { kClassic, kPipeline, kDelta };
 
     /**
-     * Used to indicate that a diff is being passed to the constructor.
+     * Used to indicate that a certain type of update is being passed to the constructor.
      */
     struct DiffTag {};
+    struct ClassicTag {};
 
     // Given the 'o' field of an update oplog entry, will return an UpdateModification that can be
     // applied.
     static UpdateModification parseFromOplogEntry(const BSONObj& oField);
+    static UpdateModification parseFromClassicUpdate(const BSONObj& modifiers) {
+        return UpdateModification(modifiers, ClassicTag{});
+    }
+    static UpdateModification parseFromV2Delta(const doc_diff::Diff& diff) {
+        return UpdateModification(diff, DiffTag{});
+    }
 
     UpdateModification() = default;
     UpdateModification(BSONElement update);
     UpdateModification(std::vector<BSONObj> pipeline);
     UpdateModification(doc_diff::Diff, DiffTag);
     // This constructor exists only to provide a fast-path for constructing classic-style updates.
-    UpdateModification(const BSONObj& update);
+    UpdateModification(const BSONObj& update, ClassicTag);
 
     /**
      * These methods support IDL parsing of the "u" field from the update command and OP_UPDATE.

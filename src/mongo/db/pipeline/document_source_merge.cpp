@@ -148,8 +148,8 @@ MergeStrategy makeInsertStrategy() {
 BatchTransform makeUpdateTransform(const std::string& updateOp) {
     return [updateOp](auto& batch) {
         for (auto&& obj : batch) {
-            std::get<UpdateModification>(obj) =
-                BSON(updateOp << std::get<UpdateModification>(obj).getUpdateClassic());
+            std::get<UpdateModification>(obj) = UpdateModification::parseFromClassicUpdate(
+                BSON(updateOp << std::get<UpdateModification>(obj).getUpdateClassic()));
         }
     };
 }

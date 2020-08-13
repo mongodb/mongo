@@ -62,11 +62,15 @@ namespace {
 using str::stream;
 using unittest::assertGet;
 
+write_ops::UpdateModification makeUpdateMod(const BSONObj& bson) {
+    return write_ops::UpdateModification::parseFromClassicUpdate(bson);
+}
+
 TEST(Parse, Normal) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$set:{a:1}}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(driver.parse(makeUpdateMod(fromjson("{$set:{a:1}}")), arrayFilters));
     ASSERT_FALSE(driver.type() == UpdateDriver::UpdateType::kReplacement);
 }
 
@@ -74,7 +78,7 @@ TEST(Parse, MultiMods) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$set:{a:1, b:1}}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(driver.parse(makeUpdateMod(fromjson("{$set:{a:1, b:1}}")), arrayFilters));
     ASSERT_FALSE(driver.type() == UpdateDriver::UpdateType::kReplacement);
 }
 
@@ -82,7 +86,8 @@ TEST(Parse, MixingMods) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$set:{a:1}, $unset:{b:1}}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(
+        driver.parse(makeUpdateMod(fromjson("{$set:{a:1}, $unset:{b:1}}")), arrayFilters));
     ASSERT_FALSE(driver.type() == UpdateDriver::UpdateType::kReplacement);
 }
 
@@ -90,7 +95,8 @@ TEST(Parse, ObjectReplacment) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{obj: \"obj replacement\"}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(
+        driver.parse(makeUpdateMod(fromjson("{obj: \"obj replacement\"}")), arrayFilters));
     ASSERT_TRUE(driver.type() == UpdateDriver::UpdateType::kReplacement);
 }
 
@@ -122,14 +128,14 @@ TEST(Parse, EmptyMod) {
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     // Verifies that {$set: {}} is accepted.
-    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$set: {}}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(driver.parse(makeUpdateMod(fromjson("{$set: {}}")), arrayFilters));
 }
 
 TEST(Parse, WrongMod) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_THROWS_CODE_AND_WHAT(driver.parse(fromjson("{$xyz:{a:1}}"), arrayFilters),
+    ASSERT_THROWS_CODE_AND_WHAT(driver.parse(makeUpdateMod(fromjson("{$xyz:{a:1}}")), arrayFilters),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
                                 "Unknown modifier: $xyz. Expected a valid update modifier or "
@@ -140,11 +146,12 @@ TEST(Parse, WrongType) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_THROWS_CODE_AND_WHAT(driver.parse(fromjson("{$set:[{a:1}]}"), arrayFilters),
-                                AssertionException,
-                                ErrorCodes::FailedToParse,
-                                "Modifiers operate on fields but we found type array instead. For "
-                                "example: {$mod: {<field>: ...}} not {$set: [ { a: 1 } ]}");
+    ASSERT_THROWS_CODE_AND_WHAT(
+        driver.parse(makeUpdateMod(fromjson("{$set:[{a:1}]}")), arrayFilters),
+        AssertionException,
+        ErrorCodes::FailedToParse,
+        "Modifiers operate on fields but we found type array instead. For "
+        "example: {$mod: {<field>: ...}} not {$set: [ { a: 1 } ]}");
 }
 
 TEST(Parse, ModsWithLaterObjReplacement) {
@@ -152,7 +159,8 @@ TEST(Parse, ModsWithLaterObjReplacement) {
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     ASSERT_THROWS_CODE_AND_WHAT(
-        driver.parse(fromjson("{$set:{a:1}, obj: \"obj replacement\"}"), arrayFilters),
+        driver.parse(makeUpdateMod(fromjson("{$set:{a:1}, obj: \"obj replacement\"}")),
+                     arrayFilters),
         AssertionException,
         ErrorCodes::FailedToParse,
         "Unknown modifier: obj. Expected a valid update modifier or pipeline-style update "
@@ -163,7 +171,8 @@ TEST(Parse, SetOnInsert) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    ASSERT_DOES_NOT_THROW(driver.parse(fromjson("{$setOnInsert:{a:1}}"), arrayFilters));
+    ASSERT_DOES_NOT_THROW(
+        driver.parse(makeUpdateMod(fromjson("{$setOnInsert:{a:1}}")), arrayFilters));
     ASSERT_FALSE(driver.type() == UpdateDriver::UpdateType::kReplacement);
 }
 
@@ -174,7 +183,7 @@ TEST(Collator, SetCollationUpdatesModifierInterfaces) {
     UpdateDriver driver(expCtx);
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
 
-    ASSERT_DOES_NOT_THROW(driver.parse(updateDocument, arrayFilters));
+    ASSERT_DOES_NOT_THROW(driver.parse(makeUpdateMod(updateDocument), arrayFilters));
 
     const bool validateForStorage = true;
     const FieldRefSet emptyImmutablePaths;
@@ -209,8 +218,8 @@ public:
               new ExpressionContext(_opCtx.get(), nullptr, NamespaceString("foo")))),
           _driverRepl(new UpdateDriver(
               new ExpressionContext(_opCtx.get(), nullptr, NamespaceString("foo")))) {
-        _driverOps->parse(fromjson("{$set:{'_':1}}"), _arrayFilters);
-        _driverRepl->parse(fromjson("{}"), _arrayFilters);
+        _driverOps->parse(makeUpdateMod(fromjson("{$set:{'_':1}}")), _arrayFilters);
+        _driverRepl->parse(makeUpdateMod(fromjson("{}")), _arrayFilters);
     }
 
     mutablebson::Document& doc() {
@@ -578,6 +587,7 @@ public:
             ASSERT(expr->getPlaceholder());
             arrayFilters[expr->getPlaceholder().get()] = std::move(expr);
         }
+
         _driver->setFromOplogApplication(fromOplog);
         _driver->refreshIndexKeys(indexData);
         _driver->parse(updateSpec, arrayFilters);
@@ -607,61 +617,61 @@ public:
 TEST_F(ModifiedPathsTestFixture, SetFieldInRoot) {
     BSONObj spec = fromjson("{$set: {a: 1}}");
     mutablebson::Document doc(fromjson("{a: 0}"));
-    runUpdate(&doc, spec);
+    runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, IncFieldInRoot) {
     BSONObj spec = fromjson("{$inc: {a: 1}}");
     mutablebson::Document doc(fromjson("{a: 0}"));
-    runUpdate(&doc, spec);
+    runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UnsetFieldInRoot) {
     BSONObj spec = fromjson("{$unset: {a: ''}}");
     mutablebson::Document doc(fromjson("{a: 0}"));
-    runUpdate(&doc, spec);
+    runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UpdateArrayElement) {
     BSONObj spec = fromjson("{$set: {'a.0.b': 1}}");
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
-    runUpdate(&doc, spec);
+    runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{a.0.b}");
 }
 
 TEST_F(ModifiedPathsTestFixture, SetBeyondTheEndOfArrayShouldReturnPathToArray) {
     BSONObj spec = fromjson("{$set: {'a.1.b': 1}}");
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
-    runUpdate(&doc, spec);
+    runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, InsertingAndUpdatingArrayShouldReturnPathToArray) {
     BSONObj spec = fromjson("{$set: {'a.0.b': 1, 'a.1.c': 2}}");
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
-    runUpdate(&doc, spec);
+    runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{a}");
 
     spec = fromjson("{$set: {'a.10.b': 1, 'a.1.c': 2}}");
     mutablebson::Document doc2(fromjson("{a: [{b: 0}, {b: 0}]}"));
-    runUpdate(&doc2, spec);
+    runUpdate(&doc2, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UpdateWithPositionalOperator) {
     BSONObj spec = fromjson("{$set: {'a.$': 1}}");
     mutablebson::Document doc(fromjson("{a: [0, 1, 2]}"));
-    runUpdate(&doc, spec, "0"_sd);
+    runUpdate(&doc, makeUpdateMod(spec), "0"_sd);
     ASSERT_EQ(_modifiedPaths, "{a.0}");
 }
 
 TEST_F(ModifiedPathsTestFixture, UpdateWithPositionalOperatorToNestedField) {
     BSONObj spec = fromjson("{$set: {'a.$.b': 1}}");
     mutablebson::Document doc(fromjson("{a: [{b: 1}, {b: 2}]}"));
-    runUpdate(&doc, spec, "1"_sd);
+    runUpdate(&doc, makeUpdateMod(spec), "1"_sd);
     ASSERT_EQ(_modifiedPaths, "{a.1.b}");
 }
 
@@ -669,7 +679,7 @@ TEST_F(ModifiedPathsTestFixture, ArrayFilterThatMatchesNoElements) {
     BSONObj spec = fromjson("{$set: {'a.$[i]': 1}}");
     BSONObj arrayFilter = fromjson("{i: 0}");
     mutablebson::Document doc(fromjson("{a: [1, 2, 3]}"));
-    runUpdate(&doc, spec, ""_sd, {arrayFilter});
+    runUpdate(&doc, makeUpdateMod(spec), ""_sd, {arrayFilter});
     ASSERT_EQ(_modifiedPaths, "{a}");
 }
 
@@ -677,7 +687,7 @@ TEST_F(ModifiedPathsTestFixture, ArrayFilterThatMatchesNoElements) {
 TEST_F(ModifiedPathsTestFixture, ReplaceFullDocumentAlwaysAffectsIndex) {
     BSONObj spec = fromjson("{a: 1, b: 1}}");
     mutablebson::Document doc(fromjson("{a: 0, b: 0}"));
-    runUpdate(&doc, spec);
+    runUpdate(&doc, makeUpdateMod(spec));
     ASSERT_EQ(_modifiedPaths, "{}");
 }
 
@@ -692,13 +702,21 @@ TEST_F(ModifiedPathsTestFixture, PipelineUpdatesAlwaysAffectsIndex) {
 TEST_F(ModifiedPathsTestFixture, DeltaUpdateNotAffectingIndex) {
     BSONObj spec = fromjson("{d: {a: false}}");
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
-    runUpdate(&doc, write_ops::UpdateModification(spec, {}), ""_sd, {}, true /* fromOplog */);
+    runUpdate(&doc,
+              write_ops::UpdateModification::parseFromV2Delta(spec),
+              ""_sd,
+              {},
+              true /* fromOplog */);
     ASSERT(!_driver->modsAffectIndices());
 
     UpdateIndexData indexData;
     indexData.addPath(FieldRef("p"));
-    runUpdate(
-        &doc, write_ops::UpdateModification(spec, {}), ""_sd, {}, true /* fromOplog */, &indexData);
+    runUpdate(&doc,
+              write_ops::UpdateModification::parseFromV2Delta(spec),
+              ""_sd,
+              {},
+              true /* fromOplog */,
+              &indexData);
     ASSERT(!_driver->modsAffectIndices());
 }
 
@@ -708,8 +726,12 @@ TEST_F(ModifiedPathsTestFixture, DeltaUpdateAffectingIndex) {
     UpdateIndexData indexData;
     indexData.addPath(FieldRef("q"));
     indexData.addPath(FieldRef("a.p"));
-    runUpdate(
-        &doc, write_ops::UpdateModification(spec, {}), ""_sd, {}, true /* fromOplog */, &indexData);
+    runUpdate(&doc,
+              write_ops::UpdateModification::parseFromV2Delta(spec),
+              ""_sd,
+              {},
+              true /* fromOplog */,
+              &indexData);
     ASSERT(_driver->modsAffectIndices());
 }
 

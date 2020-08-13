@@ -248,7 +248,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_runUpdates(
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(_id);
-            entry.setU(updatedStateDoc.toBSON());
+            entry.setU(
+                write_ops::UpdateModification::parseFromClassicUpdate(updatedStateDoc.toBSON()));
             return entry;
         }()});
         return updateOp.serialize(

@@ -65,7 +65,8 @@ BSONObj createShardIdentityUpsertForAddShard(const AddShard& addShardCmd) {
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(BSON("_id" << kShardIdentityDocumentId));
-            entry.setU(addShardCmd.getShardIdentity().toBSON());
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                addShardCmd.getShardIdentity().toBSON()));
             entry.setUpsert(true);
             return entry;
         }()});

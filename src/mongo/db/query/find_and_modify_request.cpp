@@ -367,7 +367,7 @@ void FindAndModifyRequest::setQuery(BSONObj query) {
     _query = query.getOwned();
 }
 void FindAndModifyRequest::setUpdateObj(BSONObj updateObj) {
-    _update.emplace(updateObj.getOwned());
+    _update.emplace(write_ops::UpdateModification::parseFromClassicUpdate(updateObj.getOwned()));
 }
 
 void FindAndModifyRequest::setShouldReturnNew(bool shouldReturnNew) {

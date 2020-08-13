@@ -87,7 +87,7 @@ public:
 
         auto commandResponse = dbClient.runCommand([&] {
             write_ops::Update updateOp(_storageNss);
-            write_ops::UpdateModification updateModification(update);
+            auto updateModification = write_ops::UpdateModification::parseFromClassicUpdate(update);
             write_ops::UpdateOpEntry updateEntry(query.obj, updateModification);
             updateEntry.setMulti(false);
             updateEntry.setUpsert(upsert);

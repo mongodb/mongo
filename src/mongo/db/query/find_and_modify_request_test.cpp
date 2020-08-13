@@ -41,7 +41,10 @@ namespace {
 TEST(FindAndModifyRequest, BasicUpdate) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
 
     BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
@@ -71,7 +74,10 @@ TEST(FindAndModifyRequest, PipelineUpdate) {
 TEST(FindAndModifyRequest, UpdateWithUpsert) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setUpsert(true);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -87,7 +93,10 @@ TEST(FindAndModifyRequest, UpdateWithUpsert) {
 TEST(FindAndModifyRequest, UpdateWithUpsertFalse) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setUpsert(false);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -104,7 +113,10 @@ TEST(FindAndModifyRequest, UpdateWithProjection) {
     const BSONObj update(BSON("y" << 1));
     const BSONObj field(BSON("z" << 1));
 
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setFieldProjection(field);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -121,7 +133,10 @@ TEST(FindAndModifyRequest, UpdateWithNewTrue) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
 
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setShouldReturnNew(true);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -138,7 +153,10 @@ TEST(FindAndModifyRequest, UpdateWithNewFalse) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
 
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setShouldReturnNew(false);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -155,7 +173,10 @@ TEST(FindAndModifyRequest, UpdateWithSort) {
     const BSONObj update(BSON("y" << 1));
     const BSONObj sort(BSON("z" << -1));
 
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setSort(sort);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -173,7 +194,10 @@ TEST(FindAndModifyRequest, UpdateWithHint) {
     const BSONObj update(BSON("y" << 1));
     const BSONObj hint(BSON("z" << -1));
 
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setHint(hint);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -192,7 +216,10 @@ TEST(FindAndModifyRequest, UpdateWithCollation) {
     const BSONObj collation(BSON("locale"
                                  << "en_US"));
 
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setCollation(collation);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -210,7 +237,10 @@ TEST(FindAndModifyRequest, UpdateWithArrayFilters) {
     const BSONObj update(BSON("y" << 1));
     const std::vector<BSONObj> arrayFilters{BSON("i" << 0)};
 
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setArrayFilters(arrayFilters);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -228,7 +258,10 @@ TEST(FindAndModifyRequest, UpdateWithWriteConcern) {
     const BSONObj update(BSON("y" << 1));
     const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
 
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setWriteConcern(writeConcern);
 
     BSONObj expectedObj(fromjson(R"json({
@@ -245,7 +278,10 @@ TEST(FindAndModifyRequest, UpdateWithRuntimeConstants) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
 
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setRuntimeConstants({Date_t(), Timestamp(1, 0)});
 
     BSONObj expectedObj(fromjson(R"json({
@@ -273,7 +309,10 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
     auto rtc = RuntimeConstants{Date_t(), Timestamp(1, 0)};
 
-    auto request = FindAndModifyRequest::makeUpdate(NamespaceString("test.user"), query, update);
+    auto request = FindAndModifyRequest::makeUpdate(
+        NamespaceString("test.user"),
+        query,
+        write_ops::UpdateModification::parseFromClassicUpdate(update));
     request.setFieldProjection(field);
     request.setShouldReturnNew(true);
     request.setSort(sort);

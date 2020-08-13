@@ -247,7 +247,7 @@ void UpsertStage::_generateNewDocumentFromSuppliedDoc(const FieldRefSet& immutab
     UpdateDriver replacementDriver(nullptr);
 
     // Create a new replacement-style update from the supplied document.
-    replacementDriver.parse({suppliedDoc}, {});
+    replacementDriver.parse(write_ops::UpdateModification::parseFromClassicUpdate(suppliedDoc), {});
     replacementDriver.setLogOp(false);
 
     // We do not validate for storage, as we will validate the full document before inserting.

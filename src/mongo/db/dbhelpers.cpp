@@ -245,7 +245,7 @@ void Helpers::upsert(OperationContext* opCtx,
     request.setNamespaceString(requestNs);
 
     request.setQuery(filter);
-    request.setUpdateModification(updateMod);
+    request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(updateMod));
     request.setUpsert();
     request.setFromMigration(fromMigrate);
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
@@ -260,7 +260,7 @@ void Helpers::putSingleton(OperationContext* opCtx, const char* ns, BSONObj obj)
     auto request = UpdateRequest();
     request.setNamespaceString(requestNs);
 
-    request.setUpdateModification(obj);
+    request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(obj));
     request.setUpsert();
 
     update(opCtx, context.db(), request);

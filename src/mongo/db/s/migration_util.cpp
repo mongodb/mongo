@@ -667,8 +667,9 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const UUID& migrationId) {
     write_ops::Update updateOp(NamespaceString::kRangeDeletionNamespace);
     auto queryFilter = BSON(RangeDeletionTask::kIdFieldName << migrationId);
-    auto updateModification = write_ops::UpdateModification(
-        BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << "")));
+    auto updateModification =
+        write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""))));
     write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
     updateEntry.setMulti(false);
     updateEntry.setUpsert(false);
@@ -700,7 +701,8 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
     write_ops::Update updateOp(NamespaceString::kServerConfigurationNamespace);
     auto queryFilter = BSON("_id"
                             << "migrationCoordinatorStats");
-    auto updateModification = write_ops::UpdateModification(BSON("$inc" << BSON("count" << 1)));
+    auto updateModification = write_ops::UpdateModification(
+        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$inc" << BSON("count" << 1))));
 
     write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
     updateEntry.setMulti(false);

@@ -219,7 +219,8 @@ public:
 
             request.setUpsert();
             request.setQuery(query);
-            request.setUpdateModification(updates);
+            request.setUpdateModification(
+                write_ops::UpdateModification::parseFromClassicUpdate(updates));
 
             const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
             const auto constants = boost::none;
@@ -293,7 +294,8 @@ public:
 
             request.setMulti();
             request.setQuery(query);
-            request.setUpdateModification(updates);
+            request.setUpdateModification(
+                write_ops::UpdateModification::parseFromClassicUpdate(updates));
 
             const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
             const auto constants = boost::none;
@@ -402,7 +404,8 @@ public:
 
         // Populate the request.
         request.setQuery(query);
-        request.setUpdateModification(fromjson("{$set: {x: 0}}"));
+        request.setUpdateModification(
+            write_ops::UpdateModification::parseFromClassicUpdate(fromjson("{$set: {x: 0}}")));
         request.setSort(BSONObj());
         request.setMulti(false);
         request.setReturnDocs(UpdateRequest::RETURN_OLD);
@@ -494,7 +497,8 @@ public:
 
         // Populate the request.
         request.setQuery(query);
-        request.setUpdateModification(fromjson("{$set: {x: 0}}"));
+        request.setUpdateModification(
+            write_ops::UpdateModification::parseFromClassicUpdate(fromjson("{$set: {x: 0}}")));
         request.setSort(BSONObj());
         request.setMulti(false);
         request.setReturnDocs(UpdateRequest::RETURN_NEW);
