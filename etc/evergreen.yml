@@ -8422,7 +8422,7 @@ buildvariants:
     scons_cache_mode: all
     test_flags: --excludeWithAnyTags=requires_http_client
     target_resmoke_time: 15
-    max_sub_suites: 100
+    max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_all_run_unittests_parallel_TG
@@ -9445,7 +9445,7 @@ buildvariants:
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
-    max_sub_suites: 100
+    max_sub_suites: 3
     large_distro_name: windows-64-vs2019-large
     push_path: windows
     push_bucket: downloads.10gen.com
@@ -9485,7 +9485,7 @@ buildvariants:
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
-    max_sub_suites: 100
+    max_sub_suites: 3
     large_distro_name: windows-64-vs2019-large
     push_path: windows
     push_bucket: downloads.10gen.com
@@ -9875,7 +9875,7 @@ buildvariants:
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
-    max_sub_suites: 100
+    max_sub_suites: 3
     large_distro_name: rhel62-large
   tasks:
   - name: compile_all_run_unittests_TG
@@ -9972,7 +9972,7 @@ buildvariants:
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
-    max_sub_suites: 100
+    max_sub_suites: 3
     large_distro_name: rhel62-large
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
@@ -12187,7 +12187,7 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     scons_cache_mode: all
-    max_sub_suites: 100
+    max_sub_suites: 3
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_all_run_unittests_parallel_TG
@@ -12441,7 +12441,7 @@ buildvariants:
     scons_cache_scope: shared
     scons_cache_mode: all
     target_resmoke_time: 10
-    max_sub_suites: 100
+    max_sub_suites: 3
     large_distro_name: rhel62-large
     num_scons_link_jobs_available: 0.99
     record_with: --recordWith /opt/undodb5/bin/live-record

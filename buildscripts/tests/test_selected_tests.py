@@ -92,13 +92,13 @@ class TestAcceptance(unittest.TestCase):
         self.assertEqual(
             len(build_variants_with_generated_tasks), len(evg_config.get_required_variants()))
 
-        # jstests/auth/auth1.js belongs to two suites, auth and auth_audit, each of which has
-        # fallback_num_sub_suites = 4 in their resmoke args, resulting in 4 subtasks being generated
-        # for each, hence 8 tasks total
+        # jstests/auth/auth1.js belongs to two suites, auth and auth_audit,
+        # max_sub_suites = 3, resulting in 3 subtasks being generated
+        # for each, hence 6 tasks total
         rhel_62_with_generated_tasks = next(
             (variant for variant in build_variants_with_generated_tasks
              if variant["name"] == "enterprise-rhel-62-64-bit-dynamic-required"), None)
-        self.assertEqual(len(rhel_62_with_generated_tasks["tasks"]), 8)
+        self.assertEqual(len(rhel_62_with_generated_tasks["tasks"]), 6)
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     def test_when_task_mappings_are_found_for_changed_files(self):
@@ -122,15 +122,15 @@ class TestAcceptance(unittest.TestCase):
 
         self.assertIn("selected_tests_config.json", config_dict)
 
-        # the auth task's generator task, auth_gen, has fallback_num_sub_suites = 4 in
-        # its resmoke args, resulting in 4 subtasks being generated, plus a _misc task, hence 5
+        # the auth task's generator task, max_sub_suites is 3,
+        # resulting in 3 subtasks being generated, plus a _misc task, hence 4
         # tasks total
         build_variants_with_generated_tasks = json.loads(
             config_dict["selected_tests_config.json"])["buildvariants"]
         rhel_62_with_generated_tasks = next(
             (variant for variant in build_variants_with_generated_tasks
              if variant["name"] == "enterprise-rhel-62-64-bit-dynamic-required"), None)
-        self.assertEqual(len(rhel_62_with_generated_tasks["tasks"]), 5)
+        self.assertEqual(len(rhel_62_with_generated_tasks["tasks"]), 4)
 
 
 class TestSelectedTestsConfigOptions(unittest.TestCase):
