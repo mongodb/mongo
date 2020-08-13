@@ -1287,13 +1287,10 @@ function appendSetParameterArgs(argArray) {
             }
 
             if (!programMajorMinorVersion || programMajorMinorVersion >= 360) {
-                if (jsTest.options().storageEngine === "wiredTiger" ||
-                    !jsTest.options().storageEngine) {
-                    if (jsTest.options().enableMajorityReadConcern !== undefined &&
-                        !argArrayContains("--enableMajorityReadConcern")) {
-                        argArray.push(...['--enableMajorityReadConcern',
-                                          jsTest.options().enableMajorityReadConcern.toString()]);
-                    }
+                if (jsTest.options().enableMajorityReadConcern !== undefined &&
+                    !argArrayContains("--enableMajorityReadConcern")) {
+                    argArray.push(...['--enableMajorityReadConcern',
+                                      jsTest.options().enableMajorityReadConcern.toString()]);
                 }
             }
 

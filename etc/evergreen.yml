@@ -11986,6 +11986,7 @@ buildvariants:
     # TODO (SERVER-47022): Re-enable oplog constraint enforcement once we set the application mode
     # correctly after rollbackViaRefetch.
     test_flags: >-
+      --majorityReadConcern=off
       --storageEngine=ephemeralForTest
       --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_wiredtiger,uses_transactions,uses_speculative_majority,requires_snapshot_read,requires_majority_read_concern,uses_change_streams,requires_sharding,incompatible_with_eft
       --mongodSetParameters="{oplogApplicationEnforcesSteadyStateConstraints: false}"

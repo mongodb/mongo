@@ -47,6 +47,14 @@ class FlowControlTest : public ServiceContextMongoDTest {
 public:
     void setUp() {
         ServiceContextMongoDTest::setUp();
+
+        // Flow control requires 'enableMajorityReadConcern' to be set to true to run properly.
+        // This test uses ephemeralForTest under the hood and is ran in standalone mode. Given that,
+        // to satisfy the tests requirements, we forcefully set 'enableMajorityReadConcern' to true
+        // for these tests.
+        _stashedEnableMajorityReadConcern =
+            std::exchange(serverGlobalParams.enableMajorityReadConcern, true);
+
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext());
         auto replCoordPtr = replCoord.get();
         replCoordMock = replCoordPtr;
@@ -63,10 +71,19 @@ public:
         opCtx = client->makeOperationContext();
     }
 
+    void tearDown() {
+        ServiceContextMongoDTest::tearDown();
+
+        serverGlobalParams.enableMajorityReadConcern = _stashedEnableMajorityReadConcern;
+    }
+
     std::unique_ptr<FlowControl> flowControl;
     repl::ReplicationCoordinatorMock* replCoordMock;
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
+
+private:
+    bool _stashedEnableMajorityReadConcern;
 };
 
 TEST_F(FlowControlTest, AddingSamples) {

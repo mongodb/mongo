@@ -59,6 +59,10 @@ private:
         bool repair;
     } _stashedStorageParams;
 
+    struct {
+        bool enableMajorityReadConcern;
+    } _stashedServerParams;
+
     unittest::TempDir _tempDir;
 };
 

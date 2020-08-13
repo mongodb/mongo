@@ -132,8 +132,7 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
         LOGV2(22492, "Flow Control enabled");
     }
 
-    if (storageGlobalParams.engine == "wiredTiger" &&
-        params.count("replication.enableMajorityReadConcern")) {
+    if (params.count("replication.enableMajorityReadConcern")) {
         serverGlobalParams.enableMajorityReadConcern =
             params["replication.enableMajorityReadConcern"].as<bool>();
     }
