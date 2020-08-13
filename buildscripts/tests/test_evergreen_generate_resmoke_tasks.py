@@ -212,7 +212,7 @@ class TestAcceptance(unittest.TestCase):
             # the evergreen json config.
             generated_files = os.listdir(target_directory)
             # The expected suite count is the number of tests + the _misc suite.
-            expected_suite_count = n_tests + 1
+            expected_suite_count = 3 + 1
             # We expect files for all the suites + the evergreen json config.
             self.assertEqual(expected_suite_count + 1, len(generated_files))
 
