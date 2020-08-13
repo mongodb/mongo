@@ -506,12 +506,14 @@ AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(IndexCatalogEntry* i
                                                             size_t maxMemoryUsageBytes,
                                                             const IndexSorterInfo& sorterInfo)
     : _indexCatalogEntry(index),
-      _sorter(Sorter::makeFromExistingRanges(
-          sorterInfo.getFileName()->toString(),
-          *sorterInfo.getRanges(),
-          SortOptions().ExtSortAllowed().MaxMemoryUsageBytes(maxMemoryUsageBytes),
-          BtreeExternalSortComparison(),
-          _makeSorterSettings())),
+      _sorter(Sorter::makeFromExistingRanges(sorterInfo.getFileName()->toString(),
+                                             *sorterInfo.getRanges(),
+                                             SortOptions()
+                                                 .TempDir(sorterInfo.getTempDir()->toString())
+                                                 .ExtSortAllowed()
+                                                 .MaxMemoryUsageBytes(maxMemoryUsageBytes),
+                                             BtreeExternalSortComparison(),
+                                             _makeSorterSettings())),
       _keysInserted(*sorterInfo.getNumKeys()) {}
 
 Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCtx,

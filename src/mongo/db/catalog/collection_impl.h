@@ -353,7 +353,8 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
         OperationContext* opCtx,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
-        ScanDirection scanDirection) const final;
+        ScanDirection scanDirection,
+        boost::optional<RecordId> resumeAfterRecordId) const final;
 
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;
 

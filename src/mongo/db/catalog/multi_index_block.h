@@ -149,7 +149,10 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    Status insertAllDocumentsInCollection(OperationContext* opCtx, Collection* collection);
+    Status insertAllDocumentsInCollection(
+        OperationContext* opCtx,
+        Collection* collection,
+        boost::optional<RecordId> resumeAfterRecordId = boost::none);
 
     /**
      * Call this after init() for each document in the collection.

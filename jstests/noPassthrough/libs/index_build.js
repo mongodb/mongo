@@ -224,39 +224,36 @@ const ResumableIndexBuildTest = class {
     }
 
     /**
-     * Creates the specified index in a parallel shell and expects it to fail with
-     * InterruptedDueToReplStateChange. After calling this function and before waiting on the
-     * returned parallel shell to complete, the test should cause the node to go through a replica
-     * set state transition.
+     * Runs createIndexFn in a parellel shell to create an index, inserting the documents specified
+     * by sideWrites into the side writes table. createIndexFn should take three parameters:
+     * collection name, index specification, and index name. If {hangBeforeBuildingIndex: true},
+     * returns with the hangBeforeBuildingIndex failpoint enabled and the index build hanging at
+     * this point.
      */
-    static createIndex(primary, collName, indexSpec, indexName) {
-        return startParallelShell(
-            funWithArgs(function(collName, indexSpec, indexName) {
-                assert.commandFailedWithCode(
-                    db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
-                    ErrorCodes.InterruptedDueToReplStateChange);
-            }, collName, indexSpec, indexName), primary.port);
-    }
+    static createIndexWithSideWrites(test,
+                                     createIndexFn,
+                                     coll,
+                                     indexSpec,
+                                     indexName,
+                                     sideWrites,
+                                     {hangBeforeBuildingIndex} = {hangBeforeBuildingIndex: false}) {
+        const primary = test.getPrimary();
+        const fp = configureFailPoint(primary, "hangBeforeBuildingIndex");
 
-    /**
-     * Inserts the given documents once an index build reaches the end of the bulk load phase so
-     * that the documents are inserted into the side writes table for that index build.
-     */
-    static insertIntoSideWritesTable(primary, collName, docs) {
-        return startParallelShell(funWithArgs(function(collName, docs) {
-                                      if (!docs)
-                                          return;
+        const awaitCreateIndex = startParallelShell(
+            funWithArgs(createIndexFn, coll.getName(), indexSpec, indexName), primary.port);
 
-                                      load("jstests/libs/fail_point_util.js");
+        fp.wait();
+        assert.commandWorked(coll.insert(sideWrites));
 
-                                      const sideWritesFp = configureFailPoint(
-                                          db.getMongo(), "hangAfterSettingUpIndexBuild");
-                                      sideWritesFp.wait();
+        // Before building the index, wait for the the last op to be committed so that establishing
+        // the majority read cursor does not race with step down.
+        test.awaitLastOpCommitted();
 
-                                      assert.commandWorked(db.getCollection(collName).insert(docs));
+        if (!hangBeforeBuildingIndex)
+            fp.off();
 
-                                      sideWritesFp.off();
-                                  }, collName, docs), primary.port);
+        return awaitCreateIndex;
     }
 
     /**
@@ -286,11 +283,7 @@ const ResumableIndexBuildTest = class {
                 .buildUUID);
 
         // Don't interrupt the index build for shutdown until it is at the desired point.
-        const shutdownFpTimesEntered =
-            assert
-                .commandWorked(
-                    conn.adminCommand({configureFailPoint: "hangBeforeShutdown", mode: "alwaysOn"}))
-                .count;
+        const shutdownFpTimesEntered = configureFailPoint(conn, "hangBeforeShutdown").timesEntered;
 
         const awaitContinueShutdown = startParallelShell(
             funWithArgs(function(failPointName, failPointData, shutdownFpTimesEntered) {
@@ -307,8 +300,8 @@ const ResumableIndexBuildTest = class {
                 // Move the index build forward to the point that we want it to be interrupted for
                 // shutdown at.
                 const fp = configureFailPoint(db.getMongo(), failPointName, failPointData);
-                assert.commandWorked(db.adminCommand(
-                    {configureFailPoint: "hangAfterSettingUpIndexBuildUnlocked", mode: "off"}));
+                assert.commandWorked(
+                    db.adminCommand({configureFailPoint: "hangBeforeBuildingIndex", mode: "off"}));
                 fp.wait();
 
                 // Disabling this failpoint will allow shutdown to continue and cause the operation
@@ -343,9 +336,7 @@ const ResumableIndexBuildTest = class {
 
         rst.awaitReplication();
 
-        if (postIndexBuildInserts) {
-            assert.commandWorked(coll.insert(postIndexBuildInserts));
-        }
+        assert.commandWorked(coll.insert(postIndexBuildInserts));
 
         for (const node of rst.nodes) {
             const collection = node.getDB(dbName).getCollection(collName);
@@ -357,9 +348,9 @@ const ResumableIndexBuildTest = class {
 
     /**
      * Runs the resumable index build test specified by the provided failpoint information and
-     * index spec on the provided replica set and namespace. Document(s) specified by
-     * insertIntoSideWritesTable will be inserted during the collection scan phase so that they are
-     * inserted into the side writes table and processed during the drain writes phase.
+     * index spec on the provided replica set and namespace. Documents specified by sideWrites will
+     * be inserted after the bulk load phase so that they are inserted into the side writes table
+     * and processed during the drain writes phase.
      */
     static run(rst,
                dbName,
@@ -367,8 +358,8 @@ const ResumableIndexBuildTest = class {
                indexSpec,
                failPointName,
                failPointData,
-               insertIntoSideWritesTable,
-               postIndexBuildInserts = {}) {
+               sideWrites = [],
+               postIndexBuildInserts = []) {
         const primary = rst.getPrimary();
 
         if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(primary)) {
@@ -379,20 +370,16 @@ const ResumableIndexBuildTest = class {
         const coll = primary.getDB(dbName).getCollection(collName);
         const indexName = "resumable_index_build";
 
-        const fp = configureFailPoint(primary, "hangAfterSettingUpIndexBuildUnlocked");
-
-        const awaitInsertIntoSideWritesTable = ResumableIndexBuildTest.insertIntoSideWritesTable(
-            primary, collName, insertIntoSideWritesTable);
-
-        const awaitCreateIndex =
-            ResumableIndexBuildTest.createIndex(primary, coll.getName(), indexSpec, indexName);
-
-        fp.wait();
+        const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
+            rst, function(collName, indexSpec, indexName) {
+                assert.commandFailedWithCode(
+                    db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
+                    ErrorCodes.InterruptedDueToReplStateChange);
+            }, coll, indexSpec, indexName, sideWrites, {hangBeforeBuildingIndex: true});
 
         ResumableIndexBuildTest.restart(
             rst, primary, coll, indexName, failPointName, failPointData);
 
-        awaitInsertIntoSideWritesTable();
         awaitCreateIndex();
 
         ResumableIndexBuildTest.checkIndexes(
@@ -402,9 +389,9 @@ const ResumableIndexBuildTest = class {
     /**
      * Runs the resumable index build test specified by the provided failpoint information and
      * index spec on the provided replica set and namespace. This will specifically be used to test
-     * that resuming an index build on the former primary works. Document(s) specified by
-     * insertIntoSideWritesTable will be inserted during the collection scan phase so that they are
-     * inserted into the side writes table and processed during the drain writes phase.
+     * that resuming an index build on the former primary works. Documents specified by sideWrites
+     * will be inserted during the collection scan phase so that they are inserted into the side
+     * writes table and processed during the drain writes phase.
      */
     static runOnPrimaryToTestCommitQuorum(rst,
                                           dbName,
@@ -412,8 +399,8 @@ const ResumableIndexBuildTest = class {
                                           indexSpec,
                                           resumeNodeFailPointName,
                                           otherNodeFailPointName,
-                                          insertIntoSideWritesTable,
-                                          postIndexBuildInserts) {
+                                          sideWrites = [],
+                                          postIndexBuildInserts = []) {
         const resumeNode = rst.getPrimary();
         const resumeDB = resumeNode.getDB(dbName);
 
@@ -423,17 +410,18 @@ const ResumableIndexBuildTest = class {
         }
 
         const secondary = rst.getSecondary();
-        let coll = resumeDB.getCollection(collName);
+        const coll = resumeDB.getCollection(collName);
         const indexName = "resumable_index_build";
 
         const resumeNodeFp = configureFailPoint(resumeNode, resumeNodeFailPointName);
         const otherNodeFp = configureFailPoint(secondary, otherNodeFailPointName);
 
-        const awaitInsertIntoSideWritesTable = ResumableIndexBuildTest.insertIntoSideWritesTable(
-            resumeNode, collName, insertIntoSideWritesTable);
-
-        const awaitCreateIndex =
-            ResumableIndexBuildTest.createIndex(resumeNode, coll.getName(), indexSpec, indexName);
+        const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
+            rst, function(collName, indexSpec, indexName) {
+                assert.commandFailedWithCode(
+                    db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
+                    ErrorCodes.InterruptedDueToReplStateChange);
+            }, coll, indexSpec, indexName, sideWrites);
 
         otherNodeFp.wait();
         resumeNodeFp.wait();
@@ -442,8 +430,6 @@ const ResumableIndexBuildTest = class {
             IndexBuildTest
                 .assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName]
                 .buildUUID);
-
-        awaitInsertIntoSideWritesTable();
 
         clearRawMongoProgramOutput();
         rst.stop(resumeNode);
@@ -465,9 +451,9 @@ const ResumableIndexBuildTest = class {
     /**
      * Runs the resumable index build test specified by the provided failpoint information and
      * index spec on the provided replica set and namespace. This will specifically be used to test
-     * that resuming an index build on a secondary works. Document(s) specified by
-     * insertIntoSideWritesTable will be inserted during the collection scan phase so that they are
-     * inserted into the side writes table and processed during the drain writes phase.
+     * that resuming an index build on a secondary works. Documents specified by sideWrites will be
+     * inserted during the collection scan phase so that they are inserted into the side writes
+     * table and processed during the drain writes phase.
      */
     static runOnSecondary(rst,
                           dbName,
@@ -476,37 +462,30 @@ const ResumableIndexBuildTest = class {
                           resumeNodeFailPointName,
                           resumeNodeFailPointData,
                           primaryFailPointName,
-                          insertIntoSideWritesTable,
-                          postIndexBuildInserts) {
+                          sideWrites = [],
+                          postIndexBuildInserts = []) {
         const primary = rst.getPrimary();
         const coll = primary.getDB(dbName).getCollection(collName);
         const indexName = "resumable_index_build";
         const resumeNode = rst.getSecondary();
         const resumeNodeColl = resumeNode.getDB(dbName).getCollection(collName);
 
-        const resumeNodeFp = configureFailPoint(resumeNode, "hangAfterSettingUpIndexBuildUnlocked");
-        const sideWritesFp = configureFailPoint(resumeNode, "hangAfterSettingUpIndexBuild");
+        const resumeNodeFp = configureFailPoint(resumeNode, "hangBeforeBuildingIndex");
 
         let primaryFp;
         if (primaryFailPointName) {
             primaryFp = configureFailPoint(primary, primaryFailPointName);
         }
 
-        const awaitCreateIndex = startParallelShell(
-            funWithArgs(function(collName, indexSpec, indexName) {
+        const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
+            rst, function(collName, indexSpec, indexName) {
                 // If the secondary is shutdown for too long, the primary will step down until it
                 // can reach the secondary again. In this case, the index build will continue in the
                 // background.
                 assert.commandWorkedOrFailedWithCode(
                     db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
                     ErrorCodes.InterruptedDueToReplStateChange);
-            }, collName, indexSpec, indexName), primary.port);
-
-        // Make sure that the resumeNode has paused its index build before inserting the writes
-        // intended for the side writes table.
-        sideWritesFp.wait();
-        assert.commandWorked(coll.insert(insertIntoSideWritesTable, {"writeConcern": {w: 2}}));
-        sideWritesFp.off();
+            }, coll, indexSpec, indexName, sideWrites);
 
         resumeNodeFp.wait();
 

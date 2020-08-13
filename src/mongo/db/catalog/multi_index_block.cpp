@@ -74,32 +74,39 @@ MONGO_FAIL_POINT_DEFINE(leaveIndexBuildUnfinishedForShutdown);
 
 namespace {
 
-void failPointHangDuringBuild(OperationContext* opCtx,
-                              FailPoint* fp,
-                              StringData where,
-                              const BSONObj& doc,
-                              unsigned long long iteration) {
-    fp->executeIf(
-        [=, &doc](const BSONObj& data) {
-            LOGV2(20386,
-                  "Hanging index build during collection scan phase insertion",
-                  "where"_attr = where,
-                  "doc"_attr = doc);
+Status failPointHangDuringBuild(OperationContext* opCtx,
+                                FailPoint* fp,
+                                StringData where,
+                                const BSONObj& doc,
+                                unsigned long long iteration) {
+    try {
+        fp->executeIf(
+            [=, &doc](const BSONObj& data) {
+                LOGV2(20386,
+                      "Hanging index build during collection scan phase insertion",
+                      "where"_attr = where,
+                      "doc"_attr = doc);
 
-            fp->pauseWhileSet(opCtx);
-        },
-        [&doc, iteration](const BSONObj& data) {
-            if (data.hasField("iteration")) {
-                return iteration == static_cast<unsigned long long>(data["iteration"].numberLong());
-            }
+                fp->pauseWhileSet(opCtx);
+            },
+            [&doc, iteration](const BSONObj& data) {
+                if (data.hasField("iteration")) {
+                    return iteration ==
+                        static_cast<unsigned long long>(data["iteration"].numberLong());
+                }
 
-            auto fieldsToMatch = data.getObjectField("fieldsToMatch");
-            return std::all_of(
-                fieldsToMatch.begin(), fieldsToMatch.end(), [&doc](const auto& elem) {
-                    return SimpleBSONElementComparator::kInstance.evaluate(elem ==
-                                                                           doc[elem.fieldName()]);
-                });
-        });
+                auto fieldsToMatch = data.getObjectField("fieldsToMatch");
+                return std::all_of(
+                    fieldsToMatch.begin(), fieldsToMatch.end(), [&doc](const auto& elem) {
+                        return SimpleBSONElementComparator::kInstance.evaluate(
+                            elem == doc[elem.fieldName()]);
+                    });
+            });
+    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+        return exceptionToStatus();
+    }
+
+    return Status::OK();
 }
 
 }  // namespace
@@ -204,10 +211,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
     invariant(_indexes.empty());
 
-    // TODO (SERVER-49409): Resume from the collection scan phase.
-    if (resumeInfo &&
-        (resumeInfo->getPhase() == IndexBuildPhaseEnum::kBulkLoad ||
-         resumeInfo->getPhase() == IndexBuildPhaseEnum::kDrainWrites)) {
+    if (resumeInfo) {
         _phase = resumeInfo->getPhase();
     }
 
@@ -311,8 +315,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
             index.bulk = index.real->initiateBulk(
                 eachIndexBuildMaxMemoryUsageBytes,
-                // TODO (SERVER-49409): Resume from the collection scan phase.
-                resumeInfo && resumeInfo->getPhase() == IndexBuildPhaseEnum::kBulkLoad
+                // When resuming from the drain writes phase, there is no Sorter state to
+                // reconstruct.
+                resumeInfo && resumeInfo->getPhase() != IndexBuildPhaseEnum::kDrainWrites
                     ? sorterInfo
                     : boost::none);
 
@@ -387,8 +392,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     }
 }
 
-Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
-                                                       Collection* collection) {
+Status MultiIndexBlock::insertAllDocumentsInCollection(
+    OperationContext* opCtx,
+    Collection* collection,
+    boost::optional<RecordId> resumeAfterRecordId) {
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -447,15 +454,18 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     } else {
         yieldPolicy = PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY;
     }
-    auto exec =
-        collection->makePlanExecutor(opCtx, yieldPolicy, Collection::ScanDirection::kForward);
+    auto exec = collection->makePlanExecutor(
+        opCtx, yieldPolicy, Collection::ScanDirection::kForward, resumeAfterRecordId);
 
     // Hint to the storage engine that this collection scan should not keep data in the cache.
     bool readOnce = useReadOnceCursorsForIndexBuilds.load();
     opCtx->recoveryUnit()->setReadOnce(readOnce);
 
     try {
-        invariant(_phase == IndexBuildPhaseEnum::kInitialized,
+        // The phase will be kCollectionScan when resuming an index build from the collection scan
+        // phase.
+        invariant(_phase == IndexBuildPhaseEnum::kInitialized ||
+                      _phase == IndexBuildPhaseEnum::kCollectionScan,
                   IndexBuildPhase_serializer(_phase).toString());
         _phase = IndexBuildPhaseEnum::kCollectionScan;
 
@@ -466,7 +476,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
                MONGO_unlikely(hangAfterStartingIndexBuild.shouldFail())) {
             auto interruptStatus = opCtx->checkForInterruptNoAssert();
             if (!interruptStatus.isOK())
-                return opCtx->checkForInterruptNoAssert();
+                return interruptStatus;
 
             if (PlanExecutor::ADVANCED != state) {
                 continue;
@@ -474,11 +484,14 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 
             progress->setTotalWhileRunning(collection->numRecords(opCtx));
 
-            failPointHangDuringBuild(opCtx,
-                                     &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion,
-                                     "before",
-                                     objToIndex,
-                                     n);
+            interruptStatus =
+                failPointHangDuringBuild(opCtx,
+                                         &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion,
+                                         "before",
+                                         objToIndex,
+                                         n);
+            if (!interruptStatus.isOK())
+                return interruptStatus;
 
             // The external sorter is not part of the storage engine and therefore does not need a
             // WriteUnitOfWork to write keys.
@@ -491,7 +504,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
                                      &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
                                      "after",
                                      objToIndex,
-                                     n);
+                                     n)
+                .ignore();
 
             // Go to the next document.
             progress->hit();
@@ -891,10 +905,12 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
 
         BSONObjBuilder indexInfo(indexesArray.subobjStart());
 
-        if (_phase == IndexBuildPhaseEnum::kCollectionScan ||
-            _phase == IndexBuildPhaseEnum::kBulkLoad) {
+        if (_phase != IndexBuildPhaseEnum::kDrainWrites) {
             auto state = index.bulk->getPersistedSorterState();
 
+            // TODO (SERVER-50289): Consider not including tempDir in the persisted resumable index
+            // build state.
+            indexInfo.append("tempDir", state.tempDir);
             indexInfo.append("fileName", state.fileName);
             indexInfo.append("numKeys", index.bulk->getKeysInserted());
 

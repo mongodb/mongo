@@ -105,7 +105,7 @@ struct SortOptions {
     bool extSortAllowed;
 
     // Directory into which we place a file when spilling to disk. Must be explicitly set if
-    // extSortAllowed is true, unless constructing a Sorter from an existing file and ranges.
+    // extSortAllowed is true.
     std::string tempDir;
 
     SortOptions() : limit(0), maxMemoryUsageBytes(64 * 1024 * 1024), extSortAllowed(false) {}
@@ -223,9 +223,15 @@ public:
         Settings;
 
     struct PersistedState {
+        std::string tempDir;
         std::string fileName;
         std::vector<SorterRange> ranges;
     };
+
+    Sorter(const SortOptions& opts);
+
+    Sorter(const SortOptions& opts, const std::string& fileName)
+        : _opts(opts), _fileName(fileName) {}
 
     template <typename Comparator>
     static Sorter* make(const SortOptions& opts,
@@ -257,7 +263,7 @@ public:
     }
 
     PersistedState getPersistedState() const {
-        return {_fileName, _getRanges()};
+        return {_opts.tempDir, _fileName, _getRanges()};
     }
 
     void persistDataForShutdown();
@@ -274,6 +280,7 @@ protected:
     // Whether the files written by this Sorter should be kept on destruction.
     bool _shouldKeepFilesOnDestruction = false;
 
+    SortOptions _opts;
     std::string _fileName;
 
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.

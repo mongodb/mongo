@@ -78,6 +78,8 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeAbortCleanUp);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnStepUp);
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpResumableIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeCommit);
+MONGO_FAIL_POINT_DEFINE(hangBeforeBuildingIndex);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeWaitingUntilMajorityOpTime);
 
 namespace {
 
@@ -2262,10 +2264,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
             hangAfterInitializingIndexBuild.pauseWhileSet(opCtx);
         }
 
-        // TODO (SERVER-49409): Resume from the collection scan phase.
-        if (resumeInfo &&
-            (resumeInfo->getPhase() == IndexBuildPhaseEnum::kBulkLoad ||
-             resumeInfo->getPhase() == IndexBuildPhaseEnum::kDrainWrites)) {
+        if (resumeInfo) {
             _resumeIndexBuildFromPhase(opCtx, replState, indexBuildOptions, resumeInfo.get());
         } else {
             _buildIndex(opCtx, replState, indexBuildOptions);
@@ -2339,8 +2338,17 @@ void IndexBuildsCoordinator::_resumeIndexBuildFromPhase(
         hangAfterSettingUpResumableIndexBuild.pauseWhileSet();
     }
 
-    if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kBulkLoad)
+    if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kInitialized ||
+        resumeInfo.getPhase() == IndexBuildPhaseEnum::kCollectionScan) {
+        _scanCollectionAndInsertSortedKeysIntoIndex(
+            opCtx,
+            replState,
+            resumeInfo.getCollectionScanPosition()
+                ? boost::make_optional<RecordId>(RecordId(*resumeInfo.getCollectionScanPosition()))
+                : boost::none);
+    } else if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kBulkLoad) {
         _insertSortedKeysIntoIndexForResume(opCtx, replState);
+    }
 
     _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     _signalPrimaryForCommitReadiness(opCtx, replState);
@@ -2364,6 +2372,13 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
           "buildUUID"_attr = replState->buildUUID,
           "lastOpTime"_attr = replState->lastOpTimeBeforeInterceptors);
 
+    if (MONGO_unlikely(hangIndexBuildBeforeWaitingUntilMajorityOpTime.shouldFail())) {
+        LOGV2(4940901,
+              "Hanging index build before waiting for the last optime before interceptors to be "
+              "majority committed due to hangIndexBuildBeforeWaitingUntilMajorityOpTime failpoint");
+        hangIndexBuildBeforeWaitingUntilMajorityOpTime.pauseWhileSet(opCtx);
+    }
+
     auto status =
         replCoord->waitUntilMajorityOpTime(opCtx, replState->lastOpTimeBeforeInterceptors);
     uassertStatusOK(status);
@@ -2377,6 +2392,11 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
 void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                                          std::shared_ptr<ReplIndexBuildState> replState,
                                          const IndexBuildOptions& indexBuildOptions) {
+    if (MONGO_unlikely(hangBeforeBuildingIndex.shouldFail())) {
+        LOGV2(4940900, "Hanging before building index due to hangBeforeBuildingIndex failpoint");
+        hangBeforeBuildingIndex.pauseWhileSet();
+    }
+
     // Read without a timestamp. When we commit, we block writes which guarantees all writes are
     // visible.
     opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
@@ -2394,7 +2414,9 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
  * Second phase is extracting the sorted keys and writing them into the new index table.
  */
 void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
-    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    OperationContext* opCtx,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    boost::optional<RecordId> resumeAfterRecordId) {
     // Collection scan and insert into index.
     {
 
@@ -2418,8 +2440,8 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
             CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, replState->collectionUUID);
         invariant(collection);
 
-        uassertStatusOK(
-            _indexBuildsManager.startBuildingIndex(opCtx, collection, replState->buildUUID));
+        uassertStatusOK(_indexBuildsManager.startBuildingIndex(
+            opCtx, collection, replState->buildUUID, resumeAfterRecordId));
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildDumpsInsertsFromBulk.shouldFail())) {

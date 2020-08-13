@@ -1209,10 +1209,12 @@ StatusWith<std::vector<BSONObj>> CollectionImpl::addCollationDefaultsToIndexSpec
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExecutor(
     OperationContext* opCtx,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    ScanDirection scanDirection) const {
+    ScanDirection scanDirection,
+    boost::optional<RecordId> resumeAfterRecordId) const {
     auto isForward = scanDirection == ScanDirection::kForward;
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
-    return InternalPlanner::collectionScan(opCtx, _ns.ns(), this, yieldPolicy, direction);
+    return InternalPlanner::collectionScan(
+        opCtx, _ns.ns(), this, yieldPolicy, direction, resumeAfterRecordId);
 }
 
 void CollectionImpl::setNs(NamespaceString nss) {

@@ -548,7 +548,8 @@ public:
     virtual std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
         OperationContext* opCtx,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
-        ScanDirection scanDirection) const = 0;
+        ScanDirection scanDirection,
+        boost::optional<RecordId> resumeAfterRecordId = boost::none) const = 0;
 
     virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
 

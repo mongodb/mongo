@@ -122,10 +122,11 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
 
 Status IndexBuildsManager::startBuildingIndex(OperationContext* opCtx,
                                               Collection* collection,
-                                              const UUID& buildUUID) {
+                                              const UUID& buildUUID,
+                                              boost::optional<RecordId> resumeAfterRecordId) {
     auto builder = invariant(_getBuilder(buildUUID));
 
-    return builder->insertAllDocumentsInCollection(opCtx, collection);
+    return builder->insertAllDocumentsInCollection(opCtx, collection, resumeAfterRecordId);
 }
 
 Status IndexBuildsManager::resumeBuildingIndexFromBulkLoadPhase(OperationContext* opCtx,

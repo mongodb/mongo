@@ -97,7 +97,8 @@ public:
      */
     Status startBuildingIndex(OperationContext* opCtx,
                               Collection* collection,
-                              const UUID& buildUUID);
+                              const UUID& buildUUID,
+                              boost::optional<RecordId> resumeAfterRecordId = boost::none);
 
     Status resumeBuildingIndexFromBulkLoadPhase(OperationContext* opCtx, const UUID& buildUUID);
 

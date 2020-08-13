@@ -653,7 +653,9 @@ protected:
      * Second phase is extracting the sorted keys and writing them into the new index table.
      */
     void _scanCollectionAndInsertSortedKeysIntoIndex(
-        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
+        OperationContext* opCtx,
+        std::shared_ptr<ReplIndexBuildState> replState,
+        boost::optional<RecordId> resumeAfterRecordId = boost::none);
     /**
      * Performs the second phase of the index build, for use when resuming from the second phase.
      */

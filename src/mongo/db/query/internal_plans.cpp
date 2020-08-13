@@ -53,7 +53,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     StringData ns,
     const Collection* collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    const Direction direction) {
+    const Direction direction,
+    boost::optional<RecordId> resumeAfterRecordId) {
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
     auto expCtx = make_intrusive<ExpressionContext>(
@@ -70,7 +71,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
 
     invariant(ns == collection->ns().ns());
 
-    auto cs = _collectionScan(expCtx, ws.get(), collection, direction);
+    auto cs = _collectionScan(expCtx, ws.get(), collection, direction, resumeAfterRecordId);
 
     // Takes ownership of 'ws' and 'cs'.
     auto statusWithPlanExecutor =
@@ -201,12 +202,14 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WorkingSet* ws,
     const Collection* collection,
-    Direction direction) {
+    Direction direction,
+    boost::optional<RecordId> resumeAfterRecordId) {
     invariant(collection);
 
     CollectionScanParams params;
     params.shouldWaitForOplogVisibility =
         shouldWaitForOplogVisibility(expCtx->opCtx, collection, false);
+    params.resumeAfterRecordId = resumeAfterRecordId;
 
     if (FORWARD == direction) {
         params.direction = CollectionScanParams::FORWARD;

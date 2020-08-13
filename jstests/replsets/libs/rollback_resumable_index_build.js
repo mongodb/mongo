@@ -7,9 +7,8 @@ const RollbackResumableIndexBuildTest = class {
      * rollback starts is specified by rollbackStartFailPointName. The phase that the index build
      * will resume from after rollback completes is specified by rollbackEndFailPointName. If
      * either of these points is in the drain writes phase, documents to insert into the side
-     * writes table must be specified by insertIntoSideWritesTable. Documents specified by
-     * insertsToBeRolledBack are inserted after transitioning to rollback operations and will be
-     * rolled back.
+     * writes table must be specified by sideWrites. Documents specified by insertsToBeRolledBack
+     * are inserted after transitioning to rollback operations and will be rolled back.
      */
     static run(rollbackTest,
                dbName,
@@ -20,7 +19,7 @@ const RollbackResumableIndexBuildTest = class {
                rollbackEndFailPointName,
                rollbackEndFailPointData,
                insertsToBeRolledBack,
-               insertIntoSideWritesTable) {
+               sideWrites = []) {
         const originalPrimary = rollbackTest.getPrimary();
 
         if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(originalPrimary)) {
@@ -38,15 +37,15 @@ const RollbackResumableIndexBuildTest = class {
         const rollbackStartFp = configureFailPoint(
             originalPrimary, rollbackStartFailPointName, rollbackStartFailPointData);
 
-        const awaitInsertIntoSideWritesTable = ResumableIndexBuildTest.insertIntoSideWritesTable(
-            originalPrimary, collName, insertIntoSideWritesTable);
-
-        const awaitCreateIndex =
-            ResumableIndexBuildTest.createIndex(originalPrimary, collName, indexSpec, indexName);
+        const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
+            rollbackTest, function(collName, indexSpec, indexName) {
+                assert.commandFailedWithCode(
+                    db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
+                    ErrorCodes.InterruptedDueToReplStateChange);
+            }, coll, indexSpec, indexName, sideWrites);
 
         // Wait until we've completed the last operation that won't be rolled back so that we can
         // begin the operations that will be rolled back.
-        awaitInsertIntoSideWritesTable();
         rollbackEndFp.wait();
 
         const buildUUID = extractUUIDFromObject(
@@ -120,9 +119,9 @@ const RollbackResumableIndexBuildTest = class {
      * Runs the resumable index build rollback test in the case where rollback begins after the
      * index build has already completed. The point during the index build to roll back to is
      * specified by rollbackEndFailPointName. If this point is in the drain writes phase, documents
-     * to insert into the side writes table must be specified by insertIntoSideWritesTable.
-     * Documents specified by insertsToBeRolledBack are inserted after transitioning to rollback
-     * operations and will be rolled back.
+     * to insert into the side writes table must be specified by sideWrites. Documents specified by
+     * insertsToBeRolledBack are inserted after transitioning to rollback operations and will be
+     * rolled back.
      */
     static runIndexBuildComplete(rollbackTest,
                                  dbName,
@@ -131,7 +130,7 @@ const RollbackResumableIndexBuildTest = class {
                                  rollbackEndFailPointName,
                                  rollbackEndFailPointData,
                                  insertsToBeRolledBack,
-                                 insertIntoSideWritesTable) {
+                                 sideWrites = []) {
         const originalPrimary = rollbackTest.getPrimary();
 
         if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(originalPrimary)) {
@@ -147,23 +146,19 @@ const RollbackResumableIndexBuildTest = class {
         const rollbackEndFp =
             configureFailPoint(originalPrimary, rollbackEndFailPointName, rollbackEndFailPointData);
 
-        const awaitInsertIntoSideWritesTable = ResumableIndexBuildTest.insertIntoSideWritesTable(
-            originalPrimary, collName, insertIntoSideWritesTable);
-
-        const awaitCreateIndex =
-            startParallelShell(funWithArgs(function(collName, indexSpec, indexName) {
-                                   assert.commandWorked(db.runCommand({
-                                       createIndexes: collName,
-                                       indexes: [{key: indexSpec, name: indexName}],
-                                       // Commit quorum is disabled so that the index build can
-                                       // complete while the primary is isolated and will roll back.
-                                       commitQuorum: 0
-                                   }));
-                               }, collName, indexSpec, indexName), originalPrimary.port);
+        const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
+            rollbackTest, function(collName, indexSpec, indexName) {
+                assert.commandWorked(db.runCommand({
+                    createIndexes: collName,
+                    indexes: [{key: indexSpec, name: indexName}],
+                    // Commit quorum is disabled so that the index build can
+                    // complete while the primary is isolated and will roll back.
+                    commitQuorum: 0
+                }));
+            }, coll, indexSpec, indexName, sideWrites);
 
         // Wait until we reach the desired ending point so that we can begin the operations that
         // will be rolled back.
-        awaitInsertIntoSideWritesTable();
         rollbackEndFp.wait();
 
         const buildUUID = extractUUIDFromObject(

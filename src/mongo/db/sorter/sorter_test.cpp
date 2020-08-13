@@ -482,6 +482,7 @@ private:
     void assertRangeInfo(unowned_ptr<IWSorter> sorter, const SortOptions& opts) {
         auto state = sorter->getPersistedState();
         if (opts.extSortAllowed) {
+            ASSERT_EQ(state.tempDir, opts.tempDir);
             ASSERT_STRING_CONTAINS(state.fileName, opts.tempDir);
         }
         if (auto numRanges = correctNumRanges()) {
