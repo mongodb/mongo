@@ -27,9 +27,15 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -38,6 +44,27 @@
 
 namespace mongo {
 namespace {
+
+/**
+ * Mock interface to allow specifiying mock results for the lookup pipeline.
+ */
+class MockMongoInterface final : public StubMongoProcessInterface {
+public:
+    MockMongoInterface(std::deque<DocumentSource::GetNextResult> mockResults)
+        : _mockResults(std::move(mockResults)) {}
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        Pipeline* ownedPipeline, bool allowTargetingShards = true) final {
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
+            ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
+
+        pipeline->addInitialSource(
+            DocumentSourceMock::createForTest(_mockResults, pipeline->getContext()));
+        return pipeline;
+    }
+
+private:
+    std::deque<DocumentSource::GetNextResult> _mockResults;
+};
 
 class ReshardingUtilTest : public ConfigServerTestFixture {
 protected:
@@ -217,6 +244,63 @@ TEST_F(ReshardingUtilTest, FailWhenOverlappingZones) {
     zones.push_back(makeZone(overlapZoneRanges[0], zoneName("0")));
     zones.push_back(makeZone(overlapZoneRanges[1], zoneName("1")));
     ASSERT_THROWS_CODE(validateZones(zones, authoritativeTags), DBException, ErrorCodes::BadValue);
+}
+
+class ReshardingAggTest : public AggregationContextFixture {
+protected:
+    const NamespaceString& reshardingOplogNss() {
+        return _oplogNss;
+    }
+
+    boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext() {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+            new ExpressionContextForTest(getOpCtx(), _oplogNss));
+        expCtx->setResolvedNamespace(_oplogNss, {_oplogNss, {}});
+        return expCtx;
+    }
+
+private:
+    const NamespaceString _oplogNss{"config.localReshardingOplogBuffer.xxx.yyy"};
+};
+
+TEST_F(ReshardingAggTest, OplogPipelineBasicCRUDOnly) {
+    const NamespaceString crudNss("test.foo");
+    const UUID uuid(UUID::gen());
+    auto insertOplog = repl::MutableOplogEntry::makeInsertOperation(crudNss, uuid, BSON("x" << 1));
+    auto updateOplog = repl::MutableOplogEntry::makeUpdateOperation(
+        crudNss, uuid, BSON("x" << 1), BSON("$set" << BSON("y" << 1)));
+    auto deleteOplog = repl::MutableOplogEntry::makeDeleteOperation(crudNss, uuid, BSON("x" << 1));
+
+    std::deque<DocumentSource::GetNextResult> mockResults;
+    mockResults.emplace_back(Document(insertOplog.toBSON()));
+    mockResults.emplace_back(Document(updateOplog.toBSON()));
+    mockResults.emplace_back(Document(deleteOplog.toBSON()));
+
+    // Mock lookup collection document souce.
+    auto expCtx = createExpressionContext();
+    expCtx->ns = reshardingOplogNss();
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
+
+    auto pipeline = createAggForReshardingOplogBuffer(expCtx, BSONObj());
+
+    // Mock non-lookup collection document source.
+    auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
+    pipeline->addInitialSource(mockSource);
+
+    auto next = pipeline->getNext();
+
+    ASSERT_EQ("i", next->getField("op").getStringData());
+    ASSERT_EQ(0, next->getField(kReshardingOplogPrePostImageOps).getArrayLength());
+
+    next = pipeline->getNext();
+    ASSERT_EQ("u", next->getField("op").getStringData());
+    ASSERT_EQ(0, next->getField(kReshardingOplogPrePostImageOps).getArrayLength());
+
+    next = pipeline->getNext();
+    ASSERT_EQ("d", next->getField("op").getStringData());
+    ASSERT_EQ(0, next->getField(kReshardingOplogPrePostImageOps).getArrayLength());
+
+    ASSERT(!pipeline->getNext());
 }
 
 }  // namespace

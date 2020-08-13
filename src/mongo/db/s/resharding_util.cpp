@@ -31,6 +31,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/s/grid.h"
 
@@ -108,6 +111,44 @@ void validateZones(const std::vector<mongo::BSONObj>& zones,
     }
 
     checkForOverlappingZones(validZones);
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& resumeToken) {
+    std::list<boost::intrusive_ptr<DocumentSource>> stages;
+
+    if (!resumeToken.isEmpty()) {
+        stages.emplace_back(
+            DocumentSourceMatch::create(BSON("_id" << BSON("$gt" << resumeToken)), expCtx));
+    }
+
+    stages.emplace_back(DocumentSourceSort::create(expCtx, BSON("_id" << 1)));
+
+    BSONObjBuilder lookupBuilder;
+    lookupBuilder.append("from", expCtx->ns.coll());
+    lookupBuilder.append("let",
+                         BSON("preImageId" << BSON("clusterTime"
+                                                   << "$preImageOpTime.ts"
+                                                   << "ts"
+                                                   << "$preImageOpTime.ts")
+                                           << "postImageId"
+                                           << BSON("clusterTime"
+                                                   << "$postImageOpTime.ts"
+                                                   << "ts"
+                                                   << "$postImageOpTime.ts")));
+    lookupBuilder.append("as", kReshardingOplogPrePostImageOps);
+
+    BSONArrayBuilder lookupPipelineBuilder(lookupBuilder.subarrayStart("pipeline"));
+    lookupPipelineBuilder.append(
+        BSON("$match" << BSON(
+                 "$expr" << BSON("$in" << BSON_ARRAY("$_id" << BSON_ARRAY("$$preImageId"
+                                                                          << "$$postImageId"))))));
+    lookupPipelineBuilder.done();
+
+    BSONObj lookupBSON(BSON("" << lookupBuilder.obj()));
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(lookupBSON.firstElement(), expCtx));
+
+    return Pipeline::create(std::move(stages), expCtx);
 }
 
 }  // namespace mongo

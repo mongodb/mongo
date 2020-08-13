@@ -33,10 +33,13 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/resharded_chunk_gen.h"
 
 namespace mongo {
+
+constexpr auto kReshardingOplogPrePostImageOps = "prePostImageOps"_sd;
 
 /**
  * Asserts that there is not a hole or overlap in the chunks.
@@ -65,5 +68,13 @@ void checkForOverlappingZones(std::vector<TagsType>& zones);
  */
 void validateZones(const std::vector<mongo::BSONObj>& zones,
                    const std::vector<TagsType>& authoritativeTags);
+
+/**
+ * Create pipeline stages for iterating the buffered copy of the donor oplog and link together the
+ * oplog entries with their preImage/postImage oplog. Note that caller is responsible for making
+ * sure that the donorOplogNS is properly resolved and ns is set in the expCtx.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& resumeToken);
 
 }  // namespace mongo
