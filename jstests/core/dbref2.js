@@ -1,4 +1,9 @@
 
+/**
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
+ */
 a = db.dbref2a;
 b = db.dbref2b;
 c = db.dbref2c;

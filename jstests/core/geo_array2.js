@@ -1,4 +1,7 @@
 // Check the semantics of near calls with multiple locations
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.geoarray2;
 t.drop();

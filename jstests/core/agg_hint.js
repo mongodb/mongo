@@ -1,6 +1,10 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, does_not_support_stepdowns]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   does_not_support_stepdowns,
+//   sbe_incompatible,
+// ]
 
 // Confirms correct behavior for hinted aggregation execution. This includes tests for scenarios
 // where agg execution differs from query. It also includes confirmation that hint works for find

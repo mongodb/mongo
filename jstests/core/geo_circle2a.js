@@ -2,6 +2,9 @@
 // Tests to make sure that nested multi-key indexing works for geo indexes and is not used for
 // direct position
 // lookups
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 var coll = db.geo_circle2a;
 coll.drop();

@@ -7,7 +7,10 @@
  *
  * contained in a top-level element, embedded element, and within _id.
  *
- * @tags: [assumes_unsharded_collection]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

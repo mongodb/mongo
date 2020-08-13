@@ -1,6 +1,9 @@
 //
 // Ensures spherical queries report invalid latitude values in points and center positions
 //
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

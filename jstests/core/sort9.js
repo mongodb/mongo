@@ -1,4 +1,7 @@
 // Unindexed array sorting SERVER-2884
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.jstests_sort9;
 t.drop();

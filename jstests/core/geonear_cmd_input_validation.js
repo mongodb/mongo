@@ -1,6 +1,9 @@
 //
 // Test input validation for geoNear command.
 //
+// @tags: [
+//   sbe_incompatible,
+// ]
 var t = db.geonear_cmd_input_validation;
 t.drop();
 t.ensureIndex({loc: "2dsphere"});

@@ -2,10 +2,11 @@
  * Ensure the 'hidden' flag can be found in currentOp and profiler.
  *
  * @tags: [
- *      assumes_read_concern_unchanged,
- *      assumes_read_preference_unchanged,
- *      requires_non_retryable_writes,
- *      requires_profiling,
+ *   assumes_read_concern_unchanged,
+ *   assumes_read_preference_unchanged,
+ *   requires_non_retryable_writes,
+ *   requires_profiling,
+ *   sbe_incompatible,
  * ]
  */
 

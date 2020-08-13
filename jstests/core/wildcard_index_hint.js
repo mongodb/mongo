@@ -1,5 +1,8 @@
 /**
  * Tests that $** indexes obey hinting.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

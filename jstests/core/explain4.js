@@ -1,4 +1,7 @@
 // Test that limit is applied by explain.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.jstests_explain4;
 t.drop();

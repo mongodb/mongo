@@ -2,8 +2,11 @@ var t = db.geo_s2intersectinglines;
 t.drop();
 t.ensureIndex({geo: "2dsphere"});
 
-/* All the tests in this file are generally confirming intersections based upon
+/**All the tests in this file are generally confirming intersections based upon
  * these three geo objects.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 var canonLine = {
     name: 'canonLine',

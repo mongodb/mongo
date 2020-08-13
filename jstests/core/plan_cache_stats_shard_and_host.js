@@ -6,6 +6,7 @@
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
+//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

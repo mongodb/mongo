@@ -1,6 +1,9 @@
 /**
  * Test to verify the behaviour of find, count, distinct operations in the presence of compound
  * hashed indexes.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,4 +1,7 @@
 // SERVER-2585 Test $or clauses within indexed top level $or clauses.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.jstests_ork;
 t.drop();

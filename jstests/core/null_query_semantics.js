@@ -1,4 +1,7 @@
 // Tests the behavior of queries with a {$eq: null} or {$ne: null} predicate.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

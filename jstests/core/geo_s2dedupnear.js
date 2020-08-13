@@ -1,5 +1,8 @@
 // Make sure that we don't return several of the same result due to faulty
 // assumptions about the btree cursor.  That is, don't return duplicate results.
+// @tags: [
+//   sbe_incompatible,
+// ]
 t = db.geo_s2dedupnear;
 t.drop();
 

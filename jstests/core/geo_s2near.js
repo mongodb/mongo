@@ -1,4 +1,7 @@
-// @tags: [requires_getmore]
+// @tags: [
+//   requires_getmore,
+//   sbe_incompatible,
+// ]
 
 // Test 2dsphere near search, called via find and $geoNear.
 (function() {

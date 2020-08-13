@@ -8,6 +8,9 @@ var query_gte = {a: {$gte: [1, 2]}};
 //
 // without index
 //
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 assert.eq(1, t.find({a: [1, 2]}).count(), '$eq (without index)');
 assert.eq(1, t.find(query_gte).itcount(), '$gte (without index)');

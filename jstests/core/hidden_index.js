@@ -3,7 +3,9 @@
  * it will not be used in planning. It is handled in the same way as other indexes by the index
  * catalog and for TTL purposes.
  * @tags: [
- *  requires_non_retryable_commands,    # CollMod is not retryable.
+ *   # CollMod is not retryable.
+ *   requires_non_retryable_commands,
+ *   sbe_incompatible,
  * ]
  */
 

@@ -3,6 +3,9 @@
  * like $or, $not etc. In particular, the hashed field of a compound hashed index cannot generate
  * bounds for $not predicates, since we may incorrectly filter out matching documents that collide
  * with the same hash value as the one given in the predicate.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

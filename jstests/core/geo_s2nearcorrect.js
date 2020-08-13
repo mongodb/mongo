@@ -2,6 +2,9 @@
 // A geometry may have several covers, one of which is in a search ring and the other of which is
 // not.  If we see the cover that's not in the search ring, we can't mark the object as 'seen' for
 // this ring.
+// @tags: [
+//   sbe_incompatible,
+// ]
 t = db.geo_s2nearcorrect;
 t.drop();
 

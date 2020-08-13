@@ -1,6 +1,7 @@
 // @tags: [
-//     # Haystack index is not available on embedded
-//     incompatible_with_embedded,
+//   # Haystack index is not available on embedded
+//   incompatible_with_embedded,
+//   sbe_incompatible,
 // ]
 
 t = db.geo_haystack2;

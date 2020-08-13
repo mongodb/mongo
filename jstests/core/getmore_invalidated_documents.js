@@ -1,7 +1,12 @@
 // Cannot implicitly shard accessed collections because of following errmsg: A single
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
-// @tags: [assumes_unsharded_collection, requires_getmore, requires_non_retryable_writes]
+// @tags: [
+//   assumes_unsharded_collection,
+//   requires_getmore,
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 
 // Tests for invalidation during a getmore. This behavior is storage-engine dependent.
 // See SERVER-16675.

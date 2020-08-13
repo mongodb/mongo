@@ -1,5 +1,8 @@
 // Test that a rename that overwrites its destination with an equivalent value of a different type
 // updates the type of the destination (SERVER-32109).
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

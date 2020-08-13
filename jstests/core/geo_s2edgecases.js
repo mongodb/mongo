@@ -7,6 +7,9 @@ roundworldpoint = {
 };
 
 // Opposite the equator
+// @tags: [
+//   sbe_incompatible,
+// ]
 roundworld = {
     "type": "Polygon",
     "coordinates": [[[179, 1], [-179, 1], [-179, -1], [179, -1], [179, 1]]]

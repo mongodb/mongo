@@ -3,10 +3,11 @@
  * the 'find' command. The test verifies compound hashed index with hashed prefix and non-hashed
  * prefix.
  * @tags: [
- *  assumes_unsharded_collection,
- *  # Sort optimizations added in 4.7 can generate a different plan in the presence of equality
- *  # predicates.
- *  requires_fcv_47
+ *   assumes_unsharded_collection,
+ *   # Sort optimizations added in 4.7 can generate a different plan in the presence of equality
+ *   # predicates.
+ *   requires_fcv_47,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

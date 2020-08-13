@@ -2,8 +2,9 @@
  * Tests explode for sort query planner behavior when the input query plan contains OR > FETCH >
  * IXSCAN, OR > IXSCAN subtrees or a mix of both.
  * @tags: [
- * # Does not work with legacy shellWriteMode.
- * requires_find_command
+ *   # Does not work with legacy shellWriteMode.
+ *   requires_find_command,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

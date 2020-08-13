@@ -1,4 +1,7 @@
 // Test basic usage of "textIndexVersion:1" indexes.
+// @tags: [
+//   sbe_incompatible,
+// ]
 var coll = db.fts_index_version1;
 
 // Test basic English search.

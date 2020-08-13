@@ -1,4 +1,8 @@
-// @tags: [requires_non_retryable_writes, requires_fastcount]
+// @tags: [
+//   requires_fastcount,
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 
 // Top level match fields within an $elemMatch clause may constrain multiple subfields from a
 // compound multikey index.  SERVER-3104

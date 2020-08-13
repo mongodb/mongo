@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 
 // Check query type bracketing SERVER-3222
 

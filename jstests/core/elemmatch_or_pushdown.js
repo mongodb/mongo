@@ -1,6 +1,9 @@
 /**
  * Tests that an $elemMatch-$or query is evaluated correctly. Designed to reproduce SERVER-33005 and
  * SERVER-38164.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

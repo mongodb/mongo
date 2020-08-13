@@ -1,6 +1,9 @@
 //
 // Tests polygon edge cases
 //
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 var coll = db.getCollection('jstests_geo_poly_edge');
 coll.drop();

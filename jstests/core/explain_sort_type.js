@@ -8,6 +8,7 @@
  *   assumes_unsharded_collection,
  *   # This test uses a non-retryable multi-update command.
  *   requires_non_retryable_writes,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

@@ -5,8 +5,13 @@
  * The tags below are necessary because collation requires that we use read/write commands rather
  * than legacy operations. We also require that collections are unsharded, since we perform queries
  * which we expect to be covered.
- * @tags: [assumes_unsharded_collection, requires_find_command, requires_non_retryable_commands,
- * requires_non_retryable_writes]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   requires_find_command,
+ *   requires_non_retryable_commands,
+ *   requires_non_retryable_writes,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "user strict";

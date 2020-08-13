@@ -1,6 +1,9 @@
 /**
  * Analyzes execution stats for indexed distinct.
- * @tags: [assumes_balancer_off]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 load("jstests/libs/analyze_plan.js");  // For getPlanStage.

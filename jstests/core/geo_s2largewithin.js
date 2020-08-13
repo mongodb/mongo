@@ -1,5 +1,8 @@
 // If our $within is enormous, create a coarse covering for the search so it
 // doesn't take forever.
+// @tags: [
+//   sbe_incompatible,
+// ]
 t = db.geo_s2largewithin;
 t.drop();
 t.ensureIndex({geo: "2dsphere"});

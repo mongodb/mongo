@@ -1,4 +1,4 @@
-/*
+/**
  * Test that the query plan cache will be cleared for the given collection on hiding or unhiding an
  * index.
  *
@@ -6,8 +6,9 @@
  *   # This test attempts to perform queries and introspect the server's plan cache entries. The
  *   # former operation may be routed to a secondary in the replica set, whereas the latter must be
  *   # routed to the primary.
- *   assumes_read_preference_unchanged,
  *   assumes_read_concern_unchanged,
+ *   assumes_read_preference_unchanged,
+ *   sbe_incompatible,
  * ]
  */
 

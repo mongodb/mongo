@@ -1,7 +1,10 @@
 // Tests that large queries and updates are properly profiled.
 
 // Special db so that it can be run in parallel tests.
-// @tags: [requires_profiling]
+// @tags: [
+//   requires_profiling,
+//   sbe_incompatible,
+// ]
 
 var coll = db.getSisterDB("profile2").profile2;
 

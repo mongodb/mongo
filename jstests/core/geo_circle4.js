@@ -1,4 +1,7 @@
 // Reported as server-848.
+// @tags: [
+//   sbe_incompatible,
+// ]
 function test(index) {
     db.server848.drop();
 

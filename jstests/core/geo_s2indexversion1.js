@@ -1,6 +1,9 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   sbe_incompatible,
+// ]
 
 // Tests 2dsphere index option "2dsphereIndexVersion".  Verifies that GeoJSON objects that are new
 // in version 2 are not allowed in version 1.

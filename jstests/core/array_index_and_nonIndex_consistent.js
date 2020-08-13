@@ -1,6 +1,9 @@
 /**
  * Make sure that $gt and $lt queries return the same results regardless of whether there is a
  * multikey index.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

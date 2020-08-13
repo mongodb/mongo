@@ -1,4 +1,9 @@
 
+/**
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
+ */
 t = db.ne1;
 t.drop();
 

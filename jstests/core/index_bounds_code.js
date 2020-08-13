@@ -1,5 +1,9 @@
 // Index bounds generation tests for Code/CodeWSCope values.
-// @tags: [requires_non_retryable_writes, assumes_unsharded_collection]
+// @tags: [
+//   assumes_unsharded_collection,
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

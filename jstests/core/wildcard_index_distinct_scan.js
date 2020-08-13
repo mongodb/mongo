@@ -1,5 +1,8 @@
 /**
  * Tests that a $** index can provide a DISTINCT_SCAN or indexed solution where appropriate.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,4 +1,8 @@
-// @tags: [requires_getmore, requires_capped]
+// @tags: [
+//   requires_capped,
+//   requires_getmore,
+//   sbe_incompatible,
+// ]
 
 // Tests for the behavior of combining the tailable and awaitData options to the getMore command
 // with the batchSize option.

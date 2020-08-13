@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 
 /**
  * Tests for the array-related behavior of the $type query operator.

@@ -1,5 +1,8 @@
 // Tests equality query on _id with a sort, intended to be tested on both mongos and mongod. For
 // SERVER-20641.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 'use strict';

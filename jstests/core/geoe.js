@@ -3,6 +3,9 @@
 // the first search for a matching point in the geo code could run to
 // the end of the btree and not reverse direction (leaving the rest of
 // the search always looking at some random non-matching point).
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.geo_box;
 t.drop();

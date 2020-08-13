@@ -1,5 +1,8 @@
 /**
  * Tests that a $** index can support queries which test for equality to empty nested objects.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

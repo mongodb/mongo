@@ -12,6 +12,7 @@
  *   # false when the test assumes they are true because the query has already been run many times.
  *   assumes_balancer_off,
  *   inspects_whether_plan_cache_entry_is_active,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

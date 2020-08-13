@@ -1,6 +1,9 @@
 // Fix for SERVER-32072
 //
 // Ensures round-trippability of int ids in DBRef's after a save/restore
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

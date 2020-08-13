@@ -1,4 +1,7 @@
 // check that we don't crash if an index used by an earlier or clause is dropped
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 // Dropping an index kills all cursors on the indexed namespace, not just those
 // cursors using the dropped index.  This test is to serve as a reminder that

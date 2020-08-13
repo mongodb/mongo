@@ -1,4 +1,8 @@
-// @tags: [requires_fastcount, assumes_balancer_off]
+// @tags: [
+//   assumes_balancer_off,
+//   requires_fastcount,
+//   sbe_incompatible,
+// ]
 
 t = db.geo_center_sphere1;
 

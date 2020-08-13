@@ -1,4 +1,8 @@
-// @tags: [does_not_support_stepdowns, requires_profiling]
+// @tags: [
+//   does_not_support_stepdowns,
+//   requires_profiling,
+//   sbe_incompatible,
+// ]
 
 // Confirms that profiled find execution contains all expected metrics with proper values.
 

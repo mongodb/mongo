@@ -1,4 +1,4 @@
-/*
+/**
  * Test for $jsonSchema behavior in contexts other than document validation, including:
  * - read commands (count, geoNear, distinct, etc)
  * - queries that specify a collation
@@ -17,6 +17,7 @@
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
  *   requires_replication,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

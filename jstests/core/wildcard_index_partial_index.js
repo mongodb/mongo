@@ -1,5 +1,8 @@
 /**
  * Test that $** indexes work when provided with a partial filter expression.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

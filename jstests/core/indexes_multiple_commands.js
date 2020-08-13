@@ -1,6 +1,9 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   sbe_incompatible,
+// ]
 
 // Test that commands behave correctly under the presence of multiple indexes with the same key
 // pattern.

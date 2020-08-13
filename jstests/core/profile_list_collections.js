@@ -1,4 +1,9 @@
-// @tags: [does_not_support_stepdowns, requires_getmore, requires_profiling]
+// @tags: [
+//   does_not_support_stepdowns,
+//   requires_getmore,
+//   requires_profiling,
+//   sbe_incompatible,
+// ]
 
 // Confirms that a listCollections command is not profiled.
 

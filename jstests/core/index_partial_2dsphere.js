@@ -1,6 +1,9 @@
 // A document with invalid GeoJSON should be able to be removed or updated when it is not part of
 // a partial index filter.
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 
 (function() {
 

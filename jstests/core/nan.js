@@ -1,5 +1,8 @@
 /**
  * Tests basic NaN handling. Note that WiredTiger indexes handle -NaN and NaN differently.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

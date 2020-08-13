@@ -2,6 +2,9 @@
  * This test ensures that range predicates with a BinData value:
  * 1) Return the correct documents.
  * 2) Can perform index-only data access.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

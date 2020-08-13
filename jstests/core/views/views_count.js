@@ -1,6 +1,9 @@
 // Test the count command with views.
 //
-// @tags: [requires_fastcount]
+// @tags: [
+//   requires_fastcount,
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

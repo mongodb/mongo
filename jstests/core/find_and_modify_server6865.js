@@ -3,6 +3,7 @@
 // key.
 // @tags: [
 //   assumes_unsharded_collection,
+//   sbe_incompatible,
 // ]
 
 /**

@@ -7,7 +7,10 @@
 // include the 'textScore' meta field, so we are adding this test to ensure that we still get the
 // same covered matching behavior with and without 'textScore' in the projection.
 //
-// @tags: [assumes_balancer_off]
+// @tags: [
+//   assumes_balancer_off,
+//   sbe_incompatible,
+// ]
 
 load("jstests/libs/analyze_plan.js");
 

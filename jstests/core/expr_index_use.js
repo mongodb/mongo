@@ -1,4 +1,7 @@
 // Confirms expected index use when performing a match with a $expr statement.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

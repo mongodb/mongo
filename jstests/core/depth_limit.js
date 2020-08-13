@@ -1,7 +1,8 @@
 // SERVER-11781 Don't crash when converting deeply nested or cyclical JS objects to BSON.
 // @tags: [
-//     # Uses $where operator
-//     requires_scripting
+//   # Uses $where operator
+//   requires_scripting,
+//   sbe_incompatible,
 // ]
 
 function test() {

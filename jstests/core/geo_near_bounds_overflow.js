@@ -1,4 +1,7 @@
 // Tests behavior with invalid 2d bounds.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

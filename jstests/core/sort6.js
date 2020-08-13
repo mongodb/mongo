@@ -1,4 +1,9 @@
 
+/**
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
+ */
 t = db.sort6;
 
 function get(x) {

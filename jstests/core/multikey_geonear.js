@@ -1,5 +1,8 @@
 // Test that we correct return results for compound 2d and 2dsphere indices in
 // both the multikey and non-multikey cases.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 var t = db.jstests_multikey_geonear;
 t.drop();

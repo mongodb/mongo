@@ -1,4 +1,7 @@
 // Test different directions for compound indexes
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 function eq(one, two) {
     assert.eq(one.a, two.a);

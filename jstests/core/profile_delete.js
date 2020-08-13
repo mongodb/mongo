@@ -1,4 +1,9 @@
-// @tags: [does_not_support_stepdowns, requires_non_retryable_writes, requires_profiling]
+// @tags: [
+//   does_not_support_stepdowns,
+//   requires_non_retryable_writes,
+//   requires_profiling,
+//   sbe_incompatible,
+// ]
 
 // Confirms that profiled delete execution contains all expected metrics with proper values.
 

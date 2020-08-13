@@ -1,4 +1,4 @@
-/*
+/**
  * This is a regression test for SERVER-45508, which was an invariant failure in the query planner.
  *
  * Previously the invariant would be triggered only when all of these happen together:
@@ -7,7 +7,10 @@
  * - the point ranges are indexed in descending order
  * - more than one index can satisfy the query
  * - the query asks for a sort within each point range
- * @tags: [assumes_no_implicit_collection_creation_after_drop]
+ * @tags: [
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

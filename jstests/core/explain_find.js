@@ -1,4 +1,7 @@
 // Tests for explaining find through the explain command.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

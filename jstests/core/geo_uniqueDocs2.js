@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 
 // Additional checks for geo uniqueDocs and includeLocs SERVER-3139.
 // SERVER-12120 uniqueDocs is deprecated.

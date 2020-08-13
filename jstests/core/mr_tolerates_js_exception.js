@@ -7,6 +7,7 @@
  *   does_not_support_causal_consistency,
  *   does_not_support_stepdowns,
  *   requires_scripting,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

@@ -1,4 +1,7 @@
 // A few rooted $or cases.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 var t = db.jstests_orq;
 t.drop();

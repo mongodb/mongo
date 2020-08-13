@@ -1,6 +1,10 @@
 // Cannot implicitly shard accessed collections because of extra shard key index in sharded
 // collection.
-// @tags: [assumes_no_implicit_index_creation, requires_fastcount]
+// @tags: [
+//   assumes_no_implicit_index_creation,
+//   requires_fastcount,
+//   sbe_incompatible,
+// ]
 
 t = db.geo1;
 t.drop();

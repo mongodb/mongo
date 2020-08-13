@@ -1,5 +1,9 @@
 // Test $minDistance option for $near and $nearSphere queries, and the $geoNear aggregation stage.
-// @tags: [requires_fastcount, requires_getmore]
+// @tags: [
+//   requires_fastcount,
+//   requires_getmore,
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

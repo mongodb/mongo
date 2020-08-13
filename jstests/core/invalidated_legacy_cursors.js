@@ -1,7 +1,12 @@
-/*
+/**
  * Test that all DBClientCursor cursor types throw an exception when the server returns
  * CursorNotFound.
- * @tags: [requires_getmore, requires_non_retryable_commands, assumes_balancer_off]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   requires_getmore,
+ *   requires_non_retryable_commands,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

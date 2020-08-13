@@ -1,5 +1,8 @@
 // SERVER-9547
 // Test that sorting with .max() and .min() doesn't crash.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 var t = db.server9547;
 t.drop();

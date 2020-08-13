@@ -1,4 +1,7 @@
 // Test that weird polygons work SERVER-3725
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.geo_polygon5;
 t.drop();

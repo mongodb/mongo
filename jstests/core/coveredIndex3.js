@@ -1,6 +1,7 @@
 // Check proper covered index handling when query and processGetMore yield.
 // SERVER-4975
 // @tags: [
+//   sbe_incompatible,
 //   uses_parallel_shell,
 // ]
 

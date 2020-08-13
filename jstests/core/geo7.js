@@ -1,4 +1,9 @@
 
+/**
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
+ */
 t = db.geo7;
 t.drop();
 

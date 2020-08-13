@@ -1,6 +1,9 @@
 /**
  * Make sure explain succeeds even when the index bounds are really big.
- * @tags: [resource_intensive]
+ * @tags: [
+ *   resource_intensive,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 const coll = db.jstests_explain_large_bounds;

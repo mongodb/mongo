@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_getmore,
+//   sbe_incompatible,
 // ]
 // Tests for $elemMatch projections and $ positional operator projection.
 (function() {

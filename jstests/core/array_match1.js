@@ -1,4 +1,9 @@
 
+/**
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
+ */
 t = db.array_match1;
 t.drop();
 

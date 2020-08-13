@@ -1,5 +1,10 @@
 // Confirms that the number of profiled operations is consistent with the sampleRate, if set.
-// @tags: [does_not_support_stepdowns, requires_fastcount, requires_profiling]
+// @tags: [
+//   does_not_support_stepdowns,
+//   requires_fastcount,
+//   requires_profiling,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

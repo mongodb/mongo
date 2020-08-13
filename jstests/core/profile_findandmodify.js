@@ -1,5 +1,8 @@
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
-// @tags: [requires_profiling]
+// @tags: [
+//   requires_profiling,
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

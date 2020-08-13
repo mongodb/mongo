@@ -2,6 +2,7 @@
 // startSession may cause this test to fail to find the returned sessionId.
 // @tags: [
 //   does_not_support_stepdowns,
+//   sbe_incompatible,
 //   uses_testing_only_commands,
 // ]
 

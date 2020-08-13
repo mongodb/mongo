@@ -1,5 +1,8 @@
 // Test uniqueDocs option for $within queries and the $geoNear aggregation stage. SERVER-3139
 // SERVER-12120 uniqueDocs is deprecated. Server always returns unique documents.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 collName = 'geo_uniqueDocs_test';
 t = db.geo_uniqueDocs_test;

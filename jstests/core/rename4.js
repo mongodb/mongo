@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_non_retryable_commands,
+//   sbe_incompatible,
 // ]
 
 t = db.jstests_rename4;

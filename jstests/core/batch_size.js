@@ -1,4 +1,8 @@
-// @tags: [requires_getmore, assumes_balancer_off]
+// @tags: [
+//   assumes_balancer_off,
+//   requires_getmore,
+//   sbe_incompatible,
+// ]
 
 // Test subtleties of batchSize and limit.
 

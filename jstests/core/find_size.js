@@ -1,4 +1,7 @@
 // Tests the behavior of $size for match expressions.
+// @tags [
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

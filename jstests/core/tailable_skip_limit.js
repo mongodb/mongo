@@ -1,4 +1,8 @@
-// @tags: [requires_getmore, requires_capped]
+// @tags: [
+//   requires_capped,
+//   requires_getmore,
+//   sbe_incompatible,
+// ]
 
 // Test that tailable cursors work correctly with skip and limit.
 (function() {

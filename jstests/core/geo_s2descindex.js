@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 
 //
 // Tests 2dsphere with descending fields, ensures correct lookup

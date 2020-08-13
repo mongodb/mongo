@@ -1,4 +1,7 @@
 // Check sorting of arrays indexed by key SERVER-2884
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.jstests_sort8;
 t.drop();

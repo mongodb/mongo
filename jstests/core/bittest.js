@@ -1,5 +1,8 @@
 /**
  * This test ensures that bit test query operators work.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

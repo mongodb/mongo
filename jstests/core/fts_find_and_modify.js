@@ -12,6 +12,7 @@
  *   # retryable write command, the 'fields' option does not currently work with retryable writes.
  *   # See SERVER-31242.
  *   requires_non_retryable_writes,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

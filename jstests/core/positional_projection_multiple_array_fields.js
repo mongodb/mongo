@@ -4,6 +4,9 @@
  *
  * Note that the user's query/filter document may only contain _ONE_ array field for positional
  * projection to work correctly.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,4 +1,7 @@
-// @tags: [requires_fastcount]
+// @tags: [
+//   requires_fastcount,
+//   sbe_incompatible,
+// ]
 
 t = db.jstests_exists;
 t.drop();

@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_getmore,
+//   sbe_incompatible,
 // ]
 
 // Tests where the QueryOptimizerCursor enters takeover mode during a query rather than a get more.

@@ -1,8 +1,9 @@
 // Tests toString() in object constructor.
 // Verifies that native functions do not expose the _native_function and _native_data properties.
 // @tags: [
-//     # Uses $where operator
-//     requires_scripting
+//   # Uses $where operator
+//   requires_scripting,
+//   sbe_incompatible,
 // ]
 
 var t = db.where5;

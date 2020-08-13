@@ -1,4 +1,7 @@
 // SERVER-393 Test exists with various empty array and empty object cases.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.jstests_exists9;
 t.drop();

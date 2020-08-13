@@ -1,11 +1,14 @@
-/*
+/**
  * Test that sparse indexes can be used for {$ne: null} queries. Includes tests for (sparse)
  * compound indexes and for cases when {$ne: null} is within an $elemMatch.
  *
  * Cannot run on a sharded collection because different shards may have different plans available
  * depending on how the collection is sharded. (For example, if one shard's index goes multikey,
  * but another's is still not multikey, they may need to use different plans for certain queries).
- * @tags: [assumes_unsharded_collection]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,4 +1,7 @@
-// @tags: [requires_getmore]
+// @tags: [
+//   requires_getmore,
+//   sbe_incompatible,
+// ]
 
 // SERVER-7343: allow $within without a geo index.
 t = db.geo_withinquery;

@@ -1,6 +1,11 @@
 // Cannot implicitly shard accessed collections because the explain output from a mongod when run
 // against a sharded collection is wrapped in a "shards" object with keys for each shard.
-// @tags: [assumes_unsharded_collection, does_not_support_stepdowns, requires_fcv_47]
+// @tags: [
+//   assumes_unsharded_collection,
+//   does_not_support_stepdowns,
+//   requires_fcv_47,
+//   sbe_incompatible,
+// ]
 
 // Read ops tests for partial indexes.
 

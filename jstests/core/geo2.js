@@ -1,4 +1,8 @@
-// @tags: [requires_fastcount, operations_longer_than_stepdown_interval_in_txns]
+// @tags: [
+//   operations_longer_than_stepdown_interval_in_txns,
+//   requires_fastcount,
+//   sbe_incompatible,
+// ]
 
 t = db.geo2;
 t.drop();

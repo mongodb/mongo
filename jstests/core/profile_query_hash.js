@@ -1,10 +1,11 @@
 // Confirms that profile entries for find commands contain the appropriate query hash.
 //
 // @tags: [
-//   does_not_support_stepdowns,
-//   requires_profiling,
 //   assumes_against_mongod_not_mongos,
 //   assumes_read_concern_unchanged,
+//   does_not_support_stepdowns,
+//   requires_profiling,
+//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

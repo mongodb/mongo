@@ -1,4 +1,7 @@
 // Assorted $elemMatch matching behavior checks.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.jstests_arrayfinda;
 t.drop();

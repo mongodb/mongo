@@ -1,10 +1,11 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   requires_fastcount,
+//   requires_fcv_47,
 //   requires_non_retryable_commands,
+//   sbe_incompatible,
 //   uses_$out,
 //   uses_map_reduce_with_temp_collections,
-//   requires_fcv_47,
 // ]
 
 /**

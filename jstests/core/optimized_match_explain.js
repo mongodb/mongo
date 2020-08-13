@@ -1,4 +1,7 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [
+//   does_not_support_stepdowns,
+//   sbe_incompatible,
+// ]
 
 /**
  * Tests that the explain output for $match reflects any optimizations.

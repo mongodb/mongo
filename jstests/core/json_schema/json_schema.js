@@ -1,5 +1,9 @@
 // listCollections tests expect that a collection is not implicitly created after a drop.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_non_retryable_commands]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   requires_non_retryable_commands,
+//   sbe_incompatible,
+// ]
 
 /**
  * Tests for JSON Schema document validation.

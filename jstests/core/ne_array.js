@@ -2,7 +2,10 @@
 // cannot "naively" use an index. That is, it cannot use an index by simply generating bounds for
 // {$eq: <array>} query and then complementing them. This test checks that the correct results are
 // returned for this type of query when an index is present.
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 (function() {
 const coll = db.ne_array;
 coll.drop();

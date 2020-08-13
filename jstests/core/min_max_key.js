@@ -1,4 +1,7 @@
 // Tests the behavior of queries using MinKey and MaxKey
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
+ */
 (function() {
 "use strict";
 var t = db.geob;

@@ -1,5 +1,8 @@
 // Test an in memory sort memory assertion after a plan has "taken over" in the query optimizer
 // cursor.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

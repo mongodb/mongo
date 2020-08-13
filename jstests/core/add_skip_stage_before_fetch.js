@@ -3,7 +3,11 @@
 
 // The skip operation in a sharded query always occurs in the mongoS, so this test doesn't make
 // sense on a sharded collection.
-// @tags: [assumes_unsharded_collection, operations_longer_than_stepdown_interval_in_txns]
+// @tags: [
+//   assumes_unsharded_collection,
+//   operations_longer_than_stepdown_interval_in_txns,
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

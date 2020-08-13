@@ -1,4 +1,7 @@
 // Integration tests for no case or diacritic options to $text query operator.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 load('jstests/libs/fts.js');
 

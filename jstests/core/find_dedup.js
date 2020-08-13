@@ -1,6 +1,9 @@
 // Test that duplicate query results are not returned.
 //
-// @tags: [requires_fastcount]
+// @tags: [
+//   requires_fastcount,
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

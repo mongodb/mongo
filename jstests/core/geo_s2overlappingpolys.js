@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
+ */
 var t = db.geo_s2overlappingpolys;
 t.drop();
 

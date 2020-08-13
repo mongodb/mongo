@@ -4,7 +4,10 @@
  * This test cannot implicitly shard accessed collections because queries on a sharded collection
  * cannot be covered when they aren't on the shard key since the document needs to be fetched in
  * order to apply the SHARDING_FILTER stage.
- * @tags: [assumes_unsharded_collection]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

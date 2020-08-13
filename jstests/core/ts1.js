@@ -1,7 +1,10 @@
 // Tests that timestamps are inserted in increasing order. This test assumes that timestamps
 // inserted within the same second will have increasing increment values, which may not be the case
 // if the inserts are into a sharded collection.
-// @tags: [assumes_unsharded_collection]
+// @tags: [
+//   assumes_unsharded_collection,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 const t = db.ts1;

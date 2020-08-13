@@ -1,4 +1,8 @@
-// @tags: [requires_non_retryable_writes, requires_fastcount]
+// @tags: [
+//   requires_fastcount,
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 
 //
 // Test of sample big polygon functionality

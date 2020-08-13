@@ -1,6 +1,9 @@
 //
 // Tests for N-dimensional polygon querying
 //
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.geo_polygon1;
 t.drop();

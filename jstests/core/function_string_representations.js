@@ -1,5 +1,6 @@
 // @tags: [
 //   does_not_support_stepdowns,
+//   sbe_incompatible,
 //   uses_map_reduce_with_temp_collections,
 // ]
 

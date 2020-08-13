@@ -1,4 +1,7 @@
 // A test for what geometries can interact with what other geometries.
+// @tags: [
+//   sbe_incompatible,
+// ]
 t = db.geo_allowedcomparisons;
 
 // Any GeoJSON object can intersect with any geojson object.

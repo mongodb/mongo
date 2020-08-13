@@ -1,5 +1,8 @@
 // Test to check whether the number of intervals in a geoNear query equals
 // the number of inputStages it completes
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 var t = db.jstests_geo_s2explain;
 t.drop();

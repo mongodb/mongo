@@ -1,4 +1,7 @@
 // Tests for predicates which can use the trailing field of a 2d index.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

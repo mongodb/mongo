@@ -1,6 +1,9 @@
 /**
  * Test that queries containing $elemMatch correctly use an index if each child expression is
  * compatible with the index.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

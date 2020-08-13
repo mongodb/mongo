@@ -1,5 +1,8 @@
 // Simple covered index query test with sort on _id
-// @tags: [assumes_balancer_off]
+// @tags: [
+//   assumes_balancer_off,
+//   sbe_incompatible,
+// ]
 
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");

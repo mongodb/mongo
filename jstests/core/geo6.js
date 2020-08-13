@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
+ */
 t = db.geo6;
 t.drop();
 

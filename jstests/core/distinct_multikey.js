@@ -1,5 +1,8 @@
 /**
  * Tests for distinct planning and execution in the presence of multikey indexes.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

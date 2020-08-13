@@ -1,8 +1,9 @@
 // Tests the behavior of $mod for match expressions.
 // @tags: [
-//     # Uses $where operator
-//     requires_scripting,
-//     assumes_balancer_off
+//   assumes_balancer_off,
+//   # Uses $where operator
+//   requires_scripting,
+//   sbe_incompatible,
 // ]
 
 (function() {

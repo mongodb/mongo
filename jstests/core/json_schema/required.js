@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [
+//   requires_non_retryable_commands,
+//   sbe_incompatible,
+// ]
 
 /**
  * Tests for handling of the JSON Schema 'required' keyword.

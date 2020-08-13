@@ -1,4 +1,7 @@
 // Test some cases that might be iffy with $within, mostly related to polygon w/holes.
+// @tags: [
+//   sbe_incompatible,
+// ]
 t = db.geo_s2within;
 t.drop();
 t.ensureIndex({geo: "2dsphere"});

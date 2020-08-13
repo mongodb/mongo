@@ -6,7 +6,11 @@
  * not another).
  * Doesn't support stepdowns because it runs explain() on an aggregation (which can apparently
  * return incomplete results).
- * @tags: [assumes_unsharded_collection, does_not_support_stepdowns]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   does_not_support_stepdowns,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

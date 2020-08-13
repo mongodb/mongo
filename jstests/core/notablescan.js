@@ -8,6 +8,7 @@
 //   assumes_read_preference_unchanged,
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
+//   sbe_incompatible,
 // ]
 
 t = db.test_notablescan;

@@ -1,5 +1,8 @@
 /**
  * Test $** support for the $type operator.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

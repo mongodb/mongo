@@ -1,5 +1,8 @@
 /**
  * Tests that sparse indexes are disallowed for $exists:false queries.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

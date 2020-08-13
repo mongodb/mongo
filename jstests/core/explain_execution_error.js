@@ -1,4 +1,8 @@
-// @tags: [requires_getmore, assumes_balancer_off]
+// @tags: [
+//   assumes_balancer_off,
+//   requires_getmore,
+//   sbe_incompatible,
+// ]
 
 // Test that even when the execution of a query fails, explain reports query
 // planner information.

@@ -2,6 +2,9 @@ t = db.geo_s2index;
 t.drop();
 
 // We internally drop adjacent duplicate points in lines.
+// @tags: [
+//   sbe_incompatible,
+// ]
 someline = {
     "type": "LineString",
     "coordinates": [[40, 5], [40, 5], [40, 5], [41, 6], [41, 6]]

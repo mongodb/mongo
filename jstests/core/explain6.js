@@ -1,4 +1,8 @@
-// @tags: [requires_non_retryable_writes, assumes_balancer_off]
+// @tags: [
+//   assumes_balancer_off,
+//   requires_non_retryable_writes,
+//   sbe_incompatible,
+// ]
 
 // Basic test which checks the number of documents returned, keys examined, and documents
 // examined as reported by explain.

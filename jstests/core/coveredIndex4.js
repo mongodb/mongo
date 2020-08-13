@@ -1,4 +1,7 @@
-// @tags: [requires_getmore]
+// @tags: [
+//   requires_getmore,
+//   sbe_incompatible,
+// ]
 
 // Test covered index projection with $or clause, specifically in getMore
 // SERVER-4980

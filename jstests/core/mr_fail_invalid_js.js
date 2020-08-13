@@ -4,6 +4,7 @@
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
+//   sbe_incompatible,
 //   uses_map_reduce_with_temp_collections,
 // ]
 (function() {

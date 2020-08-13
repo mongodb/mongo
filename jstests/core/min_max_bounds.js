@@ -1,6 +1,9 @@
 /**
  * This test ensures that queries using simple ranges handle bound inclusion properly.
- * @tags: [assumes_balancer_off]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

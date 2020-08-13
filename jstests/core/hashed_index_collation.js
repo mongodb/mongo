@@ -6,6 +6,7 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_find_command,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

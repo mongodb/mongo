@@ -1,7 +1,10 @@
 /**
  * Tests explode for sort query planner behavior with collated queries and indexes. This is a test
  * for SERVER-48993.
- * @tags: [requires_find_command]
+ * @tags: [
+ *   requires_find_command,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

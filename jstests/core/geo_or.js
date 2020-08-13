@@ -1,4 +1,7 @@
 // multiple geo clauses with $or
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.geoor;
 

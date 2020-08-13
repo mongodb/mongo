@@ -3,9 +3,10 @@
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
 //   does_not_support_stepdowns,
+//   requires_capped,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
-//   requires_capped,
+//   sbe_incompatible,
 // ]
 
 // Integration tests for the collation feature.

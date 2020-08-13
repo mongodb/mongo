@@ -7,14 +7,14 @@
  * 5. Bad weights test cases.
  *
  * @tags: [
- *  # Cannot implicitly shard accessed collections because of collection existing when none
- *  # expected.
- *  assumes_no_implicit_collection_creation_after_drop,
- *  # Has operations which may never complete in stepdown/kill/terminate transaction tests.
- *  operations_longer_than_stepdown_interval_in_txns,
- *
- *  # Uses index building in background
- *  requires_background_index,
+ *   # Cannot implicitly shard accessed collections because of collection existing when none
+ *   # expected.
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   # Has operations which may never complete in stepdown/kill/terminate transaction tests.
+ *   operations_longer_than_stepdown_interval_in_txns,
+ *   # Uses index building in background
+ *   requires_background_index,
+ *   sbe_incompatible,
  * ]
  */
 

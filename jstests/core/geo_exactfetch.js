@@ -1,4 +1,7 @@
 // SERVER-7322
+// @tags: [
+//   sbe_incompatible,
+// ]
 t = db.geo_exactfetch;
 t.drop();
 

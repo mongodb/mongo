@@ -6,9 +6,10 @@
  * Queries on a sharded collection can't be covered when they aren't on the shard key. The document
  * must be fetched to support the SHARDING_FILTER stage.
  * @tags: [
- *  assumes_unsharded_collection,
- *  # Sort optimizations added for hashed indexes in 4.7 can generate a different plan.
- *  requires_fcv_47
+ *   assumes_unsharded_collection,
+ *   # Sort optimizations added for hashed indexes in 4.7 can generate a different plan.
+ *   requires_fcv_47,
+ *   sbe_incompatible,
  * ]
  */
 (function() {

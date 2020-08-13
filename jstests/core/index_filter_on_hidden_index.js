@@ -10,8 +10,9 @@
  *   used until it is made visible.
  *
  * @tags: [
- *      # Command 'planCacheSetFilter' may return different values after a failover.
- *      does_not_support_stepdowns,
+ *   # Command 'planCacheSetFilter' may return different values after a failover.
+ *   does_not_support_stepdowns,
+ *   sbe_incompatible,
  * ]
  */
 

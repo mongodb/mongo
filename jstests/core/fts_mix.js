@@ -3,6 +3,9 @@ load("jstests/libs/fts.js");
 load("jstests/aggregation/extras/utils.js");  // For resultsEq.
 
 // test collection
+// @tags: [
+//   sbe_incompatible,
+// ]
 tc = db.text_mix;
 tc.drop();
 

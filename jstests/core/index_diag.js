@@ -1,5 +1,6 @@
 // @tags: [
 //   assumes_balancer_off,
+//   sbe_incompatible,
 // ]
 load("jstests/libs/fixture_helpers.js");
 

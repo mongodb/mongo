@@ -1,8 +1,9 @@
 // @tags: [
 //   assumes_unsharded_collection,
+//   requires_fastcount,
 //   requires_javascript,
 //   requires_non_retryable_commands,
-//   requires_fastcount,
+//   sbe_incompatible,
 // ]
 
 t = db.jstests_js3;

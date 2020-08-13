@@ -1,5 +1,8 @@
 // Check that we return the correct results for negations over a
 // multikey index.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 var t = db.jstests_not3;
 t.drop();

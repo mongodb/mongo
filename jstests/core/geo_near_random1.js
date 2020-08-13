@@ -1,4 +1,7 @@
 // this tests all points
+// @tags: [
+//   sbe_incompatible,
+// ]
 load("jstests/libs/geo_near_random.js");
 
 var test = new GeoNearRandomTest("geo_near_random1");

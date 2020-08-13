@@ -2,7 +2,10 @@
 //
 // This test examines the explain output to verify that certain indexes are multi-key, which may not
 // be the case on all shards.
-// @tags: [assumes_unsharded_collection]
+// @tags: [
+//   assumes_unsharded_collection,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

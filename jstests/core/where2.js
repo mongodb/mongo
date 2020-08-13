@@ -1,6 +1,7 @@
 // @tags: [
-//     # Uses $where operator
-//     requires_scripting
+//   # Uses $where operator
+//   requires_scripting,
+//   sbe_incompatible,
 // ]
 
 t = db.getCollection("where2");

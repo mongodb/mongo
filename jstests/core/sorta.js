@@ -1,4 +1,7 @@
 // SERVER-2905 sorting with missing fields
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 'use strict';

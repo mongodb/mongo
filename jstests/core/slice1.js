@@ -7,6 +7,9 @@ t.drop();
 t.insert({_id: 1, a: [0, 1, 2, 3, 4, 5, -5, -4, -3, -2, -1], b: 1, c: 1});
 
 // first three
+// @tags: [
+//   sbe_incompatible,
+// ]
 let out = t.findOne({}, {a: {$slice: 3}});
 assert.eq(out.a, [0, 1, 2], '1');
 

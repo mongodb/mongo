@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [
+//   requires_non_retryable_commands,
+//   sbe_incompatible,
+// ]
 
 /**
  * Tests for the JSON Schema 'additionalProperties' keyword.

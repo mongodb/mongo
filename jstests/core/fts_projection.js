@@ -1,4 +1,7 @@
 // Test $text with $textScore projection.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

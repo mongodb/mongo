@@ -1,4 +1,7 @@
 // test sorting, mainly a test ver simple with no index
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.sort2;
 

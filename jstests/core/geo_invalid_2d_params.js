@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
+ */
 var t = db.geo_invalid_2d_params;
 t.drop();
 

@@ -3,6 +3,7 @@
 // order to apply the SHARDING_FILTER stage.
 // @tags: [
 //   assumes_unsharded_collection,
+//   sbe_incompatible,
 // ]
 
 /**

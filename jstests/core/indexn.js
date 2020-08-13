@@ -1,5 +1,8 @@
 // Test "impossible match" queries, or queries that will always have
 // an empty result set.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.jstests_indexn;
 t.drop();

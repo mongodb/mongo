@@ -3,7 +3,10 @@
  *
  * Does not support stepdowns, because the stepdown/kill_primary passthroughs will reject commands
  * that may return different values after a failover; in this case, 'planCacheClearFilters'.
- * @tags: [does_not_support_stepdowns]
+ * @tags: [
+ *   does_not_support_stepdowns,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

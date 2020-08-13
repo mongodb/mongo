@@ -1,6 +1,9 @@
 /**
  * Tests that modding the smallest representable integer values by -1 does not result in integer
  * overflow. Exercises the fix for SERVER-43699.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

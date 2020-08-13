@@ -1,6 +1,7 @@
 // @tags: [
 //   assumes_balancer_off,
 //   requires_non_retryable_writes,
+//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

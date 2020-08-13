@@ -2,6 +2,9 @@ t = db.jstests_or3;
 t.drop();
 
 // Include helpers for analyzing explain output.
+// @tags: [
+//   sbe_incompatible,
+// ]
 load("jstests/libs/analyze_plan.js");
 
 checkArrs = function(a, b) {

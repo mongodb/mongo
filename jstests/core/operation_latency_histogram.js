@@ -6,9 +6,10 @@
 // compact does not exist on such storage engines.
 //
 // @tags: [
-//     assumes_read_preference_unchanged,
-//     requires_collstats,
-//     incompatible_with_embedded,
+//   assumes_read_preference_unchanged,
+//   incompatible_with_embedded,
+//   requires_collstats,
+//   sbe_incompatible,
 // ]
 //
 

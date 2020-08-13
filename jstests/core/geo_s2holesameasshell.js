@@ -1,4 +1,7 @@
 // If polygons have holes, the holes cannot be equal to the entire geometry.
+// @tags: [
+//   sbe_incompatible,
+// ]
 var t = db.geo_s2holessameasshell;
 t.drop();
 t.ensureIndex({geo: "2dsphere"});

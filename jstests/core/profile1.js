@@ -6,6 +6,7 @@
 //   requires_collstats,
 //   requires_non_retryable_commands,
 //   requires_profiling,
+//   sbe_incompatible,
 // ]
 
 (function() {

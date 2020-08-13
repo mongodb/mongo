@@ -1,4 +1,7 @@
-// @tags: [assumes_balancer_off]
+// @tags: [
+//   assumes_balancer_off,
+//   sbe_incompatible,
+// ]
 // Simple covered index query test
 
 // Include helpers for analyzing explain output.

@@ -1,5 +1,6 @@
 // @tags: [
 //   does_not_support_stepdowns,
+//   sbe_incompatible,
 //   uses_testing_only_commands,
 // ]
 

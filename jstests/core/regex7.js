@@ -6,6 +6,9 @@ t.insert({r: /^a/i});
 t.insert({r: /^b/});
 
 // no index
+// @tags: [
+//   sbe_incompatible,
+// ]
 assert.eq(/^a/, t.findOne({r: /^a/}).r, '1 1 a');
 assert.eq(1, t.count({r: /^a/}), '1 2');
 assert.eq(/^a/i, t.findOne({r: /^a/i}).r, '2 1 a');

@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [
+//   requires_non_retryable_commands,
+//   sbe_incompatible,
+// ]
 
 /**
  * Tests the JSON Schema "uniqueItems" keyword.
