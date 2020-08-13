@@ -232,7 +232,13 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
      * Discard any turtle setup file left-over from previous runs. This doesn't matter for
      * correctness, it's just cleaning up random files.
      */
-    WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE_SET, false));
+
+    if ((ret = __wt_remove_if_exists(session, WT_METADATA_TURTLE_SET, false)) != 0) {
+        /* If we're a readonly database, we can skip discarding the leftover file. */
+        if (ret == EACCES)
+            ret = 0;
+        WT_RET(ret);
+    }
 
     /*
      * If we found a corrupted turtle file, then delete it and create a new. We could die after

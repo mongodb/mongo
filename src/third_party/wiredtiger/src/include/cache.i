@@ -458,6 +458,10 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
     if (didworkp != NULL)
         *didworkp = false;
 
+    /* Eviction causes reconciliation. So don't evict if we can't reconcile */
+    if (F_ISSET(session, WT_SESSION_NO_RECONCILE))
+        return (0);
+
     /*
      * If the current transaction is keeping the oldest ID pinned, it is in the middle of an
      * operation. This may prevent the oldest ID from moving forward, leading to deadlock, so only

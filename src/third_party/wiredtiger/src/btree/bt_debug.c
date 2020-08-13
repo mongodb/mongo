@@ -20,8 +20,6 @@ struct __wt_dbg {
 
     WT_ITEM *hs_key; /* History store lookups */
     WT_ITEM *hs_value;
-    uint32_t session_flags;
-    bool hs_is_local;
 
     /*
      * When using the standard event handlers, the debugging output has to do its own message
@@ -287,8 +285,8 @@ __debug_wrapup(WT_DBG *ds)
     session = ds->session;
     msg = ds->msg;
 
-    if (ds->hs_is_local)
-        WT_TRET(__wt_hs_cursor_close(session, ds->session_flags));
+    if (session->hs_cursor != NULL)
+        WT_TRET(__wt_hs_cursor_close(session));
 
     __wt_scr_free(session, &ds->key);
     __wt_scr_free(session, &ds->hs_key);
@@ -974,15 +972,13 @@ __wt_debug_cursor_tree_hs(void *cursor_arg, const char *ofile)
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    uint32_t session_flags;
 
     session = CUR2S(cursor_arg);
-    session_flags = 0; /* [-Werror=maybe-uninitialized] */
 
-    WT_RET(__wt_hs_cursor_open(session, &session_flags));
+    WT_RET(__wt_hs_cursor_open(session));
     cbt = (WT_CURSOR_BTREE *)session->hs_cursor;
     WT_WITH_BTREE(session, CUR2BT(cbt), ret = __wt_debug_tree_all(session, NULL, NULL, ofile));
-    WT_TRET(__wt_hs_cursor_close(session, session_flags));
+    WT_TRET(__wt_hs_cursor_close(session));
 
     return (ret);
 }
@@ -1028,9 +1024,7 @@ __debug_page(WT_DBG *ds, WT_REF *ref, uint32_t flags)
      * doesn't work, we may be running in-memory.
      */
     if (!WT_IS_HS(S2BT(session))) {
-        if (session->hs_cursor == NULL && __wt_hs_cursor_open(session, &ds->session_flags) == 0)
-            ds->hs_is_local = true;
-        if (session->hs_cursor != NULL) {
+        if (session->hs_cursor != NULL || __wt_hs_cursor_open(session) == 0) {
             WT_RET(__wt_scr_alloc(session, 0, &ds->hs_key));
             WT_RET(__wt_scr_alloc(session, 0, &ds->hs_value));
         }

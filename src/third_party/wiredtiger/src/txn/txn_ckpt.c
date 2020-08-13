@@ -1138,11 +1138,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
  */
 #undef WT_CHECKPOINT_SESSION_FLAGS
 #define WT_CHECKPOINT_SESSION_FLAGS (WT_SESSION_CAN_WAIT | WT_SESSION_IGNORE_CACHE_SIZE)
-#undef WT_CHECKPOINT_SESSION_FLAGS_OFF
-#define WT_CHECKPOINT_SESSION_FLAGS_OFF (WT_SESSION_HS_CURSOR)
-    orig_flags = F_MASK(session, WT_CHECKPOINT_SESSION_FLAGS | WT_CHECKPOINT_SESSION_FLAGS_OFF);
+    orig_flags = F_MASK(session, WT_CHECKPOINT_SESSION_FLAGS);
     F_SET(session, WT_CHECKPOINT_SESSION_FLAGS);
-    F_CLR(session, WT_CHECKPOINT_SESSION_FLAGS_OFF);
 
     /*
      * Only one checkpoint can be active at a time, and checkpoints must run in the same order as

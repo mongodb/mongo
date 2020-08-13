@@ -92,10 +92,10 @@ int
 __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32_t flags)
 {
     WT_CONNECTION_IMPL *conn;
+    WT_CURSOR *hs_cursor_saved;
     WT_DECL_RET;
     WT_PAGE *page;
     uint64_t time_start, time_stop;
-    uint32_t session_flags;
     bool clean_page, closing, force_evict_hs, inmem_split, local_gen, tree_dead;
 
     conn = S2C(session);
@@ -107,6 +107,15 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
 
     __wt_verbose(
       session, WT_VERB_EVICT, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
+
+    /*
+     * If we have a history store cursor, save it. This ensures that if eviction needs to access the
+     * history store, it will get its own cursor, avoiding potential problems if it were to
+     * reposition or reset a history store cursor that we're in the middle of using for something
+     * else.
+     */
+    hs_cursor_saved = session->hs_cursor;
+    session->hs_cursor = NULL;
 
     tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
     if (tree_dead)
@@ -133,9 +142,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     if (!WT_IS_METADATA(S2BT(session)->dhandle) && !F_ISSET(conn, WT_CONN_IN_MEMORY) &&
       session->hs_cursor == NULL && !F_ISSET(session, WT_SESSION_NO_RECONCILE) &&
       session != conn->default_session) {
-        session_flags = 0; /* [-Werror=maybe-uninitialized] */
-        WT_RET(__wt_hs_cursor_open(session, &session_flags));
-        WT_RET(__wt_hs_cursor_close(session, session_flags));
+        WT_RET(__wt_hs_cursor_open(session));
+        WT_RET(__wt_hs_cursor_close(session));
     }
 
     /*
@@ -273,6 +281,12 @@ done:
     /* Leave any local eviction generation. */
     if (local_gen)
         __wt_session_gen_leave(session, WT_GEN_EVICT);
+
+    /* If the caller was using a history store cursor they should have closed it by now. */
+    WT_ASSERT(session, session->hs_cursor == NULL);
+
+    /* Restore caller's history store cursor. */
+    session->hs_cursor = hs_cursor_saved;
 
     return (ret);
 }

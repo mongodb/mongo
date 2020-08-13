@@ -2228,7 +2228,7 @@ tasks:
       - func: "checkpoint stress test"
         vars:
           times: 1       # No of times to run the loop
-          no_of_procs: 8 # No of processes to run in the background
+          no_of_procs: 10 # No of processes to run in the background
 
   - name: split-stress-test
     tags: ["stress-test-1", "stress-test-zseries-1"]

@@ -81,18 +81,24 @@ static const char *const ckpt_file = "checkpoint_done";
 static bool compat, inmem, stress, use_ts;
 static volatile uint64_t global_ts = 1;
 
-#define ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
+/*
+ * See notes on eviction triggers and targets where these symbols are used.
+ */
+#define ENV_CONFIG_ADD_COMPAT ",compatibility=(release=\"2.9\")"
+#define ENV_CONFIG_ADD_EVICT_DIRTY ",eviction_dirty_target=20,eviction_dirty_trigger=95"
+#define ENV_CONFIG_ADD_STRESS ",timing_stress_for_test=[prepare_checkpoint_delay]"
+
 #define ENV_CONFIG_DEF                                        \
-    "cache_size=20M,create,"                                  \
+    "cache_size=%" PRIu32                                     \
+    "M,create,"                                               \
     "debug_mode=(table_logging=true,checkpoint_retention=5)," \
-    "eviction_updates_trigger=95,eviction_updates_target=80," \
+    "eviction_updates_target=20,eviction_updates_trigger=95," \
     "log=(archive=true,file_max=10M,enabled),session_max=%d," \
     "statistics=(fast),statistics_log=(wait=1,json=true)"
 #define ENV_CONFIG_TXNSYNC \
     ENV_CONFIG_DEF         \
     ",transaction_sync=(enabled,method=none)"
 #define ENV_CONFIG_REC "log=(archive=false,recover=on)"
-#define ENV_CONFIG_STRESS ",timing_stress_for_test=[prepare_checkpoint_delay]"
 
 typedef struct {
     uint64_t absent_key; /* Last absent key */
@@ -233,6 +239,7 @@ thread_run(void *arg)
 {
     FILE *fp;
     WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_shadow;
+    WT_DECL_RET;
     WT_ITEM data;
     WT_RAND_STATE rnd;
     WT_SESSION *prepared_session, *session;
@@ -345,7 +352,9 @@ thread_run(void *arg)
         data.size = __wt_random(&rnd) % MAX_VAL;
         data.data = cbuf;
         cur_coll->set_value(cur_coll, &data);
-        testutil_check(cur_coll->insert(cur_coll));
+        if ((ret = cur_coll->insert(cur_coll)) == WT_ROLLBACK)
+            goto rollback;
+        testutil_check(ret);
         cur_shadow->set_value(cur_shadow, &data);
         if (use_ts) {
             /*
@@ -357,11 +366,13 @@ thread_run(void *arg)
               __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts));
             testutil_check(session->timestamp_transaction(session, tscfg));
         }
-        testutil_check(cur_shadow->insert(cur_shadow));
+        if ((ret = cur_shadow->insert(cur_shadow)) == WT_ROLLBACK)
+            goto rollback;
         data.size = __wt_random(&rnd) % MAX_VAL;
         data.data = obuf;
         cur_oplog->set_value(cur_oplog, &data);
-        testutil_check(cur_oplog->insert(cur_oplog));
+        if ((ret = cur_oplog->insert(cur_oplog)) == WT_ROLLBACK)
+            goto rollback;
         if (use_prep) {
             /*
              * Run with prepare every once in a while. And also yield after prepare sometimes too.
@@ -383,7 +394,9 @@ thread_run(void *arg)
         }
         testutil_check(session->commit_transaction(session, NULL));
         /*
-         * Insert into the local table outside the timestamp txn.
+         * Insert into the local table outside the timestamp txn. This must occur after the
+         * timestamp transaction, not before, because of the possibility of rollback in the
+         * transaction. The local table must stay in sync with the other tables.
          */
         data.size = __wt_random(&rnd) % MAX_VAL;
         data.data = lbuf;
@@ -395,6 +408,13 @@ thread_run(void *arg)
          */
         if (fprintf(fp, "%" PRIu64 " %" PRIu64 "\n", active_ts, i) < 0)
             testutil_die(EIO, "fprintf");
+
+        if (0) {
+rollback:
+            testutil_check(session->rollback_transaction(session, NULL));
+            if (use_prep)
+                testutil_check(prepared_session->rollback_transaction(prepared_session, NULL));
+        }
     }
     /* NOTREACHED */
 }
@@ -411,21 +431,45 @@ run_workload(uint32_t nth)
     WT_SESSION *session;
     THREAD_DATA *td;
     wt_thread_t *thr;
-    uint32_t ckpt_id, i, ts_id;
+    uint32_t cache_mb, ckpt_id, i, ts_id;
     char envconf[512], uri[128];
 
     thr = dcalloc(nth + 2, sizeof(*thr));
     td = dcalloc(nth + 2, sizeof(THREAD_DATA));
+
+    /*
+     * Size the cache appropriately for the number of threads. Each thread generally adds keys
+     * sequentially to its own portion of the key space, so each thread will be dirtying one page at
+     * a time. By default, a leaf page grows to 32K in size before it splits and the thread begins
+     * to fill another page. We'll budget for 5 full size leaf pages per thread in the cache plus a
+     * little extra in the total for overhead.
+     *
+     * The configuration sets the eviction update and dirty targets at 20% so that on average, each
+     * thread can have a dirty page before eviction threads kick in. On the other side, the eviction
+     * update and dirty triggers are 95%, so application threads aren't involved in eviction until
+     * we're close to running out of cache.
+     */
+    cache_mb = ((32 * WT_KILOBYTE * nth) * 5) / WT_MEGABYTE + 5;
+
     if (chdir(home) != 0)
         testutil_die(errno, "Child chdir: %s", home);
     if (inmem)
-        testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_DEF, SESSION_MAX));
+        testutil_check(
+          __wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_DEF, cache_mb, SESSION_MAX));
     else
-        testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, SESSION_MAX));
+        testutil_check(
+          __wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, cache_mb, SESSION_MAX));
     if (compat)
-        strcat(envconf, ENV_CONFIG_COMPAT);
+        strcat(envconf, ENV_CONFIG_ADD_COMPAT);
     if (stress)
-        strcat(envconf, ENV_CONFIG_STRESS);
+        strcat(envconf, ENV_CONFIG_ADD_STRESS);
+
+    /*
+     * The eviction dirty target and trigger configurations are not compatible with certain other
+     * configurations.
+     */
+    if (!compat && !inmem)
+        strcat(envconf, ENV_CONFIG_ADD_EVICT_DIRTY);
 
     testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
