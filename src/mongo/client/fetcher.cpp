@@ -345,7 +345,7 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     }
 
     batchData.otherFields.metadata = std::move(rcbd.response.data);
-    batchData.elapsed = rcbd.response.elapsed.value_or(Microseconds{0});
+    batchData.elapsedMillis = rcbd.response.elapsedMillis.value_or(Milliseconds{0});
     {
         stdx::lock_guard<Latch> lk(_mutex);
         batchData.first = _first;

@@ -55,9 +55,9 @@ public:
                                                const BSONObj reply){};
     /**
      * Called when a ServerHandshakeCompleteEvent is published - The initial handshake to the server
-     * at hostAndPort was successful. duration is the measured RTT (Round Trip Time).
+     * at hostAndPort was successful. durationMS is the measured RTT (Round Trip Time).
      */
-    virtual void onServerHandshakeCompleteEvent(IsMasterRTT duration,
+    virtual void onServerHandshakeCompleteEvent(IsMasterRTT durationMs,
                                                 const HostAndPort& address,
                                                 const BSONObj reply = BSONObj()){};
 
@@ -67,7 +67,7 @@ public:
 
     /**
      * Called when a ServerHeartBeatSucceededEvent is published - A heartbeat sent to the server at
-     * hostAndPort succeeded. duration is the execution time of the event, including the time it
+     * hostAndPort succeeded. durationMS is the execution time of the event, including the time it
      * took to send the message and recieve the reply from the server.
      */
     virtual void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
@@ -81,9 +81,10 @@ public:
 
     /**
      * Called when a ServerPingSucceededEvent is published - A monitoring ping to the server at
-     * hostAndPort was successful. duration is the measured RTT (Round Trip Time).
+     * hostAndPort was successful. durationMS is the measured RTT (Round Trip Time).
      */
-    virtual void onServerPingSucceededEvent(IsMasterRTT duration, const HostAndPort& hostAndPort){};
+    virtual void onServerPingSucceededEvent(IsMasterRTT durationMS,
+                                            const HostAndPort& hostAndPort){};
 };
 
 /**
@@ -103,7 +104,7 @@ public:
 
     void onTopologyDescriptionChangedEvent(TopologyDescriptionPtr previousDescription,
                                            TopologyDescriptionPtr newDescription) override;
-    virtual void onServerHandshakeCompleteEvent(IsMasterRTT duration,
+    virtual void onServerHandshakeCompleteEvent(IsMasterRTT durationMs,
                                                 const HostAndPort& address,
                                                 const BSONObj reply = BSONObj()) override;
 
@@ -117,7 +118,8 @@ public:
                                        const HostAndPort& hostAndPort,
                                        const BSONObj reply) override;
     void onServerPingFailedEvent(const HostAndPort& hostAndPort, const Status& status) override;
-    void onServerPingSucceededEvent(IsMasterRTT duration, const HostAndPort& hostAndPort) override;
+    void onServerPingSucceededEvent(IsMasterRTT durationMS,
+                                    const HostAndPort& hostAndPort) override;
 
 private:
     enum class EventType {

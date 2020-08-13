@@ -57,22 +57,22 @@ struct RemoteCommandResponseBase {
 
     RemoteCommandResponseBase(ErrorCodes::Error code, std::string reason);
 
-    RemoteCommandResponseBase(ErrorCodes::Error code, std::string reason, Microseconds elapsed);
+    RemoteCommandResponseBase(ErrorCodes::Error code, std::string reason, Milliseconds millis);
 
     RemoteCommandResponseBase(Status s);
 
-    RemoteCommandResponseBase(Status s, Microseconds elapsed);
+    RemoteCommandResponseBase(Status s, Milliseconds millis);
 
-    RemoteCommandResponseBase(BSONObj dataObj, Microseconds elapsed, bool moreToCome = false);
+    RemoteCommandResponseBase(BSONObj dataObj, Milliseconds millis, bool moreToCome = false);
 
     RemoteCommandResponseBase(const rpc::ReplyInterface& rpcReply,
-                              Microseconds elapsed,
+                              Milliseconds millis,
                               bool moreToCome = false);
 
     bool isOK() const;
 
     BSONObj data;  // Always owned. May point into message.
-    boost::optional<Microseconds> elapsed;
+    boost::optional<Milliseconds> elapsedMillis;
     Status status = Status::OK();
     bool moreToCome = false;  // Whether or not the moreToCome bit is set on an exhaust message.
 
@@ -111,17 +111,17 @@ struct RemoteCommandOnAnyResponse : RemoteCommandResponseBase {
     RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
                                ErrorCodes::Error code,
                                std::string reason,
-                               Microseconds elapsed);
+                               Milliseconds millis);
 
     RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, Status s);
 
-    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, Status s, Microseconds elapsed);
+    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, Status s, Milliseconds millis);
 
-    RemoteCommandOnAnyResponse(HostAndPort hp, BSONObj dataObj, Microseconds elapsed);
+    RemoteCommandOnAnyResponse(HostAndPort hp, BSONObj dataObj, Milliseconds millis);
 
     RemoteCommandOnAnyResponse(HostAndPort hp,
                                const rpc::ReplyInterface& rpcReply,
-                               Microseconds elapsed);
+                               Milliseconds millis);
 
     RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, const RemoteCommandResponse& other);
 

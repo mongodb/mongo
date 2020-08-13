@@ -73,7 +73,7 @@ std::string toString(const ServerType serverType);
 StatusWith<ServerType> parseServerType(StringData strServerType);
 std::ostream& operator<<(std::ostream& os, const ServerType serverType);
 
-using IsMasterRTT = mongo::Microseconds;
+using IsMasterRTT = mongo::Nanoseconds;
 
 // The result of an attempt to call the "ismaster" command on a server.
 class IsMasterOutcome {

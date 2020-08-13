@@ -39,7 +39,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_gen.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {
@@ -133,9 +132,8 @@ public:
 
                 if (CommandHelpers::appendCommandStatusNoThrow(subbob, response.status)) {
                     subbob.append("data", response.data);
-                    if (response.elapsed) {
-                        subbob.append("elapsedMillis",
-                                      durationCount<Milliseconds>(*response.elapsed));
+                    if (response.elapsedMillis) {
+                        subbob.append("elapsedMillis", response.elapsedMillis->count());
                     }
                 }
             }

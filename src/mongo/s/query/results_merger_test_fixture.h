@@ -196,7 +196,7 @@ protected:
 
     void scheduleErrorResponse(executor::TaskExecutor::ResponseStatus rs) {
         invariant(!rs.isOK());
-        rs.elapsed = Milliseconds(0);
+        rs.elapsedMillis = Milliseconds(0);
         executor::NetworkInterfaceMock* net = network();
         net->enterNetwork();
         ASSERT_TRUE(net->hasReadyRequests());

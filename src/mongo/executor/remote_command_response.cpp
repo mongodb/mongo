@@ -35,7 +35,6 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -46,22 +45,22 @@ RemoteCommandResponseBase::RemoteCommandResponseBase(ErrorCodes::Error code, std
 
 RemoteCommandResponseBase::RemoteCommandResponseBase(ErrorCodes::Error code,
                                                      std::string reason,
-                                                     Microseconds elapsed)
-    : elapsed(elapsed), status(code, reason) {}
+                                                     Milliseconds millis)
+    : elapsedMillis(millis), status(code, reason) {}
 
 RemoteCommandResponseBase::RemoteCommandResponseBase(Status s) : status(std::move(s)) {
     invariant(!isOK());
 };
 
-RemoteCommandResponseBase::RemoteCommandResponseBase(Status s, Microseconds elapsed)
-    : elapsed(elapsed), status(std::move(s)) {
+RemoteCommandResponseBase::RemoteCommandResponseBase(Status s, Milliseconds millis)
+    : elapsedMillis(millis), status(std::move(s)) {
     invariant(!isOK());
 };
 
 RemoteCommandResponseBase::RemoteCommandResponseBase(BSONObj dataObj,
-                                                     Microseconds elapsed,
+                                                     Milliseconds millis,
                                                      bool moreToCome)
-    : data(std::move(dataObj)), elapsed(elapsed), moreToCome(moreToCome) {
+    : data(std::move(dataObj)), elapsedMillis(millis), moreToCome(moreToCome) {
     // The buffer backing the default empty BSONObj has static duration so it is effectively
     // owned.
     invariant(data.isOwned() || data.objdata() == BSONObj().objdata());
@@ -70,9 +69,9 @@ RemoteCommandResponseBase::RemoteCommandResponseBase(BSONObj dataObj,
 // TODO(amidvidy): we currently discard output docs when we use this constructor. We should
 // have RCR hold those too, but we need more machinery before that is possible.
 RemoteCommandResponseBase::RemoteCommandResponseBase(const rpc::ReplyInterface& rpcReply,
-                                                     Microseconds elapsed,
+                                                     Milliseconds millis,
                                                      bool moreToCome)
-    : RemoteCommandResponseBase(rpcReply.getCommandReply(), std::move(elapsed), moreToCome) {}
+    : RemoteCommandResponseBase(rpcReply.getCommandReply(), std::move(millis), moreToCome) {}
 
 bool RemoteCommandResponseBase::isOK() const {
     return status.isOK();
@@ -82,11 +81,11 @@ std::string RemoteCommandResponse::toString() const {
     return format(FMT_STRING("RemoteResponse --"
                              " cmd: {}"
                              " status: {}"
-                             " elapsed: {}"
+                             " elapsedMillis: {}"
                              " moreToCome: {}"),
                   data.toString(),
                   status.toString(),
-                  elapsed ? StringData(elapsed->toString()) : "n/a"_sd,
+                  elapsedMillis ? StringData(elapsedMillis->toString()) : "n/a"_sd,
                   moreToCome);
 }
 
@@ -95,7 +94,7 @@ bool RemoteCommandResponse::operator==(const RemoteCommandResponse& rhs) const {
         return true;
     }
     SimpleBSONObjComparator bsonComparator;
-    return bsonComparator.evaluate(data == rhs.data) && elapsed == rhs.elapsed;
+    return bsonComparator.evaluate(data == rhs.data) && elapsedMillis == rhs.elapsedMillis;
 }
 
 bool RemoteCommandResponse::operator!=(const RemoteCommandResponse& rhs) const {
@@ -117,26 +116,26 @@ RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(boost::optional<HostAndPo
 RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
                                                        ErrorCodes::Error code,
                                                        std::string reason,
-                                                       Microseconds elapsed)
-    : RemoteCommandResponseBase(code, std::move(reason), elapsed), target(std::move(hp)) {}
+                                                       Milliseconds millis)
+    : RemoteCommandResponseBase(code, std::move(reason), millis), target(std::move(hp)) {}
 
 RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, Status s)
     : RemoteCommandResponseBase(std::move(s)), target(std::move(hp)) {}
 
 RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
                                                        Status s,
-                                                       Microseconds elapsed)
-    : RemoteCommandResponseBase(std::move(s), elapsed), target(std::move(hp)) {}
+                                                       Milliseconds millis)
+    : RemoteCommandResponseBase(std::move(s), millis), target(std::move(hp)) {}
 
 RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(HostAndPort hp,
                                                        BSONObj dataObj,
-                                                       Microseconds elapsed)
-    : RemoteCommandResponseBase(std::move(dataObj), elapsed), target(std::move(hp)) {}
+                                                       Milliseconds millis)
+    : RemoteCommandResponseBase(std::move(dataObj), millis), target(std::move(hp)) {}
 
 RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(HostAndPort hp,
                                                        const rpc::ReplyInterface& rpcReply,
-                                                       Microseconds elapsed)
-    : RemoteCommandResponseBase(rpcReply, elapsed), target(std::move(hp)) {}
+                                                       Milliseconds millis)
+    : RemoteCommandResponseBase(rpcReply, millis), target(std::move(hp)) {}
 
 RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
                                                        const RemoteCommandResponse& other)
@@ -147,7 +146,7 @@ bool RemoteCommandOnAnyResponse::operator==(const RemoteCommandOnAnyResponse& rh
         return true;
     }
     SimpleBSONObjComparator bsonComparator;
-    return bsonComparator.evaluate(data == rhs.data) && elapsed == rhs.elapsed &&
+    return bsonComparator.evaluate(data == rhs.data) && elapsedMillis == rhs.elapsedMillis &&
         target == rhs.target;
 }
 
@@ -160,12 +159,12 @@ std::string RemoteCommandOnAnyResponse::toString() const {
                              " cmd: {}"
                              " target: {}"
                              " status: {}"
-                             " elapsedMicros: {}"
+                             " elapsedMillis: {}"
                              " moreToCome: {}"),
                   data.toString(),
                   target ? StringData(target->toString()) : "[none]"_sd,
                   status.toString(),
-                  elapsed ? StringData(elapsed.get().toString()) : "n/a"_sd,
+                  elapsedMillis ? StringData(elapsedMillis.get().toString()) : "n/a"_sd,
                   moreToCome);
 }
 
