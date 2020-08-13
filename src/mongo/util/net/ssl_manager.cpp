@@ -382,6 +382,7 @@ void logSSLInfo(const SSLInformationToLog& info) {
 
 void SSLManagerCoordinator::rotate() {
     stdx::lock_guard lockGuard(_lock);
+
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(sslGlobalParams, isSSLServer);
 
@@ -398,9 +399,14 @@ void SSLManagerCoordinator::rotate() {
     auto tl = getGlobalServiceContext()->getTransportLayer();
     invariant(tl != nullptr);
     uassertStatusOK(tl->rotateCertificates(manager, false));
+
+    std::shared_ptr<SSLManagerInterface> originalManager = *_manager;
     _manager = manager;
+
     LOGV2(4913400, "Successfully rotated X509 certificates.");
     logSSLInfo(_manager->get()->getSSLInformationToLog());
+
+    originalManager->stopJobs();
 }
 
 SSLManagerCoordinator::SSLManagerCoordinator()

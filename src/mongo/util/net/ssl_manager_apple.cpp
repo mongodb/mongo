@@ -1278,6 +1278,8 @@ public:
 
     SSLInformationToLog getSSLInformationToLog() const final;
 
+    void stopJobs() final;
+
 private:
     bool _weakValidation;
     bool _allowInvalidCertificates;
@@ -1489,6 +1491,8 @@ Status SSLManagerApple::stapleOCSPResponse(asio::ssl::apple::Context* context,
                                            bool asyncOCSPStaple) {
     return Status::OK();
 }
+
+void SSLManagerApple::stopJobs() {}
 
 Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     ::SSLContextRef ssl,
@@ -1814,9 +1818,9 @@ bool isSSLServer = false;
 extern SSLManagerInterface* theSSLManager;
 extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
-std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
+std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
-    return std::make_unique<SSLManagerApple>(params, isServer);
+    return std::make_shared<SSLManagerApple>(params, isServer);
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))

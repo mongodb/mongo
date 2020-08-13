@@ -180,7 +180,7 @@ struct SSLInformationToLog {
 
 class SSLManagerInterface : public Decorable<SSLManagerInterface> {
 public:
-    static std::unique_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
+    static std::shared_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
 
     virtual ~SSLManagerInterface();
 
@@ -276,6 +276,11 @@ public:
      * SSL_CTX obect.
      */
     virtual Status stapleOCSPResponse(SSLContextType context, bool asyncOCSPStaple) = 0;
+
+    /**
+     * Stop jobs after rotation is complete.
+     */
+    virtual void stopJobs() = 0;
 
     /**
      * Get information about the certificates and CRL that will be used for outgoing and incoming
