@@ -379,8 +379,8 @@ void runCommand(OperationContext* opCtx,
         // We must obtain the client lock to set the ReadConcernArgs on the operation
         // context as it may be concurrently read by CurrentOp.
         stdx::lock_guard<Client> lk(*client);
-        return readConcernArgs.initialize(request.body);
         APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
+        return readConcernArgs.initialize(request.body);
     }();
 
     auto& apiParams = APIParameters::get(opCtx);
