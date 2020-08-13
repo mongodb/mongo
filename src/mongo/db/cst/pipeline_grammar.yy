@@ -234,6 +234,7 @@
 %token <UserMaxKey> MAX_KEY "maxKey"
 %token <std::string> DOLLAR_STRING "$-prefixed string"
 %token <std::string> DOLLAR_DOLLAR_STRING "$$-prefixed string"
+%token <std::string> DOLLAR_PREF_FIELDNAME "$-prefixed fieldname"
 %token START_PIPELINE START_MATCH
 
 //
@@ -252,7 +253,7 @@
 %nterm <CNode> simpleValue compoundValue valueArray valueObject valueFields variable
 
 // Pipeline stages and related non-terminals.
-%nterm <CNode> stageList stage inhibitOptimization unionWith skip limit project sample
+%nterm <CNode> pipeline stageList stage inhibitOptimization unionWith skip limit project sample
 %nterm <CNode> projectFields projection num
 
 // Aggregate expressions
@@ -278,16 +279,20 @@
 %%
 
 start:
-    START_PIPELINE pipeline
+    START_PIPELINE pipeline {
+        invariant(cst);
+        *cst = $pipeline;
+    }
     | START_MATCH matchExpression {
-        *cst = CNode{$matchExpression};
+        invariant(cst);
+        *cst = $matchExpression;
     }
 ;
 
 // Entry point to pipeline parsing.
 pipeline:
     START_ARRAY stageList END_ARRAY {
-        *cst = $stageList;
+        $$ = $stageList;
     }
 ;
 
@@ -440,7 +445,7 @@ projectionFieldname:
 
 matchExpression:
     START_OBJECT filterFields END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::match, $filterFields}}};
+        $$ = $filterFields;
     }
 ;
 
@@ -454,11 +459,7 @@ filterFields:
     }
 ;
 
-filterField:
-    ID filterVal {
-        $$ = {KeyFieldname::id, $filterVal};
-    }
-    | filterFieldname filterVal {
+filterField: filterFieldname filterVal {
         $$ = {$filterFieldname, $filterVal};
     }
 ;
@@ -467,8 +468,9 @@ filterVal:
     value
 ;
 
+// Filter predicates are *not* allowed over $-prefixed field names.
 filterFieldname:
-    invariableUserFieldname | stageAsUserFieldname | argAsUserFieldname | aggExprAsUserFieldname
+    idAsUserFieldname | invariableUserFieldname | argAsUserFieldname
 ;
 
 invariableUserFieldname:

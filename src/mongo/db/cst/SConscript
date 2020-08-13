@@ -9,6 +9,7 @@ env.Library(
     source=[
         'bson_lexer.cpp',
         'compound_key.cpp',
+        'cst_match_translation.cpp',
         'cst_pipeline_translation.cpp',
         'c_node.cpp',
         'c_node_validation.cpp',
@@ -29,9 +30,11 @@ env.CppUnitTest(
         'bson_lexer_test.cpp',
         'cst_error_test.cpp',
         'cst_expression_test.cpp',
+        'cst_match_translation_test.cpp',
         'cst_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'cst',
     ]
 )

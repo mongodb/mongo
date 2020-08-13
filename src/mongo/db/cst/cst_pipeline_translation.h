@@ -49,4 +49,9 @@ boost::intrusive_ptr<Expression> translateExpression(
 std::unique_ptr<Pipeline, PipelineDeleter> translatePipeline(
     const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+/**
+ * Walk a literal leaf CNode and produce a Value.
+ */
+Value translateLiteralLeaf(const CNode& cst);
+
 }  // namespace mongo::cst_pipeline_translation

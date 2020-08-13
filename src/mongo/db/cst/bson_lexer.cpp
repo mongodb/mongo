@@ -213,6 +213,10 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
             // Place the token expected by the parser if this is a reserved keyword.
             pushToken(elem.fieldNameStringData(), it->second);
             context.emplace(this, elem.fieldNameStringData());
+        } else if (elem.fieldNameStringData()[0] == '$') {
+            pushToken(elem.fieldNameStringData(),
+                      PipelineParserGen::token::DOLLAR_PREF_FIELDNAME,
+                      elem.fieldName());
         } else {
             // If we don't care about the keyword, then it's treated as a generic fieldname.
             pushToken(
@@ -246,8 +250,8 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
                 pushToken(elem, PipelineParserGen::token::DOUBLE_NON_ZERO, elem.numberDouble());
             break;
         case BSONType::String:
-            if (elem.String()[0] == '$') {
-                if (elem.String()[1] == '$') {
+            if (elem.valueStringData()[0] == '$') {
+                if (elem.valueStringData()[1] == '$') {
                     pushToken(elem.valueStringData(),
                               PipelineParserGen::token::DOLLAR_DOLLAR_STRING,
                               elem.String());

@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.6.3.
+// A Bison parser, made by GNU Bison 3.5.4.
 
 // Skeleton implementation for Bison LALR(1) parsers in C++
 
@@ -30,16 +30,15 @@
 // This special exception was added by the Free Software Foundation in
 // version 2.2 of Bison.
 
-// DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
-// especially those whose name start with YY_ or yy_.  They are
-// private implementation details that can be changed or removed.
+// Undocumented macros, especially those whose name start with YY_,
+// are private implementation details.  Do not rely on them.
 
 
 #include "pipeline_parser_gen.hpp"
 
 
 // Unqualified %code blocks.
-#line 83 "pipeline_grammar.yy"
+#line 83 "src/mongo/db/cst/pipeline_grammar.yy"
 
 #include "mongo/db/cst/bson_lexer.h"
 #include "mongo/db/cst/c_node_disambiguation.h"
@@ -60,7 +59,7 @@ void PipelineParserGen::error(const PipelineParserGen::location_type& loc, const
 // mongo.
 #define YYLLOC_DEFAULT(newPos, rhsPositions, nRhs)
 
-#line 68 "pipeline_parser_gen.cpp"
+#line 67 "src/mongo/db/cst/pipeline_parser_gen.cpp"
 
 
 #ifndef YY_
@@ -74,7 +73,6 @@ void PipelineParserGen::error(const PipelineParserGen::location_type& loc, const
 #define YY_(msgid) msgid
 #endif
 #endif
-
 
 // Whether we are compiled with exception support.
 #ifndef YY_EXCEPTIONS
@@ -126,10 +124,10 @@ void PipelineParserGen::error(const PipelineParserGen::location_type& loc, const
             yy_reduce_print_(Rule); \
     } while (false)
 
-#define YY_STACK_PRINT()       \
-    do {                       \
-        if (yydebug_)          \
-            yy_stack_print_(); \
+#define YY_STACK_PRINT()      \
+    do {                      \
+        if (yydebug_)         \
+            yystack_print_(); \
     } while (false)
 
 #else  // !YYDEBUG
@@ -151,9 +149,47 @@ void PipelineParserGen::error(const PipelineParserGen::location_type& loc, const
 #define YYERROR goto yyerrorlab
 #define YYRECOVERING() (!!yyerrstatus_)
 
-#line 58 "pipeline_grammar.yy"
+#line 58 "src/mongo/db/cst/pipeline_grammar.yy"
 namespace mongo {
-#line 161 "pipeline_parser_gen.cpp"
+#line 159 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+
+
+/* Return YYSTR after stripping away unnecessary quotes and
+   backslashes, so that it's suitable for yyerror.  The heuristic is
+   that double-quoting is unnecessary unless the string contains an
+   apostrophe, a comma, or backslash (other than backslash-backslash).
+   YYSTR is taken from yytname.  */
+std::string PipelineParserGen::yytnamerr_(const char* yystr) {
+    if (*yystr == '"') {
+        std::string yyr;
+        char const* yyp = yystr;
+
+        for (;;)
+            switch (*++yyp) {
+                case '\'':
+                case ',':
+                    goto do_not_strip_quotes;
+
+                case '\\':
+                    if (*++yyp != '\\')
+                        goto do_not_strip_quotes;
+                    else
+                        goto append;
+
+                append:
+                default:
+                    yyr += *yyp;
+                    break;
+
+                case '"':
+                    return yyr;
+            }
+    do_not_strip_quotes:;
+    }
+
+    return yystr;
+}
+
 
 /// Build a parser object.
 PipelineParserGen::PipelineParserGen(BSONLexer& lexer_yyarg, CNode* cst_yyarg)
@@ -172,7 +208,7 @@ PipelineParserGen::~PipelineParserGen() {}
 PipelineParserGen::syntax_error::~syntax_error() YY_NOEXCEPT YY_NOTHROW {}
 
 /*---------------.
-| symbol kinds.  |
+| Symbol types.  |
 `---------------*/
 
 
@@ -192,18 +228,18 @@ void PipelineParserGen::by_state::move(by_state& that) {
 
 PipelineParserGen::by_state::by_state(state_type s) YY_NOEXCEPT : state(s) {}
 
-PipelineParserGen::symbol_kind_type PipelineParserGen::by_state::kind() const YY_NOEXCEPT {
+PipelineParserGen::symbol_number_type PipelineParserGen::by_state::type_get() const YY_NOEXCEPT {
     if (state == empty_state)
-        return symbol_kind::S_YYEMPTY;
+        return empty_symbol;
     else
-        return YY_CAST(symbol_kind_type, yystos_[+state]);
+        return yystos_[+state];
 }
 
 PipelineParserGen::stack_symbol_type::stack_symbol_type() {}
 
 PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_type) that)
     : super_type(YY_MOVE(that.state), YY_MOVE(that.location)) {
-    switch (that.kind()) {
+    switch (that.type_get()) {
         case 99:  // "BinData"
             value.YY_MOVE_OR_COPY<BSONBinData>(YY_MOVE(that.value));
             break;
@@ -228,133 +264,134 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_ty
             value.YY_MOVE_OR_COPY<BSONSymbol>(YY_MOVE(that.value));
             break;
 
-        case 134:  // dbPointer
-        case 135:  // javascript
-        case 136:  // symbol
-        case 137:  // javascriptWScope
-        case 138:  // int
-        case 139:  // timestamp
-        case 140:  // long
-        case 141:  // double
-        case 142:  // decimal
-        case 143:  // minKey
-        case 144:  // maxKey
-        case 145:  // value
-        case 146:  // string
-        case 147:  // fieldPath
-        case 148:  // binary
-        case 149:  // undefined
-        case 150:  // objectId
-        case 151:  // bool
-        case 152:  // date
-        case 153:  // null
-        case 154:  // regex
-        case 155:  // simpleValue
-        case 156:  // compoundValue
-        case 157:  // valueArray
-        case 158:  // valueObject
-        case 159:  // valueFields
-        case 160:  // variable
-        case 161:  // stageList
-        case 162:  // stage
-        case 163:  // inhibitOptimization
-        case 164:  // unionWith
-        case 165:  // skip
-        case 166:  // limit
-        case 167:  // project
-        case 168:  // sample
-        case 169:  // projectFields
-        case 170:  // projection
-        case 171:  // num
-        case 172:  // expression
-        case 173:  // compoundExpression
-        case 174:  // exprFixedTwoArg
-        case 175:  // expressionArray
-        case 176:  // expressionObject
-        case 177:  // expressionFields
-        case 178:  // maths
-        case 179:  // add
-        case 180:  // atan2
-        case 181:  // boolExps
-        case 182:  // and
-        case 183:  // or
-        case 184:  // not
-        case 185:  // literalEscapes
-        case 186:  // const
-        case 187:  // literal
-        case 188:  // stringExps
-        case 189:  // concat
-        case 190:  // dateFromString
-        case 191:  // dateToString
-        case 192:  // indexOfBytes
-        case 193:  // indexOfCP
-        case 194:  // ltrim
-        case 195:  // regexFind
-        case 196:  // regexFindAll
-        case 197:  // regexMatch
-        case 198:  // regexArgs
-        case 199:  // replaceOne
-        case 200:  // replaceAll
-        case 201:  // rtrim
-        case 202:  // split
-        case 203:  // strLenBytes
-        case 204:  // strLenCP
-        case 205:  // strcasecmp
-        case 206:  // substr
-        case 207:  // substrBytes
-        case 208:  // substrCP
-        case 209:  // toLower
-        case 210:  // toUpper
-        case 211:  // trim
-        case 212:  // compExprs
-        case 213:  // cmp
-        case 214:  // eq
-        case 215:  // gt
-        case 216:  // gte
-        case 217:  // lt
-        case 218:  // lte
-        case 219:  // ne
-        case 220:  // typeExpression
-        case 221:  // convert
-        case 222:  // toBool
-        case 223:  // toDate
-        case 224:  // toDecimal
-        case 225:  // toDouble
-        case 226:  // toInt
-        case 227:  // toLong
-        case 228:  // toObjectId
-        case 229:  // toString
-        case 230:  // type
-        case 231:  // abs
-        case 232:  // ceil
-        case 233:  // divide
-        case 234:  // exponent
-        case 235:  // floor
-        case 236:  // ln
-        case 237:  // log
-        case 238:  // logten
-        case 239:  // mod
-        case 240:  // multiply
-        case 241:  // pow
-        case 242:  // round
-        case 243:  // sqrt
-        case 244:  // subtract
-        case 245:  // trunc
-        case 255:  // matchExpression
-        case 256:  // filterFields
-        case 257:  // filterVal
+        case 135:  // dbPointer
+        case 136:  // javascript
+        case 137:  // symbol
+        case 138:  // javascriptWScope
+        case 139:  // int
+        case 140:  // timestamp
+        case 141:  // long
+        case 142:  // double
+        case 143:  // decimal
+        case 144:  // minKey
+        case 145:  // maxKey
+        case 146:  // value
+        case 147:  // string
+        case 148:  // fieldPath
+        case 149:  // binary
+        case 150:  // undefined
+        case 151:  // objectId
+        case 152:  // bool
+        case 153:  // date
+        case 154:  // null
+        case 155:  // regex
+        case 156:  // simpleValue
+        case 157:  // compoundValue
+        case 158:  // valueArray
+        case 159:  // valueObject
+        case 160:  // valueFields
+        case 161:  // variable
+        case 162:  // pipeline
+        case 163:  // stageList
+        case 164:  // stage
+        case 165:  // inhibitOptimization
+        case 166:  // unionWith
+        case 167:  // skip
+        case 168:  // limit
+        case 169:  // project
+        case 170:  // sample
+        case 171:  // projectFields
+        case 172:  // projection
+        case 173:  // num
+        case 174:  // expression
+        case 175:  // compoundExpression
+        case 176:  // exprFixedTwoArg
+        case 177:  // expressionArray
+        case 178:  // expressionObject
+        case 179:  // expressionFields
+        case 180:  // maths
+        case 181:  // add
+        case 182:  // atan2
+        case 183:  // boolExps
+        case 184:  // and
+        case 185:  // or
+        case 186:  // not
+        case 187:  // literalEscapes
+        case 188:  // const
+        case 189:  // literal
+        case 190:  // stringExps
+        case 191:  // concat
+        case 192:  // dateFromString
+        case 193:  // dateToString
+        case 194:  // indexOfBytes
+        case 195:  // indexOfCP
+        case 196:  // ltrim
+        case 197:  // regexFind
+        case 198:  // regexFindAll
+        case 199:  // regexMatch
+        case 200:  // regexArgs
+        case 201:  // replaceOne
+        case 202:  // replaceAll
+        case 203:  // rtrim
+        case 204:  // split
+        case 205:  // strLenBytes
+        case 206:  // strLenCP
+        case 207:  // strcasecmp
+        case 208:  // substr
+        case 209:  // substrBytes
+        case 210:  // substrCP
+        case 211:  // toLower
+        case 212:  // toUpper
+        case 213:  // trim
+        case 214:  // compExprs
+        case 215:  // cmp
+        case 216:  // eq
+        case 217:  // gt
+        case 218:  // gte
+        case 219:  // lt
+        case 220:  // lte
+        case 221:  // ne
+        case 222:  // typeExpression
+        case 223:  // convert
+        case 224:  // toBool
+        case 225:  // toDate
+        case 226:  // toDecimal
+        case 227:  // toDouble
+        case 228:  // toInt
+        case 229:  // toLong
+        case 230:  // toObjectId
+        case 231:  // toString
+        case 232:  // type
+        case 233:  // abs
+        case 234:  // ceil
+        case 235:  // divide
+        case 236:  // exponent
+        case 237:  // floor
+        case 238:  // ln
+        case 239:  // log
+        case 240:  // logten
+        case 241:  // mod
+        case 242:  // multiply
+        case 243:  // pow
+        case 244:  // round
+        case 245:  // sqrt
+        case 246:  // subtract
+        case 247:  // trunc
+        case 257:  // matchExpression
+        case 258:  // filterFields
+        case 259:  // filterVal
             value.YY_MOVE_OR_COPY<CNode>(YY_MOVE(that.value));
             break;
 
-        case 121:  // projectionFieldname
-        case 122:  // expressionFieldname
-        case 123:  // stageAsUserFieldname
-        case 124:  // filterFieldname
-        case 125:  // argAsUserFieldname
-        case 126:  // aggExprAsUserFieldname
-        case 127:  // invariableUserFieldname
-        case 128:  // idAsUserFieldname
-        case 129:  // valueFieldname
+        case 122:  // projectionFieldname
+        case 123:  // expressionFieldname
+        case 124:  // stageAsUserFieldname
+        case 125:  // filterFieldname
+        case 126:  // argAsUserFieldname
+        case 127:  // aggExprAsUserFieldname
+        case 128:  // invariableUserFieldname
+        case 129:  // idAsUserFieldname
+        case 130:  // valueFieldname
             value.YY_MOVE_OR_COPY<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
@@ -402,16 +439,16 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_ty
             value.YY_MOVE_OR_COPY<long long>(YY_MOVE(that.value));
             break;
 
-        case 130:  // projectField
-        case 131:  // expressionField
-        case 132:  // valueField
-        case 133:  // filterField
-        case 246:  // onErrorArg
-        case 247:  // onNullArg
-        case 248:  // formatArg
-        case 249:  // timezoneArg
-        case 250:  // charsArg
-        case 251:  // optionsArg
+        case 131:  // projectField
+        case 132:  // expressionField
+        case 133:  // valueField
+        case 134:  // filterField
+        case 248:  // onErrorArg
+        case 249:  // onNullArg
+        case 250:  // formatArg
+        case 251:  // timezoneArg
+        case 252:  // charsArg
+        case 253:  // optionsArg
             value.YY_MOVE_OR_COPY<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
             break;
 
@@ -419,12 +456,13 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_ty
         case 98:   // "string"
         case 116:  // "$-prefixed string"
         case 117:  // "$$-prefixed string"
+        case 118:  // "$-prefixed fieldname"
             value.YY_MOVE_OR_COPY<std::string>(YY_MOVE(that.value));
             break;
 
-        case 252:  // expressions
-        case 253:  // values
-        case 254:  // exprZeroToTwo
+        case 254:  // expressions
+        case 255:  // values
+        case 256:  // exprZeroToTwo
             value.YY_MOVE_OR_COPY<std::vector<CNode>>(YY_MOVE(that.value));
             break;
 
@@ -440,7 +478,7 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_ty
 
 PipelineParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_REF(symbol_type) that)
     : super_type(s, YY_MOVE(that.location)) {
-    switch (that.kind()) {
+    switch (that.type_get()) {
         case 99:  // "BinData"
             value.move<BSONBinData>(YY_MOVE(that.value));
             break;
@@ -465,133 +503,134 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_RE
             value.move<BSONSymbol>(YY_MOVE(that.value));
             break;
 
-        case 134:  // dbPointer
-        case 135:  // javascript
-        case 136:  // symbol
-        case 137:  // javascriptWScope
-        case 138:  // int
-        case 139:  // timestamp
-        case 140:  // long
-        case 141:  // double
-        case 142:  // decimal
-        case 143:  // minKey
-        case 144:  // maxKey
-        case 145:  // value
-        case 146:  // string
-        case 147:  // fieldPath
-        case 148:  // binary
-        case 149:  // undefined
-        case 150:  // objectId
-        case 151:  // bool
-        case 152:  // date
-        case 153:  // null
-        case 154:  // regex
-        case 155:  // simpleValue
-        case 156:  // compoundValue
-        case 157:  // valueArray
-        case 158:  // valueObject
-        case 159:  // valueFields
-        case 160:  // variable
-        case 161:  // stageList
-        case 162:  // stage
-        case 163:  // inhibitOptimization
-        case 164:  // unionWith
-        case 165:  // skip
-        case 166:  // limit
-        case 167:  // project
-        case 168:  // sample
-        case 169:  // projectFields
-        case 170:  // projection
-        case 171:  // num
-        case 172:  // expression
-        case 173:  // compoundExpression
-        case 174:  // exprFixedTwoArg
-        case 175:  // expressionArray
-        case 176:  // expressionObject
-        case 177:  // expressionFields
-        case 178:  // maths
-        case 179:  // add
-        case 180:  // atan2
-        case 181:  // boolExps
-        case 182:  // and
-        case 183:  // or
-        case 184:  // not
-        case 185:  // literalEscapes
-        case 186:  // const
-        case 187:  // literal
-        case 188:  // stringExps
-        case 189:  // concat
-        case 190:  // dateFromString
-        case 191:  // dateToString
-        case 192:  // indexOfBytes
-        case 193:  // indexOfCP
-        case 194:  // ltrim
-        case 195:  // regexFind
-        case 196:  // regexFindAll
-        case 197:  // regexMatch
-        case 198:  // regexArgs
-        case 199:  // replaceOne
-        case 200:  // replaceAll
-        case 201:  // rtrim
-        case 202:  // split
-        case 203:  // strLenBytes
-        case 204:  // strLenCP
-        case 205:  // strcasecmp
-        case 206:  // substr
-        case 207:  // substrBytes
-        case 208:  // substrCP
-        case 209:  // toLower
-        case 210:  // toUpper
-        case 211:  // trim
-        case 212:  // compExprs
-        case 213:  // cmp
-        case 214:  // eq
-        case 215:  // gt
-        case 216:  // gte
-        case 217:  // lt
-        case 218:  // lte
-        case 219:  // ne
-        case 220:  // typeExpression
-        case 221:  // convert
-        case 222:  // toBool
-        case 223:  // toDate
-        case 224:  // toDecimal
-        case 225:  // toDouble
-        case 226:  // toInt
-        case 227:  // toLong
-        case 228:  // toObjectId
-        case 229:  // toString
-        case 230:  // type
-        case 231:  // abs
-        case 232:  // ceil
-        case 233:  // divide
-        case 234:  // exponent
-        case 235:  // floor
-        case 236:  // ln
-        case 237:  // log
-        case 238:  // logten
-        case 239:  // mod
-        case 240:  // multiply
-        case 241:  // pow
-        case 242:  // round
-        case 243:  // sqrt
-        case 244:  // subtract
-        case 245:  // trunc
-        case 255:  // matchExpression
-        case 256:  // filterFields
-        case 257:  // filterVal
+        case 135:  // dbPointer
+        case 136:  // javascript
+        case 137:  // symbol
+        case 138:  // javascriptWScope
+        case 139:  // int
+        case 140:  // timestamp
+        case 141:  // long
+        case 142:  // double
+        case 143:  // decimal
+        case 144:  // minKey
+        case 145:  // maxKey
+        case 146:  // value
+        case 147:  // string
+        case 148:  // fieldPath
+        case 149:  // binary
+        case 150:  // undefined
+        case 151:  // objectId
+        case 152:  // bool
+        case 153:  // date
+        case 154:  // null
+        case 155:  // regex
+        case 156:  // simpleValue
+        case 157:  // compoundValue
+        case 158:  // valueArray
+        case 159:  // valueObject
+        case 160:  // valueFields
+        case 161:  // variable
+        case 162:  // pipeline
+        case 163:  // stageList
+        case 164:  // stage
+        case 165:  // inhibitOptimization
+        case 166:  // unionWith
+        case 167:  // skip
+        case 168:  // limit
+        case 169:  // project
+        case 170:  // sample
+        case 171:  // projectFields
+        case 172:  // projection
+        case 173:  // num
+        case 174:  // expression
+        case 175:  // compoundExpression
+        case 176:  // exprFixedTwoArg
+        case 177:  // expressionArray
+        case 178:  // expressionObject
+        case 179:  // expressionFields
+        case 180:  // maths
+        case 181:  // add
+        case 182:  // atan2
+        case 183:  // boolExps
+        case 184:  // and
+        case 185:  // or
+        case 186:  // not
+        case 187:  // literalEscapes
+        case 188:  // const
+        case 189:  // literal
+        case 190:  // stringExps
+        case 191:  // concat
+        case 192:  // dateFromString
+        case 193:  // dateToString
+        case 194:  // indexOfBytes
+        case 195:  // indexOfCP
+        case 196:  // ltrim
+        case 197:  // regexFind
+        case 198:  // regexFindAll
+        case 199:  // regexMatch
+        case 200:  // regexArgs
+        case 201:  // replaceOne
+        case 202:  // replaceAll
+        case 203:  // rtrim
+        case 204:  // split
+        case 205:  // strLenBytes
+        case 206:  // strLenCP
+        case 207:  // strcasecmp
+        case 208:  // substr
+        case 209:  // substrBytes
+        case 210:  // substrCP
+        case 211:  // toLower
+        case 212:  // toUpper
+        case 213:  // trim
+        case 214:  // compExprs
+        case 215:  // cmp
+        case 216:  // eq
+        case 217:  // gt
+        case 218:  // gte
+        case 219:  // lt
+        case 220:  // lte
+        case 221:  // ne
+        case 222:  // typeExpression
+        case 223:  // convert
+        case 224:  // toBool
+        case 225:  // toDate
+        case 226:  // toDecimal
+        case 227:  // toDouble
+        case 228:  // toInt
+        case 229:  // toLong
+        case 230:  // toObjectId
+        case 231:  // toString
+        case 232:  // type
+        case 233:  // abs
+        case 234:  // ceil
+        case 235:  // divide
+        case 236:  // exponent
+        case 237:  // floor
+        case 238:  // ln
+        case 239:  // log
+        case 240:  // logten
+        case 241:  // mod
+        case 242:  // multiply
+        case 243:  // pow
+        case 244:  // round
+        case 245:  // sqrt
+        case 246:  // subtract
+        case 247:  // trunc
+        case 257:  // matchExpression
+        case 258:  // filterFields
+        case 259:  // filterVal
             value.move<CNode>(YY_MOVE(that.value));
             break;
 
-        case 121:  // projectionFieldname
-        case 122:  // expressionFieldname
-        case 123:  // stageAsUserFieldname
-        case 124:  // filterFieldname
-        case 125:  // argAsUserFieldname
-        case 126:  // aggExprAsUserFieldname
-        case 127:  // invariableUserFieldname
-        case 128:  // idAsUserFieldname
-        case 129:  // valueFieldname
+        case 122:  // projectionFieldname
+        case 123:  // expressionFieldname
+        case 124:  // stageAsUserFieldname
+        case 125:  // filterFieldname
+        case 126:  // argAsUserFieldname
+        case 127:  // aggExprAsUserFieldname
+        case 128:  // invariableUserFieldname
+        case 129:  // idAsUserFieldname
+        case 130:  // valueFieldname
             value.move<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
@@ -639,16 +678,16 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_RE
             value.move<long long>(YY_MOVE(that.value));
             break;
 
-        case 130:  // projectField
-        case 131:  // expressionField
-        case 132:  // valueField
-        case 133:  // filterField
-        case 246:  // onErrorArg
-        case 247:  // onNullArg
-        case 248:  // formatArg
-        case 249:  // timezoneArg
-        case 250:  // charsArg
-        case 251:  // optionsArg
+        case 131:  // projectField
+        case 132:  // expressionField
+        case 133:  // valueField
+        case 134:  // filterField
+        case 248:  // onErrorArg
+        case 249:  // onNullArg
+        case 250:  // formatArg
+        case 251:  // timezoneArg
+        case 252:  // charsArg
+        case 253:  // optionsArg
             value.move<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
             break;
 
@@ -656,12 +695,13 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_RE
         case 98:   // "string"
         case 116:  // "$-prefixed string"
         case 117:  // "$$-prefixed string"
+        case 118:  // "$-prefixed fieldname"
             value.move<std::string>(YY_MOVE(that.value));
             break;
 
-        case 252:  // expressions
-        case 253:  // values
-        case 254:  // exprZeroToTwo
+        case 254:  // expressions
+        case 255:  // values
+        case 256:  // exprZeroToTwo
             value.move<std::vector<CNode>>(YY_MOVE(that.value));
             break;
 
@@ -670,14 +710,14 @@ PipelineParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_RE
     }
 
     // that is emptied.
-    that.kind_ = symbol_kind::S_YYEMPTY;
+    that.type = empty_symbol;
 }
 
 #if YY_CPLUSPLUS < 201103L
 PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::operator=(
     const stack_symbol_type& that) {
     state = that.state;
-    switch (that.kind()) {
+    switch (that.type_get()) {
         case 99:  // "BinData"
             value.copy<BSONBinData>(that.value);
             break;
@@ -702,133 +742,134 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
             value.copy<BSONSymbol>(that.value);
             break;
 
-        case 134:  // dbPointer
-        case 135:  // javascript
-        case 136:  // symbol
-        case 137:  // javascriptWScope
-        case 138:  // int
-        case 139:  // timestamp
-        case 140:  // long
-        case 141:  // double
-        case 142:  // decimal
-        case 143:  // minKey
-        case 144:  // maxKey
-        case 145:  // value
-        case 146:  // string
-        case 147:  // fieldPath
-        case 148:  // binary
-        case 149:  // undefined
-        case 150:  // objectId
-        case 151:  // bool
-        case 152:  // date
-        case 153:  // null
-        case 154:  // regex
-        case 155:  // simpleValue
-        case 156:  // compoundValue
-        case 157:  // valueArray
-        case 158:  // valueObject
-        case 159:  // valueFields
-        case 160:  // variable
-        case 161:  // stageList
-        case 162:  // stage
-        case 163:  // inhibitOptimization
-        case 164:  // unionWith
-        case 165:  // skip
-        case 166:  // limit
-        case 167:  // project
-        case 168:  // sample
-        case 169:  // projectFields
-        case 170:  // projection
-        case 171:  // num
-        case 172:  // expression
-        case 173:  // compoundExpression
-        case 174:  // exprFixedTwoArg
-        case 175:  // expressionArray
-        case 176:  // expressionObject
-        case 177:  // expressionFields
-        case 178:  // maths
-        case 179:  // add
-        case 180:  // atan2
-        case 181:  // boolExps
-        case 182:  // and
-        case 183:  // or
-        case 184:  // not
-        case 185:  // literalEscapes
-        case 186:  // const
-        case 187:  // literal
-        case 188:  // stringExps
-        case 189:  // concat
-        case 190:  // dateFromString
-        case 191:  // dateToString
-        case 192:  // indexOfBytes
-        case 193:  // indexOfCP
-        case 194:  // ltrim
-        case 195:  // regexFind
-        case 196:  // regexFindAll
-        case 197:  // regexMatch
-        case 198:  // regexArgs
-        case 199:  // replaceOne
-        case 200:  // replaceAll
-        case 201:  // rtrim
-        case 202:  // split
-        case 203:  // strLenBytes
-        case 204:  // strLenCP
-        case 205:  // strcasecmp
-        case 206:  // substr
-        case 207:  // substrBytes
-        case 208:  // substrCP
-        case 209:  // toLower
-        case 210:  // toUpper
-        case 211:  // trim
-        case 212:  // compExprs
-        case 213:  // cmp
-        case 214:  // eq
-        case 215:  // gt
-        case 216:  // gte
-        case 217:  // lt
-        case 218:  // lte
-        case 219:  // ne
-        case 220:  // typeExpression
-        case 221:  // convert
-        case 222:  // toBool
-        case 223:  // toDate
-        case 224:  // toDecimal
-        case 225:  // toDouble
-        case 226:  // toInt
-        case 227:  // toLong
-        case 228:  // toObjectId
-        case 229:  // toString
-        case 230:  // type
-        case 231:  // abs
-        case 232:  // ceil
-        case 233:  // divide
-        case 234:  // exponent
-        case 235:  // floor
-        case 236:  // ln
-        case 237:  // log
-        case 238:  // logten
-        case 239:  // mod
-        case 240:  // multiply
-        case 241:  // pow
-        case 242:  // round
-        case 243:  // sqrt
-        case 244:  // subtract
-        case 245:  // trunc
-        case 255:  // matchExpression
-        case 256:  // filterFields
-        case 257:  // filterVal
+        case 135:  // dbPointer
+        case 136:  // javascript
+        case 137:  // symbol
+        case 138:  // javascriptWScope
+        case 139:  // int
+        case 140:  // timestamp
+        case 141:  // long
+        case 142:  // double
+        case 143:  // decimal
+        case 144:  // minKey
+        case 145:  // maxKey
+        case 146:  // value
+        case 147:  // string
+        case 148:  // fieldPath
+        case 149:  // binary
+        case 150:  // undefined
+        case 151:  // objectId
+        case 152:  // bool
+        case 153:  // date
+        case 154:  // null
+        case 155:  // regex
+        case 156:  // simpleValue
+        case 157:  // compoundValue
+        case 158:  // valueArray
+        case 159:  // valueObject
+        case 160:  // valueFields
+        case 161:  // variable
+        case 162:  // pipeline
+        case 163:  // stageList
+        case 164:  // stage
+        case 165:  // inhibitOptimization
+        case 166:  // unionWith
+        case 167:  // skip
+        case 168:  // limit
+        case 169:  // project
+        case 170:  // sample
+        case 171:  // projectFields
+        case 172:  // projection
+        case 173:  // num
+        case 174:  // expression
+        case 175:  // compoundExpression
+        case 176:  // exprFixedTwoArg
+        case 177:  // expressionArray
+        case 178:  // expressionObject
+        case 179:  // expressionFields
+        case 180:  // maths
+        case 181:  // add
+        case 182:  // atan2
+        case 183:  // boolExps
+        case 184:  // and
+        case 185:  // or
+        case 186:  // not
+        case 187:  // literalEscapes
+        case 188:  // const
+        case 189:  // literal
+        case 190:  // stringExps
+        case 191:  // concat
+        case 192:  // dateFromString
+        case 193:  // dateToString
+        case 194:  // indexOfBytes
+        case 195:  // indexOfCP
+        case 196:  // ltrim
+        case 197:  // regexFind
+        case 198:  // regexFindAll
+        case 199:  // regexMatch
+        case 200:  // regexArgs
+        case 201:  // replaceOne
+        case 202:  // replaceAll
+        case 203:  // rtrim
+        case 204:  // split
+        case 205:  // strLenBytes
+        case 206:  // strLenCP
+        case 207:  // strcasecmp
+        case 208:  // substr
+        case 209:  // substrBytes
+        case 210:  // substrCP
+        case 211:  // toLower
+        case 212:  // toUpper
+        case 213:  // trim
+        case 214:  // compExprs
+        case 215:  // cmp
+        case 216:  // eq
+        case 217:  // gt
+        case 218:  // gte
+        case 219:  // lt
+        case 220:  // lte
+        case 221:  // ne
+        case 222:  // typeExpression
+        case 223:  // convert
+        case 224:  // toBool
+        case 225:  // toDate
+        case 226:  // toDecimal
+        case 227:  // toDouble
+        case 228:  // toInt
+        case 229:  // toLong
+        case 230:  // toObjectId
+        case 231:  // toString
+        case 232:  // type
+        case 233:  // abs
+        case 234:  // ceil
+        case 235:  // divide
+        case 236:  // exponent
+        case 237:  // floor
+        case 238:  // ln
+        case 239:  // log
+        case 240:  // logten
+        case 241:  // mod
+        case 242:  // multiply
+        case 243:  // pow
+        case 244:  // round
+        case 245:  // sqrt
+        case 246:  // subtract
+        case 247:  // trunc
+        case 257:  // matchExpression
+        case 258:  // filterFields
+        case 259:  // filterVal
             value.copy<CNode>(that.value);
             break;
 
-        case 121:  // projectionFieldname
-        case 122:  // expressionFieldname
-        case 123:  // stageAsUserFieldname
-        case 124:  // filterFieldname
-        case 125:  // argAsUserFieldname
-        case 126:  // aggExprAsUserFieldname
-        case 127:  // invariableUserFieldname
-        case 128:  // idAsUserFieldname
-        case 129:  // valueFieldname
+        case 122:  // projectionFieldname
+        case 123:  // expressionFieldname
+        case 124:  // stageAsUserFieldname
+        case 125:  // filterFieldname
+        case 126:  // argAsUserFieldname
+        case 127:  // aggExprAsUserFieldname
+        case 128:  // invariableUserFieldname
+        case 129:  // idAsUserFieldname
+        case 130:  // valueFieldname
             value.copy<CNode::Fieldname>(that.value);
             break;
 
@@ -876,16 +917,16 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
             value.copy<long long>(that.value);
             break;
 
-        case 130:  // projectField
-        case 131:  // expressionField
-        case 132:  // valueField
-        case 133:  // filterField
-        case 246:  // onErrorArg
-        case 247:  // onNullArg
-        case 248:  // formatArg
-        case 249:  // timezoneArg
-        case 250:  // charsArg
-        case 251:  // optionsArg
+        case 131:  // projectField
+        case 132:  // expressionField
+        case 133:  // valueField
+        case 134:  // filterField
+        case 248:  // onErrorArg
+        case 249:  // onNullArg
+        case 250:  // formatArg
+        case 251:  // timezoneArg
+        case 252:  // charsArg
+        case 253:  // optionsArg
             value.copy<std::pair<CNode::Fieldname, CNode>>(that.value);
             break;
 
@@ -893,12 +934,13 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
         case 98:   // "string"
         case 116:  // "$-prefixed string"
         case 117:  // "$$-prefixed string"
+        case 118:  // "$-prefixed fieldname"
             value.copy<std::string>(that.value);
             break;
 
-        case 252:  // expressions
-        case 253:  // values
-        case 254:  // exprZeroToTwo
+        case 254:  // expressions
+        case 255:  // values
+        case 256:  // exprZeroToTwo
             value.copy<std::vector<CNode>>(that.value);
             break;
 
@@ -913,7 +955,7 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
 PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::operator=(
     stack_symbol_type& that) {
     state = that.state;
-    switch (that.kind()) {
+    switch (that.type_get()) {
         case 99:  // "BinData"
             value.move<BSONBinData>(that.value);
             break;
@@ -938,133 +980,134 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
             value.move<BSONSymbol>(that.value);
             break;
 
-        case 134:  // dbPointer
-        case 135:  // javascript
-        case 136:  // symbol
-        case 137:  // javascriptWScope
-        case 138:  // int
-        case 139:  // timestamp
-        case 140:  // long
-        case 141:  // double
-        case 142:  // decimal
-        case 143:  // minKey
-        case 144:  // maxKey
-        case 145:  // value
-        case 146:  // string
-        case 147:  // fieldPath
-        case 148:  // binary
-        case 149:  // undefined
-        case 150:  // objectId
-        case 151:  // bool
-        case 152:  // date
-        case 153:  // null
-        case 154:  // regex
-        case 155:  // simpleValue
-        case 156:  // compoundValue
-        case 157:  // valueArray
-        case 158:  // valueObject
-        case 159:  // valueFields
-        case 160:  // variable
-        case 161:  // stageList
-        case 162:  // stage
-        case 163:  // inhibitOptimization
-        case 164:  // unionWith
-        case 165:  // skip
-        case 166:  // limit
-        case 167:  // project
-        case 168:  // sample
-        case 169:  // projectFields
-        case 170:  // projection
-        case 171:  // num
-        case 172:  // expression
-        case 173:  // compoundExpression
-        case 174:  // exprFixedTwoArg
-        case 175:  // expressionArray
-        case 176:  // expressionObject
-        case 177:  // expressionFields
-        case 178:  // maths
-        case 179:  // add
-        case 180:  // atan2
-        case 181:  // boolExps
-        case 182:  // and
-        case 183:  // or
-        case 184:  // not
-        case 185:  // literalEscapes
-        case 186:  // const
-        case 187:  // literal
-        case 188:  // stringExps
-        case 189:  // concat
-        case 190:  // dateFromString
-        case 191:  // dateToString
-        case 192:  // indexOfBytes
-        case 193:  // indexOfCP
-        case 194:  // ltrim
-        case 195:  // regexFind
-        case 196:  // regexFindAll
-        case 197:  // regexMatch
-        case 198:  // regexArgs
-        case 199:  // replaceOne
-        case 200:  // replaceAll
-        case 201:  // rtrim
-        case 202:  // split
-        case 203:  // strLenBytes
-        case 204:  // strLenCP
-        case 205:  // strcasecmp
-        case 206:  // substr
-        case 207:  // substrBytes
-        case 208:  // substrCP
-        case 209:  // toLower
-        case 210:  // toUpper
-        case 211:  // trim
-        case 212:  // compExprs
-        case 213:  // cmp
-        case 214:  // eq
-        case 215:  // gt
-        case 216:  // gte
-        case 217:  // lt
-        case 218:  // lte
-        case 219:  // ne
-        case 220:  // typeExpression
-        case 221:  // convert
-        case 222:  // toBool
-        case 223:  // toDate
-        case 224:  // toDecimal
-        case 225:  // toDouble
-        case 226:  // toInt
-        case 227:  // toLong
-        case 228:  // toObjectId
-        case 229:  // toString
-        case 230:  // type
-        case 231:  // abs
-        case 232:  // ceil
-        case 233:  // divide
-        case 234:  // exponent
-        case 235:  // floor
-        case 236:  // ln
-        case 237:  // log
-        case 238:  // logten
-        case 239:  // mod
-        case 240:  // multiply
-        case 241:  // pow
-        case 242:  // round
-        case 243:  // sqrt
-        case 244:  // subtract
-        case 245:  // trunc
-        case 255:  // matchExpression
-        case 256:  // filterFields
-        case 257:  // filterVal
+        case 135:  // dbPointer
+        case 136:  // javascript
+        case 137:  // symbol
+        case 138:  // javascriptWScope
+        case 139:  // int
+        case 140:  // timestamp
+        case 141:  // long
+        case 142:  // double
+        case 143:  // decimal
+        case 144:  // minKey
+        case 145:  // maxKey
+        case 146:  // value
+        case 147:  // string
+        case 148:  // fieldPath
+        case 149:  // binary
+        case 150:  // undefined
+        case 151:  // objectId
+        case 152:  // bool
+        case 153:  // date
+        case 154:  // null
+        case 155:  // regex
+        case 156:  // simpleValue
+        case 157:  // compoundValue
+        case 158:  // valueArray
+        case 159:  // valueObject
+        case 160:  // valueFields
+        case 161:  // variable
+        case 162:  // pipeline
+        case 163:  // stageList
+        case 164:  // stage
+        case 165:  // inhibitOptimization
+        case 166:  // unionWith
+        case 167:  // skip
+        case 168:  // limit
+        case 169:  // project
+        case 170:  // sample
+        case 171:  // projectFields
+        case 172:  // projection
+        case 173:  // num
+        case 174:  // expression
+        case 175:  // compoundExpression
+        case 176:  // exprFixedTwoArg
+        case 177:  // expressionArray
+        case 178:  // expressionObject
+        case 179:  // expressionFields
+        case 180:  // maths
+        case 181:  // add
+        case 182:  // atan2
+        case 183:  // boolExps
+        case 184:  // and
+        case 185:  // or
+        case 186:  // not
+        case 187:  // literalEscapes
+        case 188:  // const
+        case 189:  // literal
+        case 190:  // stringExps
+        case 191:  // concat
+        case 192:  // dateFromString
+        case 193:  // dateToString
+        case 194:  // indexOfBytes
+        case 195:  // indexOfCP
+        case 196:  // ltrim
+        case 197:  // regexFind
+        case 198:  // regexFindAll
+        case 199:  // regexMatch
+        case 200:  // regexArgs
+        case 201:  // replaceOne
+        case 202:  // replaceAll
+        case 203:  // rtrim
+        case 204:  // split
+        case 205:  // strLenBytes
+        case 206:  // strLenCP
+        case 207:  // strcasecmp
+        case 208:  // substr
+        case 209:  // substrBytes
+        case 210:  // substrCP
+        case 211:  // toLower
+        case 212:  // toUpper
+        case 213:  // trim
+        case 214:  // compExprs
+        case 215:  // cmp
+        case 216:  // eq
+        case 217:  // gt
+        case 218:  // gte
+        case 219:  // lt
+        case 220:  // lte
+        case 221:  // ne
+        case 222:  // typeExpression
+        case 223:  // convert
+        case 224:  // toBool
+        case 225:  // toDate
+        case 226:  // toDecimal
+        case 227:  // toDouble
+        case 228:  // toInt
+        case 229:  // toLong
+        case 230:  // toObjectId
+        case 231:  // toString
+        case 232:  // type
+        case 233:  // abs
+        case 234:  // ceil
+        case 235:  // divide
+        case 236:  // exponent
+        case 237:  // floor
+        case 238:  // ln
+        case 239:  // log
+        case 240:  // logten
+        case 241:  // mod
+        case 242:  // multiply
+        case 243:  // pow
+        case 244:  // round
+        case 245:  // sqrt
+        case 246:  // subtract
+        case 247:  // trunc
+        case 257:  // matchExpression
+        case 258:  // filterFields
+        case 259:  // filterVal
             value.move<CNode>(that.value);
             break;
 
-        case 121:  // projectionFieldname
-        case 122:  // expressionFieldname
-        case 123:  // stageAsUserFieldname
-        case 124:  // filterFieldname
-        case 125:  // argAsUserFieldname
-        case 126:  // aggExprAsUserFieldname
-        case 127:  // invariableUserFieldname
-        case 128:  // idAsUserFieldname
-        case 129:  // valueFieldname
+        case 122:  // projectionFieldname
+        case 123:  // expressionFieldname
+        case 124:  // stageAsUserFieldname
+        case 125:  // filterFieldname
+        case 126:  // argAsUserFieldname
+        case 127:  // aggExprAsUserFieldname
+        case 128:  // invariableUserFieldname
+        case 129:  // idAsUserFieldname
+        case 130:  // valueFieldname
             value.move<CNode::Fieldname>(that.value);
             break;
 
@@ -1112,16 +1155,16 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
             value.move<long long>(that.value);
             break;
 
-        case 130:  // projectField
-        case 131:  // expressionField
-        case 132:  // valueField
-        case 133:  // filterField
-        case 246:  // onErrorArg
-        case 247:  // onNullArg
-        case 248:  // formatArg
-        case 249:  // timezoneArg
-        case 250:  // charsArg
-        case 251:  // optionsArg
+        case 131:  // projectField
+        case 132:  // expressionField
+        case 133:  // valueField
+        case 134:  // filterField
+        case 248:  // onErrorArg
+        case 249:  // onNullArg
+        case 250:  // formatArg
+        case 251:  // timezoneArg
+        case 252:  // charsArg
+        case 253:  // optionsArg
             value.move<std::pair<CNode::Fieldname, CNode>>(that.value);
             break;
 
@@ -1129,12 +1172,13 @@ PipelineParserGen::stack_symbol_type& PipelineParserGen::stack_symbol_type::oper
         case 98:   // "string"
         case 116:  // "$-prefixed string"
         case 117:  // "$$-prefixed string"
+        case 118:  // "$-prefixed fieldname"
             value.move<std::string>(that.value);
             break;
 
-        case 252:  // expressions
-        case 253:  // values
-        case 254:  // exprZeroToTwo
+        case 254:  // expressions
+        case 255:  // values
+        case 256:  // exprZeroToTwo
             value.move<std::vector<CNode>>(that.value);
             break;
 
@@ -1160,15 +1204,18 @@ template <typename Base>
 void PipelineParserGen::yy_print_(std::ostream& yyo, const basic_symbol<Base>& yysym) const {
     std::ostream& yyoutput = yyo;
     YYUSE(yyoutput);
+    symbol_number_type yytype = yysym.type_get();
+#if defined __GNUC__ && !defined __clang__ && !defined __ICC && \
+    __GNUC__ * 100 + __GNUC_MINOR__ <= 408
+    // Avoid a (spurious) G++ 4.8 warning about "array subscript is
+    // below array bounds".
     if (yysym.empty())
-        yyo << "empty symbol";
-    else {
-        symbol_kind_type yykind = yysym.kind();
-        yyo << (yykind < YYNTOKENS ? "token" : "nterm") << ' ' << yysym.name() << " ("
-            << yysym.location << ": ";
-        YYUSE(yykind);
-        yyo << ')';
-    }
+        std::abort();
+#endif
+    yyo << (yytype < yyntokens_ ? "token" : "nterm") << ' ' << yytname_[yytype] << " ("
+        << yysym.location << ": ";
+    YYUSE(yytype);
+    yyo << ')';
 }
 #endif
 
@@ -1211,11 +1258,11 @@ void PipelineParserGen::set_debug_level(debug_level_type l) {
 #endif  // YYDEBUG
 
 PipelineParserGen::state_type PipelineParserGen::yy_lr_goto_state_(state_type yystate, int yysym) {
-    int yyr = yypgoto_[yysym - YYNTOKENS] + yystate;
+    int yyr = yypgoto_[yysym - yyntokens_] + yystate;
     if (0 <= yyr && yyr <= yylast_ && yycheck_[yyr] == yystate)
         return yytable_[yyr];
     else
-        return yydefgoto_[yysym - YYNTOKENS];
+        return yydefgoto_[yysym - yyntokens_];
 }
 
 bool PipelineParserGen::yy_pact_value_is_default_(int yyvalue) {
@@ -1267,7 +1314,6 @@ int PipelineParserGen::parse() {
     `-----------------------------------------------*/
     yynewstate:
         YYCDEBUG << "Entering state " << int(yystack_[0].state) << '\n';
-        YY_STACK_PRINT();
 
         // Accept?
         if (yystack_[0].state == yyfinal_)
@@ -1287,7 +1333,7 @@ int PipelineParserGen::parse() {
 
         // Read a lookahead token.
         if (yyla.empty()) {
-            YYCDEBUG << "Reading a token\n";
+            YYCDEBUG << "Reading a token: ";
 #if YY_EXCEPTIONS
             try
 #endif  // YY_EXCEPTIONS
@@ -1305,19 +1351,10 @@ int PipelineParserGen::parse() {
         }
         YY_SYMBOL_PRINT("Next token is", yyla);
 
-        if (yyla.kind() == symbol_kind::S_YYerror) {
-            // The scanner already issued an error message, process directly
-            // to error recovery.  But do not keep the error token as
-            // lookahead, it is too special and may lead us to an endless
-            // loop in error recovery. */
-            yyla.kind_ = symbol_kind::S_YYUNDEF;
-            goto yyerrlab1;
-        }
-
         /* If the proper action on seeing token YYLA.TYPE is to reduce or
            to detect an error, take that action.  */
-        yyn += yyla.kind();
-        if (yyn < 0 || yylast_ < yyn || yycheck_[yyn] != yyla.kind()) {
+        yyn += yyla.type_get();
+        if (yyn < 0 || yylast_ < yyn || yycheck_[yyn] != yyla.type_get()) {
             goto yydefault;
         }
 
@@ -1385,133 +1422,134 @@ int PipelineParserGen::parse() {
                     yylhs.value.emplace<BSONSymbol>();
                     break;
 
-                case 134:  // dbPointer
-                case 135:  // javascript
-                case 136:  // symbol
-                case 137:  // javascriptWScope
-                case 138:  // int
-                case 139:  // timestamp
-                case 140:  // long
-                case 141:  // double
-                case 142:  // decimal
-                case 143:  // minKey
-                case 144:  // maxKey
-                case 145:  // value
-                case 146:  // string
-                case 147:  // fieldPath
-                case 148:  // binary
-                case 149:  // undefined
-                case 150:  // objectId
-                case 151:  // bool
-                case 152:  // date
-                case 153:  // null
-                case 154:  // regex
-                case 155:  // simpleValue
-                case 156:  // compoundValue
-                case 157:  // valueArray
-                case 158:  // valueObject
-                case 159:  // valueFields
-                case 160:  // variable
-                case 161:  // stageList
-                case 162:  // stage
-                case 163:  // inhibitOptimization
-                case 164:  // unionWith
-                case 165:  // skip
-                case 166:  // limit
-                case 167:  // project
-                case 168:  // sample
-                case 169:  // projectFields
-                case 170:  // projection
-                case 171:  // num
-                case 172:  // expression
-                case 173:  // compoundExpression
-                case 174:  // exprFixedTwoArg
-                case 175:  // expressionArray
-                case 176:  // expressionObject
-                case 177:  // expressionFields
-                case 178:  // maths
-                case 179:  // add
-                case 180:  // atan2
-                case 181:  // boolExps
-                case 182:  // and
-                case 183:  // or
-                case 184:  // not
-                case 185:  // literalEscapes
-                case 186:  // const
-                case 187:  // literal
-                case 188:  // stringExps
-                case 189:  // concat
-                case 190:  // dateFromString
-                case 191:  // dateToString
-                case 192:  // indexOfBytes
-                case 193:  // indexOfCP
-                case 194:  // ltrim
-                case 195:  // regexFind
-                case 196:  // regexFindAll
-                case 197:  // regexMatch
-                case 198:  // regexArgs
-                case 199:  // replaceOne
-                case 200:  // replaceAll
-                case 201:  // rtrim
-                case 202:  // split
-                case 203:  // strLenBytes
-                case 204:  // strLenCP
-                case 205:  // strcasecmp
-                case 206:  // substr
-                case 207:  // substrBytes
-                case 208:  // substrCP
-                case 209:  // toLower
-                case 210:  // toUpper
-                case 211:  // trim
-                case 212:  // compExprs
-                case 213:  // cmp
-                case 214:  // eq
-                case 215:  // gt
-                case 216:  // gte
-                case 217:  // lt
-                case 218:  // lte
-                case 219:  // ne
-                case 220:  // typeExpression
-                case 221:  // convert
-                case 222:  // toBool
-                case 223:  // toDate
-                case 224:  // toDecimal
-                case 225:  // toDouble
-                case 226:  // toInt
-                case 227:  // toLong
-                case 228:  // toObjectId
-                case 229:  // toString
-                case 230:  // type
-                case 231:  // abs
-                case 232:  // ceil
-                case 233:  // divide
-                case 234:  // exponent
-                case 235:  // floor
-                case 236:  // ln
-                case 237:  // log
-                case 238:  // logten
-                case 239:  // mod
-                case 240:  // multiply
-                case 241:  // pow
-                case 242:  // round
-                case 243:  // sqrt
-                case 244:  // subtract
-                case 245:  // trunc
-                case 255:  // matchExpression
-                case 256:  // filterFields
-                case 257:  // filterVal
+                case 135:  // dbPointer
+                case 136:  // javascript
+                case 137:  // symbol
+                case 138:  // javascriptWScope
+                case 139:  // int
+                case 140:  // timestamp
+                case 141:  // long
+                case 142:  // double
+                case 143:  // decimal
+                case 144:  // minKey
+                case 145:  // maxKey
+                case 146:  // value
+                case 147:  // string
+                case 148:  // fieldPath
+                case 149:  // binary
+                case 150:  // undefined
+                case 151:  // objectId
+                case 152:  // bool
+                case 153:  // date
+                case 154:  // null
+                case 155:  // regex
+                case 156:  // simpleValue
+                case 157:  // compoundValue
+                case 158:  // valueArray
+                case 159:  // valueObject
+                case 160:  // valueFields
+                case 161:  // variable
+                case 162:  // pipeline
+                case 163:  // stageList
+                case 164:  // stage
+                case 165:  // inhibitOptimization
+                case 166:  // unionWith
+                case 167:  // skip
+                case 168:  // limit
+                case 169:  // project
+                case 170:  // sample
+                case 171:  // projectFields
+                case 172:  // projection
+                case 173:  // num
+                case 174:  // expression
+                case 175:  // compoundExpression
+                case 176:  // exprFixedTwoArg
+                case 177:  // expressionArray
+                case 178:  // expressionObject
+                case 179:  // expressionFields
+                case 180:  // maths
+                case 181:  // add
+                case 182:  // atan2
+                case 183:  // boolExps
+                case 184:  // and
+                case 185:  // or
+                case 186:  // not
+                case 187:  // literalEscapes
+                case 188:  // const
+                case 189:  // literal
+                case 190:  // stringExps
+                case 191:  // concat
+                case 192:  // dateFromString
+                case 193:  // dateToString
+                case 194:  // indexOfBytes
+                case 195:  // indexOfCP
+                case 196:  // ltrim
+                case 197:  // regexFind
+                case 198:  // regexFindAll
+                case 199:  // regexMatch
+                case 200:  // regexArgs
+                case 201:  // replaceOne
+                case 202:  // replaceAll
+                case 203:  // rtrim
+                case 204:  // split
+                case 205:  // strLenBytes
+                case 206:  // strLenCP
+                case 207:  // strcasecmp
+                case 208:  // substr
+                case 209:  // substrBytes
+                case 210:  // substrCP
+                case 211:  // toLower
+                case 212:  // toUpper
+                case 213:  // trim
+                case 214:  // compExprs
+                case 215:  // cmp
+                case 216:  // eq
+                case 217:  // gt
+                case 218:  // gte
+                case 219:  // lt
+                case 220:  // lte
+                case 221:  // ne
+                case 222:  // typeExpression
+                case 223:  // convert
+                case 224:  // toBool
+                case 225:  // toDate
+                case 226:  // toDecimal
+                case 227:  // toDouble
+                case 228:  // toInt
+                case 229:  // toLong
+                case 230:  // toObjectId
+                case 231:  // toString
+                case 232:  // type
+                case 233:  // abs
+                case 234:  // ceil
+                case 235:  // divide
+                case 236:  // exponent
+                case 237:  // floor
+                case 238:  // ln
+                case 239:  // log
+                case 240:  // logten
+                case 241:  // mod
+                case 242:  // multiply
+                case 243:  // pow
+                case 244:  // round
+                case 245:  // sqrt
+                case 246:  // subtract
+                case 247:  // trunc
+                case 257:  // matchExpression
+                case 258:  // filterFields
+                case 259:  // filterVal
                     yylhs.value.emplace<CNode>();
                     break;
 
-                case 121:  // projectionFieldname
-                case 122:  // expressionFieldname
-                case 123:  // stageAsUserFieldname
-                case 124:  // filterFieldname
-                case 125:  // argAsUserFieldname
-                case 126:  // aggExprAsUserFieldname
-                case 127:  // invariableUserFieldname
-                case 128:  // idAsUserFieldname
-                case 129:  // valueFieldname
+                case 122:  // projectionFieldname
+                case 123:  // expressionFieldname
+                case 124:  // stageAsUserFieldname
+                case 125:  // filterFieldname
+                case 126:  // argAsUserFieldname
+                case 127:  // aggExprAsUserFieldname
+                case 128:  // invariableUserFieldname
+                case 129:  // idAsUserFieldname
+                case 130:  // valueFieldname
                     yylhs.value.emplace<CNode::Fieldname>();
                     break;
 
@@ -1559,16 +1597,16 @@ int PipelineParserGen::parse() {
                     yylhs.value.emplace<long long>();
                     break;
 
-                case 130:  // projectField
-                case 131:  // expressionField
-                case 132:  // valueField
-                case 133:  // filterField
-                case 246:  // onErrorArg
-                case 247:  // onNullArg
-                case 248:  // formatArg
-                case 249:  // timezoneArg
-                case 250:  // charsArg
-                case 251:  // optionsArg
+                case 131:  // projectField
+                case 132:  // expressionField
+                case 133:  // valueField
+                case 134:  // filterField
+                case 248:  // onErrorArg
+                case 249:  // onNullArg
+                case 250:  // formatArg
+                case 251:  // timezoneArg
+                case 252:  // charsArg
+                case 253:  // optionsArg
                     yylhs.value.emplace<std::pair<CNode::Fieldname, CNode>>();
                     break;
 
@@ -1576,12 +1614,13 @@ int PipelineParserGen::parse() {
                 case 98:   // "string"
                 case 116:  // "$-prefixed string"
                 case 117:  // "$$-prefixed string"
+                case 118:  // "$-prefixed fieldname"
                     yylhs.value.emplace<std::string>();
                     break;
 
-                case 252:  // expressions
-                case 253:  // values
-                case 254:  // exprZeroToTwo
+                case 254:  // expressions
+                case 255:  // values
+                case 256:  // exprZeroToTwo
                     yylhs.value.emplace<std::vector<CNode>>();
                     break;
 
@@ -1604,96 +1643,106 @@ int PipelineParserGen::parse() {
 #endif  // YY_EXCEPTIONS
             {
                 switch (yyn) {
-                    case 3:
-#line 282 "pipeline_grammar.yy"
+                    case 2:
+#line 282 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
-                        *cst = CNode{YY_MOVE(yystack_[0].value.as<CNode>())};
+                        invariant(cst);
+                        *cst = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1678 "pipeline_parser_gen.cpp"
+#line 1720 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 3:
+#line 286 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        invariant(cst);
+                        *cst = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 1729 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 4:
-#line 289 "pipeline_grammar.yy"
+#line 294 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
-                        *cst = YY_MOVE(yystack_[1].value.as<CNode>());
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 1686 "pipeline_parser_gen.cpp"
+#line 1737 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 5:
-#line 295 "pipeline_grammar.yy"
+#line 300 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                     }
-#line 1692 "pipeline_parser_gen.cpp"
+#line 1743 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 6:
-#line 296 "pipeline_grammar.yy"
+#line 301 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}};
                     }
-#line 1700 "pipeline_parser_gen.cpp"
+#line 1751 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 7:
-#line 304 "pipeline_grammar.yy"
+#line 309 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         lexer.sortObjTokens();
                     }
-#line 1706 "pipeline_parser_gen.cpp"
+#line 1757 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 9:
-#line 307 "pipeline_grammar.yy"
+#line 312 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1712 "pipeline_parser_gen.cpp"
+#line 1763 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 10:
-#line 307 "pipeline_grammar.yy"
+#line 312 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1718 "pipeline_parser_gen.cpp"
+#line 1769 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 11:
-#line 307 "pipeline_grammar.yy"
+#line 312 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1724 "pipeline_parser_gen.cpp"
+#line 1775 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 12:
-#line 307 "pipeline_grammar.yy"
+#line 312 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1730 "pipeline_parser_gen.cpp"
+#line 1781 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 13:
-#line 307 "pipeline_grammar.yy"
+#line 312 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1736 "pipeline_parser_gen.cpp"
+#line 1787 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 14:
-#line 307 "pipeline_grammar.yy"
+#line 312 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1742 "pipeline_parser_gen.cpp"
+#line 1793 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 15:
-#line 310 "pipeline_grammar.yy"
+#line 315 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{std::pair{
                             KeyFieldname::sample,
@@ -1701,20 +1750,20 @@ int PipelineParserGen::parse() {
                                 {KeyFieldname::sizeArg, YY_MOVE(yystack_[1].value.as<CNode>())},
                             }}}}};
                     }
-#line 1754 "pipeline_parser_gen.cpp"
+#line 1805 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 16:
-#line 320 "pipeline_grammar.yy"
+#line 325 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()}}};
                     }
-#line 1762 "pipeline_parser_gen.cpp"
+#line 1813 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 17:
-#line 326 "pipeline_grammar.yy"
+#line 331 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         auto pipeline = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{std::pair{
@@ -1723,61 +1772,61 @@ int PipelineParserGen::parse() {
                                 {KeyFieldname::collArg, YY_MOVE(yystack_[3].value.as<CNode>())},
                                 {KeyFieldname::pipelineArg, std::move(pipeline)}}}}}};
                     }
-#line 1775 "pipeline_parser_gen.cpp"
+#line 1826 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 18:
-#line 336 "pipeline_grammar.yy"
+#line 341 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1781 "pipeline_parser_gen.cpp"
+#line 1832 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 19:
-#line 336 "pipeline_grammar.yy"
+#line 341 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1787 "pipeline_parser_gen.cpp"
+#line 1838 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 20:
-#line 336 "pipeline_grammar.yy"
+#line 341 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1793 "pipeline_parser_gen.cpp"
+#line 1844 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 21:
-#line 336 "pipeline_grammar.yy"
+#line 341 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1799 "pipeline_parser_gen.cpp"
+#line 1850 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 22:
-#line 340 "pipeline_grammar.yy"
+#line 345 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             std::pair{KeyFieldname::skip, YY_MOVE(yystack_[0].value.as<CNode>())}}};
                     }
-#line 1807 "pipeline_parser_gen.cpp"
+#line 1858 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 23:
-#line 345 "pipeline_grammar.yy"
+#line 350 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{std::pair{
                             KeyFieldname::limit, YY_MOVE(yystack_[0].value.as<CNode>())}}};
                     }
-#line 1815 "pipeline_parser_gen.cpp"
+#line 1866 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 24:
-#line 350 "pipeline_grammar.yy"
+#line 355 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         auto&& fields = YY_MOVE(yystack_[1].value.as<CNode>());
                         if (auto inclusion =
@@ -1793,244 +1842,244 @@ int PipelineParserGen::parse() {
                             // function.
                             error(yystack_[3].location, inclusion.getStatus().reason());
                     }
-#line 1833 "pipeline_parser_gen.cpp"
+#line 1884 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 25:
-#line 366 "pipeline_grammar.yy"
+#line 371 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 1841 "pipeline_parser_gen.cpp"
+#line 1892 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 26:
-#line 369 "pipeline_grammar.yy"
+#line 374 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 1850 "pipeline_parser_gen.cpp"
+#line 1901 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 27:
-#line 376 "pipeline_grammar.yy"
+#line 381 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             KeyFieldname::id, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 1858 "pipeline_parser_gen.cpp"
+#line 1909 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 28:
-#line 379 "pipeline_grammar.yy"
+#line 384 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 1866 "pipeline_parser_gen.cpp"
+#line 1917 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 29:
-#line 385 "pipeline_grammar.yy"
+#line 390 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1872 "pipeline_parser_gen.cpp"
+#line 1923 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 30:
-#line 386 "pipeline_grammar.yy"
+#line 391 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1878 "pipeline_parser_gen.cpp"
+#line 1929 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 31:
-#line 387 "pipeline_grammar.yy"
+#line 392 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1884 "pipeline_parser_gen.cpp"
+#line 1935 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 32:
-#line 388 "pipeline_grammar.yy"
+#line 393 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1890 "pipeline_parser_gen.cpp"
+#line 1941 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 33:
-#line 389 "pipeline_grammar.yy"
+#line 394 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1896 "pipeline_parser_gen.cpp"
+#line 1947 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 34:
-#line 390 "pipeline_grammar.yy"
+#line 395 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1902 "pipeline_parser_gen.cpp"
+#line 1953 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 35:
-#line 391 "pipeline_grammar.yy"
+#line 396 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1908 "pipeline_parser_gen.cpp"
+#line 1959 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 36:
-#line 392 "pipeline_grammar.yy"
+#line 397 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1914 "pipeline_parser_gen.cpp"
+#line 1965 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 37:
-#line 393 "pipeline_grammar.yy"
+#line 398 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1920 "pipeline_parser_gen.cpp"
+#line 1971 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 38:
-#line 394 "pipeline_grammar.yy"
+#line 399 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1926 "pipeline_parser_gen.cpp"
+#line 1977 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 39:
-#line 395 "pipeline_grammar.yy"
+#line 400 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1932 "pipeline_parser_gen.cpp"
+#line 1983 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 40:
-#line 396 "pipeline_grammar.yy"
+#line 401 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<int>())}};
                     }
-#line 1940 "pipeline_parser_gen.cpp"
+#line 1991 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 41:
-#line 399 "pipeline_grammar.yy"
+#line 404 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::intZeroKey};
                     }
-#line 1948 "pipeline_parser_gen.cpp"
+#line 1999 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 42:
-#line 402 "pipeline_grammar.yy"
+#line 407 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<long long>())}};
                     }
-#line 1956 "pipeline_parser_gen.cpp"
+#line 2007 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 43:
-#line 405 "pipeline_grammar.yy"
+#line 410 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::longZeroKey};
                     }
-#line 1964 "pipeline_parser_gen.cpp"
+#line 2015 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 44:
-#line 408 "pipeline_grammar.yy"
+#line 413 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<double>())}};
                     }
-#line 1972 "pipeline_parser_gen.cpp"
+#line 2023 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 45:
-#line 411 "pipeline_grammar.yy"
+#line 416 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::doubleZeroKey};
                     }
-#line 1980 "pipeline_parser_gen.cpp"
+#line 2031 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 46:
-#line 414 "pipeline_grammar.yy"
+#line 419 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<Decimal128>())}};
                     }
-#line 1988 "pipeline_parser_gen.cpp"
+#line 2039 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 47:
-#line 417 "pipeline_grammar.yy"
+#line 422 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::decimalZeroKey};
                     }
-#line 1996 "pipeline_parser_gen.cpp"
+#line 2047 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 48:
-#line 420 "pipeline_grammar.yy"
+#line 425 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::trueKey};
                     }
-#line 2004 "pipeline_parser_gen.cpp"
+#line 2055 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 49:
-#line 423 "pipeline_grammar.yy"
+#line 428 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::falseKey};
                     }
-#line 2012 "pipeline_parser_gen.cpp"
+#line 2063 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 50:
-#line 426 "pipeline_grammar.yy"
+#line 431 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2018 "pipeline_parser_gen.cpp"
+#line 2069 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 51:
-#line 427 "pipeline_grammar.yy"
+#line 432 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2024 "pipeline_parser_gen.cpp"
+#line 2075 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 52:
-#line 428 "pipeline_grammar.yy"
+#line 433 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2030 "pipeline_parser_gen.cpp"
+#line 2081 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 53:
-#line 429 "pipeline_grammar.yy"
+#line 434 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             c_node_disambiguation::disambiguateCompoundProjection(
@@ -2042,820 +2091,801 @@ int PipelineParserGen::parse() {
                                       "object project field cannot contain both inclusion and "
                                       "exclusion indicators");
                     }
-#line 2041 "pipeline_parser_gen.cpp"
+#line 2092 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 54:
-#line 438 "pipeline_grammar.yy"
+#line 443 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2047 "pipeline_parser_gen.cpp"
+#line 2098 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 55:
-#line 438 "pipeline_grammar.yy"
+#line 443 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2053 "pipeline_parser_gen.cpp"
+#line 2104 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 56:
-#line 438 "pipeline_grammar.yy"
+#line 443 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2059 "pipeline_parser_gen.cpp"
+#line 2110 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 57:
-#line 438 "pipeline_grammar.yy"
+#line 443 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2065 "pipeline_parser_gen.cpp"
+#line 2116 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 58:
-#line 442 "pipeline_grammar.yy"
+#line 447 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{std::pair{
-                            KeyFieldname::match, YY_MOVE(yystack_[1].value.as<CNode>())}}};
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 2073 "pipeline_parser_gen.cpp"
+#line 2124 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 59:
-#line 448 "pipeline_grammar.yy"
+#line 453 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 2081 "pipeline_parser_gen.cpp"
+#line 2132 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 60:
-#line 451 "pipeline_grammar.yy"
+#line 456 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 2090 "pipeline_parser_gen.cpp"
+#line 2141 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 61:
-#line 458 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
-                            KeyFieldname::id, YY_MOVE(yystack_[0].value.as<CNode>())};
-                    }
-#line 2098 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 62:
-#line 461 "pipeline_grammar.yy"
+#line 462 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2106 "pipeline_parser_gen.cpp"
+#line 2149 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 63:
-#line 467 "pipeline_grammar.yy"
+                    case 62:
+#line 468 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2112 "pipeline_parser_gen.cpp"
+#line 2155 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 63:
+#line 473 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode::Fieldname>() =
+                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                    }
+#line 2161 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 64:
-#line 471 "pipeline_grammar.yy"
+#line 473 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2118 "pipeline_parser_gen.cpp"
+#line 2167 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 65:
-#line 471 "pipeline_grammar.yy"
+#line 473 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2124 "pipeline_parser_gen.cpp"
+#line 2173 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 66:
-#line 471 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
-                    }
-#line 2130 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 67:
-#line 471 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
-                    }
-#line 2136 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 68:
-#line 475 "pipeline_grammar.yy"
+#line 477 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             UserFieldname{YY_MOVE(yystack_[0].value.as<std::string>())};
                     }
-#line 2144 "pipeline_parser_gen.cpp"
+#line 2181 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 69:
-#line 483 "pipeline_grammar.yy"
+                    case 67:
+#line 485 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             UserFieldname{"$_internalInhibitOptimization"};
                     }
-#line 2152 "pipeline_parser_gen.cpp"
+#line 2189 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 70:
-#line 486 "pipeline_grammar.yy"
+                    case 68:
+#line 488 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$unionWith"};
                     }
-#line 2160 "pipeline_parser_gen.cpp"
+#line 2197 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 71:
-#line 489 "pipeline_grammar.yy"
+                    case 69:
+#line 491 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$skip"};
                     }
-#line 2168 "pipeline_parser_gen.cpp"
+#line 2205 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 72:
-#line 492 "pipeline_grammar.yy"
+                    case 70:
+#line 494 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$limit"};
                     }
-#line 2176 "pipeline_parser_gen.cpp"
+#line 2213 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 73:
-#line 495 "pipeline_grammar.yy"
+                    case 71:
+#line 497 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$project"};
                     }
-#line 2184 "pipeline_parser_gen.cpp"
+#line 2221 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 74:
-#line 498 "pipeline_grammar.yy"
+                    case 72:
+#line 500 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$sample"};
                     }
-#line 2192 "pipeline_parser_gen.cpp"
+#line 2229 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 75:
-#line 507 "pipeline_grammar.yy"
+                    case 73:
+#line 509 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"coll"};
                     }
-#line 2200 "pipeline_parser_gen.cpp"
+#line 2237 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 76:
-#line 510 "pipeline_grammar.yy"
+                    case 74:
+#line 512 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"pipeline"};
                     }
-#line 2208 "pipeline_parser_gen.cpp"
+#line 2245 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 77:
-#line 513 "pipeline_grammar.yy"
+                    case 75:
+#line 515 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"size"};
                     }
-#line 2216 "pipeline_parser_gen.cpp"
+#line 2253 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 78:
-#line 516 "pipeline_grammar.yy"
+                    case 76:
+#line 518 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"input"};
                     }
-#line 2224 "pipeline_parser_gen.cpp"
+#line 2261 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 79:
-#line 519 "pipeline_grammar.yy"
+                    case 77:
+#line 521 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"to"};
                     }
-#line 2232 "pipeline_parser_gen.cpp"
+#line 2269 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 80:
-#line 522 "pipeline_grammar.yy"
+                    case 78:
+#line 524 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"onError"};
                     }
-#line 2240 "pipeline_parser_gen.cpp"
+#line 2277 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 81:
-#line 525 "pipeline_grammar.yy"
+                    case 79:
+#line 527 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"onNull"};
                     }
-#line 2248 "pipeline_parser_gen.cpp"
+#line 2285 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 82:
-#line 528 "pipeline_grammar.yy"
+                    case 80:
+#line 530 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"dateString"};
                     }
-#line 2256 "pipeline_parser_gen.cpp"
+#line 2293 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 83:
-#line 531 "pipeline_grammar.yy"
+                    case 81:
+#line 533 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"format"};
                     }
-#line 2264 "pipeline_parser_gen.cpp"
+#line 2301 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 84:
-#line 534 "pipeline_grammar.yy"
+                    case 82:
+#line 536 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"timezone"};
                     }
-#line 2272 "pipeline_parser_gen.cpp"
+#line 2309 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 85:
-#line 537 "pipeline_grammar.yy"
+                    case 83:
+#line 539 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"date"};
                     }
-#line 2280 "pipeline_parser_gen.cpp"
+#line 2317 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 86:
-#line 540 "pipeline_grammar.yy"
+                    case 84:
+#line 542 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"chars"};
                     }
-#line 2288 "pipeline_parser_gen.cpp"
+#line 2325 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 87:
-#line 543 "pipeline_grammar.yy"
+                    case 85:
+#line 545 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"regex"};
                     }
-#line 2296 "pipeline_parser_gen.cpp"
+#line 2333 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 88:
-#line 546 "pipeline_grammar.yy"
+                    case 86:
+#line 548 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"options"};
                     }
-#line 2304 "pipeline_parser_gen.cpp"
+#line 2341 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 89:
-#line 549 "pipeline_grammar.yy"
+                    case 87:
+#line 551 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"find"};
                     }
-#line 2312 "pipeline_parser_gen.cpp"
+#line 2349 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 90:
-#line 552 "pipeline_grammar.yy"
+                    case 88:
+#line 554 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"replacement"};
                     }
-#line 2320 "pipeline_parser_gen.cpp"
+#line 2357 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 91:
-#line 560 "pipeline_grammar.yy"
+                    case 89:
+#line 562 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$add"};
                     }
-#line 2328 "pipeline_parser_gen.cpp"
+#line 2365 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 92:
-#line 563 "pipeline_grammar.yy"
+                    case 90:
+#line 565 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$atan2"};
                     }
-#line 2336 "pipeline_parser_gen.cpp"
+#line 2373 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 93:
-#line 566 "pipeline_grammar.yy"
+                    case 91:
+#line 568 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$and"};
                     }
-#line 2344 "pipeline_parser_gen.cpp"
+#line 2381 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 94:
-#line 569 "pipeline_grammar.yy"
+                    case 92:
+#line 571 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$const"};
                     }
-#line 2352 "pipeline_parser_gen.cpp"
+#line 2389 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 95:
-#line 572 "pipeline_grammar.yy"
+                    case 93:
+#line 574 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$literal"};
                     }
-#line 2360 "pipeline_parser_gen.cpp"
+#line 2397 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 96:
-#line 575 "pipeline_grammar.yy"
+                    case 94:
+#line 577 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$or"};
                     }
-#line 2368 "pipeline_parser_gen.cpp"
+#line 2405 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 97:
-#line 578 "pipeline_grammar.yy"
+                    case 95:
+#line 580 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$not"};
                     }
-#line 2376 "pipeline_parser_gen.cpp"
+#line 2413 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 98:
-#line 581 "pipeline_grammar.yy"
+                    case 96:
+#line 583 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$cmp"};
                     }
-#line 2384 "pipeline_parser_gen.cpp"
+#line 2421 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 99:
-#line 584 "pipeline_grammar.yy"
+                    case 97:
+#line 586 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$eq"};
                     }
-#line 2392 "pipeline_parser_gen.cpp"
+#line 2429 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 100:
-#line 587 "pipeline_grammar.yy"
+                    case 98:
+#line 589 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$gt"};
                     }
-#line 2400 "pipeline_parser_gen.cpp"
+#line 2437 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 101:
-#line 590 "pipeline_grammar.yy"
+                    case 99:
+#line 592 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$gte"};
                     }
-#line 2408 "pipeline_parser_gen.cpp"
+#line 2445 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 102:
-#line 593 "pipeline_grammar.yy"
+                    case 100:
+#line 595 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$lt"};
                     }
-#line 2416 "pipeline_parser_gen.cpp"
+#line 2453 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 103:
-#line 596 "pipeline_grammar.yy"
+                    case 101:
+#line 598 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$lte"};
                     }
-#line 2424 "pipeline_parser_gen.cpp"
+#line 2461 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 104:
-#line 599 "pipeline_grammar.yy"
+                    case 102:
+#line 601 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ne"};
                     }
-#line 2432 "pipeline_parser_gen.cpp"
+#line 2469 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 105:
-#line 602 "pipeline_grammar.yy"
+                    case 103:
+#line 604 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$convert"};
                     }
-#line 2440 "pipeline_parser_gen.cpp"
+#line 2477 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 106:
-#line 605 "pipeline_grammar.yy"
+                    case 104:
+#line 607 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toBool"};
                     }
-#line 2448 "pipeline_parser_gen.cpp"
+#line 2485 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 107:
-#line 608 "pipeline_grammar.yy"
+                    case 105:
+#line 610 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toDate"};
                     }
-#line 2456 "pipeline_parser_gen.cpp"
+#line 2493 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 108:
-#line 611 "pipeline_grammar.yy"
+                    case 106:
+#line 613 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toDecimal"};
                     }
-#line 2464 "pipeline_parser_gen.cpp"
+#line 2501 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 109:
-#line 614 "pipeline_grammar.yy"
+                    case 107:
+#line 616 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toDouble"};
                     }
-#line 2472 "pipeline_parser_gen.cpp"
+#line 2509 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 110:
-#line 617 "pipeline_grammar.yy"
+                    case 108:
+#line 619 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toInt"};
                     }
-#line 2480 "pipeline_parser_gen.cpp"
+#line 2517 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 111:
-#line 620 "pipeline_grammar.yy"
+                    case 109:
+#line 622 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toLong"};
                     }
-#line 2488 "pipeline_parser_gen.cpp"
+#line 2525 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 112:
-#line 623 "pipeline_grammar.yy"
+                    case 110:
+#line 625 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toObjectId"};
                     }
-#line 2496 "pipeline_parser_gen.cpp"
+#line 2533 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 113:
-#line 626 "pipeline_grammar.yy"
+                    case 111:
+#line 628 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toString"};
                     }
-#line 2504 "pipeline_parser_gen.cpp"
+#line 2541 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 114:
-#line 629 "pipeline_grammar.yy"
+                    case 112:
+#line 631 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$type"};
                     }
-#line 2512 "pipeline_parser_gen.cpp"
+#line 2549 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 115:
-#line 632 "pipeline_grammar.yy"
+                    case 113:
+#line 634 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$abs"};
                     }
-#line 2520 "pipeline_parser_gen.cpp"
+#line 2557 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 116:
-#line 635 "pipeline_grammar.yy"
+                    case 114:
+#line 637 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ceil"};
                     }
-#line 2528 "pipeline_parser_gen.cpp"
+#line 2565 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 117:
-#line 638 "pipeline_grammar.yy"
+                    case 115:
+#line 640 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$divide"};
                     }
-#line 2536 "pipeline_parser_gen.cpp"
+#line 2573 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 118:
-#line 641 "pipeline_grammar.yy"
+                    case 116:
+#line 643 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$exp"};
                     }
-#line 2544 "pipeline_parser_gen.cpp"
+#line 2581 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 119:
-#line 644 "pipeline_grammar.yy"
+                    case 117:
+#line 646 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$floor"};
                     }
-#line 2552 "pipeline_parser_gen.cpp"
+#line 2589 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 120:
-#line 647 "pipeline_grammar.yy"
+                    case 118:
+#line 649 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ln"};
                     }
-#line 2560 "pipeline_parser_gen.cpp"
+#line 2597 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 121:
-#line 650 "pipeline_grammar.yy"
+                    case 119:
+#line 652 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$log"};
                     }
-#line 2568 "pipeline_parser_gen.cpp"
+#line 2605 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 122:
-#line 653 "pipeline_grammar.yy"
+                    case 120:
+#line 655 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$log10"};
                     }
-#line 2576 "pipeline_parser_gen.cpp"
+#line 2613 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 123:
-#line 656 "pipeline_grammar.yy"
+                    case 121:
+#line 658 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$mod"};
                     }
-#line 2584 "pipeline_parser_gen.cpp"
+#line 2621 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 124:
-#line 659 "pipeline_grammar.yy"
+                    case 122:
+#line 661 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$multiply"};
                     }
-#line 2592 "pipeline_parser_gen.cpp"
+#line 2629 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 125:
-#line 662 "pipeline_grammar.yy"
+                    case 123:
+#line 664 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$pow"};
                     }
-#line 2600 "pipeline_parser_gen.cpp"
+#line 2637 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 126:
-#line 665 "pipeline_grammar.yy"
+                    case 124:
+#line 667 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$round"};
                     }
-#line 2608 "pipeline_parser_gen.cpp"
+#line 2645 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 127:
-#line 668 "pipeline_grammar.yy"
+                    case 125:
+#line 670 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$sqrt"};
                     }
-#line 2616 "pipeline_parser_gen.cpp"
+#line 2653 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 128:
-#line 671 "pipeline_grammar.yy"
+                    case 126:
+#line 673 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$subtract"};
                     }
-#line 2624 "pipeline_parser_gen.cpp"
+#line 2661 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 129:
-#line 674 "pipeline_grammar.yy"
+                    case 127:
+#line 676 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$trunc"};
                     }
-#line 2632 "pipeline_parser_gen.cpp"
+#line 2669 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 130:
-#line 677 "pipeline_grammar.yy"
+                    case 128:
+#line 679 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$concat"};
                     }
-#line 2640 "pipeline_parser_gen.cpp"
+#line 2677 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 131:
-#line 680 "pipeline_grammar.yy"
+                    case 129:
+#line 682 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$dateFromString"};
                     }
-#line 2648 "pipeline_parser_gen.cpp"
+#line 2685 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 132:
-#line 683 "pipeline_grammar.yy"
+                    case 130:
+#line 685 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$dateToString"};
                     }
-#line 2656 "pipeline_parser_gen.cpp"
+#line 2693 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 133:
-#line 686 "pipeline_grammar.yy"
+                    case 131:
+#line 688 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$indexOfBytes"};
                     }
-#line 2664 "pipeline_parser_gen.cpp"
+#line 2701 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 134:
-#line 689 "pipeline_grammar.yy"
+                    case 132:
+#line 691 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$indexOfCP"};
                     }
-#line 2672 "pipeline_parser_gen.cpp"
+#line 2709 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 135:
-#line 692 "pipeline_grammar.yy"
+                    case 133:
+#line 694 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ltrim"};
                     }
-#line 2680 "pipeline_parser_gen.cpp"
+#line 2717 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 136:
-#line 695 "pipeline_grammar.yy"
+                    case 134:
+#line 697 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$regexFind"};
                     }
-#line 2688 "pipeline_parser_gen.cpp"
+#line 2725 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 137:
-#line 698 "pipeline_grammar.yy"
+                    case 135:
+#line 700 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$regexFindAll"};
                     }
-#line 2696 "pipeline_parser_gen.cpp"
+#line 2733 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 138:
-#line 701 "pipeline_grammar.yy"
+                    case 136:
+#line 703 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$regexMatch"};
                     }
-#line 2704 "pipeline_parser_gen.cpp"
+#line 2741 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 139:
-#line 704 "pipeline_grammar.yy"
+                    case 137:
+#line 706 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$replaceOne"};
                     }
-#line 2712 "pipeline_parser_gen.cpp"
+#line 2749 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 140:
-#line 707 "pipeline_grammar.yy"
+                    case 138:
+#line 709 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$replaceAll"};
                     }
-#line 2720 "pipeline_parser_gen.cpp"
+#line 2757 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 141:
-#line 710 "pipeline_grammar.yy"
+                    case 139:
+#line 712 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$rtrim"};
                     }
-#line 2728 "pipeline_parser_gen.cpp"
+#line 2765 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 142:
-#line 713 "pipeline_grammar.yy"
+                    case 140:
+#line 715 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$split"};
                     }
-#line 2736 "pipeline_parser_gen.cpp"
+#line 2773 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 143:
-#line 716 "pipeline_grammar.yy"
+                    case 141:
+#line 718 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strLenBytes"};
                     }
-#line 2744 "pipeline_parser_gen.cpp"
+#line 2781 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 144:
-#line 719 "pipeline_grammar.yy"
+                    case 142:
+#line 721 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strLenCP"};
                     }
-#line 2752 "pipeline_parser_gen.cpp"
+#line 2789 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 145:
-#line 722 "pipeline_grammar.yy"
+                    case 143:
+#line 724 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strcasecmp"};
                     }
-#line 2760 "pipeline_parser_gen.cpp"
+#line 2797 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 146:
-#line 725 "pipeline_grammar.yy"
+                    case 144:
+#line 727 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substr"};
                     }
-#line 2768 "pipeline_parser_gen.cpp"
+#line 2805 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 147:
-#line 728 "pipeline_grammar.yy"
+                    case 145:
+#line 730 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substrBytes"};
                     }
-#line 2776 "pipeline_parser_gen.cpp"
+#line 2813 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 148:
-#line 731 "pipeline_grammar.yy"
+                    case 146:
+#line 733 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substrCP"};
                     }
-#line 2784 "pipeline_parser_gen.cpp"
+#line 2821 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 149:
-#line 734 "pipeline_grammar.yy"
+                    case 147:
+#line 736 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toLower"};
                     }
-#line 2792 "pipeline_parser_gen.cpp"
+#line 2829 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 150:
-#line 737 "pipeline_grammar.yy"
+                    case 148:
+#line 739 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$trim"};
                     }
-#line 2800 "pipeline_parser_gen.cpp"
+#line 2837 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 151:
-#line 740 "pipeline_grammar.yy"
+                    case 149:
+#line 742 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toUpper"};
                     }
-#line 2808 "pipeline_parser_gen.cpp"
+#line 2845 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 152:
-#line 747 "pipeline_grammar.yy"
+                    case 150:
+#line 749 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserString{YY_MOVE(yystack_[0].value.as<std::string>())}};
                     }
-#line 2816 "pipeline_parser_gen.cpp"
+#line 2853 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 153:
-#line 752 "pipeline_grammar.yy"
+                    case 151:
+#line 754 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         std::string str = YY_MOVE(yystack_[0].value.as<std::string>());
                         if (str.size() == 1) {
@@ -2863,11 +2893,11 @@ int PipelineParserGen::parse() {
                         }
                         yylhs.value.as<CNode>() = CNode{UserFieldPath{str.substr(1), false}};
                     }
-#line 2828 "pipeline_parser_gen.cpp"
+#line 2865 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 154:
-#line 760 "pipeline_grammar.yy"
+                    case 152:
+#line 762 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         std::string str = YY_MOVE(yystack_[0].value.as<std::string>()).substr(2);
                         auto status = c_node_validation::validateVariableName(str);
@@ -2876,815 +2906,815 @@ int PipelineParserGen::parse() {
                         }
                         yylhs.value.as<CNode>() = CNode{UserFieldPath{str, true}};
                     }
-#line 2841 "pipeline_parser_gen.cpp"
+#line 2878 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 155:
-#line 769 "pipeline_grammar.yy"
+                    case 153:
+#line 771 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserBinary{YY_MOVE(yystack_[0].value.as<BSONBinData>())}};
                     }
-#line 2849 "pipeline_parser_gen.cpp"
+#line 2886 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 156:
-#line 775 "pipeline_grammar.yy"
+                    case 154:
+#line 777 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserUndefined{}};
                     }
-#line 2857 "pipeline_parser_gen.cpp"
+#line 2894 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 157:
-#line 781 "pipeline_grammar.yy"
+                    case 155:
+#line 783 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserObjectId{}};
                     }
-#line 2865 "pipeline_parser_gen.cpp"
+#line 2902 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 158:
-#line 787 "pipeline_grammar.yy"
+                    case 156:
+#line 789 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserDate{YY_MOVE(yystack_[0].value.as<Date_t>())}};
                     }
-#line 2873 "pipeline_parser_gen.cpp"
+#line 2910 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 159:
-#line 793 "pipeline_grammar.yy"
+                    case 157:
+#line 795 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserNull{}};
                     }
-#line 2881 "pipeline_parser_gen.cpp"
+#line 2918 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 160:
-#line 799 "pipeline_grammar.yy"
+                    case 158:
+#line 801 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserRegex{YY_MOVE(yystack_[0].value.as<BSONRegEx>())}};
                     }
-#line 2889 "pipeline_parser_gen.cpp"
+#line 2926 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 161:
-#line 805 "pipeline_grammar.yy"
+                    case 159:
+#line 807 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserDBPointer{YY_MOVE(yystack_[0].value.as<BSONDBRef>())}};
                     }
-#line 2897 "pipeline_parser_gen.cpp"
+#line 2934 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 162:
-#line 811 "pipeline_grammar.yy"
+                    case 160:
+#line 813 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserJavascript{YY_MOVE(yystack_[0].value.as<BSONCode>())}};
                     }
-#line 2905 "pipeline_parser_gen.cpp"
+#line 2942 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 163:
-#line 817 "pipeline_grammar.yy"
+                    case 161:
+#line 819 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserSymbol{YY_MOVE(yystack_[0].value.as<BSONSymbol>())}};
                     }
-#line 2913 "pipeline_parser_gen.cpp"
+#line 2950 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 164:
-#line 823 "pipeline_grammar.yy"
+                    case 162:
+#line 825 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserJavascriptWithScope{
                             YY_MOVE(yystack_[0].value.as<BSONCodeWScope>())}};
                     }
-#line 2921 "pipeline_parser_gen.cpp"
+#line 2958 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 165:
-#line 829 "pipeline_grammar.yy"
+                    case 163:
+#line 831 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserTimestamp{YY_MOVE(yystack_[0].value.as<Timestamp>())}};
                     }
-#line 2929 "pipeline_parser_gen.cpp"
+#line 2966 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 166:
-#line 835 "pipeline_grammar.yy"
+                    case 164:
+#line 837 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserMinKey{YY_MOVE(yystack_[0].value.as<UserMinKey>())}};
                     }
-#line 2937 "pipeline_parser_gen.cpp"
+#line 2974 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 167:
-#line 841 "pipeline_grammar.yy"
+                    case 165:
+#line 843 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserMaxKey{YY_MOVE(yystack_[0].value.as<UserMaxKey>())}};
                     }
-#line 2945 "pipeline_parser_gen.cpp"
+#line 2982 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 168:
-#line 847 "pipeline_grammar.yy"
+                    case 166:
+#line 849 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserInt{YY_MOVE(yystack_[0].value.as<int>())}};
                     }
-#line 2953 "pipeline_parser_gen.cpp"
+#line 2990 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 169:
-#line 850 "pipeline_grammar.yy"
+                    case 167:
+#line 852 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserInt{0}};
                     }
-#line 2961 "pipeline_parser_gen.cpp"
+#line 2998 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 170:
-#line 856 "pipeline_grammar.yy"
+                    case 168:
+#line 858 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserLong{YY_MOVE(yystack_[0].value.as<long long>())}};
                     }
-#line 2969 "pipeline_parser_gen.cpp"
+#line 3006 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 171:
-#line 859 "pipeline_grammar.yy"
+                    case 169:
+#line 861 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserLong{0ll}};
                     }
-#line 2977 "pipeline_parser_gen.cpp"
+#line 3014 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 172:
-#line 865 "pipeline_grammar.yy"
+                    case 170:
+#line 867 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserDouble{YY_MOVE(yystack_[0].value.as<double>())}};
                     }
-#line 2985 "pipeline_parser_gen.cpp"
+#line 3022 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 173:
-#line 868 "pipeline_grammar.yy"
+                    case 171:
+#line 870 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserDouble{0.0}};
                     }
-#line 2993 "pipeline_parser_gen.cpp"
+#line 3030 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 174:
-#line 874 "pipeline_grammar.yy"
+                    case 172:
+#line 876 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserDecimal{YY_MOVE(yystack_[0].value.as<Decimal128>())}};
                     }
-#line 3001 "pipeline_parser_gen.cpp"
+#line 3038 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 175:
-#line 877 "pipeline_grammar.yy"
+                    case 173:
+#line 879 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserDecimal{0.0}};
                     }
-#line 3009 "pipeline_parser_gen.cpp"
+#line 3046 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 176:
-#line 883 "pipeline_grammar.yy"
+                    case 174:
+#line 885 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserBoolean{true}};
                     }
-#line 3017 "pipeline_parser_gen.cpp"
+#line 3054 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 177:
-#line 886 "pipeline_grammar.yy"
+                    case 175:
+#line 888 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserBoolean{false}};
                     }
-#line 3025 "pipeline_parser_gen.cpp"
+#line 3062 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 176:
+#line 894 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3068 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 177:
+#line 895 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3074 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 178:
-#line 892 "pipeline_grammar.yy"
+#line 896 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3031 "pipeline_parser_gen.cpp"
+#line 3080 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 179:
-#line 893 "pipeline_grammar.yy"
+#line 897 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3037 "pipeline_parser_gen.cpp"
+#line 3086 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 180:
-#line 894 "pipeline_grammar.yy"
+#line 898 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3043 "pipeline_parser_gen.cpp"
+#line 3092 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 181:
-#line 895 "pipeline_grammar.yy"
+#line 899 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3049 "pipeline_parser_gen.cpp"
+#line 3098 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 182:
-#line 896 "pipeline_grammar.yy"
+#line 900 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3055 "pipeline_parser_gen.cpp"
+#line 3104 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 183:
-#line 897 "pipeline_grammar.yy"
+#line 901 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3061 "pipeline_parser_gen.cpp"
+#line 3110 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 184:
-#line 898 "pipeline_grammar.yy"
+#line 902 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3067 "pipeline_parser_gen.cpp"
+#line 3116 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 185:
-#line 899 "pipeline_grammar.yy"
+#line 903 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3073 "pipeline_parser_gen.cpp"
+#line 3122 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 186:
-#line 900 "pipeline_grammar.yy"
+#line 904 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3079 "pipeline_parser_gen.cpp"
+#line 3128 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 187:
-#line 901 "pipeline_grammar.yy"
+#line 905 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3085 "pipeline_parser_gen.cpp"
+#line 3134 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 188:
-#line 902 "pipeline_grammar.yy"
+#line 906 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3091 "pipeline_parser_gen.cpp"
+#line 3140 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 189:
-#line 903 "pipeline_grammar.yy"
+#line 907 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3097 "pipeline_parser_gen.cpp"
+#line 3146 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 190:
-#line 904 "pipeline_grammar.yy"
+#line 908 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3103 "pipeline_parser_gen.cpp"
+#line 3152 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 191:
-#line 905 "pipeline_grammar.yy"
+#line 909 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3109 "pipeline_parser_gen.cpp"
+#line 3158 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 192:
-#line 906 "pipeline_grammar.yy"
+#line 910 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3115 "pipeline_parser_gen.cpp"
+#line 3164 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 193:
-#line 907 "pipeline_grammar.yy"
+#line 911 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3121 "pipeline_parser_gen.cpp"
+#line 3170 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 194:
-#line 908 "pipeline_grammar.yy"
+#line 912 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3127 "pipeline_parser_gen.cpp"
+#line 3176 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 195:
-#line 909 "pipeline_grammar.yy"
+#line 913 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3133 "pipeline_parser_gen.cpp"
+#line 3182 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 196:
-#line 910 "pipeline_grammar.yy"
+#line 914 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3139 "pipeline_parser_gen.cpp"
+#line 3188 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 197:
-#line 911 "pipeline_grammar.yy"
+#line 921 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3145 "pipeline_parser_gen.cpp"
+#line 3194 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 198:
-#line 912 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3151 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 199:
-#line 919 "pipeline_grammar.yy"
-                    {
-                    }
-#line 3157 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 200:
-#line 920 "pipeline_grammar.yy"
+#line 922 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             YY_MOVE(yystack_[0].value.as<std::vector<CNode>>());
                         yylhs.value.as<std::vector<CNode>>().emplace_back(
                             YY_MOVE(yystack_[1].value.as<CNode>()));
                     }
-#line 3166 "pipeline_parser_gen.cpp"
+#line 3203 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 199:
+#line 929 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3209 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 200:
+#line 929 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3215 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 201:
-#line 927 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3172 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 202:
-#line 927 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3178 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 203:
-#line 931 "pipeline_grammar.yy"
+#line 933 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>()),
                                                        YY_MOVE(yystack_[1].value.as<CNode>())}};
                     }
-#line 3186 "pipeline_parser_gen.cpp"
+#line 3223 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 202:
+#line 938 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3229 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 203:
+#line 938 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3235 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 204:
-#line 936 "pipeline_grammar.yy"
+#line 938 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3192 "pipeline_parser_gen.cpp"
+#line 3241 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 205:
-#line 936 "pipeline_grammar.yy"
+#line 938 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3198 "pipeline_parser_gen.cpp"
+#line 3247 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 206:
-#line 936 "pipeline_grammar.yy"
+#line 938 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3204 "pipeline_parser_gen.cpp"
+#line 3253 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 207:
-#line 936 "pipeline_grammar.yy"
+#line 938 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3210 "pipeline_parser_gen.cpp"
+#line 3259 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 208:
-#line 936 "pipeline_grammar.yy"
+#line 939 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3216 "pipeline_parser_gen.cpp"
+#line 3265 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 209:
-#line 936 "pipeline_grammar.yy"
+#line 939 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3222 "pipeline_parser_gen.cpp"
+#line 3271 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 210:
-#line 937 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3228 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 211:
-#line 937 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3234 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 212:
-#line 943 "pipeline_grammar.yy"
+#line 945 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{YY_MOVE(yystack_[1].value.as<std::vector<CNode>>())};
                     }
-#line 3242 "pipeline_parser_gen.cpp"
+#line 3279 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 213:
-#line 951 "pipeline_grammar.yy"
+                    case 211:
+#line 953 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 3250 "pipeline_parser_gen.cpp"
+#line 3287 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 214:
-#line 957 "pipeline_grammar.yy"
+                    case 212:
+#line 959 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 3258 "pipeline_parser_gen.cpp"
+#line 3295 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 215:
-#line 960 "pipeline_grammar.yy"
+                    case 213:
+#line 962 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 3267 "pipeline_parser_gen.cpp"
+#line 3304 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 216:
-#line 967 "pipeline_grammar.yy"
+                    case 214:
+#line 969 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 3275 "pipeline_parser_gen.cpp"
+#line 3312 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 215:
+#line 976 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode::Fieldname>() =
+                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                    }
+#line 3318 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 216:
+#line 976 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode::Fieldname>() =
+                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                    }
+#line 3324 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 217:
-#line 974 "pipeline_grammar.yy"
+#line 976 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 3281 "pipeline_parser_gen.cpp"
+#line 3330 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 218:
-#line 974 "pipeline_grammar.yy"
+#line 976 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 3287 "pipeline_parser_gen.cpp"
+#line 3336 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 219:
-#line 974 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
-                    }
-#line 3293 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 220:
-#line 974 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
-                    }
-#line 3299 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 221:
-#line 978 "pipeline_grammar.yy"
+#line 980 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"_id"};
                     }
-#line 3307 "pipeline_parser_gen.cpp"
+#line 3344 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 220:
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3350 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 221:
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3356 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 222:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3313 "pipeline_parser_gen.cpp"
+#line 3362 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 223:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3319 "pipeline_parser_gen.cpp"
+#line 3368 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 224:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3325 "pipeline_parser_gen.cpp"
+#line 3374 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 225:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3331 "pipeline_parser_gen.cpp"
+#line 3380 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 226:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3337 "pipeline_parser_gen.cpp"
+#line 3386 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 227:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3343 "pipeline_parser_gen.cpp"
+#line 3392 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 228:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3349 "pipeline_parser_gen.cpp"
+#line 3398 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 229:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3355 "pipeline_parser_gen.cpp"
+#line 3404 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 230:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3361 "pipeline_parser_gen.cpp"
+#line 3410 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 231:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3367 "pipeline_parser_gen.cpp"
+#line 3416 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 232:
-#line 984 "pipeline_grammar.yy"
+#line 986 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3373 "pipeline_parser_gen.cpp"
+#line 3422 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 233:
-#line 984 "pipeline_grammar.yy"
+#line 987 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3379 "pipeline_parser_gen.cpp"
+#line 3428 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 234:
-#line 984 "pipeline_grammar.yy"
+#line 987 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3385 "pipeline_parser_gen.cpp"
+#line 3434 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 235:
-#line 985 "pipeline_grammar.yy"
+#line 987 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3391 "pipeline_parser_gen.cpp"
+#line 3440 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 236:
-#line 985 "pipeline_grammar.yy"
+#line 987 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3397 "pipeline_parser_gen.cpp"
+#line 3446 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 237:
-#line 985 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3403 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 238:
-#line 985 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3409 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 239:
-#line 989 "pipeline_grammar.yy"
+#line 991 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::add, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3418 "pipeline_parser_gen.cpp"
+#line 3455 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 240:
-#line 996 "pipeline_grammar.yy"
+                    case 238:
+#line 998 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::atan2, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3427 "pipeline_parser_gen.cpp"
+#line 3464 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 241:
-#line 1002 "pipeline_grammar.yy"
+                    case 239:
+#line 1004 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::abs, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3435 "pipeline_parser_gen.cpp"
+#line 3472 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 242:
-#line 1007 "pipeline_grammar.yy"
+                    case 240:
+#line 1009 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ceil, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3443 "pipeline_parser_gen.cpp"
+#line 3480 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 243:
-#line 1012 "pipeline_grammar.yy"
+                    case 241:
+#line 1014 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::divide,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3452 "pipeline_parser_gen.cpp"
+#line 3489 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 244:
-#line 1018 "pipeline_grammar.yy"
+                    case 242:
+#line 1020 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::exponent, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3460 "pipeline_parser_gen.cpp"
+#line 3497 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 245:
-#line 1023 "pipeline_grammar.yy"
+                    case 243:
+#line 1025 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::floor, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3468 "pipeline_parser_gen.cpp"
+#line 3505 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 246:
-#line 1028 "pipeline_grammar.yy"
+                    case 244:
+#line 1030 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ln, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3476 "pipeline_parser_gen.cpp"
+#line 3513 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 247:
-#line 1033 "pipeline_grammar.yy"
+                    case 245:
+#line 1035 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::log,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3485 "pipeline_parser_gen.cpp"
+#line 3522 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 248:
-#line 1039 "pipeline_grammar.yy"
+                    case 246:
+#line 1041 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::logten, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3493 "pipeline_parser_gen.cpp"
+#line 3530 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 249:
-#line 1044 "pipeline_grammar.yy"
+                    case 247:
+#line 1046 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::mod,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3502 "pipeline_parser_gen.cpp"
+#line 3539 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 250:
-#line 1050 "pipeline_grammar.yy"
+                    case 248:
+#line 1052 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::multiply,
@@ -3695,292 +3725,292 @@ int PipelineParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 3514 "pipeline_parser_gen.cpp"
+#line 3551 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 251:
-#line 1059 "pipeline_grammar.yy"
+                    case 249:
+#line 1061 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::pow,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3523 "pipeline_parser_gen.cpp"
+#line 3560 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 252:
-#line 1065 "pipeline_grammar.yy"
+                    case 250:
+#line 1067 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::round,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3532 "pipeline_parser_gen.cpp"
+#line 3569 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 253:
-#line 1071 "pipeline_grammar.yy"
+                    case 251:
+#line 1073 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::sqrt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3540 "pipeline_parser_gen.cpp"
+#line 3577 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 254:
-#line 1076 "pipeline_grammar.yy"
+                    case 252:
+#line 1078 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::subtract,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3549 "pipeline_parser_gen.cpp"
+#line 3586 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 255:
-#line 1082 "pipeline_grammar.yy"
+                    case 253:
+#line 1084 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::trunc,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3558 "pipeline_parser_gen.cpp"
+#line 3595 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 254:
+#line 1090 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3601 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 255:
+#line 1090 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3607 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 256:
-#line 1088 "pipeline_grammar.yy"
+#line 1090 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3564 "pipeline_parser_gen.cpp"
+#line 3613 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 257:
-#line 1088 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3570 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 258:
-#line 1088 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3576 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 259:
-#line 1092 "pipeline_grammar.yy"
+#line 1094 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::andExpr, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3585 "pipeline_parser_gen.cpp"
+#line 3622 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 260:
-#line 1099 "pipeline_grammar.yy"
+                    case 258:
+#line 1101 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::orExpr, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3594 "pipeline_parser_gen.cpp"
+#line 3631 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 261:
-#line 1106 "pipeline_grammar.yy"
+                    case 259:
+#line 1108 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::notExpr,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3603 "pipeline_parser_gen.cpp"
+#line 3640 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 260:
+#line 1115 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3646 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 261:
+#line 1115 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3652 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 262:
-#line 1113 "pipeline_grammar.yy"
+#line 1115 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3609 "pipeline_parser_gen.cpp"
+#line 3658 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 263:
-#line 1113 "pipeline_grammar.yy"
+#line 1115 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3615 "pipeline_parser_gen.cpp"
+#line 3664 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 264:
-#line 1113 "pipeline_grammar.yy"
+#line 1115 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3621 "pipeline_parser_gen.cpp"
+#line 3670 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 265:
-#line 1113 "pipeline_grammar.yy"
+#line 1115 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3627 "pipeline_parser_gen.cpp"
+#line 3676 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 266:
-#line 1113 "pipeline_grammar.yy"
+#line 1115 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3633 "pipeline_parser_gen.cpp"
+#line 3682 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 267:
-#line 1113 "pipeline_grammar.yy"
+#line 1116 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3639 "pipeline_parser_gen.cpp"
+#line 3688 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 268:
-#line 1113 "pipeline_grammar.yy"
+#line 1116 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3645 "pipeline_parser_gen.cpp"
+#line 3694 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 269:
-#line 1114 "pipeline_grammar.yy"
+#line 1116 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3651 "pipeline_parser_gen.cpp"
+#line 3700 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 270:
-#line 1114 "pipeline_grammar.yy"
+#line 1116 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3657 "pipeline_parser_gen.cpp"
+#line 3706 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 271:
-#line 1114 "pipeline_grammar.yy"
+#line 1116 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3663 "pipeline_parser_gen.cpp"
+#line 3712 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 272:
-#line 1114 "pipeline_grammar.yy"
+#line 1116 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3669 "pipeline_parser_gen.cpp"
+#line 3718 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 273:
-#line 1114 "pipeline_grammar.yy"
+#line 1116 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3675 "pipeline_parser_gen.cpp"
+#line 3724 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 274:
-#line 1114 "pipeline_grammar.yy"
+#line 1116 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3681 "pipeline_parser_gen.cpp"
+#line 3730 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 275:
-#line 1114 "pipeline_grammar.yy"
+#line 1117 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3687 "pipeline_parser_gen.cpp"
+#line 3736 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 276:
-#line 1114 "pipeline_grammar.yy"
+#line 1117 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3693 "pipeline_parser_gen.cpp"
+#line 3742 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 277:
-#line 1115 "pipeline_grammar.yy"
+#line 1117 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3699 "pipeline_parser_gen.cpp"
+#line 3748 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 278:
-#line 1115 "pipeline_grammar.yy"
+#line 1117 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3705 "pipeline_parser_gen.cpp"
+#line 3754 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 279:
-#line 1115 "pipeline_grammar.yy"
+#line 1117 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3711 "pipeline_parser_gen.cpp"
+#line 3760 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 280:
-#line 1115 "pipeline_grammar.yy"
+#line 1117 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3717 "pipeline_parser_gen.cpp"
+#line 3766 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 281:
-#line 1115 "pipeline_grammar.yy"
+#line 1117 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3723 "pipeline_parser_gen.cpp"
+#line 3772 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 282:
-#line 1115 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3729 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 283:
-#line 1115 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3735 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 284:
-#line 1119 "pipeline_grammar.yy"
+#line 1121 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::concat, CNode{CNode::ArrayChildren{}}}}};
@@ -3989,47 +4019,47 @@ int PipelineParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 3747 "pipeline_parser_gen.cpp"
+#line 3784 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 285:
-#line 1129 "pipeline_grammar.yy"
+                    case 283:
+#line 1131 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::formatArg, CNode{KeyValue::absentKey}};
                     }
-#line 3755 "pipeline_parser_gen.cpp"
+#line 3792 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 286:
-#line 1132 "pipeline_grammar.yy"
+                    case 284:
+#line 1134 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::formatArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 3763 "pipeline_parser_gen.cpp"
+#line 3800 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 287:
-#line 1138 "pipeline_grammar.yy"
+                    case 285:
+#line 1140 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::timezoneArg, CNode{KeyValue::absentKey}};
                     }
-#line 3771 "pipeline_parser_gen.cpp"
+#line 3808 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 288:
-#line 1141 "pipeline_grammar.yy"
+                    case 286:
+#line 1143 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::timezoneArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 3779 "pipeline_parser_gen.cpp"
+#line 3816 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 289:
-#line 1148 "pipeline_grammar.yy"
+                    case 287:
+#line 1150 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::dateFromString,
@@ -4045,11 +4075,11 @@ int PipelineParserGen::parse() {
                                  YY_MOVE(yystack_[2]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 3789 "pipeline_parser_gen.cpp"
+#line 3826 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 290:
-#line 1157 "pipeline_grammar.yy"
+                    case 288:
+#line 1159 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::dateToString,
@@ -4062,38 +4092,38 @@ int PipelineParserGen::parse() {
                                  YY_MOVE(yystack_[2]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 3799 "pipeline_parser_gen.cpp"
+#line 3836 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 291:
-#line 1165 "pipeline_grammar.yy"
+                    case 289:
+#line 1167 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() = CNode::ArrayChildren{};
                     }
-#line 3807 "pipeline_parser_gen.cpp"
+#line 3844 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 292:
-#line 1168 "pipeline_grammar.yy"
+                    case 290:
+#line 1170 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             CNode::ArrayChildren{YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 3815 "pipeline_parser_gen.cpp"
+#line 3852 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 293:
-#line 1171 "pipeline_grammar.yy"
+                    case 291:
+#line 1173 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             CNode::ArrayChildren{YY_MOVE(yystack_[1].value.as<CNode>()),
                                                  YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 3823 "pipeline_parser_gen.cpp"
+#line 3860 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 294:
-#line 1178 "pipeline_grammar.yy"
+                    case 292:
+#line 1180 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::indexOfBytes,
@@ -4104,11 +4134,11 @@ int PipelineParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 3835 "pipeline_parser_gen.cpp"
+#line 3872 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 295:
-#line 1189 "pipeline_grammar.yy"
+                    case 293:
+#line 1191 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::indexOfCP,
@@ -4119,29 +4149,29 @@ int PipelineParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 3847 "pipeline_parser_gen.cpp"
+#line 3884 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 296:
-#line 1199 "pipeline_grammar.yy"
+                    case 294:
+#line 1201 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::charsArg, CNode{KeyValue::absentKey}};
                     }
-#line 3855 "pipeline_parser_gen.cpp"
+#line 3892 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 297:
-#line 1202 "pipeline_grammar.yy"
+                    case 295:
+#line 1204 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::charsArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 3863 "pipeline_parser_gen.cpp"
+#line 3900 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 298:
-#line 1208 "pipeline_grammar.yy"
+                    case 296:
+#line 1210 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ltrim,
@@ -4150,11 +4180,11 @@ int PipelineParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 3873 "pipeline_parser_gen.cpp"
+#line 3910 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 299:
-#line 1216 "pipeline_grammar.yy"
+                    case 297:
+#line 1218 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::rtrim,
@@ -4163,11 +4193,11 @@ int PipelineParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 3883 "pipeline_parser_gen.cpp"
+#line 3920 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 300:
-#line 1224 "pipeline_grammar.yy"
+                    case 298:
+#line 1226 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::trim,
@@ -4176,29 +4206,29 @@ int PipelineParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 3893 "pipeline_parser_gen.cpp"
+#line 3930 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 301:
-#line 1232 "pipeline_grammar.yy"
+                    case 299:
+#line 1234 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::optionsArg, CNode{KeyValue::absentKey}};
                     }
-#line 3901 "pipeline_parser_gen.cpp"
+#line 3938 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 302:
-#line 1235 "pipeline_grammar.yy"
+                    case 300:
+#line 1237 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::optionsArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 3909 "pipeline_parser_gen.cpp"
+#line 3946 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 303:
-#line 1240 "pipeline_grammar.yy"
+                    case 301:
+#line 1242 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         // Note that the order of these arguments must match the constructor for the
                         // regex expression.
@@ -4207,38 +4237,38 @@ int PipelineParserGen::parse() {
                             {KeyFieldname::regexArg, YY_MOVE(yystack_[1].value.as<CNode>())},
                             YY_MOVE(yystack_[3].value.as<std::pair<CNode::Fieldname, CNode>>())}};
                     }
-#line 3921 "pipeline_parser_gen.cpp"
+#line 3958 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 304:
-#line 1249 "pipeline_grammar.yy"
+                    case 302:
+#line 1251 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::regexFind, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3929 "pipeline_parser_gen.cpp"
+#line 3966 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 305:
-#line 1255 "pipeline_grammar.yy"
+                    case 303:
+#line 1257 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::regexFindAll, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3937 "pipeline_parser_gen.cpp"
+#line 3974 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 306:
-#line 1261 "pipeline_grammar.yy"
+                    case 304:
+#line 1263 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::regexMatch, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3945 "pipeline_parser_gen.cpp"
+#line 3982 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 307:
-#line 1268 "pipeline_grammar.yy"
+                    case 305:
+#line 1270 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::replaceOne,
@@ -4248,11 +4278,11 @@ int PipelineParserGen::parse() {
                                  {KeyFieldname::replacementArg,
                                   YY_MOVE(yystack_[2].value.as<CNode>())}}}}}};
                     }
-#line 3956 "pipeline_parser_gen.cpp"
+#line 3993 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 308:
-#line 1278 "pipeline_grammar.yy"
+                    case 306:
+#line 1280 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::replaceAll,
@@ -4262,51 +4292,51 @@ int PipelineParserGen::parse() {
                                  {KeyFieldname::replacementArg,
                                   YY_MOVE(yystack_[2].value.as<CNode>())}}}}}};
                     }
-#line 3967 "pipeline_parser_gen.cpp"
+#line 4004 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 309:
-#line 1287 "pipeline_grammar.yy"
+                    case 307:
+#line 1289 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::split,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3976 "pipeline_parser_gen.cpp"
+#line 4013 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 310:
-#line 1294 "pipeline_grammar.yy"
+                    case 308:
+#line 1296 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::strLenBytes, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3985 "pipeline_parser_gen.cpp"
+#line 4022 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 311:
-#line 1301 "pipeline_grammar.yy"
+                    case 309:
+#line 1303 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::strLenCP, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3994 "pipeline_parser_gen.cpp"
+#line 4031 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 312:
-#line 1309 "pipeline_grammar.yy"
+                    case 310:
+#line 1311 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::strcasecmp,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4003 "pipeline_parser_gen.cpp"
+#line 4040 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 313:
-#line 1317 "pipeline_grammar.yy"
+                    case 311:
+#line 1319 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::substr,
@@ -4314,11 +4344,11 @@ int PipelineParserGen::parse() {
                                                         YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4012 "pipeline_parser_gen.cpp"
+#line 4049 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 314:
-#line 1325 "pipeline_grammar.yy"
+                    case 312:
+#line 1327 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::substrBytes,
@@ -4326,11 +4356,11 @@ int PipelineParserGen::parse() {
                                                         YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4021 "pipeline_parser_gen.cpp"
+#line 4058 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 315:
-#line 1333 "pipeline_grammar.yy"
+                    case 313:
+#line 1335 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::substrCP,
@@ -4338,440 +4368,440 @@ int PipelineParserGen::parse() {
                                                         YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4030 "pipeline_parser_gen.cpp"
+#line 4067 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 316:
-#line 1340 "pipeline_grammar.yy"
+                    case 314:
+#line 1342 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toLower, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4038 "pipeline_parser_gen.cpp"
+#line 4075 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 317:
-#line 1346 "pipeline_grammar.yy"
+                    case 315:
+#line 1348 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toUpper, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4046 "pipeline_parser_gen.cpp"
+#line 4083 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 316:
+#line 1354 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 4089 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 317:
+#line 1354 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 4095 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 318:
-#line 1352 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 4052 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 319:
-#line 1352 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 4058 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 320:
-#line 1356 "pipeline_grammar.yy"
+#line 1358 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::constExpr,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4067 "pipeline_parser_gen.cpp"
+#line 4104 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 321:
-#line 1363 "pipeline_grammar.yy"
+                    case 319:
+#line 1365 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::literal,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4076 "pipeline_parser_gen.cpp"
+#line 4113 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 320:
+#line 1372 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 4119 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 321:
+#line 1372 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 4125 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 322:
-#line 1370 "pipeline_grammar.yy"
+#line 1376 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4082 "pipeline_parser_gen.cpp"
+#line 4131 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 323:
-#line 1370 "pipeline_grammar.yy"
+#line 1376 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4088 "pipeline_parser_gen.cpp"
+#line 4137 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 324:
-#line 1374 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 4094 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 325:
-#line 1374 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 4100 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 326:
-#line 1378 "pipeline_grammar.yy"
+#line 1380 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{YY_MOVE(yystack_[1].value.as<std::vector<CNode>>())};
                     }
-#line 4108 "pipeline_parser_gen.cpp"
+#line 4145 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 327:
-#line 1384 "pipeline_grammar.yy"
+                    case 325:
+#line 1386 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                     }
-#line 4114 "pipeline_parser_gen.cpp"
+#line 4151 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 328:
-#line 1385 "pipeline_grammar.yy"
+                    case 326:
+#line 1387 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             YY_MOVE(yystack_[0].value.as<std::vector<CNode>>());
                         yylhs.value.as<std::vector<CNode>>().emplace_back(
                             YY_MOVE(yystack_[1].value.as<CNode>()));
                     }
-#line 4123 "pipeline_parser_gen.cpp"
+#line 4160 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 329:
-#line 1392 "pipeline_grammar.yy"
+                    case 327:
+#line 1394 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 4131 "pipeline_parser_gen.cpp"
+#line 4168 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 330:
-#line 1398 "pipeline_grammar.yy"
+                    case 328:
+#line 1400 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 4139 "pipeline_parser_gen.cpp"
+#line 4176 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 331:
-#line 1401 "pipeline_grammar.yy"
+                    case 329:
+#line 1403 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 4148 "pipeline_parser_gen.cpp"
+#line 4185 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 332:
-#line 1408 "pipeline_grammar.yy"
+                    case 330:
+#line 1410 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4156 "pipeline_parser_gen.cpp"
+#line 4193 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 331:
+#line 1417 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode::Fieldname>() =
+                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                    }
+#line 4199 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 332:
+#line 1418 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode::Fieldname>() =
+                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                    }
+#line 4205 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 333:
-#line 1415 "pipeline_grammar.yy"
+#line 1419 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4162 "pipeline_parser_gen.cpp"
+#line 4211 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 334:
-#line 1416 "pipeline_grammar.yy"
+#line 1420 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4168 "pipeline_parser_gen.cpp"
+#line 4217 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 335:
-#line 1417 "pipeline_grammar.yy"
+#line 1421 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4174 "pipeline_parser_gen.cpp"
+#line 4223 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 336:
-#line 1418 "pipeline_grammar.yy"
+#line 1424 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4180 "pipeline_parser_gen.cpp"
+#line 4229 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 337:
-#line 1419 "pipeline_grammar.yy"
+#line 1424 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4186 "pipeline_parser_gen.cpp"
+#line 4235 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 338:
-#line 1422 "pipeline_grammar.yy"
+#line 1424 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4192 "pipeline_parser_gen.cpp"
+#line 4241 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 339:
-#line 1422 "pipeline_grammar.yy"
+#line 1424 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4198 "pipeline_parser_gen.cpp"
+#line 4247 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 340:
-#line 1422 "pipeline_grammar.yy"
+#line 1424 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4204 "pipeline_parser_gen.cpp"
+#line 4253 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 341:
-#line 1422 "pipeline_grammar.yy"
+#line 1424 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4210 "pipeline_parser_gen.cpp"
+#line 4259 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 342:
-#line 1422 "pipeline_grammar.yy"
+#line 1424 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4216 "pipeline_parser_gen.cpp"
+#line 4265 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 343:
-#line 1422 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 4222 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 344:
-#line 1422 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 4228 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 345:
-#line 1424 "pipeline_grammar.yy"
+#line 1426 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::cmp, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4237 "pipeline_parser_gen.cpp"
+#line 4274 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 346:
-#line 1429 "pipeline_grammar.yy"
+                    case 344:
+#line 1431 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::eq, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4246 "pipeline_parser_gen.cpp"
+#line 4283 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 347:
-#line 1434 "pipeline_grammar.yy"
+                    case 345:
+#line 1436 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::gt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4255 "pipeline_parser_gen.cpp"
+#line 4292 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 348:
-#line 1439 "pipeline_grammar.yy"
+                    case 346:
+#line 1441 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::gte, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4264 "pipeline_parser_gen.cpp"
+#line 4301 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 349:
-#line 1444 "pipeline_grammar.yy"
+                    case 347:
+#line 1446 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::lt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4273 "pipeline_parser_gen.cpp"
+#line 4310 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 350:
-#line 1449 "pipeline_grammar.yy"
+                    case 348:
+#line 1451 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::lte, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4282 "pipeline_parser_gen.cpp"
+#line 4319 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 351:
-#line 1454 "pipeline_grammar.yy"
+                    case 349:
+#line 1456 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ne, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4291 "pipeline_parser_gen.cpp"
+#line 4328 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 350:
+#line 1462 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 4334 "src/mongo/db/cst/pipeline_parser_gen.cpp"
+                    break;
+
+                    case 351:
+#line 1463 "src/mongo/db/cst/pipeline_grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 4340 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 352:
-#line 1460 "pipeline_grammar.yy"
+#line 1464 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4297 "pipeline_parser_gen.cpp"
+#line 4346 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 353:
-#line 1461 "pipeline_grammar.yy"
+#line 1465 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4303 "pipeline_parser_gen.cpp"
+#line 4352 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 354:
-#line 1462 "pipeline_grammar.yy"
+#line 1466 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4309 "pipeline_parser_gen.cpp"
+#line 4358 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 355:
-#line 1463 "pipeline_grammar.yy"
+#line 1467 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4315 "pipeline_parser_gen.cpp"
+#line 4364 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 356:
-#line 1464 "pipeline_grammar.yy"
+#line 1468 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4321 "pipeline_parser_gen.cpp"
+#line 4370 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 357:
-#line 1465 "pipeline_grammar.yy"
+#line 1469 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4327 "pipeline_parser_gen.cpp"
+#line 4376 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 358:
-#line 1466 "pipeline_grammar.yy"
+#line 1470 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4333 "pipeline_parser_gen.cpp"
+#line 4382 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 359:
-#line 1467 "pipeline_grammar.yy"
+#line 1471 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4339 "pipeline_parser_gen.cpp"
+#line 4388 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
                     case 360:
-#line 1468 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 4345 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 361:
-#line 1469 "pipeline_grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 4351 "pipeline_parser_gen.cpp"
-                    break;
-
-                    case 362:
-#line 1474 "pipeline_grammar.yy"
+#line 1476 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::onErrorArg, CNode{KeyValue::absentKey}};
                     }
-#line 4359 "pipeline_parser_gen.cpp"
+#line 4396 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 363:
-#line 1477 "pipeline_grammar.yy"
+                    case 361:
+#line 1479 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::onErrorArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4367 "pipeline_parser_gen.cpp"
+#line 4404 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 364:
-#line 1484 "pipeline_grammar.yy"
+                    case 362:
+#line 1486 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::onNullArg, CNode{KeyValue::absentKey}};
                     }
-#line 4375 "pipeline_parser_gen.cpp"
+#line 4412 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 365:
-#line 1487 "pipeline_grammar.yy"
+                    case 363:
+#line 1489 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::onNullArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4383 "pipeline_parser_gen.cpp"
+#line 4420 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 366:
-#line 1494 "pipeline_grammar.yy"
+                    case 364:
+#line 1496 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::convert,
@@ -4783,92 +4813,92 @@ int PipelineParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 4394 "pipeline_parser_gen.cpp"
+#line 4431 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 367:
-#line 1503 "pipeline_grammar.yy"
+                    case 365:
+#line 1505 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toBool, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4402 "pipeline_parser_gen.cpp"
+#line 4439 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 368:
-#line 1508 "pipeline_grammar.yy"
+                    case 366:
+#line 1510 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toDate, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4410 "pipeline_parser_gen.cpp"
+#line 4447 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 369:
-#line 1513 "pipeline_grammar.yy"
+                    case 367:
+#line 1515 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toDecimal, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4418 "pipeline_parser_gen.cpp"
+#line 4455 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 370:
-#line 1518 "pipeline_grammar.yy"
+                    case 368:
+#line 1520 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toDouble, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4426 "pipeline_parser_gen.cpp"
+#line 4463 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 371:
-#line 1523 "pipeline_grammar.yy"
+                    case 369:
+#line 1525 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toInt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4434 "pipeline_parser_gen.cpp"
+#line 4471 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 372:
-#line 1528 "pipeline_grammar.yy"
+                    case 370:
+#line 1530 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toLong, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4442 "pipeline_parser_gen.cpp"
+#line 4479 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 373:
-#line 1533 "pipeline_grammar.yy"
+                    case 371:
+#line 1535 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toObjectId, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4450 "pipeline_parser_gen.cpp"
+#line 4487 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 374:
-#line 1538 "pipeline_grammar.yy"
+                    case 372:
+#line 1540 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toString, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4458 "pipeline_parser_gen.cpp"
+#line 4495 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
-                    case 375:
-#line 1543 "pipeline_grammar.yy"
+                    case 373:
+#line 1545 "src/mongo/db/cst/pipeline_grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::type, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4466 "pipeline_parser_gen.cpp"
+#line 4503 "src/mongo/db/cst/pipeline_parser_gen.cpp"
                     break;
 
 
-#line 4470 "pipeline_parser_gen.cpp"
+#line 4507 "src/mongo/db/cst/pipeline_parser_gen.cpp"
 
                     default:
                         break;
@@ -4884,6 +4914,7 @@ int PipelineParserGen::parse() {
             YY_SYMBOL_PRINT("-> $$ =", yylhs);
             yypop_(yylen);
             yylen = 0;
+            YY_STACK_PRINT();
 
             // Shift the result of the reduction.
             yypush_(YY_NULLPTR, YY_MOVE(yylhs));
@@ -4898,9 +4929,7 @@ int PipelineParserGen::parse() {
         // If not already recovering from an error, report this error.
         if (!yyerrstatus_) {
             ++yynerrs_;
-            context yyctx(*this, yyla);
-            std::string msg = yysyntax_error_(yyctx);
-            error(yyla.location, YY_MOVE(msg));
+            error(yyla.location, yysyntax_error_(yystack_[0].state, yyla));
         }
 
 
@@ -4910,7 +4939,7 @@ int PipelineParserGen::parse() {
                error, discard it.  */
 
             // Return failure if at end of input.
-            if (yyla.kind() == symbol_kind::S_YYEOF)
+            if (yyla.type_get() == yyeof_)
                 YYABORT;
             else if (!yyla.empty()) {
                 yy_destroy_("Error: discarding", yyla);
@@ -4935,7 +4964,6 @@ int PipelineParserGen::parse() {
            this YYERROR.  */
         yypop_(yylen);
         yylen = 0;
-        YY_STACK_PRINT();
         goto yyerrlab1;
 
 
@@ -4944,29 +4972,28 @@ int PipelineParserGen::parse() {
     `-------------------------------------------------------------*/
     yyerrlab1:
         yyerrstatus_ = 3;  // Each real token shifted decrements this.
-        // Pop stack until we find a state that shifts the error token.
-        for (;;) {
-            yyn = yypact_[+yystack_[0].state];
-            if (!yy_pact_value_is_default_(yyn)) {
-                yyn += symbol_kind::S_YYerror;
-                if (0 <= yyn && yyn <= yylast_ && yycheck_[yyn] == symbol_kind::S_YYerror) {
-                    yyn = yytable_[yyn];
-                    if (0 < yyn)
-                        break;
-                }
-            }
-
-            // Pop the current state because it cannot handle the error token.
-            if (yystack_.size() == 1)
-                YYABORT;
-
-            yyerror_range[1].location = yystack_[0].location;
-            yy_destroy_("Error: popping", yystack_[0]);
-            yypop_();
-            YY_STACK_PRINT();
-        }
         {
             stack_symbol_type error_token;
+            for (;;) {
+                yyn = yypact_[+yystack_[0].state];
+                if (!yy_pact_value_is_default_(yyn)) {
+                    yyn += yy_error_token_;
+                    if (0 <= yyn && yyn <= yylast_ && yycheck_[yyn] == yy_error_token_) {
+                        yyn = yytable_[yyn];
+                        if (0 < yyn)
+                            break;
+                    }
+                }
+
+                // Pop the current state because it cannot handle the error token.
+                if (yystack_.size() == 1)
+                    YYABORT;
+
+                yyerror_range[1].location = yystack_[0].location;
+                yy_destroy_("Error: popping", yystack_[0]);
+                yypop_();
+                YY_STACK_PRINT();
+            }
 
             yyerror_range[2].location = yyla.location;
             YYLLOC_DEFAULT(error_token.location, yyerror_range, 2);
@@ -5004,7 +5031,6 @@ int PipelineParserGen::parse() {
         /* Do not reclaim the symbols of the rule whose action triggered
            this YYABORT or YYACCEPT.  */
         yypop_(yylen);
-        YY_STACK_PRINT();
         while (1 < yystack_.size()) {
             yy_destroy_("Cleanup: popping", yystack_[0]);
             yypop_();
@@ -5033,85 +5059,16 @@ void PipelineParserGen::error(const syntax_error& yyexc) {
     error(yyexc.location, yyexc.what());
 }
 
-/* Return YYSTR after stripping away unnecessary quotes and
-   backslashes, so that it's suitable for yyerror.  The heuristic is
-   that double-quoting is unnecessary unless the string contains an
-   apostrophe, a comma, or backslash (other than backslash-backslash).
-   YYSTR is taken from yytname.  */
-std::string PipelineParserGen::yytnamerr_(const char* yystr) {
-    if (*yystr == '"') {
-        std::string yyr;
-        char const* yyp = yystr;
+// Generate an error message.
+std::string PipelineParserGen::yysyntax_error_(state_type yystate, const symbol_type& yyla) const {
+    // Number of reported tokens (one for the "unexpected", one per
+    // "expected").
+    std::ptrdiff_t yycount = 0;
+    // Its maximum.
+    enum { YYERROR_VERBOSE_ARGS_MAXIMUM = 5 };
+    // Arguments of yyformat.
+    char const* yyarg[YYERROR_VERBOSE_ARGS_MAXIMUM];
 
-        for (;;)
-            switch (*++yyp) {
-                case '\'':
-                case ',':
-                    goto do_not_strip_quotes;
-
-                case '\\':
-                    if (*++yyp != '\\')
-                        goto do_not_strip_quotes;
-                    else
-                        goto append;
-
-                append:
-                default:
-                    yyr += *yyp;
-                    break;
-
-                case '"':
-                    return yyr;
-            }
-    do_not_strip_quotes:;
-    }
-
-    return yystr;
-}
-
-std::string PipelineParserGen::symbol_name(symbol_kind_type yysymbol) {
-    return yytnamerr_(yytname_[yysymbol]);
-}
-
-
-// PipelineParserGen::context.
-PipelineParserGen::context::context(const PipelineParserGen& yyparser, const symbol_type& yyla)
-    : yyparser_(yyparser), yyla_(yyla) {}
-
-int PipelineParserGen::context::expected_tokens(symbol_kind_type yyarg[], int yyargn) const {
-    // Actual number of expected tokens
-    int yycount = 0;
-
-    int yyn = yypact_[+yyparser_.yystack_[0].state];
-    if (!yy_pact_value_is_default_(yyn)) {
-        /* Start YYX at -YYN if negative to avoid negative indexes in
-           YYCHECK.  In other words, skip the first -YYN actions for
-           this state because they are default actions.  */
-        int yyxbegin = yyn < 0 ? -yyn : 0;
-        // Stay within bounds of both yycheck and yytname.
-        int yychecklim = yylast_ - yyn + 1;
-        int yyxend = yychecklim < YYNTOKENS ? yychecklim : YYNTOKENS;
-        for (int yyx = yyxbegin; yyx < yyxend; ++yyx)
-            if (yycheck_[yyx + yyn] == yyx && yyx != symbol_kind::S_YYerror &&
-                !yy_table_value_is_error_(yytable_[yyx + yyn])) {
-                if (!yyarg)
-                    ++yycount;
-                else if (yycount == yyargn)
-                    return 0;
-                else
-                    yyarg[yycount++] = YY_CAST(symbol_kind_type, yyx);
-            }
-    }
-
-    if (yyarg && yycount == 0 && 0 < yyargn)
-        yyarg[0] = symbol_kind::S_YYEMPTY;
-    return yycount;
-}
-
-
-int PipelineParserGen::yy_syntax_error_arguments_(const context& yyctx,
-                                                  symbol_kind_type yyarg[],
-                                                  int yyargn) const {
     /* There are many possibilities here to consider:
        - If this state is a consistent state with a default action, then
          the only way this function was invoked is if the default action
@@ -5136,23 +5093,30 @@ int PipelineParserGen::yy_syntax_error_arguments_(const context& yyctx,
          one exception: it will still contain any token that will not be
          accepted due to an error action in a later state.
     */
+    if (!yyla.empty()) {
+        symbol_number_type yytoken = yyla.type_get();
+        yyarg[yycount++] = yytname_[yytoken];
 
-    if (!yyctx.lookahead().empty()) {
-        if (yyarg)
-            yyarg[0] = yyctx.token();
-        int yyn = yyctx.expected_tokens(yyarg ? yyarg + 1 : yyarg, yyargn - 1);
-        return yyn + 1;
+        int yyn = yypact_[+yystate];
+        if (!yy_pact_value_is_default_(yyn)) {
+            /* Start YYX at -YYN if negative to avoid negative indexes in
+               YYCHECK.  In other words, skip the first -YYN actions for
+               this state because they are default actions.  */
+            int yyxbegin = yyn < 0 ? -yyn : 0;
+            // Stay within bounds of both yycheck and yytname.
+            int yychecklim = yylast_ - yyn + 1;
+            int yyxend = yychecklim < yyntokens_ ? yychecklim : yyntokens_;
+            for (int yyx = yyxbegin; yyx < yyxend; ++yyx)
+                if (yycheck_[yyx + yyn] == yyx && yyx != yy_error_token_ &&
+                    !yy_table_value_is_error_(yytable_[yyx + yyn])) {
+                    if (yycount == YYERROR_VERBOSE_ARGS_MAXIMUM) {
+                        yycount = 1;
+                        break;
+                    } else
+                        yyarg[yycount++] = yytname_[yyx];
+                }
+        }
     }
-    return 0;
-}
-
-// Generate an error message.
-std::string PipelineParserGen::yysyntax_error_(const context& yyctx) const {
-    // Its maximum.
-    enum { YYARGS_MAX = 5 };
-    // Arguments of yyformat.
-    symbol_kind_type yyarg[YYARGS_MAX];
-    int yycount = yy_syntax_error_arguments_(yyctx, yyarg, YYARGS_MAX);
 
     char const* yyformat = YY_NULLPTR;
     switch (yycount) {
@@ -5175,7 +5139,7 @@ std::string PipelineParserGen::yysyntax_error_(const context& yyctx) const {
     std::ptrdiff_t yyi = 0;
     for (char const* yyp = yyformat; *yyp; ++yyp)
         if (yyp[0] == '%' && yyp[1] == 's' && yyi < yycount) {
-            yyres += symbol_name(yyarg[yyi++]);
+            yyres += yytnamerr_(yyarg[yyi++]);
             ++yyp;
         } else
             yyres += *yyp;
@@ -5183,300 +5147,295 @@ std::string PipelineParserGen::yysyntax_error_(const context& yyctx) const {
 }
 
 
-const short PipelineParserGen::yypact_ninf_ = -580;
+const short PipelineParserGen::yypact_ninf_ = -557;
 
 const signed char PipelineParserGen::yytable_ninf_ = -1;
 
 const short PipelineParserGen::yypact_[] = {
-    -71,  -52,  -44,  36,   -36,  -580, -580, -580, -580, -28,  18,   360,  -16,  55,   0,    10,
-    55,   -580, 52,   -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, 625,  -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, 625,  -580, -580, -580, -580, 61,   -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, 82,   -580, 99,   33,   -36,  -580, -580, 625,  -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, 455,  55,   13,   -580, -580,
-    625,  85,   550,  -580, 834,  834,  -580, -580, -580, -580, -580, 86,   109,  -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, 625,  -580, -580, -580, -580, -580, -580, -580, 645,  760,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -29,  -580, -580, 645,  -580,
-    95,   645,  57,   57,   65,   645,  65,   70,   71,   -580, -580, -580, 73,   65,   645,  645,
-    65,   65,   74,   75,   76,   645,  77,   645,  65,   65,   -580, 78,   81,   65,   83,   57,
-    84,   -580, -580, -580, -580, -580, 93,   -580, 96,   645,  97,   645,  645,  100,  101,  106,
-    107,  645,  645,  645,  645,  645,  645,  645,  645,  645,  645,  -580, 112,  645,  881,  121,
-    -580, -580, 138,  152,  156,  645,  158,  167,  170,  645,  625,  195,  199,  201,  645,  174,
-    175,  176,  178,  179,  645,  645,  625,  180,  645,  181,  182,  183,  215,  645,  645,  186,
-    645,  189,  645,  190,  217,  191,  194,  221,  222,  645,  215,  645,  197,  645,  198,  200,
-    645,  645,  645,  645,  202,  203,  207,  209,  210,  211,  212,  214,  216,  218,  215,  645,
-    220,  -580, 645,  -580, -580, -580, -580, -580, -580, -580, -580, -580, 645,  -580, -580, -580,
-    224,  225,  645,  645,  645,  645,  -580, -580, -580, -580, -580, 645,  645,  226,  -580, 645,
-    -580, -580, -580, 645,  223,  645,  645,  -580, 227,  -580, 645,  -580, 645,  -580, -580, 645,
-    645,  645,  241,  645,  -580, 645,  -580, -580, 645,  645,  645,  645,  -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, 245,  645,  -580, -580, 228,  230,  233,  251,  260,  260,
-    237,  645,  645,  238,  240,  -580, 645,  242,  645,  243,  246,  258,  264,  266,  247,  645,
-    249,  250,  645,  645,  645,  252,  645,  253,  -580, -580, -580, 645,  272,  645,  269,  269,
-    254,  645,  256,  257,  -580, 259,  261,  262,  265,  -580, 263,  645,  276,  645,  645,  267,
-    268,  270,  271,  273,  274,  280,  275,  281,  282,  -580, 645,  295,  -580, 645,  251,  272,
-    -580, -580, 285,  286,  -580, 287,  -580, 288,  -580, -580, 645,  283,  284,  -580, 289,  -580,
-    -580, 290,  291,  292,  -580, 294,  -580, -580, 645,  -580, 272,  296,  -580, -580, -580, -580,
-    297,  645,  645,  -580, -580, -580, -580, -580, 298,  300,  301,  -580, 302,  305,  307,  308,
-    -580, 309,  310,  -580, -580, -580, -580};
+    -56,  -40,  -38,  45,   -6,   -557, -557, -557, -557, 119,  37,   854,  -2,   -8,   0,    3,
+    -8,   -557, 47,   -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, 529,  -557, -557,
+    -557, -557, 51,   -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, 73,   -557, 88,   24,   -6,   -557, -557, 529,  -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, 359,  -8,   8,    -557, -557, 529,  85,   454,  -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    738,  -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, 738,  -557, -557, -557, -557, -557, 72,   113,  -557, -557, -557, -557, -557,
+    -557, -557, -557, 529,  -557, -557, -557, -557, -557, -557, -557, 549,  664,  -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -22,  -557, -557, 549,  -557, 100,  549,  61,
+    61,   62,   549,  62,   63,   64,   -557, -557, -557, 67,   62,   549,  549,  62,   62,   68,
+    75,   76,   549,  79,   549,  62,   62,   -557, 83,   86,   62,   87,   61,   89,   -557, -557,
+    -557, -557, -557, 92,   -557, 96,   549,  98,   549,  549,  99,   103,  105,  107,  549,  549,
+    549,  549,  549,  549,  549,  549,  549,  549,  -557, 108,  549,  785,  124,  -557, -557, 158,
+    159,  160,  549,  161,  162,  164,  549,  529,  189,  193,  195,  549,  168,  169,  170,  171,
+    172,  549,  549,  529,  175,  549,  176,  177,  179,  210,  549,  549,  181,  549,  182,  549,
+    183,  208,  185,  186,  214,  215,  549,  210,  549,  196,  549,  197,  198,  549,  549,  549,
+    549,  200,  202,  203,  204,  206,  207,  209,  211,  212,  213,  210,  549,  216,  -557, 549,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, 549,  -557, -557, -557, 220,  221,  549,
+    549,  549,  549,  -557, -557, -557, -557, -557, 549,  549,  222,  -557, 549,  -557, -557, -557,
+    549,  219,  549,  549,  -557, 223,  -557, 549,  -557, 549,  -557, -557, 549,  549,  549,  232,
+    549,  -557, 549,  -557, -557, 549,  549,  549,  549,  -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, 234,  549,  -557, -557, 224,  225,  227,  237,  249,  249,  230,  549,  549,
+    235,  233,  -557, 549,  238,  549,  236,  239,  260,  264,  265,  243,  549,  244,  245,  549,
+    549,  549,  246,  549,  248,  -557, -557, -557, 549,  270,  549,  266,  266,  251,  549,  250,
+    253,  -557, 254,  255,  256,  258,  -557, 259,  549,  272,  549,  549,  261,  262,  263,  268,
+    267,  273,  277,  271,  278,  279,  -557, 549,  280,  -557, 549,  237,  270,  -557, -557, 281,
+    282,  -557, 283,  -557, 284,  -557, -557, 549,  276,  295,  -557, 285,  -557, -557, 286,  287,
+    288,  -557, 289,  -557, -557, 549,  -557, 270,  291,  -557, -557, -557, -557, 292,  549,  549,
+    -557, -557, -557, -557, -557, 293,  294,  296,  -557, 297,  298,  299,  302,  -557, 304,  305,
+    -557, -557, -557, -557};
 
 const short PipelineParserGen::yydefact_[] = {
     0,   0,   0,   0,   5,   2,   59,  3,   1,   0,   0,   0,   0,   0,   0,   0,   0,   7,   0,
-    9,   10,  11,  12,  13,  14,  4,   115, 91,  93,  86,  75,  85,  82,  89,  83,  78,  80,  81,
-    88,  76,  87,  90,  77,  84,  79,  92,  116, 98,  130, 94,  105, 131, 132, 117, 58,  99,  118,
-    119, 100, 101, 0,   133, 134, 95,  120, 121, 122, 102, 103, 135, 123, 124, 104, 97,  96,  125,
-    136, 137, 138, 140, 139, 126, 141, 142, 127, 69,  72,  73,  74,  71,  70,  145, 143, 144, 146,
-    147, 148, 128, 106, 107, 108, 109, 110, 111, 149, 112, 113, 151, 150, 129, 114, 68,  65,  0,
-    66,  67,  64,  60,  0,   175, 173, 169, 171, 168, 170, 172, 174, 18,  19,  20,  21,  23,  25,
-    0,   22,  0,   0,   5,   177, 176, 327, 330, 152, 155, 156, 157, 158, 159, 160, 161, 162, 163,
-    164, 165, 166, 167, 153, 154, 187, 188, 189, 190, 191, 196, 192, 193, 194, 197, 198, 63,  178,
-    179, 181, 182, 183, 195, 184, 185, 186, 322, 323, 324, 325, 180, 61,  62,  16,  0,   0,   0,
-    8,   6,   327, 0,   0,   24,  0,   0,   55,  56,  57,  54,  26,  0,   0,   328, 326, 329, 221,
-    334, 335, 336, 333, 337, 0,   331, 49,  48,  47,  45,  41,  43,  199, 214, 40,  42,  44,  46,
-    36,  37,  38,  39,  50,  51,  52,  29,  30,  31,  32,  33,  34,  35,  27,  53,  204, 205, 206,
-    222, 223, 207, 256, 257, 258, 208, 318, 319, 211, 262, 263, 264, 265, 266, 267, 268, 269, 270,
-    271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 283, 282, 209, 338, 339, 340, 341, 342,
-    343, 344, 210, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 224, 225, 226, 227, 228, 229,
-    230, 231, 232, 233, 234, 235, 236, 237, 238, 28,  15,  0,   332, 201, 199, 202, 0,   0,   0,
-    0,   0,   0,   0,   0,   0,   7,   7,   7,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   7,   0,   0,   0,   0,   0,   0,   7,   7,   7,   7,   7,   0,   7,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   7,
-    0,   0,   0,   0,   200, 212, 0,   0,   0,   0,   0,   0,   0,   199, 0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   296, 0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   296, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   296, 0,   0,   213, 0,   218, 219, 217, 220, 215,
-    17,  241, 239, 259, 0,   240, 242, 345, 0,   0,   0,   0,   0,   0,   346, 244, 245, 347, 348,
-    0,   0,   0,   246, 0,   248, 349, 350, 0,   0,   0,   0,   351, 0,   260, 0,   304, 0,   305,
-    306, 0,   0,   0,   0,   0,   253, 0,   310, 311, 0,   0,   0,   0,   367, 368, 369, 370, 371,
-    372, 316, 373, 374, 317, 0,   0,   375, 216, 0,   0,   0,   362, 285, 285, 0,   291, 291, 0,
-    0,   297, 0,   0,   199, 0,   0,   301, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   203, 284, 320, 0,   364, 0,   287, 287, 0,   292, 0,   0,   321, 0,   0,   0,   0,   261,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   363, 0,   0,   286,
-    0,   362, 364, 243, 293, 0,   0,   247, 0,   249, 0,   251, 302, 0,   0,   0,   252, 0,   309,
-    312, 0,   0,   0,   254, 0,   255, 365, 0,   288, 364, 0,   294, 295, 298, 250, 0,   0,   0,
-    299, 313, 314, 315, 300, 0,   0,   0,   303, 0,   0,   0,   0,   290, 0,   0,   366, 289, 308,
-    307};
+    9,   10,  11,  12,  13,  14,  4,   84,  73,  83,  80,  87,  81,  76,  78,  79,  86,  74,  85,
+    88,  75,  82,  77,  58,  219, 66,  0,   65,  64,  63,  60,  0,   173, 171, 167, 169, 166, 168,
+    170, 172, 18,  19,  20,  21,  23,  25,  0,   22,  0,   0,   5,   175, 174, 325, 328, 150, 153,
+    154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 151, 152, 185, 186, 187, 188, 189,
+    194, 190, 191, 192, 195, 196, 62,  176, 177, 179, 180, 181, 193, 182, 183, 184, 320, 321, 322,
+    323, 178, 61,  16,  0,   0,   0,   8,   6,   325, 0,   0,   113, 89,  91,  90,  114, 96,  128,
+    92,  103, 129, 130, 115, 24,  97,  116, 117, 98,  99,  0,   131, 132, 93,  118, 119, 120, 100,
+    101, 133, 121, 122, 102, 95,  94,  123, 134, 135, 136, 138, 137, 124, 139, 140, 125, 67,  70,
+    71,  72,  69,  68,  143, 141, 142, 144, 145, 146, 126, 104, 105, 106, 107, 108, 109, 147, 110,
+    111, 149, 148, 127, 112, 0,   55,  56,  57,  54,  26,  0,   0,   326, 324, 327, 332, 333, 334,
+    331, 335, 0,   329, 49,  48,  47,  45,  41,  43,  197, 212, 40,  42,  44,  46,  36,  37,  38,
+    39,  50,  51,  52,  29,  30,  31,  32,  33,  34,  35,  27,  53,  202, 203, 204, 220, 221, 205,
+    254, 255, 256, 206, 316, 317, 209, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271,
+    272, 273, 274, 275, 276, 277, 278, 279, 281, 280, 207, 336, 337, 338, 339, 340, 341, 342, 208,
+    350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 222, 223, 224, 225, 226, 227, 228, 229, 230,
+    231, 232, 233, 234, 235, 236, 28,  15,  0,   330, 199, 197, 200, 0,   0,   0,   0,   0,   0,
+    0,   0,   0,   7,   7,   7,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   7,   0,   0,   0,   0,   0,   0,   7,   7,   7,   7,   7,   0,   7,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   7,   0,   0,   0,
+    0,   198, 210, 0,   0,   0,   0,   0,   0,   0,   197, 0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   294, 0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   294, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   294, 0,   0,   211, 0,   216, 217, 215, 218, 213, 17,  239, 237,
+    257, 0,   238, 240, 343, 0,   0,   0,   0,   0,   0,   344, 242, 243, 345, 346, 0,   0,   0,
+    244, 0,   246, 347, 348, 0,   0,   0,   0,   349, 0,   258, 0,   302, 0,   303, 304, 0,   0,
+    0,   0,   0,   251, 0,   308, 309, 0,   0,   0,   0,   365, 366, 367, 368, 369, 370, 314, 371,
+    372, 315, 0,   0,   373, 214, 0,   0,   0,   360, 283, 283, 0,   289, 289, 0,   0,   295, 0,
+    0,   197, 0,   0,   299, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   201, 282,
+    318, 0,   362, 0,   285, 285, 0,   290, 0,   0,   319, 0,   0,   0,   0,   259, 0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   361, 0,   0,   284, 0,   360, 362,
+    241, 291, 0,   0,   245, 0,   247, 0,   249, 300, 0,   0,   0,   250, 0,   307, 310, 0,   0,
+    0,   252, 0,   253, 363, 0,   286, 362, 0,   292, 293, 296, 248, 0,   0,   0,   297, 311, 312,
+    313, 298, 0,   0,   0,   301, 0,   0,   0,   0,   288, 0,   0,   364, 287, 306, 305};
 
 const short PipelineParserGen::yypgoto_[] = {
-    -580, -580, -580, -180, -580, -178, -167, -177, -88,  -580, -580, -580, -580, -580, -147, -145,
-    -135, -123, -5,   -117, 8,    -10,  9,    -112, -106, -136, -163, -580, -103, -101, -93,  -580,
-    -83,  -81,  -79,  -59,  -580, -580, -580, -580, -580, 213,  -580, -580, -580, -580, -580, -580,
-    -580, -580, 134,  -3,   -306, -60,  -202, -292, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -216, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580,
-    -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -580, -242, -579,
-    -176, -210, -408, -580, -316, 160,  -175, -580, -580, 244,  -580, -580, -17,  -580};
+    -557, -557, -557, -117, -557, -112, 191,  -109, -115, -557, -557, -557, -557, -557, -114, -113,
+    -105, -104, 4,    -98,  6,    -9,   12,   -96,  -79,  -42,  -84,  -557, -78,  -77,  -76,  -557,
+    -73,  -71,  -69,  -43,  -557, -557, -557, -557, -557, -557, 231,  -557, -557, -557, -557, -557,
+    -557, -557, -557, 136,  2,    -317, -67,  -189, -286, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -219,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557,
+    -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -557, -245,
+    -556, -181, -212, -396, -557, -304, 228,  -182, -557, -557, -557, -557, -17,  -557};
 
 const short PipelineParserGen::yydefgoto_[] = {
-    -1,  197, 450, 112, 113, 114, 115, 116, 213, 214, 202, 455, 215, 117, 158, 159, 160, 161,
-    162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 317,
-    180, 181, 182, 194, 183, 10,  18,  19,  20,  21,  22,  23,  24,  187, 242, 131, 318, 319,
-    390, 244, 245, 382, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259,
-    260, 261, 262, 263, 264, 265, 419, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276,
-    277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294,
-    295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312,
-    556, 587, 558, 590, 484, 572, 320, 193, 562, 7,   11,  184, 3,   5,   420, 136};
+    -1,  195, 447, 196, 45,  46,  198, 47,  48,  211, 200, 452, 212, 49,  90,  91,  92,  93,
+    94,  95,  96,  97,  98,  99,  100, 123, 102, 103, 104, 105, 106, 107, 108, 109, 110, 314,
+    112, 113, 114, 125, 115, 5,   10,  18,  19,  20,  21,  22,  23,  24,  118, 239, 63,  315,
+    316, 387, 241, 242, 379, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
+    256, 257, 258, 259, 260, 261, 262, 416, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272,
+    273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290,
+    291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308,
+    309, 553, 584, 555, 587, 481, 569, 317, 124, 559, 7,   11,  116, 3,   417, 68};
 
 const short PipelineParserGen::yytable_[] = {
-    135, 179, 384, 129, 192, 120, 129, 198, 127, 199, 201, 127, 619, 134, 209, 386, 210, 212, 498,
-    391, 200, 128, 130, 4,   128, 130, 204, 211, 400, 401, 387, 388, 6,   235, 235, 407, 8,   409,
-    518, 633, 9,   12,  13,  14,  15,  16,  17,  1,   2,   228, 228, 229, 229, 25,  179, 428, 192,
-    430, 431, 417, 118, 230, 230, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445, 231, 231, 448,
-    132, 464, 316, 232, 232, 179, 125, 460, 233, 233, 133, 119, 137, 120, 234, 234, 469, 236, 236,
-    237, 237, 186, 475, 476, 121, 188, 479, 238, 238, 122, 189, 485, 486, 190, 488, 142, 490, 239,
-    239, 240, 240, 241, 241, 497, 206, 499, 314, 501, 392, 315, 504, 505, 506, 507, 385, 399, 222,
-    179, 402, 403, 243, 243, 421, 422, 389, 519, 410, 411, 521, 393, 394, 415, 398, 404, 405, 406,
-    408, 413, 522, 179, 414, 456, 416, 418, 525, 526, 527, 528, 123, 124, 125, 126, 425, 529, 530,
-    427, 429, 532, 457, 432, 433, 533, 129, 535, 536, 434, 435, 127, 538, 203, 539, 447, 458, 540,
-    541, 542, 459, 544, 461, 545, 128, 130, 546, 547, 548, 549, 451, 462, 452, 453, 463, 466, 467,
-    468, 470, 471, 472, 551, 473, 474, 478, 480, 481, 482, 568, 483, 487, 561, 561, 489, 491, 493,
-    566, 492, 494, 495, 496, 500, 502, 534, 503, 576, 508, 509, 579, 580, 581, 510, 583, 511, 512,
-    513, 514, 585, 515, 588, 516, 543, 517, 593, 520, 550, 465, 523, 524, 531, 537, 552, 555, 601,
-    553, 603, 604, 554, 477, 557, 560, 571, 564, 565, 573, 567, 574, 569, 615, 570, 575, 617, 577,
-    578, 586, 582, 584, 589, 592, 594, 595, 602, 454, 596, 624, 597, 598, 600, 599, 625, 626, 605,
-    606, 383, 607, 608, 609, 610, 632, 612, 395, 396, 397, 611, 616, 613, 614, 636, 637, 620, 621,
-    622, 623, 627, 628, 629, 630, 412, 631, 313, 634, 635, 638, 179, 639, 640, 641, 423, 424, 642,
-    426, 643, 644, 645, 646, 179, 618, 591, 191, 559, 205, 0,   0,   563, 0,   185, 0,   0,   0,
-    0,   446, 26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,  41,  42,
-    43,  44,  45,  0,   0,   46,  47,  48,  49,  50,  51,  52,  0,   53,  0,   0,   54,  55,  56,
-    57,  58,  59,  60,  61,  62,  0,   63,  64,  65,  66,  0,   67,  68,  69,  70,  71,  72,  73,
-    74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  0,   0,
-    91,  92,  93,  94,  95,  96,  97,  98,  99,  100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
-    110, 111, 26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,  41,  42,
-    43,  44,  45,  0,   0,   46,  47,  48,  49,  50,  51,  52,  0,   53,  0,   0,   195, 55,  56,
-    57,  58,  59,  196, 61,  62,  0,   63,  64,  65,  66,  0,   67,  68,  69,  70,  71,  72,  73,
-    74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  0,   0,
-    91,  92,  93,  94,  95,  96,  97,  98,  99,  100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
-    110, 111, 26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,  41,  42,
-    43,  44,  45,  0,   0,   46,  47,  48,  49,  50,  51,  52,  0,   53,  0,   0,   207, 55,  56,
-    57,  58,  59,  208, 61,  62,  0,   63,  64,  65,  66,  0,   67,  68,  69,  70,  71,  72,  73,
-    74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  0,   0,
-    91,  92,  93,  94,  95,  96,  97,  98,  99,  100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
-    110, 111, 138, 139, 0,   0,   0,   0,   0,   0,   0,   119, 0,   120, 0,   0,   0,   0,   0,
-    0,   0,   0,   138, 139, 121, 0,   0,   0,   0,   122, 0,   119, 0,   120, 0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   121, 0,   0,   0,   0,   122, 0,   0,   0,   0,   140, 141, 0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   222, 223,
-    0,   142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 123, 124, 125, 126, 153, 154, 155,
-    156, 157, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 123, 124, 125, 126, 153, 154,
-    155, 156, 157, 321, 322, 323, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   324, 0,   0,   325, 326, 327, 328, 329, 330, 331, 0,   332, 0,   0,   0,   333,
-    334, 335, 336, 337, 0,   338, 339, 0,   340, 341, 342, 343, 0,   344, 345, 346, 347, 348, 349,
-    350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 0,   0,   0,   0,   0,   0,   0,
-    0,   362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379,
-    380, 381, 216, 217, 0,   0,   0,   0,   0,   0,   0,   218, 0,   219, 0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   220, 0,   0,   0,   0,   221, 0,   0,   29,  30,  31,  32,  33,  34,
-    35,  36,  37,  38,  39,  40,  41,  42,  43,  44,  0,   0,   0,   0,   0,   0,   222, 223, 0,
-    0,   0,   0,   0,   0,   449, 0,   0,   0,   0,   0,   208, 0,   0,   0,   0,   0,   0,   0,
-    0,   142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 224, 225, 226, 227, 153, 154, 155,
-    85,  86,  87,  88,  89,  90,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   111};
+    67,  383, 111, 101, 61,  388, 197, 61,  206, 199, 210, 381, 52,  207, 397, 398, 209, 59,  66,
+    60,  59,  404, 60,  406, 51,  62,  52,  495, 62,  111, 225, 226, 616, 384, 385, 4,   202, 53,
+    6,   227, 228, 425, 54,  427, 428, 8,   229, 515, 230, 433, 434, 435, 436, 437, 438, 439, 440,
+    441, 442, 630, 232, 445, 414, 1,   2,   231, 233, 234, 235, 457, 9,   236, 25,  237, 50,  238,
+    64,  240, 466, 65,  111, 225, 226, 69,  472, 473, 461, 117, 476, 57,  227, 228, 119, 482, 483,
+    120, 485, 229, 487, 230, 121, 55,  56,  57,  58,  494, 74,  496, 311, 498, 61,  232, 501, 502,
+    503, 504, 231, 233, 234, 235, 204, 201, 236, 59,  237, 60,  238, 516, 240, 312, 518, 62,  418,
+    419, 389, 382, 219, 386, 390, 391, 519, 396, 395, 401, 399, 400, 522, 523, 524, 525, 402, 403,
+    407, 408, 405, 526, 527, 412, 410, 529, 453, 411, 413, 530, 415, 532, 533, 422, 111, 313, 535,
+    424, 536, 426, 429, 537, 538, 539, 430, 541, 431, 542, 432, 444, 543, 544, 545, 546, 12,  13,
+    14,  15,  16,  17,  454, 455, 456, 458, 459, 548, 460, 463, 464, 465, 467, 468, 469, 470, 471,
+    558, 558, 475, 477, 478, 563, 479, 480, 484, 486, 488, 489, 490, 491, 573, 492, 493, 576, 577,
+    578, 565, 580, 531, 497, 499, 500, 582, 505, 585, 506, 507, 508, 590, 509, 510, 540, 511, 547,
+    512, 513, 514, 552, 598, 517, 600, 601, 520, 521, 528, 534, 549, 554, 550, 448, 551, 451, 557,
+    612, 449, 562, 614, 450, 561, 566, 564, 567, 568, 570, 571, 572, 574, 575, 579, 621, 581, 583,
+    591, 586, 589, 592, 599, 593, 594, 595, 596, 622, 597, 629, 602, 603, 604, 122, 613, 606, 380,
+    605, 633, 634, 609, 607, 392, 393, 394, 608, 623, 610, 611, 208, 617, 618, 619, 620, 624, 625,
+    626, 627, 628, 409, 631, 632, 635, 636, 310, 637, 638, 639, 640, 420, 421, 641, 423, 642, 643,
+    615, 556, 588, 560, 0,   0,   111, 462, 0,   203, 0,   0,   0,   0,   0,   0,   0,   443, 111,
+    474, 126, 127, 128, 26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,
+    41,  129, 0,   0,   130, 131, 132, 133, 134, 135, 136, 0,   137, 0,   0,   138, 139, 140, 141,
+    142, 143, 144, 145, 146, 0,   147, 148, 149, 150, 0,   151, 152, 153, 154, 155, 156, 157, 158,
+    159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 0,   0,   175,
+    176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194,
+    44,  126, 127, 128, 26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,
+    41,  129, 0,   0,   130, 131, 132, 133, 134, 135, 136, 0,   137, 0,   0,   205, 139, 140, 141,
+    142, 143, 43,  145, 146, 0,   147, 148, 149, 150, 0,   151, 152, 153, 154, 155, 156, 157, 158,
+    159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 0,   0,   175,
+    176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194,
+    44,  70,  71,  0,   0,   0,   0,   0,   0,   0,   51,  0,   52,  0,   0,   0,   0,   0,   0,
+    0,   0,   70,  71,  53,  0,   0,   0,   0,   54,  0,   51,  0,   52,  0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   53,  0,   0,   0,   0,   54,  0,   0,   0,   0,   72,  73,  0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   219, 220, 0,
+    74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  55,  56,  57,  58,  85,  86,  87,  88,
+    89,  74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  55,  56,  57,  58,  85,  86,  87,
+    88,  89,  318, 319, 320, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   321, 0,   0,   322, 323, 324, 325, 326, 327, 328, 0,   329, 0,   0,   0,   330, 331,
+    332, 333, 334, 0,   335, 336, 0,   337, 338, 339, 340, 0,   341, 342, 343, 344, 345, 346, 347,
+    348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 0,   0,   0,   0,   0,   0,   0,   0,
+    359, 360, 361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377,
+    378, 213, 214, 0,   0,   0,   0,   0,   0,   0,   215, 0,   216, 0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   217, 0,   0,   0,   0,   218, 0,   0,   26,  27,  28,  29,  30,  31,  32,
+    33,  34,  35,  36,  37,  38,  39,  40,  41,  0,   0,   0,   0,   0,   0,   219, 220, 0,   0,
+    0,   0,   0,   0,   446, 0,   0,   0,   0,   0,   43,  0,   0,   0,   0,   0,   0,   0,   0,
+    74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  221, 222, 223, 224, 85,  86,  87,  169,
+    170, 171, 172, 173, 174, 26,  27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,
+    40,  41,  0,   0,   0,   0,   0,   0,   44,  0,   0,   0,   0,   0,   0,   0,   42,  0,   0,
+    0,   0,   0,   43,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   44};
 
 const short PipelineParserGen::yycheck_[] = {
-    17,  60,  318, 13,  140, 34,  16,  187, 13,  187, 187, 16,  591, 16,  194, 321, 194, 194, 426,
-    325, 187, 13,  13,  75,  16,  16,  189, 194, 334, 335, 322, 323, 76,  196, 197, 341, 0,   343,
-    446, 618, 76,  69,  70,  71,  72,  73,  74,  118, 119, 196, 197, 196, 197, 35,  113, 361, 192,
-    363, 364, 351, 76,  196, 197, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 196, 197, 381,
-    76,  393, 214, 196, 197, 140, 111, 389, 196, 197, 76,  32,  36,  34,  196, 197, 398, 196, 197,
-    196, 197, 36,  404, 405, 45,  19,  408, 196, 197, 50,  7,   413, 414, 76,  416, 98,  418, 196,
-    197, 196, 197, 196, 197, 425, 35,  427, 36,  429, 326, 16,  432, 433, 434, 435, 35,  333, 75,
-    192, 336, 337, 196, 197, 354, 355, 75,  447, 344, 345, 450, 75,  75,  349, 75,  75,  75,  75,
-    75,  75,  460, 214, 75,  36,  75,  75,  466, 467, 468, 469, 109, 110, 111, 112, 75,  475, 476,
-    75,  75,  479, 36,  75,  75,  483, 188, 485, 486, 75,  75,  188, 490, 188, 492, 75,  36,  495,
-    496, 497, 36,  499, 36,  501, 188, 188, 504, 505, 506, 507, 382, 36,  382, 382, 36,  12,  9,
-    8,   36,  36,  36,  519, 36,  36,  36,  36,  36,  36,  536, 6,   36,  529, 530, 36,  36,  36,
-    534, 12,  36,  10,  10,  36,  36,  12,  36,  543, 36,  36,  546, 547, 548, 36,  550, 36,  36,
-    36,  36,  555, 36,  557, 36,  12,  36,  561, 36,  12,  394, 35,  35,  35,  35,  35,  13,  571,
-    36,  573, 574, 36,  406, 11,  35,  15,  36,  35,  12,  35,  12,  36,  586, 35,  35,  589, 35,
-    35,  14,  35,  35,  20,  36,  35,  35,  17,  382, 36,  602, 36,  36,  36,  35,  18,  18,  36,
-    36,  315, 36,  36,  35,  35,  616, 36,  329, 330, 331, 35,  21,  36,  36,  625, 626, 36,  36,
-    36,  36,  36,  36,  36,  36,  346, 36,  197, 36,  36,  36,  394, 36,  36,  36,  356, 357, 36,
-    359, 36,  36,  36,  36,  406, 590, 559, 137, 527, 192, -1,  -1,  530, -1,  113, -1,  -1,  -1,
-    -1,  379, 3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,
-    20,  21,  22,  -1,  -1,  25,  26,  27,  28,  29,  30,  31,  -1,  33,  -1,  -1,  36,  37,  38,
-    39,  40,  41,  42,  43,  44,  -1,  46,  47,  48,  49,  -1,  51,  52,  53,  54,  55,  56,  57,
-    58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  -1,  -1,
+    17,  318, 45,  45,  13,  322, 118, 16,  125, 118, 125, 315, 34,  125, 331, 332, 125, 13,  16,
+    13,  16,  338, 16,  340, 32,  13,  34,  423, 16,  72,  144, 144, 588, 319, 320, 75,  120, 45,
+    76,  144, 144, 358, 50,  360, 361, 0,   144, 443, 144, 366, 367, 368, 369, 370, 371, 372, 373,
+    374, 375, 615, 144, 378, 348, 119, 120, 144, 144, 144, 144, 386, 76,  144, 35,  144, 76,  144,
+    76,  144, 395, 76,  123, 195, 195, 36,  401, 402, 390, 36,  405, 111, 195, 195, 19,  410, 411,
+    7,   413, 195, 415, 195, 76,  109, 110, 111, 112, 422, 98,  424, 36,  426, 119, 195, 429, 430,
+    431, 432, 195, 195, 195, 195, 35,  119, 195, 119, 195, 119, 195, 444, 195, 16,  447, 119, 351,
+    352, 323, 35,  75,  75,  75,  75,  457, 330, 75,  75,  333, 334, 463, 464, 465, 466, 75,  75,
+    341, 342, 75,  472, 473, 346, 75,  476, 36,  75,  75,  480, 75,  482, 483, 75,  211, 211, 487,
+    75,  489, 75,  75,  492, 493, 494, 75,  496, 75,  498, 75,  75,  501, 502, 503, 504, 69,  70,
+    71,  72,  73,  74,  36,  36,  36,  36,  36,  516, 36,  12,  9,   8,   36,  36,  36,  36,  36,
+    526, 527, 36,  36,  36,  531, 36,  6,   36,  36,  36,  12,  36,  36,  540, 10,  10,  543, 544,
+    545, 533, 547, 12,  36,  36,  36,  552, 36,  554, 36,  36,  36,  558, 36,  36,  12,  36,  12,
+    36,  36,  36,  13,  568, 36,  570, 571, 35,  35,  35,  35,  35,  11,  36,  379, 36,  379, 35,
+    583, 379, 35,  586, 379, 36,  36,  35,  35,  15,  12,  12,  35,  35,  35,  35,  599, 35,  14,
+    35,  20,  36,  35,  17,  36,  36,  36,  35,  18,  36,  613, 36,  36,  36,  69,  21,  35,  312,
+    36,  622, 623, 36,  35,  326, 327, 328, 35,  18,  36,  36,  125, 36,  36,  36,  36,  36,  36,
+    36,  36,  36,  343, 36,  36,  36,  36,  195, 36,  36,  36,  36,  353, 354, 36,  356, 36,  36,
+    587, 524, 556, 527, -1,  -1,  391, 391, -1,  123, -1,  -1,  -1,  -1,  -1,  -1,  -1,  376, 403,
+    403, 3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,
+    21,  22,  -1,  -1,  25,  26,  27,  28,  29,  30,  31,  -1,  33,  -1,  -1,  36,  37,  38,  39,
+    40,  41,  42,  43,  44,  -1,  46,  47,  48,  49,  -1,  51,  52,  53,  54,  55,  56,  57,  58,
+    59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  -1,  -1,  77,
+    78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96,
+    97,  3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,
+    21,  22,  -1,  -1,  25,  26,  27,  28,  29,  30,  31,  -1,  33,  -1,  -1,  36,  37,  38,  39,
+    40,  41,  42,  43,  44,  -1,  46,  47,  48,  49,  -1,  51,  52,  53,  54,  55,  56,  57,  58,
+    59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  -1,  -1,  77,
+    78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96,
+    97,  23,  24,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  32,  -1,  34,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  23,  24,  45,  -1,  -1,  -1,  -1,  50,  -1,  32,  -1,  34,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  45,  -1,  -1,  -1,  -1,  50,  -1,  -1,  -1,  -1,  75,  76,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  75,  76,  -1,
+    98,  99,  100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
+    117, 98,  99,  100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
+    116, 117, 3,   4,   5,   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  22,  -1,  -1,  25,  26,  27,  28,  29,  30,  31,  -1,  33,  -1,  -1,  -1,  37,  38,
+    39,  40,  41,  -1,  43,  44,  -1,  46,  47,  48,  49,  -1,  51,  52,  53,  54,  55,  56,  57,
+    58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
     77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,
-    96,  97,  3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,
-    20,  21,  22,  -1,  -1,  25,  26,  27,  28,  29,  30,  31,  -1,  33,  -1,  -1,  36,  37,  38,
-    39,  40,  41,  42,  43,  44,  -1,  46,  47,  48,  49,  -1,  51,  52,  53,  54,  55,  56,  57,
-    58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  -1,  -1,
-    77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,
-    96,  97,  3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,
-    20,  21,  22,  -1,  -1,  25,  26,  27,  28,  29,  30,  31,  -1,  33,  -1,  -1,  36,  37,  38,
-    39,  40,  41,  42,  43,  44,  -1,  46,  47,  48,  49,  -1,  51,  52,  53,  54,  55,  56,  57,
-    58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  -1,  -1,
-    77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,
-    96,  97,  23,  24,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  32,  -1,  34,  -1,  -1,  -1,  -1,  -1,
-    -1,  -1,  -1,  23,  24,  45,  -1,  -1,  -1,  -1,  50,  -1,  32,  -1,  34,  -1,  -1,  -1,  -1,
-    -1,  -1,  -1,  -1,  -1,  -1,  45,  -1,  -1,  -1,  -1,  50,  -1,  -1,  -1,  -1,  75,  76,  -1,
-    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  75,  76,
-    -1,  98,  99,  100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
-    116, 117, 98,  99,  100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114,
-    115, 116, 117, 3,   4,   5,   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    -1,  -1,  -1,  22,  -1,  -1,  25,  26,  27,  28,  29,  30,  31,  -1,  33,  -1,  -1,  -1,  37,
-    38,  39,  40,  41,  -1,  43,  44,  -1,  46,  47,  48,  49,  -1,  51,  52,  53,  54,  55,  56,
-    57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    -1,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,
-    95,  96,  23,  24,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  32,  -1,  34,  -1,  -1,  -1,  -1,  -1,
-    -1,  -1,  -1,  -1,  -1,  45,  -1,  -1,  -1,  -1,  50,  -1,  -1,  6,   7,   8,   9,   10,  11,
-    12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  -1,  -1,  -1,  -1,  -1,  -1,  75,  76,  -1,
-    -1,  -1,  -1,  -1,  -1,  36,  -1,  -1,  -1,  -1,  -1,  42,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    -1,  98,  99,  100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
-    69,  70,  71,  72,  73,  74,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  97};
+    96,  23,  24,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  32,  -1,  34,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  -1,  45,  -1,  -1,  -1,  -1,  50,  -1,  -1,  6,   7,   8,   9,   10,  11,  12,
+    13,  14,  15,  16,  17,  18,  19,  20,  21,  -1,  -1,  -1,  -1,  -1,  -1,  75,  76,  -1,  -1,
+    -1,  -1,  -1,  -1,  36,  -1,  -1,  -1,  -1,  -1,  42,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    98,  99,  100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 69,
+    70,  71,  72,  73,  74,  6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,
+    20,  21,  -1,  -1,  -1,  -1,  -1,  -1,  97,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  36,  -1,  -1,
+    -1,  -1,  -1,  42,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  97};
 
 const short PipelineParserGen::yystos_[] = {
-    0,   118, 119, 258, 75,  259, 76,  255, 0,   76,  161, 256, 69,  70,  71,  72,  73,  74,  162,
-    163, 164, 165, 166, 167, 168, 35,  3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,
-    15,  16,  17,  18,  19,  20,  21,  22,  25,  26,  27,  28,  29,  30,  31,  33,  36,  37,  38,
-    39,  40,  41,  42,  43,  44,  46,  47,  48,  49,  51,  52,  53,  54,  55,  56,  57,  58,  59,
-    60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,  77,  78,  79,  80,
-    81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96,  97,  123, 124,
-    125, 126, 127, 133, 76,  32,  34,  45,  50,  109, 110, 111, 112, 138, 140, 141, 142, 171, 76,
-    76,  171, 260, 261, 36,  23,  24,  75,  76,  98,  99,  100, 101, 102, 103, 104, 105, 106, 107,
-    108, 113, 114, 115, 116, 117, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146,
-    147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 160, 257, 257, 36,  169, 19,  7,
-    76,  161, 145, 253, 159, 36,  42,  121, 123, 125, 126, 127, 130, 171, 146, 253, 35,  36,  42,
-    123, 125, 126, 127, 128, 129, 132, 23,  24,  32,  34,  45,  50,  75,  76,  109, 110, 111, 112,
-    134, 135, 136, 137, 139, 143, 144, 146, 148, 149, 150, 152, 153, 154, 170, 173, 175, 176, 178,
-    179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197,
-    199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217,
-    218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236,
-    237, 238, 239, 240, 241, 242, 243, 244, 245, 170, 36,  16,  145, 155, 172, 173, 252, 3,   4,
-    5,   22,  25,  26,  27,  28,  29,  30,  31,  33,  37,  38,  39,  40,  41,  43,  44,  46,  47,
-    48,  49,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,
-    68,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,
-    95,  96,  177, 141, 252, 35,  172, 175, 175, 75,  174, 172, 174, 75,  75,  260, 260, 260, 75,
-    174, 172, 172, 174, 174, 75,  75,  75,  172, 75,  172, 174, 174, 260, 75,  75,  174, 75,  175,
-    75,  198, 260, 198, 198, 260, 260, 75,  260, 75,  172, 75,  172, 172, 75,  75,  75,  75,  172,
-    172, 172, 172, 172, 172, 172, 172, 172, 172, 260, 75,  172, 36,  122, 123, 125, 127, 128, 131,
-    36,  36,  36,  36,  172, 36,  36,  36,  252, 145, 12,  9,   8,   172, 36,  36,  36,  36,  36,
-    172, 172, 145, 36,  172, 36,  36,  36,  6,   250, 172, 172, 36,  172, 36,  172, 36,  12,  36,
-    36,  10,  10,  172, 250, 172, 36,  172, 36,  36,  172, 172, 172, 172, 36,  36,  36,  36,  36,
-    36,  36,  36,  36,  36,  250, 172, 36,  172, 172, 35,  35,  172, 172, 172, 172, 172, 172, 35,
-    172, 172, 12,  172, 172, 35,  172, 172, 172, 172, 172, 12,  172, 172, 172, 172, 172, 172, 12,
-    172, 35,  36,  36,  13,  246, 11,  248, 248, 35,  172, 254, 254, 36,  35,  172, 35,  252, 36,
-    35,  15,  251, 12,  12,  35,  172, 35,  35,  172, 172, 172, 35,  172, 35,  172, 14,  247, 172,
-    20,  249, 249, 36,  172, 35,  35,  36,  36,  36,  35,  36,  172, 17,  172, 172, 36,  36,  36,
-    36,  35,  35,  35,  36,  36,  36,  172, 21,  172, 246, 247, 36,  36,  36,  36,  172, 18,  18,
-    36,  36,  36,  36,  36,  172, 247, 36,  36,  172, 172, 36,  36,  36,  36,  36,  36,  36,  36,
-    36};
+    0,   119, 120, 260, 75,  162, 76,  257, 0,   76,  163, 258, 69,  70,  71,  72,  73,  74,  164,
+    165, 166, 167, 168, 169, 170, 35,  6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,  17,
+    18,  19,  20,  21,  36,  42,  97,  125, 126, 128, 129, 134, 76,  32,  34,  45,  50,  109, 110,
+    111, 112, 139, 141, 142, 143, 173, 76,  76,  173, 261, 262, 36,  23,  24,  75,  76,  98,  99,
+    100, 101, 102, 103, 104, 105, 106, 107, 108, 113, 114, 115, 116, 117, 135, 136, 137, 138, 139,
+    140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158,
+    159, 161, 259, 36,  171, 19,  7,   76,  163, 146, 255, 160, 3,   4,   5,   22,  25,  26,  27,
+    28,  29,  30,  31,  33,  36,  37,  38,  39,  40,  41,  42,  43,  44,  46,  47,  48,  49,  51,
+    52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,
+    71,  72,  73,  74,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,
+    92,  93,  94,  95,  96,  122, 124, 126, 127, 128, 131, 173, 147, 255, 35,  36,  124, 126, 127,
+    128, 129, 130, 133, 23,  24,  32,  34,  45,  50,  75,  76,  109, 110, 111, 112, 135, 136, 137,
+    138, 140, 144, 145, 147, 149, 150, 151, 153, 154, 155, 172, 175, 177, 178, 180, 181, 182, 183,
+    184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 201, 202, 203,
+    204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222,
+    223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241,
+    242, 243, 244, 245, 246, 247, 172, 36,  16,  146, 156, 174, 175, 254, 3,   4,   5,   22,  25,
+    26,  27,  28,  29,  30,  31,  33,  37,  38,  39,  40,  41,  43,  44,  46,  47,  48,  49,  51,
+    52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  77,  78,
+    79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96,  179,
+    142, 254, 35,  174, 177, 177, 75,  176, 174, 176, 75,  75,  261, 261, 261, 75,  176, 174, 174,
+    176, 176, 75,  75,  75,  174, 75,  174, 176, 176, 261, 75,  75,  176, 75,  177, 75,  200, 261,
+    200, 200, 261, 261, 75,  261, 75,  174, 75,  174, 174, 75,  75,  75,  75,  174, 174, 174, 174,
+    174, 174, 174, 174, 174, 174, 261, 75,  174, 36,  123, 124, 126, 128, 129, 132, 36,  36,  36,
+    36,  174, 36,  36,  36,  254, 146, 12,  9,   8,   174, 36,  36,  36,  36,  36,  174, 174, 146,
+    36,  174, 36,  36,  36,  6,   252, 174, 174, 36,  174, 36,  174, 36,  12,  36,  36,  10,  10,
+    174, 252, 174, 36,  174, 36,  36,  174, 174, 174, 174, 36,  36,  36,  36,  36,  36,  36,  36,
+    36,  36,  252, 174, 36,  174, 174, 35,  35,  174, 174, 174, 174, 174, 174, 35,  174, 174, 12,
+    174, 174, 35,  174, 174, 174, 174, 174, 12,  174, 174, 174, 174, 174, 174, 12,  174, 35,  36,
+    36,  13,  248, 11,  250, 250, 35,  174, 256, 256, 36,  35,  174, 35,  254, 36,  35,  15,  253,
+    12,  12,  35,  174, 35,  35,  174, 174, 174, 35,  174, 35,  174, 14,  249, 174, 20,  251, 251,
+    36,  174, 35,  35,  36,  36,  36,  35,  36,  174, 17,  174, 174, 36,  36,  36,  36,  35,  35,
+    35,  36,  36,  36,  174, 21,  174, 248, 249, 36,  36,  36,  36,  174, 18,  18,  36,  36,  36,
+    36,  36,  174, 249, 36,  36,  174, 174, 36,  36,  36,  36,  36,  36,  36,  36,  36};
 
 const short PipelineParserGen::yyr1_[] = {
-    0,   120, 258, 258, 259, 161, 161, 261, 260, 162, 162, 162, 162, 162, 162, 168, 163, 164, 171,
-    171, 171, 171, 165, 166, 167, 169, 169, 130, 130, 170, 170, 170, 170, 170, 170, 170, 170, 170,
-    170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 121, 121, 121,
-    121, 255, 256, 256, 133, 133, 257, 124, 124, 124, 124, 127, 123, 123, 123, 123, 123, 123, 125,
-    125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 126, 126, 126, 126,
-    126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126,
-    126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126,
-    126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126,
-    146, 147, 160, 148, 149, 150, 152, 153, 154, 134, 135, 136, 137, 139, 143, 144, 138, 138, 140,
-    140, 141, 141, 142, 142, 151, 151, 155, 155, 155, 155, 155, 155, 155, 155, 155, 155, 155, 155,
-    155, 155, 155, 155, 155, 155, 155, 155, 155, 252, 252, 172, 172, 174, 173, 173, 173, 173, 173,
-    173, 173, 173, 175, 176, 177, 177, 131, 122, 122, 122, 122, 128, 178, 178, 178, 178, 178, 178,
-    178, 178, 178, 178, 178, 178, 178, 178, 178, 178, 178, 179, 180, 231, 232, 233, 234, 235, 236,
-    237, 238, 239, 240, 241, 242, 243, 244, 245, 181, 181, 181, 182, 183, 184, 188, 188, 188, 188,
-    188, 188, 188, 188, 188, 188, 188, 188, 188, 188, 188, 188, 188, 188, 188, 188, 188, 188, 189,
-    248, 248, 249, 249, 190, 191, 254, 254, 254, 192, 193, 250, 250, 194, 201, 211, 251, 251, 198,
-    195, 196, 197, 199, 200, 202, 203, 204, 205, 206, 207, 208, 209, 210, 185, 185, 186, 187, 145,
-    145, 156, 156, 157, 253, 253, 158, 159, 159, 132, 129, 129, 129, 129, 129, 212, 212, 212, 212,
-    212, 212, 212, 213, 214, 215, 216, 217, 218, 219, 220, 220, 220, 220, 220, 220, 220, 220, 220,
-    220, 246, 246, 247, 247, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230};
+    0,   121, 260, 260, 162, 163, 163, 262, 261, 164, 164, 164, 164, 164, 164, 170, 165, 166, 173,
+    173, 173, 173, 167, 168, 169, 171, 171, 131, 131, 172, 172, 172, 172, 172, 172, 172, 172, 172,
+    172, 172, 172, 172, 172, 172, 172, 172, 172, 172, 172, 172, 172, 172, 172, 172, 122, 122, 122,
+    122, 257, 258, 258, 134, 259, 125, 125, 125, 128, 124, 124, 124, 124, 124, 124, 126, 126, 126,
+    126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 126, 127, 127, 127, 127, 127, 127,
+    127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127,
+    127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127,
+    127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 147, 148,
+    161, 149, 150, 151, 153, 154, 155, 135, 136, 137, 138, 140, 144, 145, 139, 139, 141, 141, 142,
+    142, 143, 143, 152, 152, 156, 156, 156, 156, 156, 156, 156, 156, 156, 156, 156, 156, 156, 156,
+    156, 156, 156, 156, 156, 156, 156, 254, 254, 174, 174, 176, 175, 175, 175, 175, 175, 175, 175,
+    175, 177, 178, 179, 179, 132, 123, 123, 123, 123, 129, 180, 180, 180, 180, 180, 180, 180, 180,
+    180, 180, 180, 180, 180, 180, 180, 180, 180, 181, 182, 233, 234, 235, 236, 237, 238, 239, 240,
+    241, 242, 243, 244, 245, 246, 247, 183, 183, 183, 184, 185, 186, 190, 190, 190, 190, 190, 190,
+    190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 190, 191, 250, 250,
+    251, 251, 192, 193, 256, 256, 256, 194, 195, 252, 252, 196, 203, 213, 253, 253, 200, 197, 198,
+    199, 201, 202, 204, 205, 206, 207, 208, 209, 210, 211, 212, 187, 187, 188, 189, 146, 146, 157,
+    157, 158, 255, 255, 159, 160, 160, 133, 130, 130, 130, 130, 130, 214, 214, 214, 214, 214, 214,
+    214, 215, 216, 217, 218, 219, 220, 221, 222, 222, 222, 222, 222, 222, 222, 222, 222, 222, 248,
+    248, 249, 249, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232};
 
 const signed char PipelineParserGen::yyr2_[] = {
-    0,  2, 2, 2, 3, 0, 4, 0, 2, 1, 1, 1, 1, 1, 1, 5, 3, 7,  1,  1, 1, 1, 2, 2, 4, 0, 2, 2, 2,
-    1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    3,  0, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 0, 2, 1, 1,
-    4,  1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 0, 2, 2, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1,  1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 7, 4, 4, 4, 7, 4, 7,  8,  7, 7, 4, 7, 7, 1, 1, 1, 4, 4,
-    6,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 6, 0, 2, 0, 2, 11,
-    10, 0, 1, 2, 8, 8, 0, 2, 8, 8, 8, 0, 2, 7, 4, 4, 4, 11, 11, 7, 4, 4, 7, 8, 8, 8, 4, 4, 1,
-    1,  6, 6, 1, 1, 1, 1, 3, 0, 2, 3, 0, 2, 2, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 4, 4, 4,
-    4,  4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 0, 2,  11, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+    0, 2, 2, 2, 3, 0, 4, 0, 2, 1, 1, 1, 1, 1, 1, 5,  3,  7, 1, 1, 1, 1, 2, 2, 4, 0, 2,  2,  2,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,
+    3, 0, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 0, 2, 1, 1,  4,  1,
+    1, 1, 1, 1, 1, 1, 1, 3, 3, 0, 2, 2, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,
+    1, 1, 1, 1, 1, 4, 4, 4, 4, 7, 4, 4, 4, 7, 4, 7,  8,  7, 7, 4, 7, 7, 1, 1, 1, 4, 4,  6,  1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 6, 0, 2, 0, 2, 11, 10, 0,
+    1, 2, 8, 8, 0, 2, 8, 8, 8, 0, 2, 7, 4, 4, 4, 11, 11, 7, 4, 4, 7, 8, 8, 8, 4, 4, 1,  1,  6,
+    6, 1, 1, 1, 1, 3, 0, 2, 3, 0, 2, 2, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 4, 4, 4,  4,  4,
+    4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 0, 2,  11, 4, 4, 4, 4, 4, 4, 4, 4, 4};
 
 
-#if YYDEBUG || 1
 // YYTNAME[SYMBOL-NUM] -- String name of the symbol SYMBOL-NUM.
-// First, the terminals, then, starting at \a YYNTOKENS, nonterminals.
+// First, the terminals, then, starting at \a yyntokens_, nonterminals.
 const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    "error",
-                                                   "\"invalid token\"",
+                                                   "$undefined",
                                                    "ABS",
                                                    "ADD",
                                                    "AND",
@@ -5592,6 +5551,7 @@ const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    "\"maxKey\"",
                                                    "\"$-prefixed string\"",
                                                    "\"$$-prefixed string\"",
+                                                   "\"$-prefixed fieldname\"",
                                                    "START_PIPELINE",
                                                    "START_MATCH",
                                                    "$accept",
@@ -5635,6 +5595,7 @@ const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    "valueObject",
                                                    "valueFields",
                                                    "variable",
+                                                   "pipeline",
                                                    "stageList",
                                                    "stage",
                                                    "inhibitOptimization",
@@ -5733,48 +5694,47 @@ const char* const PipelineParserGen::yytname_[] = {"\"EOF\"",
                                                    "filterFields",
                                                    "filterVal",
                                                    "start",
-                                                   "pipeline",
                                                    "START_ORDERED_OBJECT",
                                                    "$@1",
                                                    YY_NULLPTR};
-#endif
-
 
 #if YYDEBUG
 const short PipelineParserGen::yyrline_[] = {
-    0,    281,  281,  282,  289,  295,  296,  304,  304,  307,  307,  307,  307,  307,  307,  310,
-    320,  326,  336,  336,  336,  336,  340,  345,  350,  366,  369,  376,  379,  385,  386,  387,
-    388,  389,  390,  391,  392,  393,  394,  395,  396,  399,  402,  405,  408,  411,  414,  417,
-    420,  423,  426,  427,  428,  429,  438,  438,  438,  438,  442,  448,  451,  458,  461,  467,
-    471,  471,  471,  471,  475,  483,  486,  489,  492,  495,  498,  507,  510,  513,  516,  519,
-    522,  525,  528,  531,  534,  537,  540,  543,  546,  549,  552,  560,  563,  566,  569,  572,
-    575,  578,  581,  584,  587,  590,  593,  596,  599,  602,  605,  608,  611,  614,  617,  620,
-    623,  626,  629,  632,  635,  638,  641,  644,  647,  650,  653,  656,  659,  662,  665,  668,
-    671,  674,  677,  680,  683,  686,  689,  692,  695,  698,  701,  704,  707,  710,  713,  716,
-    719,  722,  725,  728,  731,  734,  737,  740,  747,  752,  760,  769,  775,  781,  787,  793,
-    799,  805,  811,  817,  823,  829,  835,  841,  847,  850,  856,  859,  865,  868,  874,  877,
-    883,  886,  892,  893,  894,  895,  896,  897,  898,  899,  900,  901,  902,  903,  904,  905,
-    906,  907,  908,  909,  910,  911,  912,  919,  920,  927,  927,  931,  936,  936,  936,  936,
-    936,  936,  937,  937,  943,  951,  957,  960,  967,  974,  974,  974,  974,  978,  984,  984,
-    984,  984,  984,  984,  984,  984,  984,  984,  984,  984,  984,  985,  985,  985,  985,  989,
-    996,  1002, 1007, 1012, 1018, 1023, 1028, 1033, 1039, 1044, 1050, 1059, 1065, 1071, 1076, 1082,
-    1088, 1088, 1088, 1092, 1099, 1106, 1113, 1113, 1113, 1113, 1113, 1113, 1113, 1114, 1114, 1114,
-    1114, 1114, 1114, 1114, 1114, 1115, 1115, 1115, 1115, 1115, 1115, 1115, 1119, 1129, 1132, 1138,
-    1141, 1147, 1156, 1165, 1168, 1171, 1177, 1188, 1199, 1202, 1208, 1216, 1224, 1232, 1235, 1240,
-    1249, 1255, 1261, 1267, 1277, 1287, 1294, 1301, 1308, 1316, 1324, 1332, 1340, 1346, 1352, 1352,
-    1356, 1363, 1370, 1370, 1374, 1374, 1378, 1384, 1385, 1392, 1398, 1401, 1408, 1415, 1416, 1417,
-    1418, 1419, 1422, 1422, 1422, 1422, 1422, 1422, 1422, 1424, 1429, 1434, 1439, 1444, 1449, 1454,
-    1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1474, 1477, 1484, 1487, 1493, 1503,
-    1508, 1513, 1518, 1523, 1528, 1533, 1538, 1543};
+    0,    282,  282,  286,  294,  300,  301,  309,  309,  312,  312,  312,  312,  312,  312,  315,
+    325,  331,  341,  341,  341,  341,  345,  350,  355,  371,  374,  381,  384,  390,  391,  392,
+    393,  394,  395,  396,  397,  398,  399,  400,  401,  404,  407,  410,  413,  416,  419,  422,
+    425,  428,  431,  432,  433,  434,  443,  443,  443,  443,  447,  453,  456,  462,  468,  473,
+    473,  473,  477,  485,  488,  491,  494,  497,  500,  509,  512,  515,  518,  521,  524,  527,
+    530,  533,  536,  539,  542,  545,  548,  551,  554,  562,  565,  568,  571,  574,  577,  580,
+    583,  586,  589,  592,  595,  598,  601,  604,  607,  610,  613,  616,  619,  622,  625,  628,
+    631,  634,  637,  640,  643,  646,  649,  652,  655,  658,  661,  664,  667,  670,  673,  676,
+    679,  682,  685,  688,  691,  694,  697,  700,  703,  706,  709,  712,  715,  718,  721,  724,
+    727,  730,  733,  736,  739,  742,  749,  754,  762,  771,  777,  783,  789,  795,  801,  807,
+    813,  819,  825,  831,  837,  843,  849,  852,  858,  861,  867,  870,  876,  879,  885,  888,
+    894,  895,  896,  897,  898,  899,  900,  901,  902,  903,  904,  905,  906,  907,  908,  909,
+    910,  911,  912,  913,  914,  921,  922,  929,  929,  933,  938,  938,  938,  938,  938,  938,
+    939,  939,  945,  953,  959,  962,  969,  976,  976,  976,  976,  980,  986,  986,  986,  986,
+    986,  986,  986,  986,  986,  986,  986,  986,  986,  987,  987,  987,  987,  991,  998,  1004,
+    1009, 1014, 1020, 1025, 1030, 1035, 1041, 1046, 1052, 1061, 1067, 1073, 1078, 1084, 1090, 1090,
+    1090, 1094, 1101, 1108, 1115, 1115, 1115, 1115, 1115, 1115, 1115, 1116, 1116, 1116, 1116, 1116,
+    1116, 1116, 1116, 1117, 1117, 1117, 1117, 1117, 1117, 1117, 1121, 1131, 1134, 1140, 1143, 1149,
+    1158, 1167, 1170, 1173, 1179, 1190, 1201, 1204, 1210, 1218, 1226, 1234, 1237, 1242, 1251, 1257,
+    1263, 1269, 1279, 1289, 1296, 1303, 1310, 1318, 1326, 1334, 1342, 1348, 1354, 1354, 1358, 1365,
+    1372, 1372, 1376, 1376, 1380, 1386, 1387, 1394, 1400, 1403, 1410, 1417, 1418, 1419, 1420, 1421,
+    1424, 1424, 1424, 1424, 1424, 1424, 1424, 1426, 1431, 1436, 1441, 1446, 1451, 1456, 1462, 1463,
+    1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1476, 1479, 1486, 1489, 1495, 1505, 1510, 1515,
+    1520, 1525, 1530, 1535, 1540, 1545};
 
-void PipelineParserGen::yy_stack_print_() const {
+// Print the state stack on the debug stream.
+void PipelineParserGen::yystack_print_() {
     *yycdebug_ << "Stack now";
     for (stack_type::const_iterator i = yystack_.begin(), i_end = yystack_.end(); i != i_end; ++i)
         *yycdebug_ << ' ' << int(i->state);
     *yycdebug_ << '\n';
 }
 
-void PipelineParserGen::yy_reduce_print_(int yyrule) const {
+// Report on the debug stream that the rule \a yyrule is going to be reduced.
+void PipelineParserGen::yy_reduce_print_(int yyrule) {
     int yylno = yyrline_[yyrule];
     int yynrhs = yyr2_[yyrule];
     // Print the symbols being reduced, and their result.
@@ -5786,8 +5746,8 @@ void PipelineParserGen::yy_reduce_print_(int yyrule) const {
 #endif  // YYDEBUG
 
 
-#line 58 "pipeline_grammar.yy"
+#line 58 "src/mongo/db/cst/pipeline_grammar.yy"
 }  // namespace mongo
-#line 5502 "pipeline_parser_gen.cpp"
+#line 5457 "src/mongo/db/cst/pipeline_parser_gen.cpp"
 
-#line 1547 "pipeline_grammar.yy"
+#line 1549 "src/mongo/db/cst/pipeline_grammar.yy"

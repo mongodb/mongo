@@ -52,13 +52,14 @@ namespace mongo {
 ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     MatchType type,
     StringData path,
-    const BSONElement& rhs,
+    Value rhs,
     ElementPath::LeafArrayBehavior leafArrBehavior,
     ElementPath::NonLeafArrayBehavior nonLeafArrBehavior,
     clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(type, path, leafArrBehavior, nonLeafArrBehavior, std::move(annotation)),
-      _rhs(rhs) {
-    invariant(_rhs);
+      _backingBSON(BSON(path << rhs)),
+      _rhs(_backingBSON.firstElement()) {
+    invariant(_rhs.type() != BSONType::EOO);
 }
 
 bool ComparisonMatchExpressionBase::equivalent(const MatchExpression* other) const {
@@ -95,11 +96,11 @@ BSONObj ComparisonMatchExpressionBase::getSerializedRightHandSide() const {
 
 ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
                                                      StringData path,
-                                                     const BSONElement& rhs,
+                                                     Value rhs,
                                                      clonable_ptr<ErrorAnnotation> annotation)
     : ComparisonMatchExpressionBase(type,
                                     path,
-                                    rhs,
+                                    std::move(rhs),
                                     ElementPath::LeafArrayBehavior::kTraverse,
                                     ElementPath::NonLeafArrayBehavior::kTraverse,
                                     std::move(annotation)) {
@@ -210,17 +211,6 @@ std::unique_ptr<pcrecpp::RE> RegexMatchExpression::makeRegex(const std::string& 
 }
 
 RegexMatchExpression::RegexMatchExpression(StringData path,
-                                           const BSONElement& e,
-                                           clonable_ptr<ErrorAnnotation> annotation)
-    : LeafMatchExpression(REGEX, path, std::move(annotation)),
-      _regex(e.regex()),
-      _flags(e.regexFlags()),
-      _re(makeRegex(_regex, _flags)) {
-    uassert(ErrorCodes::BadValue, "regex not a regex", e.type() == RegEx);
-    _init();
-}
-
-RegexMatchExpression::RegexMatchExpression(StringData path,
                                            StringData regex,
                                            StringData options,
                                            clonable_ptr<ErrorAnnotation> annotation)
@@ -228,10 +218,7 @@ RegexMatchExpression::RegexMatchExpression(StringData path,
       _regex(regex.toString()),
       _flags(options.toString()),
       _re(new pcrecpp::RE(_regex.c_str(), regex_util::flagsToPcreOptions(_flags, true))) {
-    _init();
-}
 
-void RegexMatchExpression::_init() {
     uassert(ErrorCodes::BadValue,
             "Regular expression cannot contain an embedded null byte",
             _regex.find('\0') == std::string::npos);

@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -105,7 +106,7 @@ public:
 
     ComparisonMatchExpressionBase(MatchType type,
                                   StringData path,
-                                  const BSONElement& rhs,
+                                  Value rhs,
                                   ElementPath::LeafArrayBehavior,
                                   ElementPath::NonLeafArrayBehavior,
                                   clonable_ptr<ErrorAnnotation> annotation = nullptr);
@@ -132,6 +133,7 @@ public:
      * BSONObj backing 'elem' outlives this MatchExpression.
      */
     void setData(BSONElement elem) {
+        // TODO SERVER-50629: Ensure that the _backingBSON is consistent with the new element.
         _rhs = elem;
     }
 
@@ -147,6 +149,8 @@ protected:
         _collator = collator;
     }
 
+    // BSON which holds the data referenced by _rhs.
+    BSONObj _backingBSON;
     BSONElement _rhs;
 
     // Collator used to compare elements. By default, simple binary comparison will be used.
@@ -181,7 +185,7 @@ public:
 
     ComparisonMatchExpression(MatchType type,
                               StringData path,
-                              const BSONElement& rhs,
+                              Value rhs,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual ~ComparisonMatchExpression() = default;
@@ -194,9 +198,13 @@ public:
     static constexpr StringData kName = "$eq"_sd;
 
     EqualityMatchExpression(StringData path,
+                            Value rhs,
+                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ComparisonMatchExpression(EQ, path, std::move(rhs), std::move(annotation)) {}
+    EqualityMatchExpression(StringData path,
                             const BSONElement& rhs,
                             clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(EQ, path, rhs, std::move(annotation)) {}
+        : ComparisonMatchExpression(EQ, path, Value(rhs), std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -204,7 +212,7 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
-            std::make_unique<EqualityMatchExpression>(path(), _rhs, _errorAnnotation);
+            std::make_unique<EqualityMatchExpression>(path(), Value(getData()), _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -226,9 +234,13 @@ public:
     static constexpr StringData kName = "$lte"_sd;
 
     LTEMatchExpression(StringData path,
+                       Value rhs,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ComparisonMatchExpression(LTE, path, std::move(rhs), std::move(annotation)) {}
+    LTEMatchExpression(StringData path,
                        const BSONElement& rhs,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(LTE, path, rhs, std::move(annotation)) {}
+        : ComparisonMatchExpression(LTE, path, Value(rhs), std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -258,9 +270,13 @@ public:
     static constexpr StringData kName = "$lt"_sd;
 
     LTMatchExpression(StringData path,
+                      Value rhs,
+                      clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ComparisonMatchExpression(LT, path, std::move(rhs), std::move(annotation)) {}
+    LTMatchExpression(StringData path,
                       const BSONElement& rhs,
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(LT, path, rhs, std::move(annotation)) {}
+        : ComparisonMatchExpression(LT, path, Value(rhs), std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -290,9 +306,14 @@ public:
     static constexpr StringData kName = "$gt"_sd;
 
     GTMatchExpression(StringData path,
+                      Value rhs,
+                      clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ComparisonMatchExpression(GT, path, std::move(rhs), std::move(annotation)) {}
+
+    GTMatchExpression(StringData path,
                       const BSONElement& rhs,
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(GT, path, rhs, std::move(annotation)) {}
+        : ComparisonMatchExpression(GT, path, Value(rhs), std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -322,9 +343,13 @@ public:
     static constexpr StringData kName = "$gte"_sd;
 
     GTEMatchExpression(StringData path,
+                       Value rhs,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ComparisonMatchExpression(GTE, path, std::move(rhs), std::move(annotation)) {}
+    GTEMatchExpression(StringData path,
                        const BSONElement& rhs,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(GTE, path, rhs, std::move(annotation)) {}
+        : ComparisonMatchExpression(GTE, path, Value(rhs), std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
@@ -356,9 +381,14 @@ public:
     static std::unique_ptr<pcrecpp::RE> makeRegex(const std::string& regex,
                                                   const std::string& flags);
 
+    RegexMatchExpression(StringData path, Value e, clonable_ptr<ErrorAnnotation> annotation)
+        : RegexMatchExpression(path, e.getRegex(), e.getRegexFlags(), std::move(annotation)) {}
+
     RegexMatchExpression(StringData path,
                          const BSONElement& e,
-                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
+                         clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : RegexMatchExpression(path, Value(e), annotation) {}
+
     RegexMatchExpression(StringData path,
                          StringData regex,
                          StringData options,

@@ -55,7 +55,7 @@ public:
     InternalExprEqMatchExpression(StringData path, BSONElement value)
         : ComparisonMatchExpressionBase(MatchType::INTERNAL_EXPR_EQ,
                                         path,
-                                        value,
+                                        Value(value),
                                         ElementPath::LeafArrayBehavior::kNoTraversal,
                                         ElementPath::NonLeafArrayBehavior::kMatchSubpath) {
         invariant(_rhs.type() != BSONType::Undefined);

@@ -34,92 +34,92 @@
 #include "mongo/util/printable_enum.h"
 
 #define KEYFIELDNAMES(ENUMIFY)   \
-    ENUMIFY(add)                 \
-    ENUMIFY(atan2)               \
     ENUMIFY(abs)                 \
+    ENUMIFY(add)                 \
+    ENUMIFY(andExpr)             \
+    ENUMIFY(atan2)               \
     ENUMIFY(ceil)                \
+    ENUMIFY(charsArg)            \
+    ENUMIFY(cmp)                 \
+    ENUMIFY(collArg)             \
+    ENUMIFY(concat)              \
+    ENUMIFY(constExpr)           \
+    ENUMIFY(convert)             \
+    ENUMIFY(dateArg)             \
+    ENUMIFY(dateFromString)      \
+    ENUMIFY(dateStringArg)       \
+    ENUMIFY(dateToString)        \
     ENUMIFY(divide)              \
+    ENUMIFY(eq)                  \
     ENUMIFY(exponent)            \
+    ENUMIFY(findArg)             \
     ENUMIFY(floor)               \
+    ENUMIFY(formatArg)           \
+    ENUMIFY(gt)                  \
+    ENUMIFY(gte)                 \
+    ENUMIFY(id)                  \
+    ENUMIFY(indexOfBytes)        \
+    ENUMIFY(indexOfCP)           \
+    ENUMIFY(inhibitOptimization) \
+    ENUMIFY(inputArg)            \
+    ENUMIFY(limit)               \
+    ENUMIFY(literal)             \
     ENUMIFY(ln)                  \
     ENUMIFY(log)                 \
     ENUMIFY(logten)              \
-    ENUMIFY(mod)                 \
-    ENUMIFY(multiply)            \
-    ENUMIFY(pow)                 \
-    ENUMIFY(round)               \
-    ENUMIFY(sqrt)                \
-    ENUMIFY(subtract)            \
-    ENUMIFY(trunc)               \
-    ENUMIFY(id)                  \
-    ENUMIFY(andExpr)             \
-    ENUMIFY(orExpr)              \
-    ENUMIFY(notExpr)             \
-    ENUMIFY(cmp)                 \
-    ENUMIFY(eq)                  \
-    ENUMIFY(gt)                  \
-    ENUMIFY(gte)                 \
     ENUMIFY(lt)                  \
     ENUMIFY(lte)                 \
+    ENUMIFY(ltrim)               \
+    ENUMIFY(match)               \
+    ENUMIFY(mod)                 \
+    ENUMIFY(multiply)            \
     ENUMIFY(ne)                  \
+    ENUMIFY(notExpr)             \
+    ENUMIFY(onErrorArg)          \
+    ENUMIFY(onNullArg)           \
+    ENUMIFY(optionsArg)          \
+    ENUMIFY(orExpr)              \
+    ENUMIFY(pipelineArg)         \
+    ENUMIFY(pow)                 \
     ENUMIFY(projectExclusion)    \
     ENUMIFY(projectInclusion)    \
-    ENUMIFY(match)               \
-    ENUMIFY(inhibitOptimization) \
-    ENUMIFY(unionWith)           \
-    ENUMIFY(collArg)             \
-    ENUMIFY(pipelineArg)         \
+    ENUMIFY(regexArg)            \
+    ENUMIFY(regexFind)           \
+    ENUMIFY(regexFindAll)        \
+    ENUMIFY(regexMatch)          \
+    ENUMIFY(replaceAll)          \
+    ENUMIFY(replacementArg)      \
+    ENUMIFY(replaceOne)          \
+    ENUMIFY(round)               \
+    ENUMIFY(rtrim)               \
     ENUMIFY(sample)              \
     ENUMIFY(sizeArg)             \
     ENUMIFY(skip)                \
-    ENUMIFY(limit)               \
-    ENUMIFY(constExpr)           \
-    ENUMIFY(literal)             \
-    ENUMIFY(convert)             \
-    ENUMIFY(inputArg)            \
+    ENUMIFY(split)               \
+    ENUMIFY(sqrt)                \
+    ENUMIFY(strcasecmp)          \
+    ENUMIFY(strLenBytes)         \
+    ENUMIFY(strLenCP)            \
+    ENUMIFY(substr)              \
+    ENUMIFY(substrBytes)         \
+    ENUMIFY(substrCP)            \
+    ENUMIFY(subtract)            \
+    ENUMIFY(timezoneArg)         \
     ENUMIFY(toArg)               \
-    ENUMIFY(onErrorArg)          \
-    ENUMIFY(onNullArg)           \
     ENUMIFY(toBool)              \
     ENUMIFY(toDate)              \
     ENUMIFY(toDecimal)           \
     ENUMIFY(toDouble)            \
     ENUMIFY(toInt)               \
     ENUMIFY(toLong)              \
+    ENUMIFY(toLower)             \
     ENUMIFY(toObjectId)          \
     ENUMIFY(toString)            \
-    ENUMIFY(type)                \
-    ENUMIFY(concat)              \
-    ENUMIFY(dateFromString)      \
-    ENUMIFY(dateToString)        \
-    ENUMIFY(formatArg)           \
-    ENUMIFY(timezoneArg)         \
-    ENUMIFY(dateStringArg)       \
-    ENUMIFY(dateArg)             \
-    ENUMIFY(regexArg)            \
-    ENUMIFY(findArg)             \
-    ENUMIFY(replacementArg)      \
-    ENUMIFY(optionsArg)          \
-    ENUMIFY(charsArg)            \
-    ENUMIFY(indexOfBytes)        \
-    ENUMIFY(indexOfCP)           \
-    ENUMIFY(ltrim)               \
-    ENUMIFY(rtrim)               \
+    ENUMIFY(toUpper)             \
     ENUMIFY(trim)                \
-    ENUMIFY(regexFind)           \
-    ENUMIFY(regexFindAll)        \
-    ENUMIFY(regexMatch)          \
-    ENUMIFY(replaceOne)          \
-    ENUMIFY(replaceAll)          \
-    ENUMIFY(split)               \
-    ENUMIFY(strLenBytes)         \
-    ENUMIFY(strLenCP)            \
-    ENUMIFY(strcasecmp)          \
-    ENUMIFY(substr)              \
-    ENUMIFY(substrBytes)         \
-    ENUMIFY(substrCP)            \
-    ENUMIFY(toLower)             \
-    ENUMIFY(toUpper)
+    ENUMIFY(trunc)               \
+    ENUMIFY(type)                \
+    ENUMIFY(unionWith)
 
 MAKE_PRINTABLE_ENUM(KeyFieldname, KEYFIELDNAMES);
 MAKE_PRINTABLE_ENUM_STRING_ARRAY(key_fieldname, KeyFieldname, KEYFIELDNAMES);

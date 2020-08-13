@@ -39,6 +39,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/cst/c_node.h"
+#include "mongo/db/cst/cst_match_translation.h"
 #include "mongo/db/cst/cst_pipeline_translation.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
@@ -62,10 +63,9 @@
 namespace mongo::cst_pipeline_translation {
 namespace {
 Value translateLiteralToValue(const CNode& cst);
-Value translateLiteralLeaf(const CNode& cst);
 
 /**
- * Walk a literal array payload and produce a Value. This function is neccesary because Aggregation
+ * Walk a literal array payload and produce a Value. This function is necessary because Aggregation
  * Expression literals are required to be collapsed into Values inside ExpressionConst but
  * uncollapsed otherwise.
  */
@@ -406,32 +406,6 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
     }
 }
 
-/**
- * Walk a literal leaf CNode and produce an agg Value.
- */
-Value translateLiteralLeaf(const CNode& cst) {
-    return stdx::visit(
-        visit_helper::Overloaded{
-            // These are illegal since they're non-leaf.
-            [](const CNode::ArrayChildren&) -> Value { MONGO_UNREACHABLE; },
-            [](const CNode::ObjectChildren&) -> Value { MONGO_UNREACHABLE; },
-            [](const CompoundInclusionKey&) -> Value { MONGO_UNREACHABLE; },
-            [](const CompoundExclusionKey&) -> Value { MONGO_UNREACHABLE; },
-            [](const CompoundInconsistentKey&) -> Value { MONGO_UNREACHABLE; },
-            // These are illegal since they're non-literal.
-            [](const KeyValue&) -> Value { MONGO_UNREACHABLE; },
-            [](const NonZeroKey&) -> Value { MONGO_UNREACHABLE; },
-            // These payloads require a special translation to DocumentValue parlance.
-            [](const UserUndefined&) { return Value{BSONUndefined}; },
-            [](const UserNull&) { return Value{BSONNULL}; },
-            [](const UserMinKey&) { return Value{MINKEY}; },
-            [](const UserMaxKey&) { return Value{MAXKEY}; },
-            [](const UserFieldPath& ufp) { return Value{ufp.rawStr}; },
-            // The rest convert directly.
-            [](auto&& payload) { return Value{payload}; }},
-        cst.payload);
-}
-
 enum class ProjectionType : char { inclusion, exclusion, computed };
 
 /**
@@ -593,20 +567,18 @@ auto translateLimit(const CNode& cst, const boost::intrusive_ptr<ExpressionConte
 }
 
 /**
- * Unwrap a sample stage CNode and produce a DocumentSourceMatch.
+ * Unwrap a sample stage CNode and produce a DocumentSourceSample.
  */
 auto translateSample(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return DocumentSourceSample::create(expCtx, translateNumToLong(cst.objectChildren()[0].second));
 }
 
 /**
- * Unwrap a match stage CNode and produce a DocumentSourceSample.
+ * Unwrap a match stage CNode and produce a DocumentSourceMatch.
  */
 auto translateMatch(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    // TODO SERVER-48790, Implement CST to MatchExpression/Query command translation.
-    // And add corresponding tests in cst_pipeline_translation_test.cpp.
-    auto placeholder = fromjson("{}");
-    return DocumentSourceMatch::create(placeholder, expCtx);
+    auto matchExpr = cst_match_translation::translateMatchExpression(cst, expCtx);
+    return make_intrusive<DocumentSourceMatch>(std::move(matchExpr), expCtx);
 }
 
 /**
@@ -692,6 +664,32 @@ std::unique_ptr<Pipeline, PipelineDeleter> translatePipeline(
                                      std::back_inserter(sources),
                                      [&](auto&& elem) { return translateSource(elem, expCtx); }));
     return Pipeline::create(std::move(sources), expCtx);
+}
+
+/**
+ * Walk a literal leaf CNode and produce an agg Value.
+ */
+Value translateLiteralLeaf(const CNode& cst) {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            // These are illegal since they're non-leaf.
+            [](const CNode::ArrayChildren&) -> Value { MONGO_UNREACHABLE; },
+            [](const CNode::ObjectChildren&) -> Value { MONGO_UNREACHABLE; },
+            [](const CompoundInclusionKey&) -> Value { MONGO_UNREACHABLE; },
+            [](const CompoundExclusionKey&) -> Value { MONGO_UNREACHABLE; },
+            [](const CompoundInconsistentKey&) -> Value { MONGO_UNREACHABLE; },
+            // These are illegal since they're non-literal.
+            [](const KeyValue&) -> Value { MONGO_UNREACHABLE; },
+            [](const NonZeroKey&) -> Value { MONGO_UNREACHABLE; },
+            // These payloads require a special translation to DocumentValue parlance.
+            [](const UserUndefined&) { return Value{BSONUndefined}; },
+            [](const UserNull&) { return Value{BSONNULL}; },
+            [](const UserMinKey&) { return Value{MINKEY}; },
+            [](const UserMaxKey&) { return Value{MAXKEY}; },
+            [](const UserFieldPath& ufp) { return Value{ufp.rawStr}; },
+            // The rest convert directly.
+            [](auto&& payload) { return Value{payload}; }},
+        cst.payload);
 }
 
 }  // namespace mongo::cst_pipeline_translation

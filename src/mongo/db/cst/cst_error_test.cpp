@@ -61,8 +61,8 @@ TEST(CstErrorTest, UnknownStageName) {
         ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
                                     AssertionException,
                                     ErrorCodes::FailedToParse,
-                                    "syntax error, unexpected fieldname at element '$unknownStage' "
-                                    "within array at index 0 of input pipeline");
+                                    "syntax error, unexpected $-prefixed fieldname at element "
+                                    "'$unknownStage' within array at index 0 of input pipeline");
     }
     // Subsequent stage.
     {
@@ -71,8 +71,8 @@ TEST(CstErrorTest, UnknownStageName) {
         ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
                                     AssertionException,
                                     ErrorCodes::FailedToParse,
-                                    "syntax error, unexpected fieldname at element '$unknownStage' "
-                                    "within array at index 1 of input pipeline");
+                                    "syntax error, unexpected $-prefixed fieldname at element "
+                                    "'$unknownStage' within array at index 1 of input pipeline");
     }
 }
 

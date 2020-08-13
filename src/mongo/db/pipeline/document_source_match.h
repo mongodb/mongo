@@ -78,6 +78,19 @@ public:
         const std::string& path,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSource(kStageName, expCtx) {
+        // TODO SERVER-48830: Remove need for holding serialized version of the MatchExpression.
+        _expression = std::move(expr);
+        _predicate = _expression->serialize();
+        _isTextQuery = isTextQuery(_predicate);
+        _dependencies =
+            DepsTracker(_isTextQuery ? DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore
+                                     : DepsTracker::kAllMetadata);
+        getDependencies(&_dependencies);
+    }
+
     virtual ~DocumentSourceMatch() = default;
 
     /**

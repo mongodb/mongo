@@ -331,6 +331,23 @@ TEST(CstGrammarTest, FailsToParseCompoundMixedProject) {
     }
 }
 
+TEST(CstGrammarTest, FailsToParseProjectWithDollarFieldNames) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: {$a: 1}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: {b: 1, $a: 1}}]}");
+        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        auto parseTree = PipelineParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
 TEST(CstTest, BuildsAndPrintsAnd) {
     {
         const auto cst = CNode{CNode::ObjectChildren{
@@ -856,22 +873,38 @@ TEST(CstGrammarTest, ParsesEmptyMatchInFind) {
     BSONLexer lexer(input, PipelineParserGen::token::START_MATCH);
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stage = output;
-    ASSERT(KeyFieldname::match == stage.firstKeyFieldname());
-    ASSERT_EQ(stage.toBson().toString(), "{ match: {} }");
+    ASSERT_EQ(output.toBson().toString(), "{}");
 }
 
-TEST(CstGrammarTest, ParsesMatchInFind) {
+TEST(CstGrammarTest, ParsesMatchWithEqualityPredicates) {
     CNode output;
-    auto input = fromjson("{a: 1.0, b: NumberInt(1), _id: NumberLong(1)}");
+    auto input = fromjson("{a: 5.0, b: NumberInt(10), _id: NumberLong(15)}");
     BSONLexer lexer(input, PipelineParserGen::token::START_MATCH);
     auto parseTree = PipelineParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    auto stage = output;
-    ASSERT(KeyFieldname::match == stage.firstKeyFieldname());
-    ASSERT_EQ(stage.toBson().toString(),
-              "{ match: { a: \"<UserDouble 1.000000>\", b: \"<UserInt 1>\", id: \"<UserLong "
-              "1>\" } }");
+    ASSERT_EQ(output.toBson().toString(),
+              "{ a: \"<UserDouble 5.000000>\", b: \"<UserInt 10>\", _id: \"<UserLong 15>\" }");
+}
+
+TEST(CstGrammarTest, FailsToParseDollarPrefixedPredicates) {
+    {
+        auto input = fromjson("{$atan2: [3, 5]}");
+        BSONLexer lexer(input, PipelineParserGen::token::START_MATCH);
+        ASSERT_THROWS_CODE_AND_WHAT(
+            PipelineParserGen(lexer, nullptr).parse(),
+            AssertionException,
+            ErrorCodes::FailedToParse,
+            "syntax error, unexpected ATAN2 at element '$atan2' of input filter");
+    }
+    {
+        auto input = fromjson("{$prefixed: 5}");
+        BSONLexer lexer(input, PipelineParserGen::token::START_MATCH);
+        ASSERT_THROWS_CODE_AND_WHAT(
+            PipelineParserGen(lexer, nullptr).parse(),
+            AssertionException,
+            ErrorCodes::FailedToParse,
+            "syntax error, unexpected $-prefixed fieldname at element '$prefixed' of input filter");
+    }
 }
 
 }  // namespace
