@@ -630,11 +630,17 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
                 std::string abortReason(str::stream() << "Index build aborted: " << buildUUID
                                                       << ": " << interruptionEx.toString());
-                indexBuildsCoord->abortIndexBuildByBuildUUID(
-                    abortCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort, abortReason);
-                LOGV2(20443,
-                      "Index build: aborted due to interruption",
-                      "buildUUID"_attr = buildUUID);
+                if (indexBuildsCoord->abortIndexBuildByBuildUUID(
+                        abortCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort, abortReason)) {
+                    LOGV2(20443,
+                          "Index build: aborted due to interruption",
+                          "buildUUID"_attr = buildUUID);
+                } else {
+                    // The index build may already be in the midst of tearing down.
+                    LOGV2(5010500,
+                          "Index build: failed to abort index build",
+                          "buildUUID"_attr = buildUUID);
+                }
             }
             throw;
         } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
@@ -653,10 +659,18 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
             std::string abortReason(str::stream() << "Index build aborted: " << buildUUID << ": "
                                                   << ex.toString());
-            indexBuildsCoord->abortIndexBuildByBuildUUID(
-                opCtx, buildUUID, IndexBuildAction::kPrimaryAbort, abortReason);
-            LOGV2(
-                20446, "Index build: aborted due to NotMaster error", "buildUUID"_attr = buildUUID);
+            if (indexBuildsCoord->abortIndexBuildByBuildUUID(
+                    opCtx, buildUUID, IndexBuildAction::kPrimaryAbort, abortReason)) {
+                LOGV2(20446,
+                      "Index build: aborted due to NotMaster error",
+                      "buildUUID"_attr = buildUUID);
+            } else {
+                // The index build may already be in the midst of tearing down.
+                LOGV2(5010501,
+                      "Index build: failed to abort index build",
+                      "buildUUID"_attr = buildUUID);
+            }
+
             throw;
         }
 

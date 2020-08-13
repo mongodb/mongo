@@ -728,8 +728,15 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
         return _filterIndexBuilds_inlock(lk, indexBuildFilter);
     }();
     for (auto replState : builds) {
-        abortIndexBuildByBuildUUID(
-            opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, reason);
+        if (!abortIndexBuildByBuildUUID(
+                opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, reason)) {
+            // The index build may already be in the midst of tearing down.
+            LOGV2(5010502,
+                  "Index build: failed to abort index build for database drop",
+                  "buildUUID"_attr = replState->buildUUID,
+                  "database"_attr = db,
+                  "collectionUUID"_attr = replState->collectionUUID);
+        }
     }
 }
 
@@ -743,8 +750,15 @@ void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext*
         return _filterIndexBuilds_inlock(lk, indexBuildFilter);
     }();
     for (auto replState : builds) {
-        abortIndexBuildByBuildUUID(
-            opCtx, replState->buildUUID, IndexBuildAction::kInitialSyncAbort, reason);
+        if (!abortIndexBuildByBuildUUID(
+                opCtx, replState->buildUUID, IndexBuildAction::kInitialSyncAbort, reason)) {
+            // The index build may already be in the midst of tearing down.
+            LOGV2(5010503,
+                  "Index build: failed to abort index build for initial sync",
+                  "buildUUID"_attr = replState->buildUUID,
+                  "database"_attr = replState->dbName,
+                  "collectionUUID"_attr = replState->collectionUUID);
+        }
     }
 }
 
@@ -923,9 +937,15 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
 
     std::string abortReason(str::stream()
                             << "abortIndexBuild oplog entry encountered: " << *oplogEntry.cause);
-    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-    indexBuildsCoord->abortIndexBuildByBuildUUID(
-        opCtx, buildUUID, IndexBuildAction::kOplogAbort, abortReason);
+    if (!abortIndexBuildByBuildUUID(opCtx, buildUUID, IndexBuildAction::kOplogAbort, abortReason)) {
+        // The index build may already be in the midst of tearing down.
+        LOGV2(5010504,
+              "Index build: failed to abort index build while applying abortIndexBuild operation",
+              "buildUUID"_attr = buildUUID,
+              "namespace"_attr = nss,
+              "collectionUUID"_attr = collUUID,
+              "cause"_attr = *oplogEntry.cause);
+    }
 }
 
 boost::optional<UUID> IndexBuildsCoordinator::abortIndexBuildByIndexNames(
@@ -1384,7 +1404,22 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
                   "buildUUID"_attr = replState->buildUUID);
             return;
         }
+
+        // This will unblock the index build and allow it to complete without cleaning up.
+        // Subsequently, the rollback algorithm can decide how to undo the index build depending on
+        // the state of the oplog. Signals the kRollbackAbort and then waits for the thread to join.
         const std::string reason = "rollback";
+        if (!abortIndexBuildByBuildUUID(
+                opCtx, replState->buildUUID, IndexBuildAction::kRollbackAbort, reason)) {
+            // The index build may already be in the midst of tearing down.
+            // Leave this index build out of 'buildsStopped'.
+            LOGV2(5010505,
+                  "Index build: failed to abort index build before rollback",
+                  "buildUUID"_attr = replState->buildUUID,
+                  "database"_attr = replState->dbName,
+                  "collectionUUID"_attr = replState->collectionUUID);
+            return;
+        }
 
         IndexBuildDetails aborted{replState->collectionUUID};
         // Record the index builds aborted due to rollback. This allows any rollback algorithm
@@ -1394,12 +1429,6 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
             aborted.indexSpecs.emplace_back(spec.getOwned());
         }
         buildsStopped.insert({replState->buildUUID, aborted});
-
-        // This will unblock the index build and allow it to complete without cleaning up.
-        // Subsequently, the rollback algorithm can decide how to undo the index build depending on
-        // the state of the oplog. Signals the kRollbackAbort and then waits for the thread to join.
-        abortIndexBuildByBuildUUID(
-            opCtx, replState->buildUUID, IndexBuildAction::kRollbackAbort, reason);
     };
     forEachIndexBuild(
         indexBuilds, "IndexBuildsCoordinator::stopIndexBuildsForRollback"_sd, onIndexBuild);

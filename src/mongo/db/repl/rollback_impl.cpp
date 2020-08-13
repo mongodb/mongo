@@ -343,7 +343,8 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
     invariant(opCtx);
 
     // Aborts all active, two-phase index builds.
-    IndexBuildsCoordinator::get(opCtx)->stopIndexBuildsForRollback(opCtx);
+    MONGO_COMPILER_VARIABLE_UNUSED auto stoppedIndexBuilds =
+        IndexBuildsCoordinator::get(opCtx)->stopIndexBuildsForRollback(opCtx);
 
     // Get a list of all databases.
     StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
