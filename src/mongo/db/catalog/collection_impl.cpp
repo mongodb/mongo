@@ -639,11 +639,11 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
         const auto& doc = it->doc;
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
-            std::string copyBuffer(doc.objdata(), doc.objsize());
-            copyBuffer.data()[5] = char(0x90);
+            // Generate a corrupted copy of 'obj' that is half the size of the source doc.
+            std::vector<char> copyBuffer(doc.objsize() / 2);
+            std::memcpy(&copyBuffer[0], doc.objdata(), copyBuffer.size());
 
-            records.emplace_back(
-                Record{RecordId(), RecordData(copyBuffer.c_str(), copyBuffer.size())});
+            records.emplace_back(Record{RecordId(), RecordData(&copyBuffer[0], copyBuffer.size())});
             timestamps.emplace_back(it->oplogSlot.getTimestamp());
             continue;
         }
