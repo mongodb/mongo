@@ -942,7 +942,8 @@ protected:
                 solutions[ix]->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
             }
 
-            result->emplace(buildExecutableTree(*solutions[ix], true), std::move(solutions[ix]));
+            auto execTree = buildExecutableTree(*solutions[ix], true);
+            result->emplace(std::move(execTree), std::move(solutions[ix]));
         }
         return result;
     }
