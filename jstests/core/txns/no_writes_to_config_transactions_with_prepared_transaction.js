@@ -74,7 +74,7 @@ jsTestLog("Test that dropping config.transactions fails when there is a prepared
 assert.commandFailedWithCode(assert.throws(function() {
                                               sessionConfigDB.transactions.drop();
                                           }),
-                                          40528);
+                                          [4852500, 40528]);
 
 jsTestLog("Test that we can prepare a transaction on a different session");
 const session2 = db.getMongo().startSession({causalConsistency: false});
