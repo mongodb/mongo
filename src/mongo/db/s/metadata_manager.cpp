@@ -137,8 +137,8 @@ std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMet
     }
 
     auto chunkManager = activeMetadata->getChunkManager();
-    auto chunkManagerAtClusterTime = std::make_shared<ChunkManager>(
-        chunkManager->getRoutingHistory(), atClusterTime->asTimestamp());
+    ChunkManager chunkManagerAtClusterTime =
+        ChunkManager(chunkManager->getRoutingHistory(), atClusterTime->asTimestamp());
 
     class MetadataAtTimestamp : public ScopedCollectionDescription::Impl {
     public:

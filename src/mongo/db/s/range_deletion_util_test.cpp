@@ -101,13 +101,12 @@ public:
                        ChunkVersion(1, 0, epoch),
                        ShardId("dummyShardId")}});
 
-        std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, boost::none);
-
         AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
         CollectionShardingRuntime::get(operationContext(), kNss)
-            ->setFilteringMetadata(operationContext(),
-                                   CollectionMetadata(cm, ShardId("dummyShardId")));
+            ->setFilteringMetadata(
+                operationContext(),
+                CollectionMetadata(ChunkManager(rt, boost::none), ShardId("dummyShardId")));
     }
 
     UUID uuid() const {

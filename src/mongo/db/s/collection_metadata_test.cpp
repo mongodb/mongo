@@ -82,8 +82,7 @@ std::unique_ptr<CollectionMetadata> makeCollectionMetadataImpl(
     UUID uuid(UUID::gen());
     auto rt =
         RoutingTableHistory::makeNew(kNss, uuid, shardKeyPattern, nullptr, false, epoch, allChunks);
-    std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, kChunkManager);
-    return std::make_unique<CollectionMetadata>(cm, kThisShard);
+    return std::make_unique<CollectionMetadata>(ChunkManager(rt, kChunkManager), kThisShard);
 }
 
 struct ConstructedRangeMap : public RangeMap {

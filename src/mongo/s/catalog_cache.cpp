@@ -276,12 +276,12 @@ CatalogCache::RefreshResult CatalogCache::_getCollectionRoutingInfoAt(
             continue;
         }
 
-        std::shared_ptr<ChunkManager> chunkManager = nullptr;
-        if (collEntry->routingInfo) {
-            chunkManager = std::make_shared<ChunkManager>(collEntry->routingInfo, atClusterTime);
-        }
-
-        return {CachedCollectionRoutingInfo(nss, dbInfo, std::move(chunkManager)),
+        return {CachedCollectionRoutingInfo(nss,
+                                            dbInfo,
+                                            collEntry->routingInfo
+                                                ? boost::optional<ChunkManager>(ChunkManager(
+                                                      collEntry->routingInfo, atClusterTime))
+                                                : boost::none),
                 refreshActionTaken};
     }
 }
@@ -889,7 +889,7 @@ std::string ComparableChunkVersion::toString() const {
 
 CachedCollectionRoutingInfo::CachedCollectionRoutingInfo(NamespaceString nss,
                                                          CachedDatabaseInfo db,
-                                                         std::shared_ptr<ChunkManager> cm)
+                                                         boost::optional<ChunkManager> cm)
     : _nss(std::move(nss)), _db(std::move(db)), _cm(std::move(cm)) {}
 
 }  // namespace mongo

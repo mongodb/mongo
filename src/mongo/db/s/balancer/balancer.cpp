@@ -703,8 +703,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
                                  const BSONObj& minKey) {
     auto routingInfo = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
-    const auto cm = routingInfo.cm().get();
-
+    const auto cm = routingInfo.cm();
     auto chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
 
     try {

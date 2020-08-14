@@ -128,7 +128,7 @@ TEST_F(CatalogCacheRefreshTest, NoLoadIfShardNotMarkedStaleInOperationContext) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
     auto initialRoutingInfo(
         makeChunkManager(kNss, shardKeyPattern, nullptr, true, {BSON("_id" << 0)}));
-    ASSERT_EQ(2, initialRoutingInfo->numChunks());
+    ASSERT_EQ(2, initialRoutingInfo.numChunks());
 
     auto futureNoRefresh = scheduleRoutingInfoUnforcedRefresh(kNss);
     auto routingInfo = futureNoRefresh.default_timed_get();
@@ -263,9 +263,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadNoChunksFound) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
-    const OID epoch = initialRoutingInfo->getVersion().epoch();
+    const OID epoch = initialRoutingInfo.getVersion().epoch();
 
-    ASSERT_EQ(1, initialRoutingInfo->numChunks());
+    ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
     auto future = scheduleRoutingInfoForcedRefresh(kNss);
 
@@ -444,9 +444,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithLowestVersion) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
-    const OID epoch = initialRoutingInfo->getVersion().epoch();
+    const OID epoch = initialRoutingInfo.getVersion().epoch();
 
-    ASSERT_EQ(1, initialRoutingInfo->numChunks());
+    ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
     auto future = scheduleRoutingInfoForcedRefresh(kNss);
 
@@ -504,9 +504,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithHighestVersion) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
-    const OID epoch = initialRoutingInfo->getVersion().epoch();
+    const OID epoch = initialRoutingInfo.getVersion().epoch();
 
-    ASSERT_EQ(1, initialRoutingInfo->numChunks());
+    ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
     auto future = scheduleRoutingInfoForcedRefresh(kNss);
 
@@ -563,11 +563,11 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoad) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
-    ASSERT_EQ(1, initialRoutingInfo->numChunks());
+    ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
     auto future = scheduleRoutingInfoForcedRefresh(kNss);
 
-    ChunkVersion version = initialRoutingInfo->getVersion();
+    ChunkVersion version = initialRoutingInfo.getVersion();
 
     const auto inconsistentChunks = [&]() {
         version.incMajor();
@@ -586,12 +586,12 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoad) {
 
     // Return set of chunks, one of which has different epoch. Do it three times, which is how
     // frequently the catalog cache retries.
-    expectGetCollection(initialRoutingInfo->getVersion().epoch(), shardKeyPattern);
+    expectGetCollection(initialRoutingInfo.getVersion().epoch(), shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, inconsistentChunks);
-    expectGetCollection(initialRoutingInfo->getVersion().epoch(), shardKeyPattern);
+    expectGetCollection(initialRoutingInfo.getVersion().epoch(), shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, inconsistentChunks);
 
-    expectGetCollection(initialRoutingInfo->getVersion().epoch(), shardKeyPattern);
+    expectGetCollection(initialRoutingInfo.getVersion().epoch(), shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, inconsistentChunks);
 
     try {
@@ -611,13 +611,13 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
-    ASSERT_EQ(1, initialRoutingInfo->numChunks());
+    ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
     setupNShards(2);
 
     auto future = scheduleRoutingInfoForcedRefresh(kNss);
 
-    ChunkVersion oldVersion = initialRoutingInfo->getVersion();
+    ChunkVersion oldVersion = initialRoutingInfo.getVersion();
     const OID newEpoch = OID::gen();
 
     // On the first attempt, return set of chunks, one of which has different epoch. This simulates
@@ -698,7 +698,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
-    ASSERT_EQ(1, initialRoutingInfo->numChunks());
+    ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
     setupNShards(2);
 
@@ -747,9 +747,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
-    ASSERT_EQ(1, initialRoutingInfo->numChunks());
+    ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
-    ChunkVersion version = initialRoutingInfo->getVersion();
+    ChunkVersion version = initialRoutingInfo.getVersion();
 
     auto future = scheduleRoutingInfoForcedRefresh(kNss);
 
@@ -793,9 +793,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMove) {
 
     auto initialRoutingInfo(
         makeChunkManager(kNss, shardKeyPattern, nullptr, true, {BSON("_id" << 0)}));
-    ASSERT_EQ(2, initialRoutingInfo->numChunks());
+    ASSERT_EQ(2, initialRoutingInfo.numChunks());
 
-    ChunkVersion version = initialRoutingInfo->getVersion();
+    ChunkVersion version = initialRoutingInfo.getVersion();
 
     auto future = scheduleRoutingInfoForcedRefresh(kNss);
 
@@ -833,11 +833,11 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunk) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
-    ASSERT_EQ(1, initialRoutingInfo->numChunks());
+    ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
     setupNShards(2);
 
-    ChunkVersion version = initialRoutingInfo->getVersion();
+    ChunkVersion version = initialRoutingInfo.getVersion();
 
     auto future = scheduleRoutingInfoForcedRefresh(kNss);
 

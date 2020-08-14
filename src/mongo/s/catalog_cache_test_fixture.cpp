@@ -103,7 +103,7 @@ std::vector<ShardType> CatalogCacheTestFixture::setupNShards(int numShards) {
     return shards;
 }
 
-std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
+ChunkManager CatalogCacheTestFixture::makeChunkManager(
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
     std::unique_ptr<CollatorInterface> defaultCollator,
@@ -164,7 +164,7 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
     ASSERT(routingInfo->cm());
     ASSERT(routingInfo->db().primary());
 
-    return routingInfo->cm();
+    return *routingInfo->cm();
 }
 
 void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string shardId) {

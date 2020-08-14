@@ -262,10 +262,10 @@ class CachedCollectionRoutingInfo {
 public:
     CachedDatabaseInfo db() const {
         return _db;
-    };
+    }
 
-    std::shared_ptr<ChunkManager> cm() const {
-        return _cm;
+    const ChunkManager* cm() const {
+        return _cm.get_ptr();
     }
 
 private:
@@ -274,16 +274,17 @@ private:
 
     CachedCollectionRoutingInfo(NamespaceString nss,
                                 CachedDatabaseInfo db,
-                                std::shared_ptr<ChunkManager> cm);
+                                boost::optional<ChunkManager> cm);
 
     NamespaceString _nss;
 
     // Copy of the database's cached info.
     CachedDatabaseInfo _db;
 
-    // Shared reference to the collection's cached chunk distribution if sharded, otherwise null.
-    // This is a shared reference rather than a copy because the chunk distribution can be large.
-    std::shared_ptr<ChunkManager> _cm;
+    // Shared reference to the collection's cached chunk distribution if sharded, otherwise
+    // boost::none. This is a shared reference rather than a copy because the chunk distribution can
+    // be large.
+    boost::optional<ChunkManager> _cm;
 };
 
 /**

@@ -105,7 +105,7 @@ public:
 private:
     OperationContext* _opCtx;
     std::shared_ptr<Shard> _indexShard;
-    std::shared_ptr<ChunkManager> _cm;
+    boost::optional<ChunkManager> _cm;
 };
 
 /**

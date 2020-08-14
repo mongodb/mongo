@@ -96,8 +96,8 @@ protected:
                 return std::vector<ChunkType>{chunk1, chunk2, chunk3, chunk4};
             }());
 
-        auto cm = std::make_shared<ChunkManager>(rt, boost::none);
-        ASSERT_EQ(4, cm->numChunks());
+        ChunkManager cm(rt, boost::none);
+        ASSERT_EQ(4, cm.numChunks());
 
         {
             AutoGetCollection autoColl(operationContext(), kNss, MODE_X);
@@ -109,7 +109,7 @@ protected:
             getServiceContext(), kNss, executor(), CollectionMetadata(cm, ShardId("0")));
 
         auto& oss = OperationShardingState::get(operationContext());
-        const auto version = cm->getVersion(ShardId("0"));
+        const auto version = cm.getVersion(ShardId("0"));
         BSONObjBuilder builder;
         version.appendToCommand(&builder);
         oss.initializeClientRoutingVersionsFromCommand(kNss, builder.obj());

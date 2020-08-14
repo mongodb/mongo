@@ -71,8 +71,8 @@ auto makeChunkManagerWithShardSelector(int nShards, uint32_t nChunks, ShardSelec
 
     auto routingTableHistory = RoutingTableHistory::makeNew(
         collName, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, chunks);
-    auto chunkManager = std::make_shared<ChunkManager>(routingTableHistory, boost::none);
-    return std::make_unique<CollectionMetadata>(std::move(chunkManager), ShardId("shard0"));
+    return std::make_unique<CollectionMetadata>(ChunkManager(routingTableHistory, boost::none),
+                                                ShardId("shard0"));
 }
 
 ShardId pessimalShardSelector(int i, int nShards, int nChunks) {
@@ -98,8 +98,7 @@ MONGO_COMPILER_NOINLINE auto makeChunkManagerWithOptimalBalancedDistribution(int
 MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
                                                   const std::vector<ChunkType>& newChunks) {
     auto rt = cm.getChunkManager()->getRoutingHistory()->makeUpdated(newChunks);
-    return std::make_unique<CollectionMetadata>(std::make_shared<ChunkManager>(rt, boost::none),
-                                                ShardId("shard0"));
+    return std::make_unique<CollectionMetadata>(ChunkManager(rt, boost::none), ShardId("shard0"));
 }
 
 void BM_IncrementalRefreshWithNoChange(benchmark::State& state) {
@@ -169,8 +168,8 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
     for (auto keepRunning : state) {
         auto routingTableHistory = RoutingTableHistory::makeNew(
             collName, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, chunks);
-        auto chunkManager = std::make_shared<ChunkManager>(routingTableHistory, boost::none);
-        benchmark::DoNotOptimize(CollectionMetadata(std::move(chunkManager), ShardId("shard0")));
+        benchmark::DoNotOptimize(
+            CollectionMetadata(ChunkManager(routingTableHistory, boost::none), ShardId("shard0")));
     }
 }
 

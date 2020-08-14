@@ -211,13 +211,13 @@ public:
         auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
-        std::shared_ptr<ChunkManager> chunkMgr;
+        boost::optional<ChunkManager> chunkMgr;
         std::shared_ptr<Shard> shard;
 
         if (!routingInfo.cm()) {
             shard = routingInfo.db().primary();
         } else {
-            chunkMgr = routingInfo.cm();
+            chunkMgr.emplace(*routingInfo.cm());
 
             const BSONObj query = cmdObj.getObjectField("query");
             const BSONObj collation = getCollation(cmdObj);

@@ -65,7 +65,7 @@ namespace {
  * distribution and chunk placement information which is needed by the balancer policy.
  */
 StatusWith<DistributionStatus> createCollectionDistributionStatus(
-    OperationContext* opCtx, const ShardStatisticsVector& allShards, ChunkManager* chunkMgr) {
+    OperationContext* opCtx, const ShardStatisticsVector& allShards, const ChunkManager& chunkMgr) {
     ShardToChunksMap shardToChunksMap;
 
     // Makes sure there is an entry in shardToChunksMap for every shard, so empty shards will also
@@ -74,9 +74,9 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         shardToChunksMap[stat.shardId];
     }
 
-    chunkMgr->forEachChunk([&](const auto& chunkEntry) {
+    chunkMgr.forEachChunk([&](const auto& chunkEntry) {
         ChunkType chunk;
-        chunk.setNS(chunkMgr->getns());
+        chunk.setNS(chunkMgr.getns());
         chunk.setMin(chunkEntry.getMin());
         chunk.setMax(chunkEntry.getMax());
         chunk.setJumbo(chunkEntry.isJumbo());
@@ -89,17 +89,17 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
     });
 
     const auto swCollectionTags =
-        Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, chunkMgr->getns());
+        Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, chunkMgr.getns());
     if (!swCollectionTags.isOK()) {
         return swCollectionTags.getStatus().withContext(
-            str::stream() << "Unable to load tags for collection " << chunkMgr->getns().ns());
+            str::stream() << "Unable to load tags for collection " << chunkMgr.getns());
     }
     const auto& collectionTags = swCollectionTags.getValue();
 
-    DistributionStatus distribution(chunkMgr->getns(), std::move(shardToChunksMap));
+    DistributionStatus distribution(chunkMgr.getns(), std::move(shardToChunksMap));
 
     // Cache the collection tags
-    const auto& keyPattern = chunkMgr->getShardKeyPattern().getKeyPattern();
+    const auto& keyPattern = chunkMgr.getShardKeyPattern().getKeyPattern();
 
     for (const auto& tag : collectionTags) {
         auto status = distribution.addRangeToZone(
@@ -465,9 +465,9 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* op
         return routingInfoStatus.getStatus();
     }
 
-    const auto cm = routingInfoStatus.getValue().cm().get();
+    const auto cm = routingInfoStatus.getValue().cm();
 
-    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
+    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, *cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }
@@ -494,9 +494,9 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCt
         return routingInfoStatus.getStatus();
     }
 
-    const auto cm = routingInfoStatus.getValue().cm().get();
+    const auto cm = routingInfoStatus.getValue().cm();
 
-    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
+    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, *cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }
@@ -527,9 +527,9 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
         return routingInfoStatus.getStatus();
     }
 
-    const auto cm = routingInfoStatus.getValue().cm().get();
+    const auto cm = routingInfoStatus.getValue().cm();
 
-    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
+    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, *cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }
@@ -565,11 +565,11 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
         return routingInfoStatus.getStatus();
     }
 
-    const auto cm = routingInfoStatus.getValue().cm().get();
+    const auto cm = routingInfoStatus.getValue().cm();
 
     const auto& shardKeyPattern = cm->getShardKeyPattern().getKeyPattern();
 
-    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
+    const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, *cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
     }

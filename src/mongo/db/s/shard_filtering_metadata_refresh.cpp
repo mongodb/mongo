@@ -328,7 +328,7 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
         return CollectionMetadata();
     }
 
-    return CollectionMetadata(routingInfo.cm(), shardingState->shardId());
+    return CollectionMetadata(*routingInfo.cm(), shardingState->shardId());
 }
 
 ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
@@ -421,7 +421,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         }
     }
 
-    CollectionMetadata metadata(std::move(cm), shardingState->shardId());
+    CollectionMetadata metadata(*cm, shardingState->shardId());
     const auto newShardVersion = metadata.getShardVersion();
 
     csr->setFilteringMetadata(opCtx, std::move(metadata));

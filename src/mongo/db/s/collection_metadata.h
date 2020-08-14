@@ -60,7 +60,7 @@ public:
      * "thisShardId" is the shard identity of this shard for purposes of answering questions like
      * "does this key belong to this shard"?
      */
-    CollectionMetadata(std::shared_ptr<ChunkManager> cm, const ShardId& thisShardId);
+    CollectionMetadata(ChunkManager cm, const ShardId& thisShardId);
 
     /**
      * Returns whether this metadata object represents a sharded or unsharded collection.
@@ -158,9 +158,9 @@ public:
     // Methods used for orphan filtering and general introspection of the chunks owned by the shard
     //
 
-    ChunkManager* getChunkManager() const {
+    const ChunkManager* getChunkManager() const {
         invariant(isSharded());
-        return _cm.get();
+        return _cm.get_ptr();
     }
 
     /**
@@ -225,11 +225,11 @@ public:
     void toBSONChunks(BSONArrayBuilder* builder) const;
 
 private:
-    // The full routing table for the collection or nullptr if the collection is not sharded
-    std::shared_ptr<ChunkManager> _cm;
+    // The full routing table for the collection or boost::none if the collection is not sharded
+    boost::optional<ChunkManager> _cm;
 
     // The identity of this shard, for the purpose of answering "key belongs to me" queries. If the
-    // collection is not sharded (_cm is nullptr), then this value will be empty.
+    // collection is not sharded (_cm is boost::none), then this value will be empty.
     ShardId _thisShardId;
 };
 

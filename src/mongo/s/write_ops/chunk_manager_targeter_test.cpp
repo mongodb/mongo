@@ -72,7 +72,7 @@ public:
             makeChunkManager(kNss, ShardKeyPattern(shardKeyPattern), nullptr, false, splitPoints);
         return ChunkManagerTargeter(operationContext(), kNss);
     }
-    std::shared_ptr<ChunkManager> chunkManager;
+    boost::optional<ChunkManager> chunkManager;
 };
 
 TEST_F(ChunkManagerTargeterTest, TargetInsertWithRangePrefixHashedShardKey) {

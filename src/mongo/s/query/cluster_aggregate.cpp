@@ -214,10 +214,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                           << "] cannot be set to 'true' when sent to mongos",
             !request.needsMerge() && !request.isFromMongos());
 
-    const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) -> bool {
+    const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
         const auto resolvedNsRoutingInfo =
             uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-        return resolvedNsRoutingInfo.cm().get();
+        return bool(resolvedNsRoutingInfo.cm());
     };
 
     liteParsedPipeline.verifyIsSupported(

@@ -240,7 +240,7 @@ ValidationBehaviorsRefineShardKey::ValidationBehaviorsRefineShardKey(OperationCo
     const auto minKeyShardId = routingInfo.cm()->getMinKeyShardIdWithSimpleCollation();
     _indexShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId));
-    _cm = routingInfo.cm();
+    _cm.emplace(*routingInfo.cm());
 }
 
 std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(

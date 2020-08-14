@@ -33,8 +33,6 @@
 
 #include "mongo/db/s/collection_metadata.h"
 
-#include <memory>
-
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/bson/dotted_path_support.h"
@@ -43,7 +41,7 @@
 
 namespace mongo {
 
-CollectionMetadata::CollectionMetadata(std::shared_ptr<ChunkManager> cm, const ShardId& thisShardId)
+CollectionMetadata::CollectionMetadata(ChunkManager cm, const ShardId& thisShardId)
     : _cm(std::move(cm)), _thisShardId(thisShardId) {}
 
 BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {

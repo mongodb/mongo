@@ -171,7 +171,7 @@ BSONObj getUpdateExprForTargeting(const boost::intrusive_ptr<ExpressionContext> 
  *     { _id : { $lt : 30 } } => false
  *     { foo : <anything> } => false
  */
-bool isExactIdQuery(OperationContext* opCtx, const CanonicalQuery& query, ChunkManager* manager) {
+bool isExactIdQuery(OperationContext* opCtx, const CanonicalQuery& query, const ChunkManager* cm) {
     auto shardKey = kVirtualIdShardKey.extractShardKeyFromQuery(query);
     BSONElement idElt = shardKey["_id"];
 
@@ -179,9 +179,9 @@ bool isExactIdQuery(OperationContext* opCtx, const CanonicalQuery& query, ChunkM
         return false;
     }
 
-    if (CollationIndexKey::isCollatableType(idElt.type()) && manager &&
+    if (CollationIndexKey::isCollatableType(idElt.type()) && cm &&
         !query.getQueryRequest().getCollation().isEmpty() &&
-        !CollatorInterface::collatorsMatch(query.getCollator(), manager->getDefaultCollator())) {
+        !CollatorInterface::collatorsMatch(query.getCollator(), cm->getDefaultCollator())) {
 
         // The collation applies to the _id field, but the user specified a collation which doesn't
         // match the collection default.
@@ -190,11 +190,12 @@ bool isExactIdQuery(OperationContext* opCtx, const CanonicalQuery& query, ChunkM
 
     return true;
 }
+
 bool isExactIdQuery(OperationContext* opCtx,
                     const NamespaceString& nss,
                     const BSONObj query,
                     const BSONObj collation,
-                    ChunkManager* manager) {
+                    const ChunkManager* cm) {
     auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
     if (!collation.isEmpty()) {
@@ -206,7 +207,7 @@ bool isExactIdQuery(OperationContext* opCtx,
                                                  ExtensionsCallbackNoop(),
                                                  MatchExpressionParser::kAllowAllSpecialFeatures);
 
-    return cq.isOK() && isExactIdQuery(opCtx, *cq.getValue(), manager);
+    return cq.isOK() && isExactIdQuery(opCtx, *cq.getValue(), cm);
 }
 
 //
@@ -320,9 +321,9 @@ CompareResult compareDbVersions(const CachedCollectionRoutingInfo& routingInfo,
 /**
  * Whether or not the manager/primary pair is different from the other manager/primary pair.
  */
-bool isMetadataDifferent(const std::shared_ptr<ChunkManager>& managerA,
+bool isMetadataDifferent(const ChunkManager* managerA,
                          const DatabaseVersion dbVersionA,
-                         const std::shared_ptr<ChunkManager>& managerB,
+                         const ChunkManager* managerB,
                          const DatabaseVersion dbVersionB) {
     if ((managerA && !managerB) || (!managerA && managerB))
         return true;
@@ -338,20 +339,20 @@ bool isMetadataDifferent(const std::shared_ptr<ChunkManager>& managerA,
  * Whether or not the manager/primary pair was changed or refreshed from a previous version
  * of the metadata.
  */
-bool wasMetadataRefreshed(const std::shared_ptr<ChunkManager>& managerA,
+bool wasMetadataRefreshed(const ChunkManager* managerA,
                           const DatabaseVersion dbVersionA,
-                          const std::shared_ptr<ChunkManager>& managerB,
+                          const ChunkManager* managerB,
                           const DatabaseVersion dbVersionB) {
     if (isMetadataDifferent(managerA, dbVersionA, managerB, dbVersionB))
         return true;
 
     if (managerA) {
-        dassert(managerB.get());  // otherwise metadata would be different
         return managerA->getSequenceNumber() != managerB->getSequenceNumber();
     }
 
     return false;
 }
+
 }  // namespace
 
 ChunkManagerTargeter::ChunkManagerTargeter(OperationContext* opCtx,
@@ -485,8 +486,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
                          "a single shard (and have the simple collation), but this update targeted "
                       << endPoints.size() << " shards. Update request: " << updateOp.toBSON()
                       << ", shard key pattern: " << shardKeyPattern.toString(),
-        updateOp.getMulti() ||
-            isExactIdQuery(opCtx, _nss, query, collation, _routingInfo->cm().get()));
+        updateOp.getMulti() || isExactIdQuery(opCtx, _nss, query, collation, _routingInfo->cm()));
 
     // If the request is {multi:false}, then this is a single op-style update which we are
     // broadcasting to multiple shards by exact _id. Record this event in our serverStatus metrics.
@@ -551,7 +551,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
                           << deleteOp.toBSON() << ", shard key pattern: "
                           << _routingInfo->cm()->getShardKeyPattern().toString(),
             !_routingInfo->cm() || deleteOp.getMulti() ||
-                isExactIdQuery(opCtx, *cq, _routingInfo->cm().get()));
+                isExactIdQuery(opCtx, *cq, _routingInfo->cm()));
 
     return uassertStatusOK(_targetQuery(expCtx, deleteOp.getQ(), collation));
 }

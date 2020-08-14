@@ -306,12 +306,10 @@ private:
     friend class ChunkManager;
 };
 
-// This will be renamed to RoutingTableHistory and the original RoutingTableHistory will be
-// ChunkHistoryMap
-class ChunkManager : public std::enable_shared_from_this<ChunkManager> {
-    ChunkManager(const ChunkManager&) = delete;
-    ChunkManager& operator=(const ChunkManager&) = delete;
-
+/**
+ * Wrapper around a RoutingTableHistory, which pins it to a particular point in time.
+ */
+class ChunkManager {
 public:
     ChunkManager(std::shared_ptr<RoutingTableHistory> rt, boost::optional<Timestamp> clusterTime)
         : _rt(std::move(rt)), _clusterTime(std::move(clusterTime)) {}
@@ -439,7 +437,7 @@ public:
     /**
      * Returns the number of shards on which the collection has any chunks
      */
-    int getNShardsOwningChunks() {
+    int getNShardsOwningChunks() const {
         return _rt->getNShardsOwningChunks();
     }
 

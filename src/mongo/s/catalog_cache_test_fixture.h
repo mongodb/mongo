@@ -53,12 +53,11 @@ protected:
      * points. Each individual chunk is placed on a separate shard with shard id being a single
      * number ranging from "0" to the number of chunks.
      */
-    std::shared_ptr<ChunkManager> makeChunkManager(
-        const NamespaceString& nss,
-        const ShardKeyPattern& shardKeyPattern,
-        std::unique_ptr<CollatorInterface> defaultCollator,
-        bool unique,
-        const std::vector<BSONObj>& splitPoints);
+    ChunkManager makeChunkManager(const NamespaceString& nss,
+                                  const ShardKeyPattern& shardKeyPattern,
+                                  std::unique_ptr<CollatorInterface> defaultCollator,
+                                  bool unique,
+                                  const std::vector<BSONObj>& splitPoints);
 
     /**
      * Invalidates the catalog cache for 'kNss' and schedules a thread to invoke the blocking 'get'

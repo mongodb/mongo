@@ -58,7 +58,7 @@ protected:
         auto chunkManager = makeChunkManager(kNss, shardKeyPattern, nullptr, false, splitPoints);
 
         std::set<ShardId> shardIds;
-        chunkManager->getShardIdsForRange(min, max, &shardIds);
+        chunkManager.getShardIdsForRange(min, max, &shardIds);
 
         _assertShardIdsMatch(expectedShardIds, shardIds);
     }
@@ -86,7 +86,7 @@ protected:
         }();
         auto expCtx =
             make_intrusive<ExpressionContextForTest>(operationContext(), kNss, std::move(cif));
-        chunkManager->getShardIdsForQuery(expCtx, query, queryCollation, &shardIds);
+        chunkManager.getShardIdsForQuery(expCtx, query, queryCollation, &shardIds);
         _assertShardIdsMatch(expectedShardIds, shardIds);
     }
 
