@@ -6,12 +6,6 @@
 
 load('jstests/disk/libs/wt_file_helper.js');
 
-if (_isWindows()) {
-    // TODO(SERVER-50205): Re-enable under Windows.
-    jsTestLog('Skipping test under Windows.');
-    return;
-}
-
 const baseName = "repair_corrupt_document";
 const collName = "test";
 const dbpath = MongoRunner.dataPath + baseName + "/";

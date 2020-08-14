@@ -5,12 +5,6 @@
 
 (function() {
 
-if (_isWindows()) {
-    // TODO(SERVER-50205): Re-enable under Windows.
-    jsTestLog('Skipping test under Windows.');
-    return;
-}
-
 let conn = MongoRunner.runMongod({});
 db = conn.getDB("validate_repair_mode");
 
