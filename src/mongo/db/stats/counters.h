@@ -226,6 +226,9 @@ public:
     Status incAuthenticateReceived(const std::string& mechanism);
     Status incAuthenticateSuccessful(const std::string& mechanism);
 
+    Status incClusterAuthenticateReceived(const std::string& mechanism);
+    Status incClusterAuthenticateSuccessful(const std::string& mechanism);
+
     void append(BSONObjBuilder*);
 
     void initializeMechanismMap(const std::vector<std::string>&);
@@ -240,6 +243,10 @@ private:
             AtomicWord<long long> received;
             AtomicWord<long long> successful;
         } authenticate;
+        struct {
+            AtomicWord<long long> received;
+            AtomicWord<long long> successful;
+        } clusterAuthenticate;
     };
     using MechanismMap = std::map<std::string, MechanismData>;
 
