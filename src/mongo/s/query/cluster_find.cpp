@@ -528,8 +528,6 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
 
             LOGV2_DEBUG(22839,
                         1,
-                        "Received error status for query {query} on attempt {attemptNumber} of "
-                        "{maxRetries}: {error}",
                         "Received error status for query",
                         "query"_attr = redact(query.toStringShort()),
                         "attemptNumber"_attr = retries,
@@ -571,8 +569,6 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
 
             LOGV2_DEBUG(22840,
                         1,
-                        "Received error status for query {query} on attempt {attemptNumber} of "
-                        "{maxRetries}: {error}",
                         "Received error status for query",
                         "query"_attr = redact(query.toStringShort()),
                         "attemptNumber"_attr = retries,

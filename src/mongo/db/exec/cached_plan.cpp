@@ -113,9 +113,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             // replanning.
             LOGV2_DEBUG(20579,
                         1,
-                        "Execution of cached plan failed, falling back to replan. query: "
-                        "{query} planSummary: {planSummary} status: {status}",
-                        "Execution of cached plan failed, failling back to replan",
+                        "Execution of cached plan failed, falling back to replan",
                         "query"_attr = redact(_canonicalQuery->toStringShort()),
                         "planSummary"_attr = Explain::getPlanSummary(child().get()),
                         "status"_attr = redact(ex.toStatus()));
@@ -161,16 +159,13 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     // If we're here, the trial period took more than 'maxWorksBeforeReplan' work cycles. This
     // plan is taking too long, so we replan from scratch.
-    LOGV2_DEBUG(
-        20580,
-        1,
-        "Execution of cached plan required {maxWorksBeforeReplan} works, but was originally cached "
-        "with only {decisionWorks} works. Evicting cache entry and replanning query: "
-        "{canonicalQuery_Short} plan summary before replan: {Explain_getPlanSummary_child_get}",
-        "maxWorksBeforeReplan"_attr = maxWorksBeforeReplan,
-        "decisionWorks"_attr = _decisionWorks,
-        "canonicalQuery_Short"_attr = redact(_canonicalQuery->toStringShort()),
-        "Explain_getPlanSummary_child_get"_attr = Explain::getPlanSummary(child().get()));
+    LOGV2_DEBUG(20580,
+                1,
+                "Evicting cache entry and replanning query",
+                "maxWorksBeforeReplan"_attr = maxWorksBeforeReplan,
+                "decisionWorks"_attr = _decisionWorks,
+                "query"_attr = redact(_canonicalQuery->toStringShort()),
+                "planSummary"_attr = Explain::getPlanSummary(child().get()));
 
     const bool shouldCache = true;
     return replan(
@@ -233,12 +228,10 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
         LOGV2_DEBUG(
             20581,
             1,
-            "Replanning of query resulted in single query solution, which will not be cached. "
-            "{canonicalQuery_Short} plan summary after replan: {Explain_getPlanSummary_child_get} "
-            "previous cache entry evicted: {shouldCache_yes_no}",
-            "canonicalQuery_Short"_attr = redact(_canonicalQuery->toStringShort()),
-            "Explain_getPlanSummary_child_get"_attr = Explain::getPlanSummary(child().get()),
-            "shouldCache_yes_no"_attr = (shouldCache ? "yes" : "no"));
+            "Replanning of query resulted in single query solution, which will not be cached.",
+            "query"_attr = redact(_canonicalQuery->toStringShort()),
+            "planSummary"_attr = Explain::getPlanSummary(child().get()),
+            "shouldCache"_attr = (shouldCache ? "yes" : "no"));
         return Status::OK();
     }
 
@@ -268,12 +261,10 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
 
     LOGV2_DEBUG(20582,
                 1,
-                "Replanning {canonicalQuery_Short} resulted in plan with summary: "
-                "{Explain_getPlanSummary_child_get}, which {shouldCache_has_has_not} been written "
-                "to the cache",
-                "canonicalQuery_Short"_attr = redact(_canonicalQuery->toStringShort()),
-                "Explain_getPlanSummary_child_get"_attr = Explain::getPlanSummary(child().get()),
-                "shouldCache_has_has_not"_attr = (shouldCache ? "has" : "has not"));
+                "Query plan after replanning and its cache status",
+                "query"_attr = redact(_canonicalQuery->toStringShort()),
+                "planSummary"_attr = Explain::getPlanSummary(child().get()),
+                "shouldCache"_attr = (shouldCache ? "yes" : "no"));
     return Status::OK();
 }
 

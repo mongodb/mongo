@@ -126,14 +126,14 @@ static void extractGeometries(const BSONObj& doc,
                     geometries->push_back(std::move(stored));
                 } else {
                     LOGV2_WARNING(23760,
-                                  "geoNear stage read non-geometry element {nextEl} in array {el}",
-                                  "nextEl"_attr = redact(nextEl),
-                                  "el"_attr = redact(el));
+                                  "geoNear stage read non-geometry element in array",
+                                  "nextElement"_attr = redact(nextEl),
+                                  "element"_attr = redact(el));
                 }
             }
         } else {
             LOGV2_WARNING(
-                23761, "geoNear stage read non-geometry element {el}", "el"_attr = redact(el));
+                23761, "geoNear stage read non-geometry element", "element"_attr = redact(el));
         }
     }
 }

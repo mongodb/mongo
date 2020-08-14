@@ -89,11 +89,10 @@ PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
                     // possible unless manually inserting data into a shard
                     LOGV2_WARNING(
                         23787,
-                        "no shard key found in document {member_doc_value_toBson} for shard key "
-                        "pattern {shardFilterer_getKeyPattern}, document may have been inserted "
-                        "manually into shard",
-                        "member_doc_value_toBson"_attr = redact(member->doc.value().toBson()),
-                        "shardFilterer_getKeyPattern"_attr = _shardFilterer.getKeyPattern());
+                        "No shard key found in document, it may have been inserted manually "
+                        "into shard",
+                        "document"_attr = redact(member->doc.value().toBson()),
+                        "keyPattern"_attr = _shardFilterer.getKeyPattern());
                 } else {
                     invariant(res == ShardFilterer::DocumentBelongsResult::kDoesNotBelong);
                 }

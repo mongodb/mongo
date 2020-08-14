@@ -888,14 +888,12 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         } else {
             LOGV2_WARNING(20934,
-                          "Planner error trying to build geo bounds for {element} index element",
                           "Planner error trying to build geo bounds for an index element",
                           "element"_attr = elt.toString());
             verify(0);
         }
     } else {
         LOGV2_WARNING(20935,
-                      "Planner error, trying to build bounds for expression: {expression}",
                       "Planner error while trying to build bounds for expression",
                       "expression"_attr = redact(expr->debugString()));
         verify(0);
@@ -1203,8 +1201,7 @@ void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int
 
     if (!bounds->isValidFor(kp, scanDir)) {
         LOGV2(20933,
-              "INVALID BOUNDS: {bounds}\nkp = {keyPattern}\nscanDir = {scanDirection}",
-              "INVALID BOUNDS",
+              "Invalid bounds",
               "bounds"_attr = redact(bounds->toString()),
               "keyPattern"_attr = redact(kp),
               "scanDirection"_attr = scanDir);

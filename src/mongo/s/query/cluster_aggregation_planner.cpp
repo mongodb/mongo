@@ -215,7 +215,6 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
 
     LOGV2_DEBUG(22835,
                 1,
-                "Dispatching merge pipeline {command} to designated shard",
                 "Dispatching merge pipeline to designated shard",
                 "command"_attr = redact(mergeCmdObj));
 

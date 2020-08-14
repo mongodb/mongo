@@ -435,7 +435,6 @@ std::unique_ptr<CachedSolution> PlanCache::getCacheEntryIfActive(const PlanCache
     if (res.state == PlanCache::CacheEntryState::kPresentInactive) {
         LOGV2_DEBUG(20936,
                     2,
-                    "Not using cached entry for {cachedSolution} since it is inactive",
                     "Not using cached entry since it is inactive",
                     "cachedSolution"_attr = redact(res.cachedSolution->toString()));
         return nullptr;
@@ -460,8 +459,6 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
     if (!oldEntry) {
         LOGV2_DEBUG(20937,
                     1,
-                    "Creating inactive cache entry for query shape {query} queryHash {queryHash} "
-                    "planCacheKey {planCacheKey} with works value {newWorks}",
                     "Creating inactive cache entry for query",
                     "query"_attr = redact(query.toStringShort()),
                     "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
@@ -478,9 +475,6 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
 
         LOGV2_DEBUG(20938,
                     1,
-                    "Replacing active cache entry for query {query} queryHash {queryHash} "
-                    "planCacheKey {planCacheKey} with works {oldWorks} with a plan with "
-                    "works {newWorks}",
                     "Replacing active cache entry for query",
                     "query"_attr = redact(query.toStringShort()),
                     "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
@@ -492,9 +486,6 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
     } else if (oldEntry->isActive) {
         LOGV2_DEBUG(20939,
                     1,
-                    "Attempt to write to the planCache for query {query} queryHash {queryHash} "
-                    "planCacheKey {planCacheKey} with a plan with works {newWorks} is a noop, "
-                    "since there's already a plan with works value {oldWorks}",
                     "Attempt to write to the planCache resulted in a noop, since there's already "
                     "an active cache entry with a lower works value",
                     "query"_attr = redact(query.toStringShort()),
@@ -519,8 +510,6 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
 
         LOGV2_DEBUG(20940,
                     1,
-                    "Increasing work value associated with cache entry for query {query} queryHash "
-                    "{queryHash} planCacheKey {planCacheKey} from {oldWorks} to {increasedWorks}",
                     "Increasing work value associated with cache entry",
                     "query"_attr = redact(query.toStringShort()),
                     "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
@@ -537,9 +526,6 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
         // cache (as an active entry) the plan this query used for the future.
         LOGV2_DEBUG(20941,
                     1,
-                    "Inactive cache entry for query {query} queryHash {queryHash} planCacheKey "
-                    "{planCacheKey} with works {oldWorks} is being promoted to active entry with "
-                    "works value {newWorks}",
                     "Inactive cache entry for query is being promoted to active entry",
                     "query"_attr = redact(query.toStringShort()),
                     "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
@@ -634,8 +620,6 @@ Status PlanCache::set(const CanonicalQuery& query,
     if (nullptr != evictedEntry.get()) {
         LOGV2_DEBUG(20942,
                     1,
-                    "{namespace}: plan cache maximum size exceeded - removed least recently used "
-                    "entry {evictedEntry}",
                     "Plan cache maximum size exceeded - removed least recently used entry",
                     "namespace"_attr = query.nss(),
                     "evictedEntry"_attr = redact(evictedEntry->toString()));

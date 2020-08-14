@@ -57,11 +57,9 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::plan(
         // entry, nor cache the result of replanning.
         LOGV2_DEBUG(2057901,
                     1,
-                    "Execution of cached plan failed, falling back to replan. query: "
-                    "{canonicalQuery_Short} planSummary: {Explain_getPlanSummary_child_get} ",
-                    "canonicalQuery_Short"_attr = redact(_cq.toStringShort()),
-                    "Explain_getPlanSummary_child_get"_attr =
-                        Explain::getPlanSummary(candidate.root.get()));
+                    "Execution of cached plan failed, falling back to replan",
+                    "query"_attr = redact(_cq.toStringShort()),
+                    "planSummary"_attr = Explain::getPlanSummary(candidate.root.get()));
         return replan(false);
     }
 
@@ -78,13 +76,12 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::plan(
     LOGV2_DEBUG(
         2058001,
         1,
-        "Execution of cached plan required {maxReadsBeforeReplan} works, but was originally cached "
-        "with only {decisionReads} works. Evicting cache entry and replanning query: "
-        "{canonicalQuery_Short} plan summary before replan: {Explain_getPlanSummary_child_get}",
+        "Evicting cache entry for a query and replanning it since the number of required works "
+        "mismatch the number of cached works",
         "maxReadsBeforeReplan"_attr = numReads,
         "decisionReads"_attr = _decisionReads,
-        "canonicalQuery_Short"_attr = redact(_cq.toStringShort()),
-        "Explain_getPlanSummary_child_get"_attr = Explain::getPlanSummary(candidate.root.get()));
+        "query"_attr = redact(_cq.toStringShort()),
+        "planSummary"_attr = Explain::getPlanSummary(candidate.root.get()));
     return replan(true);
 }
 
@@ -120,12 +117,10 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::replan(bool shouldCache) const
         LOGV2_DEBUG(
             2058101,
             1,
-            "Replanning of query resulted in single query solution, which will not be cached. "
-            "{canonicalQuery_Short} plan summary after replan: {Explain_getPlanSummary_child_get} "
-            "previous cache entry evicted: {shouldCache_yes_no}",
-            "canonicalQuery_Short"_attr = redact(_cq.toStringShort()),
-            "Explain_getPlanSummary_child_get"_attr = Explain::getPlanSummary(root.get()),
-            "shouldCache_yes_no"_attr = (shouldCache ? "yes" : "no"));
+            "Replanning of query resulted in a single query solution, which will not be cached. ",
+            "query"_attr = redact(_cq.toStringShort()),
+            "planSummary"_attr = Explain::getPlanSummary(root.get()),
+            "shouldCache"_attr = (shouldCache ? "yes" : "no"));
         return {std::move(solutions[0]), std::move(root), std::move(data)};
     }
 
@@ -147,12 +142,10 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::replan(bool shouldCache) const
     auto plan = multiPlanner.plan(std::move(solutions), std::move(roots));
     LOGV2_DEBUG(2058201,
                 1,
-                "Replanning {canonicalQuery_Short} resulted in plan with summary: "
-                "{Explain_getPlanSummary_child_get}, which {shouldCache_has_has_not} been written "
-                "to the cache",
-                "canonicalQuery_Short"_attr = redact(_cq.toStringShort()),
-                "Explain_getPlanSummary_child_get"_attr = Explain::getPlanSummary(plan.root.get()),
-                "shouldCache_has_has_not"_attr = (shouldCache ? "has" : "has not"));
+                "Query plan after replanning and its cache status",
+                "query"_attr = redact(_cq.toStringShort()),
+                "planSummary"_attr = Explain::getPlanSummary(plan.root.get()),
+                "shouldCache"_attr = (shouldCache ? "yes" : "no"));
     return plan;
 }
 }  // namespace mongo::sbe

@@ -45,7 +45,7 @@ void logScoreFormula(std::function<std::string()> formula,
                      double noSortBonus,
                      double noIxisectBonus,
                      double tieBreakers) {
-    LOGV2_DEBUG(20961, 2, "{sb_str}", "sb_str"_attr = [&]() {
+    LOGV2_DEBUG(20961, 2, "Score formula", "formula"_attr = [&]() {
         StringBuilder sb;
         sb << "score(" << str::convertDoubleToString(score) << ") = baseScore("
            << str::convertDoubleToString(baseScore) << ")"
@@ -60,11 +60,7 @@ void logScoreFormula(std::function<std::string()> formula,
 }
 
 void logScoreBoost(double score) {
-    LOGV2_DEBUG(20962,
-                5,
-                "Score boosted to {newScore} due to intersection forcing",
-                "Score boosted due to intersection forcing",
-                "newScore"_attr = score);
+    LOGV2_DEBUG(20962, 5, "Score boosted due to intersection forcing", "newScore"_attr = score);
 }
 
 void logScoringPlan(std::function<std::string()> solution,
@@ -74,37 +70,28 @@ void logScoringPlan(std::function<std::string()> solution,
                     bool isEOF) {
     LOGV2_DEBUG(20956,
                 5,
-                "Scoring plan {planIndex}:\n{querySolution}Stats:\n{stats}",
                 "Scoring plan",
                 "planIndex"_attr = planIndex,
                 "querySolution"_attr = redact(solution()),
                 "stats"_attr = redact(explain()));
     LOGV2_DEBUG(20957,
                 2,
-                "Scoring query plan: {planSummary} planHitEOF={planHitEOF}",
                 "Scoring query plan",
                 "planSummary"_attr = planSummary(),
                 "planHitEOF"_attr = isEOF);
 }
 
 void logScore(double score) {
-    LOGV2_DEBUG(20958, 5, "Basic plan score: {score}", "Basic plan score", "score"_attr = score);
+    LOGV2_DEBUG(20958, 5, "Basic plan score", "score"_attr = score);
 }
 
 void logEOFBonus(double eofBonus) {
-    LOGV2_DEBUG(20959,
-                5,
-                "Adding +{eofBonus} EOF bonus to score",
-                "Adding EOF bonus to score",
-                "eofBonus"_attr = eofBonus);
+    LOGV2_DEBUG(20959, 5, "Adding EOF bonus to score", "eofBonus"_attr = eofBonus);
 }
 
 void logFailedPlan(std::function<std::string()> planSummary) {
-    LOGV2_DEBUG(20960,
-                2,
-                "Not scoring plan: {planSummary} because the plan failed",
-                "Not scoring a plan because the plan failed",
-                "planSummary"_attr = planSummary());
+    LOGV2_DEBUG(
+        20960, 2, "Not scoring a plan because the plan failed", "planSummary"_attr = planSummary());
 }
 }  // namespace log_detail
 

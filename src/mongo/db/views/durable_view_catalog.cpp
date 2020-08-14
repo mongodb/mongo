@@ -197,7 +197,6 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
     if (!id.isValid() || !systemViews->findDoc(opCtx, id, &oldView)) {
         LOGV2_DEBUG(22544,
                     2,
-                    "Insert view {view} into {viewCatalog}",
                     "Insert view to system views catalog",
                     "view"_attr = view,
                     "viewCatalog"_attr = _db->getSystemViewsName());
@@ -232,7 +231,6 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
 
     LOGV2_DEBUG(22545,
                 2,
-                "Remove view {view} from {viewCatalog}",
                 "Remove view from system views catalog",
                 "view"_attr = name,
                 "viewCatalog"_attr = _db->getSystemViewsName());

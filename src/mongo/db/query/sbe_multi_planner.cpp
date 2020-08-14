@@ -66,7 +66,7 @@ plan_ranker::CandidatePlan MultiPlanner::finalizeExecutionPlans(
     LOGV2_DEBUG(4822876,
                 2,
                 "Winning plan",
-                "planSumamry"_attr = Explain::getPlanSummary(winner.root.get()));
+                "planSummary"_attr = Explain::getPlanSummary(winner.root.get()));
 
     // Close all candidate plans but the winner.
     for (size_t ix = 1; ix < decision->candidateOrder.size(); ++ix) {

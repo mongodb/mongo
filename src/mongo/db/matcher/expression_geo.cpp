@@ -79,10 +79,7 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
         BSONElement elt = geoIt.next();
         if (elt.fieldNameStringData() == "$uniqueDocs") {
             // Deprecated "$uniqueDocs" field
-            LOGV2_WARNING(23847,
-                          "Deprecated $uniqueDocs option: {query}",
-                          "Deprecated $uniqueDocs option",
-                          "query"_attr = redact(obj));
+            LOGV2_WARNING(23847, "Deprecated $uniqueDocs option", "query"_attr = redact(obj));
         } else {
             // The element must be a geo specifier. "$box", "$center", "$geometry", etc.
             geoContainer.reset(new GeometryContainer());

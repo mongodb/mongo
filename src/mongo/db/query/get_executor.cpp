@@ -217,8 +217,6 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
 
             LOGV2_DEBUG(20920,
                         2,
-                        "Multikey path metadata range index scan stats: {{ index: {index}, "
-                        "numSeeks: {numSeeks}, keysExamined: {keysExamined}}}",
                         "Multikey path metadata range index scan stats",
                         "index"_attr = desc->indexName(),
                         "numSeeks"_attr = mkAccessStats.keysExamined,
@@ -528,7 +526,6 @@ public:
         if (nullptr == _collection) {
             LOGV2_DEBUG(20921,
                         2,
-                        "Collection {namespace} does not exist. Using EOF plan: {query}",
                         "Collection does not exist. Using EOF plan",
                         "namespace"_attr = _cq->ns(),
                         "canonicalQuery"_attr = redact(_cq->toStringShort()));
@@ -591,7 +588,6 @@ public:
                         turnIxscanIntoCount(querySolution.get())) {
                         LOGV2_DEBUG(20923,
                                     2,
-                                    "Using fast count: {query}",
                                     "Using fast count",
                                     "query"_attr = redact(_cq->toStringShort()));
                     }
@@ -607,7 +603,6 @@ public:
             SubplanStage::canUseSubplanning(*_cq)) {
             LOGV2_DEBUG(20924,
                         2,
-                        "Running query as sub-queries: {query}",
                         "Running query as sub-queries",
                         "query"_attr = redact(_cq->toStringShort()));
             return buildSubPlan(plannerParams);
@@ -633,7 +628,6 @@ public:
 
                     LOGV2_DEBUG(20925,
                                 2,
-                                "Using fast count: {query}, planSummary: {planSummary}",
                                 "Using fast count",
                                 "query"_attr = redact(_cq->toStringShort()),
                                 "planSummary"_attr = result->getPlanSummary());
@@ -648,14 +642,11 @@ public:
             auto root = buildExecutableTree(*solutions[0]);
             result->emplace(std::move(root), std::move(solutions[0]));
 
-            LOGV2_DEBUG(
-                20926,
-                2,
-                "Only one plan is available; it will be run but will not be cached. {query}, "
-                "planSummary: {planSummary}",
-                "Only one plan is available; it will be run but will not be cached",
-                "query"_attr = redact(_cq->toStringShort()),
-                "planSummary"_attr = result->getPlanSummary());
+            LOGV2_DEBUG(20926,
+                        2,
+                        "Only one plan is available; it will be run but will not be cached",
+                        "query"_attr = redact(_cq->toStringShort()),
+                        "planSummary"_attr = result->getPlanSummary());
 
             return std::move(result);
         }
@@ -1237,7 +1228,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         // contains an EOF stage.
         LOGV2_DEBUG(20927,
                     2,
-                    "Collection {namespace} does not exist. Using EOF stage: {query}",
                     "Collection does not exist. Using EOF stage",
                     "namespace"_attr = nss.ns(),
                     "query"_attr = redact(request->getQuery()));
@@ -1270,11 +1260,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
             if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
                 request->getProj().isEmpty() && hasCollectionDefaultCollation) {
-                LOGV2_DEBUG(20928,
-                            2,
-                            "Using idhack: {query}",
-                            "Using idhack",
-                            "query"_attr = redact(unparsedQuery));
+                LOGV2_DEBUG(20928, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
 
                 auto idHackStage = std::make_unique<IDHackStage>(
                     expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), collection, descriptor);
@@ -1410,7 +1396,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     if (!collection) {
         LOGV2_DEBUG(20929,
                     2,
-                    "Collection {namespace} does not exist. Using EOF stage: {query}",
                     "Collection does not exist. Using EOF stage",
                     "namespace"_attr = nss.ns(),
                     "query"_attr = redact(request->getQuery()));
@@ -1438,11 +1423,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
             if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
                 request->getProj().isEmpty() && hasCollectionDefaultCollation) {
-                LOGV2_DEBUG(20930,
-                            2,
-                            "Using idhack: {query}",
-                            "Using idhack",
-                            "query"_attr = redact(unparsedQuery));
+                LOGV2_DEBUG(20930, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
 
                 // Working set 'ws' is discarded. InternalPlanner::updateWithIdHack() makes its own
                 // WorkingSet.
@@ -2056,7 +2037,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
 
     LOGV2_DEBUG(20931,
                 2,
-                "Using fast distinct: {query}, planSummary: {planSummary}",
                 "Using fast distinct",
                 "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
                 "planSummary"_attr = Explain::getPlanSummary(root.get()));
@@ -2101,7 +2081,6 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
 
             LOGV2_DEBUG(20932,
                         2,
-                        "Using fast distinct: {query}, planSummary: {planSummary}",
                         "Using fast distinct",
                         "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
                         "planSummary"_attr = Explain::getPlanSummary(root.get()));

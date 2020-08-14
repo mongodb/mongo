@@ -247,8 +247,6 @@ bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
     if (arrayIndices.size() > kWildcardMaxArrayIndexTraversalDepth) {
         LOGV2_DEBUG(20955,
                     2,
-                    "Declining to answer query on field '{field}' with $** index, as it traverses "
-                    "through more than {maxNestedArrayIndices} nested array indices",
                     "Declining to answer query on a field with $** index, as it traverses through "
                     "more than the maximum permitted depth of nested array indices",
                     "field"_attr = queryPath.dottedField(),

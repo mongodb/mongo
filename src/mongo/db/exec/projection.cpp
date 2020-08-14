@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 #include "mongo/db/exec/projection.h"
 
 #include <boost/optional.hpp>
@@ -42,7 +40,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

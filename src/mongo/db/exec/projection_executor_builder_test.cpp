@@ -65,10 +65,9 @@ public:
             base->run();
         } catch (...) {
             LOGV2(20597,
-                  "exception while testing with allowFastPath={allowFastPath} and "
-                  "allowFallBackToDefault={AllowFallBackToDefault}",
+                  "Exception while testing",
                   "allowFastPath"_attr = _allowFastPath,
-                  "AllowFallBackToDefault"_attr = AllowFallBackToDefault);
+                  "allowFallBackToDefault"_attr = AllowFallBackToDefault);
             throw;
         }
     }

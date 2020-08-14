@@ -416,7 +416,6 @@ std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContex
 
         if (res) {
             LOGV2(22837,
-                  "Cursor id {cursorId} timed out, idle since {idleSince}",
                   "Cursor timed out",
                   "cursorId"_attr = cursorId,
                   "idleSince"_attr = entry.getLastActive().toString());
@@ -625,10 +624,7 @@ std::pair<Status, int> ClusterCursorManager::killCursorsWithMatchingSessions(
             return;
         }
         uassertStatusOK(mgr.killCursor(opCtx, *cursorNss, id));
-        LOGV2(22838,
-              "Killing cursor: {cursorId} as part of killing session(s)",
-              "Killing cursor as part of killing session(s)",
-              "cursorId"_attr = id);
+        LOGV2(22838, "Killing cursor as part of killing session(s)", "cursorId"_attr = id);
     };
 
     auto bySessionCursorKiller = makeKillCursorsBySessionAdaptor(opCtx, matcher, std::move(eraser));

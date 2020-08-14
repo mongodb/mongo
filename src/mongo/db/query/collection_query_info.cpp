@@ -184,7 +184,6 @@ void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
 void CollectionQueryInfo::clearQueryCache(const Collection* coll) {
     LOGV2_DEBUG(20907,
                 1,
-                "{namespace}: clearing plan cache - collection info cache reset",
                 "Clearing plan cache - collection info cache reset",
                 "namespace"_attr = coll->ns());
     if (nullptr != _planCache.get()) {

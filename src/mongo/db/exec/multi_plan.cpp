@@ -197,22 +197,17 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     const auto& alreadyProduced = bestCandidate.results;
     const auto& bestSolution = bestCandidate.solution;
 
-    LOGV2_DEBUG(20590,
-                5,
-                "Winning solution:\n{bestSolution}",
-                "bestSolution"_attr = redact(bestSolution->toString()));
-    LOGV2_DEBUG(20591,
-                2,
-                "Winning plan: {Explain_getPlanSummary_bestCandidate_root}",
-                "Explain_getPlanSummary_bestCandidate_root"_attr =
-                    Explain::getPlanSummary(bestCandidate.root));
+    LOGV2_DEBUG(
+        20590, 5, "Winning solution", "bestSolution"_attr = redact(bestSolution->toString()));
+    LOGV2_DEBUG(
+        20591, 2, "Winning plan", "planSummary"_attr = Explain::getPlanSummary(bestCandidate.root));
 
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
         LOGV2_DEBUG(20592, 5, "Winner has blocking stage, looking for backup plan...");
         for (auto&& ix : ranking->candidateOrder) {
             if (!_candidates[ix].solution->hasBlockingStage) {
-                LOGV2_DEBUG(20593, 5, "Candidate {ix} is backup child", "ix"_attr = ix);
+                LOGV2_DEBUG(20593, 5, "Backup child", "ix"_attr = ix);
                 _backupPlanIdx = ix;
                 break;
             }

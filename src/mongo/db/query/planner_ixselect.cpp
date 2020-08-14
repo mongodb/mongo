@@ -286,7 +286,6 @@ std::vector<IndexEntry> QueryPlannerIXSelect::findIndexesByHint(
             if (entry.identifier.catalogName == hintName) {
                 LOGV2_DEBUG(20952,
                             5,
-                            "Hint by name specified, restricting indices to {keyPattern}",
                             "Hint by name specified, restricting indices",
                             "name"_attr = entry.identifier.catalogName,
                             "keyPattern"_attr = entry.keyPattern);
@@ -298,7 +297,6 @@ std::vector<IndexEntry> QueryPlannerIXSelect::findIndexesByHint(
             if (SimpleBSONObjComparator::kInstance.evaluate(entry.keyPattern == hintedIndex)) {
                 LOGV2_DEBUG(20953,
                             5,
-                            "Hint specified, restricting indices to {keyPattern}",
                             "Hint specified, restricting indices",
                             "name"_attr = entry.identifier.catalogName,
                             "keyPattern"_attr = entry.keyPattern);
@@ -586,7 +584,6 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
         return false;
     } else {
         LOGV2_WARNING(20954,
-                      "Unknown indexing for node {node} and field {field}",
                       "Unknown indexing for given node and field",
                       "node"_attr = node->debugString(),
                       "field"_attr = keyPatternElt.toString());
