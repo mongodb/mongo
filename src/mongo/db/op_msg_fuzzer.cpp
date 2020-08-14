@@ -63,7 +63,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         mongo::LogicalTime(mongo::Timestamp(3, 1));
 
     static const auto ret = [&]() {
-        auto ret = mongo::runGlobalInitializers(0, nullptr, nullptr);
+        auto ret = mongo::runGlobalInitializers(std::vector<std::string>{});
         invariant(ret.isOK());
 
         setGlobalServiceContext(mongo::ServiceContext::make());
@@ -100,7 +100,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         serviceContext->makeOperationContext(client.get());
     auto logicalClock = std::make_unique<mongo::LogicalClock>(serviceContext);
     mongo::LogicalClock::set(serviceContext, std::move(logicalClock));
-    VectorClockMutable::get(getServiceContext())->tickClusterTimeTo(kInMemoryLogicalTime);
+    mongo::VectorClockMutable::get(serviceContext)->tickClusterTimeTo(kInMemoryLogicalTime);
 
     int new_size = Size + sizeof(int);
     auto sb = mongo::SharedBuffer::allocate(new_size);
