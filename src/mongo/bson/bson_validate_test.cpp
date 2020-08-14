@@ -32,7 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/data_view.h"
-#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
@@ -252,34 +251,6 @@ TEST(BSONValidateFast, NestedObject) {
     ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize() / 2));
 }
 
-TEST(BSONValidateFast, AllTypesSimple) {
-    BSONObj x = BSON(
-        "1float" << 1.5  // 64-bit binary floating point
-                 << "2string"
-                 << "Hello"                                           // UTF-8 string
-                 << "3document" << BSON("a" << 1)                     // Embedded document
-                 << "4array" << BSON_ARRAY(1 << 2)                    // Array
-                 << "5bindata" << BSONBinData("", 0, BinDataGeneral)  // Binary data
-                 << "6undefined" << BSONUndefined  // Undefined (value) -- Deprecated
-                 << "7objectid" << OID("deadbeefdeadbeefdeadbeef")  // ObjectId
-                 << "8boolean" << true                              // Boolean
-                 << "9datetime" << DATENOW                          // UTC datetime
-                 << "10null" << BSONNULL                            // Null value
-                 << "11regex" << BSONRegEx("reg.ex")                // Regular Expression
-                 << "12dbref"
-                 << BSONDBRef("db", OID("dbdbdbdbdbdbdbdbdbdbdbdb"))  // DBPointer -- Deprecated
-                 << "13code" << BSONCode("(function(){})();")         // JavaScript code
-                 << "14symbol" << BSONSymbol("symbol")                // Symbol. Deprecated
-                 << "15code_w_s"
-                 << BSONCodeWScope("(function(){})();", BSON("a" << 1))  // JavaScript code w/ scope
-                 << "16int" << 42                                        // 32-bit integer
-                 << "17timestamp" << Timestamp(1, 2)                     // Timestamp
-                 << "18long" << 0x0123456789abcdefll                     // 64-bit integer
-                 << "19decimal" << Decimal128("0.30")  // 128-bit decimal floating point
-    );
-    ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
-}
-
 TEST(BSONValidateFast, ErrorWithId) {
     BufBuilder bb;
     BSONObjBuilder ob(bb);
@@ -290,7 +261,7 @@ TEST(BSONValidateFast, ErrorWithId) {
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(
         status.reason(),
-        "Not null terminated string in element with field name 'not_id' in object with _id: 1");
+        "not null terminated string in element with field name 'not_id' in object with _id: 1");
 }
 
 TEST(BSONValidateFast, ErrorBeforeId) {
@@ -302,7 +273,7 @@ TEST(BSONValidateFast, ErrorBeforeId) {
     const Status status = validateBSON(x.objdata(), x.objsize());
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
-                  "Not null terminated string in element with field name 'not_id' in object with "
+                  "not null terminated string in element with field name 'not_id' in object with "
                   "unknown _id");
 }
 
@@ -314,7 +285,7 @@ TEST(BSONValidateFast, ErrorNoId) {
     const Status status = validateBSON(x.objdata(), x.objsize());
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
-                  "Not null terminated string in element with field name 'not_id' in object with "
+                  "not null terminated string in element with field name 'not_id' in object with "
                   "unknown _id");
 }
 
@@ -327,7 +298,7 @@ TEST(BSONValidateFast, ErrorIsInId) {
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(
         status.reason(),
-        "Not null terminated string in element with field name '_id' in object with unknown _id");
+        "not null terminated string in element with field name '_id' in object with unknown _id");
 }
 
 TEST(BSONValidateFast, NonTopLevelId) {
@@ -341,24 +312,8 @@ TEST(BSONValidateFast, NonTopLevelId) {
     const Status status = validateBSON(x.objdata(), x.objsize());
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
-                  "Not null terminated string in element with field name 'not_id2' in object with "
+                  "not null terminated string in element with field name 'not_id2' in object with "
                   "unknown _id");
-}
-
-TEST(BSONValidateFast, ErrorInNestedObjectWithId) {
-    BufBuilder bb;
-    BSONObjBuilder ob(bb);
-    ob.append("x", 2.0);
-    appendInvalidStringElement("invalid", &bb);
-    const BSONObj nestedInvalid = ob.done();
-    const BSONObj x = BSON("_id" << 1 << "nested"
-                                 << BSON_ARRAY("a"
-                                               << "b" << nestedInvalid));
-    const Status status = validateBSON(x.objdata(), x.objsize());
-    ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(status.reason(),
-                  "Not null terminated string in element with field name 'nested.2.invalid' "
-                  "in object with _id: 1");
 }
 
 TEST(BSONValidateFast, StringHasSomething) {
@@ -377,7 +332,7 @@ TEST(BSONValidateFast, StringHasSomething) {
     ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize()));
 }
 
-TEST(BSONValidateFast, BoolValuesAreValidated) {
+TEST(BSONValidateBool, BoolValuesAreValidated) {
     BSONObjBuilder bob;
     bob.append("x", false);
     const BSONObj obj = bob.done();
@@ -407,21 +362,8 @@ TEST(BSONValidateFast, InvalidType) {
 
     // Validate fails.
     ASSERT_NOT_OK(validateBSON(obj.objdata(), obj.objsize()));
-
-    // Make sure the binary buffer above indeed has the invalid type.
     ASSERT_THROWS_CODE(obj.woCompare(BSON("A" << 1)), DBException, 10320);
 }
 
-BSONObj nest(int nesting) {
-    return nesting < 1 ? BSON("i" << nesting) : BSON("i" << nesting << "o" << nest(nesting - 1));
-}
 
-TEST(BSONValidateFast, MaxNestingDepth) {
-    BSONObj maxNesting = nest(BSONDepth::getMaxAllowableDepth());
-    ASSERT_OK(validateBSON(maxNesting.objdata(), maxNesting.objsize()));
-
-    BSONObj tooDeepNesting = nest(BSONDepth::getMaxAllowableDepth() + 1);
-    Status status = validateBSON(tooDeepNesting.objdata(), tooDeepNesting.objsize());
-    ASSERT_EQ(status.code(), ErrorCodes::Overflow);
-}
 }  // namespace

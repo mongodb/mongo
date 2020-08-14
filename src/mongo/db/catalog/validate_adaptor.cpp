@@ -72,12 +72,19 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        size_t* dataSize,
                                        ValidateResults* results,
                                        ValidateResultsMap* indexNsResultsMap) {
-    const Status status = validateBSON(record.data(), record.size());
-    if (!status.isOK())
-        return status;
+    BSONObj recordBson;
+    try {
+        recordBson = record.toBson();
+    } catch (...) {
+        return exceptionToStatus();
+    }
 
-    BSONObj recordBson = record.toBson();
-    *dataSize = recordBson.objsize();
+    const Status status = validateBSON(recordBson.objdata(), recordBson.objsize());
+    if (status.isOK()) {
+        *dataSize = recordBson.objsize();
+    } else {
+        return status;
+    }
 
     if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
         LOGV2(4666601, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
