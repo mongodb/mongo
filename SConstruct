@@ -2051,7 +2051,11 @@ if env.TargetOSIs('posix'):
         except KeyError:
             pass
 
-    if env.TargetOSIs('linux') and has_option( "gcov" ):
+    if has_option( "gcov" ):
+        if not (env.TargetOSIs('linux') and env.ToolchainIs('gcc')):
+            # TODO: This should become supported under: https://jira.mongodb.org/browse/SERVER-49877
+            env.FatalError("Coverage option 'gcov' is currently only supported on linux with gcc. See SERVER-49877.")
+
         env.Append( CCFLAGS=["-fprofile-arcs", "-ftest-coverage", "-fprofile-update=single"] )
         env.Append( LINKFLAGS=["-fprofile-arcs", "-ftest-coverage", "-fprofile-update=single"] )
 
