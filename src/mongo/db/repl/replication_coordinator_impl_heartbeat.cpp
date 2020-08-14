@@ -240,11 +240,11 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         }
     }
     const Date_t now = _replExecutor->now();
-    Milliseconds networkTime(0);
+    Microseconds networkTime(0);
     StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
 
     if (responseStatus.isOK()) {
-        networkTime = cbData.response.elapsedMillis.value_or(Milliseconds{0});
+        networkTime = cbData.response.elapsed.value_or(Microseconds{0});
         // TODO(sz) Because the term is duplicated in ReplSetMetaData, we can get rid of this
         // and update tests.
         const auto& hbResponse = hbStatusResponse.getValue();
@@ -269,8 +269,9 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
     }
 
-    HeartbeatResponseAction action =
-        _topCoord->processHeartbeatResponse(now, networkTime, target, hbStatusResponse);
+    // Leaving networkTime units as ms since the average ping calulation may be affected.
+    HeartbeatResponseAction action = _topCoord->processHeartbeatResponse(
+        now, duration_cast<Milliseconds>(networkTime), target, hbStatusResponse);
 
     if (action.getAction() == HeartbeatResponseAction::NoAction && hbStatusResponse.isOK() &&
         hbStatusResponse.getValue().hasState() &&

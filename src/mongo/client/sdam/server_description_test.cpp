@@ -37,6 +37,8 @@
 #include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/platform/random.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/system_clock_source.h"
 
 namespace mongo::sdam {
@@ -231,6 +233,8 @@ protected:
         return std::move(BSONObjBuilder().append("ok", 1));
     }
 
+    static inline auto rand = PseudoRandom(SecureRandom().nextInt64());
+
     static inline const auto clockSource = SystemClockSource::get();
 
     static inline const auto kBsonOk = okBuilder().obj();
@@ -381,6 +385,28 @@ TEST_F(ServerDescriptionTestFixture,
     auto response2 = IsMasterOutcome(HostAndPort("foo:1234"), kBsonRsPrimary);
     auto description2 = ServerDescription(clockSource, response2, description.getRtt());
     ASSERT_EQUALS(20, durationCount<mongo::Milliseconds>(*description2.getRtt()));
+}
+
+TEST_F(ServerDescriptionTestFixture, ShouldPreserveRTTPrecisionForMicroseconds) {
+    const int numIterations = 100;
+    const int minRttMicros = 100;
+
+    const auto randMicroseconds = [](int m) { return Microseconds(rand.nextInt64(m) + m); };
+    auto lastServerDescription = ServerDescriptionBuilder()
+                                     .withType(ServerType::kRSPrimary)
+                                     .withRtt(randMicroseconds(minRttMicros))
+                                     .instance();
+
+    for (int i = 0; i < numIterations; ++i) {
+        auto lastRtt = *lastServerDescription->getRtt();
+        auto response = IsMasterOutcome(
+            HostAndPort("foo:1234"), kBsonRsPrimary, randMicroseconds(minRttMicros));
+        lastServerDescription = std::make_shared<ServerDescription>(clockSource, response, lastRtt);
+    }
+
+    // assert the value does not decay to zero
+    ASSERT_GT(durationCount<Microseconds>(*lastServerDescription->getRtt()), minRttMicros);
+    ASSERT_LT(durationCount<Microseconds>(*lastServerDescription->getRtt()), 2 * minRttMicros);
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreLastWriteDate) {

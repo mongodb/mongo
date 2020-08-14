@@ -167,7 +167,7 @@ void SingleServerPingMonitor::_doServerPing() {
                     anchor->_rttListener->onServerPingFailedEvent(anchor->_hostAndPort,
                                                                   result.response.status);
                 } else {
-                    auto rtt = sdam::IsMasterRTT(timer.micros());
+                    auto rtt = Microseconds(timer.micros());
                     anchor->_rttListener->onServerPingSucceededEvent(rtt, anchor->_hostAndPort);
                 }
             }

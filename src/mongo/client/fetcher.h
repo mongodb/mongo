@@ -70,7 +70,7 @@ public:
         struct OtherFields {
             BSONObj metadata;
         } otherFields;
-        Milliseconds elapsedMillis = Milliseconds(0);
+        Microseconds elapsed = Microseconds(0);
         bool first = false;
     };
 
