@@ -153,11 +153,11 @@ protected:
                          const HostAndPort& hostAndPort,
                          MockReplicaSet* replSet) {
         processPingRequest(hostAndPort, replSet);
-
         auto deadline = elapsed() + pingFrequency;
         while (elapsed() < deadline && !_topologyListener->hasPingResponse(hostAndPort)) {
             advanceTime(Milliseconds(100));
         }
+
         ASSERT_TRUE(_topologyListener->hasPingResponse(hostAndPort));
         ASSERT_LT(elapsed(), deadline);
         auto pingResponse = _topologyListener->getPingResponse(hostAndPort);
@@ -165,6 +165,11 @@ protected:
         // There should only be one isMaster response queued up.
         ASSERT_EQ(pingResponse.size(), 1);
         ASSERT(pingResponse[0].isOK());
+
+        // The latency is from the ping monitor's local timer; not from the mocked clock.
+        // Just assert that we receive a signal.
+        ASSERT_GTE(durationCount<Microseconds>(pingResponse[0].getValue()), 1);
+
         checkNoActivityBefore(deadline, hostAndPort);
     }
 

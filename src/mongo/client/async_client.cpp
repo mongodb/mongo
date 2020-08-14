@@ -223,18 +223,14 @@ Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
     // have to communicate with servers that do not support other protocols.
     auto requestMsg =
         rpc::legacyRequestFromOpMsgRequest(OpMsgRequest::fromDBAndBody("admin", requestObj));
-    auto clkSource = _svcCtx->getFastClockSource();
-    auto start = clkSource->now();
-
     auto msgId = nextMessageId();
     return _call(requestMsg, msgId)
         .then([msgId, this]() { return _waitForResponse(msgId); })
-        .then([this, requestObj, hook, clkSource, start](Message response) {
+        .then([this, requestObj, hook, timer = Timer{}](Message response) {
             auto cmdReply = rpc::makeReply(&response);
             _parseIsMasterResponse(requestObj, cmdReply);
             if (hook) {
-                auto millis = duration_cast<Milliseconds>(clkSource->now() - start);
-                executor::RemoteCommandResponse cmdResp(*cmdReply, millis);
+                executor::RemoteCommandResponse cmdResp(*cmdReply, timer.elapsed());
                 uassertStatusOK(hook->validateHost(_peer, requestObj, std::move(cmdResp)));
             }
         });
@@ -307,16 +303,14 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
 
 Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     executor::RemoteCommandRequest request, const BatonHandle& baton) {
-    auto clkSource = _svcCtx->getPreciseClockSource();
-    auto start = clkSource->now();
+    auto startTimer = Timer();
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(
         std::move(request.dbname), std::move(request.cmdObj), std::move(request.metadata));
     auto fireAndForget =
         request.fireAndForgetMode == executor::RemoteCommandRequest::FireAndForgetMode::kOn;
     return runCommand(std::move(opMsgRequest), baton, fireAndForget)
-        .then([start, clkSource, this](rpc::UniqueReply response) {
-            auto duration = duration_cast<Milliseconds>(clkSource->now() - start);
-            return executor::RemoteCommandResponse(*response, duration);
+        .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {
+            return executor::RemoteCommandResponse(*response, startTimer.elapsed());
         });
 }
 

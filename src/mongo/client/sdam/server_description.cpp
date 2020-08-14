@@ -171,8 +171,10 @@ void ServerDescription::calculateRtt(const boost::optional<IsMasterRTT> currentR
         _rtt = currentRtt;
     } else {
         // new_rtt = alpha * x + (1 - alpha) * old_rtt
-        _rtt = IsMasterRTT(static_cast<IsMasterRTT::rep>(kRttAlpha * currentRtt.get().count() +
-                                                         (1 - kRttAlpha) * lastRtt.get().count()));
+        auto currentMicros = durationCount<Microseconds>(*currentRtt);
+        auto lastMicros = durationCount<Microseconds>(*lastRtt);
+        _rtt = Microseconds(static_cast<Microseconds::rep>(kRttAlpha * currentMicros +
+                                                           (1 - kRttAlpha) * lastMicros));
     }
 }
 
