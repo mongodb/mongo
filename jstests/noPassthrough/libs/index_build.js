@@ -273,8 +273,14 @@ const ResumableIndexBuildTest = class {
      * Restarts the given node, ensuring that the the index build with name indexName has its state
      * written to disk upon shutdown and is completed upon startup.
      */
-    static restart(
-        rst, conn, coll, indexName, failPointName, failPointData, shouldComplete = true) {
+    static restart(rst,
+                   conn,
+                   coll,
+                   indexName,
+                   failPointName,
+                   failPointData,
+                   shouldComplete = true,
+                   failPointAfterStartup) {
         clearRawMongoProgramOutput();
 
         const buildUUID = extractUUIDFromObject(
@@ -318,7 +324,11 @@ const ResumableIndexBuildTest = class {
         // Ensure that the resumable index build state was written to disk upon clean shutdown.
         assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput()));
 
-        rst.start(conn, {noCleanData: true});
+        const setParameter = failPointAfterStartup ? {
+            ["failpoint." + failPointAfterStartup]: tojson({mode: "alwaysOn"}),
+        }
+                                                   : {};
+        rst.start(conn, {noCleanData: true, setParameter: setParameter});
 
         if (shouldComplete) {
             // Ensure that the index build was completed upon the node starting back up.
@@ -349,8 +359,8 @@ const ResumableIndexBuildTest = class {
     /**
      * Runs the resumable index build test specified by the provided failpoint information and
      * index spec on the provided replica set and namespace. Documents specified by sideWrites will
-     * be inserted after the bulk load phase so that they are inserted into the side writes table
-     * and processed during the drain writes phase.
+     * be inserted during the initialization phase so that they are inserted into the side writes
+     * table and processed during the drain writes phase.
      */
     static run(rst,
                dbName,
@@ -390,7 +400,7 @@ const ResumableIndexBuildTest = class {
      * Runs the resumable index build test specified by the provided failpoint information and
      * index spec on the provided replica set and namespace. This will specifically be used to test
      * that resuming an index build on the former primary works. Documents specified by sideWrites
-     * will be inserted during the collection scan phase so that they are inserted into the side
+     * will be inserted during the initialization phase so that they are inserted into the side
      * writes table and processed during the drain writes phase.
      */
     static runOnPrimaryToTestCommitQuorum(rst,
@@ -452,7 +462,7 @@ const ResumableIndexBuildTest = class {
      * Runs the resumable index build test specified by the provided failpoint information and
      * index spec on the provided replica set and namespace. This will specifically be used to test
      * that resuming an index build on a secondary works. Documents specified by sideWrites will be
-     * inserted during the collection scan phase so that they are inserted into the side writes
+     * inserted during the initialization phase so that they are inserted into the side writes
      * table and processed during the drain writes phase.
      */
     static runOnSecondary(rst,
@@ -514,6 +524,64 @@ const ResumableIndexBuildTest = class {
         }
 
         awaitCreateIndex();
+        ResumableIndexBuildTest.checkIndexes(
+            rst, dbName, collName, indexName, postIndexBuildInserts);
+    }
+
+    /**
+     * Runs the resumable index build test specified by the provided index spec on the provided
+     * replica set and namespace. This will be used to test that failing to resume an index build
+     * during the setup phase will cause the index build to restart from the beginning instead.
+     * The provided failpoint will be set on the node on restart to specify how resuming the index
+     * build should fail. Documents specified by sideWrites will be inserted during the
+     * initialization phase so that they are inserted into the side writes table and processed
+     * during the drain writes phase.
+     */
+    static runFailToResume(rst,
+                           dbName,
+                           collName,
+                           indexSpec,
+                           failpointAfterStartup,
+                           sideWrites,
+                           postIndexBuildInserts,
+                           failWhileParsing = false) {
+        const primary = rst.getPrimary();
+        const coll = primary.getDB(dbName).getCollection(collName);
+        const indexName = "resumable_index_build";
+
+        const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
+            rst, function(collName, indexSpec, indexName) {
+                assert.commandFailedWithCode(
+                    db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
+                    ErrorCodes.InterruptedDueToReplStateChange);
+            }, coll, indexSpec, indexName, sideWrites, {hangBeforeBuildingIndex: true});
+
+        const buildUUID = extractUUIDFromObject(
+            IndexBuildTest
+                .assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName]
+                .buildUUID);
+
+        ResumableIndexBuildTest.restart(rst,
+                                        primary,
+                                        coll,
+                                        indexName,
+                                        "hangIndexBuildBeforeWaitingUntilMajorityOpTime",
+                                        {} /* failPointData */,
+                                        false /* shouldComplete */,
+                                        failpointAfterStartup);
+
+        awaitCreateIndex();
+
+        // Ensure that the resumable index build failed as expected.
+        if (failWhileParsing) {
+            assert(RegExp("4916300.*").test(rawMongoProgramOutput()));
+        } else {
+            assert(RegExp("4841701.*" + buildUUID).test(rawMongoProgramOutput()));
+        }
+
+        // Ensure that the index build was completed after it was restarted.
+        ResumableIndexBuildTest.assertCompleted(primary, coll, buildUUID, 2, ["_id_", indexName]);
+
         ResumableIndexBuildTest.checkIndexes(
             rst, dbName, collName, indexName, postIndexBuildInserts);
     }

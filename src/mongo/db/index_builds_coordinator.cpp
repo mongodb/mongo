@@ -80,6 +80,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpResumableIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeCommit);
 MONGO_FAIL_POINT_DEFINE(hangBeforeBuildingIndex);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeWaitingUntilMajorityOpTime);
+MONGO_FAIL_POINT_DEFINE(failSetUpResumeIndexBuild);
 
 namespace {
 
@@ -558,6 +559,10 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
                                                       const UUID& buildUUID,
                                                       const ResumeIndexInfo& resumeInfo) {
     NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
+
+    if (MONGO_unlikely(failSetUpResumeIndexBuild.shouldFail())) {
+        return {ErrorCodes::FailPointEnabled, "failSetUpResumeIndexBuild fail point is enabled"};
+    }
 
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     Lock::CollectionLock collLock(opCtx, nssOrUuid, MODE_X);

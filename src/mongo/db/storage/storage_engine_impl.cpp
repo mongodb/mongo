@@ -51,6 +51,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -61,6 +62,8 @@ namespace mongo {
 
 using std::string;
 using std::vector;
+
+MONGO_FAIL_POINT_DEFINE(failToParseResumeIndexInfo);
 
 namespace {
 const std::string catalogInfo = "_mdb_catalog";
@@ -357,6 +360,11 @@ bool StorageEngineImpl::_handleInternalIdents(
         if (doc.hasField("phase")) {
             ResumeIndexInfo resumeInfo;
             try {
+                if (MONGO_unlikely(failToParseResumeIndexInfo.shouldFail())) {
+                    uasserted(ErrorCodes::FailPointEnabled,
+                              "failToParseResumeIndexInfo fail point is enabled");
+                }
+
                 resumeInfo = ResumeIndexInfo::parse(IDLParserErrorContext("ResumeIndexInfo"), doc);
             } catch (const DBException& e) {
                 LOGV2(4916300, "Failed to parse resumable index info", "error"_attr = e.toStatus());

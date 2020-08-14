@@ -89,8 +89,12 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
         _indexCatalog->findIndexByName(opCtx, _indexName, true /* includeUnfinishedIndexes */);
 
     _indexCatalogEntry = descriptor->getEntry();
-    invariant(_indexCatalogEntry);
-    invariant(_method == IndexBuildMethod::kHybrid);
+
+    uassert(4945000,
+            "Index catalog entry not found while attempting to resume index build",
+            _indexCatalogEntry);
+    uassert(
+        4945001, "Cannot resume a non-hybrid index build", _method == IndexBuildMethod::kHybrid);
 
     if (phase == IndexBuildPhaseEnum::kBulkLoad) {
         // A bulk cursor can only be opened on a fresh table, so we drop the table that was created
