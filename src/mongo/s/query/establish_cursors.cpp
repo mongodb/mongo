@@ -71,7 +71,7 @@ void killOpOnShards(std::shared_ptr<executor::TaskExecutor> executor,
 
             // We do not process the response to the killOperations request (we make a good-faith
             // attempt at cleaning up the cursors, but ignore any returned errors).
-            uassertStatusOK(executor->scheduleRemoteCommand(request, [&](auto const& args) {
+            uassertStatusOK(executor->scheduleRemoteCommand(request, [host](auto const& args) {
                 if (!args.response.isOK()) {
                     LOGV2_DEBUG(4625504,
                                 2,
