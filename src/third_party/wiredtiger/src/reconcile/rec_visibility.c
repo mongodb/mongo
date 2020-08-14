@@ -427,7 +427,8 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
             WT_TIME_WINDOW_SET_START(select_tw, upd);
         else if (select_tw->stop_ts != WT_TS_NONE || select_tw->stop_txn != WT_TXN_NONE) {
             /* If we only have a tombstone in the update list, we must have an ondisk value. */
-            WT_ASSERT(session, vpack != NULL && tombstone != NULL && last_upd->next == NULL);
+            WT_ASSERT(session,
+              vpack != NULL && tombstone != NULL && !vpack->tw.prepare && last_upd->next == NULL);
             /*
              * It's possible to have a tombstone as the only update in the update list. If we
              * reconciled before with only a single update and then read the page back into cache,
@@ -437,28 +438,40 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
              * In this case, we should leave the selected update unset to indicate that we want to
              * keep the same on-disk value but set the stop time point to indicate that the validity
              * window ends when this tombstone started.
+             *
+             * FIXME-WT-6557: no need to check this after WT-6557 is done as the tombstone will be
+             * freed when it is written to the disk image in the previous eviction.
              */
-            WT_ERR(__rec_append_orig_value(session, page, tombstone, vpack));
+            if (!F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)) {
+                WT_ERR(__rec_append_orig_value(session, page, tombstone, vpack));
 
-            /*
-             * We may have updated the global transaction concurrently and the tombstone is now
-             * globally visible. In this case, the on page value is not appended. Check that.
-             */
-            if (last_upd->next != NULL) {
-                WT_ASSERT(session, last_upd->next->txnid == vpack->tw.start_txn &&
-                    last_upd->next->start_ts == vpack->tw.start_ts &&
-                    last_upd->next->type == WT_UPDATE_STANDARD && last_upd->next->next == NULL);
-                upd_select->upd = last_upd->next;
-                WT_TIME_WINDOW_SET_START(select_tw, last_upd->next);
-            } else {
                 /*
-                 * If the tombstone is aborted concurrently, we should still have appended the
-                 * onpage value.
+                 * We may have updated the global transaction concurrently and the tombstone is now
+                 * globally visible. In this case, the on page value is not appended. Verify that.
                  */
-                WT_ASSERT(session, tombstone->txnid != WT_TXN_ABORTED &&
-                    __wt_txn_upd_visible_all(session, tombstone) && upd_select->upd == NULL);
-                upd_select->upd = tombstone;
-            }
+                if (last_upd->next != NULL) {
+                    WT_ASSERT(session, last_upd->next->txnid == vpack->tw.start_txn &&
+                        last_upd->next->start_ts == vpack->tw.start_ts &&
+                        last_upd->next->type == WT_UPDATE_STANDARD && last_upd->next->next == NULL);
+                    upd_select->upd = last_upd->next;
+                    WT_TIME_WINDOW_SET_START(select_tw, last_upd->next);
+                } else {
+                    /*
+                     * If the tombstone is aborted concurrently, we should still have appended the
+                     * onpage value.
+                     */
+                    WT_ASSERT(session, tombstone->txnid != WT_TXN_ABORTED &&
+                        __wt_txn_upd_visible_all(session, tombstone) && upd_select->upd == NULL);
+                    upd_select->upd = tombstone;
+                }
+            } else
+                /*
+                 * If the tombstone is restored from the disk or history store, it must have already
+                 * been written to the disk image in the previous eviction.
+                 */
+                WT_ASSERT(session, upd_select->upd == NULL &&
+                    vpack->tw.durable_stop_ts == tombstone->durable_ts &&
+                    vpack->tw.stop_txn == tombstone->txnid);
         }
     }
 

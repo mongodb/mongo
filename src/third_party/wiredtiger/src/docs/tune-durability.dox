@@ -100,7 +100,7 @@ logging subsystem to write any outstanding in-memory buffers to the
 file system before returning.
 
 If \c sync=background is configured then this flush operation will force
-the signalling of a background synchronization operation.
+the signaling of a background synchronization operation.
 The caller may then check the status of that background
 synchronization with the WT_SESSION::transaction_sync method.
  */

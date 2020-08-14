@@ -41,7 +41,7 @@ In general the usage is:  
 wtperf_xray.sh <wtperf-config-file> [-h output-directory] [wtperf other arguments]
 @endcode
 
-The \c wtperf_xray.sh produces a few outputs to help analyse performance:
+The \c wtperf_xray.sh produces a few outputs to help analyze performance:
 
 - \c wtperf_account.txt: The top 10 functions where the workload is spending the
 most time with a count, min, max and some percentiles for each one.
@@ -50,15 +50,15 @@ most time with a count, min, max and some percentiles for each one.
 the most time. This calculation is done separately per thread.
 
 - \c wtperf_graph.svg: A function call graph showing what functions call each
-other. The edges are labelled and coloured proportionally to represent the ratio
+other. The edges are labeled and colored proportionally to represent the ratio
 of time spent in each function call.
 
-- \c wtperf_flame.svg: A graph visualising stack traces and the time spent
+- \c wtperf_flame.svg: A graph visualizing stack traces and the time spent
 within each stack frame. If \c FLAME_GRAPH_PATH is not specified, this graph
 won't be generated.
 
 The \c wtperf_xray.sh script uses a few optional environment variables to modify
-its behaviour:
+its behavior:
 
 - \c XRAY_BINARY: The binary to use to inspect the XRay log. The script defaults
 to using \c llvm-xray however, if you compiled with a particular \c clang
@@ -118,7 +118,7 @@ dependency to LLVM.
 $ ../configure --enable-llvm
 @endcode
 
-Take care NOT to customise \c CC or \c CXX. Customising either of these
+Take care NOT to customize \c CC or \c CXX. Customizing either of these
 variables will cause C++ programs such as \c workgen or \c xray_to_optrack to be
 skipped since we can't reliably link object files emitted by C and C++ compilers
 unless they are the system's default \c cc and \c c++.

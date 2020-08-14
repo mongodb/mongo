@@ -723,7 +723,17 @@ __txn_append_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_ITEM *
     if (commit)
         goto done;
 
+    /*
+     * Set the flag to indicate that this update has been restored from history store for the
+     * rollback of a prepared transaction.
+     */
+    F_SET(upd, WT_UPDATE_RESTORED_FROM_HS);
     total_size += size;
+
+    __wt_verbose(session, WT_VERB_TRANSACTION,
+      "update restored from history store (txnid: %" PRIu64 ", start_ts: %s, durable_ts: %s",
+      upd->txnid, __wt_timestamp_to_string(upd->start_ts, ts_string[0]),
+      __wt_timestamp_to_string(upd->durable_ts, ts_string[1]));
 
     /* If the history store record has a valid stop time point, append it. */
     if (hs_stop_durable_ts != WT_TS_MAX) {
@@ -733,20 +743,20 @@ __txn_append_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_ITEM *
         tombstone->start_ts = hs_cbt->upd_value->tw.stop_ts;
         tombstone->txnid = hs_cbt->upd_value->tw.stop_txn;
         tombstone->next = upd;
+        /*
+         * Set the flag to indicate that this update has been restored from history store for the
+         * rollback of a prepared transaction.
+         */
+        F_SET(tombstone, WT_UPDATE_RESTORED_FROM_HS);
         total_size += size;
-    } else
-        tombstone = upd;
 
-    __wt_verbose(session, WT_VERB_TRANSACTION,
-      "update restored from history store (txnid: %" PRIu64 ", start_ts: %s, durable_ts: %s",
-      upd->txnid, __wt_timestamp_to_string(upd->start_ts, ts_string[0]),
-      __wt_timestamp_to_string(upd->durable_ts, ts_string[1]));
+        __wt_verbose(session, WT_VERB_TRANSACTION,
+          "tombstone restored from history store (txnid: %" PRIu64 ", start_ts: %s, durable_ts: %s",
+          tombstone->txnid, __wt_timestamp_to_string(tombstone->start_ts, ts_string[0]),
+          __wt_timestamp_to_string(tombstone->durable_ts, ts_string[1]));
 
-    /*
-     * Set the flag to indicate that this update has been restored from history store for the
-     * rollback of a prepared transaction.
-     */
-    F_SET(upd, WT_UPDATE_RESTORED_FROM_HS);
+        upd = tombstone;
+    }
 
     /* Walk to the end of the chain and we can only have prepared updates on the update chain. */
     for (;; chain = chain->next) {
@@ -758,15 +768,15 @@ __txn_append_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_ITEM *
     }
 
     /* Append the update to the end of the chain. */
-    WT_PUBLISH(chain->next, tombstone);
+    WT_PUBLISH(chain->next, upd);
     *upd_appended = true;
 
     __wt_cache_page_inmem_incr(session, page, total_size);
 
     if (0) {
 err:
-        __wt_free(session, upd);
-        __wt_free(session, tombstone);
+        WT_ASSERT(session, tombstone == NULL || upd == tombstone);
+        __wt_free_update_list(session, &upd);
     }
 done:
     __wt_scr_free(session, &hs_key);
