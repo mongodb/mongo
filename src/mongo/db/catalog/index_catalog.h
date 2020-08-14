@@ -410,9 +410,9 @@ public:
      * See IndexCatalogEntry::setMultikey().
      */
     virtual void setMultikeyPaths(OperationContext* const opCtx,
-                                  Collection* coll,
+                                  const Collection* coll,
                                   const IndexDescriptor* const desc,
-                                  const MultikeyPaths& multikeyPaths) = 0;
+                                  const MultikeyPaths& multikeyPaths) const = 0;
 
     // ----- data modifiers ------
 
@@ -423,7 +423,7 @@ public:
      * This method may throw.
      */
     virtual Status indexRecords(OperationContext* const opCtx,
-                                Collection* collection,
+                                const Collection* collection,
                                 const std::vector<BsonRecord>& bsonRecords,
                                 int64_t* const keysInsertedOut) = 0;
 
@@ -434,7 +434,7 @@ public:
      * This method may throw.
      */
     virtual Status updateRecord(OperationContext* const opCtx,
-                                Collection* coll,
+                                const Collection* coll,
                                 const BSONObj& oldDoc,
                                 const BSONObj& newDoc,
                                 const RecordId& recordId,
@@ -455,7 +455,7 @@ public:
      * Attempt compaction on all ready indexes to regain disk space, if the storage engine's index
      * supports compaction in-place.
      */
-    virtual Status compactIndexes(OperationContext* opCtx) = 0;
+    virtual Status compactIndexes(OperationContext* opCtx) const = 0;
 
     virtual std::string getAccessMethodName(const BSONObj& keyPattern) = 0;
 

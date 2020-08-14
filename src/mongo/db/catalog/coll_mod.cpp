@@ -112,7 +112,7 @@ struct CollModRequest {
 
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                const NamespaceString& nss,
-                                               Collection* coll,
+                                               const Collection* coll,
                                                const BSONObj& cmdObj,
                                                BSONObjBuilder* oplogEntryBuilder) {
 
@@ -346,12 +346,11 @@ Status _collModInternal(OperationContext* opCtx,
                         const BSONObj& cmdObj,
                         BSONObjBuilder* result) {
     StringData dbName = nss.db();
-    AutoGetCollection autoColl(opCtx, nss, MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
+    AutoGetCollection coll(opCtx, nss, MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
     Lock::CollectionLock systemViewsLock(
         opCtx, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X);
 
-    Database* const db = autoColl.getDb();
-    Collection* coll = autoColl.getCollection();
+    Database* const db = coll.getDb();
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangAfterDatabaseLock, opCtx, "hangAfterDatabaseLock", []() {}, false, nss);
@@ -391,7 +390,8 @@ Status _collModInternal(OperationContext* opCtx,
     }
 
     BSONObjBuilder oplogEntryBuilder;
-    auto statusW = parseCollModRequest(opCtx, nss, coll, cmdObj, &oplogEntryBuilder);
+    auto statusW =
+        parseCollModRequest(opCtx, nss, coll.getCollection(), cmdObj, &oplogEntryBuilder);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
@@ -498,7 +498,7 @@ Status _collModInternal(OperationContext* opCtx,
             // Notify the index catalog that the definition of this index changed. This will
             // invalidate the local idx pointer. On rollback of this WUOW, the idx pointer in
             // cmrNew will be invalidated and the local var idx pointer will be valid again.
-            cmrNew.idx = coll->getIndexCatalog()->refreshEntry(opCtx, idx);
+            cmrNew.idx = coll.getWritableCollection()->getIndexCatalog()->refreshEntry(opCtx, idx);
             opCtx->recoveryUnit()->registerChange(std::make_unique<CollModResultChange>(
                 oldExpireSecs, newExpireSecs, oldHidden, newHidden, result));
 
@@ -509,19 +509,20 @@ Status _collModInternal(OperationContext* opCtx,
         }
 
         if (cmrNew.collValidator) {
-            coll->setValidator(opCtx, std::move(*cmrNew.collValidator));
+            coll.getWritableCollection()->setValidator(opCtx, std::move(*cmrNew.collValidator));
         }
         if (cmrNew.collValidationAction)
-            uassertStatusOKWithContext(
-                coll->setValidationAction(opCtx, *cmrNew.collValidationAction),
-                "Failed to set validationAction");
+            uassertStatusOKWithContext(coll.getWritableCollection()->setValidationAction(
+                                           opCtx, *cmrNew.collValidationAction),
+                                       "Failed to set validationAction");
         if (cmrNew.collValidationLevel) {
-            uassertStatusOKWithContext(coll->setValidationLevel(opCtx, *cmrNew.collValidationLevel),
+            uassertStatusOKWithContext(coll.getWritableCollection()->setValidationLevel(
+                                           opCtx, *cmrNew.collValidationLevel),
                                        "Failed to set validationLevel");
         }
 
         if (cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
-            coll->setRecordPreImages(opCtx, cmrNew.recordPreImages);
+            coll.getWritableCollection()->setRecordPreImages(opCtx, cmrNew.recordPreImages);
         }
 
         // Only observe non-view collMods, as view operations are observed as operations on the

@@ -105,8 +105,8 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     Collection* coll;
     {
         WriteUnitOfWork wunit(opCtx);
-        coll =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, NamespaceString(ns));
+        coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(
+            opCtx, NamespaceString(ns));
         if (!coll) {
             coll = autoDb.getDb()->createCollection(opCtx, NamespaceString(ns));
         }

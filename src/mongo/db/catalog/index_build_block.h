@@ -91,7 +91,7 @@ public:
      *
      * Must be called from within a `WriteUnitOfWork`
      */
-    void fail(OperationContext* opCtx, const Collection* collection);
+    void fail(OperationContext* opCtx, Collection* collection);
 
     /**
      * Returns the IndexCatalogEntry that was created in init().

@@ -281,7 +281,7 @@ bool handleError(OperationContext* opCtx,
 }
 
 void insertDocuments(OperationContext* opCtx,
-                     Collection* collection,
+                     const Collection* collection,
                      std::vector<InsertStatement>::iterator begin,
                      std::vector<InsertStatement>::iterator end,
                      bool fromMigrate) {
@@ -336,7 +336,7 @@ void insertDocuments(OperationContext* opCtx,
  * they only allow one operation at a time because they enforce insertion order with a MODE_X
  * collection lock, which we cannot hold in transactions.
  */
-Status checkIfTransactionOnCappedColl(OperationContext* opCtx, Collection* collection) {
+Status checkIfTransactionOnCappedColl(OperationContext* opCtx, const Collection* collection) {
     if (opCtx->inMultiDocumentTransaction() && collection->isCapped()) {
         return {ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "Collection '" << collection->ns()

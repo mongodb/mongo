@@ -120,7 +120,7 @@ public:
                                           const BSONObj& spec,
                                           OnInitFn onInit);
     StatusWith<std::vector<BSONObj>> initForResume(OperationContext* opCtx,
-                                                   Collection* collection,
+                                                   const Collection* collection,
                                                    const std::vector<BSONObj>& specs,
                                                    const ResumeIndexInfo& resumeInfo);
 
@@ -151,7 +151,7 @@ public:
      */
     Status insertAllDocumentsInCollection(
         OperationContext* opCtx,
-        Collection* collection,
+        const Collection* collection,
         boost::optional<RecordId> resumeAfterRecordId = boost::none);
 
     /**
@@ -206,7 +206,7 @@ public:
      * of an index build, so it must ensure that before it finishes, it has indexed all documents in
      * a collection, requiring a call to this function upon completion.
      */
-    Status retrySkippedRecords(OperationContext* opCtx, Collection* collection);
+    Status retrySkippedRecords(OperationContext* opCtx, const Collection* collection);
 
     /**
      * Check any constraits that may have been temporarily violated during the index build for

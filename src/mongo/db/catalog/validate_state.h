@@ -100,7 +100,7 @@ public:
         return _database;
     }
 
-    Collection* getCollection() const {
+    const Collection* getCollection() const {
         invariant(_collection);
         return _collection;
     }
@@ -204,7 +204,7 @@ private:
     boost::optional<Lock::CollectionLock> _collectionLock;
 
     Database* _database;
-    Collection* _collection;
+    const Collection* _collection;
 
     // Stores the indexes that are going to be validated. When validate yields periodically we'll
     // use this list to determine if validation should abort when an existing index that was

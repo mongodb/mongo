@@ -142,7 +142,9 @@ public:
      *
      * Returns nullptr if the 'uuid' is not known.
      */
-    Collection* lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
+    Collection* lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
+                                                       CollectionUUID uuid);
+    const Collection* lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
     std::shared_ptr<const Collection> lookupCollectionByUUIDForRead(OperationContext* opCtx,
                                                                     CollectionUUID uuid) const;
 
@@ -162,8 +164,10 @@ public:
      *
      * Returns nullptr if the namespace is unknown.
      */
-    Collection* lookupCollectionByNamespace(OperationContext* opCtx,
-                                            const NamespaceString& nss) const;
+    Collection* lookupCollectionByNamespaceForMetadataWrite(OperationContext* opCtx,
+                                                            const NamespaceString& nss);
+    const Collection* lookupCollectionByNamespace(OperationContext* opCtx,
+                                                  const NamespaceString& nss) const;
     std::shared_ptr<const Collection> lookupCollectionByNamespaceForRead(
         OperationContext* opCtx, const NamespaceString& nss) const;
 

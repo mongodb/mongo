@@ -237,13 +237,13 @@ public:
             _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
             AutoGetCollection collRaii(_opCtx, nss, LockMode::MODE_X);
 
-            if (collRaii.getCollection()) {
+            if (collRaii) {
                 WriteUnitOfWork wunit(_opCtx);
-                invariant(collRaii.getCollection()->truncate(_opCtx).isOK());
+                invariant(collRaii.getWritableCollection()->truncate(_opCtx).isOK());
                 if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
                     ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
                 }
-                collRaii.getCollection()->getIndexCatalog()->dropAllIndexes(_opCtx, false);
+                collRaii.getWritableCollection()->getIndexCatalog()->dropAllIndexes(_opCtx, false);
                 wunit.commit();
                 return;
             }
@@ -258,7 +258,7 @@ public:
         });
     }
 
-    void insertDocument(Collection* coll, const InsertStatement& stmt) {
+    void insertDocument(const Collection* coll, const InsertStatement& stmt) {
         // Insert some documents.
         OpDebug* const nullOpDebug = nullptr;
         const bool fromMigrate = false;
@@ -383,7 +383,7 @@ public:
                                            const Timestamp& ts,
                                            const repl::MinValidDocument& expectedDoc) {
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-        Collection* coll = autoColl.getCollection();
+        const Collection* coll = autoColl.getCollection();
 
         OneOffRead oor(_opCtx, ts);
 
@@ -667,7 +667,7 @@ public:
     }
 
     void assertMultikeyPaths(OperationContext* opCtx,
-                             Collection* collection,
+                             const Collection* collection,
                              StringData indexName,
                              Timestamp ts,
                              bool shouldBeMultikey,
@@ -1891,7 +1891,7 @@ public:
         MultiIndexBlock indexer;
         auto abortOnExit = makeGuard([&] {
             indexer.abortIndexBuild(
-                _opCtx, autoColl.getCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
+                _opCtx, autoColl.getWritableCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
         const LogicalTime beforeIndexBuild = _clock->tickClusterTime(2);
         BSONObj indexInfoObj;
@@ -1910,7 +1910,7 @@ public:
 
             auto swIndexInfoObj = indexer.init(
                 _opCtx,
-                autoColl.getCollection(),
+                autoColl.getWritableCollection(),
                 {BSON("v" << 2 << "unique" << true << "name"
                           << "a_1"
                           << "key" << BSON("a" << 1))},
@@ -1933,7 +1933,7 @@ public:
             // timestamp.
             ASSERT_OK(indexer.commit(
                 _opCtx,
-                autoColl.getCollection(),
+                autoColl.getWritableCollection(),
                 [&](const BSONObj& indexSpec) {
                     if (SimulatePrimary) {
                         // The timestamping responsibility for each index is placed on the caller.
@@ -2005,7 +2005,7 @@ public:
         MultiIndexBlock indexer;
         auto abortOnExit = makeGuard([&] {
             indexer.abortIndexBuild(
-                _opCtx, autoColl.getCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
+                _opCtx, autoColl.getWritableCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
         const LogicalTime beforeIndexBuild = _clock->tickClusterTime(2);
         BSONObj indexInfoObj;
@@ -2024,7 +2024,7 @@ public:
 
             auto swIndexInfoObj = indexer.init(
                 _opCtx,
-                autoColl.getCollection(),
+                autoColl.getWritableCollection(),
                 {BSON("v" << 2 << "unique" << true << "name"
                           << "a_1"
                           << "ns" << nss.ns() << "key" << BSON("a" << 1))},
@@ -2516,7 +2516,8 @@ public:
         std::vector<std::string> indexIdents;
         // Create an index and get the ident for each index.
         for (auto key : {"a", "b", "c"}) {
-            createIndex(autoColl.getCollection(), str::stream() << key << "_1", BSON(key << 1));
+            createIndex(
+                autoColl.getWritableCollection(), str::stream() << key << "_1", BSON(key << 1));
 
             // Timestamps at the completion of each index build.
             afterCreateTimestamps.push_back(_clock->tickClusterTime(1).asTimestamp());
@@ -2595,7 +2596,8 @@ public:
         std::vector<std::string> indexIdents;
         // Create an index and get the ident for each index.
         for (auto key : {"a", "b", "c"}) {
-            createIndex(autoColl.getCollection(), str::stream() << key << "_1", BSON(key << 1));
+            createIndex(
+                autoColl.getWritableCollection(), str::stream() << key << "_1", BSON(key << 1));
 
             // Timestamps at the completion of each index build.
             afterCreateTimestamps.push_back(_clock->tickClusterTime(1).asTimestamp());
@@ -2719,8 +2721,7 @@ public:
         NamespaceString nss("unittests.timestampIndexBuilds");
         reset(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-        auto collection = autoColl.getCollection();
+        AutoGetCollection collection(_opCtx, nss, LockMode::MODE_X);
 
         // Indexing of parallel arrays is not allowed, so these are deemed "bad".
         const auto badDoc1 =
@@ -2735,7 +2736,7 @@ public:
         {
             LOGV2(22505, "inserting {badDoc1}", "badDoc1"_attr = badDoc1);
             WriteUnitOfWork wuow(_opCtx);
-            insertDocument(autoColl.getCollection(),
+            insertDocument(collection.getCollection(),
                            InsertStatement(badDoc1, insert1.asTimestamp(), presentTerm));
             wuow.commit();
         }
@@ -2744,7 +2745,7 @@ public:
         {
             LOGV2(22506, "inserting {badDoc2}", "badDoc2"_attr = badDoc2);
             WriteUnitOfWork wuow(_opCtx);
-            insertDocument(autoColl.getCollection(),
+            insertDocument(collection.getCollection(),
                            InsertStatement(badDoc2, insert2.asTimestamp(), presentTerm));
             wuow.commit();
         }
@@ -2752,7 +2753,8 @@ public:
         const IndexCatalogEntry* buildingIndex = nullptr;
         MultiIndexBlock indexer;
         auto abortOnExit = makeGuard([&] {
-            indexer.abortIndexBuild(_opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+            indexer.abortIndexBuild(
+                _opCtx, collection.getWritableCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
         // Provide a build UUID, indicating that this is a two-phase index build.
@@ -2770,14 +2772,14 @@ public:
             {
                 TimestampBlock tsBlock(_opCtx, indexInit.asTimestamp());
 
-                auto swSpecs =
-                    indexer.init(_opCtx,
-                                 collection,
-                                 {BSON("v" << 2 << "name"
-                                           << "a_1_b_1"
-                                           << "ns" << collection->ns().ns() << "key"
-                                           << BSON("a" << 1 << "b" << 1))},
-                                 MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, collection));
+                auto swSpecs = indexer.init(_opCtx,
+                                            collection.getWritableCollection(),
+                                            {BSON("v" << 2 << "name"
+                                                      << "a_1_b_1"
+                                                      << "ns" << collection->ns().ns() << "key"
+                                                      << BSON("a" << 1 << "b" << 1))},
+                                            MultiIndexBlock::makeTimestampedIndexOnInitFn(
+                                                _opCtx, collection.getCollection()));
                 ASSERT_OK(swSpecs.getStatus());
             }
 
@@ -2786,7 +2788,7 @@ public:
                 indexCatalog->findIndexByName(_opCtx, "a_1_b_1", /* includeUnfinished */ true));
             ASSERT(buildingIndex);
 
-            ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, collection));
+            ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, collection.getCollection()));
 
             ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
 
@@ -2820,7 +2822,7 @@ public:
             buildingIndex->indexBuildInterceptor()->getSkippedRecordTracker()->areAllRecordsApplied(
                 _opCtx));
         // This fails because the bad record is still invalid.
-        auto status = indexer.retrySkippedRecords(_opCtx, collection);
+        auto status = indexer.retrySkippedRecords(_opCtx, collection.getCollection());
         ASSERT_EQ(status.code(), ErrorCodes::CannotIndexParallelArrays);
 
         ASSERT_FALSE(
@@ -2832,8 +2834,8 @@ public:
         // to the side writes table and must be drained.
         Helpers::upsert(_opCtx, collection->ns().ns(), BSON("_id" << 0 << "a" << 1 << "b" << 1));
         {
-            RecordId badRecord =
-                Helpers::findOne(_opCtx, collection, BSON("_id" << 1), false /* requireIndex */);
+            RecordId badRecord = Helpers::findOne(
+                _opCtx, collection.getCollection(), BSON("_id" << 1), false /* requireIndex */);
             WriteUnitOfWork wuow(_opCtx);
             collection->deleteDocument(_opCtx, kUninitializedStmtId, badRecord, nullptr);
             wuow.commit();
@@ -2846,7 +2848,7 @@ public:
 
 
         // This succeeds because the bad documents are now either valid or removed.
-        ASSERT_OK(indexer.retrySkippedRecords(_opCtx, collection));
+        ASSERT_OK(indexer.retrySkippedRecords(_opCtx, collection.getCollection()));
         ASSERT_TRUE(
             buildingIndex->indexBuildInterceptor()->getSkippedRecordTracker()->areAllRecordsApplied(
                 _opCtx));
@@ -2857,7 +2859,7 @@ public:
             WriteUnitOfWork wuow(_opCtx);
             ASSERT_OK(indexer.commit(
                 _opCtx,
-                collection,
+                collection.getWritableCollection(),
                 [&](const BSONObj& indexSpec) {
                     _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                         _opCtx, collection->ns(), collection->uuid(), indexSpec, false);

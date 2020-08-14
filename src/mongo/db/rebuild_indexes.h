@@ -61,7 +61,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
  */
 enum class RepairData { kYes, kNo };
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  Collection* collection,
+                                  const Collection* collection,
                                   const std::vector<BSONObj>& indexSpecs,
                                   RepairData repair);
 
@@ -70,7 +70,7 @@ Status rebuildIndexesOnCollection(OperationContext* opCtx,
  * One example usage is when a 'dropIndex' command is rolled back. The dropped index must be remade.
  */
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  Collection* collection,
+                                  const Collection* collection,
                                   const std::vector<BSONObj>& indexSpecs);
 
 }  // namespace mongo

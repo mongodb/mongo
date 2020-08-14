@@ -92,7 +92,7 @@ public:
 
         WriteUnitOfWork wunit(opCtx);
         UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
-        Collection* collection =
+        const Collection* collection =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         if (!collection) {
             collection = db->createCollection(opCtx, nss);
@@ -146,7 +146,7 @@ public:
 
         // Lock the database in mode IX and lock the collection exclusively.
         AutoGetCollection autoColl(opCtx, fullNs, MODE_X);
-        Collection* collection = autoColl.getCollection();
+        Collection* collection = autoColl.getWritableCollection();
         if (!collection) {
             uasserted(ErrorCodes::NamespaceNotFound,
                       str::stream() << "collection " << fullNs.ns() << " does not exist");

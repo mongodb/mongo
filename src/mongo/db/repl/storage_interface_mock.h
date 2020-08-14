@@ -272,12 +272,12 @@ public:
     }
 
     boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestamp(
-        OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) override {
+        OperationContext* opCtx, const Collection* oplog, const Timestamp& timestamp) override {
         return boost::none;
     }
 
     boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
-        OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) override {
+        OperationContext* opCtx, const Collection* oplog, const Timestamp& timestamp) override {
         return boost::none;
     }
 

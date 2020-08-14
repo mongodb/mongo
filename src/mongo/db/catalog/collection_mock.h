@@ -79,10 +79,7 @@ public:
         return _indexCatalog.get();
     }
 
-    const RecordStore* getRecordStore() const {
-        std::abort();
-    }
-    RecordStore* getRecordStore() {
+    RecordStore* getRecordStore() const {
         std::abort();
     }
     std::shared_ptr<Ident> getSharedIdent() const {
@@ -115,7 +112,7 @@ public:
                         OpDebug* opDebug,
                         bool fromMigrate,
                         bool noWarn,
-                        Collection::StoreDeletedDoc storeDeletedDoc) {
+                        Collection::StoreDeletedDoc storeDeletedDoc) const {
         std::abort();
     }
 
@@ -123,26 +120,26 @@ public:
                            std::vector<InsertStatement>::const_iterator begin,
                            std::vector<InsertStatement>::const_iterator end,
                            OpDebug* opDebug,
-                           bool fromMigrate) {
+                           bool fromMigrate) const {
         std::abort();
     }
 
     Status insertDocument(OperationContext* opCtx,
                           const InsertStatement& doc,
                           OpDebug* opDebug,
-                          bool fromMigrate) {
+                          bool fromMigrate) const {
         std::abort();
     }
 
     Status insertDocumentsForOplog(OperationContext* opCtx,
                                    std::vector<Record>* records,
-                                   const std::vector<Timestamp>& timestamps) {
+                                   const std::vector<Timestamp>& timestamps) const {
         std::abort();
     }
 
     Status insertDocumentForBulkLoader(OperationContext* opCtx,
                                        const BSONObj& doc,
-                                       const OnRecordInsertedFn& onRecordInserted) {
+                                       const OnRecordInsertedFn& onRecordInserted) const {
         std::abort();
     }
 
@@ -152,7 +149,7 @@ public:
                             const BSONObj& newDoc,
                             bool indexesAffected,
                             OpDebug* opDebug,
-                            CollectionUpdateArgs* args) {
+                            CollectionUpdateArgs* args) const {
         std::abort();
     }
 
@@ -165,7 +162,7 @@ public:
                                                      const Snapshotted<RecordData>& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages,
-                                                     CollectionUpdateArgs* args) {
+                                                     CollectionUpdateArgs* args) const {
         std::abort();
     }
 

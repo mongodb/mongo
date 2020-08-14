@@ -394,7 +394,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
 Status MultiIndexBlock::insertAllDocumentsInCollection(
     OperationContext* opCtx,
-    Collection* collection,
+    const Collection* collection,
     boost::optional<RecordId> resumeAfterRecordId) {
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
@@ -714,7 +714,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
     return Status::OK();
 }
 
-Status MultiIndexBlock::retrySkippedRecords(OperationContext* opCtx, Collection* collection) {
+Status MultiIndexBlock::retrySkippedRecords(OperationContext* opCtx, const Collection* collection) {
     invariant(!_buildIsCleanedUp);
     for (auto&& index : _indexes) {
         auto interceptor = index.block->getEntry()->indexBuildInterceptor();

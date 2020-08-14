@@ -58,7 +58,7 @@ namespace {
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
 bool checkIfSingleDoc(OperationContext* opCtx,
-                      Collection* collection,
+                      const Collection* collection,
                       const IndexDescriptor* idx,
                       const ChunkType* chunk) {
     KeyPattern kp(idx->keyPattern());
@@ -210,7 +210,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
 
     AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
-    Collection* const collection = autoColl.getCollection();
+    const Collection* const collection = autoColl.getCollection();
     if (!collection) {
         LOGV2_WARNING(
             23778,

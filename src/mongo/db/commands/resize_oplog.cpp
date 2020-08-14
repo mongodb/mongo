@@ -83,10 +83,9 @@ public:
              const std::string& dbname,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
-        AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_X);
-        Database* database = autoColl.getDb();
+        AutoGetCollection coll(opCtx, NamespaceString::kRsOplogNamespace, MODE_X);
+        Database* database = coll.getDb();
         uassert(ErrorCodes::NamespaceNotFound, "database local does not exist", database);
-        Collection* coll = autoColl.getCollection();
         uassert(ErrorCodes::NamespaceNotFound, "oplog does not exist", coll);
         uassert(ErrorCodes::IllegalOperation, "oplog isn't capped", coll->isCapped());
 

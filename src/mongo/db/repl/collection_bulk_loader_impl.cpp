@@ -60,12 +60,11 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient&
     : _client{std::move(client)},
       _opCtx{std::move(opCtx)},
       _autoColl{std::move(autoColl)},
-      _collection{_autoColl->getCollection()},
+      _collection{_autoColl->getWritableCollection()},
       _nss{_autoColl->getCollection()->ns()},
       _idIndexBlock(std::make_unique<MultiIndexBlock>()),
       _secondaryIndexesBlock(std::make_unique<MultiIndexBlock>()),
       _idIndexSpec(idIndexSpec.getOwned()) {
-
     invariant(_opCtx);
     invariant(_collection);
 }

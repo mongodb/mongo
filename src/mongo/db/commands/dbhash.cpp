@@ -316,7 +316,7 @@ public:
 private:
     std::string _hashCollection(OperationContext* opCtx, Database* db, const NamespaceString& nss) {
 
-        Collection* collection =
+        const Collection* collection =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         invariant(collection);
 

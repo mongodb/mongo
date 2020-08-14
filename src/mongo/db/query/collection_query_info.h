@@ -63,7 +63,7 @@ public:
     /**
      * Builds internal cache state based on the current state of the Collection's IndexCatalog.
      */
-    void init(OperationContext* opCtx, Collection* coll);
+    void init(OperationContext* opCtx, const Collection* coll);
 
     /**
      * Register a newly-created index with the cache.  Must be called whenever an index is
@@ -71,7 +71,7 @@ public:
      *
      * Must be called under exclusive collection lock.
      */
-    void addedIndex(OperationContext* opCtx, Collection* coll, const IndexDescriptor* desc);
+    void addedIndex(OperationContext* opCtx, const Collection* coll, const IndexDescriptor* desc);
 
     /**
      * Deregister a newly-dropped index with the cache.  Must be called whenever an index is
@@ -79,7 +79,7 @@ public:
      *
      * Must be called under exclusive collection lock.
      */
-    void droppedIndex(OperationContext* opCtx, Collection* coll, StringData indexName);
+    void droppedIndex(OperationContext* opCtx, const Collection* coll, StringData indexName);
 
     /**
      * Removes all cached query plans.
@@ -91,14 +91,14 @@ public:
                        const PlanSummaryStats& summaryStats) const;
 
 private:
-    void computeIndexKeys(OperationContext* opCtx, Collection* coll);
-    void updatePlanCacheIndexEntries(OperationContext* opCtx, Collection* coll);
+    void computeIndexKeys(OperationContext* opCtx, const Collection* coll);
+    void updatePlanCacheIndexEntries(OperationContext* opCtx, const Collection* coll);
 
     /**
      * Rebuilds cached information that is dependent on index composition. Must be called
      * when index composition changes.
      */
-    void rebuildIndexData(OperationContext* opCtx, Collection* coll);
+    void rebuildIndexData(OperationContext* opCtx, const Collection* coll);
 
     // ---  index keys cache
     bool _keysComputed;

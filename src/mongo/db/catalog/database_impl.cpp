@@ -172,7 +172,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
 
     auto& catalog = CollectionCatalog::get(opCtx);
     for (const auto& uuid : catalog.getAllCollectionUUIDsFromDb(_name)) {
-        auto collection = catalog.lookupCollectionByUUID(opCtx, uuid);
+        auto collection = catalog.lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
         invariant(collection);
         // If this is called from the repair path, the collection is already initialized.
         if (!collection->isInitialized())
@@ -360,7 +360,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
             "dropCollection() cannot accept a valid drop optime when writes are replicated.");
     }
 
-    Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    Collection* collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
 
     if (!collection) {
         return Status::OK();  // Post condition already met.
@@ -489,7 +490,7 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
 
 Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                                            const NamespaceString& nss,
-                                           Collection* collection) const {
+                                           const Collection* collection) const {
     UUID uuid = collection->uuid();
     LOGV2(20318,
           "Finishing collection drop for {namespace} ({uuid}).",
@@ -527,7 +528,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     }
 
     Collection* collToRename =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, fromNss);
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx, fromNss);
     if (!collToRename) {
         return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
     }
@@ -818,7 +819,8 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
         if (nss.isSystem())
             continue;
 
-        Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+        const Collection* coll =
+            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         if (!coll)
             continue;
 

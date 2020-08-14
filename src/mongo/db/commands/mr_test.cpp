@@ -267,7 +267,7 @@ public:
      * Tracks the temporary collections mapReduces creates.
      */
     void onCreateCollection(OperationContext* opCtx,
-                            Collection* coll,
+                            const Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
@@ -321,7 +321,7 @@ void MapReduceOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void MapReduceOpObserver::onCreateCollection(OperationContext*,
-                                             Collection*,
+                                             const Collection*,
                                              const NamespaceString& collectionName,
                                              const CollectionOptions& options,
                                              const BSONObj&,
@@ -530,14 +530,14 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
     auto indexSpec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
                               << "a_1");
     {
-        AutoGetCollection autoColl(_opCtx.get(), outputNss, MODE_X);
-        auto coll = autoColl.getCollection();
+        AutoGetCollection coll(_opCtx.get(), outputNss, MODE_X);
         ASSERT(coll);
-        auto indexCatalog = coll->getIndexCatalog();
         writeConflictRetry(
             _opCtx.get(), "ReplacingExistingOutputCollectionPreservesIndexes", outputNss.ns(), [&] {
                 WriteUnitOfWork wuow(_opCtx.get());
-                ASSERT_OK(indexCatalog->createIndexOnEmptyCollection(_opCtx.get(), indexSpec));
+                ASSERT_OK(
+                    coll.getWritableCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
+                        _opCtx.get(), indexSpec));
                 wuow.commit();
             });
     }

@@ -59,7 +59,7 @@ protected:
     static NamespaceString nss() {
         return NamespaceString("unittests.pdfiletests.Insert");
     }
-    Collection* collection() {
+    const Collection* collection() {
         return CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
     }
 
@@ -75,7 +75,7 @@ public:
         WriteUnitOfWork wunit(&_opCtx);
         BSONObj x = BSON("x" << 1);
         ASSERT(x["_id"].type() == 0);
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             coll = _context.db()->createCollection(&_opCtx, nss());

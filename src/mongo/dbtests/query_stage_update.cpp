@@ -204,7 +204,7 @@ public:
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver(_expCtx);
-            Collection* collection = ctx.getCollection();
+            const Collection* collection = ctx.getCollection();
             ASSERT(collection);
 
             // Collection should be empty.
@@ -276,7 +276,7 @@ public:
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver(_expCtx);
-            Collection* coll =
+            const Collection* coll =
                 CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
             ASSERT(coll);
 
@@ -388,7 +388,7 @@ public:
         // Various variables we'll need.
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         ASSERT(coll);
         auto request = UpdateRequest();
         request.setNamespaceString(nss);
@@ -481,7 +481,7 @@ public:
         // Various variables we'll need.
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         ASSERT(coll);
         auto request = UpdateRequest();
         request.setNamespaceString(nss);

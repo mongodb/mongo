@@ -73,7 +73,7 @@ public:
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), obj));
     }
 
-    const IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
+    const IndexDescriptor* getIndex(const BSONObj& obj, const Collection* coll) {
         std::vector<const IndexDescriptor*> indexes;
         coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         if (indexes.empty()) {
@@ -92,7 +92,7 @@ public:
         return params;
     }
 
-    void getRecordIds(set<RecordId>* out, Collection* coll) {
+    void getRecordIds(set<RecordId>* out, const Collection* coll) {
         auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
@@ -178,7 +178,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -264,7 +264,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -345,7 +345,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -389,7 +389,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -437,7 +437,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -483,7 +483,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -536,7 +536,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -589,7 +589,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -645,7 +645,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -693,7 +693,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -746,7 +746,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -796,7 +796,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -918,7 +918,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -1026,7 +1026,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -1080,7 +1080,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -1119,7 +1119,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -1162,7 +1162,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -1223,7 +1223,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -1276,7 +1276,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll = ctx.getCollection();
+        const Collection* coll = ctx.getCollection();
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());

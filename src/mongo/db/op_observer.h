@@ -182,7 +182,7 @@ public:
     }
 
     virtual void onCreateCollection(OperationContext* opCtx,
-                                    Collection* coll,
+                                    const Collection* coll,
                                     const NamespaceString& collectionName,
                                     const CollectionOptions& options,
                                     const BSONObj& idIndex,

@@ -110,7 +110,7 @@ public:
                    bool fromMigrate) override;
 
     void onCreateCollection(OperationContext* opCtx,
-                            Collection* coll,
+                            const Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
@@ -224,7 +224,7 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
 }
 
 void OpObserverMock::onCreateCollection(OperationContext* opCtx,
-                                        Collection* coll,
+                                        const Collection* coll,
                                         const NamespaceString& collectionName,
                                         const CollectionOptions& options,
                                         const BSONObj& idIndex,
@@ -439,7 +439,7 @@ CollectionUUID _getCollectionUuid(OperationContext* opCtx, const NamespaceString
  * Get collection namespace by UUID.
  */
 NamespaceString _getCollectionNssFromUUID(OperationContext* opCtx, const UUID& uuid) {
-    Collection* source = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
+    const Collection* source = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
     return source ? source->ns() : NamespaceString();
 }
 
@@ -462,16 +462,15 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const std::string& indexName) {
     writeConflictRetry(opCtx, "_createIndexOnEmptyCollection", nss.ns(), [=] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
-        auto collection = autoColl.getCollection();
+        AutoGetCollection collection(opCtx, nss, MODE_X);
         ASSERT_TRUE(collection) << "Cannot create index on empty collection " << nss
                                 << " because collection " << nss << " does not exist.";
 
         auto indexInfoObj = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
                                      << BSON("a" << 1) << "name" << indexName);
 
-        auto indexCatalog = collection->getIndexCatalog();
         WriteUnitOfWork wuow(opCtx);
+        auto indexCatalog = collection.getWritableCollection()->getIndexCatalog();
         ASSERT_OK(indexCatalog->createIndexOnEmptyCollection(opCtx, indexInfoObj).getStatus());
         wuow.commit();
     });
@@ -500,7 +499,7 @@ void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const 
  * Retrieves the pointer to a collection associated with the given namespace string from the
  * catalog. The caller must hold the appropriate locks from the lock manager.
  */
-Collection* _getCollection_inlock(OperationContext* opCtx, const NamespaceString& nss) {
+const Collection* _getCollection_inlock(OperationContext* opCtx, const NamespaceString& nss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto* db = databaseHolder->getDb(opCtx, nss.db());
@@ -1186,14 +1185,14 @@ TEST_F(RenameCollectionTest, CollectionPointerRemainsValidThroughRename) {
 
     // Get a pointer to the source collection, and ensure that it reports the expected namespace
     // string.
-    Collection* sourceColl = _getCollection_inlock(_opCtx.get(), _sourceNss);
+    const Collection* sourceColl = _getCollection_inlock(_opCtx.get(), _sourceNss);
     ASSERT(sourceColl);
 
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
 
     // Retrieve the pointer associated with the target namespace, and ensure that its the same
     // pointer (i.e. the renamed collection has the very same Collection instance).
-    Collection* targetColl = _getCollection_inlock(_opCtx.get(), _targetNss);
+    const Collection* targetColl = _getCollection_inlock(_opCtx.get(), _targetNss);
     ASSERT(targetColl);
     ASSERT_EQ(targetColl, sourceColl);
 
@@ -1224,7 +1223,7 @@ TEST_F(RenameCollectionTest, CollectionCatalogMappingRemainsIntactThroughRename)
     Lock::DBLock sourceLk(_opCtx.get(), _sourceNss.db(), MODE_X);
     Lock::DBLock targetLk(_opCtx.get(), _targetNss.db(), MODE_X);
     auto& catalog = CollectionCatalog::get(_opCtx.get());
-    Collection* sourceColl = _getCollection_inlock(_opCtx.get(), _sourceNss);
+    const Collection* sourceColl = _getCollection_inlock(_opCtx.get(), _sourceNss);
     ASSERT(sourceColl);
     ASSERT_EQ(sourceColl, catalog.lookupCollectionByUUID(_opCtx.get(), sourceColl->uuid()));
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));

@@ -1105,9 +1105,9 @@ void IndexCatalogImpl::deleteIndexFromDisk(OperationContext* opCtx, const string
 }
 
 void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,
-                                        Collection* coll,
+                                        const Collection* coll,
                                         const IndexDescriptor* desc,
-                                        const MultikeyPaths& multikeyPaths) {
+                                        const MultikeyPaths& multikeyPaths) const {
     IndexCatalogEntry* entry = desc->getEntry();
     invariant(entry);
     entry->setMultikey(opCtx, coll, multikeyPaths);
@@ -1332,7 +1332,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 // ---------------------------
 
 Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
-                                    Collection* coll,
+                                    const Collection* coll,
                                     IndexCatalogEntry* index,
                                     const KeyStringSet& keys,
                                     const KeyStringSet& multikeyMetadataKeys,
@@ -1385,7 +1385,7 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
 }
 
 Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
-                                               Collection* coll,
+                                               const Collection* coll,
                                                IndexCatalogEntry* index,
                                                const std::vector<BsonRecord>& bsonRecords,
                                                int64_t* keysInsertedOut) {
@@ -1436,7 +1436,7 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
 }
 
 Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
-                                       Collection* coll,
+                                       const Collection* coll,
                                        IndexCatalogEntry* index,
                                        const std::vector<BsonRecord>& bsonRecords,
                                        int64_t* keysInsertedOut) {
@@ -1458,7 +1458,7 @@ Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
 }
 
 Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
-                                       Collection* coll,
+                                       const Collection* coll,
                                        IndexCatalogEntry* index,
                                        const BSONObj& oldDoc,
                                        const BSONObj& newDoc,
@@ -1599,7 +1599,7 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
 }
 
 Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
-                                      Collection* coll,
+                                      const Collection* coll,
                                       const std::vector<BsonRecord>& bsonRecords,
                                       int64_t* keysInsertedOut) {
     if (keysInsertedOut) {
@@ -1622,7 +1622,7 @@ Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
 }
 
 Status IndexCatalogImpl::updateRecord(OperationContext* const opCtx,
-                                      Collection* coll,
+                                      const Collection* coll,
                                       const BSONObj& oldDoc,
                                       const BSONObj& newDoc,
                                       const RecordId& recordId,
@@ -1684,7 +1684,7 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
     }
 }
 
-Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx) {
+Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx) const {
     for (IndexCatalogEntryContainer::const_iterator it = _readyIndexes.begin();
          it != _readyIndexes.end();
          ++it) {
@@ -1772,7 +1772,7 @@ void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
 }
 
 StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
-                                                    Collection* collection,
+                                                    const Collection* collection,
                                                     const BSONObj& spec) const {
     auto statusWithSpec = adjustIndexSpecObject(spec);
     if (!statusWithSpec.isOK()) {

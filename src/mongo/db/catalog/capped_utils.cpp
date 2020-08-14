@@ -72,7 +72,8 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     uassert(ErrorCodes::NamespaceNotFound, "no such database", db);
 
     Collection* collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collectionName);
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx,
+                                                                                  collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
             collection || !ViewCatalog::get(db)->lookup(opCtx, collectionName.ns()));
@@ -114,7 +115,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                              const NamespaceString& toNss,
                              long long size,
                              bool temp) {
-    Collection* fromCollection =
+    const Collection* fromCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, fromNss);
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -153,7 +154,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         uassertStatusOK(createCollection(opCtx, toNss.db().toString(), cmd.done()));
     }
 
-    Collection* toCollection =
+    const Collection* toCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
     invariant(toCollection);  // we created above
 
@@ -243,7 +244,7 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
     StringData dbname = ns.db();
     StringData shortSource = ns.coll();
 
-    AutoGetCollection autoColl(opCtx, ns, MODE_X);
+    AutoGetCollection coll(opCtx, ns, MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);
@@ -252,11 +253,11 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
             str::stream() << "Not primary while converting " << ns << " to a capped collection",
             !userInitiatedWritesAndNotPrimary);
 
-    Database* const db = autoColl.getDb();
+    Database* const db = coll.getDb();
     uassert(
         ErrorCodes::NamespaceNotFound, str::stream() << "database " << dbname << " not found", db);
 
-    if (Collection* coll = autoColl.getCollection()) {
+    if (coll) {
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     }
 

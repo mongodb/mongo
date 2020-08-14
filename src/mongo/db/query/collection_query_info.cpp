@@ -87,7 +87,7 @@ const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx
     return _indexedPaths;
 }
 
-void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, Collection* coll) {
+void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const Collection* coll) {
     _indexedPaths.clear();
 
     std::unique_ptr<IndexCatalog::IndexIterator> it =
@@ -195,7 +195,8 @@ PlanCache* CollectionQueryInfo::getPlanCache() const {
     return _planCache.get();
 }
 
-void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx, Collection* coll) {
+void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx,
+                                                      const Collection* coll) {
     std::vector<CoreIndexInfo> indexCores;
 
     // TODO We shouldn't need to include unfinished indexes, but we must here because the index
@@ -211,7 +212,7 @@ void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx, C
     _planCache->notifyOfIndexUpdates(indexCores);
 }
 
-void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
+void CollectionQueryInfo::init(OperationContext* opCtx, const Collection* coll) {
     const bool includeUnfinishedIndexes = false;
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
         coll->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
@@ -225,7 +226,7 @@ void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
 }
 
 void CollectionQueryInfo::addedIndex(OperationContext* opCtx,
-                                     Collection* coll,
+                                     const Collection* coll,
                                      const IndexDescriptor* desc) {
     invariant(desc);
 
@@ -235,14 +236,14 @@ void CollectionQueryInfo::addedIndex(OperationContext* opCtx,
 }
 
 void CollectionQueryInfo::droppedIndex(OperationContext* opCtx,
-                                       Collection* coll,
+                                       const Collection* coll,
                                        StringData indexName) {
     rebuildIndexData(opCtx, coll);
     CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations())
         .unregisterIndex(indexName);
 }
 
-void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, Collection* coll) {
+void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const Collection* coll) {
     clearQueryCache(coll);
 
     _keysComputed = false;

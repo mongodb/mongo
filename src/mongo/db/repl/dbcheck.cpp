@@ -172,7 +172,7 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(const NamespaceString& nss,
 }
 
 DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
-                             Collection* collection,
+                             const Collection* collection,
                              const BSONKey& start,
                              const BSONKey& end,
                              int64_t maxCount,
@@ -233,7 +233,7 @@ std::string hashCollectionInfo(const DbCheckCollectionInformation& info) {
 }
 
 std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
-    OperationContext* opCtx, Collection* collection) {
+    OperationContext* opCtx, const Collection* collection) {
     const CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
     const UUID uuid = collection->uuid();
 
@@ -350,7 +350,7 @@ bool DbCheckHasher::_canHash(const BSONObj& obj) {
     return true;
 }
 
-std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, Collection* collection) {
+std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const Collection* collection) {
     std::vector<BSONObj> result;
     std::vector<std::string> names;
 
@@ -370,7 +370,7 @@ std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, Collection* co
     return result;
 }
 
-BSONObj collectionOptions(OperationContext* opCtx, Collection* collection) {
+BSONObj collectionOptions(OperationContext* opCtx, const Collection* collection) {
     return DurableCatalog::get(opCtx)
         ->getCollectionOptions(opCtx, collection->getCatalogId())
         .toBSON();
@@ -408,7 +408,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                const repl::OpTime& optime,
                                const DbCheckOplogBatch& entry) {
     AutoGetCollectionForDbCheck agc(opCtx, entry.getNss(), entry.getType());
-    Collection* collection = agc.getCollection();
+    const Collection* collection = agc.getCollection();
     std::string msg = "replication consistency check";
 
     if (!collection) {

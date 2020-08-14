@@ -84,13 +84,13 @@ TEST_F(IndexBuildsManagerTest, IndexBuildsManagerSetUpAndTearDown) {
 
     auto specs = makeSpecs(_nss, {"a", "b"});
     ASSERT_OK(_indexBuildsManager.setUpIndexBuild(operationContext(),
-                                                  autoColl.getCollection(),
+                                                  autoColl.getWritableCollection(),
                                                   specs,
                                                   _buildUUID,
                                                   MultiIndexBlock::kNoopOnInitFn));
 
     _indexBuildsManager.abortIndexBuild(operationContext(),
-                                        autoColl.getCollection(),
+                                        autoColl.getWritableCollection(),
                                         _buildUUID,
                                         MultiIndexBlock::kNoopOnCleanUpFn);
     _indexBuildsManager.unregisterIndexBuild(_buildUUID);

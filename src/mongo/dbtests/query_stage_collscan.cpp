@@ -247,7 +247,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
 TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
     dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
 
-    Collection* coll = ctx.getCollection();
+    const Collection* coll = ctx.getCollection();
 
     // Get the RecordIds that would be returned by an in-order scan.
     vector<RecordId> recordIds;
@@ -300,7 +300,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
 // object we would have gotten after that.  But, do it in reverse!
 TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackward) {
     dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-    Collection* coll = ctx.getCollection();
+    const Collection* coll = ctx.getCollection();
 
     // Get the RecordIds that would be returned by an in-order scan.
     vector<RecordId> recordIds;

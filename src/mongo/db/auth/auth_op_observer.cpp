@@ -90,7 +90,7 @@ void AuthOpObserver::onDelete(OperationContext* opCtx,
 }
 
 void AuthOpObserver::onCreateCollection(OperationContext* opCtx,
-                                        Collection* coll,
+                                        const Collection* coll,
                                         const NamespaceString& collectionName,
                                         const CollectionOptions& options,
                                         const BSONObj& idIndex,

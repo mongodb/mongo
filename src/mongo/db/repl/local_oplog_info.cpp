@@ -81,11 +81,11 @@ void LocalOplogInfo::setOplogCollectionName(ServiceContext* service) {
     }
 }
 
-Collection* LocalOplogInfo::getCollection() const {
+const Collection* LocalOplogInfo::getCollection() const {
     return _oplog;
 }
 
-void LocalOplogInfo::setCollection(Collection* oplog) {
+void LocalOplogInfo::setCollection(const Collection* oplog) {
     _oplog = oplog;
 }
 

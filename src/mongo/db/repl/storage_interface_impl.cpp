@@ -230,8 +230,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         // Get locks and create the collection.
         AutoGetOrCreateDb db(opCtx.get(), nss.db(), MODE_IX);
         AutoGetCollection coll(opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_X));
-
-        if (coll.getCollection()) {
+        if (coll) {
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "Collection " << nss.ns() << " already exists.");
         }
@@ -251,17 +250,17 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         if (options.capped) {
             WriteUnitOfWork wunit(opCtx.get());
             if (!idIndexSpec.isEmpty()) {
-                auto status =
-                    autoColl->getCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
-                        opCtx.get(), idIndexSpec);
+                auto status = autoColl->getWritableCollection()
+                                  ->getIndexCatalog()
+                                  ->createIndexOnEmptyCollection(opCtx.get(), idIndexSpec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
             }
             for (auto&& spec : secondaryIndexSpecs) {
-                auto status =
-                    autoColl->getCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
-                        opCtx.get(), spec);
+                auto status = autoColl->getWritableCollection()
+                                  ->getIndexCatalog()
+                                  ->createIndexOnEmptyCollection(opCtx.get(), spec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
@@ -300,7 +299,7 @@ Status StorageInterfaceImpl::insertDocument(OperationContext* opCtx,
 namespace {
 
 /**
- * Returns Collection* from database RAII object.
+ * Returns const Collection* from database RAII object.
  * Returns NamespaceNotFound if the database or collection does not exist.
  */
 template <typename AutoGetCollectionType>
@@ -330,7 +329,7 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
                                   std::vector<InsertStatement>::const_iterator end) {
     boost::optional<AutoGetCollection> autoColl;
     boost::optional<AutoGetOplog> autoOplog;
-    Collection* collection;
+    const Collection* collection;
 
     auto nss = nsOrUUID.nss();
     if (nss && nss->isOplog()) {
@@ -505,8 +504,8 @@ Status StorageInterfaceImpl::createIndexesOnEmptyCollection(
         for (auto&& spec : secondaryIndexSpecs) {
             // Will error if collection is not empty.
             auto secIndexSW =
-                autoColl.getCollection()->getIndexCatalog()->createIndexOnEmptyCollection(opCtx,
-                                                                                          spec);
+                autoColl.getWritableCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
+                    opCtx, spec);
             auto status = secIndexSW.getStatus();
             if (!status.isOK()) {
                 return status;
@@ -545,10 +544,9 @@ Status StorageInterfaceImpl::truncateCollection(OperationContext* opCtx,
         if (!collectionResult.isOK()) {
             return collectionResult.getStatus();
         }
-        auto collection = collectionResult.getValue();
 
         WriteUnitOfWork wunit(opCtx);
-        const auto status = collection->truncate(opCtx);
+        const auto status = autoColl.getWritableCollection()->truncate(opCtx);
         if (!status.isOK()) {
             return status;
         }
@@ -1103,7 +1101,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
 }
 
 boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTimestamp(
-    OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) {
+    OperationContext* opCtx, const Collection* oplog, const Timestamp& timestamp) {
     invariant(oplog);
     invariant(opCtx->lockState()->isLocked());
 
@@ -1134,7 +1132,7 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
 }
 
 boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
-    OperationContext* opCtx, Collection* oplogCollection, const Timestamp& timestamp) {
+    OperationContext* opCtx, const Collection* oplogCollection, const Timestamp& timestamp) {
     // Oplog reads are specially done under only MODE_IS global locks, without database or
     // collection level intent locks. Therefore, reads can run concurrently with validate cmds that
     // take collection MODE_X locks. Validate with {full:true} set calls WT::verify on the
@@ -1329,11 +1327,12 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
         return Status::OK();
     }
 
-    Collection* const usersCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-        opCtx, AuthorizationManager::usersCollectionNamespace);
+    const Collection* const usersCollection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+            opCtx, AuthorizationManager::usersCollectionNamespace);
     const bool hasUsers =
         usersCollection && !Helpers::findOne(opCtx, usersCollection, BSONObj(), false).isNull();
-    Collection* const adminVersionCollection =
+    const Collection* const adminVersionCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
             opCtx, AuthorizationManager::versionCollectionNamespace);
     BSONObj authSchemaVersionDocument;

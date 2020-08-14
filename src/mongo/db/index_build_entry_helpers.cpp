@@ -62,7 +62,7 @@ Status upsert(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry) {
                               [&]() -> Status {
                                   AutoGetCollection autoCollection(
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                                  Collection* collection = autoCollection.getCollection();
+                                  const Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
                                       str::stream ss;
                                       ss << "Collection not found: "
@@ -118,7 +118,7 @@ Status upsert(OperationContext* opCtx, const BSONObj& filter, const BSONObj& upd
                               [&]() -> Status {
                                   AutoGetCollection autoCollection(
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                                  Collection* collection = autoCollection.getCollection();
+                                  const Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
                                       str::stream ss;
                                       ss << "Collection not found: "
@@ -158,7 +158,7 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
                                    opCtx, NamespaceString::kIndexBuildEntryNamespace)) {
                                WriteUnitOfWork wuow(opCtx);
                                CollectionOptions defaultCollectionOptions;
-                               Collection* collection =
+                               const Collection* collection =
                                    db->createCollection(opCtx,
                                                         NamespaceString::kIndexBuildEntryNamespace,
                                                         defaultCollectionOptions);
@@ -195,7 +195,7 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
         [&]() -> Status {
             AutoGetCollection autoCollection(
                 opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-            Collection* collection = autoCollection.getCollection();
+            const Collection* collection = autoCollection.getCollection();
             if (!collection) {
                 str::stream ss;
                 ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
@@ -229,7 +229,7 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
         [&]() -> Status {
             AutoGetCollection autoCollection(
                 opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-            Collection* collection = autoCollection.getCollection();
+            const Collection* collection = autoCollection.getCollection();
             if (!collection) {
                 str::stream ss;
                 ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();

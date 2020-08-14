@@ -108,7 +108,7 @@ public:
         return _autoColl->getDb();
     }
 
-    Collection* getColl() const {
+    const Collection* getColl() const {
         invariant(_autoColl);
         return _autoColl->getCollection();
     }

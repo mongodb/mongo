@@ -82,9 +82,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         LOGV2(4666601, "[validate]", "recordId"_attr = recordId, "recordData"_attr = recordBson);
     }
 
-    Collection* coll = _validateState->getCollection();
-    IndexCatalog* indexCatalog = coll->getIndexCatalog();
-    if (!indexCatalog->haveAnyIndexes()) {
+    const Collection* coll = _validateState->getCollection();
+    if (!coll->getIndexCatalog()->haveAnyIndexes()) {
         return status;
     }
 
@@ -119,7 +118,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             if (_validateState->shouldRunRepair()) {
                 writeConflictRetry(opCtx, "setIndexAsMultikey", coll->ns().ns(), [&] {
                     WriteUnitOfWork wuow(opCtx);
-                    indexCatalog->setMultikeyPaths(opCtx, coll, descriptor, *documentMultikeyPaths);
+                    coll->getIndexCatalog()->setMultikeyPaths(
+                        opCtx, coll, descriptor, *documentMultikeyPaths);
                     wuow.commit();
                 });
 
@@ -149,7 +149,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                 if (_validateState->shouldRunRepair()) {
                     writeConflictRetry(opCtx, "increaseMultikeyPathCoverage", coll->ns().ns(), [&] {
                         WriteUnitOfWork wuow(opCtx);
-                        indexCatalog->setMultikeyPaths(
+                        coll->getIndexCatalog()->setMultikeyPaths(
                             opCtx, coll, descriptor, *documentMultikeyPaths);
                         wuow.commit();
                     });

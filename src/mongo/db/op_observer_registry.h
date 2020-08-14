@@ -172,7 +172,7 @@ public:
     }
 
     void onCreateCollection(OperationContext* const opCtx,
-                            Collection* coll,
+                            const Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,

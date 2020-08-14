@@ -737,7 +737,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
 
         // Gets the missing indexes and checks if the collection is empty (auto-healing is
         // possible).
-        auto checkEmptyOrGetMissingIndexesFromDonor = [&](Collection* collection) {
+        auto checkEmptyOrGetMissingIndexesFromDonor = [&](const Collection* collection) {
             auto indexCatalog = collection->getIndexCatalog();
             auto indexSpecs = indexCatalog->removeExistingIndexesNoChecks(
                 opCtx, collectionOptionsAndIndexes.indexSpecs);

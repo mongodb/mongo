@@ -578,7 +578,7 @@ TEST_F(TenantOplogApplierTest, ApplyCommand_Success) {
              << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
-                                            Collection*,
+                                            const Collection*,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&) {
@@ -609,7 +609,7 @@ TEST_F(TenantOplogApplierTest, ApplyCommand_WrongNSS) {
              << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
-                                            Collection*,
+                                            const Collection*,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&) { applyCmdCalled = true; };

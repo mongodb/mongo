@@ -72,7 +72,7 @@ public:
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), obj));
     }
 
-    const IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
+    const IndexDescriptor* getIndex(const BSONObj& obj, const Collection* coll) {
         std::vector<const IndexDescriptor*> indexes;
         coll->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         return indexes.empty() ? nullptr : indexes[0];
@@ -101,7 +101,7 @@ public:
         _client.update(ns(), predicate, update);
     }
 
-    void getRecordIds(set<RecordId>* out, Collection* coll) {
+    void getRecordIds(set<RecordId>* out, const Collection* coll) {
         auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
@@ -148,7 +148,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -218,7 +218,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -287,7 +287,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -357,7 +357,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -431,7 +431,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -499,7 +499,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -557,7 +557,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -677,7 +677,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -780,7 +780,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -852,7 +852,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        Collection* coll =
+        const Collection* coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);

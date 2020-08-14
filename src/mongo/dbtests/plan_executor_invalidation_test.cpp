@@ -118,7 +118,8 @@ public:
     }
 
     Collection* collection() {
-        return CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
+        return CollectionCatalog::get(&_opCtx).lookupCollectionByNamespaceForMetadataWrite(&_opCtx,
+                                                                                           nss);
     }
 
     void truncateCollection(Collection* collection) const {

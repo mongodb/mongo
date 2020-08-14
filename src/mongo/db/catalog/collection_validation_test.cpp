@@ -164,7 +164,7 @@ int insertDataRange(OperationContext* opCtx, int startIDNum, int endIDNum) {
 
 
     AutoGetCollection autoColl(opCtx, kNss, MODE_IX);
-    Collection* coll = autoColl.getCollection();
+    const Collection* coll = autoColl.getCollection();
     std::vector<InsertStatement> inserts;
     for (int i = startIDNum; i < endIDNum; ++i) {
         auto doc = BSON("_id" << i);
@@ -184,7 +184,7 @@ int insertDataRange(OperationContext* opCtx, int startIDNum, int endIDNum) {
  */
 int setUpInvalidData(OperationContext* opCtx) {
     AutoGetCollection autoColl(opCtx, kNss, MODE_IX);
-    Collection* coll = autoColl.getCollection();
+    const Collection* coll = autoColl.getCollection();
     RecordStore* rs = coll->getRecordStore();
 
     {

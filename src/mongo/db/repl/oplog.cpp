@@ -213,7 +213,7 @@ void _logOpsInner(OperationContext* opCtx,
                   const NamespaceString& nss,
                   std::vector<Record>* records,
                   const std::vector<Timestamp>& timestamps,
-                  Collection* oplogCollection,
+                  const Collection* oplogCollection,
                   OpTime finalOpTime,
                   Date_t wallTime) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
@@ -536,7 +536,7 @@ void createOplog(OperationContext* opCtx,
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();
 
     OldClientContext ctx(opCtx, oplogCollectionName.ns());
-    Collection* collection =
+    const Collection* collection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, oplogCollectionName);
 
     if (collection) {
@@ -981,7 +981,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     }
 
     NamespaceString requestNss;
-    Collection* collection = nullptr;
+    const Collection* collection = nullptr;
     if (auto uuid = op.getUuid()) {
         CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
         collection = catalog.lookupCollectionByUUID(opCtx, uuid.get());
@@ -1019,7 +1019,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
     if (op.getObject2())
         o2 = op.getObject2().get();
 
-    IndexCatalog* indexCatalog = collection == nullptr ? nullptr : collection->getIndexCatalog();
+    const IndexCatalog* indexCatalog =
+        collection == nullptr ? nullptr : collection->getIndexCatalog();
     const bool haveWrappingWriteUnitOfWork = opCtx->lockState()->inAWriteUnitOfWork();
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "applyOps not supported on view: " << requestNss.ns(),
@@ -1753,7 +1754,7 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx) {
     }
 }
 
-void establishOplogCollectionForLogging(OperationContext* opCtx, Collection* oplog) {
+void establishOplogCollectionForLogging(OperationContext* opCtx, const Collection* oplog) {
     invariant(opCtx->lockState()->isW());
     invariant(oplog);
     LocalOplogInfo::get(opCtx)->setCollection(oplog);

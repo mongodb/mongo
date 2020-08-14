@@ -52,7 +52,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
         }
 
         boost::optional<Lock::CollectionLock> clk;
-        Collection* collection = nullptr;
+        const Collection* collection = nullptr;
 
         while (auto nss = catalog.lookupNSSByUUID(opCtx, uuid)) {
             // Get a fresh snapshot for each locked collection to see any catalog changes.

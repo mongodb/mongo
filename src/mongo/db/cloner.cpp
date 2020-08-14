@@ -367,7 +367,7 @@ Status Cloner::_createCollectionsForDb(
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);
 
-            Collection* collection =
+            const Collection* collection =
                 CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
             if (collection) {
                 if (!params.shardedColl) {

@@ -66,8 +66,8 @@ public:
      */
     void setOplogCollectionName(ServiceContext* service);
 
-    Collection* getCollection() const;
-    void setCollection(Collection* oplog);
+    const Collection* getCollection() const;
+    void setCollection(const Collection* oplog);
     void resetCollection();
 
     /**
@@ -88,7 +88,7 @@ private:
     // The "oplog" pointer is always valid (or null) because an operation must take the global
     // exclusive lock to set the pointer to null when the Collection instance is destroyed. See
     // "oplogCheckCloseDatabase".
-    Collection* _oplog = nullptr;
+    const Collection* _oplog = nullptr;
 
     // Synchronizes the section where a new Timestamp is generated and when it is registered in the
     // storage engine.

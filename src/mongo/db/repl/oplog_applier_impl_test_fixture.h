@@ -99,7 +99,7 @@ public:
      * Called when OplogApplierImpl creates a collection.
      */
     void onCreateCollection(OperationContext* opCtx,
-                            Collection* coll,
+                            const Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
@@ -121,7 +121,7 @@ public:
     std::function<void(OperationContext*, const OplogUpdateEntryArgs&)> onUpdateFn;
 
     std::function<void(OperationContext*,
-                       Collection*,
+                       const Collection*,
                        const NamespaceString&,
                        const CollectionOptions&,
                        const BSONObj&)>

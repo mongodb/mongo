@@ -33,16 +33,14 @@
 
 namespace mongo {
 
-template <typename CollectionT>
-void RequiresCollectionStageBase<CollectionT>::doSaveState() {
+void RequiresCollectionStage::doSaveState() {
     doSaveStateRequiresCollection();
 
     // A stage may not access storage while in a saved state.
     _collection = nullptr;
 }
 
-template <typename CollectionT>
-void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
+void RequiresCollectionStage::doRestoreState() {
     invariant(!_collection);
 
     // We should be holding a lock associated with the name of the collection prior to yielding,
@@ -75,8 +73,5 @@ void RequiresCollectionStageBase<CollectionT>::doRestoreState() {
 
     doRestoreStateRequiresCollection();
 }
-
-template class RequiresCollectionStageBase<const Collection*>;
-template class RequiresCollectionStageBase<Collection*>;
 
 }  // namespace mongo

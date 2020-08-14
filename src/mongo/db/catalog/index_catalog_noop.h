@@ -194,19 +194,19 @@ public:
     }
 
     void setMultikeyPaths(OperationContext* const opCtx,
-                          Collection* coll,
+                          const Collection* coll,
                           const IndexDescriptor* const desc,
-                          const MultikeyPaths& multikeyPaths) override {}
+                          const MultikeyPaths& multikeyPaths) const override {}
 
     Status indexRecords(OperationContext* const opCtx,
-                        Collection* coll,
+                        const Collection* coll,
                         const std::vector<BsonRecord>& bsonRecords,
                         int64_t* const keysInsertedOut) override {
         return Status::OK();
     }
 
     Status updateRecord(OperationContext* const opCtx,
-                        Collection* coll,
+                        const Collection* coll,
                         const BSONObj& oldDoc,
                         const BSONObj& newDoc,
                         const RecordId& recordId,

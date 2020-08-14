@@ -81,7 +81,7 @@ public:
         addIndex(BSON("b" << 1));
 
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-        Collection* collection = ctx.getCollection();
+        const Collection* collection = ctx.getCollection();
         ASSERT(collection);
 
         // Add data.
@@ -111,7 +111,7 @@ public:
         wuow.commit();
     }
 
-    void insertDocument(Collection* collection, BSONObj obj) {
+    void insertDocument(const Collection* collection, BSONObj obj) {
         WriteUnitOfWork wuow(&_opCtx);
 
         OpDebug* const nullOpDebug = nullptr;

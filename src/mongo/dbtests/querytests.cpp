@@ -69,7 +69,8 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             _database = _context.db();
             _collection =
-                CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
+                CollectionCatalog::get(&_opCtx).lookupCollectionByNamespaceForMetadataWrite(&_opCtx,
+                                                                                            nss());
             if (_collection) {
                 _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }

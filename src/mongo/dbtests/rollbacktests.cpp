@@ -84,7 +84,8 @@ Status renameCollection(OperationContext* opCtx,
     return renameCollection(opCtx, source, target, {});
 }
 Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto coll =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
     return coll->truncate(opCtx);
 }
 
@@ -121,7 +122,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
     size_t numEntries = 0;
 
     auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-    IndexCatalog* catalog = coll->getIndexCatalog();
+    const IndexCatalog* catalog = coll->getIndexCatalog();
     auto desc = catalog->findIndexByName(opCtx, idxName, false);
 
     if (desc) {
@@ -142,7 +143,8 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 }
 
 void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto coll =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
     auto desc = coll->getIndexCatalog()->findIndexByName(opCtx, idxName);
     ASSERT(desc);
     ASSERT_OK(coll->getIndexCatalog()->dropIndex(opCtx, desc));
@@ -485,7 +487,8 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(&opCtx, nss);
+        Collection* coll =
+            CollectionCatalog::get(&opCtx).lookupCollectionByNamespaceForMetadataWrite(&opCtx, nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -526,7 +529,8 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(&opCtx, nss);
+        Collection* coll =
+            CollectionCatalog::get(&opCtx).lookupCollectionByNamespaceForMetadataWrite(&opCtx, nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -579,7 +583,8 @@ public:
 
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
-        Collection* coll = CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(&opCtx, nss);
+        Collection* coll =
+            CollectionCatalog::get(&opCtx).lookupCollectionByNamespaceForMetadataWrite(&opCtx, nss);
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
@@ -643,7 +648,8 @@ public:
             ASSERT_OK(ctx.db()->userCreateNS(&opCtx, nss, collectionOptions, false));
             ASSERT(collectionExists(&opCtx, &ctx, nss.ns()));
             Collection* coll =
-                CollectionCatalog::get(&opCtx).lookupCollectionByNamespace(&opCtx, nss);
+                CollectionCatalog::get(&opCtx).lookupCollectionByNamespaceForMetadataWrite(&opCtx,
+                                                                                           nss);
             IndexCatalog* catalog = coll->getIndexCatalog();
 
             ASSERT_OK(catalog->createIndexOnEmptyCollection(&opCtx, specA));

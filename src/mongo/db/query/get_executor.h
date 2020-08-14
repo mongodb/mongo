@@ -240,7 +240,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
-    Collection* collection,
+    const Collection* collection,
     ParsedDelete* parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity);
 
@@ -266,7 +266,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    Collection* collection,
+    const Collection* collection,
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity);
 }  // namespace mongo

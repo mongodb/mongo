@@ -459,7 +459,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 }
 
 void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
-                                               Collection* coll,
+                                               const Collection* coll,
                                                const NamespaceString& collectionName,
                                                const CollectionOptions& options,
                                                const BSONObj& idIndex,

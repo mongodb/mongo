@@ -39,24 +39,19 @@
 namespace mongo {
 
 /**
- * A base class for plan stages which access a collection. In addition to providing derived classes
+ * A class for plan stages which access a collection. In addition to providing derived classes
  * access to the Collection pointer, the primary purpose of this class is to assume responsibility
  * for checking that the collection is still valid (e.g. has not been dropped) when recovering from
  * yield.
  *
  * Subclasses must implement doSaveStateRequiresCollection() and doRestoreStateRequiresCollection()
  * in order to supply custom yield preparation or yield recovery logic.
- *
- * Templated on 'CollectionT', which may be instantiated using either Collection* or const
- * Collection*. This abstracts the implementation of this base class for use by derived classes
- * which read (e.g. COLLSCAN and MULTI_ITERATOR) and derived classes that write (e.g. UPDATE and
- * DELETE). Derived classes should use the 'RequiresCollectionStage' or
- * 'RequiresMutableCollectionStage' aliases provided below.
  */
-template <typename CollectionT>
-class RequiresCollectionStageBase : public PlanStage {
+class RequiresCollectionStage : public PlanStage {
 public:
-    RequiresCollectionStageBase(const char* stageType, ExpressionContext* expCtx, CollectionT coll)
+    RequiresCollectionStage(const char* stageType,
+                            ExpressionContext* expCtx,
+                            const Collection* coll)
         : PlanStage(stageType, expCtx),
           _collection(coll),
           _collectionUUID(_collection->uuid()),
@@ -65,7 +60,7 @@ public:
         invariant(_collection);
     }
 
-    virtual ~RequiresCollectionStageBase() = default;
+    virtual ~RequiresCollectionStage() = default;
 
 protected:
     void doSaveState() final;
@@ -82,7 +77,7 @@ protected:
      */
     virtual void doRestoreStateRequiresCollection() = 0;
 
-    CollectionT collection() const {
+    const Collection* collection() const {
         return _collection;
     }
 
@@ -96,7 +91,7 @@ private:
         return CollectionCatalog::get(opCtx()).getEpoch();
     }
 
-    CollectionT _collection;
+    const Collection* _collection;
     const UUID _collectionUUID;
     const uint64_t _catalogEpoch;
 
@@ -105,10 +100,7 @@ private:
     const NamespaceString _nss;
 };
 
-// Type alias for use by PlanStages that read a Collection.
-using RequiresCollectionStage = RequiresCollectionStageBase<const Collection*>;
-
 // Type alias for use by PlanStages that write to a Collection.
-using RequiresMutableCollectionStage = RequiresCollectionStageBase<Collection*>;
+using RequiresMutableCollectionStage = RequiresCollectionStage;
 
 }  // namespace mongo

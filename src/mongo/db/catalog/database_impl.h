@@ -137,7 +137,7 @@ private:
      */
     Status _finishDropCollection(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 Collection* collection) const;
+                                 const Collection* collection) const;
 
     /**
      * Removes all indexes for a collection.

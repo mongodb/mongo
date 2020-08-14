@@ -212,7 +212,7 @@ void createSlimOplogView(OperationContext* opCtx, Database* db) {
             {
                 // Create 'system.views' in a separate WUOW if it does not exist.
                 WriteUnitOfWork wuow(opCtx);
-                Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+                const Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
                     opCtx, NamespaceString(db->getSystemViewsName()));
                 if (!coll) {
                     coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));

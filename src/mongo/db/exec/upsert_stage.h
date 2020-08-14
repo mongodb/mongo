@@ -54,7 +54,7 @@ public:
     UpsertStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
-                Collection* collection,
+                const Collection* collection,
                 PlanStage* child);
 
     bool isEOF() final;

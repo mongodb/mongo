@@ -1188,7 +1188,7 @@ StatusWith<std::unique_ptr<projection_ast::Projection>> makeProjection(const BSO
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
-    Collection* collection,
+    const Collection* collection,
     ParsedDelete* parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     auto expCtx = parsedDelete->expCtx();
@@ -1346,7 +1346,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    Collection* collection,
+    const Collection* collection,
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     auto expCtx = parsedUpdate->expCtx();

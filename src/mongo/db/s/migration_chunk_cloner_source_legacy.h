@@ -159,7 +159,7 @@ public:
      * NOTE: Must be called with the collection lock held in at least IS mode.
      */
     Status nextCloneBatch(OperationContext* opCtx,
-                          Collection* collection,
+                          const Collection* collection,
                           BSONArrayBuilder* arrBuilder);
 
     /**
@@ -221,14 +221,14 @@ private:
     StatusWith<BSONObj> _callRecipient(const BSONObj& cmdObj);
 
     StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getIndexScanExecutor(
-        OperationContext* opCtx, Collection* const collection);
+        OperationContext* opCtx, const Collection* const collection);
 
     void _nextCloneBatchFromIndexScan(OperationContext* opCtx,
-                                      Collection* collection,
+                                      const Collection* collection,
                                       BSONArrayBuilder* arrBuilder);
 
     void _nextCloneBatchFromCloneLocs(OperationContext* opCtx,
-                                      Collection* collection,
+                                      const Collection* collection,
                                       BSONArrayBuilder* arrBuilder);
 
     /**

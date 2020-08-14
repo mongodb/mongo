@@ -200,22 +200,29 @@ protected:
         auto indexSpec = (bob << "v" << kIndexVersion << "background" << background).obj();
 
         Lock::DBLock dbLock(opCtx(), nss.db(), MODE_X);
-        AutoGetCollection autoColl(opCtx(), nss, MODE_X);
-        auto coll = autoColl.getCollection();
+        AutoGetCollection coll(opCtx(), nss, MODE_X);
 
         MultiIndexBlock indexer;
-        auto abortOnExit = makeGuard(
-            [&] { indexer.abortIndexBuild(opCtx(), coll, MultiIndexBlock::kNoopOnCleanUpFn); });
+        auto abortOnExit = makeGuard([&] {
+            indexer.abortIndexBuild(
+                opCtx(), coll.getWritableCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
+        });
 
         // Initialize the index builder and add all documents currently in the collection.
-        ASSERT_OK(
-            indexer.init(opCtx(), coll, indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus());
-        ASSERT_OK(indexer.insertAllDocumentsInCollection(opCtx(), coll));
+        ASSERT_OK(indexer
+                      .init(opCtx(),
+                            coll.getWritableCollection(),
+                            indexSpec,
+                            MultiIndexBlock::kNoopOnInitFn)
+                      .getStatus());
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(opCtx(), coll.getCollection()));
         ASSERT_OK(indexer.checkConstraints(opCtx()));
 
         WriteUnitOfWork wunit(opCtx());
-        ASSERT_OK(indexer.commit(
-            opCtx(), coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+        ASSERT_OK(indexer.commit(opCtx(),
+                                 coll.getWritableCollection(),
+                                 MultiIndexBlock::kNoopOnCreateEachFn,
+                                 MultiIndexBlock::kNoopOnCommitFn));
         abortOnExit.dismiss();
         wunit.commit();
     }

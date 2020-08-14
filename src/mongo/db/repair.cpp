@@ -201,12 +201,14 @@ Status repairCollection(OperationContext* opCtx,
 
     LOGV2(21027, "Repairing collection", "namespace"_attr = nss);
 
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
     Status status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
 
     // Need to lookup from catalog again because the old collection object was invalidated by
     // repairRecordStore.
-    collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
 
     // If data was modified during repairRecordStore, we know to rebuild indexes without needing
     // to run an expensive collection validation.

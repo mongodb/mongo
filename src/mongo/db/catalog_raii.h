@@ -116,6 +116,24 @@ public:
         AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
         Date_t deadline = Date_t::max());
 
+    explicit operator bool() const {
+        return static_cast<bool>(_coll);
+    }
+
+    /**
+     * AutoGetCollection can be used as a pointer with the -> operator.
+     */
+    CollectionPtr operator->() const {
+        return getCollection();
+    }
+
+    /**
+     * Dereference operator, returns a lvalue reference to the collection.
+     */
+    std::add_lvalue_reference_t<std::remove_pointer_t<CollectionPtr>> operator*() const {
+        return *getCollection();
+    }
+
     /**
      * Returns the database, or nullptr if it didn't exist.
      */
@@ -167,8 +185,8 @@ private:
 };
 
 struct CatalogCollectionLookup {
-    using CollectionStorage = Collection*;
-    using CollectionPtr = Collection*;
+    using CollectionStorage = const Collection*;
+    using CollectionPtr = const Collection*;
 
     static CollectionStorage lookupCollection(OperationContext* opCtx, const NamespaceString& nss);
     static CollectionPtr toCollectionPtr(CollectionStorage collection) {
@@ -188,6 +206,14 @@ struct CatalogCollectionLookupForRead {
 class AutoGetCollection : public AutoGetCollectionBase<CatalogCollectionLookup> {
 public:
     using AutoGetCollectionBase::AutoGetCollectionBase;
+
+    /**
+     * Returns writable Collection. Necessary Collection lock mode is required.
+     * Any previous Collection that has been returned may be invalidated.
+     */
+    Collection* getWritableCollection() const {
+        return const_cast<Collection*>(getCollection());
+    }
 };
 
 /**
@@ -310,7 +336,7 @@ public:
     /**
      * Returns a pointer to the oplog collection or nullptr if the oplog collection didn't exist.
      */
-    Collection* getCollection() const {
+    const Collection* getCollection() const {
         return _oplog;
     }
 
@@ -321,7 +347,7 @@ private:
     boost::optional<Lock::DBLock> _dbWriteLock;
     boost::optional<Lock::CollectionLock> _collWriteLock;
     repl::LocalOplogInfo* _oplogInfo;
-    Collection* _oplog;
+    const Collection* _oplog;
 };
 
 }  // namespace mongo

@@ -121,7 +121,7 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
 }
 
 Status IndexBuildsManager::startBuildingIndex(OperationContext* opCtx,
-                                              Collection* collection,
+                                              const Collection* collection,
                                               const UUID& buildUUID,
                                               boost::optional<RecordId> resumeAfterRecordId) {
     auto builder = invariant(_getBuilder(buildUUID));
@@ -277,7 +277,7 @@ Status IndexBuildsManager::drainBackgroundWrites(
 
 Status IndexBuildsManager::retrySkippedRecords(OperationContext* opCtx,
                                                const UUID& buildUUID,
-                                               Collection* collection) {
+                                               const Collection* collection) {
     auto builder = invariant(_getBuilder(buildUUID));
     return builder->retrySkippedRecords(opCtx, collection);
 }
@@ -331,7 +331,7 @@ bool IndexBuildsManager::abortIndexBuild(OperationContext* opCtx,
 }
 
 bool IndexBuildsManager::abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
-                                                                  Collection* collection,
+                                                                  const Collection* collection,
                                                                   const UUID& buildUUID,
                                                                   bool isResumable) {
     auto builder = _getBuilder(buildUUID);
@@ -352,7 +352,7 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanupForRollback(OperationConte
 }
 
 bool IndexBuildsManager::abortIndexBuildWithoutCleanupForShutdown(OperationContext* opCtx,
-                                                                  Collection* collection,
+                                                                  const Collection* collection,
                                                                   const UUID& buildUUID,
                                                                   bool isResumable) {
     auto builder = _getBuilder(buildUUID);
@@ -410,7 +410,7 @@ StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
     auto originalCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-    Collection* localCollection =
+    const Collection* localCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, lostAndFoundNss);
 
     // Create the collection if it doesn't exist.

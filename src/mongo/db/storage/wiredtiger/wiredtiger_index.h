@@ -120,7 +120,7 @@ public:
 
     virtual Status initAsEmpty(OperationContext* opCtx);
 
-    virtual Status compact(OperationContext* opCtx);
+    Status compact(OperationContext* opCtx) override;
 
     const std::string& uri() const {
         return _uri;

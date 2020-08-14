@@ -178,7 +178,7 @@ IndexBuildBlock::~IndexBuildBlock() {
     // Don't need to call fail() here, as rollback will clean everything up for us.
 }
 
-void IndexBuildBlock::fail(OperationContext* opCtx, const Collection* collection) {
+void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 

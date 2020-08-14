@@ -69,7 +69,7 @@ public:
     }
 
     Collection* coll() const {
-        return _coll->getCollection();
+        return _coll->getWritableCollection();
     }
 
     OperationContext* opCtx() {

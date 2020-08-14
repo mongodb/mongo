@@ -138,7 +138,7 @@ public:
      * 'numDeleted' will be set to the number of keys removed from the index for the document.
      */
     virtual Status update(OperationContext* opCtx,
-                          Collection* coll,
+                          const Collection* coll,
                           const UpdateTicket& ticket,
                           int64_t* numInserted,
                           int64_t* numDeleted) = 0;
@@ -198,7 +198,7 @@ public:
      * Sets this index as multikey with the provided paths.
      */
     virtual void setIndexIsMultikey(OperationContext* opCtx,
-                                    Collection* collection,
+                                    const Collection* collection,
                                     MultikeyPaths paths) = 0;
 
     //
@@ -473,7 +473,7 @@ public:
                        UpdateTicket* ticket) const final;
 
     Status update(OperationContext* opCtx,
-                  Collection* coll,
+                  const Collection* coll,
                   const UpdateTicket& ticket,
                   int64_t* numInserted,
                   int64_t* numDeleted) final;
@@ -499,7 +499,7 @@ public:
     Status compact(OperationContext* opCtx) final;
 
     void setIndexIsMultikey(OperationContext* opCtx,
-                            Collection* collection,
+                            const Collection* collection,
                             MultikeyPaths paths) final;
 
     std::unique_ptr<BulkBuilder> initiateBulk(

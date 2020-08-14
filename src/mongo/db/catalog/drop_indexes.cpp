@@ -60,7 +60,7 @@ constexpr auto kIndexFieldName = "index"_sd;
 Status checkView(OperationContext* opCtx,
                  const NamespaceString& nss,
                  Database* db,
-                 Collection* collection) {
+                 const Collection* collection) {
     if (!collection) {
         if (db && ViewCatalog::get(db)->lookup(opCtx, nss.ns())) {
             return Status(ErrorCodes::CommandNotSupportedOnView,
@@ -73,7 +73,7 @@ Status checkView(OperationContext* opCtx,
 
 Status checkReplState(OperationContext* opCtx,
                       NamespaceStringOrUUID dbAndUUID,
-                      Collection* collection) {
+                      const Collection* collection) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto canAcceptWrites = replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
     bool writesAreReplicatedAndNotPrimary = opCtx->writesAreReplicated() && !canAcceptWrites;
@@ -101,7 +101,7 @@ Status checkReplState(OperationContext* opCtx,
  * Validates the key pattern passed through the command.
  */
 StatusWith<const IndexDescriptor*> getDescriptorByKeyPattern(OperationContext* opCtx,
-                                                             IndexCatalog* indexCatalog,
+                                                             const IndexCatalog* indexCatalog,
                                                              const BSONElement& keyPattern) {
     const bool includeUnfinished = true;
     std::vector<const IndexDescriptor*> indexes;
@@ -142,7 +142,7 @@ StatusWith<const IndexDescriptor*> getDescriptorByKeyPattern(OperationContext* o
  * to be held to look up the index name from the key pattern.
  */
 StatusWith<std::vector<std::string>> getIndexNames(OperationContext* opCtx,
-                                                   Collection* collection,
+                                                   const Collection* collection,
                                                    const BSONElement& indexElem) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
 
@@ -187,7 +187,7 @@ std::vector<UUID> abortIndexBuildByIndexNames(OperationContext* opCtx,
  * Drops single index given a descriptor.
  */
 Status dropIndexByDescriptor(OperationContext* opCtx,
-                             Collection* collection,
+                             const Collection* collection,
                              IndexCatalog* indexCatalog,
                              const IndexDescriptor* desc) {
     if (desc->isIdIndex()) {
@@ -324,7 +324,7 @@ Status dropIndexes(OperationContext* opCtx,
     autoColl.emplace(opCtx, nss, MODE_IX);
 
     Database* db = autoColl->getDb();
-    Collection* collection = autoColl->getCollection();
+    Collection* collection = autoColl->getWritableCollection();
     Status status = checkView(opCtx, nss, db, collection);
     if (!status.isOK()) {
         return status;
@@ -407,7 +407,7 @@ Status dropIndexes(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
 
         db = autoColl->getDb();
-        collection = autoColl->getCollection();
+        collection = autoColl->getWritableCollection();
         if (!collection) {
             return Status(ErrorCodes::NamespaceNotFound,
                           str::stream()
@@ -506,12 +506,11 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
                               const BSONObj& cmdObj,
                               BSONObjBuilder* result) {
     return writeConflictRetry(opCtx, "dropIndexes", nss.db(), [opCtx, &nss, &cmdObj, result] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        AutoGetCollection collection(opCtx, nss, MODE_X);
 
         // If db/collection does not exist, short circuit and return.
-        Database* db = autoColl.getDb();
-        Collection* collection = autoColl.getCollection();
-        Status status = checkView(opCtx, nss, db, collection);
+        Database* db = collection.getDb();
+        Status status = checkView(opCtx, nss, db, collection.getCollection());
         if (!status.isOK()) {
             return status;
         }
@@ -527,7 +526,7 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
             collection->uuid());
 
         BSONElement indexElem = cmdObj.getField(kIndexFieldName);
-        auto swIndexNames = getIndexNames(opCtx, collection, indexElem);
+        auto swIndexNames = getIndexNames(opCtx, collection.getCollection(), indexElem);
         if (!swIndexNames.isOK()) {
             return swIndexNames.getStatus();
         }
@@ -539,7 +538,8 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
 
         // Use an empty BSONObjBuilder to avoid duplicate appends to result on retry loops.
         BSONObjBuilder tempObjBuilder;
-        status = dropReadyIndexes(opCtx, collection, swIndexNames.getValue(), &tempObjBuilder);
+        status = dropReadyIndexes(
+            opCtx, collection.getWritableCollection(), swIndexNames.getValue(), &tempObjBuilder);
         if (!status.isOK()) {
             return status;
         }

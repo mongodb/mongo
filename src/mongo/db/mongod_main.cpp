@@ -254,7 +254,7 @@ void logStartup(OperationContext* opCtx) {
     Lock::GlobalWrite lk(opCtx);
     AutoGetOrCreateDb autoDb(opCtx, startupLogCollectionName.db(), mongo::MODE_X);
     Database* db = autoDb.getDb();
-    Collection* collection =
+    const Collection* collection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, startupLogCollectionName);
     WriteUnitOfWork wunit(opCtx);
     if (!collection) {

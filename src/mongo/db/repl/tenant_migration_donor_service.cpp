@@ -116,8 +116,7 @@ repl::OpTime TenantMigrationDonorService::Instance::_updateStateDocument(
 
     uassertStatusOK(
         writeConflictRetry(opCtx, "updateStateDoc", _stateDocumentsNS.ns(), [&]() -> Status {
-            AutoGetCollection autoCollection(opCtx, _stateDocumentsNS, MODE_IX);
-            Collection* collection = autoCollection.getCollection();
+            AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
 
             if (!collection) {
                 return Status(ErrorCodes::NamespaceNotFound,
@@ -127,8 +126,8 @@ repl::OpTime TenantMigrationDonorService::Instance::_updateStateDocument(
             WriteUnitOfWork wuow(opCtx);
 
             const auto originalStateDocBson = _stateDoc.toBSON();
-            const auto originalRecordId =
-                Helpers::findOne(opCtx, collection, originalStateDocBson, false /* requireIndex */);
+            const auto originalRecordId = Helpers::findOne(
+                opCtx, collection.getCollection(), originalStateDocBson, false /* requireIndex */);
             const auto originalSnapshot =
                 Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(), originalStateDocBson);
             invariant(!originalRecordId.isNull());

@@ -66,7 +66,7 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
                               << nss.ns() << "')",
                 db);
 
-        Collection* collection =
+        const Collection* collection =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
 
         uassert(ErrorCodes::IndexNotFound,

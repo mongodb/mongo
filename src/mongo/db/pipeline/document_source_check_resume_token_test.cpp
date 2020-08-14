@@ -124,10 +124,7 @@ public:
         return std::make_unique<ChangeStreamOplogCursorMock>(&_records);
     }
 
-    const RecordStore* getRecordStore() const override {
-        return _recordStore.get();
-    }
-    RecordStore* getRecordStore() override {
+    RecordStore* getRecordStore() const override {
         return _recordStore.get();
     }
 

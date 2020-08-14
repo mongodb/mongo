@@ -387,7 +387,7 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
 }
 
 Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
-                                         Collection* coll,
+                                         const Collection* coll,
                                          const UpdateTicket& ticket,
                                          int64_t* numInserted,
                                          int64_t* numDeleted) {
@@ -725,7 +725,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 }
 
 void AbstractIndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx,
-                                                   Collection* collection,
+                                                   const Collection* collection,
                                                    MultikeyPaths paths) {
     _indexCatalogEntry->setMultikey(opCtx, collection, paths);
 }

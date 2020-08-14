@@ -143,10 +143,10 @@ Status verifySystemIndexes(OperationContext* opCtx) {
 
     // Create indexes for the admin.system.users collection.
     {
-        AutoGetCollection autoColl(opCtx, systemUsers, MODE_X);
+        AutoGetCollection collection(opCtx, systemUsers, MODE_X);
 
-        if (Collection* collection = autoColl.getCollection()) {
-            IndexCatalog* indexCatalog = collection->getIndexCatalog();
+        if (collection) {
+            const IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
@@ -176,11 +176,11 @@ Status verifySystemIndexes(OperationContext* opCtx) {
 
     // Create indexes for the admin.system.roles collection.
     {
-        AutoGetCollection autoColl(opCtx, systemRoles, MODE_X);
+        AutoGetCollection collection(opCtx, systemRoles, MODE_X);
 
         // Ensure that system indexes exist for the roles collection, if it exists.
-        if (Collection* collection = autoColl.getCollection()) {
-            IndexCatalog* indexCatalog = collection->getIndexCatalog();
+        if (collection) {
+            const IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
 
             std::vector<const IndexDescriptor*> indexes;
@@ -199,7 +199,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void createSystemIndexes(OperationContext* opCtx, Collection* collection) {
+void createSystemIndexes(OperationContext* opCtx, const Collection* collection) {
     invariant(collection);
     const NamespaceString& ns = collection->ns();
     BSONObj indexSpec;

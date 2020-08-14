@@ -81,7 +81,8 @@ public:
     }
 
     Collection* collection() {
-        return CollectionCatalog::get(_opCtx).lookupCollectionByNamespace(_opCtx, _nss);
+        return CollectionCatalog::get(_opCtx).lookupCollectionByNamespaceForMetadataWrite(_opCtx,
+                                                                                          _nss);
     }
 
 protected:

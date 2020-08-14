@@ -325,7 +325,7 @@ public:
      * matches are found.
      */
     virtual boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestamp(
-        OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) = 0;
+        OperationContext* opCtx, const Collection* oplog, const Timestamp& timestamp) = 0;
 
     /**
      * Calls findOplogEntryLessThanOrEqualToTimestamp with endless WriteConflictException retries.
@@ -336,7 +336,7 @@ public:
      * fail, say for correctness.
      */
     virtual boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
-        OperationContext* opCtx, Collection* oplog, const Timestamp& timestamp) = 0;
+        OperationContext* opCtx, const Collection* oplog, const Timestamp& timestamp) = 0;
 
     /**
      * Fetches the latest oplog entry's timestamp. Bypasses the oplog visibility rules.

@@ -41,7 +41,7 @@
 namespace mongo {
 
 long long deleteObjects(OperationContext* opCtx,
-                        Collection* collection,
+                        const Collection* collection,
                         const NamespaceString& ns,
                         BSONObj pattern,
                         bool justOne,

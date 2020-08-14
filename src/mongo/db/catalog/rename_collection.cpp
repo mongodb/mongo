@@ -110,7 +110,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                       str::stream()
                           << "Database " << source.db() << " does not exist or is drop pending");
 
-    Collection* const sourceColl =
+    const auto sourceColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
     if (!sourceColl) {
         if (ViewCatalog::get(db)->lookup(opCtx, source.ns()))
@@ -122,7 +122,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
 
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
-    Collection* targetColl =
+    const auto targetColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target);
 
     if (!targetColl) {
@@ -220,7 +220,7 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
                                      OptionalCollectionUUID uuid,
                                      NamespaceString source,
                                      NamespaceString target,
-                                     Collection* targetColl,
+                                     const Collection* targetColl,
                                      RenameCollectionOptions options,
                                      repl::OpTime renameOpTimeFromApplyOps) {
     return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
@@ -319,9 +319,9 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
         return status;
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
-    Collection* const sourceColl =
+    const auto sourceColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
-    Collection* const targetColl =
+    const auto targetColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target);
 
     AutoStatsTracker statsTracker(
@@ -362,7 +362,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         return status;
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
-    Collection* const sourceColl =
+    const auto sourceColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
 
     AutoStatsTracker statsTracker(
@@ -373,8 +373,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
 
     return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
-        Collection* targetColl =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target);
+        auto targetColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target);
         WriteUnitOfWork wuow(opCtx);
         if (targetColl) {
             if (sourceColl->uuid() == targetColl->uuid()) {
@@ -491,7 +490,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
         AutoStatsTracker::LogMode::kUpdateCurOp,
         CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
 
-    Collection* const sourceColl =
+    const auto sourceColl =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
     if (!sourceColl) {
         if (sourceDB && ViewCatalog::get(sourceDB)->lookup(opCtx, source.ns()))
@@ -515,7 +514,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
     // Check if the target namespace exists and if dropTarget is true.
     // Return a non-OK status if target exists and dropTarget is not true or if the collection
     // is sharded.
-    Collection* targetColl = targetDB
+    const auto targetColl = targetDB
         ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target)
         : nullptr;
     if (targetColl) {
@@ -564,7 +563,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
           "temporaryCollection"_attr = tmpName,
           "sourceCollection"_attr = source);
 
-    Collection* tmpColl = nullptr;
+    const Collection* tmpColl = nullptr;
     {
         auto collectionOptions =
             DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, sourceColl->getCatalogId());

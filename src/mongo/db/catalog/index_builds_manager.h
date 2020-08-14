@@ -96,7 +96,7 @@ public:
      * Runs the scanning/insertion phase of the index build..
      */
     Status startBuildingIndex(OperationContext* opCtx,
-                              Collection* collection,
+                              const Collection* collection,
                               const UUID& buildUUID,
                               boost::optional<RecordId> resumeAfterRecordId = boost::none);
 
@@ -126,7 +126,7 @@ public:
      */
     Status retrySkippedRecords(OperationContext* opCtx,
                                const UUID& buildUUID,
-                               Collection* collection);
+                               const Collection* collection);
 
     /**
      * Runs the index constraint violation checking phase of the index build..
@@ -163,7 +163,7 @@ public:
      * been cleared away, or not having yet started..
      */
     bool abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
-                                                  Collection* collection,
+                                                  const Collection* collection,
                                                   const UUID& buildUUID,
                                                   bool isResumable);
 
@@ -173,7 +173,7 @@ public:
      * index build and resumable index builds are supported.
      */
     bool abortIndexBuildWithoutCleanupForShutdown(OperationContext* opCtx,
-                                                  Collection* collection,
+                                                  const Collection* collection,
                                                   const UUID& buildUUID,
                                                   bool isResumable);
 

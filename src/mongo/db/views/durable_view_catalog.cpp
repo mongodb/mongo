@@ -111,7 +111,7 @@ void DurableViewCatalogImpl::_iterate(OperationContext* opCtx,
                                       ViewCatalogLookupBehavior lookupBehavior) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_db->getSystemViewsName(), MODE_IS));
 
-    Collection* systemViews =
+    const Collection* systemViews =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, _db->getSystemViewsName());
     if (!systemViews) {
         return;
@@ -186,7 +186,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
     NamespaceString systemViewsNs(_db->getSystemViewsName());
     dassert(opCtx->lockState()->isCollectionLockedForMode(systemViewsNs, MODE_X));
 
-    Collection* systemViews =
+    const Collection* systemViews =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, systemViewsNs);
     invariant(systemViews);
 
@@ -218,7 +218,7 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
     dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(name, MODE_IX));
 
-    Collection* systemViews =
+    const Collection* systemViews =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, _db->getSystemViewsName());
     dassert(opCtx->lockState()->isCollectionLockedForMode(systemViews->ns(), MODE_X));
 

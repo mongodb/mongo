@@ -284,8 +284,7 @@ TEST_F(CreateCollectionTest, ValidationDisabledForTemporaryReshardingCollection)
     ASSERT_OK(createCollection(opCtx.get(), reshardingNss.db().toString(), createCmdObj));
     ASSERT_TRUE(collectionExists(opCtx.get(), reshardingNss));
 
-    AutoGetCollection agc(opCtx.get(), reshardingNss, MODE_X);
-    Collection* collection = agc.getCollection();
+    AutoGetCollection collection(opCtx.get(), reshardingNss, MODE_X);
 
     WriteUnitOfWork wuow(opCtx.get());
     // Ensure a document that violates validator criteria can be inserted into the temporary

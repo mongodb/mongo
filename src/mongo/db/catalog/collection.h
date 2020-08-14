@@ -294,8 +294,7 @@ public:
     virtual const IndexCatalog* getIndexCatalog() const = 0;
     virtual IndexCatalog* getIndexCatalog() = 0;
 
-    virtual const RecordStore* getRecordStore() const = 0;
-    virtual RecordStore* getRecordStore() = 0;
+    virtual RecordStore* getRecordStore() const = 0;
 
     /**
      * Fetches the Ident for this collection.
@@ -336,7 +335,7 @@ public:
                                 OpDebug* const opDebug,
                                 const bool fromMigrate = false,
                                 const bool noWarn = false,
-                                StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off) = 0;
+                                StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off) const = 0;
 
     /*
      * Inserts all documents inside one WUOW.
@@ -349,7 +348,7 @@ public:
                                    const std::vector<InsertStatement>::const_iterator begin,
                                    const std::vector<InsertStatement>::const_iterator end,
                                    OpDebug* const opDebug,
-                                   const bool fromMigrate = false) = 0;
+                                   const bool fromMigrate = false) const = 0;
 
     /**
      * this does NOT modify the doc before inserting
@@ -360,7 +359,7 @@ public:
     virtual Status insertDocument(OperationContext* const opCtx,
                                   const InsertStatement& doc,
                                   OpDebug* const opDebug,
-                                  const bool fromMigrate = false) = 0;
+                                  const bool fromMigrate = false) const = 0;
 
     /**
      * Callers must ensure no document validation is performed for this collection when calling
@@ -368,7 +367,7 @@ public:
      */
     virtual Status insertDocumentsForOplog(OperationContext* const opCtx,
                                            std::vector<Record>* records,
-                                           const std::vector<Timestamp>& timestamps) = 0;
+                                           const std::vector<Timestamp>& timestamps) const = 0;
 
     /**
      * Inserts a document into the record store for a bulk loader that manages the index building
@@ -377,9 +376,10 @@ public:
      *
      * NOTE: It is up to caller to commit the indexes.
      */
-    virtual Status insertDocumentForBulkLoader(OperationContext* const opCtx,
-                                               const BSONObj& doc,
-                                               const OnRecordInsertedFn& onRecordInserted) = 0;
+    virtual Status insertDocumentForBulkLoader(
+        OperationContext* const opCtx,
+        const BSONObj& doc,
+        const OnRecordInsertedFn& onRecordInserted) const = 0;
 
     /**
      * Updates the document @ oldLocation with newDoc.
@@ -396,7 +396,7 @@ public:
                                     const BSONObj& newDoc,
                                     const bool indexesAffected,
                                     OpDebug* const opDebug,
-                                    CollectionUpdateArgs* const args) = 0;
+                                    CollectionUpdateArgs* const args) const = 0;
 
     virtual bool updateWithDamagesSupported() const = 0;
 
@@ -413,7 +413,7 @@ public:
         const Snapshotted<RecordData>& oldRec,
         const char* const damageSource,
         const mutablebson::DamageVector& damages,
-        CollectionUpdateArgs* const args) = 0;
+        CollectionUpdateArgs* const args) const = 0;
 
     // -----------
 

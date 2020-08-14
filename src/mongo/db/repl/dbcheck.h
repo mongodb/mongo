@@ -82,8 +82,8 @@ struct DbCheckCollectionInformation {
  * Returns a pair of previous and next UUIDs around the given collections uuid. If there is no
  * previous or next UUID, return boost::none respectively.
  */
-std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(OperationContext* opCtx,
-                                                                            Collection* collection);
+std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
+    OperationContext* opCtx, const Collection* collection);
 
 /**
  * Get a HealthLogEntry for a dbCheck collection.
@@ -118,7 +118,7 @@ public:
      * @param maxBytes The maximum number of bytes to hash.
      */
     DbCheckHasher(OperationContext* opCtx,
-                  Collection* collection,
+                  const Collection* collection,
                   const BSONKey& start,
                   const BSONKey& end,
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
@@ -191,26 +191,26 @@ public:
     AutoGetCollectionForDbCheck(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 const OplogEntriesEnum& type);
-    Collection* getCollection(void) {
+    const Collection* getCollection(void) {
         return _collection;
     }
 
 private:
     AutoGetDbForDbCheck _agd;
     Lock::CollectionLock _collLock;
-    Collection* _collection;
+    const Collection* _collection;
 };
 
 
 /**
  * Gather the index information for a collection.
  */
-std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, Collection* collection);
+std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const Collection* collection);
 
 /**
  * Gather other information for a collection.
  */
-BSONObj collectionOptions(OperationContext* opCtx, Collection* collection);
+BSONObj collectionOptions(OperationContext* opCtx, const Collection* collection);
 
 namespace repl {
 

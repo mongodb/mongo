@@ -160,7 +160,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         EnforcePrepareConflictsBlock enforcePrepare(opCtx);
 
         uassertStatusOK(createProfileCollection(opCtx, db));
-        Collection* const coll =
+        const Collection* const coll =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, dbProfilingNS);
 
         invariant(!opCtx->shouldParticipateInFlowControl());
@@ -190,7 +190,7 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
     // collection creation would endlessly throw errors because the collection exists: must check
     // and see the collection exists in order to break free.
     return writeConflictRetry(opCtx, "createProfileCollection", dbProfilingNS.ns(), [&] {
-        Collection* const collection =
+        const Collection* const collection =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, dbProfilingNS);
         if (collection) {
             if (!collection->isCapped()) {

@@ -145,10 +145,9 @@ public:
                     << toReIndexNss << "' while replication is active");
         }
 
-        AutoGetCollection autoColl(opCtx, toReIndexNss, MODE_X);
-        Collection* collection = autoColl.getCollection();
+        AutoGetCollection collection(opCtx, toReIndexNss, MODE_X);
         if (!collection) {
-            auto db = autoColl.getDb();
+            auto db = collection.getDb();
             if (db && ViewCatalog::get(db)->lookup(opCtx, toReIndexNss.ns()))
                 uasserted(ErrorCodes::CommandNotSupportedOnView, "can't re-index a view");
             else
@@ -220,17 +219,18 @@ public:
 
         writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
+            collection.getWritableCollection()->getIndexCatalog()->dropAllIndexes(opCtx, true);
 
-            swIndexesToRebuild =
-                indexer->init(opCtx, collection, all, MultiIndexBlock::kNoopOnInitFn);
+            swIndexesToRebuild = indexer->init(
+                opCtx, collection.getWritableCollection(), all, MultiIndexBlock::kNoopOnInitFn);
             uassertStatusOK(swIndexesToRebuild.getStatus());
             wunit.commit();
         });
 
         // The 'indexer' can throw, so ensure build cleanup occurs.
         auto abortOnExit = makeGuard([&] {
-            indexer->abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
+            indexer->abortIndexBuild(
+                opCtx, collection.getWritableCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
         if (MONGO_unlikely(reIndexCrashAfterDrop.shouldFail())) {
@@ -240,14 +240,15 @@ public:
 
         // The following function performs its own WriteConflict handling, so don't wrap it in a
         // writeConflictRetry loop.
-        uassertStatusOK(indexer->insertAllDocumentsInCollection(opCtx, collection));
+        uassertStatusOK(
+            indexer->insertAllDocumentsInCollection(opCtx, collection.getWritableCollection()));
 
         uassertStatusOK(indexer->checkConstraints(opCtx));
 
         writeConflictRetry(opCtx, "commitReIndex", toReIndexNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
             uassertStatusOK(indexer->commit(opCtx,
-                                            collection,
+                                            collection.getWritableCollection(),
                                             MultiIndexBlock::kNoopOnCreateEachFn,
                                             MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
@@ -259,7 +260,7 @@ public:
         // tries to read in the intermediate state where all indexes are newer than the current
         // snapshot so are unable to be used.
         auto clusterTime = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
-        collection->setMinimumVisibleSnapshot(clusterTime);
+        collection.getWritableCollection()->setMinimumVisibleSnapshot(clusterTime);
 
         result.append("nIndexes", static_cast<int>(swIndexesToRebuild.getValue().size()));
         result.append("indexes", swIndexesToRebuild.getValue());

@@ -63,7 +63,8 @@ public:
     /**
      * Create collection 'nss' and insert some documents. It will possess a default _id index.
      */
-    Collection* createCollectionAndPopulateIt(OperationContext* opCtx, const NamespaceString& nss);
+    const Collection* createCollectionAndPopulateIt(OperationContext* opCtx,
+                                                    const NamespaceString& nss);
 
 private:
     void setUp() override;
@@ -75,13 +76,13 @@ void ValidateStateTest::createCollection(OperationContext* opCtx, const Namespac
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, defaultCollectionOptions));
 }
 
-Collection* ValidateStateTest::createCollectionAndPopulateIt(OperationContext* opCtx,
-                                                             const NamespaceString& nss) {
+const Collection* ValidateStateTest::createCollectionAndPopulateIt(OperationContext* opCtx,
+                                                                   const NamespaceString& nss) {
     // Create collection.
     createCollection(opCtx, nss);
 
     AutoGetCollection autoColl(opCtx, nss, MODE_X);
-    Collection* collection = autoColl.getCollection();
+    const Collection* collection = autoColl.getCollection();
     invariant(collection);
 
     // Insert some data.
@@ -141,14 +142,14 @@ void createIndex(OperationContext* opCtx, const NamespaceString& nss, const BSON
  * Drops index 'indexName' in collection 'nss'.
  */
 void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const std::string& indexName) {
-    AutoGetCollection autoColl(opCtx, nss, MODE_X);
+    AutoGetCollection collection(opCtx, nss, MODE_X);
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto collection = autoColl.getCollection();
     auto indexDescriptor = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     ASSERT(indexDescriptor);
-    ASSERT_OK(collection->getIndexCatalog()->dropIndex(opCtx, indexDescriptor));
+    ASSERT_OK(
+        collection.getWritableCollection()->getIndexCatalog()->dropIndex(opCtx, indexDescriptor));
 
     wuow.commit();
 }
