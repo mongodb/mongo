@@ -113,6 +113,13 @@ add_option('ninja',
     help='Enable the build.ninja generator tool stable or canary version',
 )
 
+add_option('build-tools',
+    choices=['stable', 'next'],
+    default='stable',
+    type='choice',
+    help='Enable experimental build tools',
+)
+
 add_option('legacy-tarball',
     choices=['true', 'false'],
     default='false',
@@ -1070,6 +1077,14 @@ envDict = dict(BUILD_ROOT=buildDir,
                CONFIG_HEADER_DEFINES={},
                LIBDEPS_TAG_EXPANSIONS=[],
                )
+
+
+# By default, we will get the normal SCons tool search. But if the
+# user has opted into the next gen tools, add our experimental tool
+# directory into the default toolpath, ahead of whatever is already in
+# there so it overrides it.
+if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
+    SCons.Tool.DefaultToolpath.insert(0, os.path.abspath('site_scons/site_tools/next'))
 
 env = Environment(variables=env_vars, **envDict)
 
@@ -3877,11 +3892,8 @@ if get_option('ninja') != 'disabled':
         if env['ICECREAM_VERSION'] < parse_version("1.2"):
             env.FatalError("Use of ccache is mandatory with --ninja and icecream older than 1.2. You are running {}.".format(env['ICECREAM_VERSION']))
 
-    if get_option('ninja') == 'stable':
-        ninja_builder = Tool("ninja")
-        ninja_builder.generate(env)
-    else:
-        ninja_builder = Tool("ninja_next")
+    ninja_builder = Tool("ninja")
+    if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
         env["NINJA_BUILDDIR"] = env.Dir("$BUILD_DIR/ninja")
         ninja_builder.generate(env)
 
@@ -3890,7 +3902,8 @@ if get_option('ninja') != 'disabled':
         })
         env['NINJA_COMPDB_EXPAND'] = ninjaConf.CheckNinjaCompdbExpand()
         ninjaConf.Finish()
-
+    else:
+        ninja_builder.generate(env)
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
