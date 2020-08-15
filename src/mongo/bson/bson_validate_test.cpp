@@ -412,6 +412,13 @@ TEST(BSONValidateFast, InvalidType) {
     ASSERT_THROWS_CODE(obj.woCompare(BSON("A" << 1)), DBException, 10320);
 }
 
+TEST(BSONValidateFast, ValidCodeWScope) {
+    BSONObj obj = BSON("a" << BSONCodeWScope("code", BSON("c" << BSONObj())));
+    ASSERT_OK(validateBSON(obj.objdata(), obj.objsize()));
+    obj = BSON("a" << BSONCodeWScope("code", BSON("c" << BSONArray() << "d" << BSONArray())));
+    ASSERT_OK(validateBSON(obj.objdata(), obj.objsize()));
+}
+
 BSONObj nest(int nesting) {
     return nesting < 1 ? BSON("i" << nesting) : BSON("i" << nesting << "o" << nest(nesting - 1));
 }

@@ -216,6 +216,7 @@ private:
     const char* _pushCodeWithScope(Cursor cursor) {
         cursor.ptr = _pushFrame(cursor);  // Push a dummy frame to check the CodeWScope size.
         cursor.skipString();              // Now skip the BSON UTF8 string containing the code.
+        _currElem = cursor.ptr - 1;       // Use the terminating NUL as adummy scope element.
         return _pushFrame(cursor);
     }
 
