@@ -239,7 +239,7 @@ class LibdepLinter(object):
             lib = os.path.basename(str(libdep))
             self._raise_libdep_lint_exception(
                 textwrap.dedent(f"""\
-                    Program '{self.target[0]}' links non-public library '{lib}
+                    Program '{self.target[0]}' links non-public library '{lib}'
                     A 'Program' can only have {Constants.Libdeps} libs,
                     not {Constants.LibdepsPrivate} or {Constants.LibdepsInterface}."""
                 ))
