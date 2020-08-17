@@ -13,6 +13,7 @@ import subprocess
 import sys
 import textwrap
 import uuid
+from glob import glob
 
 from pkg_resources import parse_version
 
@@ -3909,6 +3910,23 @@ if get_option('ninja') != 'disabled':
         })
         env['NINJA_COMPDB_EXPAND'] = ninjaConf.CheckNinjaCompdbExpand()
         ninjaConf.Finish()
+
+        # TODO: API for getting the sconscripts programmatically
+        # exists upstream: https://github.com/SCons/scons/issues/3625
+        def ninja_generate_deps(env, target, source, for_signature):
+            dependencies = env.Flatten([
+                'SConstruct',
+                glob(os.path.join('src', '**', 'SConscript'), recursive=True),
+                glob(os.path.join(os.path.expanduser('~/.scons/'), '**', '*.py'), recursive=True),
+                glob(os.path.join('site_scons', '**', '*.py'), recursive=True),
+                glob(os.path.join('buildscripts', '**', '*.py'), recursive=True),
+                glob(os.path.join('src/third_party/scons-*', '**', '*.py'), recursive=True),
+                glob(os.path.join('src/mongo/db/modules', '**', '*.py'), recursive=True),
+            ])
+
+            return dependencies
+
+        env['NINJA_REGENERATE_DEPS'] = ninja_generate_deps
     else:
         ninja_builder.generate(env)
 
