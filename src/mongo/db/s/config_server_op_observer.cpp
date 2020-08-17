@@ -34,6 +34,7 @@
 #include "mongo/db/s/config_server_op_observer.h"
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -174,17 +175,21 @@ void ConfigServerOpObserver::onApplyOps(OperationContext* opCtx,
     if (updateShard["ns"].str() != ShardType::ConfigNS.ns()) {
         return;
     }
+
     auto updateElem = updateShard["o"];
-    if (updateElem.type() != Object) {
+    if (updateElem.type() != BSONType::Object) {
         return;
     }
-    auto updateObj = updateElem.Obj();
-    auto setElem = updateObj["$set"];
-    if (setElem.type() != Object) {
+
+    auto updateObj = updateElem.embeddedObject();
+    if (update_oplog_entry::extractUpdateType(updateObj) ==
+        update_oplog_entry::UpdateType::kReplacement) {
         return;
     }
-    auto setObj = setElem.Obj();
-    auto newTopologyTime = setObj[ShardType::topologyTime()].timestamp();
+
+    auto newTopologyTime =
+        update_oplog_entry::extractNewValueForField(updateObj, ShardType::topologyTime())
+            .timestamp();
     if (newTopologyTime == Timestamp()) {
         return;
     }
