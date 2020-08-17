@@ -115,15 +115,16 @@ class TestFileExplorer(object):
         return program.returncode, stdout.decode("utf-8"), stderr.decode("utf-8")
 
     @staticmethod
-    def parse_tag_file(test_kind):
+    def parse_tag_file(test_kind, tag_file=None, tagged_tests=None):
         """Parse the tag file and return a dict of tagged tests.
 
         The resulting dict will have as a key the filename and the
         value a list of tags, i.e., {'file1.js': ['tag1', 'tag2'], 'file2.js': ['tag2', 'tag3']}.
         """
-        tagged_tests = collections.defaultdict(list)
-        if config.TAG_FILE:
-            tags_conf = _tags.TagsConfig.from_file(config.TAG_FILE)
+        if tagged_tests is None:
+            tagged_tests = collections.defaultdict(list)
+        if tag_file and os.path.exists(tag_file):
+            tags_conf = _tags.TagsConfig.from_file(tag_file)
             tagged_roots = tags_conf.get_test_patterns(test_kind)
             for tagged_root in tagged_roots:
                 # Multiple tests could be returned for a set of tags.
@@ -336,7 +337,8 @@ class _SelectorConfig(object):
 
     def __init__(  # pylint: disable=too-many-arguments
             self, root=None, roots=None, include_files=None, exclude_files=None, include_tags=None,
-            exclude_tags=None, include_with_any_tags=None, exclude_with_any_tags=None):
+            exclude_tags=None, include_with_any_tags=None, exclude_with_any_tags=None,
+            tag_file=None):
         """Initialize the _SelectorConfig from the configuration elements.
 
         Args:
@@ -350,6 +352,7 @@ class _SelectorConfig(object):
                 selected tests must not match. Incompatible with 'include_tags'.
             include_with_any_tags: a list of tags. All selected tests must have at least one them.
             exclude_with_any_tags: a list of tags. No selected tests can have any of them.
+            tag_file: filename of a tag file associating tests to tags.
         """
         # Incompatible arguments check.
         if root and roots:
@@ -358,6 +361,7 @@ class _SelectorConfig(object):
             raise ValueError("include_tags and exclude_tags cannot be specified at the same time")
         self.root = root
         self.roots = roots
+        self.tag_file = tag_file
         self.include_files = utils.default_if_none(include_files, [])
         self.exclude_files = utils.default_if_none(exclude_files, [])
         include_with_any_tags = self.__merge_lists(include_with_any_tags,
@@ -457,12 +461,12 @@ class _JSTestSelectorConfig(_SelectorConfig):
 
     def __init__(  # pylint: disable=too-many-arguments
             self, roots=None, include_files=None, exclude_files=None, include_with_any_tags=None,
-            exclude_with_any_tags=None, include_tags=None, exclude_tags=None):
-        _SelectorConfig.__init__(self, roots=roots, include_files=include_files,
-                                 exclude_files=exclude_files,
-                                 include_with_any_tags=include_with_any_tags,
-                                 exclude_with_any_tags=exclude_with_any_tags,
-                                 include_tags=include_tags, exclude_tags=exclude_tags)
+            exclude_with_any_tags=None, include_tags=None, exclude_tags=None, tag_file=None):
+        _SelectorConfig.__init__(
+            self, roots=roots, include_files=include_files, exclude_files=exclude_files,
+            include_with_any_tags=include_with_any_tags,
+            exclude_with_any_tags=exclude_with_any_tags, include_tags=include_tags,
+            exclude_tags=exclude_tags, tag_file=tag_file)
 
 
 class _JSTestSelector(_Selector):
@@ -470,7 +474,12 @@ class _JSTestSelector(_Selector):
 
     def __init__(self, test_file_explorer):
         _Selector.__init__(self, test_file_explorer)
-        self._tags = self._test_file_explorer.parse_tag_file("js_test")
+        self._tags = self._test_file_explorer.parse_tag_file("js_test", config.TAG_FILE)
+
+    def select(self, selector_config):
+        self._tags = self._test_file_explorer.parse_tag_file("js_test", selector_config.tag_file,
+                                                             self._tags)
+        return _Selector.select(self, selector_config)
 
     def get_tags(self, test_file):
         """Return tags from test_file."""

@@ -4,6 +4,7 @@ import sys
 import fnmatch
 import os.path
 import unittest
+import collections
 
 import buildscripts.resmokelib.parser as parser
 import buildscripts.resmokelib.selector as selector
@@ -11,6 +12,8 @@ import buildscripts.resmokelib.utils.globstar as globstar
 import buildscripts.resmokelib.config
 
 # pylint: disable=missing-docstring,protected-access
+
+FIXTURE_PREFIX = "buildscripts/tests/selftest_fixtures"
 
 
 class TestExpressions(unittest.TestCase):
@@ -104,6 +107,26 @@ class TestTestFileExplorer(unittest.TestCase):
         self.assertTrue(self.test_file_explorer.fnmatchcase("directory/file.js", pattern))
         self.assertFalse(self.test_file_explorer.fnmatchcase("other/file.js", pattern))
 
+    def test_parse_tag_file(self):
+        tests = (os.path.join(FIXTURE_PREFIX, "one.js"), os.path.join(FIXTURE_PREFIX, "two.js"),
+                 os.path.join(FIXTURE_PREFIX, "three.js"))
+        expected = collections.defaultdict(list)
+        expected[tests[0]] = ["tag1", "tag2", "tag3"]
+        expected[tests[1]] = ["tag1", "tag2"]
+
+        tags = self.test_file_explorer.parse_tag_file("js_test",
+                                                      os.path.join(FIXTURE_PREFIX, "tag_file1.yml"))
+        # defaultdict isn't == comparable
+        for test in tests:
+            self.assertEqual(tags[test], expected[test])
+
+        expected[tests[1]] = ["tag1", "tag2", "tag4"]
+        tags = self.test_file_explorer.parse_tag_file("js_test",
+                                                      os.path.join(FIXTURE_PREFIX, "tag_file2.yml"),
+                                                      tags)
+        for test in tests:
+            self.assertEqual(tags[test], expected[test])
+
 
 class MockTestFileExplorer(object):
     """Component giving access to mock test files data."""
@@ -148,7 +171,7 @@ class MockTestFileExplorer(object):
     def list_dbtests(self, binary):  # pylint: disable=no-self-use,unused-argument
         return ["dbtestA", "dbtestB", "dbtestC"]
 
-    def parse_tag_file(self, test_kind):
+    def parse_tag_file(self, test_kind, tag_file=None, tagged_tests=None):  # pylint: disable=unused-argument
         if test_kind == "js_test":
             return self.jstest_tag_file
         return None

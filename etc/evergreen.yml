@@ -1584,7 +1584,7 @@ functions:
           set -o verbose
 
           ${activate_virtualenv}
-          $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-files --suite=${suite} --task-path-suffix=${use_multiversion} --is-generated-suite=true
+          $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=${use_multiversion}
     - command: archive.targz_pack
       params:
         target: generate_tasks_config.tgz
@@ -2039,8 +2039,7 @@ functions:
 
           ${activate_virtualenv}
           $python buildscripts/evergreen_gen_multiversion_tests.py run --expansion-file expansions.yml
-
-          $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-files --suite=${task_name} --task-path-suffix=${task_path_suffix} --is-generated-suite=true
+          $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=${task_path_suffix}
 
     - command: archive.targz_pack
       params:
@@ -4396,6 +4395,7 @@ tasks:
   - func: "set up virtualenv"
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
+  - *do_multiversion_setup
   - command: shell.exec
     type: test
     params:
@@ -4405,6 +4405,10 @@ tasks:
         set -o errexit
         set -o verbose
         ${activate_virtualenv}
+
+        # Multiversion exclusions can be used when selecting tests.
+        $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=/data/multiversion --output=multiversion_exclude_tags.yml
+
         # Capture a list of new and modified tests. The expansion macro burn_in_tests_build_variant
         # is used to for finding the associated tasks from a different build varaint than the
         # burn_in_tests_gen task executes on.
@@ -4467,6 +4471,10 @@ tasks:
         burn_in_args="$burn_in_args"
         # Evergreen executable is in $HOME.
         PATH=$PATH:$HOME $python buildscripts/burn_in_tests_multiversion.py --task_id=${task_id} --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_multiversion_gen.json $burn_in_args --verbose
+        if [ -d generated_resmoke_config ]; then
+            $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=/data/multiversion
+        fi
+
 
   - command: archive.targz_pack
     params:
@@ -6964,7 +6972,20 @@ tasks:
         set -o verbose
 
         ${activate_virtualenv}
-        $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-files --suite=replica_sets_multiversion --task-path-suffix=/data/multiversion --is-generated-suite=false
+        $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=/data/multiversion --output=multiversion_exclude_tags.yml
+
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: multiversion_exclude_tags.yml
+      remote_file: ${project}/${build_variant}/${revision}/exclude_tags/${task_name}-${build_id}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: atext-plain
+      display_name: Multiversion Exclude Tags - Execution ${execution}
+      optional: true
+
   - func: "run tests"
     vars:
       task_path_suffix: /data/multiversion

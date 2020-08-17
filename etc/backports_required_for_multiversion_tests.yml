@@ -18,90 +18,76 @@
 # (ticket, test_file) pair on the last-stable branch.
 #
 
-change_streams_multiversion:
+all:
+  - ticket: SERVER-47810
+    test_file: jstests/change_streams/report_post_batch_resume_token.js
+  - ticket: SERVER-40805
+    test_file: jstests/core/profile_find.js
+  - ticket: SERVER-44260
+    test_file: jstests/core/txns/new_transaction_waits_for_previous_txn_table_updates.js
+  - ticket: SERVER-46196
+    test_file: jstests/core/create_collection_fail_cleanup.js
+  - ticket: SERVER-47773
+    test_file: jstests/core/geo_near_tailable.js
+  - ticket: SERVER-48614
+    test_file: jstests/core/wildcard_index_partial_index.js
+  - ticket: SERVER-48993
+    test_file: jstests/core/explode_for_sort_collation.js
+  - ticket: SERVER-42825
+    test_file: jstests/replsets/kill_reads_with_prepare_conflicts_during_step_down.js
+  - ticket: SERVER-42825
+    test_file: jstests/replsets/kill_reads_with_prepare_conflicts_during_step_up.js
+  - ticket: SERVER-42825
+    test_file: jstests/replsets/no_disconnect_on_stepdown.js
+  - ticket: SERVER-42825
+    test_file: jstests/replsets/read_operations_during_rollback.js
+  - ticket: SERVER-42825
+    test_file: jstests/replsets/read_operations_during_step_down.js
+  - ticket: SERVER-42825
+    test_file: jstests/replsets/read_operations_during_step_up.js
+  - ticket: SERVER-42825
+    test_file: jstests/replsets/step_down_on_secondary.js
+  - ticket: SERVER-45010
+    test_file: jstests/replsets/rollback_dup_ids_clean_shutdown_during_rollback.js
+  - ticket: SERVER-45906
+    test_file: jstests/replsets/trigger_initial_stable_checkpoint.js
+  - ticket: SERVER-45178
+    test_file: jstests/replsets/rollback_via_refetch_update_rollback_id_before_oplog_truncation.js
+  - ticket: SERVER-32903
+    test_file: jstests/replsets/initial_sync_ambiguous_index.js
+  - ticket: SERVER-45143
+    test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
+  - ticket: SERVER-44500
+    test_file: jstests/replsets/apply_ops_inserts_do_not_include_fromMigrate_field.js
+  - ticket: SERVER-47190
+    test_file: jstests/replsets/force_shutdown_primary.js
+  - ticket: SERVER-47390
+    test_file: jstests/replsets/disallow_adding_initialized_node1.js
+  - ticket: SERVER-49471
+    test_file: jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
+  - ticket: SERVER-50140
+    test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
+  - ticket: SERVER-38691
+    test_file: jstests/sharding/explain_cmd.js
+  - ticket: SERVER-43889
+    test_file: jstests/sharding/retryable_writes.js
+  - ticket: SERVER-31368
+    test_file: jstests/sharding/log_remote_op_wait.js
 
-change_streams_sharded_collections_multiversion_passthrough:
-- ticket: SERVER-47810
-  test_file: jstests/change_streams/report_post_batch_resume_token.js
+suites:
 
-concurrency_replication_multiversion:
+  change_streams_multiversion:
 
-concurrency_sharded_replication_multiversion:
+  concurrency_replication_multiversion:
 
-replica_sets_jscore_multiversion_passthrough:
-- ticket: SERVER-40805
-  test_file: jstests/core/profile_find.js
-- ticket: SERVER-44260
-  test_file: jstests/core/txns/new_transaction_waits_for_previous_txn_table_updates.js
-- ticket: SERVER-46196
-  test_file: jstests/core/create_collection_fail_cleanup.js
-- ticket: SERVER-47773
-  test_file: jstests/core/geo_near_tailable.js
-- ticket: SERVER-48614
-  test_file: jstests/core/wildcard_index_partial_index.js
-- ticket: SERVER-48993
-  test_file: jstests/core/explode_for_sort_collation.js
+  replica_sets_jscore_multiversion_passthrough:
 
-replica_sets_multiversion:
-- ticket: SERVER-42825
-  test_file: jstests/replsets/kill_reads_with_prepare_conflicts_during_step_down.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/kill_reads_with_prepare_conflicts_during_step_up.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/no_disconnect_on_stepdown.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/read_operations_during_rollback.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/read_operations_during_step_down.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/read_operations_during_step_up.js
-- ticket: SERVER-42825
-  test_file: jstests/replsets/step_down_on_secondary.js
-- ticket: SERVER-45010
-  test_file: jstests/replsets/rollback_dup_ids_clean_shutdown_during_rollback.js
-- ticket: SERVER-45906
-  test_file: jstests/replsets/trigger_initial_stable_checkpoint.js
-- ticket: SERVER-45178
-  test_file: jstests/replsets/rollback_via_refetch_update_rollback_id_before_oplog_truncation.js
-- ticket: SERVER-32903
-  test_file: jstests/replsets/initial_sync_ambiguous_index.js
-- ticket: SERVER-45143
-  test_file: jstests/replsets/reconfig_uses_default_protocolVersion.js
-- ticket: SERVER-44500
-  test_file: jstests/replsets/apply_ops_inserts_do_not_include_fromMigrate_field.js
-- ticket: SERVER-47190
-  test_file: jstests/replsets/force_shutdown_primary.js
-- ticket: SERVER-47390
-  test_file: jstests/replsets/disallow_adding_initialized_node1.js
-- ticket: SERVER-49471
-  test_file: jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
-- ticket: SERVER-50140
-  test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
+  replica_sets_multiversion:
 
-sharding_multiversion:
-- ticket: SERVER-38691
-  test_file: jstests/sharding/explain_cmd.js
-- ticket: SERVER-43889
-  test_file: jstests/sharding/retryable_writes.js
-- ticket: SERVER-31368
-  test_file: jstests/sharding/log_remote_op_wait.js
+  concurrency_sharded_replication_multiversion:
 
-sharding_jscore_multiversion_passthrough:
-- ticket: SERVER-46196
-  test_file: jstests/core/create_collection_fail_cleanup.js
-- ticket: SERVER-47773
-  test_file: jstests/core/geo_near_tailable.js
-- ticket: SERVER-48614
-  test_file: jstests/core/wildcard_index_partial_index.js
-- ticket: SERVER-48993
-  test_file: jstests/core/explode_for_sort_collation.js
+  sharding_jscore_multiversion_passthrough:
 
-sharded_collections_jscore_multiversion_passthrough:
-- ticket: SERVER-46196
-  test_file: jstests/core/create_collection_fail_cleanup.js
-- ticket: SERVER-47773
-  test_file: jstests/core/geo_near_tailable.js
-- ticket: SERVER-48614
-  test_file: jstests/core/wildcard_index_partial_index.js
-- ticket: SERVER-48993
-  test_file: jstests/core/explode_for_sort_collation.js
+  sharded_collections_jscore_multiversion_passthrough:
+
+  sharding_multiversion:

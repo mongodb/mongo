@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 from typing import Optional, List, Set
+from collections import defaultdict
 
 from subprocess import check_output
 
@@ -26,6 +27,7 @@ from buildscripts.util.fileops import write_file_to_dir
 import buildscripts.evergreen_generate_resmoke_tasks as generate_resmoke
 from buildscripts.evergreen_generate_resmoke_tasks import Suite, ConfigOptions
 import buildscripts.evergreen_gen_fuzzer_tests as gen_fuzzer
+import buildscripts.ciconfig.tags as _tags
 
 # pylint: disable=len-as-condition
 
@@ -50,6 +52,9 @@ MULTIVERSION_CONFIG_KEY = "use_in_multiversion"
 PASSTHROUGH_TAG = "multiversion_passthrough"
 RANDOM_REPLSETS_TAG = "random_multiversion_replica_sets"
 EXCLUDE_TAGS = f"{REQUIRES_FCV_TAG},multiversion_incompatible"
+BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
+EXCLUDE_TAGS = f"{REQUIRES_FCV_TAG},multiversion_incompatible,{BACKPORT_REQUIRED_TAG}"
+EXCLUDE_TAGS_FILE = "multiversion_exclude_tags.yml"
 
 # The directory in which BACKPORTS_REQUIRED_FILE resides.
 ETC_DIR = "etc"
@@ -101,7 +106,7 @@ def get_backports_required_last_stable_hash(task_path_suffix: str):
     return last_stable_commit_hash
 
 
-def get_last_stable_yaml(last_stable_commit_hash, suite_name):
+def get_last_stable_yaml(last_stable_commit_hash):
     """Download BACKPORTS_REQUIRED_FILE from the last stable commit and return the yaml."""
     LOGGER.info(
         f"Downloading file from commit hash of last-stable branch {last_stable_commit_hash}")
@@ -117,41 +122,15 @@ def get_last_stable_yaml(last_stable_commit_hash, suite_name):
         fileh.write(response.text)
 
     backports_required_last_stable = generate_resmoke.read_yaml(temp_dir, last_stable_file)
-    return backports_required_last_stable[suite_name]
-
-
-def get_exclude_files(suite_name, task_path_suffix):
-    """Generate the list of files to exclude based on the BACKPORTS_REQUIRED_FILE."""
-    backports_required_latest = generate_resmoke.read_yaml(ETC_DIR, BACKPORTS_REQUIRED_FILE)
-    if suite_name not in backports_required_latest:
-        LOGGER.info(f"Generating exclude files not supported for '{suite_name}''.")
-        return set()
-
-    latest_suite_yaml = backports_required_latest[suite_name]
-
-    if not latest_suite_yaml:
-        LOGGER.info(f"No tests need to be excluded from suite '{suite_name}'.")
-        return set()
-
-    # Get the state of the backports_required_for_multiversion_tests.yml file for the last-stable
-    # binary we are running tests against. We do this by using the commit hash from the last-stable
-    # mongo shell executable.
-    last_stable_commit_hash = get_backports_required_last_stable_hash(task_path_suffix)
-
-    # Get the yaml contents under the 'suite_name' key from the last-stable commit.
-    last_stable_suite_yaml = get_last_stable_yaml(last_stable_commit_hash, suite_name)
-    if last_stable_suite_yaml is None:
-        return set(elem["test_file"] for elem in latest_suite_yaml)
-    else:
-        return set(
-            elem["test_file"] for elem in latest_suite_yaml if elem not in last_stable_suite_yaml)
+    return backports_required_last_stable
 
 
 def _generate_resmoke_args(suite_file: str, mixed_version_config: str, is_sharded: bool, options,
                            burn_in_test: Optional[str]) -> str:
-    return (f"{options.resmoke_args} --suite={suite_file} --mixedBinVersions={mixed_version_config}"
-            f" --excludeWithAnyTags={EXCLUDE_TAGS} --originSuite={options.suite} "
-            f" {get_multiversion_resmoke_args(is_sharded)} {burn_in_test if burn_in_test else ''}")
+    return (
+        f"{options.resmoke_args} --suite={suite_file} --mixedBinVersions={mixed_version_config}"
+        f" --excludeWithAnyTags={EXCLUDE_TAGS},{generate_resmoke.remove_gen_suffix(options.task)}_{BACKPORT_REQUIRED_TAG} --tagFile={os.path.join(CONFIG_DIR, EXCLUDE_TAGS_FILE)} --originSuite={options.suite} "
+        f" {get_multiversion_resmoke_args(is_sharded)} {burn_in_test if burn_in_test else ''}")
 
 
 class EvergreenMultiversionConfigGenerator(object):
@@ -363,7 +342,7 @@ class EvergreenMultiversionConfigGenerator(object):
 
 @click.group()
 def main():
-    """Serve as an entry point for the 'run' and 'generate-exclude-files' commands."""
+    """Serve as an entry point for the 'run' and 'generate-exclude-tags' commands."""
     pass
 
 
@@ -393,17 +372,15 @@ def run_generate_tasks(expansion_file: str, evergreen_config: Optional[str] = No
     config_generator.run()
 
 
-@main.command("generate-exclude-files")
-@click.option("--suite", type=str, required=True,
-              help="The multiversion suite to generate the exclude_files yaml for.")
+@main.command("generate-exclude-tags")
 @click.option("--task-path-suffix", type=str, required=True,
               help="The directory in which multiversion binaries are stored.")
-@click.option("--is-generated-suite", type=bool, required=True,
-              help="Indicates whether the suite yaml to update is generated or static.")
-def generate_exclude_yaml(suite: str, task_path_suffix: str, is_generated_suite: bool) -> None:
+@click.option("--output", type=str, default=os.path.join(CONFIG_DIR, EXCLUDE_TAGS_FILE),
+              show_default=True, help="Where to output the generated tags.")
+def generate_exclude_yaml(task_path_suffix: str, output: str) -> None:
     # pylint: disable=too-many-locals
     """
-    Update the given multiversion suite configuration yaml to exclude tests.
+    Create a tag file associating multiversion tests to tags for exclusion.
 
     Compares the BACKPORTS_REQUIRED_FILE on the current branch with the same file on the
     last-stable branch to determine which tests should be blacklisted.
@@ -411,57 +388,47 @@ def generate_exclude_yaml(suite: str, task_path_suffix: str, is_generated_suite:
 
     enable_logging()
 
-    suite_name = generate_resmoke.remove_gen_suffix(suite)
+    backports_required_latest = generate_resmoke.read_yaml(ETC_DIR, BACKPORTS_REQUIRED_FILE)
 
-    files_to_exclude = get_exclude_files(suite_name, task_path_suffix)
+    # Get the state of the backports_required_for_multiversion_tests.yml file for the last-lts
+    # binary we are running tests against. We do this by using the commit hash from the last-lts
+    # mongo shell executable.
+    last_lts_commit_hash = get_backports_required_last_stable_hash(task_path_suffix)
 
-    if not files_to_exclude:
-        LOGGER.info(f"No tests need to be excluded from suite '{suite_name}'.")
-        return
+    # Get the yaml contents from the last-lts commit.
+    backports_required_last_lts = get_last_stable_yaml(last_lts_commit_hash)
 
-    suite_yaml_dict = {}
+    def diff(list1, list2):
+        return [elem for elem in (list1 or []) if elem not in (list2 or [])]
 
-    if not is_generated_suite:
-        # Populate the config values to get the resmoke config directory.
-        buildscripts.resmokelib.parser.set_run_options()
-        suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
-
-        # Update the static suite config with the excluded files and write to disk.
-        file_name = f"{suite_name}.yml"
-        suite_config = generate_resmoke.read_yaml(suites_dir, file_name)
-        suite_yaml_dict[file_name] = generate_resmoke.generate_resmoke_suite_config(
-            suite_config, file_name, excludes=list(files_to_exclude))
+    suites_latest = backports_required_latest["suites"] or {}
+    # Check if the changed syntax for etc/backports_required_multiversion.yml has been backported.
+    # This variable and all branches where it's not set can be deleted after backporting the change.
+    change_backported = "all" in backports_required_last_lts.keys()
+    if change_backported:
+        always_exclude = diff(backports_required_latest["all"], backports_required_last_lts["all"])
+        suites_last_lts: defaultdict = defaultdict(list, backports_required_last_lts["suites"])
     else:
-        if not os.path.exists(CONFIG_DIR) or len(os.listdir(CONFIG_DIR)) == 0:
-            LOGGER.info(
-                f"No configuration files exist in '{CONFIG_DIR}'. Skipping exclude file generation")
-            return
+        always_exclude = backports_required_latest["all"] or []
+        suites_last_lts = defaultdict(list, backports_required_last_lts)
 
-        # We expect the generated suites to already have been generated in the generated config
-        # directory.
-        suites_dir = CONFIG_DIR
-        for file_name in os.listdir(suites_dir):
-            # Update the 'exclude_files' for each of the appropriate generated suites.
-            if file_name.endswith('misc.yml'):
-                # New tests will be run as part of misc.yml. We want to make sure to properly
-                # exclude these tests if they have been blacklisted.
-                suite_config = generate_resmoke.read_yaml(CONFIG_DIR, file_name)
-                exclude_files = suite_config["selector"]["exclude_files"]
-                add_to_excludes = [test for test in files_to_exclude if test not in exclude_files]
-                exclude_files += add_to_excludes
-                suite_yaml_dict[file_name] = generate_resmoke.generate_resmoke_suite_config(
-                    suite_config, file_name, excludes=list(exclude_files))
-            elif file_name.endswith('.yml'):
-                suite_config = generate_resmoke.read_yaml(CONFIG_DIR, file_name)
-                selected_files = suite_config["selector"]["roots"]
-                # Only exclude the files that we want to exclude in the first place and have been
-                # selected to run as part of the generated suite yml.
-                intersection = [test for test in selected_files if test in files_to_exclude]
-                if not intersection:
-                    continue
-                suite_yaml_dict[file_name] = generate_resmoke.generate_resmoke_suite_config(
-                    suite_config, file_name, excludes=list(intersection))
-    generate_resmoke.write_file_dict(suites_dir, suite_yaml_dict)
+    tags = _tags.TagsConfig()
+
+    # Tag tests that are excluded from every suite.
+    for elem in always_exclude:
+        tags.add_tag("js_test", elem["test_file"], BACKPORT_REQUIRED_TAG)
+
+    # Tag tests that are excluded on a suite-by-suite basis.
+    for suite in suites_latest.keys():
+        test_set = set()
+        for elem in diff(suites_latest[suite], suites_last_lts[suite]):
+            test_set.add(elem["test_file"])
+        for test in test_set:
+            tags.add_tag("js_test", test, f"{suite}_{BACKPORT_REQUIRED_TAG}")
+
+    LOGGER.info(f"Writing exclude tags to {output}.")
+    tags.write_file(filename=output,
+                    preamble="Tag file that specifies exclusions from multiversion suites.")
 
 
 if __name__ == '__main__':
