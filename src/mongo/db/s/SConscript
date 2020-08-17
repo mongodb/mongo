@@ -91,6 +91,7 @@ env.Library(
         env.Idlc('range_deletion_task.idl')[0],
         env.Idlc('resharding/coordinator_document.idl')[0],
         env.Idlc('resharding/donor_document.idl')[0],
+        env.Idlc('resharding/donor_oplog_id.idl')[0],
         env.Idlc('resharding/recipient_document.idl')[0],
     ],
     LIBDEPS=[

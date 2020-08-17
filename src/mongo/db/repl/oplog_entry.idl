@@ -34,6 +34,7 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/logical_session_id.idl"
+    - "mongo/db/pipeline/value.idl"
     - "mongo/db/repl/optime_and_wall_time_base.idl"
     - "mongo/db/repl/replication_types.idl"
     - "mongo/s/sharding_types.idl"
@@ -125,9 +126,11 @@ structs:
                 description: "Contains the UUID of a tenant migration for an operation caused by
                               one."
             _id:
-                type: objectid
+                cpp_name: _id
+                type: Value
                 optional: true
-                description: "An optional _id field for tests that manually insert oplog entries"
+                description: "Used by tests in replication and also by resharding to store
+                              timestamps."
             stmtId:
                 cpp_name: statementId
                 type: StmtId

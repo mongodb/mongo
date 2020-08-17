@@ -114,12 +114,13 @@ void validateZones(const std::vector<mongo::BSONObj>& zones,
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& resumeToken) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::optional<ReshardingDonorOplogId>& resumeToken) {
     std::list<boost::intrusive_ptr<DocumentSource>> stages;
 
-    if (!resumeToken.isEmpty()) {
-        stages.emplace_back(
-            DocumentSourceMatch::create(BSON("_id" << BSON("$gt" << resumeToken)), expCtx));
+    if (resumeToken) {
+        stages.emplace_back(DocumentSourceMatch::create(
+            BSON("_id" << BSON("$gt" << resumeToken->toBSON())), expCtx));
     }
 
     stages.emplace_back(DocumentSourceSort::create(expCtx, BSON("_id" << 1)));

@@ -34,6 +34,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/resharded_chunk_gen.h"
 
@@ -75,6 +76,7 @@ void validateZones(const std::vector<mongo::BSONObj>& zones,
  * sure that the donorOplogNS is properly resolved and ns is set in the expCtx.
  */
 std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& resumeToken);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::optional<ReshardingDonorOplogId>& resumeToken);
 
 }  // namespace mongo
