@@ -155,15 +155,6 @@ public:
     }
 
     /**
-     * Provides logic for determining if a user is a cluster member or an actual client for SASL
-     * authentication mechanisms
-     */
-    bool isClusterMember() const {
-        return _principalName == internalSecurity.user->getName().getUser().toString() &&
-            getAuthenticationDatabase() == internalSecurity.user->getName().getDB();
-    };
-
-    /**
      * Performs a single step of a SASL exchange. Takes an input provided by a client,
      * and either returns an error, or a response to be sent back.
      */

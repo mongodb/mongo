@@ -39,17 +39,14 @@ const mechStats =
 printjson(mechStats);
 assert(mechStats['SCRAM-SHA-256'] !== undefined);
 Object.keys(mechStats).forEach(function(mech) {
-    const specStats = mechStats[mech].speculativeAuthenticate;
-    const clusterStats = mechStats[mech].clusterAuthenticate;
+    const stats = mechStats[mech].speculativeAuthenticate;
 
     if (mech === 'SCRAM-SHA-256') {
-        assert.gte(specStats.received, 2);
-        assert.gte(clusterStats.received, 2);
+        assert.gte(stats.received, 2);
     } else {
-        assert.eq(specStats.received, 0);
+        assert.eq(stats.received, 0);
     }
-    assert.eq(specStats.received, specStats.successful);
-    assert.eq(clusterStats.received, clusterStats.successful);
+    assert.eq(stats.received, stats.successful);
 });
 
 test(baseURI);
