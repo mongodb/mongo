@@ -8,6 +8,7 @@ const mongod = MongoRunner.runMongod({
     tlsMode: 'requireTLS',
     tlsCertificateKeyFile: 'jstests/libs/server.pem',
     tlsCAFile: 'jstests/libs/ca.pem',
+    clusterAuthMode: "x509",
 });
 const admin = mongod.getDB('admin');
 const external = mongod.getDB('$external');
@@ -26,6 +27,19 @@ function test(uri) {
                                  'jstests/libs/ca.pem',
                                  '--tlsCertificateKeyFile',
                                  'jstests/libs/client.pem',
+                                 uri,
+                                 '--eval',
+                                 ';');
+    assert.eq(0, x509);
+}
+
+function testInternal(uri) {
+    const x509 = runMongoProgram('mongo',
+                                 '--tls',
+                                 '--tlsCAFile',
+                                 'jstests/libs/ca.pem',
+                                 '--tlsCertificateKeyFile',
+                                 'jstests/libs/server.pem',
                                  uri,
                                  '--eval',
                                  ';');
@@ -62,6 +76,24 @@ assertStats(function(mechStats) {
     const stats = mechStats['MONGODB-X509'].speculativeAuthenticate;
     assert.eq(stats.received, 1);
     assert.eq(stats.successful, 1);
+});
+
+// We haven't done any cluster auth yet, so clusterAuthenticate counts should be 0
+assertStats(function(mechStats) {
+    const stats = mechStats['MONGODB-X509'].clusterAuthenticate;
+    assert.eq(stats.received, 0);
+    assert.eq(stats.successful, 0);
+});
+
+// Connect intra-cluster with speculation.
+testInternal(baseURI + '?authMechanism=MONGODB-X509');
+assertStats(function(mechStats) {
+    const specStats = mechStats['MONGODB-X509'].speculativeAuthenticate;
+    const clusterStats = mechStats['MONGODB-X509'].clusterAuthenticate;
+    assert.eq(specStats.received, 2);
+    assert.eq(specStats.successful, 2);
+    assert.eq(clusterStats.received, 1);
+    assert.eq(clusterStats.successful, 1);
 });
 
 MongoRunner.stopMongod(mongod);
