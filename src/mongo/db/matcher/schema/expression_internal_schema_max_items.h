@@ -40,9 +40,14 @@ namespace mongo {
 class InternalSchemaMaxItemsMatchExpression final
     : public InternalSchemaNumArrayItemsMatchExpression {
 public:
-    InternalSchemaMaxItemsMatchExpression(StringData path, long long numItems)
-        : InternalSchemaNumArrayItemsMatchExpression(
-              INTERNAL_SCHEMA_MAX_ITEMS, path, numItems, "$_internalSchemaMaxItems"_sd) {}
+    InternalSchemaMaxItemsMatchExpression(StringData path,
+                                          long long numItems,
+                                          clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : InternalSchemaNumArrayItemsMatchExpression(INTERNAL_SCHEMA_MAX_ITEMS,
+                                                     path,
+                                                     numItems,
+                                                     "$_internalSchemaMaxItems"_sd,
+                                                     std::move(annotation)) {}
 
     bool matchesArray(const BSONObj& anArray, MatchDetails* details) const final {
         return (anArray.nFields() <= numItems());

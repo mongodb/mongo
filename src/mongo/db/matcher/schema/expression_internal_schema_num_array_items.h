@@ -44,7 +44,8 @@ public:
     InternalSchemaNumArrayItemsMatchExpression(MatchType type,
                                                StringData path,
                                                long long numItems,
-                                               StringData name);
+                                               StringData name,
+                                               clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual ~InternalSchemaNumArrayItemsMatchExpression() {}
 

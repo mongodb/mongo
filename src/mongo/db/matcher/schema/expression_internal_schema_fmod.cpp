@@ -37,10 +37,12 @@
 
 namespace mongo {
 
-InternalSchemaFmodMatchExpression::InternalSchemaFmodMatchExpression(StringData path,
-                                                                     Decimal128 divisor,
-                                                                     Decimal128 remainder)
-    : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_FMOD, path),
+InternalSchemaFmodMatchExpression::InternalSchemaFmodMatchExpression(
+    StringData path,
+    Decimal128 divisor,
+    Decimal128 remainder,
+    clonable_ptr<ErrorAnnotation> annotation)
+    : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_FMOD, path, std::move(annotation)),
       _divisor(divisor),
       _remainder(remainder) {
     uassert(ErrorCodes::BadValue, "divisor cannot be 0", !divisor.isZero());

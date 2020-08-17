@@ -40,9 +40,14 @@ namespace mongo {
 class InternalSchemaMinItemsMatchExpression final
     : public InternalSchemaNumArrayItemsMatchExpression {
 public:
-    InternalSchemaMinItemsMatchExpression(StringData path, long long numItems)
-        : InternalSchemaNumArrayItemsMatchExpression(
-              INTERNAL_SCHEMA_MIN_ITEMS, path, numItems, "$_internalSchemaMinItems"_sd) {}
+    InternalSchemaMinItemsMatchExpression(StringData path,
+                                          long long numItems,
+                                          clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : InternalSchemaNumArrayItemsMatchExpression(INTERNAL_SCHEMA_MIN_ITEMS,
+                                                     path,
+                                                     numItems,
+                                                     "$_internalSchemaMinItems"_sd,
+                                                     std::move(annotation)) {}
 
     bool matchesArray(const BSONObj& anArray, MatchDetails* details) const final {
         return (anArray.nFields() >= numItems());

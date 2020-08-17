@@ -43,7 +43,8 @@ public:
     InternalSchemaStrLengthMatchExpression(MatchType type,
                                            StringData path,
                                            long long strLen,
-                                           StringData name);
+                                           StringData name,
+                                           clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual ~InternalSchemaStrLengthMatchExpression() {}
 

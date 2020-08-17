@@ -39,11 +39,15 @@ namespace mongo {
  */
 class InternalSchemaFmodMatchExpression final : public LeafMatchExpression {
 public:
-    InternalSchemaFmodMatchExpression(StringData path, Decimal128 divisor, Decimal128 remainder);
+    InternalSchemaFmodMatchExpression(StringData path,
+                                      Decimal128 divisor,
+                                      Decimal128 remainder,
+                                      clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<InternalSchemaFmodMatchExpression> m =
-            std::make_unique<InternalSchemaFmodMatchExpression>(path(), _divisor, _remainder);
+            std::make_unique<InternalSchemaFmodMatchExpression>(
+                path(), _divisor, _remainder, _errorAnnotation);
         if (getTag()) {
             m->setTag(getTag()->clone());
         }

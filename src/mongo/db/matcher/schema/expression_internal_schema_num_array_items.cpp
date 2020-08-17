@@ -34,8 +34,14 @@
 namespace mongo {
 
 InternalSchemaNumArrayItemsMatchExpression::InternalSchemaNumArrayItemsMatchExpression(
-    MatchType type, StringData path, long long numItems, StringData name)
-    : ArrayMatchingMatchExpression(type, path), _name(name), _numItems(numItems) {}
+    MatchType type,
+    StringData path,
+    long long numItems,
+    StringData name,
+    clonable_ptr<ErrorAnnotation> annotation)
+    : ArrayMatchingMatchExpression(type, path, std::move(std::move(annotation))),
+      _name(name),
+      _numItems(numItems) {}
 
 void InternalSchemaNumArrayItemsMatchExpression::debugString(StringBuilder& debug,
                                                              int indentationLevel) const {

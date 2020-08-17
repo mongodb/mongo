@@ -44,7 +44,11 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/match_expression_walker.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_str_length.h"
 
 namespace mongo::doc_validation_error {
 namespace {
@@ -356,17 +360,65 @@ public:
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
-    void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
-    void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {}
+    void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
+        static constexpr auto kNormalReason = "encrypted value has wrong type";
+        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        if (_context->shouldGenerateError(*expr)) {
+            ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
+            BSONMatchableDocument doc(_context->getCurrentDocument());
+            MatchableDocument::IteratorHolder cursor(&doc, &path);
+            invariant(cursor->more());
+            auto elem = cursor->next().element();
+            // Only generate an error in the normal case since if the value exists and it is
+            // encrypted, in the inverted case, this node's sibling expression will generate an
+            // appropriate error.
+            if (elem.type() == BSONType::BinData && elem.binDataType() == BinDataType::Encrypt &&
+                _context->inversion == InvertError::kNormal) {
+                auto& builder = _context->getCurrentObjBuilder();
+                appendOperatorName(*expr->getErrorAnnotation(), &builder);
+                builder.append("reason", kNormalReason);
+            } else {
+                _context->setCurrentRuntimeState(RuntimeState::kNoError);
+            }
+        }
+    }
+    void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {
+        static constexpr auto kNormalReason = "value was not encrypted";
+        static constexpr auto kInvertedReason = "value was encrypted";
+        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        if (_context->shouldGenerateError(*expr)) {
+            auto& builder = _context->getCurrentObjBuilder();
+            appendOperatorName(*expr->getErrorAnnotation(), &builder);
+            appendErrorReason(*expr, kNormalReason, kInvertedReason);
+        }
+    }
     void visit(const InternalSchemaCondMatchExpression* expr) final {}
     void visit(const InternalSchemaEqMatchExpression* expr) final {}
-    void visit(const InternalSchemaFmodMatchExpression* expr) final {}
+    void visit(const InternalSchemaFmodMatchExpression* expr) final {
+        static constexpr auto kNormalReason =
+            "considered value is not a multiple of the specified value";
+        static constexpr auto kInvertedReason =
+            "considered value is a multiple of the specified value";
+        static const std::set<BSONType> kExpectedTypes{BSONType::NumberLong,
+                                                       BSONType::NumberDouble,
+                                                       BSONType::NumberDecimal,
+                                                       BSONType::NumberInt};
+        generatePathError(*expr,
+                          kNormalReason,
+                          kInvertedReason,
+                          &kExpectedTypes,
+                          LeafArrayBehavior::kNoTraversal);
+    }
     void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {}
-    void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {}
+    void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
+        generateStringLengthError(*expr);
+    }
     void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaMinItemsMatchExpression* expr) final {}
-    void visit(const InternalSchemaMinLengthMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
+        generateStringLengthError(*expr);
+    }
     void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaObjectMatchExpression* expr) final {
         // This node should never be responsible for generating an error directly.
@@ -414,9 +466,11 @@ public:
     void visit(const ModMatchExpression* expr) final {
         static constexpr auto kNormalReason = "$mod did not evaluate to expected remainder";
         static constexpr auto kInvertedReason = "$mod did evaluate to expected remainder";
-        static const std::set<BSONType> expectedTypes{
-            NumberLong, NumberDouble, NumberDecimal, NumberInt};
-        generatePathError(*expr, kNormalReason, kInvertedReason, &expectedTypes);
+        static const std::set<BSONType> kExpectedTypes{BSONType::NumberLong,
+                                                       BSONType::NumberDouble,
+                                                       BSONType::NumberDecimal,
+                                                       BSONType::NumberInt};
+        generatePathError(*expr, kNormalReason, kInvertedReason, &kExpectedTypes);
     }
     void visit(const NorMatchExpression* expr) final {
         preVisitTreeOperator(expr);
@@ -442,8 +496,9 @@ public:
     void visit(const RegexMatchExpression* expr) final {
         static constexpr auto kNormalReason = "regular expression did not match";
         static constexpr auto kInvertedReason = "regular expression did match";
-        static const std::set<BSONType> expectedTypes{String, Symbol, RegEx};
-        generatePathError(*expr, kNormalReason, kInvertedReason, &expectedTypes);
+        static const std::set<BSONType> kExpectedTypes{
+            BSONType::String, BSONType::Symbol, BSONType::RegEx};
+        generatePathError(*expr, kNormalReason, kInvertedReason, &kExpectedTypes);
     }
     void visit(const SizeMatchExpression* expr) final {
         static constexpr auto kNormalReason = "array length was not equal to given size";
@@ -713,6 +768,14 @@ private:
         }
     }
 
+    void generateStringLengthError(const InternalSchemaStrLengthMatchExpression& expr) {
+        static constexpr auto kNormalReason = "specified string length was not satisfied";
+        static constexpr auto kInvertedReason = "specified string length was satisfied";
+        static const std::set<BSONType> expectedTypes{BSONType::String};
+        generatePathError(
+            expr, kNormalReason, kInvertedReason, &expectedTypes, LeafArrayBehavior::kNoTraversal);
+    }
+
     ValidationErrorContext* _context;
 };
 
@@ -873,17 +936,27 @@ public:
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
-    void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
-    void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {}
+    void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
+    void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaCondMatchExpression* expr) final {}
     void visit(const InternalSchemaEqMatchExpression* expr) final {}
-    void visit(const InternalSchemaFmodMatchExpression* expr) final {}
+    void visit(const InternalSchemaFmodMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {}
-    void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {}
+    void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaMinItemsMatchExpression* expr) final {}
-    void visit(const InternalSchemaMinLengthMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaObjectMatchExpression* expr) final {
         _context->finishCurrentError(expr);

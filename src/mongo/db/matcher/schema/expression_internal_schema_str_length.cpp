@@ -35,11 +35,13 @@
 
 namespace mongo {
 
-InternalSchemaStrLengthMatchExpression::InternalSchemaStrLengthMatchExpression(MatchType type,
-                                                                               StringData path,
-                                                                               long long strLen,
-                                                                               StringData name)
-    : LeafMatchExpression(type, path), _name(name), _strLen(strLen) {}
+InternalSchemaStrLengthMatchExpression::InternalSchemaStrLengthMatchExpression(
+    MatchType type,
+    StringData path,
+    long long strLen,
+    StringData name,
+    clonable_ptr<ErrorAnnotation> annotation)
+    : LeafMatchExpression(type, path, std::move(annotation)), _name(name), _strLen(strLen) {}
 
 void InternalSchemaStrLengthMatchExpression::debugString(StringBuilder& debug,
                                                          int indentationLevel) const {

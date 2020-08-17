@@ -287,11 +287,13 @@ StatusWithMatchExpression parseLength(const boost::intrusive_ptr<ExpressionConte
         return parsedLength.getStatus();
     }
 
+    auto annotation = doc_validation_error::createAnnotation(
+        expCtx, length.fieldNameStringData().toString(), length.wrap());
     if (path.empty()) {
-        return {std::make_unique<AlwaysTrueMatchExpression>()};
+        return {std::make_unique<AlwaysTrueMatchExpression>(std::move(annotation))};
     }
 
-    auto expr = std::make_unique<T>(path, parsedLength.getValue());
+    auto expr = std::make_unique<T>(path, parsedLength.getValue(), std::move(annotation));
     return makeRestriction(expCtx, restrictionType, path, std::move(expr), typeExpr);
 }
 
@@ -306,13 +308,16 @@ StatusWithMatchExpression parsePattern(const boost::intrusive_ptr<ExpressionCont
                            << "' must be a string")};
     }
 
+    auto annotation = doc_validation_error::createAnnotation(
+        expCtx, pattern.fieldNameStringData().toString(), pattern.wrap());
     if (path.empty()) {
-        return {std::make_unique<AlwaysTrueMatchExpression>()};
+        return {std::make_unique<AlwaysTrueMatchExpression>(std::move(annotation))};
     }
 
     // JSON Schema does not allow regex flags to be specified.
     constexpr auto emptyFlags = "";
-    auto expr = std::make_unique<RegexMatchExpression>(path, pattern.valueStringData(), emptyFlags);
+    auto expr = std::make_unique<RegexMatchExpression>(
+        path, pattern.valueStringData(), emptyFlags, std::move(annotation));
 
     return makeRestriction(expCtx, BSONType::String, path, std::move(expr), typeExpr);
 }
@@ -334,12 +339,14 @@ StatusWithMatchExpression parseMultipleOf(const boost::intrusive_ptr<ExpressionC
                            << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaMultipleOfKeyword
                            << "' must have a positive value")};
     }
+    auto annotation = doc_validation_error::createAnnotation(
+        expCtx, multipleOf.fieldNameStringData().toString(), multipleOf.wrap());
     if (path.empty()) {
-        return {std::make_unique<AlwaysTrueMatchExpression>()};
+        return {std::make_unique<AlwaysTrueMatchExpression>(std::move(annotation))};
     }
 
     auto expr = std::make_unique<InternalSchemaFmodMatchExpression>(
-        path, multipleOf.numberDecimal(), Decimal128(0));
+        path, multipleOf.numberDecimal(), Decimal128(0), std::move(annotation));
 
     MatcherTypeSet restrictionType;
     restrictionType.allNumbers = true;
@@ -1465,11 +1472,19 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
             auto encryptInfo = EncryptionInfo::parse(encryptCtxt, encryptElt.embeddedObject());
             auto infoType = encryptInfo.getBsonType();
 
-            andExpr->add(new InternalSchemaBinDataSubTypeExpression(path, BinDataType::Encrypt));
+            andExpr->add(new InternalSchemaBinDataSubTypeExpression(
+                path,
+                BinDataType::Encrypt,
+                doc_validation_error::createAnnotation(
+                    expCtx, encryptElt.fieldNameStringData().toString(), BSONObj())));
 
-            if (auto typeOptional = infoType)
+            if (auto typeOptional = infoType) {
                 andExpr->add(new InternalSchemaBinDataEncryptedTypeExpression(
-                    path, typeOptional->typeSet()));
+                    path,
+                    typeOptional->typeSet(),
+                    doc_validation_error::createAnnotation(
+                        expCtx, encryptElt.fieldNameStringData().toString(), BSONObj())));
+            }
         } catch (const AssertionException&) {
             return exceptionToStatus();
         }
@@ -1624,8 +1639,10 @@ StatusWithMatchExpression _parse(const boost::intrusive_ptr<ExpressionContext>& 
     } else if (encryptElem) {
         // The presence of the encrypt keyword implies the restriction that the field must be
         // of type BinData.
-        typeExpr =
-            std::make_unique<InternalSchemaTypeExpression>(path, MatcherTypeSet(BSONType::BinData));
+        typeExpr = std::make_unique<InternalSchemaTypeExpression>(
+            path,
+            MatcherTypeSet(BSONType::BinData),
+            doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
     }
 
     auto andExpr = std::make_unique<AndMatchExpression>(
