@@ -639,11 +639,8 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
         const auto& doc = it->doc;
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
-            // Generate a corrupted copy of 'obj' that is half the size of the source doc.
-            std::vector<char> copyBuffer(doc.objsize() / 2);
-            std::memcpy(&copyBuffer[0], doc.objdata(), copyBuffer.size());
-
-            records.emplace_back(Record{RecordId(), RecordData(&copyBuffer[0], copyBuffer.size())});
+            // Insert a truncated record that is half the expected size of the source document.
+            records.emplace_back(Record{RecordId(), RecordData(doc.objdata(), doc.objsize() / 2)});
             timestamps.emplace_back(it->oplogSlot.getTimestamp());
             continue;
         }
