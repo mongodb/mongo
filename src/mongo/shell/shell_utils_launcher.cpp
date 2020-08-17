@@ -63,6 +63,7 @@
 
 #include "mongo/base/environment_buffer.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/logv2/log.h"
@@ -763,8 +764,15 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = nullptr) {
 #endif
 }
 
+// Output up to BSONObjMaxUserSize characters of the most recent log output in order to
+// avoid hitting the 16MB size limit of a BSONObject.
 BSONObj RawMongoProgramOutput(const BSONObj& args, void* data) {
-    return BSON("" << programOutputLogger.str());
+    std::string programLog = programOutputLogger.str();
+    std::size_t sz = programLog.size();
+    const string& outputStr =
+        sz > BSONObjMaxUserSize ? programLog.substr(sz - BSONObjMaxUserSize) : programLog;
+
+    return BSON("" << outputStr);
 }
 
 BSONObj ClearRawMongoProgramOutput(const BSONObj& args, void* data) {
