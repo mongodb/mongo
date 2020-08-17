@@ -2963,14 +2963,19 @@ def doConfigure(myenv):
                 # the benefits of libunwind. Fixing this is:
                 env.FatalError("Cannot use libunwind with TSAN, please add --use-libunwind=off to your compile flags")
 
-            # If anything is changed, added, or removed in tsan_options, be sure
-            # to make the corresponding changes to the appropriate build
-            # variants in etc/evergreen.yml
-            # die_after_fork=0 is a temporary setting to allow tests to continue while we figure out why
-            # we're running afoul of it. If we remove it here, it also needs to be removed from the test
-            # variant in etc/evergreen.yml
-            # TODO: https://jira.mongodb.org/browse/SERVER-49121
-            tsan_options += "die_after_fork=0:suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
+            # If anything is changed, added, or removed in
+            # tsan_options, be sure to make the corresponding changes
+            # to the appropriate build variants in etc/evergreen.yml
+            #
+            # TODO SERVER-49121: die_after_fork=0 is a temporary
+            # setting to allow tests to continue while we figure out
+            # why we're running afoul of it.
+            #
+            # TODO SERVER-48490: report_thread_leaks=0 suppresses
+            # reporting thread leaks, which we have because we don't
+            # do a clean shutdown of the ServiceContext.
+            #
+            tsan_options += "halt_on_error=1:report_thread_leaks=0:die_after_fork=0:suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
             myenv['ENV']['TSAN_OPTIONS'] = tsan_options
             myenv.AppendUnique(CPPDEFINES=['THREAD_SANITIZER'])
 

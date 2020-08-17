@@ -12330,9 +12330,18 @@ buildvariants:
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
     variant_path_suffix: /opt/mongodbtoolchain/v3/bin
     lang_environment: LANG=C
-    # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
-    san_options: TSAN_OPTIONS="die_after_fork=0:suppressions=etc/tsan.suppressions:halt_on_error=1"
+    # If you add anything to san_options, make sure the appropriate
+    # changes are also made to SConstruct.
+    #
+    # TODO SERVER-49121: die_after_fork=0 is a temporary setting to
+    # allow tests to continue while we figure out why we're running
+    # afoul of it.
+    #
+    # TODO SERVER-48490: report_thread_leaks=0 suppresses reporting
+    # thread leaks, which we have because we don't do a clean shutdown
+    # of the ServiceContext.
+    #
+    san_options: TSAN_OPTIONS="halt_on_error=1:report_thread_leaks=0:die_after_fork=0:suppressions=etc/tsan.suppressions"
     # TODO: Remove some of the excluded tags when the ephemeralForTest storage engine is
     # further along in development: https://jira.mongodb.org/browse/SERVER-48325
     test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_journaling,uses_transactions,requires_wiredtiger,requires_snapshot_read
