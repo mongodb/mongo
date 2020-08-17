@@ -179,15 +179,19 @@ class LibdepLinter(object):
         else:
             raise LibdepLinterError(message)
 
-    def _check_for_lint_tags(self, lint_tag, env=None):
+    def _check_for_lint_tags(self, lint_tag, env=None, inclusive_tag=False):
         """
         Used to get the lint tag from the environment,
         and if printing instead of raising exceptions,
         will ignore the tags.
         """
 
-        # ignore LIBDEP_TAGS if printing was selected
-        if self.__class__.print_linter_errors:
+        # If print mode is on, we want to make sure to bypass checking
+        # exclusive tags so we can make sure the exceptions are not excluded
+        # and are printed. If it's an inclusive tag, we want to ignore this
+        # early return completely, because we want to make sure the node
+        # gets included for checking, and the exception gets printed.
+        if not inclusive_tag and self.__class__.print_linter_errors:
             return False
 
         target_env = env if env else self.env
@@ -201,6 +205,29 @@ class LibdepLinter(object):
         deps_dependents = target_env.get(Constants.LibdepsDependents, [])
         deps_dependents += target_env.get(Constants.ProgdepsDependents, [])
         return deps_dependents
+
+    @linter_rule
+    def linter_rule_leaf_node_no_deps(self, libdep):
+        """
+        LIBDEP RULE:
+            Nodes marked explicitly as a leaf node should not have any dependencies,
+            unless those dependencies are explicitly marked as allowed as leaf node
+            dependencies.
+        """
+        if not self._check_for_lint_tags('lint-leaf-node-no-deps', inclusive_tag=True):
+            return
+
+        # Ignore dependencies that explicitly exempt themselves.
+        if self._check_for_lint_tags('lint-leaf-node-allowed-dep', libdep.target_node.env):
+            return
+
+        target_type = self.target[0].builder.get_name(self.env)
+        lib = os.path.basename(str(libdep))
+        self._raise_libdep_lint_exception(
+            textwrap.dedent(f"""\
+                {target_type} '{self.target[0]}' has dependency '{lib}' and is marked explicitly as a leaf node,
+                and '{lib}' does not exempt itself as an exception to the rule."""
+            ))
 
     @linter_rule
     def linter_rule_no_dups(self, libdep):

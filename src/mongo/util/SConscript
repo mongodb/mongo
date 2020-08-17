@@ -71,8 +71,10 @@ env.Library(
     source=[
         'boost_assert_shim.cpp'
     ],
-    # NOTE: This library *must not* depend on any mongodb code
-    LIBDEPS=[],
+    LIBDEPS_TAGS=[
+        # NOTE: This library *must not* depend on any mongodb code
+        'lint-leaf-node-no-deps',
+    ],
 )
 
 env.SConscript(

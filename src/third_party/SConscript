@@ -543,6 +543,13 @@ gperftoolsEnv.Library(
         "shim_allocator.cpp",
     ],
     DISABLE_ALLOCATOR_SHIM_INJECTION=True,
+    LIBDEPS_TAGS=[
+        # The shim allocator must be linked to every node, including what would
+        # be considered a leaf node to ensure the system allocator
+        # is not linked in before tcmalloc. This tag allows nodes tagged as
+        # leaf nodes to still get the correct allocator.
+        'lint-leaf-node-allowed-dep'
+    ],
 )
 
 
