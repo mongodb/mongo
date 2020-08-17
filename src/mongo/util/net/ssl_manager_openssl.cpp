@@ -1998,6 +1998,7 @@ void OCSPFetcher::shutdown() {
 
     if (_ocspStaplingAnchor.isValid()) {
         _ocspStaplingAnchor.stop();
+        _ocspStaplingAnchor.detach();
     }
 }
 
