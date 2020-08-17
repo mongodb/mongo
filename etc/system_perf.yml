@@ -1564,6 +1564,26 @@ buildvariants:
     - name: sb_large_scale
     - name: sb_timeseries
 
+- name: linux-3-node-replSet-last-continuous-fcv
+  display_name: Linux 3-Node ReplSet (Last Continuous FCV)
+  batchtime: 10080 # 7 days
+  modules: *modules
+  expansions:
+    setup: replica-last-continuous-fcv
+    cluster: replica
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-replset"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
+  tasks: *3nodetasks
+
 - name: linux-3-node-replSet-noflowcontrol
   display_name: Linux 3-Node ReplSet (Flow Control off)
   batchtime: 10080  # 7 days
