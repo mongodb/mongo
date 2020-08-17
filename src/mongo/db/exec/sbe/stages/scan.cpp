@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/scan.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -130,6 +131,9 @@ void ScanStage::doRestoreState() {
 
     _coll.emplace(_opCtx, _name);
 
+    uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
+        _opCtx, _coll->getNss(), true));
+
     if (_cursor) {
         const bool couldRestore = _cursor->restore();
         uassert(ErrorCodes::CappedPositionLost,
@@ -158,6 +162,9 @@ void ScanStage::open(bool reOpen) {
         invariant(!_cursor);
         invariant(!_coll);
         _coll.emplace(_opCtx, _name);
+
+        uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
+            _opCtx, _coll->getNss(), true));
     } else {
         invariant(_cursor);
         invariant(_coll);
@@ -401,6 +408,9 @@ void ParallelScanStage::doRestoreState() {
 
     _coll.emplace(_opCtx, _name);
 
+    uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
+        _opCtx, _coll->getNss(), true));
+
     if (_cursor) {
         const bool couldRestore = _cursor->restore();
         uassert(ErrorCodes::CappedPositionLost,
@@ -429,6 +439,10 @@ void ParallelScanStage::open(bool reOpen) {
     invariant(!_cursor);
     invariant(!_coll);
     _coll.emplace(_opCtx, _name);
+
+    uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
+        _opCtx, _coll->getNss(), true));
+
     auto collection = _coll->getCollection();
 
     if (collection) {

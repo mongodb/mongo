@@ -35,6 +35,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/repl/replication_coordinator.h"
 
 namespace mongo::sbe {
 IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
@@ -137,6 +138,9 @@ void IndexScanStage::doRestoreState() {
 
     _coll.emplace(_opCtx, _name);
 
+    uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
+        _opCtx, _coll->getNss(), true));
+
     if (_cursor) {
         _cursor->restore();
     }
@@ -161,6 +165,9 @@ void IndexScanStage::open(bool reOpen) {
         invariant(!_cursor);
         invariant(!_coll);
         _coll.emplace(_opCtx, _name);
+
+        uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
+            _opCtx, _coll->getNss(), true));
     } else {
         invariant(_cursor);
         invariant(_coll);
