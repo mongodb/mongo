@@ -79,7 +79,6 @@ protected:
     void doRestoreStateRequiresCollection() final;
 
 private:
-    OperationContext* _opCtx;
     std::vector<std::unique_ptr<RecordCursor>> _iterators;
 
     // Not owned by us.
