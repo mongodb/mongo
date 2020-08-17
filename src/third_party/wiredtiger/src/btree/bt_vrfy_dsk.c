@@ -561,9 +561,10 @@ __verify_dsk_row_leaf(
          */
         prefix = unpack->prefix;
         if (last_pfx->size == 0 && prefix != 0)
-            WT_ERR_VRFY(session, "the %" PRIu32
-                                 " key on page at %s is the first non-overflow key on the page and "
-                                 "has a non-zero prefix compression value",
+            WT_ERR_VRFY(session,
+              "the %" PRIu32
+              " key on page at %s is the first non-overflow key on the page and has a non-zero "
+              "prefix compression value",
               cell_num, tag);
 
         /* Confirm the prefix compression count is possible. */
@@ -795,9 +796,10 @@ __verify_dsk_col_var(
         } else if (cell_type == WT_CELL_VALUE && last.data != NULL && last.size == unpack->size &&
           memcmp(last.data, unpack->data, last.size) == 0)
 match_err:
-        WT_RET_VRFY(session, "data entries %" PRIu32 " and %" PRIu32
-                             " on page at %s are identical and should have been run-length encoded",
-          cell_num - 1, cell_num, tag);
+            WT_RET_VRFY(session,
+              "data entries %" PRIu32 " and %" PRIu32
+              " on page at %s are identical and should have been run-length encoded",
+              cell_num - 1, cell_num, tag);
 
         WT_TIME_WINDOW_COPY(&last.tw, &unpack->tw);
         switch (cell_type) {
@@ -954,8 +956,9 @@ __err_cell_type(WT_SESSION_IMPL *session, uint32_t entry_num, const char *tag, u
   uint8_t dsk_type)
 {
     if (!__wt_cell_type_check(cell_type, dsk_type))
-        WT_RET_VRFY(session, "illegal cell and page type combination: cell %" PRIu32
-                             " on page at %s is a %s cell on a %s page",
+        WT_RET_VRFY(session,
+          "illegal cell and page type combination: cell %" PRIu32
+          " on page at %s is a %s cell on a %s page",
           entry_num, tag, __wt_cell_type_string(cell_type), __wt_page_type_string(dsk_type));
     return (0);
 }

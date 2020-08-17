@@ -472,8 +472,9 @@ __verify_tree(
     case WT_PAGE_COL_INT:
     case WT_PAGE_COL_VAR:
         if (ref->ref_recno != vs->records_so_far + 1)
-            WT_RET_MSG(session, WT_ERROR, "page at %s has a starting record of %" PRIu64
-                                          " when the expected starting record is %" PRIu64,
+            WT_RET_MSG(session, WT_ERROR,
+              "page at %s has a starting record of %" PRIu64
+              " when the expected starting record is %" PRIu64,
               __verify_addr_string(session, ref, vs->tmp1), ref->ref_recno, vs->records_so_far + 1);
         break;
     }
@@ -522,10 +523,10 @@ __verify_tree(
     case WT_PAGE_ROW_INT:
         if (addr_unpack->raw != WT_CELL_ADDR_INT)
 celltype_err:
-        WT_RET_MSG(session, WT_ERROR,
-          "page at %s, of type %s, is referenced in its parent by a cell of type %s",
-          __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(page->type),
-          __wt_cell_type_string(addr_unpack->raw));
+            WT_RET_MSG(session, WT_ERROR,
+              "page at %s, of type %s, is referenced in its parent by a cell of type %s",
+              __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(page->type),
+              __wt_cell_type_string(addr_unpack->raw));
         break;
     }
 
@@ -623,9 +624,10 @@ __verify_row_int_key_order(
     /* Compare the key against the largest key we've seen so far. */
     WT_RET(__wt_compare(session, btree->collator, &item, vs->max_key, &cmp));
     if (cmp <= 0)
-        WT_RET_MSG(session, WT_ERROR, "the internal key in entry %" PRIu32
-                                      " on the page at %s sorts before the last key appearing on "
-                                      "page %s, earlier in the tree: %s, %s",
+        WT_RET_MSG(session, WT_ERROR,
+          "the internal key in entry %" PRIu32
+          " on the page at %s sorts before the last key appearing on page %s, earlier in the tree: "
+          "%s, %s",
           entry, __verify_addr_string(session, ref, vs->tmp1), (char *)vs->max_addr->data,
           __wt_buf_set_printable(session, item.data, item.size, vs->tmp2),
           __wt_buf_set_printable(session, vs->max_key->data, vs->max_key->size, vs->tmp3));
@@ -875,8 +877,9 @@ __verify_page_content_int(
         ++cell_num;
 
         if (!__wt_cell_type_check(unpack.type, dsk->type))
-            WT_RET_MSG(session, WT_ERROR, "illegal cell and page type combination: cell %" PRIu32
-                                          " on page at %s is a %s cell on a %s page",
+            WT_RET_MSG(session, WT_ERROR,
+              "illegal cell and page type combination: cell %" PRIu32
+              " on page at %s is a %s cell on a %s page",
               cell_num - 1, __verify_addr_string(session, ref, vs->tmp1),
               __wt_cell_type_string(unpack.type), __wt_page_type_string(dsk->type));
 
@@ -950,8 +953,9 @@ __verify_page_content_leaf(
         ++cell_num;
 
         if (!__wt_cell_type_check(unpack.type, dsk->type))
-            WT_RET_MSG(session, WT_ERROR, "illegal cell and page type combination: cell %" PRIu32
-                                          " on page at %s is a %s cell on a %s page",
+            WT_RET_MSG(session, WT_ERROR,
+              "illegal cell and page type combination: cell %" PRIu32
+              " on page at %s is a %s cell on a %s page",
               cell_num - 1, __verify_addr_string(session, ref, vs->tmp1),
               __wt_cell_type_string(unpack.type), __wt_page_type_string(dsk->type));
 

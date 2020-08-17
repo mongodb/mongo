@@ -14,7 +14,6 @@ skip	dist/log_data.py
 skip	dist/prototypes.py
 skip	dist/s_comment.py
 skip	dist/s_function_loop.py
-skip	dist/s_goto.py
 skip	dist/stat.py
 skip	dist/stat_data.py
 skip	dist/style.py

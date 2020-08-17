@@ -259,7 +259,7 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rl
           "obsolete, stop time point %s",
           (void *)ref, obsolete ? "" : "not ",
           __wt_time_point_to_string(
-                       newest_stop_ts, newest_stop_durable_ts, newest_stop_txn, tp_string));
+            newest_stop_ts, newest_stop_durable_ts, newest_stop_txn, tp_string));
         return (0);
     }
     WT_REF_UNLOCK(ref, previous_state);
@@ -334,7 +334,7 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_LIST *rl
       "obsolete, stop time point %s",
       (void *)ref, tag, obsolete ? "" : "not ",
       __wt_time_point_to_string(
-                   newest_stop_ts, newest_stop_durable_ts, newest_stop_txn, tp_string));
+        newest_stop_ts, newest_stop_durable_ts, newest_stop_txn, tp_string));
 
 err:
     if (hazard)

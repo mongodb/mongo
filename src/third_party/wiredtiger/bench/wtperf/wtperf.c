@@ -868,15 +868,11 @@ op_err:
                 if (ret == WT_ROLLBACK && ops_per_txn == 0) {
                     lprintf(wtperf, ret, 1, "log-table: ROLLBACK");
                     if ((ret = session->rollback_transaction(session, NULL)) != 0) {
-                        lprintf(wtperf, ret, 0,
-                          "Failed"
-                          " rollback_transaction");
+                        lprintf(wtperf, ret, 0, "Failed rollback_transaction");
                         goto err;
                     }
                     if ((ret = session->begin_transaction(session, NULL)) != 0) {
-                        lprintf(wtperf, ret, 0,
-                          "Worker begin "
-                          "transaction failed");
+                        lprintf(wtperf, ret, 0, "Worker begin transaction failed");
                         goto err;
                     }
                 } else
@@ -1409,10 +1405,9 @@ monitor(void *arg)
         cur_updates = (updates - last_updates) / opts->sample_interval;
 
         (void)fprintf(fp,
-          "%s,%" PRIu32 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
-          ",%c,%c"
+          "%s,%" PRIu32 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%c,%c,%" PRIu32
           ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
-          ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "\n",
+          ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "\n",
           buf, wtperf->totalsec, cur_inserts, cur_modifies, cur_reads, cur_updates,
           wtperf->ckpt ? 'Y' : 'N', wtperf->scan ? 'Y' : 'N', insert_avg, insert_min, insert_max,
           modify_avg, modify_min, modify_max, read_avg, read_min, read_max, update_avg, update_min,
@@ -1437,8 +1432,9 @@ monitor(void *arg)
               ",\"modify\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
               ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
               cur_modifies, modify_avg, modify_min, modify_max);
-            (void)fprintf(jfp, ",\"read\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
-                               ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
+            (void)fprintf(jfp,
+              ",\"read\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
+              ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
               cur_reads, read_avg, read_min, read_max);
             (void)fprintf(jfp,
               ",\"update\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
@@ -1447,8 +1443,9 @@ monitor(void *arg)
             fprintf(jfp, "}}\n");
         }
 
-        if (latency_max != 0 && (insert_max > latency_max || modify_max > latency_max ||
-                                  read_max > latency_max || update_max > latency_max)) {
+        if (latency_max != 0 &&
+          (insert_max > latency_max || modify_max > latency_max || read_max > latency_max ||
+            update_max > latency_max)) {
             if (opts->max_latency_fatal) {
                 level = 1;
                 msg_err = WT_PANIC;
@@ -1463,10 +1460,11 @@ monitor(void *arg)
               " modify max %" PRIu32 " read max %" PRIu32 " update max %" PRIu32,
               str, latency_max, insert_max, modify_max, read_max, update_max);
         }
-        if (min_thr != 0 && ((cur_inserts != 0 && cur_inserts < min_thr) ||
-                              (cur_modifies != 0 && cur_modifies < min_thr) ||
-                              (cur_reads != 0 && cur_reads < min_thr) ||
-                              (cur_updates != 0 && cur_updates < min_thr))) {
+        if (min_thr != 0 &&
+          ((cur_inserts != 0 && cur_inserts < min_thr) ||
+            (cur_modifies != 0 && cur_modifies < min_thr) ||
+            (cur_reads != 0 && cur_reads < min_thr) ||
+            (cur_updates != 0 && cur_updates < min_thr))) {
             if (opts->min_throughput_fatal) {
                 level = 1;
                 msg_err = WT_PANIC;
@@ -1645,10 +1643,7 @@ scan_worker(void *arg)
             generate_key(opts, key_buf, cur_id);
             cursor->set_key(cursor, key_buf);
             if ((ret = cursor->search(cursor)) != 0) {
-                lprintf(wtperf, ret, 0,
-                  "Failed scan search "
-                  "key %s, items %d",
-                  key_buf, (int)items);
+                lprintf(wtperf, ret, 0, "Failed scan search key %s, items %d", key_buf, (int)items);
                 goto err;
             }
 
@@ -1731,8 +1726,9 @@ execute_populate(WTPERF *wtperf)
         interval = 0;
         wtperf->totalsec += opts->report_interval;
         wtperf->insert_ops = sum_pop_ops(wtperf);
-        lprintf(wtperf, 0, 1, "%" PRIu64 " populate inserts (%" PRIu64 " of %" PRIu32
-                              ") in %" PRIu32 " secs (%" PRIu32 " total secs)",
+        lprintf(wtperf, 0, 1,
+          "%" PRIu64 " populate inserts (%" PRIu64 " of %" PRIu32 ") in %" PRIu32 " secs (%" PRIu32
+          " total secs)",
           wtperf->insert_ops - last_ops, wtperf->insert_ops, opts->icount, opts->report_interval,
           wtperf->totalsec);
         last_ops = wtperf->insert_ops;
@@ -2523,9 +2519,7 @@ extern char *__wt_optarg;
 static void
 usage(void)
 {
-    printf(
-      "wtperf [-C config] "
-      "[-h home] [-O file] [-o option] [-T config]\n");
+    printf("wtperf [-C config] [-h home] [-O file] [-o option] [-T config]\n");
     printf("\t-C <string> additional connection configuration\n");
     printf("\t            (added to option conn_config)\n");
     printf("\t-h <string> Wired Tiger home must exist, default WT_TEST\n");

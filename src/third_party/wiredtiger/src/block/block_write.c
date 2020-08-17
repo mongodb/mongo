@@ -118,7 +118,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FH *fh, wt_off_t
      */
     if (block->extend_size > block->size &&
       (offset > block->extend_size ||
-          offset + block->extend_len + (wt_off_t)align_size < block->extend_size))
+        offset + block->extend_len + (wt_off_t)align_size < block->extend_size))
         return (0);
 
     /*

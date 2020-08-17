@@ -143,9 +143,7 @@ __config_merge_scan(
          */
         for (len = 0; len < k.len; ++len)
             if (k.str[len] == SEPC)
-                WT_ERR_MSG(session, EINVAL,
-                  "key %.*s contains a '%c' separator "
-                  "character",
+                WT_ERR_MSG(session, EINVAL, "key %.*s contains a '%c' separator character",
                   (int)k.len, (char *)k.str, SEPC);
 
         /* Build the key/value strings. */

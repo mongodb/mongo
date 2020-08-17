@@ -57,11 +57,12 @@ main(int argc, char *argv[])
         const char *uri;
         const char *desc;
         const char *config;
-    } * cp, configs[] = {{"file:wt", NULL, NULL}, {"table:wt", NULL, NULL},
+    } * cp,
+      configs[] = {{"file:wt", NULL, NULL}, {"table:wt", NULL, NULL},
 /* Configure for a modest cache size. */
 #define LSM_CONFIG "lsm=(chunk_size=1m,merge_max=2),leaf_page_max=4k"
-              {"lsm:wt", NULL, LSM_CONFIG}, {"table:wt", " [lsm]", "type=lsm," LSM_CONFIG},
-              {NULL, NULL, NULL}};
+        {"lsm:wt", NULL, LSM_CONFIG}, {"table:wt", " [lsm]", "type=lsm," LSM_CONFIG},
+        {NULL, NULL, NULL}};
     u_int nthreads;
     int ch, cnt, runs;
     char *config_open, *working_dir;
@@ -150,9 +151,8 @@ wt_startup(char *config_open)
     testutil_make_work_dir(home);
 
     testutil_check(__wt_snprintf(config_buf, sizeof(config_buf),
-      "create,error_prefix=\"%s\",cache_size=5MB%s%s,"
-      "operation_tracking=(enabled=false)",
-      progname, config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
+      "create,error_prefix=\"%s\",cache_size=5MB%s%s,operation_tracking=(enabled=false)", progname,
+      config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
     testutil_check(wiredtiger_open(home, &event_handler, config_buf, &conn));
 }
 
@@ -233,9 +233,7 @@ static int
 usage(void)
 {
     fprintf(stderr,
-      "usage: %s "
-      "[-C wiredtiger-config] [-l log] [-n ops] [-r runs] [-t threads] "
-      "[-x] \n",
+      "usage: %s [-C wiredtiger-config] [-l log] [-n ops] [-r runs] [-t threads] [-x] \n",
       progname);
     fprintf(stderr, "%s",
       "\t-C specify wiredtiger_open configuration arguments\n"

@@ -116,7 +116,7 @@ util_str2num(WT_SESSION *session, const char *p, bool endnul, uint64_t *vp)
      */
     if (endnul && endptr[0] != '\0')
 format:
-    return (util_err(session, EINVAL, "%s: invalid number", p));
+        return (util_err(session, EINVAL, "%s: invalid number", p));
 
     *vp = v;
     return (0);

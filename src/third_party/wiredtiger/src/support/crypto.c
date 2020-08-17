@@ -27,9 +27,8 @@ __wt_decrypt(
 #endif
 
     if (encrypt_len > in->size)
-        WT_RET_MSG(session, WT_ERROR,
-          "corrupted encrypted item: padded size less than "
-          "actual size");
+        WT_RET_MSG(
+          session, WT_ERROR, "corrupted encrypted item: padded size less than actual size");
     /*
      * We're allocating the number of bytes we're expecting from decryption plus the unencrypted
      * header.

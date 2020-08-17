@@ -116,14 +116,14 @@ __wt_verbose_dump_log(WT_SESSION_IMPL *session)
     WT_RET(__wt_msg(session, "Pre-allocate files: %s", conn->log_prealloc > 0 ? "yes" : "no"));
     WT_RET(__wt_msg(session, "Logging directory: %s", conn->log_path));
     WT_RET(__wt_msg(session, "Logging maximum file size: %" PRId64, (int64_t)conn->log_file_max));
-    WT_RET(
-      __wt_msg(session, "Log sync setting: %s", !FLD_ISSET(conn->txn_logsync, WT_LOG_SYNC_ENABLED) ?
-          "none" :
-          FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC) ?
-          "dsync" :
-          FLD_ISSET(conn->txn_logsync, WT_LOG_FLUSH) ?
-          "write to OS" :
-          FLD_ISSET(conn->txn_logsync, WT_LOG_FSYNC) ? "fsync to disk" : "unknown sync setting"));
+    WT_RET(__wt_msg(session, "Log sync setting: %s",
+      !FLD_ISSET(conn->txn_logsync, WT_LOG_SYNC_ENABLED) ?
+        "none" :
+        FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC) ?
+        "dsync" :
+        FLD_ISSET(conn->txn_logsync, WT_LOG_FLUSH) ?
+        "write to OS" :
+        FLD_ISSET(conn->txn_logsync, WT_LOG_FSYNC) ? "fsync to disk" : "unknown sync setting"));
     WT_RET(__wt_msg(session, "Log record allocation alignment: %" PRIu32, log->allocsize));
     WT_RET(__wt_msg(session, "Current log file number: %" PRIu32, log->fileid));
     WT_RET(__wt_msg(session, "Current log version number: %" PRIu16, log->log_version));

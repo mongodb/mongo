@@ -359,9 +359,8 @@ __wt_meta_block_metadata(WT_SESSION_IMPL *session, const char *config, WT_CKPT *
      */
     WT_ERR(__wt_config_gets(session, filecfg, "encryption", &cval));
     WT_ERR(__wt_buf_fmt(session, b,
-      "encryption=%.*s,"
-      "block_metadata_encrypted=%s,block_metadata=[%.*s]",
-      (int)cval.len, cval.str, kencryptor == NULL ? "false" : "true", (int)metadata_len, metadata));
+      "encryption=%.*s,block_metadata_encrypted=%s,block_metadata=[%.*s]", (int)cval.len, cval.str,
+      kencryptor == NULL ? "false" : "true", (int)metadata_len, metadata));
     WT_ERR(__wt_strndup(session, b->data, b->size, &ckpt->block_metadata));
 
 err:
@@ -973,9 +972,8 @@ __ckpt_version_chk(WT_SESSION_IMPL *session, const char *fname, const char *conf
       (majorv == WT_BTREE_MAJOR_VERSION_MIN && minorv < WT_BTREE_MINOR_VERSION_MIN) ||
       (majorv == WT_BTREE_MAJOR_VERSION_MAX && minorv > WT_BTREE_MINOR_VERSION_MAX))
         WT_RET_MSG(session, EACCES,
-          "%s is an unsupported WiredTiger source file version %d.%d"
-          "; this WiredTiger build only supports versions from %d.%d "
-          "to %d.%d",
+          "%s is an unsupported WiredTiger source file version %d.%d; this WiredTiger build only "
+          "supports versions from %d.%d to %d.%d",
           fname, majorv, minorv, WT_BTREE_MAJOR_VERSION_MIN, WT_BTREE_MINOR_VERSION_MIN,
           WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX);
     return (0);

@@ -103,8 +103,7 @@ wiredtiger_config_validate(
      */
     if (session != NULL && event_handler != NULL)
         WT_RET_MSG(session, EINVAL,
-          "wiredtiger_config_validate event handler ignored when "
-          "a session also specified");
+          "wiredtiger_config_validate event handler ignored when a session also specified");
 
     /*
      * If we're not given a session, but we do have an event handler, build a fake
@@ -231,9 +230,8 @@ __wt_configure_method(WT_SESSION_IMPL *session, const char *method, const char *
         WT_RET_MSG(session, EINVAL, "no configuration type specified");
     if (strcmp(type, "boolean") != 0 && strcmp(type, "int") != 0 && strcmp(type, "list") != 0 &&
       strcmp(type, "string") != 0)
-        WT_RET_MSG(session, EINVAL,
-          "type must be one of \"boolean\", \"int\", \"list\" or "
-          "\"string\"");
+        WT_RET_MSG(
+          session, EINVAL, "type must be one of \"boolean\", \"int\", \"list\" or \"string\"");
 
     /*
      * Translate the method name to our configuration names, then find a match.

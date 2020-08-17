@@ -188,10 +188,8 @@ monitor(void *args)
             if (ctr != last_ops[i])
                 last_ops[i] = ctr;
             else {
-                printf(
-                  "Thread %d had a task running"
-                  " for more than %d seconds\n",
-                  i, MAX_EXECUTION_TIME / 2);
+                printf("Thread %d had a task running for more than %d seconds\n", i,
+                  MAX_EXECUTION_TIME / 2);
                 abort();
             }
         }

@@ -589,7 +589,7 @@ __curjoin_entry_member(
 
     if (entry->subjoin == NULL && iter != NULL &&
       (iter->end_pos + iter->end_skip >= entry->ends_next ||
-          (iter->end_skip > 0 && F_ISSET(entry, WT_CURJOIN_ENTRY_DISJUNCTION))))
+        (iter->end_skip > 0 && F_ISSET(entry, WT_CURJOIN_ENTRY_DISJUNCTION))))
         return (0); /* no checks to make */
 
     entry->stats.membership_check++;
@@ -884,9 +884,7 @@ __curjoin_init_next(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin, bool iterab
 
     mainbuf = NULL;
     if (cjoin->entries_next == 0)
-        WT_RET_MSG(session, EINVAL,
-          "join cursor has not yet been joined with any other "
-          "cursors");
+        WT_RET_MSG(session, EINVAL, "join cursor has not yet been joined with any other cursors");
 
     /* Get a consistent view of our subordinate cursors if appropriate. */
     __wt_txn_cursor_op(session);
@@ -935,8 +933,7 @@ __curjoin_init_next(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin, bool iterab
         if (!iterable && F_ISSET(je, WT_CURJOIN_ENTRY_BLOOM)) {
             if (session->txn->isolation == WT_ISO_READ_UNCOMMITTED)
                 WT_ERR_MSG(session, EINVAL,
-                  "join cursors with Bloom filters cannot be "
-                  "used with read-uncommitted isolation");
+                  "join cursors with Bloom filters cannot be used with read-uncommitted isolation");
             if (je->bloom == NULL) {
                 /*
                  * Look for compatible filters to be shared, pick compatible numbers for bit counts
@@ -1353,19 +1350,15 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin, WT_INDEX *idx
     } else {
         /* Merge the join into an existing entry for this index */
         if (count != 0 && entry->count != 0 && entry->count != count)
-            WT_RET_MSG(session, EINVAL, "count=%" PRIu64
-                                        " does not match "
-                                        "previous count=%" PRIu64 " for this index",
-              count, entry->count);
-        if (LF_MASK(WT_CURJOIN_ENTRY_BLOOM) != F_MASK(entry, WT_CURJOIN_ENTRY_BLOOM))
             WT_RET_MSG(session, EINVAL,
-              "join has incompatible strategy "
-              "values for the same index");
+              "count=%" PRIu64 " does not match previous count=%" PRIu64 " for this index", count,
+              entry->count);
+        if (LF_MASK(WT_CURJOIN_ENTRY_BLOOM) != F_MASK(entry, WT_CURJOIN_ENTRY_BLOOM))
+            WT_RET_MSG(session, EINVAL, "join has incompatible strategy values for the same index");
         if (LF_MASK(WT_CURJOIN_ENTRY_FALSE_POSITIVES) !=
           F_MASK(entry, WT_CURJOIN_ENTRY_FALSE_POSITIVES))
             WT_RET_MSG(session, EINVAL,
-              "join has incompatible bloom_false_positives "
-              "values for the same index");
+              "join has incompatible bloom_false_positives values for the same index");
 
         /*
          * Check against other comparisons (we call them endpoints)
@@ -1391,20 +1384,19 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin, WT_INDEX *idx
                   ((range & WT_CURJOIN_END_GT) != 0 || range_eq)) ||
               (F_ISSET(end, WT_CURJOIN_END_LT) && ((range & WT_CURJOIN_END_LT) != 0 || range_eq)) ||
               (endrange == WT_CURJOIN_END_EQ &&
-                  (range & (WT_CURJOIN_END_LT | WT_CURJOIN_END_GT)) != 0))
+                (range & (WT_CURJOIN_END_LT | WT_CURJOIN_END_GT)) != 0))
                 WT_RET_MSG(session, EINVAL, "join has overlapping ranges");
             if (range == WT_CURJOIN_END_EQ && endrange == WT_CURJOIN_END_EQ &&
               !F_ISSET(entry, WT_CURJOIN_ENTRY_DISJUNCTION))
-                WT_RET_MSG(session, EINVAL,
-                  "compare=eq can only be combined "
-                  "using operation=or");
+                WT_RET_MSG(session, EINVAL, "compare=eq can only be combined using operation=or");
 
             /*
              * Sort "gt"/"ge" to the front, followed by any number of "eq", and finally "lt"/"le".
              */
-            if (!hasins && ((range & WT_CURJOIN_END_GT) != 0 ||
-                             (range == WT_CURJOIN_END_EQ && endrange != WT_CURJOIN_END_EQ &&
-                               !F_ISSET(end, WT_CURJOIN_END_GT)))) {
+            if (!hasins &&
+              ((range & WT_CURJOIN_END_GT) != 0 ||
+                (range == WT_CURJOIN_END_EQ && endrange != WT_CURJOIN_END_EQ &&
+                  !F_ISSET(end, WT_CURJOIN_END_GT)))) {
                 ins = i;
                 hasins = true;
             }

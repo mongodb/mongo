@@ -32,7 +32,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
         __wt_cache_page_inmem_incr(session, page, sizeof(*modify));
     else
 err:
-    __wt_free(session, modify);
+        __wt_free(session, modify);
     return (ret);
 }
 
@@ -73,11 +73,11 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
      * A "full update list" is distinguished from "an update" by checking whether it has a "next"
      * update. The modify type should only be set if no update list provided.
      */
-    WT_ASSERT(
-      session, ((modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE) &&
-                 value == NULL && upd_arg == NULL) ||
+    WT_ASSERT(session,
+      ((modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE) && value == NULL &&
+        upd_arg == NULL) ||
         (!(modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE) &&
-                 ((value == NULL && upd_arg != NULL) || (value != NULL && upd_arg == NULL))));
+          ((value == NULL && upd_arg != NULL) || (value != NULL && upd_arg == NULL))));
     WT_ASSERT(session, upd_arg == NULL || modify_type == WT_UPDATE_INVALID);
 
     /* If we don't yet have a modify structure, we'll need one. */

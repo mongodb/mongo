@@ -114,10 +114,8 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, NULL,
-      "create,cache_size=1G,checkpoint=(wait=30),"
-      "eviction_trigger=80,eviction_target=64,eviction_dirty_target=65,"
-      "log=(enabled,file_max=10M),"
-      "transaction_sync=(enabled=true,method=none)",
+      "create,cache_size=1G,checkpoint=(wait=30),eviction_trigger=80,eviction_target=64,eviction_"
+      "dirty_target=65,log=(enabled,file_max=10M),transaction_sync=(enabled=true,method=none)",
       &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
 

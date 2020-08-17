@@ -814,9 +814,11 @@ config_pct(void)
         uint32_t *vp;     /* Value store */
         u_int order;      /* Order of assignment */
     } list[] = {
-      {"ops.pct.delete", &g.c_delete_pct, 0}, {"ops.pct.insert", &g.c_insert_pct, 0},
+      {"ops.pct.delete", &g.c_delete_pct, 0},
+      {"ops.pct.insert", &g.c_insert_pct, 0},
 #define CONFIG_MODIFY_ENTRY 2
-      {"ops.pct.modify", &g.c_modify_pct, 0}, {"ops.pct.read", &g.c_read_pct, 0},
+      {"ops.pct.modify", &g.c_modify_pct, 0},
+      {"ops.pct.read", &g.c_read_pct, 0},
       {"ops.pct.write", &g.c_write_pct, 0},
     };
     u_int i, max_order, max_slot, n, pct;

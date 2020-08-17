@@ -816,8 +816,8 @@ compare:
             if (rle != 0) {
                 if (WT_TIME_WINDOWS_EQUAL(&tw, &last.tw) &&
                   ((deleted && last.deleted) ||
-                      (!deleted && !last.deleted && last.value->size == size &&
-                        memcmp(last.value->data, data, size) == 0))) {
+                    (!deleted && !last.deleted && last.value->size == size &&
+                      memcmp(last.value->data, data, size) == 0))) {
                     /* The time window for deleted keys must be empty. */
                     WT_ASSERT(
                       session, (!deleted && !last.deleted) || WT_TIME_WINDOW_IS_EMPTY(&last.tw));
@@ -960,8 +960,8 @@ compare:
             if (rle != 0) {
                 if (WT_TIME_WINDOWS_EQUAL(&last.tw, &tw) &&
                   ((deleted && last.deleted) ||
-                      (!deleted && !last.deleted && size != 0 && last.value->size == size &&
-                        memcmp(last.value->data, data, size) == 0))) {
+                    (!deleted && !last.deleted && size != 0 && last.value->size == size &&
+                      memcmp(last.value->data, data, size) == 0))) {
                     /*
                      * The time window for deleted keys must be empty.
                      */
@@ -994,10 +994,10 @@ compare:
             last.deleted = deleted;
             rle = 1;
 
-        /*
-         * Move to the next record. It's not a simple increment because if it's the maximum record,
-         * incrementing it wraps to 0 and this turns into an infinite loop.
-         */
+            /*
+             * Move to the next record. It's not a simple increment because if it's the maximum
+             * record, incrementing it wraps to 0 and this turns into an infinite loop.
+             */
 next:
             if (src_recno == UINT64_MAX)
                 break;

@@ -1536,7 +1536,7 @@ retry:
      */
     if (slot < max_entries &&
       (retries < 2 ||
-          (retries < WT_RETRY_MAX && (slot == queue->evict_entries || slot > start_slot)))) {
+        (retries < WT_RETRY_MAX && (slot == queue->evict_entries || slot > start_slot)))) {
         start_slot = slot;
         ++retries;
         goto retry;
@@ -2089,7 +2089,7 @@ __evict_get_ref(WT_SESSION_IMPL *session, bool is_server, WT_BTREE **btreep, WT_
       !__evict_queue_full(cache->evict_current_queue) &&
       !__evict_queue_full(cache->evict_fill_queue) &&
       (cache->evict_empty_score > WT_EVICT_SCORE_CUTOFF ||
-          __evict_queue_empty(cache->evict_fill_queue, false)))
+        __evict_queue_empty(cache->evict_fill_queue, false)))
         return (WT_NOTFOUND);
 
     __wt_spin_lock(session, &cache->evict_queue_lock);
@@ -2598,8 +2598,9 @@ __verbose_dump_cache_apply(WT_SESSION_IMPL *session, uint64_t *total_bytesp,
           F_ISSET(dhandle, WT_DHANDLE_DISCARD))
             continue;
 
-        WT_WITH_DHANDLE(session, dhandle, ret = __verbose_dump_cache_single(session, total_bytesp,
-                                            total_dirty_bytesp, total_updates_bytesp));
+        WT_WITH_DHANDLE(session, dhandle,
+          ret = __verbose_dump_cache_single(
+            session, total_bytesp, total_dirty_bytesp, total_updates_bytesp));
         if (ret != 0)
             WT_RET(ret);
     }
@@ -2636,8 +2637,9 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
     needed = __wt_eviction_updates_needed(session, &pct);
     WT_RET(__wt_msg(session, "cache updates check: %s (%2.3f%%)", needed ? "yes" : "no", pct));
 
-    WT_WITH_HANDLE_LIST_READ_LOCK(session, ret = __verbose_dump_cache_apply(session, &total_bytes,
-                                             &total_dirty_bytes, &total_updates_bytes));
+    WT_WITH_HANDLE_LIST_READ_LOCK(session,
+      ret = __verbose_dump_cache_apply(
+        session, &total_bytes, &total_dirty_bytes, &total_updates_bytes));
     WT_RET(ret);
 
     /*
@@ -2645,10 +2647,9 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
      */
     total_bytes = __wt_cache_bytes_plus_overhead(conn->cache, total_bytes);
 
-    WT_RET(__wt_msg(session,
-      "cache dump: "
-      "total found: %" PRIu64 "MB vs tracked inuse %" PRIu64 "MB",
-      total_bytes / WT_MEGABYTE, cache->bytes_inmem / WT_MEGABYTE));
+    WT_RET(
+      __wt_msg(session, "cache dump: total found: %" PRIu64 "MB vs tracked inuse %" PRIu64 "MB",
+        total_bytes / WT_MEGABYTE, cache->bytes_inmem / WT_MEGABYTE));
     WT_RET(__wt_msg(session, "total dirty bytes: %" PRIu64 "MB vs tracked dirty %" PRIu64 "MB",
       total_dirty_bytes / WT_MEGABYTE,
       (cache->bytes_dirty_intl + cache->bytes_dirty_leaf) / WT_MEGABYTE));

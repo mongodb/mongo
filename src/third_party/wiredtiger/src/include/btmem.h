@@ -1297,10 +1297,12 @@ struct __wt_insert_head {
 
 /* WT_FIX_FOREACH walks fixed-length bit-fields on a disk page. */
 #define WT_FIX_FOREACH(btree, dsk, v, i)                                     \
-    for ((i) = 0, (v) = (i) < (dsk)->u.entries ?                             \
+    for ((i) = 0,                                                            \
+        (v) = (i) < (dsk)->u.entries ?                                       \
            __bit_getv(WT_PAGE_HEADER_BYTE(btree, dsk), 0, (btree)->bitcnt) : \
            0;                                                                \
-         (i) < (dsk)->u.entries; ++(i), (v) = (i) < (dsk)->u.entries ?       \
+         (i) < (dsk)->u.entries; ++(i),                                      \
+        (v) = (i) < (dsk)->u.entries ?                                       \
            __bit_getv(WT_PAGE_HEADER_BYTE(btree, dsk), i, (btree)->bitcnt) : \
            0)
 

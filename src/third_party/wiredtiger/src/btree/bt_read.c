@@ -206,7 +206,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
   ,
   const char *func, int line
 #endif
-  )
+)
 {
     WT_BTREE *btree;
     WT_DECL_RET;

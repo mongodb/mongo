@@ -38,8 +38,9 @@ handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const ch
     (void)(handler);
 
     /* Skip the error messages we're expecting to see. */
-    if (ignore_errors > 0 && (strstr(message, "requires key be set") != NULL ||
-                               strstr(message, "requires value be set") != NULL)) {
+    if (ignore_errors > 0 &&
+      (strstr(message, "requires key be set") != NULL ||
+        strstr(message, "requires value be set") != NULL)) {
         --ignore_errors;
         return (0);
     }
@@ -87,41 +88,52 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
             RESERVE,
             UPDATE
         } func;
-    } * op, ops[] = {/*
-                      * The ops order is specific: insert has to happen first so
-                      * other operations are possible, and remove has to be last.
-                      */
-              {
-                "insert", INSERT_GET_KEY,
-              },
-              {
-                "insert", INSERT_GET_VALUE,
-              },
-              {
-                "search", SEARCH,
-              },
-              {
-                "search", SEARCH_NEAR,
-              },
-              {
-                "reserve", RESERVE,
-              },
-              {
-                "insert", MODIFY,
-              },
-              {
-                "update", UPDATE,
-              },
-              {
-                "remove", REMOVE_GET_KEY,
-              },
-              {
-                "remove", REMOVE_GET_VALUE,
-              },
-              {
-                "remove", REMOVE_POS,
-              },
-              {NULL, INSERT_GET_KEY}};
+    } * op,
+      ops[] = {/*
+                * The ops order is specific: insert has to happen first so
+                * other operations are possible, and remove has to be last.
+                */
+        {
+          "insert",
+          INSERT_GET_KEY,
+        },
+        {
+          "insert",
+          INSERT_GET_VALUE,
+        },
+        {
+          "search",
+          SEARCH,
+        },
+        {
+          "search",
+          SEARCH_NEAR,
+        },
+        {
+          "reserve",
+          RESERVE,
+        },
+        {
+          "insert",
+          MODIFY,
+        },
+        {
+          "update",
+          UPDATE,
+        },
+        {
+          "remove",
+          REMOVE_GET_KEY,
+        },
+        {
+          "remove",
+          REMOVE_GET_VALUE,
+        },
+        {
+          "remove",
+          REMOVE_POS,
+        },
+        {NULL, INSERT_GET_KEY}};
     WT_CURSOR *cursor;
 #define MODIFY_ENTRIES 2
     WT_MODIFY entries[MODIFY_ENTRIES];

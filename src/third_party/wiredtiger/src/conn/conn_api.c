@@ -397,9 +397,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_CONFIG_
     WT_ERR(__encryptor_confchk(session, cval, &nenc));
     if (nenc == NULL) {
         if (keyid->len != 0)
-            WT_ERR_MSG(session, EINVAL,
-              "encryption.keyid "
-              "requires encryption.name to be set");
+            WT_ERR_MSG(session, EINVAL, "encryption.keyid requires encryption.name to be set");
         goto out;
     }
 
@@ -408,9 +406,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_CONFIG_
      * needs to be configured on the database as well.
      */
     if (conn->kencryptor == NULL && kencryptorp != &conn->kencryptor)
-        WT_ERR_MSG(session, EINVAL,
-          "table encryption "
-          "requires connection encryption to be set");
+        WT_ERR_MSG(session, EINVAL, "table encryption requires connection encryption to be set");
     hash = __wt_hash_city64(keyid->str, keyid->len);
     bucket = hash % WT_HASH_ARRAY_SIZE;
     TAILQ_FOREACH (kenc, &nenc->keyedhashqh[bucket], q)
@@ -1432,8 +1428,9 @@ __conn_config_file(
     WT_ERR(__conn_config_check_version(session, cbuf->data));
 
     /* Check the configuration information. */
-    WT_ERR(__wt_config_check(session, is_user ? WT_CONFIG_REF(session, wiredtiger_open_usercfg) :
-                                                WT_CONFIG_REF(session, wiredtiger_open_basecfg),
+    WT_ERR(__wt_config_check(session,
+      is_user ? WT_CONFIG_REF(session, wiredtiger_open_usercfg) :
+                WT_CONFIG_REF(session, wiredtiger_open_basecfg),
       cbuf->data, 0));
 
     /* Append it to the stack. */
@@ -1489,8 +1486,8 @@ __conn_env_var(WT_SESSION_IMPL *session, const char *cfg[], const char *name, co
     WT_ERR(__wt_config_gets(session, cfg, "use_environment_priv", &cval));
     if (cval.val == 0)
         WT_ERR_MSG(session, WT_ERROR,
-          "privileged process has %s environment variable set, "
-          "without having \"use_environment_priv\" configured",
+          "privileged process has %s environment variable set, without having "
+          "\"use_environment_priv\" configured",
           name);
     return (0);
 
@@ -1599,8 +1596,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
         }
     if (match)
         WT_ERR_MSG(session, EBUSY,
-          "WiredTiger database is already being managed by another "
-          "thread in this process");
+          "WiredTiger database is already being managed by another thread in this process");
 
     /*
      * !!!
@@ -1672,9 +1668,8 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
          * locking past the end-of-file.
          */
         if (__wt_file_lock(session, conn->lock_fh, true) != 0)
-            WT_ERR_MSG(session, EBUSY,
-              "WiredTiger database is already being managed by "
-              "another process");
+            WT_ERR_MSG(
+              session, EBUSY, "WiredTiger database is already being managed by another process");
 
 /*
  * If the size of the lock file is non-zero, we created it (or won a locking race with the thread
@@ -1716,9 +1711,8 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
          * Immediately release the lock, it's just a test.
          */
         if (__wt_file_lock(session, fh, true) != 0) {
-            WT_ERR_MSG(session, EBUSY,
-              "WiredTiger database is already being managed by "
-              "another process");
+            WT_ERR_MSG(
+              session, EBUSY, "WiredTiger database is already being managed by another process");
         }
         WT_ERR(__wt_file_lock(session, fh, false));
     }
@@ -1736,8 +1730,8 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
     if (conn->is_new) {
         if (F_ISSET(conn, WT_CONN_READONLY))
             WT_ERR_MSG(session, EINVAL,
-              "The database directory is empty or needs recovery, cannot continue with a"
-              " read only connection");
+              "The database directory is empty or needs recovery, cannot continue with a read only "
+              "connection");
         WT_ERR(__wt_snprintf_len_set(
           buf, sizeof(buf), &len, "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING));
         WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
@@ -1751,8 +1745,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
         WT_ERR(__wt_config_gets(session, cfg, "exclusive", &cval));
         if (cval.val != 0)
             WT_ERR_MSG(session, EEXIST,
-              "WiredTiger database already exists and exclusive "
-              "option configured");
+              "WiredTiger database already exists and exclusive option configured");
     }
 
 err:
@@ -1935,14 +1928,15 @@ __wt_verbose_dump_sessions(WT_SESSION_IMPL *session, bool show_cursors)
               session, "  Current dhandle: %s", s->dhandle == NULL ? "NONE" : s->dhandle->name));
             WT_ERR(
               __wt_msg(session, "  Backup in progress: %s", s->bkp_cursor == NULL ? "no" : "yes"));
-            WT_ERR(__wt_msg(session, "  Compact state: %s", s->compact_state == WT_COMPACT_NONE ?
+            WT_ERR(__wt_msg(session, "  Compact state: %s",
+              s->compact_state == WT_COMPACT_NONE ?
                 "none" :
                 (s->compact_state == WT_COMPACT_RUNNING ? "running" : "success")));
             WT_ERR(__wt_msg(session, "  Flags: 0x%" PRIx32, s->flags));
-            WT_ERR(
-              __wt_msg(session, "  Isolation level: %s", s->isolation == WT_ISO_READ_COMMITTED ?
-                  "read-committed" :
-                  (s->isolation == WT_ISO_READ_UNCOMMITTED ? "read-uncommitted" : "snapshot")));
+            WT_ERR(__wt_msg(session, "  Isolation level: %s",
+              s->isolation == WT_ISO_READ_COMMITTED ?
+                "read-committed" :
+                (s->isolation == WT_ISO_READ_UNCOMMITTED ? "read-uncommitted" : "snapshot")));
             WT_ERR(__wt_msg(session, "  Transaction:"));
             WT_ERR(__wt_verbose_dump_txn_one(session, s, 0, NULL));
         } else {
@@ -2130,7 +2124,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
     ret = __wt_sync_and_rename(session, &fs, WT_BASECONFIG_SET, WT_BASECONFIG);
 
     if (0) {
-    /* Close open file handle, remove any temporary file. */
+        /* Close open file handle, remove any temporary file. */
 err:
         WT_TRET(__wt_fclose(session, &fs));
         WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET, false));
@@ -2163,8 +2157,8 @@ __conn_set_file_system(WT_CONNECTION *wt_conn, WT_FILE_SYSTEM *file_system, cons
      */
     if (conn->file_system != NULL)
         WT_ERR_MSG(session, EPERM,
-          "filesystem already configured; custom filesystems should "
-          "enable \"early_load\" configuration");
+          "filesystem already configured; custom filesystems should enable \"early_load\" "
+          "configuration");
 
     conn->file_system = file_system;
 

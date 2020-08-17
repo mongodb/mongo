@@ -35,7 +35,8 @@ __rollback_abort_newer_update(WT_SESSION_IMPL *session, WT_UPDATE *first_upd,
              * is not configured for key consistency check, the timestamps could be out of order
              * here.
              */
-            WT_ASSERT(session, !FLD_ISSET(S2BT(session)->assert_flags, WT_ASSERT_COMMIT_TS_KEYS) ||
+            WT_ASSERT(session,
+              !FLD_ISSET(S2BT(session)->assert_flags, WT_ASSERT_COMMIT_TS_KEYS) ||
                 upd == first_upd);
             first_upd = upd->next;
 
@@ -262,8 +263,9 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
          * records newer than or equal to the onpage value if eviction runs concurrently with
          * checkpoint. In that case, don't verify the first record.
          */
-        WT_ASSERT(session, hs_stop_durable_ts <= newer_hs_durable_ts ||
-            hs_start_ts == hs_stop_durable_ts || first_record);
+        WT_ASSERT(session,
+          hs_stop_durable_ts <= newer_hs_durable_ts || hs_start_ts == hs_stop_durable_ts ||
+            first_record);
 
         if (hs_stop_durable_ts < newer_hs_durable_ts)
             WT_STAT_CONN_INCR(session, txn_rts_hs_stop_older_than_newer_start);
@@ -285,8 +287,8 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
         /* Stop processing when we find a stable update according to the given timestamp. */
         if (hs_durable_ts <= rollback_timestamp) {
             __wt_verbose(session, WT_VERB_RTS,
-              "history store update valid with start timestamp: %s, durable timestamp: %s, "
-              "stop timestamp: %s and stable timestamp: %s",
+              "history store update valid with start timestamp: %s, durable timestamp: %s, stop "
+              "timestamp: %s and stable timestamp: %s",
               __wt_timestamp_to_string(hs_start_ts, ts_string[0]),
               __wt_timestamp_to_string(hs_durable_ts, ts_string[1]),
               __wt_timestamp_to_string(hs_stop_durable_ts, ts_string[2]),
@@ -330,8 +332,9 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
             upd->txnid = cbt->upd_value->tw.start_txn;
             upd->durable_ts = cbt->upd_value->tw.durable_start_ts;
             upd->start_ts = cbt->upd_value->tw.start_ts;
-            __wt_verbose(session, WT_VERB_RTS, "update restored from history store (txnid: %" PRIu64
-                                               ", start_ts: %s, durable_ts: %s",
+            __wt_verbose(session, WT_VERB_RTS,
+              "update restored from history store (txnid: %" PRIu64
+              ", start_ts: %s, durable_ts: %s",
               upd->txnid, __wt_timestamp_to_string(upd->start_ts, ts_string[0]),
               __wt_timestamp_to_string(upd->durable_ts, ts_string[1]));
 
@@ -427,8 +430,8 @@ __rollback_abort_row_ondisk_kv(
          */
         if (vpack->tw.durable_stop_ts > rollback_timestamp || vpack->tw.stop_ts == WT_TS_MAX) {
             __wt_verbose(session, WT_VERB_RTS,
-              "hs update aborted with start durable/commit timestamp: %s, %s, "
-              "stop durable/commit timestamp: %s, %s and stable timestamp: %s",
+              "hs update aborted with start durable/commit timestamp: %s, %s, stop durable/commit "
+              "timestamp: %s, %s and stable timestamp: %s",
               __wt_timestamp_to_string(vpack->tw.durable_start_ts, ts_string[0]),
               __wt_timestamp_to_string(vpack->tw.start_ts, ts_string[1]),
               __wt_timestamp_to_string(vpack->tw.durable_stop_ts, ts_string[2]),
@@ -599,11 +602,11 @@ __rollback_abort_row_reconciled_page(
 
     if (mod->rec_result == WT_PM_REC_REPLACE &&
       (mod->mod_replace.ta.newest_start_durable_ts > rollback_timestamp ||
-          mod->mod_replace.ta.newest_stop_durable_ts > rollback_timestamp ||
-          mod->mod_replace.ta.prepare)) {
+        mod->mod_replace.ta.newest_stop_durable_ts > rollback_timestamp ||
+        mod->mod_replace.ta.prepare)) {
         __wt_verbose(session, WT_VERB_RTS,
-          "reconciled replace block page history store update removal on-disk with start "
-          "durable timestamp: %s, stop durable timestamp: %s and stable timestamp: %s",
+          "reconciled replace block page history store update removal on-disk with start durable "
+          "timestamp: %s, stop durable timestamp: %s and stable timestamp: %s",
           __wt_timestamp_to_string(mod->mod_replace.ta.newest_start_durable_ts, ts_string[0]),
           __wt_timestamp_to_string(mod->mod_replace.ta.newest_stop_durable_ts, ts_string[1]),
           __wt_timestamp_to_string(rollback_timestamp, ts_string[2]));
@@ -626,9 +629,8 @@ __rollback_abort_row_reconciled_page(
               multi->addr.ta.newest_stop_durable_ts > rollback_timestamp ||
               multi->addr.ta.prepare) {
                 __wt_verbose(session, WT_VERB_RTS,
-                  "reconciled multi block page history store update removal on-disk with "
-                  "start durable timestamp: %s, stop durable timestamp: %s and stable "
-                  "timestamp: %s",
+                  "reconciled multi block page history store update removal on-disk with start "
+                  "durable timestamp: %s, stop durable timestamp: %s and stable timestamp: %s",
                   __wt_timestamp_to_string(multi->addr.ta.newest_start_durable_ts, ts_string[0]),
                   __wt_timestamp_to_string(multi->addr.ta.newest_stop_durable_ts, ts_string[1]),
                   __wt_timestamp_to_string(rollback_timestamp, ts_string[2]));

@@ -479,9 +479,7 @@ recover_and_verify(uint32_t nthreads)
                     fatal = true;
                 } else {
                     if (!inmem)
-                        printf(
-                          "%s: deleted record"
-                          " found with key %" PRIu64 "\n",
+                        printf("%s: deleted record found with key %" PRIu64 "\n",
                           fname[DELETE_RECORD_FILE_ID], key);
                     absent++;
                     middle = key;
@@ -501,9 +499,7 @@ recover_and_verify(uint32_t nthreads)
                     if (ret != WT_NOTFOUND)
                         testutil_die(ret, "search");
                     if (!inmem)
-                        printf(
-                          "%s: no insert record"
-                          " with key %" PRIu64 "\n",
+                        printf("%s: no insert record with key %" PRIu64 "\n",
                           fname[INSERT_RECORD_FILE_ID], key);
                     absent++;
                     middle = key;

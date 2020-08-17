@@ -412,12 +412,14 @@ err:
 static int
 __debug_hs_cursor(WT_DBG *ds, WT_CURSOR *hs_cursor)
 {
+    WT_CURSOR_BTREE *cbt;
     WT_SESSION_IMPL *session;
     WT_TIME_WINDOW tw;
     uint64_t hs_counter, hs_upd_type;
     uint32_t hs_btree_id;
     char time_string[WT_TIME_STRING_SIZE];
 
+    cbt = (WT_CURSOR_BTREE *)hs_cursor;
     session = ds->session;
 
     WT_TIME_WINDOW_INIT(&tw);
@@ -431,7 +433,7 @@ __debug_hs_cursor(WT_DBG *ds, WT_CURSOR *hs_cursor)
         WT_RET(ds->f(ds,
           "\t"
           "hs-modify: %s\n",
-          __wt_time_window_to_string(&tw, time_string)));
+          __wt_time_window_to_string(&cbt->upd_value->tw, time_string)));
         WT_RET(ds->f(ds, "\tV "));
         WT_RET(__debug_modify(ds, ds->hs_value->data));
         WT_RET(ds->f(ds, "\n"));
@@ -440,7 +442,7 @@ __debug_hs_cursor(WT_DBG *ds, WT_CURSOR *hs_cursor)
         WT_RET(ds->f(ds,
           "\t"
           "hs-update: %s\n",
-          __wt_time_window_to_string(&tw, time_string)));
+          __wt_time_window_to_string(&cbt->upd_value->tw, time_string)));
         WT_RET(__debug_item_value(ds, "V", ds->hs_value->data, ds->hs_value->size));
         break;
     default:

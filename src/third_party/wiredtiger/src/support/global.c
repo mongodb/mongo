@@ -35,9 +35,7 @@ __endian_check(void)
     e = "little-endian";
 #endif
     fprintf(stderr,
-      "This is a %s build of the WiredTiger data engine, incompatible "
-      "with this system\n",
-      e);
+      "This is a %s build of the WiredTiger data engine, incompatible with this system\n", e);
     return (EINVAL);
 }
 

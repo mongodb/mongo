@@ -100,7 +100,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *pro
             case WT_PROJ_NEXT:
                 WT_RET(__pack_next(&pack, &pv));
                 WT_PACK_GET(session, pv, ap);
-            /* FALLTHROUGH */
+                /* FALLTHROUGH */
 
             case WT_PROJ_REUSE:
                 /* Read the item we're about to overwrite. */
@@ -301,7 +301,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *
             case WT_PROJ_NEXT:
                 WT_RET(__pack_next(&vpack, &vpv));
                 WT_RET(__unpack_read(session, &vpv, &vp, (size_t)(vend - vp)));
-            /* FALLTHROUGH */
+                /* FALLTHROUGH */
 
             case WT_PROJ_REUSE:
                 if (skip)

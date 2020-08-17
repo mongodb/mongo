@@ -181,9 +181,8 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session, uint8_t *src, siz
     lz4_prefix_swap(&prefix);
 #endif
     if (prefix.compressed_len + sizeof(LZ4_PREFIX) > src_len) {
-        (void)wt_api->err_printf(wt_api, session,
-          "WT_COMPRESSOR.decompress: stored size exceeds source "
-          "size");
+        (void)wt_api->err_printf(
+          wt_api, session, "WT_COMPRESSOR.decompress: stored size exceeds source size");
         return (WT_ERROR);
     }
 

@@ -76,11 +76,12 @@ typedef enum {
         (s)->txn->isolation = saved_txn_iso;                                    \
         WT_ASSERT((s), (s)->txn->forced_iso > 0);                               \
         (s)->txn->forced_iso--;                                                 \
-        WT_ASSERT((s), txn_shared->id == saved_txn_shared.id &&                 \
+        WT_ASSERT((s),                                                          \
+          txn_shared->id == saved_txn_shared.id &&                              \
             (txn_shared->metadata_pinned == saved_txn_shared.metadata_pinned || \
-                         saved_txn_shared.metadata_pinned == WT_TXN_NONE) &&    \
+              saved_txn_shared.metadata_pinned == WT_TXN_NONE) &&               \
             (txn_shared->pinned_id == saved_txn_shared.pinned_id ||             \
-                         saved_txn_shared.pinned_id == WT_TXN_NONE));           \
+              saved_txn_shared.pinned_id == WT_TXN_NONE));                      \
         txn_shared->metadata_pinned = saved_txn_shared.metadata_pinned;         \
         txn_shared->pinned_id = saved_txn_shared.pinned_id;                     \
     } while (0)

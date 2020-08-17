@@ -82,8 +82,8 @@ text(WT_SESSION *session, const char *uri)
     if (!WT_STREQ(cursor->value_format, "S") ||
       (!WT_STREQ(cursor->key_format, "S") && !WT_STREQ(cursor->key_format, "r")))
         return (util_err(session, EINVAL,
-          "the loadtext command can only load objects configured "
-          "for record number or string keys, and string values"));
+          "the loadtext command can only load objects configured for record number or string keys, "
+          "and string values"));
     readkey = !WT_STREQ(cursor->key_format, "r");
 
     /* Insert the records */

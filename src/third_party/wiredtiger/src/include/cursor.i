@@ -483,10 +483,10 @@ __cursor_row_slot_key_return(
         memcpy((uint8_t *)cbt->row_key->data + cbt->row_key->size, kpack->data, kpack->size);
         cbt->row_key->size += kpack->size;
     } else {
-    /*
-     * Call __wt_row_leaf_key_work instead of __wt_row_leaf_key: we already did __wt_row_leaf_key's
-     * fast-path checks inline.
-     */
+        /*
+         * Call __wt_row_leaf_key_work instead of __wt_row_leaf_key: we already did
+         * __wt_row_leaf_key's fast-path checks inline.
+         */
 slow:
         WT_RET(__wt_row_leaf_key_work(session, page, rip, cbt->row_key, false));
     }

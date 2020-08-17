@@ -342,9 +342,7 @@ run_check_subtest_range(TEST_OPTS *opts, const char *debugger, bool close_test)
     bool got_failure, got_success;
 
     if (opts->verbose)
-        printf(
-          "Determining best range of operations until failure, "
-          "with close_test %s.\n",
+        printf("Determining best range of operations until failure, with close_test %s.\n",
           (close_test ? "enabled" : "disabled"));
 
     run_check_subtest(opts, debugger, 1, close_test, &cutoff);
@@ -386,9 +384,7 @@ run_check_subtest_range(TEST_OPTS *opts, const char *debugger, bool close_test)
     if (!got_failure || !got_success) {
         fprintf(stderr,
           "Warning: did not find a reliable test range.\n"
-          "midpoint=%" PRIu64
-          ", close_test=%d, got_failure=%d, "
-          "got_success=%d\n",
+          "midpoint=%" PRIu64 ", close_test=%d, got_failure=%d, got_success=%d\n",
           mid, (int)close_test, (int)got_failure, (int)got_success);
         return (EAGAIN);
     }
@@ -511,17 +507,14 @@ subtest_main(int argc, char *argv[], bool close_test)
     if ((p = getenv("top_builddir")) == NULL)
         p = "../../build_posix";
     testutil_check(__wt_snprintf(config, sizeof(config),
-      "create,cache_size=250M,log=(enabled),"
-      "transaction_sync=(enabled,method=none),"
-      "extensions=(%s/%s="
-      "(early_load,config={environment=true,verbose=true}))",
+      "create,cache_size=250M,log=(enabled),transaction_sync=(enabled,method=none),extensions=(%s/"
+      "%s=(early_load,config={environment=true,verbose=true}))",
       p, WT_FAIL_FS_LIB));
     testutil_check(wiredtiger_open(opts->home, &event_handler, config, &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(session->create(session, "table:subtest",
-      "key_format=i,value_format=iiiS,"
-      "columns=(id,v0,v1,v2,big)"));
+    testutil_check(session->create(
+      session, "table:subtest", "key_format=i,value_format=iiiS,columns=(id,v0,v1,v2,big)"));
 
     testutil_check(session->create(session, "table:subtest2", "key_format=i,value_format=i"));
 

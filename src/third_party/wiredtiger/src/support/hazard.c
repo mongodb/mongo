@@ -66,7 +66,7 @@ __wt_hazard_set_func(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
   ,
   const char *func, int line
 #endif
-  )
+)
 {
     WT_HAZARD *hp;
     uint8_t current_state;
@@ -89,7 +89,8 @@ __wt_hazard_set_func(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 
     /* If we have filled the current hazard pointer array, grow it. */
     if (session->nhazard >= session->hazard_size) {
-        WT_ASSERT(session, session->nhazard == session->hazard_size &&
+        WT_ASSERT(session,
+          session->nhazard == session->hazard_size &&
             session->hazard_inuse == session->hazard_size);
         WT_RET(hazard_grow(session));
     }
@@ -98,11 +99,13 @@ __wt_hazard_set_func(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
      * If there are no available hazard pointer slots, make another one visible.
      */
     if (session->nhazard >= session->hazard_inuse) {
-        WT_ASSERT(session, session->nhazard == session->hazard_inuse &&
+        WT_ASSERT(session,
+          session->nhazard == session->hazard_inuse &&
             session->hazard_inuse < session->hazard_size);
         hp = &session->hazard[session->hazard_inuse++];
     } else {
-        WT_ASSERT(session, session->nhazard < session->hazard_inuse &&
+        WT_ASSERT(session,
+          session->nhazard < session->hazard_inuse &&
             session->hazard_inuse <= session->hazard_size);
 
         /*
@@ -258,9 +261,7 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
         }
 
     if (session->nhazard != 0)
-        __wt_errx(session,
-          "session %p: close hazard pointer table: count didn't "
-          "match entries",
+        __wt_errx(session, "session %p: close hazard pointer table: count didn't match entries",
           (void *)session);
 }
 
@@ -390,8 +391,7 @@ __wt_hazard_check_assert(WT_SESSION_IMPL *session, void *ref, bool waitfor)
         __wt_sleep(0, 10000);
     }
     __wt_errx(session,
-      "hazard pointer reference to discarded object: "
-      "(%p: session %p name %s: %s, line %d)",
+      "hazard pointer reference to discarded object: (%p: session %p name %s: %s, line %d)",
       (void *)hp->ref, (void *)s, s->name == NULL ? "UNKNOWN" : s->name, hp->func, hp->line);
     return (false);
 }

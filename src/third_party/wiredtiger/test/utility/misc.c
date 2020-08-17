@@ -246,14 +246,10 @@ testutil_sleep_wait(uint32_t seconds, pid_t pid)
     while (seconds > 0) {
         if ((got = waitpid(pid, &status, WNOHANG | WUNTRACED)) == pid) {
             if (WIFEXITED(status))
-                testutil_die(EINVAL, "Child process %" PRIu64
-                                     " exited early"
-                                     " with status %d",
+                testutil_die(EINVAL, "Child process %" PRIu64 " exited early with status %d",
                   (uint64_t)pid, WEXITSTATUS(status));
             if (WIFSIGNALED(status))
-                testutil_die(EINVAL, "Child process %" PRIu64
-                                     " terminated "
-                                     " with signal %d",
+                testutil_die(EINVAL, "Child process %" PRIu64 " terminated  with signal %d",
                   (uint64_t)pid, WTERMSIG(status));
         } else if (got == -1)
             testutil_die(errno, "waitpid");

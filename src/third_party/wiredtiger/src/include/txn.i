@@ -370,9 +370,8 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
     if (F_ISSET(txn, WT_TXN_READONLY)) {
         if (F_ISSET(txn, WT_TXN_IGNORE_PREPARE))
-            WT_RET_MSG(session, ENOTSUP,
-              "Transactions with ignore_prepare=true"
-              " cannot perform updates");
+            WT_RET_MSG(
+              session, ENOTSUP, "Transactions with ignore_prepare=true cannot perform updates");
         WT_RET_MSG(session, WT_ROLLBACK, "Attempt to update in a read-only transaction");
     }
 
@@ -1006,8 +1005,9 @@ retry:
      */
     if (prepare_upd != NULL) {
         WT_ASSERT(session, F_ISSET(prepare_upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS));
-        if (retry && (prepare_upd->txnid == WT_TXN_ABORTED ||
-                       prepare_upd->prepare_state == WT_PREPARE_RESOLVED)) {
+        if (retry &&
+          (prepare_upd->txnid == WT_TXN_ABORTED ||
+            prepare_upd->prepare_state == WT_PREPARE_RESOLVED)) {
             retry = false;
             /* Clean out any stale value before performing the retry. */
             __wt_upd_value_clear(cbt->upd_value);
@@ -1211,14 +1211,11 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
     if (!F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
       FLD_ISSET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS) &&
       !F_ISSET(txn, WT_TXN_SHARED_TS_READ))
-        WT_RET_MSG(session, EINVAL,
-          "read_timestamp required and "
-          "none set on this transaction");
+        WT_RET_MSG(session, EINVAL, "read_timestamp required and none set on this transaction");
     if (FLD_ISSET(btree->assert_flags, WT_ASSERT_READ_TS_NEVER) &&
       F_ISSET(txn, WT_TXN_SHARED_TS_READ))
-        WT_RET_MSG(session, EINVAL,
-          "no read_timestamp required and "
-          "timestamp set on this transaction");
+        WT_RET_MSG(
+          session, EINVAL, "no read_timestamp required and timestamp set on this transaction");
     return (0);
 }
 

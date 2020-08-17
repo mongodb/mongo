@@ -383,9 +383,8 @@ __desc_read(WT_SESSION_IMPL *session, uint32_t allocsize, WT_BLOCK *block)
     if (desc->majorv > WT_BLOCK_MAJOR_VERSION ||
       (desc->majorv == WT_BLOCK_MAJOR_VERSION && desc->minorv > WT_BLOCK_MINOR_VERSION))
         WT_ERR_MSG(session, WT_ERROR,
-          "unsupported WiredTiger file version: this build only "
-          "supports major/minor versions up to %d/%d, and the file "
-          "is version %" PRIu16 "/%" PRIu16,
+          "unsupported WiredTiger file version: this build only supports major/minor versions up "
+          "to %d/%d, and the file is version %" PRIu16 "/%" PRIu16,
           WT_BLOCK_MAJOR_VERSION, WT_BLOCK_MINOR_VERSION, desc->majorv, desc->minorv);
 
     __wt_verbose(session, WT_VERB_BLOCK, "%s: magic %" PRIu32 ", major/minor: %" PRIu32 "/%" PRIu32,
