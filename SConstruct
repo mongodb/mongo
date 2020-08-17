@@ -647,6 +647,10 @@ def variable_distsrc_converter(val):
         return val + "/"
     return val
 
+def fatal_error(env, msg, *args):
+    print(msg.format(*args))
+    Exit(1)
+
 # Apply the default variables files, and walk the provided
 # arguments. Interpret any falsy argument (like the empty string) as
 # resetting any prior state. This makes the argument
@@ -660,10 +664,9 @@ for variables_file in variables_files_args:
     else:
         variables_files = []
 for vf in variables_files:
-    if os.path.isfile(vf):
-        print("Using variable customization file {}".format(vf))
-    else:
-        print("IGNORING missing variable customization file {}".format(vf))
+    if not os.path.isfile(vf):
+        fatal_error(None, f"Specified variables file '{vf}' does not exist")
+    print(f"Using variable customization file {vf}")
 
 # Attempt to prevent confusion between the different ways of
 # specifying file placement between hygienic and non-hygienic
@@ -1153,10 +1156,6 @@ for var in ['CC', 'CXX']:
 
 env.AddMethod(mongo_platform.env_os_is_wrapper, 'TargetOSIs')
 env.AddMethod(mongo_platform.env_get_os_name_wrapper, 'GetTargetOSName')
-
-def fatal_error(env, msg, *args):
-    print(msg.format(*args))
-    Exit(1)
 
 def conf_error(env, msg, *args):
     print(msg.format(*args))
