@@ -3570,19 +3570,6 @@ tasks:
         files:
           - src/artifacts.json
 
-## compile_core_tools - minimal version of compile used for commit queue ##
-- name: compile_core_tools
-  depends_on: []
-  commands:
-    - func: "scons compile"
-      vars:
-        # The targets here should be the install analogues of whatever
-        # archive targets the 'compile' task builds, excluding -debug targets.
-        targets: install-dist-test
-        compiling_for_test: true
-        task_compile_flags: >-
-          --separate-debug
-
 - name: compile_ninja
   commands:
     - func: "scons compile"
@@ -8262,14 +8249,6 @@ tasks:
   - func: "set up win mount script"
   - func: "shared scons cache pruning"
 
-- name: commit_queue_placeholder
-  commands:
-  - command: shell.exec
-    params:
-      script: |
-        echo "Commit Queue Placeholder"
-        exit 0
-
 - name: validate_commit_message
   commands:
   - command: manifest.load
@@ -8322,11 +8301,6 @@ task_groups:
   - compile_no_archive
   - compile
   - package
-
-- <<: *compile_task_group_template
-  name: compile_core_tools_TG
-  tasks:
-  - compile_core_tools
 
 - <<: *compile_task_group_template
   name: compile_ninja_TG
@@ -12550,27 +12524,7 @@ buildvariants:
     - rhel62-small
   batchtime: 10080 # 7 days
   stepback: false
-  expansions:
-    additional_package_targets: archive-mh archive-mh-debug
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: rhel62
-    multiversion_edition: enterprise
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: rhel62
-    repo_edition: enterprise
-    scons_cache_scope: shared
-    jstestfuzz_num_generated_files: 40
-    jstestfuzz_concurrent_num_files: 10
-    target_resmoke_time: 10
-    large_distro_name: rhel62-large
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff
   tasks:
-  - name: commit_queue_placeholder
-  - name: compile_core_tools_TG
-    distros:
-    - rhel62-large
   - name: validate_commit_message
 
 - name: live-record
