@@ -744,8 +744,15 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = NULL) {
 #endif
 }
 
+// Output up to BSONObjMaxUserSize characters of the most recent log output in order to
+// avoid hitting the 16MB size limit of a BSONObject.
 BSONObj RawMongoProgramOutput(const BSONObj& args, void* data) {
-    return BSON("" << programOutputLogger.str());
+    std::string programLog = programOutputLogger.str();
+    std::size_t sz = programLog.size();
+    const string& outputStr =
+        sz > BSONObjMaxUserSize ? programLog.substr(sz - BSONObjMaxUserSize) : programLog;
+
+    return BSON("" << outputStr);
 }
 
 BSONObj ClearRawMongoProgramOutput(const BSONObj& args, void* data) {

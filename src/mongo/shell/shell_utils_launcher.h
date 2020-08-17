@@ -67,7 +67,6 @@ void installShellUtilsLauncher(Scope& scope);
 class ProgramOutputMultiplexer {
 public:
     void appendLine(int port, ProcessId pid, const std::string& name, const std::string& line);
-    /** @return up to 100000 characters of the most recent log output. */
     std::string str() const;
     void clear();
 
