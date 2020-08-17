@@ -3841,8 +3841,11 @@ if env.ToolchainIs("clang"):
 elif env.ToolchainIs("gcc"):
     env["ICECC_COMPILER_TYPE"] = "gcc"
 
-env.Tool('icecream')
-
+if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
+    env['ICECREAM_TARGET_DIR'] = '$BUILD_ROOT/scons/icecream'
+    env.Tool('icecream', verbose=env.Verbose())
+else:
+    env.Tool('icecream')
 
 # Defaults for SCons provided flags. SetOption only sets the option to our value
 # if the user did not provide it. So for any flag here if it's explicitly passed

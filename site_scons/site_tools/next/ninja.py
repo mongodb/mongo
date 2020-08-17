@@ -139,7 +139,7 @@ def get_order_only(node):
     """Return a list of order only dependencies for node."""
     if node.prerequisites is None:
         return []
-    return [get_path(src_file(prereq)) for prereq in node.prerequisites]
+    return [get_path(src_file(prereq)) for prereq in node.prerequisites if is_valid_dependent_node(prereq)]
 
 
 def get_dependencies(node, skip_sources=False):
@@ -148,9 +148,9 @@ def get_dependencies(node, skip_sources=False):
         return [
             get_path(src_file(child))
             for child in node.children()
-            if child not in node.sources
+            if child not in node.sources and is_valid_dependent_node(child)
         ]
-    return [get_path(src_file(child)) for child in node.children()]
+    return [get_path(src_file(child)) for child in node.children() if is_valid_dependent_node(child)]
 
 
 def get_inputs(node, skip_unknown_types=False):
