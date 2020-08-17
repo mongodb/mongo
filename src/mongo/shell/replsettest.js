@@ -1294,20 +1294,30 @@ var ReplSetTest = function(opts) {
         cmd[cmdKey] = config;
 
         // Initiating a replica set with a single node will use "latest" FCV. This will
-        // cause IncompatibleServerVersion errors if additional "last-lts" binary version
-        // nodes are subsequently added to the set, since such nodes cannot set their FCV to
-        // "latest". Therefore, we make sure the primary is "last-lts" FCV before adding in
-        // nodes of different binary versions to the replica set.
+        // cause IncompatibleServerVersion errors if additional "last-lts"/"last-continuous" binary
+        // version nodes are subsequently added to the set, since such nodes cannot set their FCV to
+        // "latest". Therefore, we make sure the primary is "last-lts"/"last-continuous" FCV before
+        // adding in nodes of different binary versions to the replica set.
         let lastLTSBinVersionWasSpecifiedForSomeNode = false;
+        let lastContinuousBinVersionWasSpecifiedForSomeNode = false;
         let explicitBinVersionWasSpecifiedForSomeNode = false;
         Object.keys(this.nodeOptions).forEach(function(key, index) {
             let val = self.nodeOptions[key];
             if (typeof (val) === "object" && val.hasOwnProperty("binVersion")) {
                 lastLTSBinVersionWasSpecifiedForSomeNode =
                     MongoRunner.areBinVersionsTheSame(val.binVersion, lastLTSFCV);
+                lastContinuousBinVersionWasSpecifiedForSomeNode =
+                    (lastLTSFCV !== lastContinuousFCV) &&
+                    MongoRunner.areBinVersionsTheSame(val.binVersion, lastContinuousFCV);
                 explicitBinVersionWasSpecifiedForSomeNode = true;
             }
         });
+
+        if (lastLTSBinVersionWasSpecifiedForSomeNode &&
+            lastContinuousBinVersionWasSpecifiedForSomeNode) {
+            throw new Error("Can only specify one of 'last-lts' and 'last-continuous' " +
+                            "in binVersion, not both.");
+        }
 
         // If no binVersions have been explicitly set, then we should be using the latest binary
         // version, which allows us to use the failpoint below.
@@ -1347,26 +1357,33 @@ var ReplSetTest = function(opts) {
         print("ReplSetTest initiate command took " + (new Date() - initiateStart) + "ms for " +
               this.nodes.length + " nodes in set '" + this.name + "'");
 
-        // Set the FCV to 'last-lts' if we are running a mixed version replica set. If this is a
-        // config server, the FCV will be set as part of ShardingTest.
+        // Set the FCV to 'last-lts'/'last-continuous' if we are running a mixed version replica
+        // set. If this is a config server, the FCV will be set as part of ShardingTest.
+        // TODO SERVER-50389: Set FCV to 'last-continuous' properly when last-continuous binary
+        // versions are supported with the useRandomBinVersionsWithinReplicaSet option.
         let setLastLTSFCV = (lastLTSBinVersionWasSpecifiedForSomeNode ||
                              jsTest.options().useRandomBinVersionsWithinReplicaSet) &&
             !self.isConfigServer;
-        if (setLastLTSFCV && jsTest.options().replSetFeatureCompatibilityVersion) {
+        let setLastContinuousFCV = !setLastLTSFCV &&
+            lastContinuousBinVersionWasSpecifiedForSomeNode && !self.isConfigServer;
+
+        if ((setLastLTSFCV || setLastContinuousFCV) &&
+            jsTest.options().replSetFeatureCompatibilityVersion) {
+            const fcv = setLastLTSFCV ? lastLTSFCV : lastContinuousFCV;
             throw new Error(
-                "The FCV will be set to 'last-lts' automatically when starting up a replica " +
+                "The FCV will be set to '" + fcv + "' automatically when starting up a replica " +
                 "set with mixed binary versions. Therefore, we expect an empty value for " +
                 "'replSetFeatureCompatibilityVersion'.");
         }
 
-        if (setLastLTSFCV) {
+        if (setLastLTSFCV || setLastContinuousFCV) {
             // Authenticate before running the command.
             asCluster(self.nodes, function setFCV() {
-                let fcv = lastLTSFCV;
+                let fcv = setLastLTSFCV ? lastLTSFCV : lastContinuousFCV;
                 print("Setting feature compatibility version for replica set to '" + fcv + "'");
                 assert.commandWorked(
                     self.getPrimary().adminCommand({setFeatureCompatibilityVersion: fcv}));
-                checkFCV(self.getPrimary().getDB("admin"), lastLTSFCV);
+                checkFCV(self.getPrimary().getDB("admin"), fcv);
                 print("Fetch the config version from primay since 4.4 downgrade runs a reconfig.");
                 config.version = self.getReplSetConfigFromNode().version;
             });
@@ -2946,6 +2963,8 @@ var ReplSetTest = function(opts) {
                 options.binVersion = "latest";
             } else {
                 const rand = Random.rand();
+                // TODO SERVER-50389: Support last-continuous binary version with
+                // useRandomBinVersionsWithinReplicaSet.
                 options.binVersion = rand < 0.5 ? "latest" : "last-lts";
             }
             print("Randomly assigned binary version: " + options.binVersion + " to node: " + n);

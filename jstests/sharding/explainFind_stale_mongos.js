@@ -22,7 +22,8 @@ assert.commandWorked(freshMongos.adminCommand({enableSharding: dbName}));
 assert.commandWorked(freshMongos.adminCommand({shardCollection: ns, key: {"_id": 1}}));
 
 jsTest.log("Ensure the shard knows " + ns + " is sharded");
-if (st.isMixedVersionCluster()) {
+const clusterVersionInfo = st.getClusterVersionInfo();
+if (clusterVersionInfo.isMixedVersion) {
     assert.commandWorked(
         st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
 } else {

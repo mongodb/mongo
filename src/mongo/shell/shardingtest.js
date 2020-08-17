@@ -980,76 +980,92 @@ var ShardingTest = function(params) {
     };
 
     /**
-     * Returns whether any settings to ShardingTest or jsTestOptions indicate this is a multiversion
-     * cluster.
+     * Returns a document {isMixedVersion: <bool>, oldestBinVersion: <string>}.
+     * The 'isMixedVersion' field is true if any settings to ShardingTest or jsTestOptions indicate
+     * this is a multiversion cluster.
+     * The 'oldestBinVersion' field is set to the oldest binary version used in this cluster, one of
+     * 'latest', 'last-continuous' and 'last-lts'.
+     * Note: Mixed version cluster with binary versions older than 'last-lts' is not supported. If
+     * such binary exists in the cluster, this function assumes this is not a mixed version cluster
+     * and returns 'oldestBinVersion' as 'latest'.
      *
-     * Checks for 'last-lts' bin versions via:
+     * Checks for bin versions via:
      *     jsTestOptions().shardMixedBinVersions, jsTestOptions().mongosBinVersion,
      *     otherParams.configOptions.binVersion, otherParams.shardOptions.binVersion,
      *     otherParams.mongosOptions.binVersion
      */
-    this.isMixedVersionCluster = function() {
-        var lastLTSBinVersion = MongoRunner.getBinVersionFor('last-lts');
+    this.getClusterVersionInfo = function() {
+        function clusterHasBinVersion(version) {
+            const binVersion = MongoRunner.getBinVersionFor(version);
+            const hasBinVersionInParams = (params) => {
+                return params && params.binVersion &&
+                    MongoRunner.areBinVersionsTheSame(
+                        binVersion, MongoRunner.getBinVersionFor(params.binVersion));
+            };
 
-        // Must check shardMixedBinVersion because it causes shardOptions.binVersion to be an object
-        // (versionIterator) rather than a version string. Must check mongosBinVersion, as well,
-        // because it does not update mongosOptions.binVersion.
-        if (jsTestOptions().shardMixedBinVersions ||
-            (jsTestOptions().mongosBinVersion &&
-             MongoRunner.areBinVersionsTheSame(lastLTSBinVersion,
-                                               jsTestOptions().mongosBinVersion))) {
-            return true;
-        }
-
-        // Check for 'last-lts' config servers.
-        if (otherParams.configOptions && otherParams.configOptions.binVersion &&
-            MongoRunner.areBinVersionsTheSame(
-                lastLTSBinVersion,
-                MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion))) {
-            return true;
-        }
-        for (var i = 0; i < numConfigs; ++i) {
-            if (otherParams['c' + i] && otherParams['c' + i].binVersion &&
-                MongoRunner.areBinVersionsTheSame(
-                    lastLTSBinVersion,
-                    MongoRunner.getBinVersionFor(otherParams['c' + i].binVersion))) {
+            // Must check shardMixedBinVersion because it causes shardOptions.binVersion to be an
+            // object (versionIterator) rather than a version string. Must check mongosBinVersion,
+            // as well, because it does not update mongosOptions.binVersion.
+            // TODO SERVER-50389: Differentiate between 'last-lts' and 'last-continuous' when
+            // last-continuous is supported with shardMixedBinVersions.
+            if (jsTestOptions().shardMixedBinVersions ||
+                (jsTestOptions().mongosBinVersion &&
+                 MongoRunner.areBinVersionsTheSame(binVersion, jsTestOptions().mongosBinVersion))) {
                 return true;
             }
-        }
 
-        // Check for 'last-lts' mongod servers.
-        if (otherParams.shardOptions && otherParams.shardOptions.binVersion &&
-            MongoRunner.areBinVersionsTheSame(
-                lastLTSBinVersion,
-                MongoRunner.getBinVersionFor(otherParams.shardOptions.binVersion))) {
-            return true;
-        }
-        for (var i = 0; i < numShards; ++i) {
-            if (otherParams['d' + i] && otherParams['d' + i].binVersion &&
-                MongoRunner.areBinVersionsTheSame(
-                    lastLTSBinVersion,
-                    MongoRunner.getBinVersionFor(otherParams['d' + i].binVersion))) {
+            // Check for config servers.
+            if (hasBinVersionInParams(otherParams.configOptions)) {
                 return true;
             }
-        }
+            for (let i = 0; i < numConfigs; ++i) {
+                if (hasBinVersionInParams(otherParams['c' + i])) {
+                    return true;
+                }
+            }
 
-        // Check for 'last-lts' mongos servers.
-        if (otherParams.mongosOptions && otherParams.mongosOptions.binVersion &&
-            MongoRunner.areBinVersionsTheSame(
-                lastLTSBinVersion,
-                MongoRunner.getBinVersionFor(otherParams.mongosOptions.binVersion))) {
-            return true;
-        }
-        for (var i = 0; i < numMongos; ++i) {
-            if (otherParams['s' + i] && otherParams['s' + i].binVersion &&
-                MongoRunner.areBinVersionsTheSame(
-                    lastLTSBinVersion,
-                    MongoRunner.getBinVersionFor(otherParams['s' + i].binVersion))) {
+            // Check for mongod servers.
+            if (hasBinVersionInParams(otherParams.shardOptions)) {
                 return true;
             }
+            if (hasBinVersionInParams(otherParams.rs)) {
+                return true;
+            }
+            for (let i = 0; i < numShards; ++i) {
+                if (hasBinVersionInParams(otherParams['d' + i])) {
+                    return true;
+                }
+                if (hasBinVersionInParams(otherParams['rs' + i])) {
+                    return true;
+                }
+            }
+
+            // Check for mongos servers.
+            if (hasBinVersionInParams(otherParams.mongosOptions)) {
+                return true;
+            }
+            for (let i = 0; i < numMongos; ++i) {
+                if (hasBinVersionInParams(otherParams['s' + i])) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        return false;
+        let hasLastLTS = clusterHasBinVersion("last-lts");
+        let hasLastContinuous = clusterHasBinVersion("last-continuous");
+        if ((lastLTSFCV !== lastContinuousFCV) && hasLastLTS && hasLastContinuous) {
+            throw new Error("Can only specify one of 'last-lts' and 'last-continuous' " +
+                            "in binVersion, not both.");
+        }
+        if (hasLastLTS) {
+            return {isMixedVersion: true, oldestBinVersion: "last-lts"};
+        } else if (hasLastContinuous) {
+            return {isMixedVersion: true, oldestBinVersion: "last-continuous"};
+        } else {
+            return {isMixedVersion: false, oldestBinVersion: "latest"};
+        }
     };
 
     /**
@@ -1279,6 +1295,8 @@ var ShardingTest = function(params) {
                     // version
                     // shard cluster that randomly assigns shard binVersions, half "latest" and half
                     // "last-lts".
+                    // TODO SERVER-50389: Support last-continuous binary version with
+                    // shardMixedBinVersions.
                     if (!otherParams.shardOptions.binVersion) {
                         Random.setRandomSeed();
                         otherParams.shardOptions.binVersion =
@@ -1354,6 +1372,8 @@ var ShardingTest = function(params) {
                 // If the test doesn't depend on specific shard binVersions, create a mixed version
                 // shard cluster that randomly assigns shard binVersions, half "latest" and half
                 // "last-lts".
+                // TODO SERVER-50389: Support last-continuous binary version with
+                // shardMixedBinVersions.
                 if (!otherParams.shardOptions.binVersion) {
                     Random.setRandomSeed();
                     otherParams.shardOptions.binVersion =
@@ -1646,10 +1666,11 @@ var ShardingTest = function(params) {
     }
 
     const configRS = this.configRS;
-    if (_hasNewFeatureCompatibilityVersion() && this.isMixedVersionCluster()) {
+    const clusterVersionInfo = this.getClusterVersionInfo();
+    if (_hasNewFeatureCompatibilityVersion() && clusterVersionInfo.isMixedVersion) {
+        const fcv = binVersionToFCV(clusterVersionInfo.oldestBinVersion);
         function setFeatureCompatibilityVersion() {
-            assert.commandWorked(
-                csrsPrimary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+            assert.commandWorked(csrsPrimary.adminCommand({setFeatureCompatibilityVersion: fcv}));
 
             // Wait for the new featureCompatibilityVersion to propagate to all nodes in the CSRS
             // to ensure that older versions of mongos can successfully connect.
@@ -1798,50 +1819,42 @@ var ShardingTest = function(params) {
     // Ensure that the sessions collection exists so jstests can run things with
     // logical sessions and test them. We do this by forcing an immediate cache refresh
     // on the config server, which auto-shards the collection for the cluster.
-    var lastLTSBinVersion = MongoRunner.getBinVersionFor('last-lts');
-    if ((!otherParams.configOptions) ||
-        (otherParams.configOptions && !otherParams.configOptions.binVersion) ||
-        (otherParams.configOptions && otherParams.configOptions.binVersion &&
-         MongoRunner.areBinVersionsTheSame(
-             lastLTSBinVersion,
-             MongoRunner.getBinVersionFor(otherParams.configOptions.binVersion)))) {
-        this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
+    this.configRS.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
 
-        const x509AuthRequired = (mongosOptions[0] && mongosOptions[0].clusterAuthMode &&
-                                  mongosOptions[0].clusterAuthMode === "x509");
+    const x509AuthRequired = (mongosOptions[0] && mongosOptions[0].clusterAuthMode &&
+                              mongosOptions[0].clusterAuthMode === "x509");
 
-        // Flushes the routing table cache on connection 'conn'. If 'keyFileLocal' is defined,
-        // authenticates the keyfile user on 'authConn' - a connection or set of connections for
-        // the shard - before executing the flush.
-        const flushRT = function flushRoutingTableAndHandleAuth(conn, authConn, keyFileLocal) {
-            // Invokes the actual execution of cache refresh.
-            const execFlushRT = (conn) => {
-                assert.commandWorked(conn.getDB("admin").runCommand(
-                    {_flushRoutingTableCacheUpdates: "config.system.sessions"}));
-            };
-
-            if (keyFileLocal) {
-                authutil.asCluster(authConn, keyFileLocal, () => execFlushRT(conn));
-            } else {
-                execFlushRT(conn);
-            }
+    // Flushes the routing table cache on connection 'conn'. If 'keyFileLocal' is defined,
+    // authenticates the keyfile user on 'authConn' - a connection or set of connections for
+    // the shard - before executing the flush.
+    const flushRT = function flushRoutingTableAndHandleAuth(conn, authConn, keyFileLocal) {
+        // Invokes the actual execution of cache refresh.
+        const execFlushRT = (conn) => {
+            assert.commandWorked(conn.getDB("admin").runCommand(
+                {_flushRoutingTableCacheUpdates: "config.system.sessions"}));
         };
 
-        // TODO SERVER-45108: Enable support for x509 auth for _flushRoutingTableCacheUpdates.
-        if (!otherParams.manualAddShard && !x509AuthRequired) {
-            for (let i = 0; i < numShards; i++) {
-                const keyFileLocal =
-                    (otherParams.shards && otherParams.shards[i] && otherParams.shards[i].keyFile)
-                    ? otherParams.shards[i].keyFile
-                    : this.keyFile;
+        if (keyFileLocal) {
+            authutil.asCluster(authConn, keyFileLocal, () => execFlushRT(conn));
+        } else {
+            execFlushRT(conn);
+        }
+    };
 
-                if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
-                    const rs = this._rs[i].test;
-                    flushRT(rs.getPrimary(), rs.nodes, keyFileLocal);
-                } else {
-                    // If specified, use the keyFile for the standalone shard.
-                    flushRT(this["shard" + i], this["shard" + i], keyFileLocal);
-                }
+    // TODO SERVER-45108: Enable support for x509 auth for _flushRoutingTableCacheUpdates.
+    if (!otherParams.manualAddShard && !x509AuthRequired) {
+        for (let i = 0; i < numShards; i++) {
+            const keyFileLocal =
+                (otherParams.shards && otherParams.shards[i] && otherParams.shards[i].keyFile)
+                ? otherParams.shards[i].keyFile
+                : this.keyFile;
+
+            if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
+                const rs = this._rs[i].test;
+                flushRT(rs.getPrimary(), rs.nodes, keyFileLocal);
+            } else {
+                // If specified, use the keyFile for the standalone shard.
+                flushRT(this["shard" + i], this["shard" + i], keyFileLocal);
             }
         }
     }
