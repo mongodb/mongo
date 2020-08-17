@@ -42,7 +42,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -632,11 +631,6 @@ private:
      * The service entry point
      */
     std::unique_ptr<ServiceEntryPoint> _serviceEntryPoint;
-
-    /**
-     * The ServiceExecutor
-     */
-    std::unique_ptr<transport::ServiceExecutor> _serviceExecutor;
 
     /**
      * The storage engine, if any.

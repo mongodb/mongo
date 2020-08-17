@@ -36,7 +36,6 @@
 #include <memory>
 
 #include "mongo/config.h"
-#include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/traffic_recorder.h"
@@ -45,6 +44,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
@@ -59,6 +59,7 @@
 #include "mongo/util/quick_exit.h"
 
 namespace mongo {
+namespace transport {
 namespace {
 MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
 /**
@@ -160,7 +161,6 @@ Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
 
     return exhaustMessage;
 }
-
 }  // namespace
 
 using transport::ServiceExecutor;
@@ -194,9 +194,10 @@ public:
 
         // Set up the thread name
         auto oldThreadName = getThreadName();
-        if (oldThreadName != _ssm->_threadName) {
-            _ssm->_oldThreadName = getThreadName().toString();
-            setThreadName(_ssm->_threadName);
+        const auto& threadName = _ssm->_dbClient->desc();
+        if (oldThreadName != threadName) {
+            _oldThreadName = oldThreadName.toString();
+            setThreadName(threadName);
         }
 
         // Swap the current Client so calls to cc() work as expected
@@ -258,8 +259,8 @@ public:
                 _ssm->_dbClient = Client::releaseCurrent();
             }
 
-            if (!_ssm->_oldThreadName.empty()) {
-                setThreadName(_ssm->_oldThreadName);
+            if (!_oldThreadName.empty()) {
+                setThreadName(_oldThreadName);
             }
         }
 
@@ -287,29 +288,22 @@ public:
 private:
     ServiceStateMachine* _ssm;
     bool _haveTakenOwnership = false;
+    std::string _oldThreadName;
 };
 
-std::shared_ptr<ServiceStateMachine> ServiceStateMachine::create(ServiceContext* svcContext,
-                                                                 transport::SessionHandle session,
-                                                                 transport::Mode transportMode) {
-    return std::make_shared<ServiceStateMachine>(svcContext, std::move(session), transportMode);
-}
-
-ServiceStateMachine::ServiceStateMachine(ServiceContext* svcContext,
-                                         transport::SessionHandle session,
-                                         transport::Mode transportMode)
+ServiceStateMachine::ServiceStateMachine(ServiceContext::UniqueClient client)
     : _state{State::Created},
-      _sep{svcContext->getServiceEntryPoint()},
-      _transportMode(transportMode),
-      _serviceContext(svcContext),
-      _sessionHandle(session),
-      _threadName{str::stream() << "conn" << _session()->id()},
-      _dbClient{svcContext->makeClient(_threadName, std::move(session))},
-      _dbClientPtr{_dbClient.get()},
-      _serviceExecutor(transport::ServiceExecutorSynchronous::get(_serviceContext)) {}
+      _serviceContext{client->getServiceContext()},
+      _sep{_serviceContext->getServiceEntryPoint()},
+      _dbClient{std::move(client)},
+      _dbClientPtr{_dbClient.get()} {}
 
 const transport::SessionHandle& ServiceStateMachine::_session() const {
-    return _sessionHandle;
+    return _dbClientPtr->session();
+}
+
+ServiceExecutor* ServiceStateMachine::_executor() {
+    return ServiceExecutorContext::get(_dbClientPtr)->getServiceExecutor();
 }
 
 Future<void> ServiceStateMachine::_sourceMessage(ThreadGuard guard) {
@@ -319,11 +313,12 @@ Future<void> ServiceStateMachine::_sourceMessage(ThreadGuard guard) {
     guard.release();
 
     auto sourceMsgImpl = [&] {
-        if (_transportMode == transport::Mode::kSynchronous) {
+        const auto& transportMode = _executor()->transportMode();
+        if (transportMode == transport::Mode::kSynchronous) {
             MONGO_IDLE_THREAD_BLOCK;
             return Future<Message>::makeReady(_session()->sourceMessage());
         } else {
-            invariant(_transportMode == transport::Mode::kAsynchronous);
+            invariant(transportMode == transport::Mode::kAsynchronous);
             return _session()->asyncSourceMessage();
         }
     };
@@ -346,13 +341,14 @@ Future<void> ServiceStateMachine::_sinkMessage(ThreadGuard guard) {
     auto toSink = std::exchange(_outMessage, {});
 
     auto sinkMsgImpl = [&] {
-        if (_transportMode == transport::Mode::kSynchronous) {
+        const auto& transportMode = _executor()->transportMode();
+        if (transportMode == transport::Mode::kSynchronous) {
             // We don't consider ourselves idle while sending the reply since we are still doing
             // work on behalf of the client. Contrast that with sourceMessage() where we are waiting
             // for the client to send us more work to do.
             return Future<void>::makeReady(_session()->sinkMessage(std::move(toSink)));
         } else {
-            invariant(_transportMode == transport::Mode::kAsynchronous);
+            invariant(transportMode == transport::Mode::kAsynchronous);
             return _session()->asyncSinkMessage(std::move(toSink));
         }
     };
@@ -439,7 +435,7 @@ Future<void> ServiceStateMachine::_processMessage(ThreadGuard guard) {
     invariant(!_inMessage.empty());
 
     TrafficRecorder::get(_serviceContext)
-        .observe(_sessionHandle, _serviceContext->getPreciseClockSource()->now(), _inMessage);
+        .observe(_session(), _serviceContext->getPreciseClockSource()->now(), _inMessage);
 
     auto& compressorMgr = MessageCompressorManager::forSession(_session());
 
@@ -511,8 +507,7 @@ Future<void> ServiceStateMachine::_processMessage(ThreadGuard guard) {
                 }
 
                 TrafficRecorder::get(_serviceContext)
-                    .observe(
-                        _sessionHandle, _serviceContext->getPreciseClockSource()->now(), toSink);
+                    .observe(_session(), _serviceContext->getPreciseClockSource()->now(), toSink);
 
                 _outMessage = std::move(toSink);
             } else {
@@ -524,16 +519,13 @@ Future<void> ServiceStateMachine::_processMessage(ThreadGuard guard) {
         });
 }
 
-void ServiceStateMachine::setServiceExecutor(ServiceExecutor* executor) {
-    _serviceExecutor = executor;
-}
-
-void ServiceStateMachine::start(Ownership ownershipModel) {
-    _serviceExecutor->schedule(GuaranteedExecutor::enforceRunOnce(
-        [this, anchor = shared_from_this(), ownershipModel](Status status) {
+void ServiceStateMachine::start() {
+    _executor()->schedule(
+        GuaranteedExecutor::enforceRunOnce([this, anchor = shared_from_this()](Status status) {
+            // TODO(SERVER-49109) We can't use static ownership in general with
+            // a ServiceExecutorFixed and async commands. ThreadGuard needs to become smarter.
             ThreadGuard guard(shared_from_this().get());
-            if (ownershipModel == Ownership::kStatic)
-                guard.markStaticOwnership();
+            guard.markStaticOwnership();
 
             // If this is the first run of the SSM, then update its state to Source
             if (state() == State::Created) {
@@ -583,7 +575,7 @@ void ServiceStateMachine::_runOnce() {
                 return;
             }
 
-            _serviceExecutor->schedule(GuaranteedExecutor::enforceRunOnce(
+            _executor()->schedule(GuaranteedExecutor::enforceRunOnce(
                 [this, anchor = shared_from_this()](Status status) { _runOnce(); }));
         });
 }
@@ -674,4 +666,5 @@ void ServiceStateMachine::_cleanupSession(ThreadGuard guard) {
     Client::releaseCurrent();
 }
 
+}  // namespace transport
 }  // namespace mongo

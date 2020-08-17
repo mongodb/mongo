@@ -35,6 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/config.h"
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -48,6 +49,7 @@
 #include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
+namespace transport {
 
 /*
  * The ServiceStateMachine holds the state of a single client connection and represents the
@@ -64,17 +66,9 @@ public:
     ServiceStateMachine& operator=(ServiceStateMachine&&) = delete;
 
     /*
-     * Creates a new ServiceStateMachine for a given session/service context. If sync is true,
-     * then calls into the transport layer will block while they complete, otherwise they will
-     * be handled asynchronously.
+     * Construct a ServiceStateMachine for a given Client.
      */
-    static std::shared_ptr<ServiceStateMachine> create(ServiceContext* svcContext,
-                                                       transport::SessionHandle session,
-                                                       transport::Mode transportMode);
-
-    ServiceStateMachine(ServiceContext* svcContext,
-                        transport::SessionHandle session,
-                        transport::Mode transportMode);
+    ServiceStateMachine(ServiceContext::UniqueClient client);
 
     /*
      * Any state may transition to EndSession in case of an error, otherwise the valid state
@@ -109,13 +103,7 @@ public:
     /*
      * start() schedules a call to _runOnce() in the future.
      */
-    void start(Ownership ownershipModel);
-
-    /*
-     * Set the executor to be used for the next call to runNext(). This allows switching between
-     * thread models after the SSM has started.
-     */
-    void setServiceExecutor(transport::ServiceExecutor* executor);
+    void start();
 
     /*
      * Gets the current state of connection for testing/diagnostic purposes.
@@ -174,6 +162,11 @@ private:
     const transport::SessionHandle& _session() const;
 
     /*
+     * Gets the transport::ServiceExecutor associated with this connection.
+     */
+    ServiceExecutor* _executor();
+
+    /*
      * This function actually calls into the database and processes a request. It's broken out
      * into its own inline function for better readability.
      */
@@ -210,16 +203,12 @@ private:
 
     AtomicWord<State> _state{State::Created};
 
-    ServiceEntryPoint* _sep;
-    transport::Mode _transportMode;
-
     ServiceContext* const _serviceContext;
+    ServiceEntryPoint* const _sep;
 
     transport::SessionHandle _sessionHandle;
-    const std::string _threadName;
     ServiceContext::UniqueClient _dbClient;
-    const Client* _dbClientPtr;
-    transport::ServiceExecutor* _serviceExecutor;
+    Client* _dbClientPtr;
     std::function<void()> _cleanupHook;
 
     bool _inExhaust = false;
@@ -235,7 +224,6 @@ private:
 #if MONGO_CONFIG_DEBUG_BUILD
     AtomicWord<stdx::thread::id> _owningThread;
 #endif
-    std::string _oldThreadName;
 };
 
 template <typename T>
@@ -266,4 +254,5 @@ T& operator<<(T& stream, const ServiceStateMachine::State& state) {
     return stream;
 }
 
+}  // namespace transport
 }  // namespace mongo
