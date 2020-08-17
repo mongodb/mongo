@@ -40,22 +40,34 @@
 namespace mongo {
 
 /**
- * A service context decoration that stores metrics related to API Versions used by applications.
+ * A service context decoration that stores metrics related to the API version used by applications.
  */
-class ApplicationApiVersionMetrics {
+class APIVersionMetrics {
 public:
-    static ApplicationApiVersionMetrics& get(ServiceContext* svc);
+    using APIVersionMetricsMap =
+        stdx::unordered_map<std::string, stdx::unordered_map<std::string, Date_t>>;
 
-    ApplicationApiVersionMetrics() = default;
+    static APIVersionMetrics& get(ServiceContext* svc);
 
-    void update(const ClientMetadata& clientMetadata, const APIParameters& apiParams);
+    APIVersionMetrics() = default;
+
+    // Update the timestamp for the API version used by the application.
+    void update(const std::string appName, const APIParameters& apiParams);
+
+    void appendAPIVersionMetricsInfo(BSONObjBuilder* b);
+
+    APIVersionMetricsMap getAPIVersionMetrics_forTest();
 
 private:
-    void _addVersionTimestamp(std::string applicationName, const APIParameters& apiParams);
+    class APIVersionMetricsSSM;
 
-    stdx::unordered_map<std::string, stdx::unordered_map<std::string, Date_t>>
-        _appNameVersionTimestamps;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ApplicationApiVersionMetrics::_mutex");
+    void _removeStaleTimestamps(WithLock lk, Date_t now);
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("APIVersionMetrics::_mutex");
+
+    // Map of maps for API version metrics. For every application, for each API version, we store
+    // the most recent timestamp that a command was invoked with that API version.
+    APIVersionMetricsMap _apiVersionMetrics;
 };
 
 }  // namespace mongo

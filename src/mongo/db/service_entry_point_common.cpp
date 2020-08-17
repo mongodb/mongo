@@ -936,7 +936,7 @@ void execCommandDatabase(OperationContext* opCtx,
         (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
 
     try {
-        auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
+        const auto apiParamsFromClient = initializeAPIParameters(request.body, command);
         Client* client = opCtx->getClient();
 
         {
@@ -946,10 +946,11 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         auto& apiParams = APIParameters::get(opCtx);
-        auto& apiVersionMetrics = ApplicationApiVersionMetrics::get(opCtx->getServiceContext());
+        auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
         const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
         if (clientMetadata) {
-            apiVersionMetrics.update(clientMetadata.get(), apiParams);
+            auto appName = clientMetadata.get().getApplicationName().toString();
+            apiVersionMetrics.update(appName, apiParams);
         }
 
         sleepMillisAfterCommandExecutionBegins.execute([&](const BSONObj& data) {

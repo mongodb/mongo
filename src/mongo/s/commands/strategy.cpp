@@ -375,25 +375,27 @@ void runCommand(OperationContext* opCtx,
     auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    auto readConcernParseStatus = [&]() {
-        // We must obtain the client lock to set the ReadConcernArgs on the operation
-        // context as it may be concurrently read by CurrentOp.
+    Status readConcernParseStatus = Status::OK();
+    {
+        // We must obtain the client lock to set APIParameters and ReadConcernArgs on the operation
+        // context, as it may be concurrently read by CurrentOp.
         stdx::lock_guard<Client> lk(*client);
         APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
-        return readConcernArgs.initialize(request.body);
-    }();
-
-    auto& apiParams = APIParameters::get(opCtx);
-    auto& apiVersionMetrics = ApplicationApiVersionMetrics::get(opCtx->getServiceContext());
-    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
-    if (clientMetadata) {
-        apiVersionMetrics.update(clientMetadata.get(), apiParams);
+        readConcernParseStatus = readConcernArgs.initialize(request.body);
     }
 
     if (!readConcernParseStatus.isOK()) {
         auto builder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);
         return;
+    }
+
+    auto& apiParams = APIParameters::get(opCtx);
+    auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
+    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
+    if (clientMetadata) {
+        auto appName = clientMetadata.get().getApplicationName().toString();
+        apiVersionMetrics.update(appName, apiParams);
     }
 
     boost::optional<RouterOperationContextSession> routerSession;

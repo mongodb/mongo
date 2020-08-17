@@ -116,6 +116,7 @@ env.Library(
 env.CppUnitTest(
     target='db_stats_test',
     source=[
+        'api_version_metrics_test.cpp',
         'fill_locker_info_test.cpp',
         'operation_latency_histogram_test.cpp',
         'timer_stats_test.cpp',
@@ -123,6 +124,10 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/shared_request_handling',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        'api_version_metrics',
         'fill_locker_info',
         'timer_stats',
         'top',
