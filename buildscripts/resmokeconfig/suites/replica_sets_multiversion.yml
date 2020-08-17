@@ -6,6 +6,8 @@ selector:
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_47
+  - backport_required_multiversion
+  - replica_sets_multiversion_backport_required_multiversion
   exclude_files:
   - jstests/replsets/initial_sync_rename_collection.js
   - jstests/replsets/initial_sync_drop_collection.js
@@ -14,6 +16,11 @@ selector:
   - jstests/replsets/invalidate_sessions_on_stepdown.js
   - jstests/replsets/rollback_via_refetch_anomaly.js
   - jstests/replsets/initial_sync_fails_unclean_restart.js
+
+  # This tag file can be created using ./buildscripts/evergreen_gen_multiversion_tests.py
+  # or downloaded from the evergreen task.
+  tag_file: multiversion_exclude_tags.yml
+
 executor:
   config:
     shell_options:

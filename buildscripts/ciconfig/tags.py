@@ -6,6 +6,8 @@ from functools import cmp_to_key
 import textwrap
 import yaml
 
+from ..resmokelib.utils import default_if_none
+
 
 # Setup to preserve order in yaml.dump, see https://stackoverflow.com/a/8661021
 def _represent_dict_order(self, data):
@@ -20,13 +22,14 @@ yaml.add_representer(collections.OrderedDict, _represent_dict_order)
 class TagsConfig(object):
     """Represent a test tag configuration file."""
 
-    def __init__(self, raw, cmp_func=None):
+    def __init__(self, raw=None, cmp_func=None):
         """Initialize a TagsConfig from a dict representing the associations between tests and tags.
 
+        'raw' is a dict containing a 'selector' key, whose value is a dict mapping test kinds to tests to tags.
         'cmp_func' can be used to specify a comparison function that will be used when sorting tags.
         """
 
-        self.raw = raw
+        self.raw = default_if_none(raw, {"selector": {}})
         self._conf = self.raw["selector"]
         self._conf_copy = copy.deepcopy(self._conf)
         self._cmp_func = cmp_func

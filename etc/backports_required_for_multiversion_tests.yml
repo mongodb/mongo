@@ -17,60 +17,44 @@
 # 'replica_sets_multiversion_gen' task until this file has been updated with the same
 # (ticket, test_file) pair on the last-lts branch.
 #
-# Note:
-# For tests that need to be blacklisted for the 'replica_sets_multiversion' and
-# 'sharding_multiversion' suites, please instead add them under the 'exclude_files' key in
-# 'replica_sets_multiversion.yml' and 'sharding_multiversion.yml' respectively.
-#
 
-change_streams_multiversion:
+# Tests that should be excluded from ALL multiversion suites should be listed here.
+all:
+  - ticket: SERVER-49471
+    test_file: jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
+  - ticket: SERVER-47645
+    test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
+  - ticket: SERVER-48518
+    test_file: jstests/replsets/rollback_via_refetch_anomaly.js
+  - ticket: SERVER-47773
+    test_file: jstests/core/geo_near_tailable.js
+  - ticket: SERVER-47469
+    test_file: jstests/core/apply_ops_system_dot_views.js
+  - ticket: SERVER-48614
+    test_file: jstests/core/wildcard_index_partial_index.js
+  - ticket: SERVER-48993
+    test_file: jstests/core/explode_for_sort_collation.js
+  - ticket: SERVER-48525
+    test_file: jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
+  - ticket: SERVER-47810
+    test_file: jstests/change_streams/report_post_batch_resume_token.js
+  - ticket: SERVER-50140
+    test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
 
-change_streams_sharded_collections_multiversion_passthrough:
-- ticket: SERVER-47810
-  test_file: jstests/change_streams/report_post_batch_resume_token.js
+# Tests that should only be excluded from particular suites should be listed under that suite.
+suites:
+  change_streams_multiversion:
 
-concurrency_replication_multiversion:
+  change_streams_sharded_collections_multiversion_passthrough:
 
-concurrency_sharded_replication_multiversion:
+  concurrency_replication_multiversion:
 
-replica_sets_multiversion:
-- ticket: SERVER-49471
-  test_file: jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
-- ticket: SERVER-47645
-  test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
-- ticket: SERVER-48518
-  test_file: jstests/replsets/rollback_via_refetch_anomaly.js
-- ticket: SERVER-50140
-  test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
+  concurrency_sharded_replication_multiversion:
 
-replica_sets_jscore_multiversion_passthrough:
-- ticket: SERVER-47773
-  test_file: jstests/core/geo_near_tailable.js
-- ticket: SERVER-47469
-  test_file: jstests/core/apply_ops_system_dot_views.js
-- ticket: SERVER-48614
-  test_file: jstests/core/wildcard_index_partial_index.js
-- ticket: SERVER-48993
-  test_file: jstests/core/explode_for_sort_collation.js
-- ticket: SERVER-48525
-  test_file: jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
+  replica_sets_multiversion:
 
-sharding_jscore_multiversion_passthrough:
-- ticket: SERVER-47773
-  test_file: jstests/core/geo_near_tailable.js
-- ticket: SERVER-47469
-  test_file: jstests/core/apply_ops_system_dot_views.js
-- ticket: SERVER-48614
-  test_file: jstests/core/wildcard_index_partial_index.js
-- ticket: SERVER-48993
-  test_file: jstests/core/explode_for_sort_collation.js
+  replica_sets_jscore_multiversion_passthrough:
 
-sharded_collections_jscore_multiversion_passthrough:
-- ticket: SERVER-47773
-  test_file: jstests/core/geo_near_tailable.js
-- ticket: SERVER-47469
-  test_file: jstests/core/apply_ops_system_dot_views.js
-- ticket: SERVER-48614
-  test_file: jstests/core/wildcard_index_partial_index.js
-- ticket: SERVER-48993
-  test_file: jstests/core/explode_for_sort_collation.js
+  sharding_jscore_multiversion_passthrough:
+
+  sharded_collections_jscore_multiversion_passthrough:

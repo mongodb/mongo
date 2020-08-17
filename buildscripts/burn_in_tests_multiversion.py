@@ -74,16 +74,10 @@ def create_multiversion_generate_tasks_config(tests_by_task: Dict, evg_api: Ever
                 evg_api, gen_resmoke.ConfigOptions(config_options))
             test_list = tests_by_task[suite["origin"]]["tests"]
             for test in test_list:
-                # Exclude files that should be blacklisted from multiversion testing.
-                files_to_exclude = gen_multiversion.get_exclude_files(suite["multiversion_name"],
-                                                                      TASK_PATH_SUFFIX)
-                LOGGER.debug("Files to exclude", files_to_exclude=files_to_exclude, test=test,
-                             suite=suite["multiversion_name"])
-                if test not in files_to_exclude:
-                    # Generate the multiversion tasks for each test.
-                    sub_tasks = config_generator.get_burn_in_tasks(test, idx)
-                    tasks = tasks.union(sub_tasks)
-                    idx += 1
+                # Generate the multiversion tasks for each test.
+                sub_tasks = config_generator.get_burn_in_tasks(test, idx)
+                tasks = tasks.union(sub_tasks)
+                idx += 1
 
     existing_tasks = {ExistingTask(f"{BURN_IN_MULTIVERSION_TASK}_gen")}
     build_variant.display_task(BURN_IN_MULTIVERSION_TASK, tasks,
