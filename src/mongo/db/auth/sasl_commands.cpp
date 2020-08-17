@@ -335,18 +335,26 @@ bool runSaslStart(OperationContext* opCtx,
     }
 
     std::string principalName;
-    auto swSession = doSaslStart(opCtx, db, cmdObj, &result, &principalName, speculative);
-
-    if (!swSession.isOK() || swSession.getValue()->getMechanism().isSuccess()) {
-        audit::logAuthentication(
-            client, mechanismName, UserName(principalName, db), swSession.getStatus().code());
-        uassertStatusOK(swSession.getStatus());
-        if (swSession.getValue()->getMechanism().isSuccess()) {
-            uassertStatusOK(authCounter.incAuthenticateSuccessful(mechanismName));
+    try {
+        auto session =
+            uassertStatusOK(doSaslStart(opCtx, db, cmdObj, &result, &principalName, speculative));
+        const bool isClusterMember = session->getMechanism().isClusterMember();
+        if (isClusterMember) {
+            uassertStatusOK(authCounter.incClusterAuthenticateReceived(mechanismName));
         }
-    } else {
-        auto session = std::move(swSession.getValue());
-        AuthenticationSession::swap(client, session);
+        if (session->getMechanism().isSuccess()) {
+            uassertStatusOK(authCounter.incAuthenticateSuccessful(mechanismName));
+            if (isClusterMember) {
+                uassertStatusOK(authCounter.incClusterAuthenticateSuccessful(mechanismName));
+            }
+            audit::logAuthentication(
+                client, mechanismName, UserName(principalName, db), Status::OK().code());
+        } else {
+            AuthenticationSession::swap(client, session);
+        }
+    } catch (const AssertionException& ex) {
+        audit::logAuthentication(client, mechanismName, UserName(principalName, db), ex.code());
+        throw;
     }
 
     return true;
@@ -408,6 +416,10 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
         if (mechanism.isSuccess()) {
             uassertStatusOK(
                 authCounter.incAuthenticateSuccessful(mechanism.mechanismName().toString()));
+            if (mechanism.isClusterMember()) {
+                uassertStatusOK(authCounter.incClusterAuthenticateSuccessful(
+                    mechanism.mechanismName().toString()));
+            }
         }
     } else {
         AuthenticationSession::swap(client, sessionGuard);

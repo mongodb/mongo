@@ -37,13 +37,16 @@ const mechStats =
 printjson(mechStats);
 assert(mechStats['MONGODB-X509'] !== undefined);
 Object.keys(mechStats).forEach(function(mech) {
-    const stats = mechStats[mech].speculativeAuthenticate;
+    const specStats = mechStats[mech].speculativeAuthenticate;
+    const clusterStats = mechStats[mech].clusterAuthenticate;
     if (mech === 'MONGODB-X509') {
-        assert.gte(stats.received, 2);
+        assert.gte(specStats.received, 2);
+        assert.gte(clusterStats.received, 2);
     } else {
-        assert.eq(stats.received, 0);
+        assert.eq(specStats.received, 0);
     }
-    assert.eq(stats.received, stats.successful);
+    assert.eq(specStats.received, specStats.successful);
+    assert.gte(clusterStats.received, clusterStats.successful);
 });
 
 admin.logout();
