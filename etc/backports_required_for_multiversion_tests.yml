@@ -40,6 +40,24 @@ all:
     test_file: jstests/change_streams/report_post_batch_resume_token.js
   - ticket: SERVER-50140
     test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
+  - ticket: SERVER-49986
+    test_file: jstests/core/ismaster.js
+  - ticket: SERVER-49986
+    test_file: jstests/core/views/views_all_commands.js
+  - ticket: SERVER-49986
+    test_file: jstests/sharding/database_versioning_all_commands.js
+  - ticket: SERVER-49986
+    test_file: jstests/sharding/ismaster.js
+  - ticket: SERVER-49986
+    test_file: jstests/sharding/read_write_concern_defaults_application.js
+  - ticket: SERVER-49986
+    test_file: jstests/sharding/safe_secondary_reads_drop_recreate.js
+  - ticket: SERVER-49986
+    test_file: jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
+  - ticket: SERVER-49986
+    test_file: jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
+  - ticket: SERVER-49991
+    test_file: jstests/replsets/get_replication_info_helper.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

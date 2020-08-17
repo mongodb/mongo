@@ -22,7 +22,6 @@
  *                                     results for the command run with read concern 'available'.
  * - behavior: Must be one of "unshardedOnly", "targetsPrimaryUsesConnectionVersioning" or
  * "versioned". Determines what system profiler checks are performed.
- * @tags: [requires_fcv_47]
  */
 (function() {
 "use strict";

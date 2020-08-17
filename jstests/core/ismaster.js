@@ -1,7 +1,6 @@
 /**
  * This test ensures that the hello command and its aliases, ismaster and isMaster, are all
  * accepted.
- * @tags: [requires_fcv_47]
  */
 "use strict";
 

@@ -1,6 +1,5 @@
 // Tests the output of db.getReplicationInfo(), db.printSlaveReplicationInfo(), and the latter's
 // alias, db.printSecondaryReplicationInfo().
-// @tags: [requires_fcv_47]
 
 (function() {
 "use strict";

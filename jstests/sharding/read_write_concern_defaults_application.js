@@ -25,8 +25,7 @@
  *   does_not_support_stepdowns,
  *   requires_majority_read_concern,
  *   requires_profiling,
- *   uses_transactions,
- *   requires_fcv_47
+ *   uses_transactions
  * ]
  */
 (function() {

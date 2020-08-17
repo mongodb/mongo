@@ -15,7 +15,6 @@
  *                 *when the the collection has been dropped and recreated as empty.*
  * - behavior: Must be "unshardedOnly", or "versioned". Determines what system profiler checks are
  * performed.
- * @tags: [requires_fcv_47]
  */
 (function() {
 "use strict";
