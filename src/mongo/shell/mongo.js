@@ -361,9 +361,16 @@ connect = function(url, user, pass) {
     try {
         var m = new Mongo(url);
     } catch (e) {
-        if (url.indexOf(".mongodb.net") != -1) {
-            print("\n\n*** It looks like this is a MongoDB Atlas cluster. Please ensure that your" +
-                  " IP whitelist allows connections from your network.\n\n");
+        var dest;
+        if (url.indexOf(".query.mongodb.net") != -1) {
+            dest = "MongoDB Atlas Data Lake";
+        } else if (url.indexOf(".mongodb.net") != -1) {
+            dest = "MongoDB Atlas cluster";
+        }
+
+        if (dest) {
+            print(`\n\n*** You have failed to connect to a ${dest}. Please ensure` +
+                  " that your IP whitelist allows connections from your network.\n\n");
         }
 
         throw e;
