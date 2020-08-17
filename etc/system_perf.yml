@@ -1584,6 +1584,26 @@ buildvariants:
         variant: compile-amazon2
   tasks: *3nodetasks
 
+- name: linux-3-node-replSet-last-lts-fcv
+  display_name: Linux 3-Node ReplSet (Last LTS FCV)
+  batchtime: 10080  # 7 days
+  modules: *modules
+  expansions:
+    setup: replica-last-lts-fcv
+    cluster: replica
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-replset"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
+  tasks: *3nodetasks
+
 - name: linux-3-node-replSet-noflowcontrol
   display_name: Linux 3-Node ReplSet (Flow Control off)
   batchtime: 10080  # 7 days
