@@ -87,6 +87,10 @@ const NamespaceString NamespaceString::kRangeDeletionNamespace(NamespaceString::
                                                                "rangeDeletions");
 const NamespaceString NamespaceString::kConfigReshardingOperationsNamespace(
     NamespaceString::kConfigDb, "reshardingOperations");
+
+const NamespaceString NamespaceString::kDonorReshardingOperationsNamespace(
+    NamespaceString::kConfigDb, "localReshardingOperations.donor");
+
 const NamespaceString NamespaceString::kConfigSettingsNamespace(NamespaceString::kConfigDb,
                                                                 "settings");
 const NamespaceString NamespaceString::kVectorClockNamespace(NamespaceString::kConfigDb,

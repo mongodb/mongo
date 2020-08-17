@@ -69,6 +69,7 @@ class UUID {
     friend class DonorStartMigration;
     friend class DonorWaitForMigrationToCommit;
     friend class DonorForgetMigration;
+    friend class DonorStateMachine;
     friend class DatabaseVersion;
     friend class DbCheckOplogCollection;
     friend class EncryptionPlaceholder;

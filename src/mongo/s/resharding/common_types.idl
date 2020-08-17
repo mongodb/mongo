@@ -58,10 +58,10 @@ enums:
         values:
             kUnused: "unused"
             kInitializing: "initializing"
-            kDonatingInitialData: "donating-initial-data"
-            kDonatingOplogEntries: "donating-oplog-entries"
+            kDonating: "donating"
             kMirroring: "mirroring"
             kDropping: "dropping"
+            kDone: "done"
             kError: "error"
 
     RecipientState:
