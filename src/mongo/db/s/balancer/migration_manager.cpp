@@ -65,10 +65,6 @@ namespace {
 
 const char kChunkTooBig[] = "chunkTooBig";  // TODO: delete in 3.8
 
-const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutMigration);
-
 /**
  * Parses the 'commandResponse' and converts it to a status to use as the outcome of the command.
  * Preserves backwards compatibility with 3.4 and earlier shards that, rather than use a ChunkTooBig
@@ -616,7 +612,8 @@ void MigrationManager::_abandonActiveMigrationsAndEnableManager(OperationContext
     // Clear the config.migrations collection so that those chunks can be scheduled for migration
     // again.
     catalogClient
-        ->removeConfigDocuments(opCtx, MigrationType::ConfigNS, BSONObj(), kMajorityWriteConcern)
+        ->removeConfigDocuments(
+            opCtx, MigrationType::ConfigNS, BSONObj(), ShardingCatalogClient::kLocalWriteConcern)
         .transitional_ignore();
 
     _state = State::kEnabled;
