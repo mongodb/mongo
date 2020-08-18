@@ -378,7 +378,9 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
     LatchAnalyzer::get(serviceContext).dump();
 #endif
 
+#ifdef MONGO_CONFIG_SSL
     OCSPManager::shutdown(serviceContext);
+#endif
 }
 
 Status initializeSharding(OperationContext* opCtx) {
