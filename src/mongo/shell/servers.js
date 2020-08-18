@@ -1162,7 +1162,7 @@ function appendSetParameterArgs(argArray) {
             argArray.push(...['--setParameter', "enableTestCommands=1"]);
         }
 
-        if (programMajorMinorVersion > 440) {
+        if (programMajorMinorVersion >= 440) {
             if (jsTest.options().testingDiagnosticsEnabled) {
                 argArray.push(...['--setParameter', "testingDiagnosticsEnabled=1"]);
             }
