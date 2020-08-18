@@ -29,16 +29,14 @@
 
 #include <queue>
 
-#include "mongo/db/exec/sbe/parser/parser.h"
-#include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/project.h"
-#include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/storage/key_string.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
 
 namespace {
+using SBEKeyStringTest = EExpressionTestFixture;
+
 std::string valueDebugString(std::pair<value::TypeTags, value::Value> value) {
     std::stringstream stream;
     stream << std::make_pair(value.first, value.second);
@@ -52,7 +50,7 @@ std::string valueDebugString(std::pair<value::TypeTags, value::Value> value) {
         BOB.append(NAME "-descending", VALUE); \
     } while (false);
 
-TEST(SBEKeyStringTest, Basic) {
+TEST_F(SBEKeyStringTest, Basic) {
     // Add interesting values to a BSON object. Note that we add each value twice: one will have an
     // "ascending" ordering, and the other will have a "descending" ordering.
     BSONObjBuilder bob;
@@ -121,27 +119,23 @@ TEST(SBEKeyStringTest, Basic) {
 
     // The expression takes three inputs:
     //   1) the BSON object,
-    value::SlotId bsonObjSlot = 1;
     value::ViewOfValueAccessor bsonObjAccessor;
-    ctx.pushCorrelated(bsonObjSlot, &bsonObjAccessor);
+    auto bsonObjSlot = bindAccessor(&bsonObjAccessor);
 
     //  2) the field name corresponding to the BSON element,
-    value::SlotId fieldNameSlot = 2;
     value::OwnedValueAccessor fieldNameAccessor;
-    ctx.pushCorrelated(fieldNameSlot, &fieldNameAccessor);
+    auto fieldNameSlot = bindAccessor(&fieldNameAccessor);
 
     //  3) and the KeyString component.
-    value::SlotId keyStringComponentSlot = 3;
     value::ViewOfValueAccessor keyStringComponentAccessor;
-    ctx.pushCorrelated(keyStringComponentSlot, &keyStringComponentAccessor);
+    auto keyStringComponentSlot = bindAccessor(&keyStringComponentAccessor);
 
     auto comparisonExpr = makeE<EPrimBinary>(
         EPrimBinary::eq,
         makeE<EVariable>(keyStringComponentSlot),
         makeE<EFunction>("getField",
                          makeEs(makeE<EVariable>(bsonObjSlot), makeE<EVariable>(fieldNameSlot))));
-    auto compiledComparison = comparisonExpr->compile(ctx);
-
+    auto compiledExpr = compileExpression(*comparisonExpr);
 
     bsonObjAccessor.reset(value::TypeTags::bsonObject, value::bitcastFrom(testValues.objdata()));
     std::vector<sbe::value::ViewOfValueAccessor> keyStringValues;
@@ -165,8 +159,7 @@ TEST(SBEKeyStringTest, Basic) {
         auto [fieldNameTag, fieldNameVal] = value::makeNewString(element.fieldName());
         fieldNameAccessor.reset(fieldNameTag, fieldNameVal);
 
-        vm::ByteCode vm;
-        auto result = vm.runPredicate(compiledComparison.get());
+        auto result = runCompiledExpressionPredicate(compiledExpr.get());
         ASSERT(result) << "BSONElement (" << element << ") failed to match KeyString component ("
                        << valueDebugString(std::make_pair(componentTag, componentVal)) << ")";
     }

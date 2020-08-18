@@ -1109,7 +1109,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
     MONGO_UNREACHABLE;
 }
 
-std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(CodeFragment* code) {
+std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragment* code) {
     auto pcPointer = code->instrs().data();
     auto pcEnd = pcPointer + code->instrs().size();
 
@@ -1762,7 +1762,7 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(CodeFragment* c
     return {owned, tag, val};
 }
 
-bool ByteCode::runPredicate(CodeFragment* code) {
+bool ByteCode::runPredicate(const CodeFragment* code) {
     auto [owned, tag, val] = run(code);
 
     bool pass = (tag == value::TypeTags::Boolean) && (val != 0);

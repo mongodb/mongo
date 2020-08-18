@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/scopeguard.h"
-
+#include "mongo/db/exec/sbe/expression_test_base.h"
 
 namespace mongo::sbe {
 namespace test_detail {
@@ -53,7 +47,7 @@ std::unique_ptr<sbe::EExpression> makeEFromNumber<mongo::Decimal128>(const Decim
 }
 }  // namespace test_detail
 
-class SBENumericTest : public mongo::unittest::Test {
+class SBENumericTest : public EExpressionTestFixture {
 protected:
     // Assert that convert(input) == output.
     template <typename Input, typename Output>
@@ -63,16 +57,9 @@ protected:
                           const value::TypeTags targetTag) {
 
         auto expr = test_detail::makeEFromNumber(input, srcTag, targetTag);
-
-        auto code = expr->compile(_ctx);
-
-        auto [owned, tag, val] = _interpreter.run(code.get());
-
-        auto guard = makeGuard([owned = owned, tag = tag, val = val] {
-            if (owned) {
-                value::releaseValue(tag, val);
-            }
-        });
+        auto compiledExpr = compileExpression(*expr);
+        auto [tag, val] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(tag, val);
 
         ASSERT_EQUALS(tag, targetTag);
 
@@ -90,24 +77,12 @@ protected:
     template <typename T>
     void assertLossy(const T input, const value::TypeTags srcTag, const value::TypeTags targetTag) {
         auto expr = test_detail::makeEFromNumber(input, srcTag, targetTag);
+        auto compiledExpr = compileExpression(*expr);
 
-        auto code = expr->compile(_ctx);
-
-        auto [owned, tag, val] = _interpreter.run(code.get());
-
-        auto guard = makeGuard([owned = owned, tag = tag, val = val] {
-            if (owned) {
-                value::releaseValue(tag, val);
-            }
-        });
-
+        auto [tag, val] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(tag, val);
         ASSERT_EQUALS(tag, value::TypeTags::Nothing);
     }
-
-    CompileCtx _ctx{std::make_unique<RuntimeEnvironment>()};
-    CoScanStage _emptyStage;
-
-    vm::ByteCode _interpreter;
 };
 
 TEST_F(SBENumericTest, Int32ToInt64) {

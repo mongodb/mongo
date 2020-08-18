@@ -188,6 +188,9 @@ public:
     auto& instrs() {
         return _instrs;
     }
+    const auto& instrs() const {
+        return _instrs;
+    }
     auto stackSize() const {
         return _stackSize;
     }
@@ -294,8 +297,8 @@ class ByteCode {
 public:
     ~ByteCode();
 
-    std::tuple<uint8_t, value::TypeTags, value::Value> run(CodeFragment* code);
-    bool runPredicate(CodeFragment* code);
+    std::tuple<uint8_t, value::TypeTags, value::Value> run(const CodeFragment* code);
+    bool runPredicate(const CodeFragment* code);
 
 private:
     std::vector<uint8_t> _argStackOwned;
