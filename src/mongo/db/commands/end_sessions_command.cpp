@@ -92,6 +92,14 @@ public:
         return true;
     }
 
+    /**
+     * Drivers may implicitly call {endSessions:...} for unauthenticated clients.
+     * Don't bother auditing when this happens.
+     */
+    bool auditAuthorizationFailure() const final {
+        return false;
+    }
+
 } endSessionsCommand;
 
 }  // namespace
