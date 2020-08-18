@@ -81,6 +81,14 @@ public:
         processInternal(input, merging);
     }
 
+    /**
+     * Finish processing all the pending operations, and clean up memory. Some accumulators
+     * ($accumulator for example) might do a batch processing in order to improve performace. In
+     * those cases, the memory consumption could spike up. Calling this function can help flush
+     * those batch.
+     */
+    virtual void reduceMemoryConsumptionIfAble() {}
+
     /** Marks the end of the evaluate() phase and return accumulated result.
      *  toBeMerged should be true when the outputs will be merged by process().
      */

@@ -99,6 +99,8 @@ public:
     Value getValue(bool toBeMerged) final;
     void reset() final;
     void processInternal(const Value& input, bool merging) final;
+    void reduceMemoryConsumptionIfAble() final;
+
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
@@ -140,9 +142,6 @@ private:
     // other instances of $accumulator. False means the elements of _pendingCalls should be
     // interpreted as inputs from accumulateArgs.
     bool _pendingCallsMerging;
-
-    // Call the user's accumulate/merge function for each element of _pendingCalls.
-    void reducePendingCalls();
 };
 
 }  // namespace mongo

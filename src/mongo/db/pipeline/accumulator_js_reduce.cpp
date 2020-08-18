@@ -330,7 +330,7 @@ Value AccumulatorJs::getValue(bool toBeMerged) {
     invariant(_state);
 
     // Ensure we've actually called accumulate/merge for every input document.
-    reducePendingCalls();
+    reduceMemoryConsumptionIfAble();
     invariant(_pendingCalls.empty());
 
     // If toBeMerged then we return the current state, to be fed back in to accumulate / merge /
@@ -418,13 +418,13 @@ void AccumulatorJs::processInternal(const Value& input, bool merging) {
                            sizeof(std::pair<Value, bool>));
 }
 
-void AccumulatorJs::reducePendingCalls() {
+void AccumulatorJs::reduceMemoryConsumptionIfAble() {
     // _state should be nonempty because we populate it in startNewGroup.
     invariant(_state);
-    // $group and $bucketAuto never create empty groups. The only time an accumulator is asked to
-    // accumulate an empty set is in ExpressionFromArray, but $accumulator is never used that way
-    // ($accumulator is not registered as an expression the way $sum and $avg and others are).
-    invariant(!_pendingCalls.empty());
+
+    if (_pendingCalls.empty()) {
+        return;
+    }
 
     auto& expCtx = getExpressionContext();
     auto jsExec = expCtx->getJsExecWithScope();

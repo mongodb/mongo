@@ -182,6 +182,21 @@ protected:
     void doDispose() final;
 
 private:
+    struct MemoryUsageTracker {
+        /**
+         * Cleans up any pending memory usage. Throws error, if memory usage is above
+         * 'maxMemoryUsageBytes' and cannot spill to disk. The 'saveMemory' function should return
+         * the amount of memory saved by the cleanup.
+         *
+         * Returns true, if the caller should spill to disk, false otherwise.
+         */
+        bool shouldSpillWithAttemptToSaveMemory(std::function<int()> saveMemory);
+
+        const bool allowDiskUse;
+        const size_t maxMemoryUsageBytes;
+        size_t memoryUsageBytes = 0;
+    };
+
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                  boost::optional<size_t> maxMemoryUsageBytes = boost::none);
 
@@ -214,6 +229,12 @@ private:
      */
     std::shared_ptr<Sorter<Value, Value>::Iterator> spill();
 
+    /**
+     * If we ran out of memory, finish all the pending operations so that some memory
+     * can be freed.
+     */
+    int freeMemory();
+
     Document makeDocument(const Value& id, const Accumulators& accums, bool mergeableOutput);
 
     /**
@@ -236,8 +257,9 @@ private:
 
     bool _usedDisk;  // Keeps track of whether this $group spilled to disk.
     bool _doingMerge;
-    size_t _memoryUsageBytes = 0;
-    size_t _maxMemoryUsageBytes;
+
+    MemoryUsageTracker _memoryTracker;
+
     std::string _fileName;
     std::streampos _nextSortedFileWriterOffset = 0;
     bool _ownsFileDeletion = true;  // unless a MergeIterator is made that takes over.
@@ -263,7 +285,6 @@ private:
 
     // Only used when '_spilled' is true.
     std::unique_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
-    const bool _allowDiskUse;
 
     std::pair<Value, Value> _firstPartOfNextGroup;
 };
