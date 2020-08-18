@@ -655,6 +655,14 @@ MongoDBUniqueStack()
 class MongoDBJavaScriptStack(gdb.Command):
     """Print the JavaScript stack from a MongoDB process."""
 
+    # Looking to test your changes to this? Really easy!
+    # 1. install-core to build the mongo shell binary (mongo)
+    # 2. launch it: ./path/to/bin/mongo --nodb
+    # 3. in the shell, run: sleep(99999999999). (do not use --eval)
+    # 4. ps ax | grep nodb to find the PID
+    # 5. gdb -p <PID>.
+    # 6. Run this command, mongodb-javascript-stack
+
     def __init__(self):
         """Initialize MongoDBJavaScriptStack."""
         RegisterMongoCommand.register(self, "mongodb-javascript-stack", gdb.COMMAND_STATUS)
@@ -668,6 +676,24 @@ class MongoDBJavaScriptStack(gdb.Command):
             self.javascript_stack()
         else:
             print("No JavaScript stack print done for: %s" % (main_binary_name))
+
+    @staticmethod
+    def atomic_get_ptr(atomic_scope: gdb.Value):
+        """Fetch the underlying pointer from std::atomic."""
+
+        # Awkwardly, the gdb.Value type does not support a check like
+        # `'_M_b' in atomic_scope`, so exceptions for flow control it is. :|
+        try:
+            # reach into std::atomic and grab the pointer. This is for libc++
+            return atomic_scope['_M_b']['_M_p']
+        except gdb.error:
+            # Worst case scenario: try and use .load(), but it's probably
+            # inlined. parse_and_eval required because you can't call methods
+            # in gdb on the Python API
+            return gdb.parse_and_eval(
+                f"((std::atomic<mongo::mozjs::MozJSImplScope*> *)({atomic_scope.address}))->load()")
+
+        return None
 
     @staticmethod
     def javascript_stack():
@@ -690,13 +716,29 @@ class MongoDBJavaScriptStack(gdb.Command):
                 continue
 
             try:
-                if gdb.parse_and_eval(
-                        'mongo::mozjs::kCurrentScope && mongo::mozjs::kCurrentScope->_inOp'):
-                    gdb.execute('thread', from_tty=False, to_string=False)
-                    gdb.execute(
-                        'printf "%s\\n", ' +
-                        'mongo::mozjs::kCurrentScope->buildStackString().c_str()', from_tty=False,
-                        to_string=False)
+                # The following block is roughly equivalent to this:
+                # namespace mongo::mozjs {
+                #   std::atomic<MozJSImplScope*> kCurrentScope = ...;
+                # }
+                # if (!scope || scope->_inOp == 0) { continue; }
+                # print(scope->buildStackString()->c_str());
+                atomic_scope = gdb.parse_and_eval("mongo::mozjs::kCurrentScope")
+                ptr = MongoDBJavaScriptStack.atomic_get_ptr(atomic_scope)
+                if not ptr:
+                    continue
+
+                scope = ptr.dereference()
+                if scope['_inOp'] == 0:
+                    continue
+
+                gdb.execute('thread', from_tty=False, to_string=False)
+                # gdb continues to not support calling methods through Python,
+                # so work around it by casting the raw ptr back to its type,
+                # and calling the method through execute darkness
+                gdb.execute(
+                    f'printf "%s\\n", ((mongo::mozjs::MozJSImplScope*)({ptr}))->buildStackString().c_str()',
+                    from_tty=False, to_string=False)
+
             except gdb.error as err:
                 print("Ignoring GDB error '%s' in javascript_stack" % str(err))
                 continue
