@@ -227,7 +227,16 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
     };
 
     NamespaceString nss = invocation ? invocation->ns() : NamespaceString(request.getDatabase());
-    audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(invocation, &nss), err);
+
+    // Always audit errors other than Unauthorized.
+    //
+    // When we get Unauthorized (usually),
+    // then only audit if our Command definition wants it (default),
+    // or if we don't know our Command definition.
+    if ((err != ErrorCodes::Unauthorized) || !invocation ||
+        invocation->definition()->auditAuthorizationFailure()) {
+        audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(invocation, &nss), err);
+    }
 }
 
 void CommandHelpers::uassertNoDocumentSequences(StringData commandName,
@@ -488,7 +497,9 @@ bool CommandHelpers::uassertShouldAttemptParse(OperationContext* opCtx,
     try {
         return checkAuthorizationImplPreParse(opCtx, command, request);
     } catch (const ExceptionFor<ErrorCodes::Unauthorized>& e) {
-        CommandHelpers::auditLogAuthEvent(opCtx, nullptr, request, e.code());
+        if (command->auditAuthorizationFailure()) {
+            CommandHelpers::auditLogAuthEvent(opCtx, nullptr, request, e.code());
+        }
         throw;
     }
 }

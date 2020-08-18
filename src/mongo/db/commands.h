@@ -517,6 +517,13 @@ public:
      */
     bool hasAlias(const StringData& alias) const;
 
+    /**
+     * Audit when this command fails authz check.
+     */
+    virtual bool auditAuthorizationFailure() const {
+        return true;
+    }
+
 private:
     // The full name of the command
     const std::string _name;
