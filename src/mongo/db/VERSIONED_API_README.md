@@ -1,4 +1,4 @@
-#MongoDB Versioned API
+# MongoDB Versioned API
 
 The MongoDB API is the user-visible behavior of all commands, including their parameters and reply
 fields. An "API version" is a subset of the API for which we make an especially strong promise: For
