@@ -36,12 +36,23 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/resharded_chunk_gen.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
 constexpr auto kReshardingOplogPrePostImageOps = "prePostImageOps"_sd;
+
+/**
+ * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Throws if one of the
+ * shards fails to refresh.
+ */
+void tellShardsToRefresh(OperationContext* opCtx,
+                         const std::vector<ShardId>& shardIds,
+                         const NamespaceString& nss,
+                         std::shared_ptr<executor::TaskExecutor> executor);
 
 /**
  * Asserts that there is not a hole or overlap in the chunks.

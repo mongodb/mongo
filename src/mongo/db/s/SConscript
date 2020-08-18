@@ -140,6 +140,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/expression_context',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/grid',
     ],
@@ -523,6 +524,7 @@ env.CppUnitTest(
         'balancer/type_migration_test.cpp',
         'config_server_op_observer_test.cpp',
         'vector_clock_config_server_test.cpp',
+        'resharding_util_refresh_test.cpp',
         'resharding_util_test.cpp',
     ],
     LIBDEPS=[
