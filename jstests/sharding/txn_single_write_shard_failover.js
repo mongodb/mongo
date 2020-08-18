@@ -10,9 +10,8 @@
  * causing the client to retry the whole transaction at a higher transaction number and the
  * transaction's write to be applied twice.
  *
- * TODO (SERVER-48341): Remove requires_fcv_44 after backporting SERVER-48307 to 4.2.
  * requires_find_command because legacy queries cannot be run in a session.
- * @tags: [requires_find_command, requires_fcv_44, uses_transactions, uses_multi_shard_transaction]
+ * @tags: [requires_find_command, uses_transactions, uses_multi_shard_transaction]
  */
 
 (function() {

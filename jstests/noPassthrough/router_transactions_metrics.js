@@ -1,7 +1,6 @@
 // Tests multi-statement transactions metrics in the serverStatus output from mongos in various
 // basic cases.
-// TODO (SERVER-48341): Remove requires_fcv_44 after backporting SERVER-48307 to 4.2.
-// @tags: [requires_fcv_44, uses_transactions, uses_multi_shard_transaction]
+// @tags: [uses_transactions, uses_multi_shard_transaction]
 (function() {
 "use strict";
 
