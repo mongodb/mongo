@@ -632,10 +632,18 @@ DBCollection.prototype._indexSpec = function(keys, options) {
 };
 
 DBCollection.prototype.createIndex = function(keys, options, commitQuorum) {
+    if (arguments.length > 3) {
+        throw new Error("createIndex accepts up to 3 arguments");
+    }
+
     return this.createIndexes([keys], options, commitQuorum);
 };
 
 DBCollection.prototype.createIndexes = function(keys, options, commitQuorum) {
+    if (arguments.length > 3) {
+        throw new Error("createIndexes accepts up to 3 arguments");
+    }
+
     if (!Array.isArray(keys)) {
         throw new Error("createIndexes first argument should be an array");
     }
@@ -657,6 +665,10 @@ DBCollection.prototype.createIndexes = function(keys, options, commitQuorum) {
 };
 
 DBCollection.prototype.ensureIndex = function(keys, options) {
+    if (arguments.length > 2) {
+        throw new Error("ensureIndex accepts up to 2 arguments");
+    }
+
     var result = this.createIndex(keys, options);
 
     if (this.getMongo().writeMode() != "legacy") {
