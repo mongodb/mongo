@@ -94,6 +94,12 @@ static volatile THREAD_TS th_ts[MAX_TH];
     ",transaction_sync=(enabled,method=none)"
 #define ENV_CONFIG_REC "log=(archive=false,recover=on)"
 
+/*
+ * A minimum width of 10, along with zero filling, means that all the keys sort according to their
+ * integer value, making each thread's key space distinct.
+ */
+#define KEY_FORMAT ("%010" PRIu64)
+
 typedef struct {
     uint64_t absent_key; /* Last absent key */
     uint64_t exist_key;  /* First existing key after miss */
@@ -688,7 +694,7 @@ thread_run(void *arg)
             }
         if (use_ts)
             stable_ts = __wt_atomic_addv64(&global_ts, 1);
-        testutil_check(__wt_snprintf(kname, sizeof(kname), "%" PRIu64, i));
+        testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, i));
 
         testutil_check(session->begin_transaction(session, NULL));
         if (use_prep)
@@ -1111,7 +1117,7 @@ main(int argc, char *argv[])
                   key, last_key);
                 break;
             }
-            testutil_check(__wt_snprintf(kname, sizeof(kname), "%" PRIu64, key));
+            testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
             cur_coll->set_key(cur_coll, kname);
             cur_local->set_key(cur_local, kname);
             cur_oplog->set_key(cur_oplog, kname);
