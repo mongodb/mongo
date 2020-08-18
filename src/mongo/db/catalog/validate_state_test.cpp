@@ -36,7 +36,11 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_registry.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/util/fail_point.h"
 
@@ -59,6 +63,9 @@ public:
      * Create collection 'nss' and insert some documents. It will possess a default _id index.
      */
     Collection* createCollectionAndPopulateIt(OperationContext* opCtx, const NamespaceString& nss);
+
+private:
+    void setUp() override;
 };
 
 void ValidateStateTest::createCollection(OperationContext* opCtx, const NamespaceString& nss) {
@@ -86,6 +93,29 @@ Collection* ValidateStateTest::createCollectionAndPopulateIt(OperationContext* o
     }
 
     return collection;
+}
+
+void ValidateStateTest::setUp() {
+    CatalogTestFixture::setUp();
+
+    auto service = getServiceContext();
+
+    // Set up OpObserver so that we will append actual oplog entries to the oplog using
+    // repl::logOp(). This supports index builds that have to look up the last oplog entry.
+    auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
+    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+
+    // Index builds expect a non-empty oplog and a valid committed snapshot.
+    auto opCtx = operationContext();
+    Lock::GlobalLock lk(opCtx, MODE_IX);
+    WriteUnitOfWork wuow(opCtx);
+    service->getOpObserver()->onOpMessage(opCtx, BSONObj());
+    wuow.commit();
+
+    // Provide an initial committed snapshot so that index build can begin the collection scan.
+    auto snapshotManager = service->getStorageEngine()->getSnapshotManager();
+    auto lastAppliedOpTime = repl::ReplicationCoordinator::get(service)->getMyLastAppliedOpTime();
+    snapshotManager->setCommittedSnapshot(lastAppliedOpTime.getTimestamp());
 }
 
 /**
