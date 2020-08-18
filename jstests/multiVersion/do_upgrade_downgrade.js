@@ -45,7 +45,7 @@
                     let foo = testDB.getCollection(c.name);
                     assert.commandWorked(foo.createIndex({id: 1}, {unique: true}));
                     assert.commandWorked(
-                        foo.createIndex({sno: 1}, {name: "sno_1"}, {unique: true, v: 1}));
+                        foo.createIndex({sno: 1}, {name: "sno_1", unique: true, v: 1}));
                 }
             });
         }
