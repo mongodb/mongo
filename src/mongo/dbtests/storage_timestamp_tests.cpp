@@ -2181,6 +2181,11 @@ public:
             // Save the pre-state idents so we can capture the specific ident related to index
             // creation.
             origIdents = durableCatalog->getAllIdents(_opCtx);
+
+            // Ensure we have a committed snapshot to avoid ReadConcernMajorityNotAvailableYet
+            // error at the beginning of the the collection scan phase.
+            auto snapshotManager = storageEngine->getSnapshotManager();
+            snapshotManager->setCommittedSnapshot(insertTimestamp.asTimestamp());
         }
 
         DBDirectClient client(_opCtx);
@@ -2284,6 +2289,11 @@ public:
                                            presentTerm));
             wuow.commit();
             ASSERT_EQ(1, itCount(autoColl.getCollection()));
+
+            // Ensure we have a committed snapshot to avoid ReadConcernMajorityNotAvailableYet
+            // error at the beginning of the the collection scan phase.
+            auto snapshotManager = storageEngine->getSnapshotManager();
+            snapshotManager->setCommittedSnapshot(insertTimestamp.asTimestamp());
         }
 
         DBDirectClient client(_opCtx);
@@ -2413,6 +2423,11 @@ public:
             // Save the pre-state idents so we can capture the specific ident related to index
             // creation.
             origIdents = durableCatalog->getAllIdents(_opCtx);
+
+            // Ensure we have a committed snapshot to avoid ReadConcernMajorityNotAvailableYet
+            // error at the beginning of the the collection scan phase.
+            auto snapshotManager = storageEngine->getSnapshotManager();
+            snapshotManager->setCommittedSnapshot(insertTimestamp2.asTimestamp());
         }
 
         {
@@ -2947,6 +2962,20 @@ public:
 class TimestampIndexOplogApplicationOnPrimary : public StorageTimestampTest {
 public:
     void run() {
+        // Index builds expect a non-empty oplog and a valid committed snapshot.
+        {
+            Lock::GlobalLock lk(_opCtx, MODE_IX);
+            WriteUnitOfWork wuow(_opCtx);
+            auto service = _opCtx->getServiceContext();
+            service->getOpObserver()->onOpMessage(_opCtx, BSONObj());
+            wuow.commit();
+
+            auto snapshotManager = service->getStorageEngine()->getSnapshotManager();
+            auto lastAppliedOpTime =
+                repl::ReplicationCoordinator::get(service)->getMyLastAppliedOpTime();
+            snapshotManager->setCommittedSnapshot(lastAppliedOpTime.getTimestamp());
+        }
+
         // In order for oplog application to assign timestamps, we must be in non-replicated mode
         // and disable document validation.
         repl::UnreplicatedWritesBlock uwb(_opCtx);
