@@ -84,7 +84,7 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
         // System (internal) connections that hit a prepare conflict should be killable to prevent
         // deadlocks with prepared transactions on replica set step up and step down.
         stdx::lock_guard<Client> lk(*client);
-        invariant(client->shouldKillSystemOperation(lk));
+        invariant(client->canKillSystemOperationInStepdown(lk));
     }
     // It is contradictory to be running into a prepare conflict when we are ignoring interruptions,
     // particularly when running code inside an

@@ -728,7 +728,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) {
         auto newClient = _opCtx->getServiceContext()->makeClient("MigrationCoordinator");
         {
             stdx::lock_guard<Client> lk(*newClient.get());
-            newClient->setSystemOperationKillable(lk);
+            newClient->setSystemOperationKillableByStepdown(lk);
         }
         AlternativeClientRegion acr(newClient);
         auto newOpCtxPtr = cc().makeOperationContext();

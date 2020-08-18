@@ -445,9 +445,14 @@ repl::OpTime MigrationDestinationManager::cloneDocumentsFromDonor(
     repl::OpTime lastOpApplied;
 
     stdx::thread inserterThread{[&] {
-        Client::initKillableThread("chunkInserter", opCtx->getServiceContext());
+        Client::initThread("chunkInserter", opCtx->getServiceContext(), nullptr);
+        auto client = Client::getCurrent();
+        {
+            stdx::lock_guard lk(*client);
+            client->setSystemOperationKillableByStepdown(lk);
+        }
 
-        auto inserterOpCtx = Client::getCurrent()->makeOperationContext();
+        auto inserterOpCtx = client->makeOperationContext();
         auto consumerGuard = makeGuard([&] {
             batches.closeConsumerEnd();
             lastOpApplied = repl::ReplClientInfo::forClient(inserterOpCtx->getClient()).getLastOp();
@@ -798,8 +803,14 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
 }
 
 void MigrationDestinationManager::_migrateThread() {
-    Client::initKillableThread("migrateThread", getGlobalServiceContext());
-    auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
+    Client::initThread("migrateThread");
+    auto client = Client::getCurrent();
+    {
+        stdx::lock_guard lk(*client);
+        client->setSystemOperationKillableByStepdown(lk);
+    }
+
+    auto uniqueOpCtx = client->makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
 
     if (AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled()) {
@@ -946,7 +957,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
     {
         stdx::lock_guard<Client> lk(*newClient.get());
-        newClient->setSystemOperationKillable(lk);
+        newClient->setSystemOperationKillableByStepdown(lk);
     }
 
     AlternativeClientRegion acr(newClient);

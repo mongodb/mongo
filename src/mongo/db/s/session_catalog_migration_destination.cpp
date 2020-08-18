@@ -365,8 +365,13 @@ void SessionCatalogMigrationDestination::join() {
  * 6. Wait for writes to be committed to majority of the replica set.
  */
 void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(ServiceContext* service) {
-    Client::initKillableThread("sessionCatalogMigrationProducer-" + _migrationSessionId.toString(),
-                               service);
+    Client::initThread(
+        "sessionCatalogMigrationProducer-" + _migrationSessionId.toString(), service, nullptr);
+    auto client = Client::getCurrent();
+    {
+        stdx::lock_guard lk(*client);
+        client->setSystemOperationKillableByStepdown(lk);
+    }
 
     bool oplogDrainedAfterCommiting = false;
     ProcessOplogResult lastResult;

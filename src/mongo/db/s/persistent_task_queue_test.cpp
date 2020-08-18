@@ -70,7 +70,7 @@ void killOps(ServiceContext* serviceCtx) {
 
     for (Client* client = cursor.next(); client != nullptr; client = cursor.next()) {
         stdx::lock_guard<Client> lk(*client);
-        if (client->isFromSystemConnection() && !client->shouldKillSystemOperation(lk))
+        if (client->isFromSystemConnection() && !client->canKillSystemOperationInStepdown(lk))
             continue;
 
         OperationContext* toKill = client->getOperationContext();
@@ -289,7 +289,7 @@ TEST_F(PersistentTaskQueueTest, TestKilledOperationContextWhileWaitingOnCV) {
         ThreadClient tc("RangeDeletionService", getGlobalServiceContext());
         {
             stdx::lock_guard<Client> lk(*tc.get());
-            tc->setSystemOperationKillable(lk);
+            tc->setSystemOperationKillableByStepdown(lk);
         }
 
         auto opCtx = tc->makeOperationContext();

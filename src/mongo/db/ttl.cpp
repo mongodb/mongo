@@ -106,7 +106,7 @@ public:
 
         {
             stdx::lock_guard<Client> lk(*tc.get());
-            tc.get()->setSystemOperationKillable(lk);
+            tc.get()->setSystemOperationKillableByStepdown(lk);
         }
 
         while (true) {

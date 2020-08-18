@@ -242,7 +242,7 @@ auto withTemporaryOperationContext(Callable&& callable) {
     ThreadClient tc(migrationutil::kRangeDeletionThreadName, getGlobalServiceContext());
     {
         stdx::lock_guard<Client> lk(*tc.get());
-        tc->setSystemOperationKillable(lk);
+        tc->setSystemOperationKillableByStepdown(lk);
     }
     auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
     auto opCtx = uniqueOpCtx.get();

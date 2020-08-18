@@ -91,7 +91,7 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             ThreadClient tc("RecoverRefreshThread", serviceContext);
             {
                 stdx::lock_guard<Client> lk(*tc.get());
-                tc->setSystemOperationKillable(lk);
+                tc->setSystemOperationKillableByStepdown(lk);
             }
 
             if (MONGO_unlikely(hangInRecoverRefreshThread.shouldFail())) {

@@ -324,7 +324,7 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
 
             {
                 stdx::lock_guard<Client> lk(*tc.get());
-                tc->setSystemOperationKillable(lk);
+                tc->setSystemOperationKillableByStepdown(lk);
             }
 
             const auto opCtxHolder = tc->makeOperationContext();

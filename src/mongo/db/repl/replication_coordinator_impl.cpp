@@ -2379,7 +2379,7 @@ void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
 
     for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
         stdx::lock_guard<Client> lk(*client);
-        if (client->isFromSystemConnection() && !client->shouldKillSystemOperation(lk)) {
+        if (client->isFromSystemConnection() && !client->canKillSystemOperationInStepdown(lk)) {
             continue;
         }
 

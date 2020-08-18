@@ -78,11 +78,6 @@ public:
                            transport::SessionHandle session);
 
     /**
-     * Same as initThread, but also explicitly sets the client for this thread to be killable.
-     */
-    static void initKillableThread(StringData desc, ServiceContext* serviceContext);
-
-    /**
      * Moves client into the thread_local for this thread. After this call, Client::getCurrent
      * and cc() will return client.get(). The client will be destroyed when the thread exits
      * or the ThreadClient RAII helper exits its scope.
@@ -214,10 +209,11 @@ public:
     }
 
     /**
-     * Used to set system operations as killable. This should only be called once per Client and
-     * only from system connections. The Client should be locked by the caller.
+     * Used to mark system operations that are allowed to be killed by the stepdown process. This
+     * should only be called once per Client and only from system connections. The Client should be
+     * locked by the caller.
      */
-    void setSystemOperationKillable(WithLock) {
+    void setSystemOperationKillableByStepdown(WithLock) {
         // This can only be changed once for system operations.
         invariant(isFromSystemConnection());
         invariant(!_systemOperationKillable);
@@ -225,10 +221,10 @@ public:
     }
 
     /**
-     * Used to determine whether a system operation is killable that was started by a system
-     * connection. The Client should be locked by the caller.
+     * Used to determine whether a system operation is allowed to be killed by the stepdown process.
+     * The Client should be locked by the caller.
      */
-    bool shouldKillSystemOperation(WithLock) const {
+    bool canKillSystemOperationInStepdown(WithLock) const {
         // Should only be called on system operations.
         invariant(isFromSystemConnection());
         return _systemOperationKillable;

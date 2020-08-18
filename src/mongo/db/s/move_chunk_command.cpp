@@ -148,7 +148,7 @@ public:
                         ThreadClient tc("MoveChunk", serviceContext);
                         {
                             stdx::lock_guard<Client> lk(*tc.get());
-                            tc->setSystemOperationKillable(lk);
+                            tc->setSystemOperationKillableByStepdown(lk);
                         }
                         auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
                         auto opCtx = uniqueOpCtx.get();

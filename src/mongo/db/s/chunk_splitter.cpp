@@ -70,7 +70,7 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
     options.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
         stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationKillable(lk);
+        cc().setSystemOperationKillableByStepdown(lk);
     };
     return options;
 }

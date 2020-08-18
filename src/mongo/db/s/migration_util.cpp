@@ -169,7 +169,7 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
 
             {
                 stdx::lock_guard<Client> lk(*newClient.get());
-                newClient->setSystemOperationKillable(lk);
+                newClient->setSystemOperationKillableByStepdown(lk);
             }
 
             auto newOpCtx = newClient->makeOperationContext();
@@ -293,7 +293,7 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);
             {
                 stdx::lock_guard<Client> lk(*tc.get());
-                tc->setSystemOperationKillable(lk);
+                tc->setSystemOperationKillableByStepdown(lk);
             }
             auto uniqueOpCtx = tc->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
@@ -379,7 +379,7 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
             ThreadClient tc(kRangeDeletionThreadName, serviceContext);
             {
                 stdx::lock_guard<Client> lk(*tc.get());
-                tc->setSystemOperationKillable(lk);
+                tc->setSystemOperationKillableByStepdown(lk);
             }
             auto uniqueOpCtx = tc->makeOperationContext();
             auto opCtx = uniqueOpCtx.get();
@@ -420,7 +420,7 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
             ThreadClient tc("ResubmitRangeDeletions", serviceContext);
             {
                 stdx::lock_guard<Client> lk(*tc.get());
-                tc->setSystemOperationKillable(lk);
+                tc->setSystemOperationKillableByStepdown(lk);
             }
 
             auto opCtx = tc->makeOperationContext();
@@ -826,7 +826,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                               ThreadClient tc("TriggerMigrationRecovery", serviceContext);
                               {
                                   stdx::lock_guard<Client> lk(*tc.get());
-                                  tc->setSystemOperationKillable(lk);
+                                  tc->setSystemOperationKillableByStepdown(lk);
                               }
 
                               auto opCtx = tc->makeOperationContext();
