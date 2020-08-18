@@ -3,6 +3,7 @@
 // @tags: [
 //   assumes_superuser_permissions,
 //   assumes_unsharded_collection,
+//   sbe_incompatible,
 // ]
 
 // server-3253 Unsharded support for $out

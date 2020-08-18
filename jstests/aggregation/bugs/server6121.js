@@ -1,9 +1,12 @@
-/*
+/**
  * SERVER-6121: aggregation framework converts Timestamp to long long in result set
  *
  * This test validates the SERVER-6121 ticket. Add support for timestamps to Aggregation and
  * ensure they can do everything dates can. Previously timestamps were awkwardly used as dates
  * and long longs.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 
 /*

@@ -1,5 +1,8 @@
 // SERVER-20163 introduced the $zip expression. In this test file, we check the behavior and error
 // cases of the expression.
+// @tags: [
+//   sbe_incompatible,
+// ]
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
 (function() {

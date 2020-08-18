@@ -7,6 +7,9 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: 1, b: 1}));
 
 // Run the aggregate once where the $project can be pushed down.
+// @tags: [
+//   sbe_incompatible,
+// ]
 const projectPushedDownRes =
     coll.aggregate([{$sort: {a: 1}}, {$project: {_id: 0, metaField: {$meta: "sortKey"}}}])
         .toArray();

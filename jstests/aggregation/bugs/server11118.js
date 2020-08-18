@@ -1,4 +1,7 @@
 // SERVER-11118 Tests for $dateToString
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

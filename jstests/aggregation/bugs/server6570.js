@@ -1,4 +1,7 @@
 // ensure $add asserts on string
+// @tags: [
+//   sbe_incompatible,
+// ]
 load('jstests/aggregation/extras/utils.js');
 
 c = db.s6570;

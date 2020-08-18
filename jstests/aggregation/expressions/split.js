@@ -1,5 +1,8 @@
 // In SERVER-6773, the $split expression was introduced. In this file, we test the functionality and
 // error cases of the expression.
+// @tags: [
+//   sbe_incompatible,
+// ]
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExpression.
 
 (function() {

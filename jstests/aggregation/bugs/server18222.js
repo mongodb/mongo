@@ -1,4 +1,7 @@
 // SERVER-18222: Add $isArray aggregation expression.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 'use strict';
 var coll = db.is_array_expr;

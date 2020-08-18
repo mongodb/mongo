@@ -1,4 +1,7 @@
 // SERVER-14421 minDistance for $geoNear aggregation operator
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 'use strict';
 var coll = db.mindistance;

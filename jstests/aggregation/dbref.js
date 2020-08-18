@@ -3,7 +3,10 @@
  * and $lookup.
  *
  * Uses $lookup, which doesn't support sharded foreign collection.
- * @tags: [assumes_unsharded_collection]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

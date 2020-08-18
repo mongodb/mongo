@@ -3,6 +3,7 @@
 //   # We don't try to replace TEXT_OR with OR when the results are consumed by a merging node,
 //   # because the shard doesn't know whether the merger needs the textScore metadata.
 //   assumes_unsharded_collection,
+//   sbe_incompatible,
 // ]
 (function() {
 'use strict';

@@ -1,4 +1,7 @@
 // make sure $concat doesn't optimize constants to the end
+// @tags: [
+//   sbe_incompatible,
+// ]
 c = db.c;
 c.drop();
 

@@ -7,7 +7,11 @@
 //
 // This test assumes that an initial $match will be absorbed by the query system, which will not
 // happen if the $match is wrapped within a $facet stage.
-// @tags: [do_not_wrap_aggregations_in_facets,assumes_unsharded_collection]
+// @tags: [
+//   assumes_unsharded_collection,
+//   do_not_wrap_aggregations_in_facets,
+//   sbe_incompatible,
+// ]
 load('jstests/libs/analyze_plan.js');
 
 (function() {

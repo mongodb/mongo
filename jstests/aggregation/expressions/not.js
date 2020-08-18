@@ -1,4 +1,7 @@
 // Tests the behavior of $not when used in agg expressions.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

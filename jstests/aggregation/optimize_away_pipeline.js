@@ -8,8 +8,13 @@
 // handle explain output for sharded collections.
 // This test makes assumptions about how the explain output will be formatted, so cannot be run when
 // pipeline optimization is disabled.
-// @tags: [do_not_wrap_aggregations_in_facets, assumes_unsharded_collection,
-//         requires_pipeline_optimization, requires_profiling]
+// @tags: [
+//   assumes_unsharded_collection,
+//   do_not_wrap_aggregations_in_facets,
+//   requires_pipeline_optimization,
+//   requires_profiling,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

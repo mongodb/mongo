@@ -1,4 +1,7 @@
 // SERVER-10176: Add $abs aggregation expression.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 // For assertErrorCode.
 load('jstests/aggregation/extras/utils.js');

@@ -1,5 +1,8 @@
 // Test that queryExecStats within a $collStats stage returns the correct execution stats.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

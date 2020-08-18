@@ -1,5 +1,8 @@
 // $cond returns the evaluated second argument if the first evaluates to true but the evaluated
 // third argument if the first evaluates to false.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 load('jstests/aggregation/extras/utils.js');

@@ -7,11 +7,14 @@
  * test queries below show most $match/$sort/$group combinations where that is possible.
  *
  * @tags: [
- * # The sharding and $facet passthrough suites modifiy aggregation pipelines in a way that
- * # prevents the DISTINCT_SCAN optimization from being applied, which breaks the test.
- * assumes_unsharded_collection, do_not_wrap_aggregations_in_facets,
- * # Index filter commands do not support causal consistency.
- * does_not_support_causal_consistency]
+ *   # The sharding and $facet passthrough suites modifiy aggregation pipelines in a way that
+ *   # prevents the DISTINCT_SCAN optimization from being applied, which breaks the test.
+ *   assumes_unsharded_collection,
+ *   do_not_wrap_aggregations_in_facets,
+ *   # Index filter commands do not support causal consistency.
+ *   does_not_support_causal_consistency,
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

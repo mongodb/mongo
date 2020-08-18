@@ -1,4 +1,7 @@
 // SERVER-17943: Add $filter aggregation expression.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 // For assertErrorCode.
 load('jstests/aggregation/extras/utils.js');

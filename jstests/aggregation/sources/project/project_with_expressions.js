@@ -1,6 +1,9 @@
 /**
  * Test that a $project with a combination of expressions and field projections gets evaluted
  * correctly, and overwrites the data present in the input document when necessary.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 const coll = db.project_with_expressions;

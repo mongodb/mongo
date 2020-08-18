@@ -1,4 +1,7 @@
 // Tests basic functionality of the $function expression.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

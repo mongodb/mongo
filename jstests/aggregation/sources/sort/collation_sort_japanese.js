@@ -2,6 +2,9 @@
  * Tests that the $sort stage performs sorts correctly, whether in-memory, merging on mongos, or
  * merging on a shard. (The sharding scenarios are tested when this test is run in the
  * aggregation_sharded_collections_passthrough.)
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

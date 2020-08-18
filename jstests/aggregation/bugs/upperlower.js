@@ -1,4 +1,7 @@
 // $toUpper, $toLower tests.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.jstests_aggregation_upperlower;
 t.drop();

@@ -2,6 +2,9 @@
 //
 // Cannot implicitly shard accessed collections because a collection can be implictly created and
 // exists when none is expected.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

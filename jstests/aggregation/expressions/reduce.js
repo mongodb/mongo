@@ -1,5 +1,8 @@
 // In SERVER-17258, the $reduce expression was introduced. In this test file, we check the
 // functionality and error cases of the expression.
+// @tags: [
+//   sbe_incompatible,
+// ]
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExpression.
 
 (function() {

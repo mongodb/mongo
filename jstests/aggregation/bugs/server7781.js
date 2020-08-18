@@ -1,4 +1,7 @@
 // SERVER-7781 $geoNear pipeline stage
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 'use strict';
 

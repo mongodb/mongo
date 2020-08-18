@@ -1,4 +1,7 @@
 // SERVER-6184 Support mixing nested and dotted fields with common prefixes
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 c = db.c;
 c.drop();

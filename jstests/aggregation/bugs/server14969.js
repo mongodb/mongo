@@ -1,4 +1,7 @@
 // Test dropping an index that is being used by an agg pipeline.
+// @tags: [
+//   sbe_incompatible,
+// ]
 var coll = db.server14969;
 var docsPerBatch = 3;
 coll.drop();

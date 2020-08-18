@@ -3,7 +3,11 @@
  *
  * The $out stage is not allowed with a sharded output collection. Explain of $out or $merge does
  * not accept writeConcern.
- * @tags: [assumes_unsharded_collection, assumes_write_concern_unchanged]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   assumes_write_concern_unchanged,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

@@ -1,6 +1,9 @@
 // Check $match pipeline stage.
 // - Filtering behavior equivalent to a mongo query.
 // - $where and geo operators are not allowed
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

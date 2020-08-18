@@ -1,4 +1,7 @@
 // server6189 - Support date operators with dates before 1970
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 c = db.c;
 function test(date, testSynthetics) {

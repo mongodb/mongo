@@ -1,5 +1,8 @@
 // Test that the explain helper does not modify the options document passed to it.
 // This test was designed to reproduce SERVER-32300".
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

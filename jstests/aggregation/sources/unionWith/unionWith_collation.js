@@ -4,7 +4,10 @@
  *
  * We are explicitly creating collections with collation as part of this test. So we will receive
  * 'NamespaceExists' error if we allow implicit creation.
- * @tags: [assumes_no_implicit_collection_creation_after_drop]
+ * @tags: [
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 

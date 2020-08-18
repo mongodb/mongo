@@ -1,4 +1,7 @@
 // SERVER-9841 $map expression to map over arrays
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 load('jstests/aggregation/extras/utils.js');
 var t = db.server9841;

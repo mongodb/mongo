@@ -1,6 +1,9 @@
 // SERVER-6146 introduced the $in expression to aggregation. In this file, we test the functionality
 // and error cases of the expression.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   sbe_incompatible,
+// ]
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
 (function() {

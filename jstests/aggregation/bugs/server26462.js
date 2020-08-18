@@ -1,5 +1,8 @@
 // Tests that adding a field that only contains metadata does not cause a segmentation fault when
 // grouping on the added field.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

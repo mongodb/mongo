@@ -1,4 +1,7 @@
 // server9289 - support objects as single arguments to expressions.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 var t = db.server9289;
 t.drop();

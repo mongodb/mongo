@@ -4,6 +4,9 @@
  * This test executes some simple pipelines and asserts that they have the same results whether or
  * not there are indices that could cover the projection part of the query, or provide a
  * non-blocking sort.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 
 load("jstests/aggregation/extras/utils.js");  // For orderedArrayEq.

@@ -1,4 +1,7 @@
 // SERVER-8141 Avoid treating arrays as literals in aggregation pipeline.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 'use strict';
 var coll = db.exprs_in_arrays;

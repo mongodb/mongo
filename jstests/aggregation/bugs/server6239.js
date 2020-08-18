@@ -1,5 +1,8 @@
 // SERVER-6239 reenable $add and $subtract with dates with better semantics
 // Note: error conditions tested also in server6240.js
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 load('jstests/aggregation/extras/utils.js');
 

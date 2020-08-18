@@ -1,5 +1,8 @@
 // Test that projection of dotted paths which happens in the "agg" layer works correctly. See
 // SERVER-26066 for details.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 const coll = db.project_dotted_paths;
 coll.drop();

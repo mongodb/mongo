@@ -1,5 +1,8 @@
 /**
  * Basic integration tests for the $let expression.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

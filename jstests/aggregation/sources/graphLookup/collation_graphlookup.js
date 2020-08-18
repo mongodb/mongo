@@ -1,6 +1,9 @@
 // Cannot implicitly shard accessed collections because unsupported use of sharded collection
 // for target collection of $lookup and $graphLookup.
-// @tags: [assumes_unsharded_collection]
+// @tags: [
+//   assumes_unsharded_collection,
+//   sbe_incompatible,
+// ]
 
 /**
  * Tests that the $graphLookup stage respects the collation when matching between the

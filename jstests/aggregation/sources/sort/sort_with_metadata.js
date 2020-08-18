@@ -1,4 +1,7 @@
 // Test that the $sort stage properly errors on invalid $meta.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

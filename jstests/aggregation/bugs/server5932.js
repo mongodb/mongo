@@ -2,13 +2,14 @@
  * server-5932 Cursor-based aggregation
  *
  * @tags: [
+ *   # The result set produced by this test is large, so when wrapped in a $facet, the maximum
+ *   # intermediate document size would be exceeded.
+ *   do_not_wrap_aggregations_in_facets,
  *   # This test will not work with causal consistency because an aggregate and its subsequent
  *   # getMores act as one operation, which means that there are no guarantees that future cursor
  *   # commands will read any writes which occur in between cursor commands.
  *   does_not_support_causal_consistency,
- *   # The result set produced by this test is large, so when wrapped in a $facet, the maximum
- *   # intermediate document size would be exceeded.
- *   do_not_wrap_aggregations_in_facets,
+ *   sbe_incompatible,
  * ]
  */
 

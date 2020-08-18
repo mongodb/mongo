@@ -1,4 +1,7 @@
 // SERVER-14872: Aggregation expression to concatenate multiple arrays into one
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 // For assertErrorCode.
 load('jstests/aggregation/extras/utils.js');

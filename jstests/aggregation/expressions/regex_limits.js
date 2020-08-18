@@ -1,5 +1,8 @@
-/*
+/**
  * Tests to validate limits for $regexFind, $regexFindAll and $regexMatch aggregation expressions.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 'use strict';

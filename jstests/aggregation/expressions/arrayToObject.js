@@ -1,4 +1,7 @@
 // Tests for $arrayToObject aggregation expression.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

@@ -5,13 +5,14 @@
 // TODO SERVER-44258 delete this test and replace it with a unit test.
 //
 // @tags: [
-//   # Tests the explain output, so does not work when wrapped in a facet.
-//   do_not_wrap_aggregations_in_facets,
 //   # Tests the 'stages' field of the explain output which is hidden beneath each shard's name when
 //   # run against sharded collections.
 //   assumes_unsharded_collection,
+//   # Tests the explain output, so does not work when wrapped in a facet.
+//   do_not_wrap_aggregations_in_facets,
 //   # Explicitly testing optimization.
 //   requires_pipeline_optimization,
+//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

@@ -1,7 +1,10 @@
 /**
  * Test that $unionWith's pipeline argument returns the same explain as an equivalent normal
  * pipeline.
- * @tags: [do_not_wrap_aggregations_in_facets]
+ * @tags: [
+ *   do_not_wrap_aggregations_in_facets,
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

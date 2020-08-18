@@ -4,7 +4,10 @@
 //
 // Relies on the initial $match being pushed into the query system in order for the planner to
 // consider an index scan, so the pipelines cannot be wrapped in facet stages.
-// @tags: [do_not_wrap_aggregations_in_facets]
+// @tags: [
+//   do_not_wrap_aggregations_in_facets,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

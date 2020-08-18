@@ -1,5 +1,8 @@
 /**
  * Tests the behavior of the $geoNear stage with varying values of 'minDistance' and 'maxDistance'.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

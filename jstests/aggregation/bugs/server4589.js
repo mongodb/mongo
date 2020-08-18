@@ -1,4 +1,7 @@
 // SERVER-4589: Add $arrayElemAt aggregation expression.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 // For assertErrorCode.
 load('jstests/aggregation/extras/utils.js');

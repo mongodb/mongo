@@ -1,4 +1,7 @@
 // Aggregation $substrBytes tests.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 (function() {
 "use strict";

@@ -1,5 +1,8 @@
 /**
  * Tests that maxTimeMS is respected even in an inner $unionWith pipeline.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

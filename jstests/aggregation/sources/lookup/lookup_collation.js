@@ -2,7 +2,10 @@
  * Tests that $lookup respects the user-specified collation or the inherited local collation
  * when performing comparisons on a foreign collection with a different default collation. Exercises
  * the fix for SERVER-43350.
- * @tags: [assumes_unsharded_collection]
+ * @tags: [
+ *   assumes_unsharded_collection,
+ *   sbe_incompatible,
+ * ]
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.
 

@@ -6,6 +6,9 @@
 // Save the array members to the db.
 // aggregate($sort)
 // iterate through the array ensuring the _ids are in the correct order
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 // to make results array nested (problem 2)
 function nestArray(nstArray) {

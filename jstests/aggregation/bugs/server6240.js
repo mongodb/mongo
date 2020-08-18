@@ -1,10 +1,13 @@
-/*
+/**
  * SERVER-6240: verify assertion on attempt to perform date extraction from missing or null value
  *
  * This test validates the SERVER-6240 ticket. uassert when attempting to extract a date from a
  * null value. Prevously verify'd.
  *
  * This test also validates the error cases for SERVER-6239 (support $add and $subtract with dates)
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 
 /*

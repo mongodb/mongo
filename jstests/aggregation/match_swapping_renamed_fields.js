@@ -1,7 +1,11 @@
 /**
  * Tests for the $match swapping optimization's ability to handle fields renamed in $project or
  * $addFields.
- * @tags: [do_not_wrap_aggregations_in_facets,requires_pipeline_optimization]
+ * @tags: [
+ *   do_not_wrap_aggregations_in_facets,
+ *   requires_pipeline_optimization,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

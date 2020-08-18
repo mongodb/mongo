@@ -6,6 +6,9 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 const coll = db.dateFromParts;
 
 // Basic Sanity Checks
+// @tags: [
+//   sbe_incompatible,
+// ]
 coll.drop();
 
 assert.commandWorked(coll.insert([

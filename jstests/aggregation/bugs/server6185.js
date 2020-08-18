@@ -1,5 +1,8 @@
 /**
  * Tests that projecting a non-existent subfield behaves identically in both query and aggregation.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

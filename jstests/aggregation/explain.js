@@ -1,6 +1,9 @@
 // Tests the behavior of explain() when used with the aggregation pipeline.
 // - Explain() should not read or modify the plan cache.
 // - The result should always include serverInfo.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

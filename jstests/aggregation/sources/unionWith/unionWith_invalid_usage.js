@@ -1,5 +1,8 @@
 /**
  * Tests for invalid usages of $unionWith, or invalid stages within the $unionWith sub-pipeline.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";
