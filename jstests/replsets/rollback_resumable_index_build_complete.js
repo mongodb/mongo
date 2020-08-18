@@ -2,13 +2,9 @@
  * Tests that resumable index builds restart and complete properly when rolling back from after the
  * index build completed to while the index build was still in progress.
  *
- * TODO (SERVER-49075): Move this test to the replica_sets suite once it is enabled on the resumable
- * index builds variant.
- *
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   requires_replication,
  * ]
  */
 (function() {

@@ -2,13 +2,9 @@
  * Tests that resumable index builds complete properly after being interrupted for rollback during
  * the drain writes phase.
  *
- * TODO (SERVER-49075): Move this test to the replica_sets suite once it is enabled on the resumable
- * index builds variant.
- *
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   requires_replication,
  * ]
  */
 (function() {
