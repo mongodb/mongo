@@ -79,7 +79,7 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
                                     << " has been removed from the replication configuration.");
         stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         // Setting the status in the shared data will cancel the initial sync.
-        getSharedData()->setInitialSyncStatusIfOK(lk, status);
+        getSharedData()->setStatusIfOK(lk, status);
         return status;
     }
 
@@ -93,7 +93,7 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
                       str::stream() << "Sync source " << getSource() << " has been resynced.");
         stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         // Setting the status in the shared data will cancel the initial sync.
-        getSharedData()->setInitialSyncStatusIfOK(lk, status);
+        getSharedData()->setStatusIfOK(lk, status);
         return status;
     }
     return Status(ErrorCodes::NotMasterOrSecondary,
@@ -213,7 +213,7 @@ void AllDatabaseCloner::postStage() {
                           "dbNumber"_attr = (_stats.databasesCloned + 1),
                           "totalDbs"_attr = _databases.size(),
                           "error"_attr = dbStatus.toString());
-            setInitialSyncFailedStatus(dbStatus);
+            setSyncFailedStatus(dbStatus);
             return;
         }
         if (StringData(dbName).equalCaseInsensitive("admin")) {
@@ -235,7 +235,7 @@ void AllDatabaseCloner::postStage() {
                             "Validation failed on 'admin' db due to {error}",
                             "Validation failed on 'admin' db",
                             "error"_attr = adminStatus);
-                setInitialSyncFailedStatus(adminStatus);
+                setSyncFailedStatus(adminStatus);
                 return;
             }
         }

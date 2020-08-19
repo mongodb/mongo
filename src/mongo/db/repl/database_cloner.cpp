@@ -152,12 +152,11 @@ void DatabaseCloner::postStage() {
                         "Collection clone failed",
                         "namespace"_attr = sourceNss,
                         "error"_attr = collStatus.toString());
-            setInitialSyncFailedStatus(
-                {ErrorCodes::InitialSyncFailure,
-                 collStatus
-                     .withContext(str::stream()
-                                  << "Error cloning collection '" << sourceNss.toString() << "'")
-                     .toString()});
+            setSyncFailedStatus({ErrorCodes::InitialSyncFailure,
+                                 collStatus
+                                     .withContext(str::stream() << "Error cloning collection '"
+                                                                << sourceNss.toString() << "'")
+                                     .toString()});
         }
         {
             stdx::lock_guard<Latch> lk(_mutex);

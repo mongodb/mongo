@@ -348,7 +348,7 @@ void InitialSyncer::_cancelRemainingWork_inlock() {
         // We actually hold the required lock, but the lock object itself is not passed through.
         _clearRetriableError(WithLock::withoutLock());
         stdx::lock_guard<InitialSyncSharedData> lock(*_sharedData);
-        _sharedData->setInitialSyncStatusIfOK(
+        _sharedData->setStatusIfOK(
             lock, Status{ErrorCodes::CallbackCanceled, "Initial sync attempt canceled"});
     }
     if (_client) {

@@ -52,7 +52,7 @@ MONGO_FAIL_POINT_DEFINE(initialSyncFuzzerSynchronizationPoint1);
 MONGO_FAIL_POINT_DEFINE(initialSyncFuzzerSynchronizationPoint2);
 
 BaseCloner::BaseCloner(StringData clonerName,
-                       InitialSyncSharedData* sharedData,
+                       ReplSyncSharedData* sharedData,
                        HostAndPort source,
                        DBClientConnection* client,
                        StorageInterface* storageInterface,
@@ -82,7 +82,7 @@ Status BaseCloner::run() {
             postStage();
         }
     } catch (DBException& e) {
-        setInitialSyncFailedStatus(e.toStatus());
+        setSyncFailedStatus(e.toStatus());
     }
     {
         stdx::lock_guard<Latch> lk(_mutex);
@@ -91,15 +91,15 @@ Status BaseCloner::run() {
             return _status;
         }
     }
-    stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
-    if (!_sharedData->getInitialSyncStatus(lk).isOK()) {
+    stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
+    if (!_sharedData->getStatus(lk).isOK()) {
         LOGV2(21065,
-              "Failing data clone because initial sync failed outside data clone: "
+              "Failing data clone because of failure outside data clone: "
               "{error}",
-              "Failing data clone because initial sync failed outside data clone",
-              "error"_attr = _sharedData->getInitialSyncStatus(lk));
+              "Failing data clone because of failure outside data clone",
+              "error"_attr = _sharedData->getStatus(lk));
     }
-    return _sharedData->getInitialSyncStatus(lk);
+    return _sharedData->getStatus(lk);
 }
 
 bool BaseCloner::isMyFailPoint(const BSONObj& data) const {
@@ -188,7 +188,7 @@ void BaseCloner::clearRetryingState() {
 Status BaseCloner::checkSyncSourceIsStillValid() {
     WireVersion wireVersion;
     {
-        stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+        stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
         auto wireVersionOpt = _sharedData->getSyncSourceWireVersion(lk);
         // The wire version should always have been set by the time this is called.
         invariant(wireVersionOpt);
@@ -226,7 +226,7 @@ Status BaseCloner::checkInitialSyncIdIsUnchanged() {
     InitialSyncIdDocument initialSyncIdDoc =
         InitialSyncIdDocument::parse(IDLParserErrorContext("initialSyncId"), initialSyncId);
 
-    stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+    stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
     uassert(ErrorCodes::InitialSyncFailure,
             "Sync source has been resynced since we started syncing from it",
             _sharedData->getInitialSyncSourceId(lk) == initialSyncIdDoc.get_id());
@@ -290,16 +290,15 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
                       "stage"_attr = stage->getName(),
                       "error"_attr = lastError);
                 bool shouldRetry = [&] {
-                    stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+                    stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
                     return _sharedData->shouldRetryOperation(lk, &_retryableOp);
                 }();
                 if (!shouldRetry) {
                     auto status = lastError.withContext(
-                        str::stream()
-                        << ": Exceeded initialSyncTransientErrorRetryPeriodSeconds "
-                        << _sharedData->getAllowedOutageDuration(
-                               stdx::lock_guard<InitialSyncSharedData>(*_sharedData)));
-                    setInitialSyncFailedStatus(status);
+                        str::stream() << ": Exceeded initialSyncTransientErrorRetryPeriodSeconds "
+                                      << _sharedData->getAllowedOutageDuration(
+                                             stdx::lock_guard<ReplSyncSharedData>(*_sharedData)));
+                    setSyncFailedStatus(status);
                     uassertStatusOK(status);
                 }
                 hangBeforeCheckingRollBackIdClonerStage.executeIf(
@@ -404,8 +403,8 @@ BaseCloner::AfterStageBehavior BaseCloner::runStages() {
     AfterStageBehavior afterStageBehavior = kContinueNormally;
     for (auto* stage : getStages()) {
         {
-            stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
-            if (!_sharedData->getInitialSyncStatus(lk).isOK())
+            stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
+            if (!_sharedData->getStatus(lk).isOK())
                 return kSkipRemainingStages;
         }
         afterStageBehavior = runStage(stage);
@@ -415,19 +414,19 @@ BaseCloner::AfterStageBehavior BaseCloner::runStages() {
     return afterStageBehavior;
 }
 
-void BaseCloner::setInitialSyncFailedStatus(Status status) {
+void BaseCloner::setSyncFailedStatus(Status status) {
     invariant(!status.isOK());
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _status = status;
     }
-    stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
-    _sharedData->setInitialSyncStatusIfOK(lk, status);
+    stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
+    _sharedData->setStatusIfOK(lk, status);
 }
 
 bool BaseCloner::mustExit() {
-    stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
-    return !_sharedData->getInitialSyncStatus(lk).isOK();
+    stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
+    return !_sharedData->getStatus(lk).isOK();
 }
 
 }  // namespace repl

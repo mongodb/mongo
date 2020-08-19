@@ -31,8 +31,10 @@
 
 #include <vector>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
+#include "mongo/db/repl/initial_sync_shared_data.h"
 
 namespace mongo {
 namespace repl {
@@ -62,6 +64,10 @@ public:
 
 protected:
     ClonerStages getStages() final;
+
+    InitialSyncSharedData* getSharedData() const final {
+        return checked_cast<InitialSyncSharedData*>(BaseCloner::getSharedData());
+    }
 
 private:
     friend class AllDatabaseClonerTest;

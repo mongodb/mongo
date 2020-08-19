@@ -31,6 +31,7 @@
 
 #include <vector>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/collection_cloner.h"
@@ -61,6 +62,7 @@ public:
 protected:
     void setUp() override {
         ClonerTestFixture::setUp();
+        _sharedData = std::make_unique<InitialSyncSharedData>(kInitialRollbackId, Days(1), &_clock);
         _collectionStats = std::make_shared<CollectionMockStats>();
         _standardCreateCollectionFn = [this](const NamespaceString& nss,
                                              const CollectionOptions& options,
@@ -78,11 +80,12 @@ protected:
         };
         _storageInterface.createCollectionForBulkFn = _standardCreateCollectionFn;
 
+
         _mockClient->setWireVersions(WireVersion::RESUMABLE_INITIAL_SYNC,
                                      WireVersion::RESUMABLE_INITIAL_SYNC);
         _mockServer->assignCollectionUuid(_nss.ns(), _collUuid);
         _mockServer->setCommandReply("replSetGetRBID",
-                                     BSON("ok" << 1 << "rbid" << _sharedData->getRollBackId()));
+                                     BSON("ok" << 1 << "rbid" << getSharedData()->getRollBackId()));
     }
     std::unique_ptr<CollectionCloner> makeCollectionCloner(
         CollectionOptions options = CollectionOptions()) {
@@ -90,7 +93,7 @@ protected:
         _options = options;
         return std::make_unique<CollectionCloner>(_nss,
                                                   options,
-                                                  _sharedData.get(),
+                                                  getSharedData(),
                                                   _source,
                                                   _mockClient.get(),
                                                   &_storageInterface,
@@ -111,6 +114,10 @@ protected:
 
     BSONObj& getIdIndexSpec(CollectionCloner* cloner) {
         return cloner->_idIndexSpec;
+    }
+
+    InitialSyncSharedData* getSharedData() {
+        return checked_cast<InitialSyncSharedData*>(_sharedData.get());
     }
 
     std::shared_ptr<CollectionMockStats> _collectionStats;  // Used by the _loader.
@@ -142,8 +149,8 @@ class CollectionClonerTestNonResumable : public CollectionClonerTest {
         // Set client wireVersion to 4.2, where we do not yet support resumable cloning.
         _mockClient->setWireVersions(WireVersion::SHARDED_TRANSACTIONS,
                                      WireVersion::SHARDED_TRANSACTIONS);
-        stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
-        _sharedData->setSyncSourceWireVersion(lk, WireVersion::SHARDED_TRANSACTIONS);
+        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+        getSharedData()->setSyncSourceWireVersion(lk, WireVersion::SHARDED_TRANSACTIONS);
     }
 };
 

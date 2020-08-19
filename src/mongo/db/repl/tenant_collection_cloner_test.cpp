@@ -31,6 +31,7 @@
 
 #include <vector>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -61,6 +62,7 @@ public:
 protected:
     void setUp() override {
         ClonerTestFixture::setUp();
+        _sharedData = std::make_unique<TenantMigrationSharedData>(kInitialRollbackId, &_clock);
         _standardCreateCollectionFn = [this](OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const CollectionOptions& options) -> Status {
@@ -85,7 +87,7 @@ protected:
 
         _mockServer->assignCollectionUuid(_nss.ns(), _collUuid);
         _mockServer->setCommandReply("replSetGetRBID",
-                                     BSON("ok" << 1 << "rbid" << _sharedData->getRollBackId()));
+                                     BSON("ok" << 1 << "rbid" << getSharedData()->getRollBackId()));
         _mockClient->setOperationTime(_operationTime);
     }
     std::unique_ptr<TenantCollectionCloner> makeCollectionCloner(
@@ -94,7 +96,7 @@ protected:
         _options = options;
         return std::make_unique<TenantCollectionCloner>(_nss,
                                                         options,
-                                                        _sharedData.get(),
+                                                        getSharedData(),
                                                         _source,
                                                         _mockClient.get(),
                                                         &_storageInterface,
@@ -123,6 +125,10 @@ protected:
 
     BSONObj& getIdIndexSpec(TenantCollectionCloner* cloner) {
         return cloner->_idIndexSpec;
+    }
+
+    TenantMigrationSharedData* getSharedData() {
+        return checked_cast<TenantMigrationSharedData*>(_sharedData.get());
     }
 
     StorageInterfaceMock::CreateCollectionFn _standardCreateCollectionFn;

@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -52,11 +53,12 @@ public:
 protected:
     void setUp() override {
         ClonerTestFixture::setUp();
+        _sharedData = std::make_unique<TenantMigrationSharedData>(kInitialRollbackId, &_clock);
         _mockClient->setOperationTime(_operationTime);
     }
 
     std::unique_ptr<TenantAllDatabaseCloner> makeAllDatabaseCloner() {
-        return std::make_unique<TenantAllDatabaseCloner>(_sharedData.get(),
+        return std::make_unique<TenantAllDatabaseCloner>(getSharedData(),
                                                          _source,
                                                          _mockClient.get(),
                                                          &_storageInterface,
@@ -77,6 +79,10 @@ protected:
             bob.append("ok", 1);
         }
         return bob.obj();
+    }
+
+    TenantMigrationSharedData* getSharedData() {
+        return checked_cast<TenantMigrationSharedData*>(_sharedData.get());
     }
 
     static Timestamp _operationTime;

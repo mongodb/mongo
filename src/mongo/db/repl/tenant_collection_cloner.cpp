@@ -65,7 +65,7 @@ MONGO_FAIL_POINT_DEFINE(tenantMigrationHangDuringCollectionClone);
 
 TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
                                                const CollectionOptions& collectionOptions,
-                                               InitialSyncSharedData* sharedData,
+                                               TenantMigrationSharedData* sharedData,
                                                const HostAndPort& source,
                                                DBClientConnection* client,
                                                StorageInterface* storageInterface,
@@ -92,7 +92,7 @@ TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
               try {
                   work(executor::TaskExecutor::CallbackArgs(nullptr, {}, status, opCtx));
               } catch (const DBException& e) {
-                  setInitialSyncFailedStatus(e.toStatus());
+                  setSyncFailedStatus(e.toStatus());
               }
               return TaskRunner::NextAction::kDisposeOperationContext;
           };
@@ -363,7 +363,8 @@ void TenantCollectionCloner::setMetadataReader() {
                 return readResult.getStatus().withContext(
                     "tenant collection cloner failed to read repl set metadata");
             }
-            this->setLastVisibleOpTime(readResult.getValue().getLastOpVisible());
+            stdx::lock_guard<TenantMigrationSharedData> lk(*getSharedData());
+            getSharedData()->setLastVisibleOpTime(lk, readResult.getValue().getLastOpVisible());
             return Status::OK();
         });
 }

@@ -49,7 +49,7 @@ namespace repl {
 MONGO_FAIL_POINT_DEFINE(tenantDatabaseClonerHangAfterGettingOperationTime);
 
 TenantDatabaseCloner::TenantDatabaseCloner(const std::string& dbName,
-                                           InitialSyncSharedData* sharedData,
+                                           TenantMigrationSharedData* sharedData,
                                            const HostAndPort& source,
                                            DBClientConnection* client,
                                            StorageInterface* storageInterface,
@@ -197,12 +197,11 @@ void TenantDatabaseCloner::postStage() {
                         "namespace"_attr = sourceNss,
                         "error"_attr = collStatus.toString(),
                         "tenantId"_attr = _tenantId);
-            setInitialSyncFailedStatus(
-                {collStatus.code(),
-                 collStatus
-                     .withContext(str::stream()
-                                  << "Error cloning collection '" << sourceNss.toString() << "'")
-                     .toString()});
+            setSyncFailedStatus({collStatus.code(),
+                                 collStatus
+                                     .withContext(str::stream() << "Error cloning collection '"
+                                                                << sourceNss.toString() << "'")
+                                     .toString()});
         }
         {
             stdx::lock_guard<Latch> lk(_mutex);

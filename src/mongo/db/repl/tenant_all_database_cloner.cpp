@@ -47,7 +47,7 @@ namespace repl {
 // and recorded the results and the operationTime.
 MONGO_FAIL_POINT_DEFINE(tenantAllDatabaseClonerHangAfterGettingOperationTime);
 
-TenantAllDatabaseCloner::TenantAllDatabaseCloner(InitialSyncSharedData* sharedData,
+TenantAllDatabaseCloner::TenantAllDatabaseCloner(TenantMigrationSharedData* sharedData,
                                                  const HostAndPort& source,
                                                  DBClientConnection* client,
                                                  StorageInterface* storageInterface,
@@ -144,7 +144,7 @@ void TenantAllDatabaseCloner::postStage() {
                           "totalDbs"_attr = _databases.size(),
                           "error"_attr = dbStatus.toString(),
                           "tenantId"_attr = _tenantId);
-            setInitialSyncFailedStatus(dbStatus);
+            setSyncFailedStatus(dbStatus);
             return;
         }
         {

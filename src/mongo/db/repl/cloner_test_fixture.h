@@ -66,13 +66,12 @@ protected:
     std::unique_ptr<ThreadPool> _dbWorkThreadPool;
     std::unique_ptr<MockRemoteDBServer> _mockServer;
     std::unique_ptr<DBClientConnection> _mockClient;
-    std::unique_ptr<InitialSyncSharedData> _sharedData;
+    std::unique_ptr<ReplSyncSharedData> _sharedData;
     ClockSourceMock _clock;
     UUID _initialSyncId = UUID::gen();
-
-private:
     static constexpr int kInitialRollbackId = 1;
 
+private:
     unittest::MinimumLoggedSeverityGuard _verboseGuard{logv2::LogComponent::kReplicationInitialSync,
                                                        logv2::LogSeverity::Debug(1)};
 };

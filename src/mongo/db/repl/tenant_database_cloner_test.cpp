@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -55,6 +56,7 @@ public:
 protected:
     void setUp() override {
         ClonerTestFixture::setUp();
+        _sharedData = std::make_unique<TenantMigrationSharedData>(kInitialRollbackId, &_clock);
         _storageInterface.createCollFn = [this](OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const CollectionOptions& options) -> Status {
@@ -82,7 +84,7 @@ protected:
 
     std::unique_ptr<TenantDatabaseCloner> makeDatabaseCloner() {
         return std::make_unique<TenantDatabaseCloner>(_dbName,
-                                                      _sharedData.get(),
+                                                      getSharedData(),
                                                       _source,
                                                       _mockClient.get(),
                                                       &_storageInterface,
@@ -125,6 +127,10 @@ protected:
         return cloner->_collections;
     }
 
+    TenantMigrationSharedData* getSharedData() {
+        return checked_cast<TenantMigrationSharedData*>(_sharedData.get());
+    }
+
     std::map<NamespaceString, TenantCollectionCloneInfo> _collections;
 
     static std::string _tenantId;
@@ -144,7 +150,7 @@ TEST_F(TenantDatabaseClonerTest, ListCollectionsReturnedNoCollections) {
     auto cloner = makeDatabaseCloner();
 
     ASSERT_OK(cloner->run());
-    ASSERT_OK(_sharedData->getInitialSyncStatus(WithLock::withoutLock()));
+    ASSERT_OK(getSharedData()->getStatus(WithLock::withoutLock()));
     ASSERT(getCollectionsFromCloner(cloner.get()).empty());
 }
 
@@ -171,7 +177,7 @@ TEST_F(TenantDatabaseClonerTest, ListCollections) {
     _mockServer->setCommandReply("find", createFindResponse());
 
     ASSERT_OK(cloner->run());
-    ASSERT_OK(_sharedData->getInitialSyncStatus(WithLock::withoutLock()));
+    ASSERT_OK(getSharedData()->getStatus(WithLock::withoutLock()));
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());
@@ -214,7 +220,7 @@ TEST_F(TenantDatabaseClonerTest, ListCollectionsAllowsExtraneousFields) {
     _mockServer->setCommandReply("find", createFindResponse());
 
     ASSERT_OK(cloner->run());
-    ASSERT_OK(_sharedData->getInitialSyncStatus(WithLock::withoutLock()));
+    ASSERT_OK(getSharedData()->getStatus(WithLock::withoutLock()));
     auto collections = getCollectionsFromCloner(cloner.get());
 
     ASSERT_EQUALS(2U, collections.size());

@@ -68,7 +68,6 @@ void ClonerTestFixture::setUp() {
     const bool autoReconnect = true;
     _mockClient = std::unique_ptr<DBClientConnection>(
         new MockDBClientConnection(_mockServer.get(), autoReconnect));
-    _sharedData = std::make_unique<InitialSyncSharedData>(kInitialRollbackId, Days(1), &_clock);
 
     // Required by CollectionCloner::listIndexesStage() and IndexBuildsCoordinator.
     getServiceContext()->setStorageEngine(std::make_unique<StorageEngineMock>());
@@ -86,7 +85,7 @@ void ClonerTestFixture::tearDown() {
 }
 
 void ClonerTestFixture::setInitialSyncId() {
-    stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+    stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);
     _sharedData->setSyncSourceWireVersion(lk, WireVersion::RESUMABLE_INITIAL_SYNC);
     _sharedData->setInitialSyncSourceId(lk, _initialSyncId);
 }

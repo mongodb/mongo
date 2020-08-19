@@ -35,7 +35,7 @@ namespace mongo {
 namespace repl {
 int InitialSyncSharedData::incrementRetryingOperations(WithLock lk) {
     if (_retryingOperationsCount++ == 0) {
-        _syncSourceUnreachableSince = _clock->now();
+        _syncSourceUnreachableSince = getClock()->now();
     }
     return _retryingOperationsCount;
 }
@@ -43,7 +43,7 @@ int InitialSyncSharedData::incrementRetryingOperations(WithLock lk) {
 int InitialSyncSharedData::decrementRetryingOperations(WithLock lk) {
     invariant(_retryingOperationsCount > 0);
     if (--_retryingOperationsCount == 0) {
-        _totalTimeUnreachable += (_clock->now() - _syncSourceUnreachableSince);
+        _totalTimeUnreachable += (getClock()->now() - _syncSourceUnreachableSince);
         _syncSourceUnreachableSince = Date_t();
     }
     return _retryingOperationsCount;
@@ -54,9 +54,9 @@ bool InitialSyncSharedData::shouldRetryOperation(WithLock lk, RetryableOperation
         retryableOp->emplace(this);
         incrementRetryingOperations(lk);
     }
-    invariant((**retryableOp)._sharedData == this);
+    invariant((**retryableOp).getSharedData() == this);
     auto outageDuration = getCurrentOutageDuration(lk);
-    if (outageDuration <= _allowedOutageDuration) {
+    if (outageDuration <= getAllowedOutageDuration(lk)) {
         incrementTotalRetries(lk);
         return true;
     } else {
@@ -67,12 +67,12 @@ bool InitialSyncSharedData::shouldRetryOperation(WithLock lk, RetryableOperation
 }
 Milliseconds InitialSyncSharedData::getTotalTimeUnreachable(WithLock lk) {
     return _totalTimeUnreachable +
-        ((_retryingOperationsCount > 0) ? _clock->now() - _syncSourceUnreachableSince
+        ((_retryingOperationsCount > 0) ? getClock()->now() - _syncSourceUnreachableSince
                                         : Milliseconds::zero());
 }
 
 Milliseconds InitialSyncSharedData::getCurrentOutageDuration(WithLock lk) {
-    return ((_retryingOperationsCount > 0) ? _clock->now() - _syncSourceUnreachableSince
+    return ((_retryingOperationsCount > 0) ? getClock()->now() - _syncSourceUnreachableSince
                                            : Milliseconds::min());
 }
 

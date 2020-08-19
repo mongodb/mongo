@@ -34,7 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/dbclient_connection.h"
-#include "mongo/db/repl/initial_sync_shared_data.h"
+#include "mongo/db/repl/repl_sync_shared_data.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
@@ -48,7 +48,7 @@ namespace repl {
 class BaseCloner {
 public:
     BaseCloner(StringData clonerName,
-               InitialSyncSharedData* sharedData,
+               ReplSyncSharedData* sharedData,
                HostAndPort source,
                DBClientConnection* client,
                StorageInterface* storageInterface,
@@ -161,7 +161,7 @@ protected:
         return _clonerName;
     }
 
-    InitialSyncSharedData* getSharedData() const {
+    virtual ReplSyncSharedData* getSharedData() const {
         return _sharedData;
     }
 
@@ -196,9 +196,9 @@ protected:
     virtual bool isMyFailPoint(const BSONObj& data) const;
 
     /**
-     * If initial sync status is OK, mark it failed.  Also set the local status.
+     * If the status of the sync process is OK, mark it failed.  Also set the local status.
      */
-    void setInitialSyncFailedStatus(Status status);
+    void setSyncFailedStatus(Status status);
 
     /**
      * Takes the initial sync status lock and checks the initial sync status.
@@ -268,7 +268,7 @@ private:
     // (S)  Self-synchronizing; access according to classes own rules
     // (M)  Reads and writes guarded by _mutex
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
-    InitialSyncSharedData* _sharedData;   // (S)
+    ReplSyncSharedData* _sharedData;      // (S)
     DBClientConnection* _client;          // (X)
     StorageInterface* _storageInterface;  // (X)
     ThreadPool* _dbPool;                  // (X)
@@ -289,7 +289,7 @@ private:
     std::string _stopAfterStage;  // (X)
 
     // Operation that may currently be retrying.
-    InitialSyncSharedData::RetryableOperation _retryableOp;  // (X)
+    ReplSyncSharedData::RetryableOperation _retryableOp;  // (X)
 };
 
 }  // namespace repl

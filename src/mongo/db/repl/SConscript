@@ -980,7 +980,7 @@ env.Library(
     LIBDEPS = [
         'base_cloner',
         'cloner_utils',
-        'initial_sync_shared_data',
+        'repl_sync_shared_data',
         'member_data',
         'replication_consistency_markers_impl',
         'task_runner',
@@ -1009,7 +1009,7 @@ env.Library(
     LIBDEPS = [
         'base_cloner',
         'cloner_utils',
-        'initial_sync_shared_data',
+        'repl_sync_shared_data',
         'task_runner',
         '$BUILD_DIR/mongo/base',
     ],
@@ -1102,9 +1102,11 @@ env.Library(
 )
 
 env.Library(
-    target='initial_sync_shared_data',
+    target='repl_sync_shared_data',
     source=[
+        'repl_sync_shared_data.cpp',
         'initial_sync_shared_data.cpp',
+        'tenant_migration_shared_data.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1117,7 +1119,7 @@ env.Library(
         'base_cloner.cpp',
     ],
     LIBDEPS=[
-        'initial_sync_shared_data',
+        'repl_sync_shared_data',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/util/fail_point',
@@ -1157,7 +1159,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/client/clientdriver_network',
         'initial_sync_cloners',
-        'initial_sync_shared_data',
+        'repl_sync_shared_data',
         'multiapplier',
         'oplog',
         'oplog_application_interface',
@@ -1534,7 +1536,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'replmocks',
         'initial_sync_cloners',
-        'initial_sync_shared_data',
+        'repl_sync_shared_data',
         'tenant_migration_cloners'
     ],
 )

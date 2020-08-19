@@ -32,8 +32,10 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/task_runner.h"
+#include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
@@ -69,7 +71,7 @@ public:
 
     TenantCollectionCloner(const NamespaceString& ns,
                            const CollectionOptions& collectionOptions,
-                           InitialSyncSharedData* sharedData,
+                           TenantMigrationSharedData* sharedData,
                            const HostAndPort& source,
                            DBClientConnection* client,
                            StorageInterface* storageInterface,
@@ -114,6 +116,10 @@ protected:
     ClonerStages getStages() final;
 
     bool isMyFailPoint(const BSONObj& data) const final;
+
+    TenantMigrationSharedData* getSharedData() const override {
+        return checked_cast<TenantMigrationSharedData*>(BaseCloner::getSharedData());
+    }
 
 private:
     friend class TenantCollectionClonerTest;
@@ -199,12 +205,6 @@ private:
      */
     void setMetadataReader();
     void unsetMetadataReader();
-    void setLastVisibleOpTime(OpTime opTime) {
-        _lastVisibleOpTime = opTime;
-    }
-    OpTime getLastVisibleOpTime() {
-        return _lastVisibleOpTime;
-    }
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -237,15 +237,12 @@ private:
     // only destroyed after those threads exit.
     TaskRunner _dbWorkTaskRunner;  // (R)
 
-    // TODO(SERVER-49780): Move this into TenantMigrationSharedData.
-    OpTime _lastVisibleOpTime;  // (X)
-
     // The database name prefix of the tenant associated with this migration.
-    // TODO(SERVER-49780): Consider moving this into TenantMigrationSharedData.
+    // TODO(SERVER-50492): Consider moving this into TenantMigrationSharedData.
     std::string _tenantId;  // (R)
 
     // The operationTime returned with the listIndexes result.
-    // TODO(SERVER-49780): Consider moving this into TenantMigrationSharedData.
+    // TODO(SERVER-50492): Consider moving this into TenantMigrationSharedData.
     Timestamp _operationTime;  // (X)
 };
 

@@ -31,8 +31,10 @@
 
 #include <vector>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/tenant_database_cloner.h"
+#include "mongo/db/repl/tenant_migration_shared_data.h"
 
 namespace mongo {
 namespace repl {
@@ -48,7 +50,7 @@ public:
         void append(BSONObjBuilder* builder) const;
     };
 
-    TenantAllDatabaseCloner(InitialSyncSharedData* sharedData,
+    TenantAllDatabaseCloner(TenantMigrationSharedData* sharedData,
                             const HostAndPort& source,
                             DBClientConnection* client,
                             StorageInterface* storageInterface,
@@ -65,6 +67,10 @@ public:
 
 protected:
     ClonerStages getStages() final;
+
+    TenantMigrationSharedData* getSharedData() const override {
+        return checked_cast<TenantMigrationSharedData*>(BaseCloner::getSharedData());
+    }
 
 private:
     friend class TenantAllDatabaseClonerTest;
