@@ -66,6 +66,7 @@ public:
     static constexpr StringData kUse44SortKeysName = "use44SortKeys"_sd;
     static constexpr StringData kIsMapReduceCommandName = "isMapReduceCommand"_sd;
     static constexpr StringData kLetName = "let"_sd;
+    static constexpr StringData kCollectionUUIDName = "collectionUUID"_sd;
 
     static constexpr long long kDefaultBatchSize = 101;
 
@@ -227,6 +228,10 @@ public:
         return _isMapReduceCommand;
     }
 
+    const auto& getCollectionUUID() const {
+        return _collectionUUID;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -299,6 +304,10 @@ public:
         _isMapReduceCommand = isMapReduce;
     }
 
+    void setCollectionUUID(UUID collectionUUID) {
+        _collectionUUID = std::move(collectionUUID);
+    }
+
 private:
     // Required fields.
     const NamespaceString _nss;
@@ -348,6 +357,9 @@ private:
     // A document containing runtime constants; i.e. values that do not change once computed (e.g.
     // $$NOW).
     boost::optional<RuntimeConstants> _runtimeConstants;
+
+    // The expected UUID of the namespace the aggregation executes on.
+    boost::optional<UUID> _collectionUUID;
 
     // A document containing user-specified let parameter constants; i.e. values that do not change
     // once computed.

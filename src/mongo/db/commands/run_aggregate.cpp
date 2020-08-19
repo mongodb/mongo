@@ -514,6 +514,11 @@ Status runAggregate(OperationContext* opCtx,
 
         // If this is a change stream, perform special checks and change the execution namespace.
         if (liteParsedPipeline.hasChangeStream()) {
+            uassert(4928900,
+                    str::stream() << AggregationRequest::kCollectionUUIDName
+                                  << " is not supported for a change stream",
+                    !request.getCollectionUUID());
+
             // Replace the execution namespace with that of the oplog.
             nss = NamespaceString::kRsOplogNamespace;
 
@@ -535,6 +540,11 @@ Status runAggregate(OperationContext* opCtx,
             // Obtain collection locks on the execution namespace; that is, the oplog.
             ctx.emplace(opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
         } else if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
+            uassert(4928901,
+                    str::stream() << AggregationRequest::kCollectionUUIDName
+                                  << " is not supported for a collectionless aggregation",
+                    !request.getCollectionUUID());
+
             // If this is a collectionless agg with no foreign namespaces, don't acquire any locks.
             statsTracker.emplace(opCtx,
                                  nss,
@@ -563,6 +573,10 @@ Status runAggregate(OperationContext* opCtx,
         if (ctx && ctx->getView() && !liteParsedPipeline.startsWithCollStats()) {
             invariant(nss != NamespaceString::kRsOplogNamespace);
             invariant(!nss.isCollectionlessAggregateNS());
+            uassert(ErrorCodes::OptionNotSupportedOnView,
+                    str::stream() << AggregationRequest::kCollectionUUIDName
+                                  << " is not supported against a view",
+                    !request.getCollectionUUID());
 
             // Check that the default collation of 'view' is compatible with the operation's
             // collation. The check is skipped if the request did not specify a collation.
@@ -598,6 +612,14 @@ Status runAggregate(OperationContext* opCtx,
             }
 
             return status;
+        }
+
+        if (request.getCollectionUUID()) {
+            // If the namespace is not a view and collectionUUID was provided, verify the collection
+            // exists and has the expected UUID.
+            uassert(ErrorCodes::NamespaceNotFound,
+                    "No collection found with the given namespace and UUID",
+                    uuid && uuid == *request.getCollectionUUID());
         }
 
         invariant(collatorToUse);

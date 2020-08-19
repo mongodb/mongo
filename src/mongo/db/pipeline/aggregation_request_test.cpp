@@ -56,12 +56,17 @@ const Document kDefaultCursorOptionDocument{
 
 TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson(
+    BSONObj inputBson = fromjson(
         "{pipeline: [{$match: {a: 'abc'}}], explain: false, allowDiskUse: true, fromMongos: true, "
         "needsMerge: true, bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: "
         "{batchSize: 10}, hint: {a: 1}, maxTimeMS: 100, readConcern: {level: 'linearizable'}, "
         "$queryOptions: {$readPreference: 'nearest'}, exchange: {policy: "
         "'roundrobin', consumers:NumberInt(2)}, isMapReduceCommand: true}");
+    auto uuid = UUID::gen();
+    BSONObjBuilder uuidBob;
+    uuid.appendToBuilder(&uuidBob, AggregationRequest::kCollectionUUIDName);
+    inputBson = inputBson.addField(uuidBob.obj().firstElement());
+
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_FALSE(request.getExplain());
     ASSERT_TRUE(request.shouldAllowDiskUse());
@@ -82,6 +87,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
                            << "nearest"));
     ASSERT_TRUE(request.getExchangeSpec().is_initialized());
     ASSERT_TRUE(request.getIsMapReduceCommand());
+    ASSERT_EQ(*request.getCollectionUUID(), uuid);
 }
 
 TEST(AggregationRequestTest, ShouldParseExplicitExplainTrue) {
@@ -193,6 +199,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     const auto letParamsObj = BSON("foo"
                                    << "bar");
     request.setLetParameters(letParamsObj);
+    auto uuid = UUID::gen();
+    request.setCollectionUUID(uuid);
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
@@ -209,7 +217,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {QueryRequest::kUnwrappedReadPrefField, readPrefObj},
                  {QueryRequest::cmdOptionMaxTimeMS, 10},
                  {AggregationRequest::kIsMapReduceCommandName, true},
-                 {AggregationRequest::kLetName, letParamsObj}};
+                 {AggregationRequest::kLetName, letParamsObj},
+                 {AggregationRequest::kCollectionUUIDName, uuid}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 
@@ -503,6 +512,14 @@ TEST(AggregationRequestTest, ShouldRejectInvalidWriteConcern) {
         fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, writeConcern: 'invalid'}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
+
+TEST(AggregationRequestTest, ShouldRejectInvalidCollectionUUID) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBSON = fromjson("{pipeline: [{$match: {}}], collectionUUID: 2}");
+    ASSERT_EQUALS(AggregationRequest::parseFromBSON(nss, inputBSON).getStatus().code(),
+                  ErrorCodes::InvalidUUID);
+}
+
 //
 // Ignore fields parsed elsewhere.
 //

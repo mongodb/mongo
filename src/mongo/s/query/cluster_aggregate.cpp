@@ -213,6 +213,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                           << ", " << AggregationRequest::kFromMongosName
                           << "] cannot be set to 'true' when sent to mongos",
             !request.needsMerge() && !request.isFromMongos());
+    uassert(4928902,
+            str::stream() << AggregationRequest::kCollectionUUIDName
+                          << " is not supported on a mongos",
+            !request.getCollectionUUID());
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
         const auto resolvedNsRoutingInfo =
