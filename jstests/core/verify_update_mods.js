@@ -288,6 +288,18 @@ const testCases = [
         inputDocuments: [{_id: 1}],
         expectedResults: [{_id: 1}],
     },
+    {
+        query: {_id: 1},
+        update: {$pullAll: {}},
+        inputDocuments: [{_id: 1, a: [1, 2]}],
+        expectedResults: [{_id: 1, a: [1, 2]}],
+    },
+    {
+        query: {_id: 1},
+        update: {$pullAll: {a: [1]}},
+        inputDocuments: [{_id: 1, a: [1, 2, 1]}],
+        expectedResults: [{_id: 1, a: [2]}],
+    },
 ];
 
 for (const command of [updateCommand, findAndModifyCommand]) {
