@@ -19,31 +19,8 @@ const secondary = rst.getSecondary();
 const primaryAdminDB = primary.getDB("admin");
 const secondaryAdminDB = secondary.getDB("admin");
 
-// This test manually runs isMaster with internalClient, which means that to the mongod, the
-// connection appears to be from another server. Since mongod expects other cluster members to
-// always include explicit read/write concern (on commands that accept read/write concern), this
-// test must be careful to mimic this behavior.
-
-// Get the server topologyVersion, minWireVersion, and maxWireversion.
-const primaryResult = assert.commandWorked(primaryAdminDB.runCommand(
-    {isMaster: 1, internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(9)}}));
-assert(primaryResult.hasOwnProperty("topologyVersion"), tojson(primaryResult));
-const primaryTopologyVersion = primaryResult.topologyVersion;
-assert(primaryTopologyVersion.hasOwnProperty("processId"), tojson(primaryTopologyVersion));
-assert(primaryTopologyVersion.hasOwnProperty("counter"), tojson(primaryTopologyVersion));
-
-const maxWireVersion = primaryResult.maxWireVersion;
-const initMinWireVersion = primaryResult.minWireVersion;
-assert.eq(maxWireVersion, initMinWireVersion);
-
-const secondaryResult = assert.commandWorked(secondaryAdminDB.runCommand({isMaster: 1}));
-assert(secondaryResult.hasOwnProperty("topologyVersion"), tojson(secondaryResult));
-const secondaryTopologyVersion = secondaryResult.topologyVersion;
-assert(secondaryTopologyVersion.hasOwnProperty("processId"), tojson(secondaryTopologyVersion));
-assert(secondaryTopologyVersion.hasOwnProperty("counter"), tojson(secondaryTopologyVersion));
-
 function runAwaitableIsMasterBeforeFCVChange(
-    topologyVersionField, isUpgrade, isPrimary, prevMinWireVersion, serverMaxWireVersion) {
+    topologyVersionField, targetFCV, isPrimary, prevMinWireVersion, serverMaxWireVersion) {
     db.getMongo().setSlaveOk();
     let response = assert.commandWorked(db.runCommand({
         isMaster: 1,
@@ -67,159 +44,194 @@ function runAwaitableIsMasterBeforeFCVChange(
     const minWireVersion = response.minWireVersion;
     const maxWireVersion = response.maxWireVersion;
     assert.neq(prevMinWireVersion, minWireVersion);
-    if (isUpgrade) {
+    if (targetFCV === latestFCV) {
         // minWireVersion should always equal maxWireVersion if we have not fully downgraded FCV.
         assert.eq(minWireVersion, maxWireVersion, response);
-    } else {
+    } else if (targetFCV === lastContinuousFCV) {
         assert.eq(minWireVersion + 1, maxWireVersion, response);
+    } else {
+        assert.eq(minWireVersion + numVersionsSinceLastLTS, maxWireVersion, response);
     }
 }
 
-// A failpoint signalling that the servers have received the isMaster request and are waiting for a
-// topology change.
-let primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-let secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+function runTest(downgradeFCV) {
+    jsTestLog("Running test with downgradeFCV: " + downgradeFCV);
+    // This test manually runs isMaster with internalClient, which means that to the mongod, the
+    // connection appears to be from another server. Since mongod expects other cluster members to
+    // always include explicit read/write concern (on commands that accept read/write concern), this
+    // test must be careful to mimic this behavior.
 
-// Send an awaitable isMaster request. This will block until maxAwaitTimeMS has elapsed or a
-// topology change happens.
-let awaitIsMasterBeforeDowngradeFCVOnPrimary =
-    startParallelShell(funWithArgs(runAwaitableIsMasterBeforeFCVChange,
-                                   primaryTopologyVersion,
-                                   false /* isUpgrade */,
-                                   true /* isPrimary */,
-                                   initMinWireVersion,
-                                   maxWireVersion),
-                       primary.port);
-let awaitIsMasterBeforeDowngradeFCVOnSecondary =
-    startParallelShell(funWithArgs(runAwaitableIsMasterBeforeFCVChange,
-                                   secondaryTopologyVersion,
-                                   false /* isUpgrade */,
-                                   false /* isPrimary */,
-                                   initMinWireVersion,
-                                   maxWireVersion),
-                       secondary.port);
-primaryFailPoint.wait();
-secondaryFailPoint.wait();
+    // Get the server topologyVersion, minWireVersion, and maxWireversion.
+    const primaryResult = assert.commandWorked(primaryAdminDB.runCommand({
+        isMaster: 1,
+        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(9)}
+    }));
+    assert(primaryResult.hasOwnProperty("topologyVersion"), tojson(primaryResult));
 
-// Each node has one isMaster request waiting on a topology change.
-let numAwaitingTopologyChangeOnPrimary =
-    primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-let numAwaitingTopologyChangeOnSecondary =
-    secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-assert.eq(1, numAwaitingTopologyChangeOnPrimary);
-assert.eq(1, numAwaitingTopologyChangeOnSecondary);
+    const maxWireVersion = primaryResult.maxWireVersion;
+    const initMinWireVersion = primaryResult.minWireVersion;
+    assert.eq(maxWireVersion, initMinWireVersion);
 
-// Setting the FCV to the same version will not trigger an isMaster response.
-assert.commandWorked(
-    primaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, writeConcern: {w: 1}}));
-checkFCV(primaryAdminDB, latestFCV);
-checkFCV(secondaryAdminDB, latestFCV);
+    const secondaryResult = assert.commandWorked(secondaryAdminDB.runCommand({isMaster: 1}));
+    assert(secondaryResult.hasOwnProperty("topologyVersion"), tojson(secondaryResult));
+    const primaryTopologyVersion = primaryResult.topologyVersion;
+    assert(primaryTopologyVersion.hasOwnProperty("processId"), tojson(primaryTopologyVersion));
+    assert(primaryTopologyVersion.hasOwnProperty("counter"), tojson(primaryTopologyVersion));
 
-// Each node still has one isMaster request waiting on a topology change.
-numAwaitingTopologyChangeOnPrimary =
-    primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-numAwaitingTopologyChangeOnSecondary =
-    secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-assert.eq(1, numAwaitingTopologyChangeOnPrimary);
-assert.eq(1, numAwaitingTopologyChangeOnSecondary);
+    const secondaryTopologyVersion = secondaryResult.topologyVersion;
+    assert(secondaryTopologyVersion.hasOwnProperty("processId"), tojson(secondaryTopologyVersion));
+    assert(secondaryTopologyVersion.hasOwnProperty("counter"), tojson(secondaryTopologyVersion));
 
-jsTestLog("Downgrade the featureCompatibilityVersion.");
-// Downgrading the FCV will cause the isMaster requests to respond on both primary and secondary.
-assert.commandWorked(
-    primaryAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, writeConcern: {w: 1}}));
-awaitIsMasterBeforeDowngradeFCVOnPrimary();
-awaitIsMasterBeforeDowngradeFCVOnSecondary();
-// Ensure the featureCompatibilityVersion document update has been replicated.
-rst.awaitReplication();
-checkFCV(primaryAdminDB, lastLTSFCV);
-checkFCV(secondaryAdminDB, lastLTSFCV);
+    // A failpoint signalling that the servers have received the isMaster request and are waiting
+    // for a topology change.
+    let primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
+    let secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
 
-// All isMaster requests should have been responded to after the FCV change.
-numAwaitingTopologyChangeOnPrimary =
-    primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-numAwaitingTopologyChangeOnSecondary =
-    secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-assert.eq(0, numAwaitingTopologyChangeOnPrimary);
-assert.eq(0, numAwaitingTopologyChangeOnSecondary);
+    // Send an awaitable isMaster request. This will block until maxAwaitTimeMS has elapsed or a
+    // topology change happens.
+    let awaitIsMasterBeforeDowngradeFCVOnPrimary =
+        startParallelShell(funWithArgs(runAwaitableIsMasterBeforeFCVChange,
+                                       primaryTopologyVersion,
+                                       downgradeFCV,
+                                       true /* isPrimary */,
+                                       initMinWireVersion,
+                                       maxWireVersion),
+                           primary.port);
+    let awaitIsMasterBeforeDowngradeFCVOnSecondary =
+        startParallelShell(funWithArgs(runAwaitableIsMasterBeforeFCVChange,
+                                       secondaryTopologyVersion,
+                                       downgradeFCV,
+                                       false /* isPrimary */,
+                                       initMinWireVersion,
+                                       maxWireVersion),
+                           secondary.port);
+    primaryFailPoint.wait();
+    secondaryFailPoint.wait();
 
-// Get the new topologyVersion.
-const primaryResponseAfterDowngrade = assert.commandWorked(primaryAdminDB.runCommand({
-    isMaster: 1,
-    internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(maxWireVersion)}
-}));
-assert(primaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
-       tojson(primaryResponseAfterDowngrade));
-const primaryTopologyVersionAfterDowngrade = primaryResponseAfterDowngrade.topologyVersion;
-const minWireVersionAfterDowngrade = primaryResponseAfterDowngrade.minWireVersion;
+    // Each node has one isMaster request waiting on a topology change.
+    let numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    let numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    assert.eq(1, numAwaitingTopologyChangeOnPrimary);
+    assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
-const secondaryResponseAfterDowngrade =
-    assert.commandWorked(secondaryAdminDB.runCommand({isMaster: 1}));
-assert(secondaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
-       tojson(secondaryResponseAfterDowngrade));
-const secondaryTopologyVersionAfterDowngrade = secondaryResponseAfterDowngrade.topologyVersion;
+    // Setting the FCV to the same version will not trigger an isMaster response.
+    assert.commandWorked(primaryAdminDB.runCommand(
+        {setFeatureCompatibilityVersion: latestFCV, writeConcern: {w: 1}}));
+    checkFCV(primaryAdminDB, latestFCV);
+    checkFCV(secondaryAdminDB, latestFCV);
 
-// Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
-primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
-let awaitIsMasterBeforeUpgradeFCVOnPrimary =
-    startParallelShell(funWithArgs(runAwaitableIsMasterBeforeFCVChange,
-                                   primaryTopologyVersionAfterDowngrade,
-                                   true /* isUpgrade */,
-                                   true /* isPrimary */,
-                                   minWireVersionAfterDowngrade,
-                                   maxWireVersion),
-                       primary.port);
-let awaitIsMasterBeforeUpgradeFCVOnSecondary =
-    startParallelShell(funWithArgs(runAwaitableIsMasterBeforeFCVChange,
-                                   secondaryTopologyVersionAfterDowngrade,
-                                   true /* isUpgrade */,
-                                   false /* isPrimary */,
-                                   minWireVersionAfterDowngrade,
-                                   maxWireVersion),
-                       secondary.port);
-primaryFailPoint.wait();
-secondaryFailPoint.wait();
+    // Each node still has one isMaster request waiting on a topology change.
+    numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    assert.eq(1, numAwaitingTopologyChangeOnPrimary);
+    assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
-// Each node has one isMaster request waiting on a topology change.
-numAwaitingTopologyChangeOnPrimary =
-    primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-numAwaitingTopologyChangeOnSecondary =
-    secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-assert.eq(1, numAwaitingTopologyChangeOnPrimary);
-assert.eq(1, numAwaitingTopologyChangeOnSecondary);
+    jsTestLog("Downgrade the featureCompatibilityVersion.");
+    // Downgrading the FCV will cause the isMaster requests to respond on both primary and
+    // secondary.
+    assert.commandWorked(primaryAdminDB.runCommand(
+        {setFeatureCompatibilityVersion: downgradeFCV, writeConcern: {w: 1}}));
+    awaitIsMasterBeforeDowngradeFCVOnPrimary();
+    awaitIsMasterBeforeDowngradeFCVOnSecondary();
+    // Ensure the featureCompatibilityVersion document update has been replicated.
+    rst.awaitReplication();
+    checkFCV(primaryAdminDB, downgradeFCV);
+    checkFCV(secondaryAdminDB, downgradeFCV);
 
-// Setting the FCV to the same version will not trigger an isMaster response.
-assert.commandWorked(
-    primaryAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, writeConcern: {w: 1}}));
-checkFCV(primaryAdminDB, lastLTSFCV);
-checkFCV(secondaryAdminDB, lastLTSFCV);
+    // All isMaster requests should have been responded to after the FCV change.
+    numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    assert.eq(0, numAwaitingTopologyChangeOnPrimary);
+    assert.eq(0, numAwaitingTopologyChangeOnSecondary);
 
-// Each node still has one isMaster request waiting on a topology change.
-numAwaitingTopologyChangeOnPrimary =
-    primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-numAwaitingTopologyChangeOnSecondary =
-    secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-assert.eq(1, numAwaitingTopologyChangeOnPrimary);
-assert.eq(1, numAwaitingTopologyChangeOnSecondary);
+    // Get the new topologyVersion.
+    const primaryResponseAfterDowngrade = assert.commandWorked(primaryAdminDB.runCommand({
+        isMaster: 1,
+        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(maxWireVersion)}
+    }));
+    assert(primaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
+           tojson(primaryResponseAfterDowngrade));
+    const primaryTopologyVersionAfterDowngrade = primaryResponseAfterDowngrade.topologyVersion;
+    const minWireVersionAfterDowngrade = primaryResponseAfterDowngrade.minWireVersion;
 
-jsTestLog("Upgrade the featureCompatibilityVersion.");
-// Upgrading the FCV will cause the isMaster requests to respond on both primary and secondary.
-assert.commandWorked(
-    primaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, writeConcern: {w: 1}}));
-awaitIsMasterBeforeUpgradeFCVOnPrimary();
-awaitIsMasterBeforeUpgradeFCVOnSecondary();
-// Ensure the featureCompatibilityVersion document update has been replicated.
-rst.awaitReplication();
-checkFCV(primaryAdminDB, latestFCV);
-checkFCV(secondaryAdminDB, latestFCV);
+    const secondaryResponseAfterDowngrade =
+        assert.commandWorked(secondaryAdminDB.runCommand({isMaster: 1}));
+    assert(secondaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
+           tojson(secondaryResponseAfterDowngrade));
+    const secondaryTopologyVersionAfterDowngrade = secondaryResponseAfterDowngrade.topologyVersion;
 
-// All isMaster requests should have been responded to after the FCV change.
-numAwaitingTopologyChangeOnPrimary =
-    primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-numAwaitingTopologyChangeOnSecondary =
-    secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
-assert.eq(0, numAwaitingTopologyChangeOnPrimary);
-assert.eq(0, numAwaitingTopologyChangeOnSecondary);
+    // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
+    primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
+    secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+    let awaitIsMasterBeforeUpgradeFCVOnPrimary =
+        startParallelShell(funWithArgs(runAwaitableIsMasterBeforeFCVChange,
+                                       primaryTopologyVersionAfterDowngrade,
+                                       latestFCV,
+                                       true /* isPrimary */,
+                                       minWireVersionAfterDowngrade,
+                                       maxWireVersion),
+                           primary.port);
+    let awaitIsMasterBeforeUpgradeFCVOnSecondary =
+        startParallelShell(funWithArgs(runAwaitableIsMasterBeforeFCVChange,
+                                       secondaryTopologyVersionAfterDowngrade,
+                                       latestFCV,
+                                       false /* isPrimary */,
+                                       minWireVersionAfterDowngrade,
+                                       maxWireVersion),
+                           secondary.port);
+    primaryFailPoint.wait();
+    secondaryFailPoint.wait();
+
+    // Each node has one isMaster request waiting on a topology change.
+    numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    assert.eq(1, numAwaitingTopologyChangeOnPrimary);
+    assert.eq(1, numAwaitingTopologyChangeOnSecondary);
+
+    // Setting the FCV to the same version will not trigger an isMaster response.
+    assert.commandWorked(primaryAdminDB.runCommand(
+        {setFeatureCompatibilityVersion: downgradeFCV, writeConcern: {w: 1}}));
+    checkFCV(primaryAdminDB, downgradeFCV);
+    checkFCV(secondaryAdminDB, downgradeFCV);
+
+    // Each node still has one isMaster request waiting on a topology change.
+    numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    assert.eq(1, numAwaitingTopologyChangeOnPrimary);
+    assert.eq(1, numAwaitingTopologyChangeOnSecondary);
+
+    jsTestLog("Upgrade the featureCompatibilityVersion.");
+    // Upgrading the FCV will cause the isMaster requests to respond on both primary and secondary.
+    assert.commandWorked(primaryAdminDB.runCommand(
+        {setFeatureCompatibilityVersion: latestFCV, writeConcern: {w: 1}}));
+    awaitIsMasterBeforeUpgradeFCVOnPrimary();
+    awaitIsMasterBeforeUpgradeFCVOnSecondary();
+    // Ensure the featureCompatibilityVersion document update has been replicated.
+    rst.awaitReplication();
+    checkFCV(primaryAdminDB, latestFCV);
+    checkFCV(secondaryAdminDB, latestFCV);
+
+    // All isMaster requests should have been responded to after the FCV change.
+    numAwaitingTopologyChangeOnPrimary =
+        primaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary =
+        secondaryAdminDB.serverStatus().connections.awaitingTopologyChanges;
+    assert.eq(0, numAwaitingTopologyChangeOnPrimary);
+    assert.eq(0, numAwaitingTopologyChangeOnSecondary);
+}
+
+runTest(lastLTSFCV);
+runTest(lastContinuousFCV);
 
 rst.stopSet();
 })();

@@ -61,6 +61,7 @@
 namespace mongo {
 
 using repl::UnreplicatedWritesBlock;
+using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
 
 Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVersionLock");
 
@@ -122,26 +123,37 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 }  // namespace
 
 void FeatureCompatibilityVersion::setTargetUpgradeFrom(
-    OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version fromVersion) {
+    OperationContext* opCtx, FeatureCompatibilityParams::Version fromVersion) {
+    FeatureCompatibilityParams::Version version;
+    // It is possible that we did not fully complete a previous upgrade. In that case, we
+    // must set the source version to be the fully downgraded version as the FCV document
+    // serializer does not recognize upgrading/downgrading states.
+    if (fromVersion == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest) {
+        version = FeatureCompatibilityParams::kLastContinuous;
+    } else if (fromVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest) {
+        version = FeatureCompatibilityParams::kLastLTS;
+    } else {
+        version = fromVersion;
+    }
     // Sets both 'version' and 'targetVersion' fields.
     FeatureCompatibilityVersionDocument fcvDoc;
-    fcvDoc.setVersion(fromVersion);
-    fcvDoc.setTargetVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+    fcvDoc.setVersion(version);
+    fcvDoc.setTargetVersion(FeatureCompatibilityParams::kLatest);
     runUpdateCommand(opCtx, fcvDoc);
 }
 
-void FeatureCompatibilityVersion::setTargetDowngrade(
-    OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version version) {
+void FeatureCompatibilityVersion::setTargetDowngrade(OperationContext* opCtx,
+                                                     FeatureCompatibilityParams::Version version) {
     // Sets 'version', 'targetVersion' and 'previousVersion' fields.
     FeatureCompatibilityVersionDocument fcvDoc;
     fcvDoc.setVersion(version);
     fcvDoc.setTargetVersion(version);
-    fcvDoc.setPreviousVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+    fcvDoc.setPreviousVersion(FeatureCompatibilityParams::kLatest);
     runUpdateCommand(opCtx, fcvDoc);
 }
 
 void FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(
-    OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version version) {
+    OperationContext* opCtx, FeatureCompatibilityParams::Version version) {
     // Updates 'version' field, while also unsetting the 'targetVersion' field and the
     // 'previousVersion' field.
     FeatureCompatibilityVersionDocument fcvDoc;
@@ -172,9 +184,9 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
 
     FeatureCompatibilityVersionDocument fcvDoc;
     if (storeUpgradeVersion) {
-        fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
+        fcvDoc.setVersion(FeatureCompatibilityParams::kLatest);
     } else {
-        fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
+        fcvDoc.setVersion(FeatureCompatibilityParams::kLastLTS);
     }
 
     // We then insert the featureCompatibilityVersion document into the server configuration
@@ -203,14 +215,14 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
     WireSpec& wireSpec = WireSpec::instance();
 
     if (serverGlobalParams.featureCompatibility.isGreaterThan(
-            ServerGlobalParams::FeatureCompatibility::kLastContinuous)) {
+            FeatureCompatibilityParams::kLastContinuous)) {
         // FCV == kLatest
         WireSpec::Specification newSpec = *wireSpec.get();
         newSpec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
         newSpec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
         wireSpec.reset(std::move(newSpec));
     } else if (serverGlobalParams.featureCompatibility.isGreaterThan(
-                   ServerGlobalParams::FeatureCompatibility::kLastLTS)) {
+                   FeatureCompatibilityParams::kLastLTS)) {
         // FCV == kLastContinuous
         WireSpec::Specification newSpec = *wireSpec.get();
         newSpec.incomingInternalClient.minWireVersion = LAST_CONT_WIRE_VERSION;

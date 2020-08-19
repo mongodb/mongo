@@ -48,6 +48,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
 
 void FcvOpObserver::_setVersion(OperationContext* opCtx,
                                 ServerGlobalParams::FeatureCompatibility::Version newVersion) {
@@ -86,8 +87,10 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     // 2. Setting featureCompatibilityVersion from fullyDowngraded to upgrading.
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     const auto shouldIncrementTopologyVersion =
-        newVersion == ServerGlobalParams::FeatureCompatibility::kLastLTS ||
-        newVersion == ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To47;
+        newVersion == FeatureCompatibilityParams::kLastLTS ||
+        newVersion == FeatureCompatibilityParams::kLastContinuous ||
+        newVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest ||
+        newVersion == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest;
     if (isReplSet && shouldIncrementTopologyVersion) {
         replCoordinator->incrementTopologyVersion();
     }

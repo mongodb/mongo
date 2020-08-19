@@ -131,6 +131,22 @@ function runStandaloneTest(downgradeVersion) {
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV}));
     checkFCV(adminDB, downgradeFCV);
 
+    // setFeatureCompatibilityVersion does not support upgrading/downgrading between last-lts and
+    // last-continuous FCV.
+    if (lastContinuousFCV !== lastLTSFCV) {
+        if (downgradeFCV === lastContinuousFCV) {
+            // Attempt to downgrade FCV from last-continuous to last-lts.
+            assert.commandFailedWithCode(
+                adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
+                ErrorCodes.IllegalOperation);
+        } else {
+            // Attempt to upgrade FCV from last-lts to last-continuous.
+            assert.commandFailedWithCode(
+                adminDB.runCommand({setFeatureCompatibilityVersion: lastContinuousFCV}),
+                ErrorCodes.IllegalOperation);
+        }
+    }
+
     // setFeatureCompatibilityVersion fails to upgrade to 'latestFCV' if the write fails.
     assert.commandWorked(adminDB.runCommand({
         configureFailPoint: "failCollectionUpdates",
@@ -271,9 +287,36 @@ function runReplicaSetTest(downgradeVersion) {
     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
     restartServerReplication(secondary);
 
-    // Because the failed setFCV command left the primary in an intermediary state, complete the
-    // upgrade then reset back to downgradeFCV.
+    // Downgrading the FCV should fail if a previous upgrade has not yet completed.
+    assert.commandFailedWithCode(
+        primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}),
+        ErrorCodes.IllegalOperation);
+
+    // Because the failed upgrade command left the primary in an intermediary state, complete the
+    // upgrade.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+
+    stopServerReplication(secondary);
+    res = primary.adminCommand(
+        {setFeatureCompatibilityVersion: downgradeFCV, writeConcern: {wtimeout: 1000}});
+    assert.eq(0, res.ok);
+    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+    restartServerReplication(secondary);
+
+    // Upgrading the FCV should fail if a previous downgrade has not yet completed.
+    assert.commandFailedWithCode(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}),
+                                 ErrorCodes.IllegalOperation);
+
+    if (lastContinuousFCV !== lastLTSFCV) {
+        // We will fail if we have not yet completed a downgrade and attempt to downgrade to a
+        // different target version.
+        assert.commandFailedWithCode(primary.adminCommand({
+            setFeatureCompatibilityVersion: downgradeFCV === lastContinuousFCV ? lastLTSFCV
+                                                                               : lastContinuousFCV
+        }),
+                                     ErrorCodes.IllegalOperation);
+    }
+    // Complete the downgrade.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
 
     secondary = rst.add({binVersion: downgradeVersion});
