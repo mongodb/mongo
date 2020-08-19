@@ -97,7 +97,12 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
         for (auto it = _dropPendingIdents.cbegin();
              it != _dropPendingIdents.cend() && it->first < ts;
              ++it) {
-            toDrop.insert(*it);
+            // This collection/index satisfies the 'ts' requirement to be safe to drop, but we must
+            // also check that there are no active operations remaining that still retain a
+            // reference by which to access the collection/index data.
+            if (it->second.dropToken.expired()) {
+                toDrop.insert(*it);
+            }
         }
     }
 
@@ -139,12 +144,23 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
 
     {
         // Entries must be removed AFTER drops are completed, so that getEarliestDropTimestamp()
-        // returns appropriate results.
+        // returns correct results while the success of the drop operations above are uncertain.
+
         stdx::lock_guard<Latch> lock(_mutex);
         for (const auto& timestampAndIdentInfo : toDrop) {
-            const auto& dropTimestamp = timestampAndIdentInfo.first;
-            // This may return zero if _dropPendingIdents was cleared using clearDropPendingState().
-            _dropPendingIdents.erase(dropTimestamp);
+            // Some idents with drop timestamps safe to drop may not have been dropped because they
+            // are still in use by another operation. Therefore, we must iterate the entries in the
+            // multimap matching a particular timestamp and erase only the entry with a match on the
+            // ident as well as the timestamp.
+            auto beginEndPair = _dropPendingIdents.equal_range(timestampAndIdentInfo.first);
+            for (auto it = beginEndPair.first; it != beginEndPair.second;) {
+                if (it->second.identName == timestampAndIdentInfo.second.identName) {
+                    it = _dropPendingIdents.erase(it);
+                    break;
+                } else {
+                    ++it;
+                }
+            }
         }
     }
 }
