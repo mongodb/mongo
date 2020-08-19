@@ -8,6 +8,8 @@ selector:
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_47
+  - backport_required_multiversion
+  - sharding_last_lts_mongos_and_mixed_shards_backport_required_multiversion
   exclude_files:
   # Requires fix to SERVER-31689
   - jstests/sharding/query/aggregation_currentop.js
@@ -31,6 +33,10 @@ selector:
   # Enable when SERVER-43614 is backported.
   - jstests/sharding/query/unionWith_current_op.js
   - jstests/sharding/verify_sessions_expiration_sharded.js
+
+  # This tag file can be created using ./buildscripts/evergreen_gen_multiversion_tests.py
+  # or downloaded from the evergreen task.
+  tag_file: multiversion_exclude_tags.yml
 
 executor:
   config:
