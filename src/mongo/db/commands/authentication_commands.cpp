@@ -44,7 +44,6 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/sasl_options.h"
@@ -101,10 +100,6 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
     } else {
         // Handle internal cluster member auth, only applies to server-server connections
         if (sslConfiguration->isClusterMember(clientName)) {
-            Status status = authCounter.incClusterAuthenticateReceived("MONGODB-X509");
-            if (!status.isOK()) {
-                return status;
-            }
             int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
             if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_undefined ||
                 clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile) {
@@ -127,10 +122,6 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
                     LOGV2_WARNING(20430,
                                   "Client isn't a mongod or mongos, but is connecting with a "
                                   "certificate with cluster membership");
-                }
-                status = authCounter.incClusterAuthenticateSuccessful("MONGODB-X509");
-                if (!status.isOK()) {
-                    return status;
                 }
             }
 
@@ -301,40 +292,48 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
         user = internalSecurity.user->getName();
     }
 
-    try {
-        uassertStatusOK(authCounter.incAuthenticateReceived(mechanism));
+    Status status = authCounter.incAuthenticateReceived(mechanism);
+    if (status.isOK()) {
+        status = _authenticate(opCtx, mechanism, user, cmdObj);
+    }
+    audit::logAuthentication(Client::getCurrent(), mechanism, user, status.code());
 
-        uassertStatusOK(_authenticate(opCtx, mechanism, user, cmdObj));
-        audit::logAuthentication(opCtx->getClient(), mechanism, user, ErrorCodes::OK);
-
+    if (!status.isOK()) {
         if (!serverGlobalParams.quiet.load()) {
-            LOGV2(20429,
-                  "Successfully authenticated as principal {user} on {db} from client {client}",
-                  "Successfully authenticated",
-                  "user"_attr = user.getUser(),
-                  "db"_attr = user.getDB(),
-                  "client"_attr = opCtx->getClient()->session()->remote());
-        }
-
-        uassertStatusOK(authCounter.incAuthenticateSuccessful(mechanism));
-
-        result.append("dbname", user.getDB());
-        result.append("user", user.getUser());
-        return true;
-    } catch (const AssertionException& ex) {
-        auto status = ex.toStatus();
-        auto const client = opCtx->getClient();
-        audit::logAuthentication(client, mechanism, user, status.code());
-        if (!serverGlobalParams.quiet.load()) {
+            auto const client = opCtx->getClient();
             LOGV2(20428,
+                  "Failed to authenticate {user} from client {client} with mechanism "
+                  "{mechanism}: {error}",
                   "Failed to authenticate",
                   "user"_attr = user,
                   "client"_attr = client->getRemote(),
                   "mechanism"_attr = mechanism,
                   "error"_attr = status);
         }
-        throw;
+        sleepmillis(saslGlobalParams.authFailedDelay.load());
+        if (status.code() == ErrorCodes::AuthenticationFailed) {
+            // Statuses with code AuthenticationFailed may contain messages we do not wish to
+            // reveal to the user, so we return a status with the message "auth failed".
+            uasserted(ErrorCodes::AuthenticationFailed, "auth failed");
+        } else {
+            uassertStatusOK(status);
+        }
+        return false;
     }
+
+    if (!serverGlobalParams.quiet.load()) {
+        LOGV2(20429,
+              "Successfully authenticated as principal {user} on {db} from client {client}",
+              "Successfully authenticated",
+              "user"_attr = user.getUser(),
+              "db"_attr = user.getDB(),
+              "client"_attr = opCtx->getClient()->session()->remote());
+    }
+
+    uassertStatusOK(authCounter.incAuthenticateSuccessful(mechanism));
+    result.append("dbname", user.getDB());
+    result.append("user", user.getUser());
+    return true;
 }
 
 Status CmdAuthenticate::_authenticate(OperationContext* opCtx,

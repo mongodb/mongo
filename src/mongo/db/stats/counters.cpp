@@ -244,24 +244,6 @@ Status AuthCounter::incAuthenticateSuccessful(const std::string& mechanism) try 
                           << " which is not enabled"};
 }
 
-Status AuthCounter::incClusterAuthenticateReceived(const std::string& mechanism) try {
-    _mechanisms.at(mechanism).clusterAuthenticate.received.fetchAndAddRelaxed(1);
-    return Status::OK();
-} catch (const std::out_of_range&) {
-    return {ErrorCodes::BadValue,
-            str::stream() << "Received authentication for mechanism " << mechanism
-                          << " which is unknown or not enabled"};
-}
-
-Status AuthCounter::incClusterAuthenticateSuccessful(const std::string& mechanism) try {
-    _mechanisms.at(mechanism).clusterAuthenticate.successful.fetchAndAddRelaxed(1);
-    return Status::OK();
-} catch (const std::out_of_range&) {
-    return {ErrorCodes::BadValue,
-            str::stream() << "Received authentication for mechanism " << mechanism
-                          << " which is not enabled"};
-}
-
 /**
  * authentication: {
  *   "mechanisms": {
@@ -290,16 +272,6 @@ void AuthCounter::append(BSONObjBuilder* b) {
             specAuthBuilder.append("received", received);
             specAuthBuilder.append("successful", successful);
             specAuthBuilder.done();
-        }
-
-        {
-            const auto received = it.second.clusterAuthenticate.received.load();
-            const auto successful = it.second.clusterAuthenticate.successful.load();
-
-            BSONObjBuilder clusterAuthBuilder(mechBuilder.subobjStart(auth::kClusterAuthenticate));
-            clusterAuthBuilder.append("received", received);
-            clusterAuthBuilder.append("successful", successful);
-            clusterAuthBuilder.done();
         }
 
         {

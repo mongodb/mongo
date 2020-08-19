@@ -55,17 +55,6 @@ assert.eq(runMongoProgram('mongo',
                           '--eval',
                           ';'),
           0);
-assert.eq(runMongoProgram('mongo',
-                          uri,
-                          '--tls',
-                          '--tlsCertificateKeyFile',
-                          SERVER_CERT,
-                          '--tlsCAFile',
-                          CA_CERT,
-                          '--tlsAllowInvalidHostnames',
-                          '--eval',
-                          ';'),
-          0);
 
 const authStats = assert.commandWorked(admin.runCommand({serverStatus: 1}))
                       .security.authentication.mechanisms['MONGODB-X509'];
@@ -74,20 +63,14 @@ jsTest.log('Authenticated stats: ' + tojson(authStats));
 // Got and succeeded an additional speculation.
 const initSpec = initialStats.speculativeAuthenticate;
 const authSpec = authStats.speculativeAuthenticate;
-assert.eq(authSpec.received, initSpec.received + 2);
-assert.eq(authSpec.successful, initSpec.successful + 2);
+assert.eq(authSpec.received, initSpec.received + 1);
+assert.eq(authSpec.successful, initSpec.successful + 1);
 
 // Got and succeeded an additional auth.
 const initAuth = initialStats.authenticate;
 const authAuth = authStats.authenticate;
-assert.eq(authAuth.received, initAuth.received + 2);
-assert.eq(authAuth.successful, initAuth.successful + 2);
-
-// Got and succeeded intra-cluster auth.
-const initCluster = initialStats.clusterAuthenticate;
-const authCluster = authStats.clusterAuthenticate;
-assert.eq(authCluster.received, initCluster.received + 1);
-assert.eq(authCluster.successful, initCluster.successful + 1);
+assert.eq(authAuth.received, initAuth.received + 1);
+assert.eq(authAuth.successful, initAuth.successful + 1);
 
 /////////////////////////////////////////////////////////////////////////////
 

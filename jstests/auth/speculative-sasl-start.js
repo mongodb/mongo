@@ -3,8 +3,7 @@
 (function() {
 'use strict';
 
-const keyFile = 'jstests/libs/key1';
-const mongod = MongoRunner.runMongod({auth: '', keyFile: keyFile});
+const mongod = MongoRunner.runMongod({auth: ''});
 const admin = mongod.getDB('admin');
 
 admin.createUser(
@@ -36,22 +35,10 @@ assertStats(function(mechStats) {
     });
 });
 
-// No "intra-cluster" auth attempts yet.
-assertStats(function(mechStats) {
-    Object.keys(mechStats).forEach(function(mech) {
-        const stats = mechStats[mech].clusterAuthenticate;
-        assert.eq(stats.received, 0);
-        assert.eq(stats.successful, 0);
-    });
-});
-
-function expectN(mechStats, mech, N1, M1, N2 = 0, M2 = 0) {
-    const specStats = mechStats[mech].speculativeAuthenticate;
-    const clusterStats = mechStats[mech].clusterAuthenticate;
-    assert.eq(N1, specStats.received);
-    assert.eq(M1, specStats.successful);
-    assert.eq(N2, clusterStats.received);
-    assert.eq(M2, clusterStats.successful);
+function expectN(mechStats, mech, N, M) {
+    const stats = mechStats[mech].speculativeAuthenticate;
+    assert.eq(N, stats.received);
+    assert.eq(M, stats.successful);
 }
 
 const baseOKURI = 'mongodb://admin:pwd@localhost:' + mongod.port + '/admin';
@@ -109,17 +96,6 @@ assertStats((s) => expectN(s, 'SCRAM-SHA-256', 6, 2));
 mongod.getDB('test').createUser({user: 'alice', pwd: 'secret', roles: []});
 test('mongodb://alice:secret@localhost:' + mongod.port + '/test', true);
 assertStats((s) => expectN(s, 'SCRAM-SHA-256', 7, 3));
-
-// Test "intra-cluster" speculative authentication.
-const systemPass = cat(keyFile).replace(/\s/g, '');
-test('mongodb://__system:' + systemPass + '@localhost:' + mongod.port + '/admin' +
-         '?authMechanism=SCRAM-SHA-256',
-     true);
-assertStats((s) => expectN(s, 'SCRAM-SHA-256', 8, 4, 1, 1));
-test('mongodb://__system:hunter2@localhost:' + mongod.port + '/admin' +
-         '?authMechanism=SCRAM-SHA-256',
-     false);
-assertStats((s) => expectN(s, 'SCRAM-SHA-256', 9, 4, 3, 1));
 
 MongoRunner.stopMongod(mongod);
 })();
