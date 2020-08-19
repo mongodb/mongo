@@ -6,7 +6,7 @@
 "use strict";
 
 const storageEngine = jsTest.options().storageEngine;
-if (storageEngine === "wiredTiger") {
+if (storageEngine === "wiredTiger" || storageEngine === "inMemory") {
     return;
 }
 
