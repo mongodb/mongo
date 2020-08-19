@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/cst/bson_lexer.h"
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/cst_match_translation.h"
 #include "mongo/db/cst/key_fieldname.h"
@@ -49,6 +50,14 @@ namespace {
 auto getExpCtx() {
     auto nss = NamespaceString{"db", "coll"};
     return boost::intrusive_ptr<ExpressionContextForTest>{new ExpressionContextForTest(nss)};
+}
+
+auto parseMatchToCst(BSONObj input) {
+    CNode output;
+    BSONLexer lexer(input["filter"]);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    return output;
 }
 
 TEST(CstMatchTranslationTest, TranslatesEmpty) {
@@ -83,6 +92,87 @@ TEST(CstMatchTranslationTest, TranslatesEqualityPredicatesWithId) {
     ASSERT(andExpr);
     ASSERT_EQ(1, andExpr->numChildren());
     ASSERT_BSONOBJ_EQ(match->serialize(), fromjson("{$and: [{_id: {$eq: null}}]}"));
+}
+
+TEST(CstMatchTranslationTest, TranslatesEmptyObject) {
+    const auto cst = CNode{CNode::ObjectChildren{}};
+    auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+    auto andExpr = dynamic_cast<AndMatchExpression*>(match.get());
+    ASSERT(andExpr);
+    ASSERT_EQ(0, andExpr->numChildren());
+}
+
+TEST(CstMatchTranslationTest, TranslatesNotWithRegex) {
+    auto input = fromjson("{filter: {a: {$not: /b/}}}");
+    auto cst = parseMatchToCst(input);
+    auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+    auto andExpr = dynamic_cast<AndMatchExpression*>(match.get());
+    ASSERT(andExpr);
+    ASSERT_EQ(1, andExpr->numChildren());
+    auto notExpr = dynamic_cast<NotMatchExpression*>(andExpr->getChild(0));
+    ASSERT(notExpr);
+    auto regex = dynamic_cast<RegexMatchExpression*>(notExpr->getChild(0));
+    ASSERT(regex);
+    ASSERT_EQ("a", regex->path());
+    ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $not: { $regex: \"b\" } } } ] }");
+}
+
+TEST(CstMatchTranslationTest, TranslatesNotWithExpression) {
+    auto input = fromjson("{filter: {a: {$not: {$not: /b/}}}}");
+    auto cst = parseMatchToCst(input);
+    auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+    ASSERT_EQ(match->serialize().toString(),
+              "{ $and: [ { $nor: [ { a: { $not: { $regex: \"b\" } } } ] } ] }");
+}
+
+TEST(CstMatchTranslationTest, TranslatesLogicalTreeExpressions) {
+    {
+        auto input = fromjson("{filter: {$and: [{b: {$not: /a/}}]}}");
+        auto cst = parseMatchToCst(input);
+        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        ASSERT_EQ(match->serialize().toString(),
+                  "{ $and: [ { $and: [ { b: { $not: { $regex: \"a\" } } } ] } ] }");
+    }
+    {
+        auto input = fromjson("{filter: {$or: [{b: {$not: /a/}}, {a: {$not: /b/}}]}}");
+        auto cst = parseMatchToCst(input);
+        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        ASSERT_EQ(match->serialize().toString(),
+                  "{ $and: [ { $or: [ { a: { $not: { $regex: \"b\" } } }, { b: { $not: { $regex: "
+                  "\"a\" } } } ] } ] }");
+    }
+    {
+        auto input = fromjson("{filter: {$nor: [{b: {$not: /a/}}]}}");
+        auto cst = parseMatchToCst(input);
+        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        ASSERT_EQ(match->serialize().toString(),
+                  "{ $and: [ { $nor: [ { b: { $not: { $regex: \"a\" } } } ] } ] }");
+    }
+}
+
+TEST(CstMatchTranslationTest, TranslatesNestedLogicalTreeExpressions) {
+    {
+        auto input = fromjson("{filter: {$and: [{$or: [{b: {$not: /a/}}]}]}}");
+        auto cst = parseMatchToCst(input);
+        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        ASSERT_EQ(match->serialize().toString(),
+                  "{ $and: [ { $and: [ { $or: [ { b: { $not: { $regex: \"a\" } } } ] } ] } ] }");
+    }
+    {
+        auto input = fromjson("{filter: {$or: [{$and: [{b: {$not: /a/}}, {a: {$not: /b/}}]}]}}");
+        auto cst = parseMatchToCst(input);
+        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        ASSERT_EQ(match->serialize().toString(),
+                  "{ $and: [ { $or: [ { $and: [ { a: { $not: { $regex: \"b\" } } }, { b: { $not: { "
+                  "$regex: \"a\" } } } ] } ] } ] }");
+    }
+    {
+        auto input = fromjson("{filter: {$and: [{$nor: [{b: {$not: /a/}}]}]}}");
+        auto cst = parseMatchToCst(input);
+        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        ASSERT_EQ(match->serialize().toString(),
+                  "{ $and: [ { $and: [ { $nor: [ { b: { $not: { $regex: \"a\" } } } ] } ] } ] }");
+    }
 }
 
 }  // namespace

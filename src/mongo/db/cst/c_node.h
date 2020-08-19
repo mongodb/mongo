@@ -90,6 +90,13 @@ struct CNode {
         return toStringHelper(0) + "\n";
     }
 
+    friend std::ostream& operator<<(std::ostream& stream, const CNode& cst) {
+        return stream << cst.toString();
+    }
+    friend StringBuilder& operator<<(StringBuilder& stream, const CNode& cst) {
+        return stream << cst.toString();
+    }
+
     /**
      * Produce BSON representing this CST. This is for debugging and testing with structured output,
      * not for decompiling to the input query. The produced BSON will consist of arrays, objects,

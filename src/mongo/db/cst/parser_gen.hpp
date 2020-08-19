@@ -486,9 +486,11 @@ public:
             // sqrt
             // subtract
             // trunc
-            // matchExpression
-            // filterFields
-            // filterVal
+            // match
+            // predicates
+            // compoundMatchExprs
+            // predValue
+            // additionalExprs
             // sortSpecs
             // specList
             // metaSort
@@ -499,12 +501,13 @@ public:
             // projectionFieldname
             // expressionFieldname
             // stageAsUserFieldname
-            // filterFieldname
+            // predFieldname
             // argAsUserFieldname
             // aggExprAsUserFieldname
             // invariableUserFieldname
             // idAsUserFieldname
             // valueFieldname
+            // logicalExprField
             char dummy8[sizeof(CNode::Fieldname)];
 
             // "Date"
@@ -543,13 +546,16 @@ public:
             // projectField
             // expressionField
             // valueField
-            // filterField
             // onErrorArg
             // onNullArg
             // formatArg
             // timezoneArg
             // charsArg
             // optionsArg
+            // predicate
+            // logicalExpr
+            // operatorExpression
+            // notExpr
             // sortSpec
             char dummy20[sizeof(std::pair<CNode::Fieldname, CNode>)];
 
@@ -670,70 +676,71 @@ public:
             MOD = 67,
             MULTIPLY = 68,
             NE = 69,
-            NOT = 70,
-            OR = 71,
-            POW = 72,
-            RAND_VAL = 73,
-            REGEX_FIND = 74,
-            REGEX_FIND_ALL = 75,
-            REGEX_MATCH = 76,
-            REPLACE_ALL = 77,
-            REPLACE_ONE = 78,
-            ROUND = 79,
-            RTRIM = 80,
-            SPLIT = 81,
-            SQRT = 82,
-            STAGE_INHIBIT_OPTIMIZATION = 83,
-            STAGE_LIMIT = 84,
-            STAGE_PROJECT = 85,
-            STAGE_SAMPLE = 86,
-            STAGE_SKIP = 87,
-            STAGE_UNION_WITH = 88,
-            START_ARRAY = 89,
-            START_OBJECT = 90,
-            STR_CASE_CMP = 91,
-            STR_LEN_BYTES = 92,
-            STR_LEN_CP = 93,
-            SUBSTR = 94,
-            SUBSTR_BYTES = 95,
-            SUBSTR_CP = 96,
-            SUBTRACT = 97,
-            TEXT_SCORE = 98,
-            TO_BOOL = 99,
-            TO_DATE = 100,
-            TO_DECIMAL = 101,
-            TO_DOUBLE = 102,
-            TO_INT = 103,
-            TO_LONG = 104,
-            TO_LOWER = 105,
-            TO_OBJECT_ID = 106,
-            TO_STRING = 107,
-            TO_UPPER = 108,
-            TRIM = 109,
-            TRUNC = 110,
-            TYPE = 111,
-            FIELDNAME = 112,
-            STRING = 113,
-            BINARY = 114,
-            UNDEFINED = 115,
-            OBJECT_ID = 116,
-            DATE_LITERAL = 117,
-            JSNULL = 118,
-            REGEX = 119,
-            DB_POINTER = 120,
-            JAVASCRIPT = 121,
-            SYMBOL = 122,
-            JAVASCRIPT_W_SCOPE = 123,
-            INT_OTHER = 124,
-            LONG_OTHER = 125,
-            DOUBLE_OTHER = 126,
-            DECIMAL_OTHER = 127,
-            TIMESTAMP = 128,
-            MIN_KEY = 129,
-            MAX_KEY = 130,
-            DOLLAR_STRING = 131,
-            DOLLAR_DOLLAR_STRING = 132,
-            DOLLAR_PREF_FIELDNAME = 133
+            NOR = 70,
+            NOT = 71,
+            OR = 72,
+            POW = 73,
+            RAND_VAL = 74,
+            REGEX_FIND = 75,
+            REGEX_FIND_ALL = 76,
+            REGEX_MATCH = 77,
+            REPLACE_ALL = 78,
+            REPLACE_ONE = 79,
+            ROUND = 80,
+            RTRIM = 81,
+            SPLIT = 82,
+            SQRT = 83,
+            STAGE_INHIBIT_OPTIMIZATION = 84,
+            STAGE_LIMIT = 85,
+            STAGE_PROJECT = 86,
+            STAGE_SAMPLE = 87,
+            STAGE_SKIP = 88,
+            STAGE_UNION_WITH = 89,
+            START_ARRAY = 90,
+            START_OBJECT = 91,
+            STR_CASE_CMP = 92,
+            STR_LEN_BYTES = 93,
+            STR_LEN_CP = 94,
+            SUBSTR = 95,
+            SUBSTR_BYTES = 96,
+            SUBSTR_CP = 97,
+            SUBTRACT = 98,
+            TEXT_SCORE = 99,
+            TO_BOOL = 100,
+            TO_DATE = 101,
+            TO_DECIMAL = 102,
+            TO_DOUBLE = 103,
+            TO_INT = 104,
+            TO_LONG = 105,
+            TO_LOWER = 106,
+            TO_OBJECT_ID = 107,
+            TO_STRING = 108,
+            TO_UPPER = 109,
+            TRIM = 110,
+            TRUNC = 111,
+            TYPE = 112,
+            FIELDNAME = 113,
+            STRING = 114,
+            BINARY = 115,
+            UNDEFINED = 116,
+            OBJECT_ID = 117,
+            DATE_LITERAL = 118,
+            JSNULL = 119,
+            REGEX = 120,
+            DB_POINTER = 121,
+            JAVASCRIPT = 122,
+            SYMBOL = 123,
+            JAVASCRIPT_W_SCOPE = 124,
+            INT_OTHER = 125,
+            LONG_OTHER = 126,
+            DOUBLE_OTHER = 127,
+            DECIMAL_OTHER = 128,
+            TIMESTAMP = 129,
+            MIN_KEY = 130,
+            MAX_KEY = 131,
+            DOLLAR_STRING = 132,
+            DOLLAR_DOLLAR_STRING = 133,
+            DOLLAR_PREF_FIELDNAME = 134
         };
     };
 
@@ -957,27 +964,27 @@ public:
 
             // Type destructor.
             switch (yytype) {
-                case 114:  // "BinData"
+                case 115:  // "BinData"
                     value.template destroy<BSONBinData>();
                     break;
 
-                case 121:  // "Code"
+                case 122:  // "Code"
                     value.template destroy<BSONCode>();
                     break;
 
-                case 123:  // "CodeWScope"
+                case 124:  // "CodeWScope"
                     value.template destroy<BSONCodeWScope>();
                     break;
 
-                case 120:  // "dbPointer"
+                case 121:  // "dbPointer"
                     value.template destroy<BSONDBRef>();
                     break;
 
-                case 119:  // "regex"
+                case 120:  // "regex"
                     value.template destroy<BSONRegEx>();
                     break;
 
-                case 122:  // "Symbol"
+                case 123:  // "Symbol"
                     value.template destroy<BSONSymbol>();
                     break;
 
@@ -1094,92 +1101,98 @@ public:
                 case 258:  // sqrt
                 case 259:  // subtract
                 case 260:  // trunc
-                case 270:  // matchExpression
-                case 271:  // filterFields
-                case 272:  // filterVal
-                case 273:  // sortSpecs
-                case 274:  // specList
-                case 275:  // metaSort
-                case 276:  // oneOrNegOne
-                case 277:  // metaSortKeyword
+                case 270:  // match
+                case 271:  // predicates
+                case 272:  // compoundMatchExprs
+                case 273:  // predValue
+                case 274:  // additionalExprs
+                case 280:  // sortSpecs
+                case 281:  // specList
+                case 282:  // metaSort
+                case 283:  // oneOrNegOne
+                case 284:  // metaSortKeyword
                     value.template destroy<CNode>();
                     break;
 
-                case 135:  // projectionFieldname
-                case 136:  // expressionFieldname
-                case 137:  // stageAsUserFieldname
-                case 138:  // filterFieldname
-                case 139:  // argAsUserFieldname
-                case 140:  // aggExprAsUserFieldname
-                case 141:  // invariableUserFieldname
-                case 142:  // idAsUserFieldname
-                case 143:  // valueFieldname
+                case 136:  // projectionFieldname
+                case 137:  // expressionFieldname
+                case 138:  // stageAsUserFieldname
+                case 139:  // predFieldname
+                case 140:  // argAsUserFieldname
+                case 141:  // aggExprAsUserFieldname
+                case 142:  // invariableUserFieldname
+                case 143:  // idAsUserFieldname
+                case 144:  // valueFieldname
+                case 279:  // logicalExprField
                     value.template destroy<CNode::Fieldname>();
                     break;
 
-                case 117:  // "Date"
+                case 118:  // "Date"
                     value.template destroy<Date_t>();
                     break;
 
-                case 127:  // "arbitrary decimal"
+                case 128:  // "arbitrary decimal"
                     value.template destroy<Decimal128>();
                     break;
 
-                case 116:  // "ObjectID"
+                case 117:  // "ObjectID"
                     value.template destroy<OID>();
                     break;
 
-                case 128:  // "Timestamp"
+                case 129:  // "Timestamp"
                     value.template destroy<Timestamp>();
                     break;
 
-                case 130:  // "maxKey"
+                case 131:  // "maxKey"
                     value.template destroy<UserMaxKey>();
                     break;
 
-                case 129:  // "minKey"
+                case 130:  // "minKey"
                     value.template destroy<UserMinKey>();
                     break;
 
-                case 118:  // "null"
+                case 119:  // "null"
                     value.template destroy<UserNull>();
                     break;
 
-                case 115:  // "undefined"
+                case 116:  // "undefined"
                     value.template destroy<UserUndefined>();
                     break;
 
-                case 126:  // "arbitrary double"
+                case 127:  // "arbitrary double"
                     value.template destroy<double>();
                     break;
 
-                case 124:  // "arbitrary integer"
+                case 125:  // "arbitrary integer"
                     value.template destroy<int>();
                     break;
 
-                case 125:  // "arbitrary long"
+                case 126:  // "arbitrary long"
                     value.template destroy<long long>();
                     break;
 
-                case 144:  // projectField
-                case 145:  // expressionField
-                case 146:  // valueField
-                case 147:  // filterField
+                case 145:  // projectField
+                case 146:  // expressionField
+                case 147:  // valueField
                 case 261:  // onErrorArg
                 case 262:  // onNullArg
                 case 263:  // formatArg
                 case 264:  // timezoneArg
                 case 265:  // charsArg
                 case 266:  // optionsArg
-                case 278:  // sortSpec
+                case 275:  // predicate
+                case 276:  // logicalExpr
+                case 277:  // operatorExpression
+                case 278:  // notExpr
+                case 285:  // sortSpec
                     value.template destroy<std::pair<CNode::Fieldname, CNode>>();
                     break;
 
-                case 112:  // "fieldname"
-                case 113:  // "string"
-                case 131:  // "$-prefixed string"
-                case 132:  // "$$-prefixed string"
-                case 133:  // "$-prefixed fieldname"
+                case 113:  // "fieldname"
+                case 114:  // "string"
+                case 132:  // "$-prefixed string"
+                case 133:  // "$$-prefixed string"
+                case 134:  // "$-prefixed fieldname"
                     value.template destroy<std::string>();
                     break;
 
@@ -1287,12 +1300,12 @@ public:
                 tok == token::LOGTEN || tok == token::LONG_NEGATIVE_ONE || tok == token::LONG_ONE ||
                 tok == token::LONG_ZERO || tok == token::LT || tok == token::LTE ||
                 tok == token::LTRIM || tok == token::META || tok == token::MOD ||
-                tok == token::MULTIPLY || tok == token::NE || tok == token::NOT ||
-                tok == token::OR || tok == token::POW || tok == token::RAND_VAL ||
-                tok == token::REGEX_FIND || tok == token::REGEX_FIND_ALL ||
-                tok == token::REGEX_MATCH || tok == token::REPLACE_ALL ||
-                tok == token::REPLACE_ONE || tok == token::ROUND || tok == token::RTRIM ||
-                tok == token::SPLIT || tok == token::SQRT ||
+                tok == token::MULTIPLY || tok == token::NE || tok == token::NOR ||
+                tok == token::NOT || tok == token::OR || tok == token::POW ||
+                tok == token::RAND_VAL || tok == token::REGEX_FIND ||
+                tok == token::REGEX_FIND_ALL || tok == token::REGEX_MATCH ||
+                tok == token::REPLACE_ALL || tok == token::REPLACE_ONE || tok == token::ROUND ||
+                tok == token::RTRIM || tok == token::SPLIT || tok == token::SQRT ||
                 tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_LIMIT ||
                 tok == token::STAGE_PROJECT || tok == token::STAGE_SAMPLE ||
                 tok == token::STAGE_SKIP || tok == token::STAGE_UNION_WITH ||
@@ -1334,12 +1347,12 @@ public:
                 tok == token::LOGTEN || tok == token::LONG_NEGATIVE_ONE || tok == token::LONG_ONE ||
                 tok == token::LONG_ZERO || tok == token::LT || tok == token::LTE ||
                 tok == token::LTRIM || tok == token::META || tok == token::MOD ||
-                tok == token::MULTIPLY || tok == token::NE || tok == token::NOT ||
-                tok == token::OR || tok == token::POW || tok == token::RAND_VAL ||
-                tok == token::REGEX_FIND || tok == token::REGEX_FIND_ALL ||
-                tok == token::REGEX_MATCH || tok == token::REPLACE_ALL ||
-                tok == token::REPLACE_ONE || tok == token::ROUND || tok == token::RTRIM ||
-                tok == token::SPLIT || tok == token::SQRT ||
+                tok == token::MULTIPLY || tok == token::NE || tok == token::NOR ||
+                tok == token::NOT || tok == token::OR || tok == token::POW ||
+                tok == token::RAND_VAL || tok == token::REGEX_FIND ||
+                tok == token::REGEX_FIND_ALL || tok == token::REGEX_MATCH ||
+                tok == token::REPLACE_ALL || tok == token::REPLACE_ONE || tok == token::ROUND ||
+                tok == token::RTRIM || tok == token::SPLIT || tok == token::SQRT ||
                 tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_LIMIT ||
                 tok == token::STAGE_PROJECT || tok == token::STAGE_SAMPLE ||
                 tok == token::STAGE_SKIP || tok == token::STAGE_UNION_WITH ||
@@ -2206,6 +2219,15 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_NOR(location_type l) {
+        return symbol_type(token::NOR, std::move(l));
+    }
+#else
+    static symbol_type make_NOR(const location_type& l) {
+        return symbol_type(token::NOR, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_NOT(location_type l) {
         return symbol_type(token::NOT, std::move(l));
     }
@@ -3056,10 +3078,10 @@ private:
     /// Constants.
     enum {
         yyeof_ = 0,
-        yylast_ = 1192,   ///< Last index in yytable_.
-        yynnts_ = 148,    ///< Number of nonterminal symbols.
+        yylast_ = 1238,   ///< Last index in yytable_.
+        yynnts_ = 154,    ///< Number of nonterminal symbols.
         yyfinal_ = 15,    ///< Termination state number.
-        yyntokens_ = 134  ///< Number of tokens.
+        yyntokens_ = 135  ///< Number of tokens.
     };
 
 
@@ -3078,27 +3100,27 @@ template <typename Base>
 ParserGen::basic_symbol<Base>::basic_symbol(basic_symbol&& that)
     : Base(std::move(that)), value(), location(std::move(that.location)) {
     switch (this->type_get()) {
-        case 114:  // "BinData"
+        case 115:  // "BinData"
             value.move<BSONBinData>(std::move(that.value));
             break;
 
-        case 121:  // "Code"
+        case 122:  // "Code"
             value.move<BSONCode>(std::move(that.value));
             break;
 
-        case 123:  // "CodeWScope"
+        case 124:  // "CodeWScope"
             value.move<BSONCodeWScope>(std::move(that.value));
             break;
 
-        case 120:  // "dbPointer"
+        case 121:  // "dbPointer"
             value.move<BSONDBRef>(std::move(that.value));
             break;
 
-        case 119:  // "regex"
+        case 120:  // "regex"
             value.move<BSONRegEx>(std::move(that.value));
             break;
 
-        case 122:  // "Symbol"
+        case 123:  // "Symbol"
             value.move<BSONSymbol>(std::move(that.value));
             break;
 
@@ -3215,92 +3237,98 @@ ParserGen::basic_symbol<Base>::basic_symbol(basic_symbol&& that)
         case 258:  // sqrt
         case 259:  // subtract
         case 260:  // trunc
-        case 270:  // matchExpression
-        case 271:  // filterFields
-        case 272:  // filterVal
-        case 273:  // sortSpecs
-        case 274:  // specList
-        case 275:  // metaSort
-        case 276:  // oneOrNegOne
-        case 277:  // metaSortKeyword
+        case 270:  // match
+        case 271:  // predicates
+        case 272:  // compoundMatchExprs
+        case 273:  // predValue
+        case 274:  // additionalExprs
+        case 280:  // sortSpecs
+        case 281:  // specList
+        case 282:  // metaSort
+        case 283:  // oneOrNegOne
+        case 284:  // metaSortKeyword
             value.move<CNode>(std::move(that.value));
             break;
 
-        case 135:  // projectionFieldname
-        case 136:  // expressionFieldname
-        case 137:  // stageAsUserFieldname
-        case 138:  // filterFieldname
-        case 139:  // argAsUserFieldname
-        case 140:  // aggExprAsUserFieldname
-        case 141:  // invariableUserFieldname
-        case 142:  // idAsUserFieldname
-        case 143:  // valueFieldname
+        case 136:  // projectionFieldname
+        case 137:  // expressionFieldname
+        case 138:  // stageAsUserFieldname
+        case 139:  // predFieldname
+        case 140:  // argAsUserFieldname
+        case 141:  // aggExprAsUserFieldname
+        case 142:  // invariableUserFieldname
+        case 143:  // idAsUserFieldname
+        case 144:  // valueFieldname
+        case 279:  // logicalExprField
             value.move<CNode::Fieldname>(std::move(that.value));
             break;
 
-        case 117:  // "Date"
+        case 118:  // "Date"
             value.move<Date_t>(std::move(that.value));
             break;
 
-        case 127:  // "arbitrary decimal"
+        case 128:  // "arbitrary decimal"
             value.move<Decimal128>(std::move(that.value));
             break;
 
-        case 116:  // "ObjectID"
+        case 117:  // "ObjectID"
             value.move<OID>(std::move(that.value));
             break;
 
-        case 128:  // "Timestamp"
+        case 129:  // "Timestamp"
             value.move<Timestamp>(std::move(that.value));
             break;
 
-        case 130:  // "maxKey"
+        case 131:  // "maxKey"
             value.move<UserMaxKey>(std::move(that.value));
             break;
 
-        case 129:  // "minKey"
+        case 130:  // "minKey"
             value.move<UserMinKey>(std::move(that.value));
             break;
 
-        case 118:  // "null"
+        case 119:  // "null"
             value.move<UserNull>(std::move(that.value));
             break;
 
-        case 115:  // "undefined"
+        case 116:  // "undefined"
             value.move<UserUndefined>(std::move(that.value));
             break;
 
-        case 126:  // "arbitrary double"
+        case 127:  // "arbitrary double"
             value.move<double>(std::move(that.value));
             break;
 
-        case 124:  // "arbitrary integer"
+        case 125:  // "arbitrary integer"
             value.move<int>(std::move(that.value));
             break;
 
-        case 125:  // "arbitrary long"
+        case 126:  // "arbitrary long"
             value.move<long long>(std::move(that.value));
             break;
 
-        case 144:  // projectField
-        case 145:  // expressionField
-        case 146:  // valueField
-        case 147:  // filterField
+        case 145:  // projectField
+        case 146:  // expressionField
+        case 147:  // valueField
         case 261:  // onErrorArg
         case 262:  // onNullArg
         case 263:  // formatArg
         case 264:  // timezoneArg
         case 265:  // charsArg
         case 266:  // optionsArg
-        case 278:  // sortSpec
+        case 275:  // predicate
+        case 276:  // logicalExpr
+        case 277:  // operatorExpression
+        case 278:  // notExpr
+        case 285:  // sortSpec
             value.move<std::pair<CNode::Fieldname, CNode>>(std::move(that.value));
             break;
 
-        case 112:  // "fieldname"
-        case 113:  // "string"
-        case 131:  // "$-prefixed string"
-        case 132:  // "$$-prefixed string"
-        case 133:  // "$-prefixed fieldname"
+        case 113:  // "fieldname"
+        case 114:  // "string"
+        case 132:  // "$-prefixed string"
+        case 133:  // "$$-prefixed string"
+        case 134:  // "$-prefixed fieldname"
             value.move<std::string>(std::move(that.value));
             break;
 
@@ -3320,27 +3348,27 @@ template <typename Base>
 ParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
     : Base(that), value(), location(that.location) {
     switch (this->type_get()) {
-        case 114:  // "BinData"
+        case 115:  // "BinData"
             value.copy<BSONBinData>(YY_MOVE(that.value));
             break;
 
-        case 121:  // "Code"
+        case 122:  // "Code"
             value.copy<BSONCode>(YY_MOVE(that.value));
             break;
 
-        case 123:  // "CodeWScope"
+        case 124:  // "CodeWScope"
             value.copy<BSONCodeWScope>(YY_MOVE(that.value));
             break;
 
-        case 120:  // "dbPointer"
+        case 121:  // "dbPointer"
             value.copy<BSONDBRef>(YY_MOVE(that.value));
             break;
 
-        case 119:  // "regex"
+        case 120:  // "regex"
             value.copy<BSONRegEx>(YY_MOVE(that.value));
             break;
 
-        case 122:  // "Symbol"
+        case 123:  // "Symbol"
             value.copy<BSONSymbol>(YY_MOVE(that.value));
             break;
 
@@ -3457,92 +3485,98 @@ ParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
         case 258:  // sqrt
         case 259:  // subtract
         case 260:  // trunc
-        case 270:  // matchExpression
-        case 271:  // filterFields
-        case 272:  // filterVal
-        case 273:  // sortSpecs
-        case 274:  // specList
-        case 275:  // metaSort
-        case 276:  // oneOrNegOne
-        case 277:  // metaSortKeyword
+        case 270:  // match
+        case 271:  // predicates
+        case 272:  // compoundMatchExprs
+        case 273:  // predValue
+        case 274:  // additionalExprs
+        case 280:  // sortSpecs
+        case 281:  // specList
+        case 282:  // metaSort
+        case 283:  // oneOrNegOne
+        case 284:  // metaSortKeyword
             value.copy<CNode>(YY_MOVE(that.value));
             break;
 
-        case 135:  // projectionFieldname
-        case 136:  // expressionFieldname
-        case 137:  // stageAsUserFieldname
-        case 138:  // filterFieldname
-        case 139:  // argAsUserFieldname
-        case 140:  // aggExprAsUserFieldname
-        case 141:  // invariableUserFieldname
-        case 142:  // idAsUserFieldname
-        case 143:  // valueFieldname
+        case 136:  // projectionFieldname
+        case 137:  // expressionFieldname
+        case 138:  // stageAsUserFieldname
+        case 139:  // predFieldname
+        case 140:  // argAsUserFieldname
+        case 141:  // aggExprAsUserFieldname
+        case 142:  // invariableUserFieldname
+        case 143:  // idAsUserFieldname
+        case 144:  // valueFieldname
+        case 279:  // logicalExprField
             value.copy<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case 117:  // "Date"
+        case 118:  // "Date"
             value.copy<Date_t>(YY_MOVE(that.value));
             break;
 
-        case 127:  // "arbitrary decimal"
+        case 128:  // "arbitrary decimal"
             value.copy<Decimal128>(YY_MOVE(that.value));
             break;
 
-        case 116:  // "ObjectID"
+        case 117:  // "ObjectID"
             value.copy<OID>(YY_MOVE(that.value));
             break;
 
-        case 128:  // "Timestamp"
+        case 129:  // "Timestamp"
             value.copy<Timestamp>(YY_MOVE(that.value));
             break;
 
-        case 130:  // "maxKey"
+        case 131:  // "maxKey"
             value.copy<UserMaxKey>(YY_MOVE(that.value));
             break;
 
-        case 129:  // "minKey"
+        case 130:  // "minKey"
             value.copy<UserMinKey>(YY_MOVE(that.value));
             break;
 
-        case 118:  // "null"
+        case 119:  // "null"
             value.copy<UserNull>(YY_MOVE(that.value));
             break;
 
-        case 115:  // "undefined"
+        case 116:  // "undefined"
             value.copy<UserUndefined>(YY_MOVE(that.value));
             break;
 
-        case 126:  // "arbitrary double"
+        case 127:  // "arbitrary double"
             value.copy<double>(YY_MOVE(that.value));
             break;
 
-        case 124:  // "arbitrary integer"
+        case 125:  // "arbitrary integer"
             value.copy<int>(YY_MOVE(that.value));
             break;
 
-        case 125:  // "arbitrary long"
+        case 126:  // "arbitrary long"
             value.copy<long long>(YY_MOVE(that.value));
             break;
 
-        case 144:  // projectField
-        case 145:  // expressionField
-        case 146:  // valueField
-        case 147:  // filterField
+        case 145:  // projectField
+        case 146:  // expressionField
+        case 147:  // valueField
         case 261:  // onErrorArg
         case 262:  // onNullArg
         case 263:  // formatArg
         case 264:  // timezoneArg
         case 265:  // charsArg
         case 266:  // optionsArg
-        case 278:  // sortSpec
+        case 275:  // predicate
+        case 276:  // logicalExpr
+        case 277:  // operatorExpression
+        case 278:  // notExpr
+        case 285:  // sortSpec
             value.copy<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
             break;
 
-        case 112:  // "fieldname"
-        case 113:  // "string"
-        case 131:  // "$-prefixed string"
-        case 132:  // "$$-prefixed string"
-        case 133:  // "$-prefixed fieldname"
+        case 113:  // "fieldname"
+        case 114:  // "string"
+        case 132:  // "$-prefixed string"
+        case 133:  // "$$-prefixed string"
+        case 134:  // "$-prefixed fieldname"
             value.copy<std::string>(YY_MOVE(that.value));
             break;
 
@@ -3567,27 +3601,27 @@ template <typename Base>
 void ParserGen::basic_symbol<Base>::move(basic_symbol& s) {
     super_type::move(s);
     switch (this->type_get()) {
-        case 114:  // "BinData"
+        case 115:  // "BinData"
             value.move<BSONBinData>(YY_MOVE(s.value));
             break;
 
-        case 121:  // "Code"
+        case 122:  // "Code"
             value.move<BSONCode>(YY_MOVE(s.value));
             break;
 
-        case 123:  // "CodeWScope"
+        case 124:  // "CodeWScope"
             value.move<BSONCodeWScope>(YY_MOVE(s.value));
             break;
 
-        case 120:  // "dbPointer"
+        case 121:  // "dbPointer"
             value.move<BSONDBRef>(YY_MOVE(s.value));
             break;
 
-        case 119:  // "regex"
+        case 120:  // "regex"
             value.move<BSONRegEx>(YY_MOVE(s.value));
             break;
 
-        case 122:  // "Symbol"
+        case 123:  // "Symbol"
             value.move<BSONSymbol>(YY_MOVE(s.value));
             break;
 
@@ -3704,92 +3738,98 @@ void ParserGen::basic_symbol<Base>::move(basic_symbol& s) {
         case 258:  // sqrt
         case 259:  // subtract
         case 260:  // trunc
-        case 270:  // matchExpression
-        case 271:  // filterFields
-        case 272:  // filterVal
-        case 273:  // sortSpecs
-        case 274:  // specList
-        case 275:  // metaSort
-        case 276:  // oneOrNegOne
-        case 277:  // metaSortKeyword
+        case 270:  // match
+        case 271:  // predicates
+        case 272:  // compoundMatchExprs
+        case 273:  // predValue
+        case 274:  // additionalExprs
+        case 280:  // sortSpecs
+        case 281:  // specList
+        case 282:  // metaSort
+        case 283:  // oneOrNegOne
+        case 284:  // metaSortKeyword
             value.move<CNode>(YY_MOVE(s.value));
             break;
 
-        case 135:  // projectionFieldname
-        case 136:  // expressionFieldname
-        case 137:  // stageAsUserFieldname
-        case 138:  // filterFieldname
-        case 139:  // argAsUserFieldname
-        case 140:  // aggExprAsUserFieldname
-        case 141:  // invariableUserFieldname
-        case 142:  // idAsUserFieldname
-        case 143:  // valueFieldname
+        case 136:  // projectionFieldname
+        case 137:  // expressionFieldname
+        case 138:  // stageAsUserFieldname
+        case 139:  // predFieldname
+        case 140:  // argAsUserFieldname
+        case 141:  // aggExprAsUserFieldname
+        case 142:  // invariableUserFieldname
+        case 143:  // idAsUserFieldname
+        case 144:  // valueFieldname
+        case 279:  // logicalExprField
             value.move<CNode::Fieldname>(YY_MOVE(s.value));
             break;
 
-        case 117:  // "Date"
+        case 118:  // "Date"
             value.move<Date_t>(YY_MOVE(s.value));
             break;
 
-        case 127:  // "arbitrary decimal"
+        case 128:  // "arbitrary decimal"
             value.move<Decimal128>(YY_MOVE(s.value));
             break;
 
-        case 116:  // "ObjectID"
+        case 117:  // "ObjectID"
             value.move<OID>(YY_MOVE(s.value));
             break;
 
-        case 128:  // "Timestamp"
+        case 129:  // "Timestamp"
             value.move<Timestamp>(YY_MOVE(s.value));
             break;
 
-        case 130:  // "maxKey"
+        case 131:  // "maxKey"
             value.move<UserMaxKey>(YY_MOVE(s.value));
             break;
 
-        case 129:  // "minKey"
+        case 130:  // "minKey"
             value.move<UserMinKey>(YY_MOVE(s.value));
             break;
 
-        case 118:  // "null"
+        case 119:  // "null"
             value.move<UserNull>(YY_MOVE(s.value));
             break;
 
-        case 115:  // "undefined"
+        case 116:  // "undefined"
             value.move<UserUndefined>(YY_MOVE(s.value));
             break;
 
-        case 126:  // "arbitrary double"
+        case 127:  // "arbitrary double"
             value.move<double>(YY_MOVE(s.value));
             break;
 
-        case 124:  // "arbitrary integer"
+        case 125:  // "arbitrary integer"
             value.move<int>(YY_MOVE(s.value));
             break;
 
-        case 125:  // "arbitrary long"
+        case 126:  // "arbitrary long"
             value.move<long long>(YY_MOVE(s.value));
             break;
 
-        case 144:  // projectField
-        case 145:  // expressionField
-        case 146:  // valueField
-        case 147:  // filterField
+        case 145:  // projectField
+        case 146:  // expressionField
+        case 147:  // valueField
         case 261:  // onErrorArg
         case 262:  // onNullArg
         case 263:  // formatArg
         case 264:  // timezoneArg
         case 265:  // charsArg
         case 266:  // optionsArg
-        case 278:  // sortSpec
+        case 275:  // predicate
+        case 276:  // logicalExpr
+        case 277:  // operatorExpression
+        case 278:  // notExpr
+        case 285:  // sortSpec
             value.move<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(s.value));
             break;
 
-        case 112:  // "fieldname"
-        case 113:  // "string"
-        case 131:  // "$-prefixed string"
-        case 132:  // "$$-prefixed string"
-        case 133:  // "$-prefixed fieldname"
+        case 113:  // "fieldname"
+        case 114:  // "string"
+        case 132:  // "$-prefixed string"
+        case 133:  // "$$-prefixed string"
+        case 134:  // "$-prefixed fieldname"
             value.move<std::string>(YY_MOVE(s.value));
             break;
 
@@ -3834,7 +3874,7 @@ inline int ParserGen::by_type::type_get() const YY_NOEXCEPT {
 
 #line 57 "src/mongo/db/cst/grammar.yy"
 }  // namespace mongo
-#line 4844 "src/mongo/db/cst/parser_gen.hpp"
+#line 4890 "src/mongo/db/cst/parser_gen.hpp"
 
 
 #endif  // !YY_YY_SRC_MONGO_DB_CST_PARSER_GEN_HPP_INCLUDED

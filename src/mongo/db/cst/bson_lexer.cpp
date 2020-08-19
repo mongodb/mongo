@@ -59,6 +59,7 @@ const StringMap<ParserGen::token_type> reservedKeyLookup = {
     {"$atan2", ParserGen::token::ATAN2},
     {"$and", ParserGen::token::AND},
     {"$or", ParserGen::token::OR},
+    {"$nor", ParserGen::token::NOR},
     {"$not", ParserGen::token::NOT},
     {"$const", ParserGen::token::CONST_EXPR},
     {"$literal", ParserGen::token::LITERAL},

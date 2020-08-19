@@ -75,6 +75,7 @@
     ENUMIFY(mod)                 \
     ENUMIFY(multiply)            \
     ENUMIFY(ne)                  \
+    ENUMIFY(norExpr)             \
     ENUMIFY(notExpr)             \
     ENUMIFY(onErrorArg)          \
     ENUMIFY(onNullArg)           \

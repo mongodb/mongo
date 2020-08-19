@@ -181,6 +181,7 @@
     MOD
     MULTIPLY
     NE
+    NOR
     NOT
     OR
     POW
@@ -255,10 +256,10 @@
 //
 
 // Possible user fieldnames.
-%nterm <CNode::Fieldname> projectionFieldname expressionFieldname stageAsUserFieldname filterFieldname
+%nterm <CNode::Fieldname> projectionFieldname expressionFieldname stageAsUserFieldname predFieldname
 %nterm <CNode::Fieldname> argAsUserFieldname aggExprAsUserFieldname invariableUserFieldname
 %nterm <CNode::Fieldname> idAsUserFieldname valueFieldname
-%nterm <std::pair<CNode::Fieldname, CNode>> projectField expressionField valueField filterField
+%nterm <std::pair<CNode::Fieldname, CNode>> projectField expressionField valueField
 
 // Literals.
 %nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal
@@ -283,7 +284,11 @@
 %nterm <std::pair<CNode::Fieldname, CNode>> onErrorArg onNullArg
 %nterm <std::pair<CNode::Fieldname, CNode>> formatArg timezoneArg charsArg optionsArg
 %nterm <std::vector<CNode>> expressions values exprZeroToTwo
-%nterm <CNode> matchExpression filterFields filterVal
+
+// Match expressions.
+%nterm <CNode> match predicates compoundMatchExprs predValue additionalExprs
+%nterm <std::pair<CNode::Fieldname, CNode>> predicate logicalExpr operatorExpression notExpr
+%nterm <CNode::Fieldname> logicalExprField
 
 // Sort related rules
 %nterm <CNode> sortSpecs specList metaSort oneOrNegOne metaSortKeyword
@@ -299,14 +304,14 @@ start:
     ARG_PIPELINE pipeline {
         *cst = $pipeline;
     }
-    | ARG_FILTER matchExpression {
-        *cst = $matchExpression;
+    | ARG_FILTER match {
+        *cst = $match;
     }
-    | ARG_QUERY matchExpression {
-        *cst = $matchExpression;
+    | ARG_QUERY match {
+        *cst = $match;
     }
-    | ARG_Q matchExpression {
-        *cst = $matchExpression;
+    | ARG_Q match {
+        *cst = $match;
     }
     | ARG_SORT sortSpecs {
         *cst = $sortSpecs;
@@ -491,35 +496,91 @@ projectionFieldname:
     invariableUserFieldname | stageAsUserFieldname | argAsUserFieldname | aggExprAsUserFieldname
 ;
 
-matchExpression:
-    START_OBJECT filterFields END_OBJECT {
-        $$ = $filterFields;
+match:
+    START_OBJECT predicates END_OBJECT {
+        $$ = $predicates;
     }
 ;
 
-filterFields:
+predicates:
     %empty {
         $$ = CNode::noopLeaf();
     }
-    | filterFields[filterArg] filterField {
+    | predicates[filterArg] predicate {
         $$ = $filterArg;
-        $$.objectChildren().emplace_back($filterField);
+        $$.objectChildren().emplace_back($predicate);
     }
 ;
 
-filterField: filterFieldname filterVal {
-        $$ = {$filterFieldname, $filterVal};
+predicate: predFieldname predValue {
+        $$ = {$predFieldname, $predValue};
+    }
+    | logicalExpr {
+        $$ = $logicalExpr;
     }
 ;
 
-filterVal:
-    value
+// TODO SERVER-48847: This rule assumes that object predicates always contain sub-expressions.
+// Will need to expand to allow comparisons against literal objects (note that order of fields
+// in object predicates is important! --> {a: 1, $gt: 2} is different than {$gt: 2, a: 1}).
+predValue:
+    simpleValue 
+    | START_OBJECT compoundMatchExprs END_OBJECT {
+        $$ = $compoundMatchExprs;
+    }
+;
+
+compoundMatchExprs: 
+    %empty {
+        $$ = CNode::noopLeaf();
+    }
+    | compoundMatchExprs[exprs] operatorExpression {
+        $$ = $exprs;
+        $$.objectChildren().emplace_back($operatorExpression);
+    }
+;
+
+// Rules for the operators which act on a path.
+operatorExpression: notExpr
+
+notExpr:
+    NOT regex {
+        $$ = std::pair{KeyFieldname::notExpr, $regex};
+    }
+    // $not requires an object with atleast one expression.
+    | NOT START_OBJECT operatorExpression compoundMatchExprs END_OBJECT {
+        auto&& exprs = $compoundMatchExprs;
+        exprs.objectChildren().emplace_back($operatorExpression);
+
+        $$ = std::pair{KeyFieldname::notExpr, std::move(exprs)};
+    }
+;
+
+// Logical expressions accept an array of objects, with at least one element.
+logicalExpr: logicalExprField START_ARRAY match additionalExprs END_ARRAY {
+        auto&& children = $additionalExprs;
+        children.arrayChildren().emplace_back($match);
+        $$ = {$logicalExprField, std::move(children)};
+    }
+;
+
+logicalExprField: 
+    AND { $$ = KeyFieldname::andExpr; }
+    | OR { $$ = KeyFieldname::orExpr; }
+    | NOR { $$ = KeyFieldname::norExpr; }
+
+additionalExprs: 
+    %empty {
+        $$ = CNode{CNode::ArrayChildren{}};
+    }
+    | additionalExprs[exprs] match {
+        $$ = $exprs;
+        $$.arrayChildren().emplace_back($match);
+    }
 ;
 
 // Filter predicates are *not* allowed over $-prefixed field names.
-filterFieldname:
-    idAsUserFieldname | invariableUserFieldname | argAsUserFieldname
-;
+predFieldname: idAsUserFieldname | argAsUserFieldname | invariableUserFieldname;
 
 invariableUserFieldname:
     FIELDNAME {

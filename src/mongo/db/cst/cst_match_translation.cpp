@@ -39,18 +39,86 @@
 #include "mongo/db/cst/cst_pipeline_translation.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo::cst_match_translation {
 namespace {
 
-std::unique_ptr<MatchExpression> translateMatchElement(const CNode::Fieldname& field,
-                                                       const CNode& cst) {
-    if (auto fieldName = stdx::get_if<UserFieldname>(&field)) {
+std::unique_ptr<MatchExpression> translateMatchPredicate(
+    const CNode::Fieldname& fieldName,
+    const CNode& cst,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
+ * Walk an array of nodes and produce a vector of MatchExpressions.
+ */
+template <class Type>
+std::unique_ptr<Type> translateTreeExpr(const CNode::ArrayChildren& array,
+                                        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto expr = std::make_unique<Type>();
+    for (auto&& node : array) {
+        // Tree expressions require each element to be an object.
+        for (auto&& [fieldName, child] : node.objectChildren()) {
+            expr->add(translateMatchPredicate(fieldName, child, expCtx).release());
+        }
+    }
+    return expr;
+}
+
+std::unique_ptr<MatchExpression> translateNot(
+    const CNode::Fieldname& fieldName,
+    const CNode& argument,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // $not can accept a regex or an object expression.
+    if (auto regex = stdx::get_if<UserRegex>(&argument.payload)) {
+        auto regexExpr = std::make_unique<RegexMatchExpression>(
+            stdx::get<UserFieldname>(fieldName), regex->pattern, regex->flags);
+        return std::make_unique<NotMatchExpression>(std::move(regexExpr));
+    }
+
+    auto root = std::make_unique<AndMatchExpression>();
+    root->add(translateMatchPredicate(fieldName, argument, expCtx).release());
+    return std::make_unique<NotMatchExpression>(std::move(root));
+}
+
+std::unique_ptr<MatchExpression> translatePathExpression(
+    const CNode::Fieldname& fieldName,
+    const CNode::ObjectChildren& object,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    for (auto&& [op, argument] : object) {
+        switch (stdx::get<KeyFieldname>(op)) {
+            case KeyFieldname::notExpr:
+                return translateNot(fieldName, argument, expCtx);
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+    MONGO_UNREACHABLE;
+}
+
+std::unique_ptr<MatchExpression> translateMatchPredicate(
+    const CNode::Fieldname& fieldName,
+    const CNode& cst,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (auto keyField = stdx::get_if<KeyFieldname>(&fieldName)) {
+        // Top level match expression.
+        switch (*keyField) {
+            case KeyFieldname::andExpr:
+                return translateTreeExpr<AndMatchExpression>(cst.arrayChildren(), expCtx);
+            case KeyFieldname::orExpr:
+                return translateTreeExpr<OrMatchExpression>(cst.arrayChildren(), expCtx);
+            case KeyFieldname::norExpr:
+                return translateTreeExpr<NorMatchExpression>(cst.arrayChildren(), expCtx);
+            default:
+                MONGO_UNREACHABLE;
+        }
+    } else {
         // Expression is over a user fieldname.
         return stdx::visit(
             visit_helper::Overloaded{
                 [&](const CNode::ObjectChildren& userObject) -> std::unique_ptr<MatchExpression> {
-                    MONGO_UNREACHABLE;
+                    return translatePathExpression(fieldName, userObject, expCtx);
                 },
                 [&](const CNode::ArrayChildren& userObject) -> std::unique_ptr<MatchExpression> {
                     MONGO_UNREACHABLE;
@@ -58,12 +126,10 @@ std::unique_ptr<MatchExpression> translateMatchElement(const CNode::Fieldname& f
                 // Other types are always treated as equality predicates.
                 [&](auto&& userValue) -> std::unique_ptr<MatchExpression> {
                     return std::make_unique<EqualityMatchExpression>(
-                        StringData(*fieldName),
+                        StringData{stdx::get<UserFieldname>(fieldName)},
                         cst_pipeline_translation::translateLiteralLeaf(cst));
                 }},
             cst.payload);
-    } else {
-        // Top level match expression.
     }
     MONGO_UNREACHABLE;
 }
@@ -73,8 +139,8 @@ std::unique_ptr<MatchExpression> translateMatchElement(const CNode::Fieldname& f
 std::unique_ptr<MatchExpression> translateMatchExpression(
     const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto root = std::make_unique<AndMatchExpression>();
-    for (auto&& [field, expr] : cst.objectChildren()) {
-        root->add(translateMatchElement(field, expr).release());
+    for (const auto& [fieldName, expr] : cst.objectChildren()) {
+        root->add(translateMatchPredicate(fieldName, expr, expCtx).release());
     }
     return root;
 }

@@ -227,6 +227,10 @@ public:
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : MatchExpression(NOT, std::move(annotation)), _exp(e) {}
 
+    explicit NotMatchExpression(std::unique_ptr<MatchExpression> expr,
+                                clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : MatchExpression(NOT, std::move(annotation)), _exp(std::move(expr)) {}
+
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<NotMatchExpression> self =
             std::make_unique<NotMatchExpression>(_exp->shallowClone().release(), _errorAnnotation);

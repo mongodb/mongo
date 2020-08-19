@@ -868,46 +868,6 @@ TEST(CstGrammarTest, ParsesValidTrunc) {
         "{ projectInclusion: { val: { trunc: [ \"<UserDouble 1.234000>\", \"<UserInt 2>\" ] } } }");
 }
 
-TEST(CstGrammarTest, ParsesEmptyMatchInFind) {
-    CNode output;
-    auto input = fromjson("{filter: {}}");
-    BSONLexer lexer(input["filter"]);
-    auto parseTree = ParserGen(lexer, &output);
-    ASSERT_EQ(0, parseTree.parse());
-    ASSERT_EQ(output.toBson().toString(), "{}");
-}
-
-TEST(CstGrammarTest, ParsesMatchWithEqualityPredicates) {
-    CNode output;
-    auto input = fromjson("{filter: {a: 5.0, b: NumberInt(10), _id: NumberLong(15)}}");
-    BSONLexer lexer(input["filter"]);
-    auto parseTree = ParserGen(lexer, &output);
-    ASSERT_EQ(0, parseTree.parse());
-    ASSERT_EQ(output.toBson().toString(),
-              "{ a: \"<UserDouble 5.000000>\", b: \"<UserInt 10>\", _id: \"<UserLong 15>\" }");
-}
-
-TEST(CstGrammarTest, FailsToParseDollarPrefixedPredicates) {
-    {
-        auto input = fromjson("{filter: {$atan2: [3, 5]}}");
-        BSONLexer lexer(input["filter"]);
-        ASSERT_THROWS_CODE_AND_WHAT(
-            ParserGen(lexer, nullptr).parse(),
-            AssertionException,
-            ErrorCodes::FailedToParse,
-            "syntax error, unexpected ATAN2 at element '$atan2' of input filter");
-    }
-    {
-        auto input = fromjson("{filter: {$prefixed: 5}}");
-        BSONLexer lexer(input["filter"]);
-        ASSERT_THROWS_CODE_AND_WHAT(
-            ParserGen(lexer, nullptr).parse(),
-            AssertionException,
-            ErrorCodes::FailedToParse,
-            "syntax error, unexpected $-prefixed fieldname at element '$prefixed' of input filter");
-    }
-}
-
 TEST(CstGrammarTest, ParsesBasicSort) {
     CNode output;
     auto input = fromjson("{sort: {val: 1, test: -1}}");
