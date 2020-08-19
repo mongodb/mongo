@@ -246,7 +246,19 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
                 pushToken(elem, PipelineParserGen::token::DOUBLE_NON_ZERO, elem.numberDouble());
             break;
         case BSONType::String:
-            pushToken(elem.valueStringData(), PipelineParserGen::token::STRING, elem.String());
+            if (elem.String()[0] == '$') {
+                if (elem.String()[1] == '$') {
+                    pushToken(elem.valueStringData(),
+                              PipelineParserGen::token::DOLLAR_DOLLAR_STRING,
+                              elem.String());
+                } else {
+                    pushToken(elem.valueStringData(),
+                              PipelineParserGen::token::DOLLAR_STRING,
+                              elem.String());
+                }
+            } else {
+                pushToken(elem.valueStringData(), PipelineParserGen::token::STRING, elem.String());
+            }
             break;
         case BSONType::BinData: {
             int len;

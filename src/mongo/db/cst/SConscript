@@ -18,6 +18,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/pipeline/variable_validation',
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
     ]
 )

@@ -40,6 +40,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -370,7 +371,7 @@ DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
 
         for (auto&& varElem : *letVariables) {
             const auto varName = varElem.fieldNameStringData();
-            Variables::validateNameForUserWrite(varName);
+            variableValidation::validateNameForUserWrite(varName);
 
             _letVariables->emplace(
                 varName.toString(),

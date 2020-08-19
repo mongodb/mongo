@@ -73,8 +73,6 @@ public:
 
     Variables() = default;
 
-    static void validateNameForUserWrite(StringData varName);
-    static void validateNameForUserRead(StringData varName);
     static bool isUserDefinedVariable(Variables::Id id) {
         return id >= 0;
     }
@@ -198,11 +196,6 @@ private:
     };
 
     void setValue(Id id, const Value& value, bool isConstant);
-
-    static void validateName(StringData varName,
-                             std::function<bool(char)> prefixPred,
-                             std::function<bool(char)> suffixPred,
-                             int prefixLen);
 
     static auto getBuiltinVariableName(Variables::Id variable) {
         for (auto& [name, id] : kBuiltinVarNameToId) {

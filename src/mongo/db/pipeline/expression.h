@@ -1384,13 +1384,19 @@ public:
         indicator
       @returns the newly created field path expression
      */
-    static boost::intrusive_ptr<ExpressionFieldPath> create(ExpressionContext* const expCtx,
-                                                            const std::string& fieldPath);
+    static boost::intrusive_ptr<ExpressionFieldPath> deprecatedCreate(
+        ExpressionContext* const expCtx, const std::string& fieldPath);
 
-    /// Like create(), but works with the raw std::string from the user with the "$" prefixes.
+    // Parse from the raw std::string from the user with the "$" prefixes.
     static boost::intrusive_ptr<ExpressionFieldPath> parse(ExpressionContext* const expCtx,
                                                            const std::string& raw,
                                                            const VariablesParseState& vps);
+    // Create from a non-prefixed string. Assumes path not variable.
+    static boost::intrusive_ptr<ExpressionFieldPath> createPathFromString(
+        ExpressionContext* const expCtx, const std::string& raw, const VariablesParseState& vps);
+    // Create from a non-prefixed string. Assumes variable not path.
+    static boost::intrusive_ptr<ExpressionFieldPath> createVarFromString(
+        ExpressionContext* const expCtx, const std::string& raw, const VariablesParseState& vps);
 
     /**
      * Returns true if this expression logically represents the path 'dottedPath'. For example, if

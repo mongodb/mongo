@@ -426,6 +426,7 @@ Value translateLiteralLeaf(const CNode& cst) {
             [](const UserNull&) { return Value{BSONNULL}; },
             [](const UserMinKey&) { return Value{MINKEY}; },
             [](const UserMaxKey&) { return Value{MAXKEY}; },
+            [](const UserFieldPath& ufp) { return Value{ufp.rawStr}; },
             // The rest convert directly.
             [](auto&& payload) { return Value{payload}; }},
         cst.payload);
@@ -662,6 +663,17 @@ boost::intrusive_ptr<Expression> translateExpression(
                 }
             },
             [](const NonZeroKey&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
+            [&](const UserFieldPath& ufp) -> boost::intrusive_ptr<Expression> {
+                if (ufp.isVariable) {
+                    // Remove two '$' characters.
+                    return ExpressionFieldPath::createVarFromString(
+                        expCtx.get(), ufp.rawStr, expCtx->variablesParseState);
+                } else {
+                    // Remove one '$' character.
+                    return ExpressionFieldPath::createPathFromString(
+                        expCtx.get(), ufp.rawStr, expCtx->variablesParseState);
+                }
+            },
             // Everything else is a literal leaf.
             [&](auto &&) -> boost::intrusive_ptr<Expression> {
                 return ExpressionConstant::create(expCtx.get(), translateLiteralLeaf(cst));

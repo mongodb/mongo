@@ -232,6 +232,8 @@
 %token <Timestamp> TIMESTAMP "Timestamp"
 %token <UserMinKey> MIN_KEY "minKey"
 %token <UserMaxKey> MAX_KEY "maxKey"
+%token <std::string> DOLLAR_STRING "$-prefixed string"
+%token <std::string> DOLLAR_DOLLAR_STRING "$$-prefixed string"
 %token START_PIPELINE START_MATCH
 
 //
@@ -246,8 +248,8 @@
 
 // Literals.
 %nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal
-%nterm <CNode> minKey maxKey value string binary undefined objectId bool date null regex
-%nterm <CNode> simpleValue compoundValue valueArray valueObject valueFields
+%nterm <CNode> minKey maxKey value string fieldPath binary undefined objectId bool date null regex
+%nterm <CNode> simpleValue compoundValue valueArray valueObject valueFields variable
 
 // Pipeline stages and related non-terminals.
 %nterm <CNode> stageList stage inhibitOptimization unionWith skip limit project sample
@@ -746,7 +748,23 @@ string:
         $$ = CNode{UserString{$1}};
     }
 ;
-
+fieldPath:
+    DOLLAR_STRING {
+        std::string str = $1;
+        if (str.size() == 1) {
+            error(@1, "'$' by iteslf is not a valid FieldPath");
+        }
+        $$ = CNode{UserFieldPath{str.substr(1), false}};
+    }
+variable:
+    DOLLAR_DOLLAR_STRING {
+        std::string str = $1.substr(2);
+        auto status = c_node_validation::validateVariableName(str);
+        if (!status.isOK()) {
+            error(@1, status.reason());
+        }
+        $$ = CNode{UserFieldPath{str, true}};
+    }
 binary:
     BINARY {
         $$ = CNode{UserBinary{$1}};
@@ -872,6 +890,8 @@ bool:
 
 simpleValue:
     string
+    | fieldPath
+    | variable
     | binary
     | undefined
     | objectId

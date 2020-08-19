@@ -72,6 +72,11 @@ using UserDecimal = Decimal128;
 struct UserMinKey {};
 struct UserMaxKey {};
 
+struct UserFieldPath {
+    std::string rawStr;
+    bool isVariable;
+};
+
 struct CNode {
     static auto noopLeaf() {
         return CNode{ObjectChildren{}};
@@ -177,6 +182,7 @@ public:
                   NonZeroKey,
                   UserDouble,
                   UserString,
+                  UserFieldPath,
                   UserBinary,
                   UserUndefined,
                   UserObjectId,

@@ -49,7 +49,7 @@ void assertTokensMatch(BSONLexer& lexer,
 }
 
 TEST(BSONLexerTest, TokenizesOpaqueUserObjects) {
-    auto input = fromjson("{pipeline: [{a: 1, b: '1'}]}");
+    auto input = fromjson("{pipeline: [{a: 1, b: '1', c: \"$path\", d: \"$$NOW\"}]}");
     BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
     assertTokensMatch(lexer,
                       {PipelineParserGen::token::START_PIPELINE,
@@ -59,6 +59,10 @@ TEST(BSONLexerTest, TokenizesOpaqueUserObjects) {
                        PipelineParserGen::token::INT_NON_ZERO,
                        PipelineParserGen::token::FIELDNAME,
                        PipelineParserGen::token::STRING,
+                       PipelineParserGen::token::FIELDNAME,
+                       PipelineParserGen::token::DOLLAR_STRING,
+                       PipelineParserGen::token::FIELDNAME,
+                       PipelineParserGen::token::DOLLAR_DOLLAR_STRING,
                        PipelineParserGen::token::END_OBJECT,
                        PipelineParserGen::token::END_ARRAY});
 }
@@ -232,6 +236,34 @@ TEST(BSONLexerTest, EmptyMatchExpressionsAreLexedCorrectly) {
                       {PipelineParserGen::token::START_MATCH,
                        PipelineParserGen::token::START_OBJECT,
                        PipelineParserGen::token::END_OBJECT});
+}
+
+TEST(BSONLexerTest, TokenizesObjWithPathCorrectly) {
+    auto input = fromjson(
+        "{pipeline: [{$project: { m: { $dateToString: { date: '$date', "
+        "format: '%Y-%m-%d' } } } } ] }");
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    assertTokensMatch(lexer,
+                      {
+                          PipelineParserGen::token::START_PIPELINE,
+                          PipelineParserGen::token::START_ARRAY,
+                          PipelineParserGen::token::START_OBJECT,
+                          PipelineParserGen::token::STAGE_PROJECT,
+                          PipelineParserGen::token::START_OBJECT,
+                          PipelineParserGen::token::FIELDNAME,
+                          PipelineParserGen::token::START_OBJECT,
+                          PipelineParserGen::token::DATE_TO_STRING,
+                          PipelineParserGen::token::START_OBJECT,
+                          PipelineParserGen::token::ARG_DATE,
+                          PipelineParserGen::token::DOLLAR_STRING,
+                          PipelineParserGen::token::ARG_FORMAT,
+                          PipelineParserGen::token::STRING,
+                          PipelineParserGen::token::END_OBJECT,
+                          PipelineParserGen::token::END_OBJECT,
+                          PipelineParserGen::token::END_OBJECT,
+                          PipelineParserGen::token::END_OBJECT,
+                          PipelineParserGen::token::END_ARRAY,
+                      });
 }
 
 }  // namespace

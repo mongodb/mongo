@@ -35,6 +35,7 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/storage_validation.h"
@@ -62,7 +63,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
     if (constants) {
         for (auto&& constElem : *constants) {
             const auto constName = constElem.fieldNameStringData();
-            Variables::validateNameForUserRead(constName);
+            variableValidation::validateNameForUserRead(constName);
 
             auto varId = _expCtx->variablesParseState.defineVariable(constName);
             _expCtx->variables.setConstantValue(varId, Value(constElem));

@@ -29,21 +29,12 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/db/cst/c_node.h"
-
-/**
- * Functions which perform additional validation beyond what a context free grammar can handle.
- * These return error messages which can be used to cause errors from inside the Bison parser.
- */
-namespace mongo::c_node_validation {
-
-enum class IsInclusion : bool { no, yes };
-
-StatusWith<IsInclusion> validateProjectionAsInclusionOrExclusion(const CNode& projects);
-
-Status validateVariableName(std::string varStr);
-
-}  // namespace mongo::c_node_validation
+namespace mongo::variableValidation {
+void validateNameForUserWrite(StringData varName);
+void validateNameForUserRead(StringData varName);
+void validateName(StringData varName,
+                  std::function<bool(char)> prefixPred,
+                  std::function<bool(char)> suffixPred,
+                  int prefixLen);
+}  // namespace mongo::variableValidation

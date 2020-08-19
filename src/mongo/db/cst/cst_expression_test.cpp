@@ -178,7 +178,7 @@ TEST(CstExpressionTest, ParsesConvertExpressions) {
               "{ projectInclusion: { a: { toBool: \"<UserInt 1>\" }, b: { toDate: \"<UserLong "
               "1100000000000>\" }, c: { toDecimal: \"<UserInt 5>\" }, d: { toDouble: \"<UserInt "
               "-2>\" }, e: { toInt: \"<UserDouble 1.999999>\" }, f: { toLong: \"<UserDouble "
-              "1.999999>\" }, g: { toObjectId: \"<UserString $_id>\" }, h: { toString: "
+              "1.999999>\" }, g: { toObjectId: \"<UserFieldPath $_id>\" }, h: { toString: "
               "\"<UserBoolean 0>\" } } }");
 }
 
@@ -275,7 +275,7 @@ TEST(CstExpressionTest, ParsesDateToString) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ projectInclusion: { m: { dateToString: { dateArg: \"<UserString $date>\", formatArg: "
+        "{ projectInclusion: { m: { dateToString: { dateArg: \"<UserFieldPath $date>\", formatArg: "
         "\"<UserString %Y-%m-%d>\", timezoneArg: \"<KeyValue absentKey>\", onNullArg: "
         "\"<KeyValue absentKey>\" } } } }");
 }
@@ -292,11 +292,12 @@ TEST(CstExpressionTest, ParsesReplaceStringExpressions) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(stages[0].toBson().toString(),
-              "{ projectInclusion: { h: { replaceOne: { inputArg: \"<UserString $name>\", findArg: "
-              "\"<UserString Cafe>\", replacementArg: \"<UserString CAFE>\" } }, i: { replaceAll: "
-              "{ inputArg: \"<UserString cafeSeattle>\", findArg: \"<UserString cafe>\", "
-              "replacementArg: \"<UserString CAFE>\" } } } }");
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { h: { replaceOne: { inputArg: \"<UserFieldPath $name>\", findArg: "
+        "\"<UserString Cafe>\", replacementArg: \"<UserString CAFE>\" } }, i: { replaceAll: "
+        "{ inputArg: \"<UserString cafeSeattle>\", findArg: \"<UserString cafe>\", "
+        "replacementArg: \"<UserString CAFE>\" } } } }");
 }
 
 TEST(CstExpressionTest, ParsesTrim) {
@@ -353,10 +354,11 @@ TEST(CstExpressionTest, ParsesRegexExpressions) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ projectInclusion: { j: { regexFind: { inputArg: \"<UserString $details>\", regexArg: "
+        "{ projectInclusion: { j: { regexFind: { inputArg: \"<UserFieldPath $details>\", regexArg: "
         "\"<UserRegex /^[a-z0-9_.+-]/>\", optionsArg: \"<UserString i>\" } }, k: { regexFindAll: { "
-        "inputArg: \"<UserString $fname>\", regexArg: \"<UserRegex /(C(ar)*)ol/>\", optionsArg: "
-        "\"<KeyValue absentKey>\" } }, l: { regexMatch: { inputArg: \"<UserString $description>\", "
+        "inputArg: \"<UserFieldPath $fname>\", regexArg: \"<UserRegex /(C(ar)*)ol/>\", optionsArg: "
+        "\"<KeyValue absentKey>\" } }, l: { regexMatch: { inputArg: \"<UserFieldPath "
+        "$description>\", "
         "regexArg: \"<UserRegex /lin(e|k)/>\", optionsArg: \"<KeyValue absentKey>\" } } } }");
 }
 
@@ -375,9 +377,10 @@ TEST(CstExpressionTest, ParsesSubstrExpressions) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ projectInclusion: { s: { substr: [ \"<UserString $quarter>\", \"<UserInt 2>\", "
+        "{ projectInclusion: { s: { substr: [ \"<UserFieldPath $quarter>\", \"<UserInt 2>\", "
         "\"<UserInt -1>\" "
-        "] }, t: { substrBytes: [ \"<UserString $name>\", \"<UserInt 0>\", \"<UserInt 3>\" ] }, u: "
+        "] }, t: { substrBytes: [ \"<UserFieldPath $name>\", \"<UserInt 0>\", \"<UserInt 3>\" ] }, "
+        "u: "
         "{ substrCP: [ \"<UserString Hello World!>\", \"<UserInt 6>\", \"<UserInt 5>\" ] } } }");
 }
 
@@ -426,9 +429,10 @@ TEST(CstExpressionTest, ParsesStrCaseCmp) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(stages[0].toBson().toString(),
-              "{ projectInclusion: { r: { strcasecmp: [ \"<UserString $quarter>\", \"<UserString "
-              "13q4>\" ] } } }");
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ projectInclusion: { r: { strcasecmp: [ \"<UserFieldPath $quarter>\", \"<UserString "
+        "13q4>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesConcat) {
@@ -442,11 +446,37 @@ TEST(CstExpressionTest, ParsesConcat) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(
-        stages[0].toBson().toString(),
-        "{ projectInclusion: { a: { concat: [ \"<UserString $description>\", \"<UserString  - >\", "
-        "\"<UserString item>\" ] } } }");
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ projectInclusion: { a: { concat: [ \"<UserFieldPath $description>\", "
+              "\"<UserString  - >\", "
+              "\"<UserString item>\" ] } } }");
 }
 
+TEST(CstExpressionTest, FailsToParseTripleDollar) {
+    CNode output;
+    auto input = BSON("pipeline" << BSON_ARRAY(BSON("$project" << BSON("a"
+                                                                       << "$$$triple"))));
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+}
+
+TEST(CstExpressionTest, FailsToParseLoneDollar) {
+    CNode output;
+    auto input = BSON("pipeline" << BSON_ARRAY(BSON("$project" << BSON("a"
+                                                                       << "$"))));
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+}
+
+TEST(CstExpressionTest, FailsToParseInvalidVarName) {
+    CNode output;
+    auto input = BSON("pipeline" << BSON_ARRAY(BSON("$project" << BSON("a"
+                                                                       << "$$invalid"))));
+    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+}
 }  // namespace
 }  // namespace mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/cst/c_node_validation.h"
+#include "mongo/db/pipeline/variable_validation.h"
 
 namespace mongo::c_node_validation {
 namespace {
@@ -132,6 +133,17 @@ StatusWith<IsInclusion> validateProjectionAsInclusionOrExclusion(const CNode& pr
     return processAdditionalFieldsInclusionAssumed(
         projects.objectChildren().cbegin(),
         [&](auto&& iter) { return iter == projects.objectChildren().cend(); });
+}
+
+Status validateVariableName(std::string varStr) {
+    // The grammar removes the first two '$' characters.
+    const StringData varName = varStr.substr(0, varStr.find('.'));
+    try {
+        variableValidation::validateNameForUserRead(varName);
+    } catch (AssertionException& ae) {
+        return Status(ae.code(), ae.reason());
+    }
+    return Status::OK();
 }
 
 }  // namespace mongo::c_node_validation

@@ -548,7 +548,7 @@ class Dependencies {
 public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> nested = ExpressionFieldPath::create(&expCtx, "a.b");
+        intrusive_ptr<Expression> nested = ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b");
         intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(&expCtx, nested);
         DepsTracker dependencies;
         expression->addDependencies(&dependencies);
@@ -564,8 +564,8 @@ class AddToBsonObj {
 public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionCoerceToBool::create(&expCtx, ExpressionFieldPath::create(&expCtx, "foo"));
+        intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(
+            &expCtx, ExpressionFieldPath::deprecatedCreate(&expCtx, "foo"));
 
         // serialized as $and because CoerceToBool isn't an ExpressionNary
         ASSERT_BSONOBJ_BINARY_EQ(fromjson("{field:{$and:['$foo']}}"), toBsonObj(expression));
@@ -582,8 +582,8 @@ class AddToBsonArray {
 public:
     void run() {
         auto expCtx = ExpressionContextForTest{};
-        intrusive_ptr<Expression> expression =
-            ExpressionCoerceToBool::create(&expCtx, ExpressionFieldPath::create(&expCtx, "foo"));
+        intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(
+            &expCtx, ExpressionFieldPath::deprecatedCreate(&expCtx, "foo"));
 
         // serialized as $and because CoerceToBool isn't an ExpressionNary
         ASSERT_BSONOBJ_BINARY_EQ(BSON_ARRAY(fromjson("{$and:['$foo']}")), toBsonArray(expression));

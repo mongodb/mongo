@@ -826,7 +826,7 @@ DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
     // The _id field can be specified either as a fieldpath (ex. _id: "$a") or as a singleton
     // object (ex. _id: {v: "$a"}).
     if (_idFieldNames.empty()) {
-        idField = ExpressionFieldPath::create(pExpCtx.get(), groupId);
+        idField = ExpressionFieldPath::deprecatedCreate(pExpCtx.get(), groupId);
     } else {
         invariant(_idFieldNames.size() == 1);
         idField = ExpressionObject::create(pExpCtx.get(),

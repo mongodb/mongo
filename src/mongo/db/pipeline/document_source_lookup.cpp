@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/fail_point.h"
@@ -158,7 +159,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
 
     for (auto&& varElem : letVariables) {
         const auto varName = varElem.fieldNameStringData();
-        Variables::validateNameForUserWrite(varName);
+        variableValidation::validateNameForUserWrite(varName);
 
         _letVariables.emplace_back(
             varName.toString(),

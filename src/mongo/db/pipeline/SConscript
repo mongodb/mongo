@@ -55,6 +55,15 @@ env.Library(
 )
 
 env.Library(
+    target='variable_validation',
+    source=[
+        "variable_validation.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+env.Library(
     target='expression_context',
     source=[
         'expression.cpp',
@@ -80,6 +89,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/summation',
         'aggregation_request',
         'dependencies',
+        'variable_validation',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/vector_clock',

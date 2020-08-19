@@ -32,6 +32,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/platform/basic.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/str.h"
@@ -87,54 +88,6 @@ const std::map<StringData, std::function<void(const Value&)>> Variables::kSystem
                                << typeName(value.getType()),
                  value.getType() == BSONType::Bool);
      }}};
-
-void Variables::validateName(StringData varName,
-                             std::function<bool(char)> prefixPred,
-                             std::function<bool(char)> suffixPred,
-                             int prefixLen) {
-    uassert(16866, "empty variable names are not allowed", !varName.empty());
-    for (int i = 0; i < prefixLen; ++i)
-        if (!prefixPred(varName[i]))
-            uasserted(16867,
-                      str::stream()
-                          << "'" << varName
-                          << "' starts with an invalid character for a user variable name");
-
-    for (size_t i = prefixLen; i < varName.size(); i++)
-        if (!suffixPred(varName[i]))
-            uasserted(16868,
-                      str::stream() << "'" << varName << "' contains an invalid character "
-                                    << "for a variable name: '" << varName[i] << "'");
-}
-
-void Variables::validateNameForUserWrite(StringData varName) {
-    // System variables users allowed to write to (currently just one)
-    if (varName == "CURRENT") {
-        return;
-    }
-    validateName(varName,
-                 [](char ch) -> bool {
-                     return (ch >= 'a' && ch <= 'z') || (ch & '\x80');  // non-ascii
-                 },
-                 [](char ch) -> bool {
-                     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-                         (ch >= '0' && ch <= '9') || (ch == '_') || (ch & '\x80');  // non-ascii
-                 },
-                 1);
-}
-
-void Variables::validateNameForUserRead(StringData varName) {
-    validateName(varName,
-                 [](char ch) -> bool {
-                     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-                         (ch & '\x80');  // non-ascii
-                 },
-                 [](char ch) -> bool {
-                     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-                         (ch >= '0' && ch <= '9') || (ch == '_') || (ch & '\x80');  // non-ascii
-                 },
-                 1);
-}
 
 void Variables::setValue(Id id, const Value& value, bool isConstant) {
     uassert(17199, "can't use Variables::setValue to set a reserved builtin variable", id >= 0);
@@ -236,7 +189,7 @@ void Variables::setDefaultRuntimeConstants(OperationContext* opCtx) {
 void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
                                                const BSONObj letParams) {
     for (auto&& elem : letParams) {
-        Variables::validateNameForUserWrite(elem.fieldName());
+        variableValidation::validateNameForUserWrite(elem.fieldName());
         auto expr = Expression::parseOperand(expCtx, elem, expCtx->variablesParseState);
 
         uassert(4890500,
@@ -287,7 +240,7 @@ void Variables::copyToExpCtx(const VariablesParseState& vps, ExpressionContext* 
 }
 
 Variables::Id VariablesParseState::defineVariable(StringData name) {
-    // Caller should have validated before hand by using Variables::validateNameForUserWrite.
+    // Caller should have validated before hand by using variableValidationvalidateNameForUserWrite.
     massert(17275,
             "Can't redefine a non-user-writable variable",
             Variables::kBuiltinVarNameToId.find(name) == Variables::kBuiltinVarNameToId.end());

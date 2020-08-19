@@ -87,6 +87,13 @@ auto printValue(const T& payload) {
                 return "<UserDouble "s + std::to_string(userDouble) + ">";
             },
             [](const UserString& userString) { return "<UserString "s + userString + ">"; },
+            [](const UserFieldPath& userPath) {
+                if (userPath.isVariable) {
+                    return "<UserFieldPath "s + "$$" + userPath.rawStr + ">";
+                } else {
+                    return "<UserFieldPath "s + "$" + userPath.rawStr + ">";
+                }
+            },
             [](const UserBinary& userBinary) {
                 return "<UserBinary "s + typeName(userBinary.type) + ", " +
                     toHex(userBinary.data, userBinary.length) + ">";

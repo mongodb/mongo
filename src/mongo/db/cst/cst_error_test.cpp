@@ -168,12 +168,12 @@ TEST(CstErrorTest, MissingRequiredArgumentOfMultiArgStage) {
 TEST(CstErrorTest, InvalidArgumentTypeForProjectionExpression) {
     auto input = fromjson("{pipeline: [{$project: {a: {$eq: '$b'}}}]}");
     BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
-    ASSERT_THROWS_CODE_AND_WHAT(
-        PipelineParserGen(lexer, nullptr).parse(),
-        AssertionException,
-        ErrorCodes::FailedToParse,
-        "syntax error, unexpected string, expecting array at element '$b' within '$eq' within "
-        "'$project' within array at index 0 of input pipeline");
+    ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "syntax error, unexpected $-prefixed string, expecting array at "
+                                "element '$b' within '$eq' within "
+                                "'$project' within array at index 0 of input pipeline");
 }
 
 TEST(CstErrorTest, MixedProjectionTypes) {
@@ -194,7 +194,8 @@ TEST(CstErrorTest, DeeplyNestedSyntaxError) {
         PipelineParserGen(lexer, nullptr).parse(),
         AssertionException,
         ErrorCodes::FailedToParse,
-        "syntax error, unexpected string, expecting array at element '$b' within '$eq' within "
+        "syntax error, unexpected $-prefixed string, expecting array at element '$b' within '$eq' "
+        "within "
         "array at index 0 within '$or' within array at index 1 within '$and' within '$project' "
         "within array at index 0 of input pipeline");
 }

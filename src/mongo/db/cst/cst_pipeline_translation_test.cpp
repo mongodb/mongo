@@ -764,11 +764,11 @@ TEST(CstPipelineTranslationTest, TranslatesToLongExpression) {
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToObjectIdExpression) {
-    const auto cst =
-        CNode{CNode::ObjectChildren{{KeyFieldname::toObjectId, CNode{UserString{"$_id"}}}}};
+    const auto cst = CNode{
+        CNode::ObjectChildren{{KeyFieldname::toObjectId, CNode{UserFieldPath{"_id", false}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(fromjson("{$convert: {input: {$const: '$_id'}, to: {$const: 'objectId'}}}")) ==
+        Value(fromjson("{$convert: {input: '$_id', to: {$const: 'objectId'}}}")) ==
         expr->serialize(false)));
 }
 
@@ -800,10 +800,10 @@ TEST(CstPipelineTranslationTest, AbsConstantTranslation) {
 }
 
 TEST(CstPipelineTranslationTest, AbsVariableTransation) {
-    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::abs, CNode{UserString{"$foo"}}}}};
+    const auto cst =
+        CNode{CNode::ObjectChildren{{KeyFieldname::abs, CNode{UserFieldPath{"foo", false}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
-    // TODO SERVER-49927 This should be a field path.
-    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$abs: [{$const: \"$foo\"}]}")) ==
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$abs: [\"$foo\"]}")) ==
                                            expr->serialize(false)));
 }
 
@@ -1010,16 +1010,16 @@ TEST(CstPipelineTranslationTest, TranslatesDateToStringExpression) {
     const auto cst = CNode{CNode::ObjectChildren{
         {KeyFieldname::dateToString,
          CNode{CNode::ObjectChildren{
-             {KeyFieldname::dateArg, CNode{UserString{"$date"}}},
+             {KeyFieldname::dateArg, CNode{UserFieldPath{"date", false}}},
              {KeyFieldname::formatArg, CNode{UserString{"%Y-%m-%d"}}},
              {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
              {KeyFieldname::onNullArg, CNode{UserString{"8/10/20"}}},
          }}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(fromjson(
-            "{$dateToString: {date: {$const: \"$date\"}, format: {$const: \"%Y-%m-%d\"}, timezone: "
-            "{$const: \"America/New_York\"}, onNull: {$const: \"8/10/20\"}}}")) ==
+        Value(
+            fromjson("{$dateToString: {date: \"$date\", format: {$const: \"%Y-%m-%d\"}, timezone: "
+                     "{$const: \"America/New_York\"}, onNull: {$const: \"8/10/20\"}}}")) ==
         expr->serialize(false)))
         << expr->serialize(false);
 }
@@ -1200,6 +1200,35 @@ TEST(CstPipelineTranslationTest, TranslatesRegexMatch) {
         Value(fromjson("{$regexMatch: {input: {$const: \"aeiou\"}, regex: {$const: /.*/i}}}")) ==
         expr->serialize(false)))
         << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, RecognizesSingleDollarAsNonConst) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::trunc,
+         CNode{CNode::ArrayChildren{CNode{UserFieldPath{"val", false}},
+                                    CNode{UserFieldPath{"places", false}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$trunc: [\"$val\", \"$places\"]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, RecognizesDoubleDollarAsNonConst) {
+    const auto cst =
+        CNode{CNode::ObjectChildren{{KeyFieldname::toDate, CNode{UserFieldPath{"NOW", true}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$convert: {input: \"$$NOW\", to: {$const: 'date'}}}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, InvalidDollarPrefixStringFails) {
+    {
+        const auto cst = CNode{
+            CNode::ObjectChildren{{KeyFieldname::toDate, CNode{UserFieldPath{"NOWX", true}}}}};
+        ASSERT_THROWS_CODE(cst_pipeline_translation::translateExpression(cst, getExpCtx()),
+                           AssertionException,
+                           17276);
+    }
 }
 
 }  // namespace
