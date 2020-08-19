@@ -385,11 +385,21 @@ public:
     // Serialization API.
     //
 
-    /** Write this Element to the provided object builder. */
+    /**
+     * Writes this Element to the provided object builder. Note that if this element is not a root,
+     * then it gets wrapped inside an object.
+     */
     void writeTo(BSONObjBuilder* builder) const;
 
-    /** Write this Element to the provided array builder. This Element must be of type
-     *  mongo::Array.
+    /**
+     * Writes all the children of the current Element to the provided object builder. This Element
+     * must be of type mongo::Object.
+     */
+    void writeChildrenTo(BSONObjBuilder* builder) const;
+
+    /**
+     * Write this Element to the provided array builder. This Element must be of type
+     * mongo::Array.
      */
     void writeArrayTo(BSONArrayBuilder* builder) const;
 

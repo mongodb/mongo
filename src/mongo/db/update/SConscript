@@ -11,6 +11,7 @@ env.Library(
         'path_support.cpp',
         'storage_validation.cpp',
         'v1_log_builder.cpp',
+        'v2_log_builder.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -136,6 +137,7 @@ env.CppUnitTest(
         'update_object_node_test.cpp',
         'update_serialization_test.cpp',
         'v1_log_builder_test.cpp',
+        'v2_log_builder_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',

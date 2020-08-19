@@ -105,21 +105,21 @@ void ArrayDiffBuilder::serializeTo(BSONObjBuilder* output) const {
 
 void DocumentDiffBuilder::serializeTo(BSONObjBuilder* output) const {
     if (!_deletes.empty()) {
-        BSONObjBuilder subBob(output->subobjStart(StringData(&kDeleteSectionFieldName, 1)));
+        BSONObjBuilder subBob(output->subobjStart(kDeleteSectionFieldName));
         for (auto&& del : _deletes) {
             subBob.append(del, false);
         }
     }
 
     if (!_updates.empty()) {
-        BSONObjBuilder subBob(output->subobjStart(StringData(&kUpdateSectionFieldName, 1)));
+        BSONObjBuilder subBob(output->subobjStart(kUpdateSectionFieldName));
         for (auto&& update : _updates) {
             subBob.appendAs(update.second, update.first);
         }
     }
 
     if (!_inserts.empty()) {
-        BSONObjBuilder subBob(output->subobjStart(StringData(&kInsertSectionFieldName, 1)));
+        BSONObjBuilder subBob(output->subobjStart(kInsertSectionFieldName));
         for (auto&& insert : _inserts) {
             subBob.appendAs(insert.second, insert.first);
         }
@@ -200,7 +200,7 @@ boost::optional<std::pair<size_t, ArrayDiffReader::ArrayModification>> ArrayDiff
             fieldName.size() > 1);
     const size_t idx = extractArrayIndex(fieldName.substr(1, fieldName.size()));
 
-    if (fieldName[0] == kUpdateSectionFieldName) {
+    if (fieldName[0] == kUpdateSectionFieldName[0]) {
         // It's an update.
         return {{idx, next}};
     } else if (fieldName[0] == kSubDiffSectionFieldPrefix) {
@@ -232,9 +232,13 @@ DocumentDiffReader::DocumentDiffReader(const Diff& diff) : _diff(diff) {
         int order;
     };
 
-    const std::map<char, Section> sections{{kDeleteSectionFieldName, Section{&_deletes, 1}},
-                                           {kUpdateSectionFieldName, Section{&_updates, 2}},
-                                           {kInsertSectionFieldName, Section{&_inserts, 3}},
+    static_assert(kDeleteSectionFieldName.size() == 1);
+    static_assert(kInsertSectionFieldName.size() == 1);
+    static_assert(kUpdateSectionFieldName.size() == 1);
+
+    const std::map<char, Section> sections{{kDeleteSectionFieldName[0], Section{&_deletes, 1}},
+                                           {kUpdateSectionFieldName[0], Section{&_updates, 2}},
+                                           {kInsertSectionFieldName[0], Section{&_inserts, 3}},
                                            {kSubDiffSectionFieldPrefix, Section{&_subDiffs, 4}}};
 
     char prev = 0;

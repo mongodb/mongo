@@ -47,9 +47,9 @@ enum DiffType : uint8_t { kDocument, kArray };
 
 // Below are string constants used in the diff format.
 constexpr StringData kArrayHeader = "a"_sd;
-constexpr char kDeleteSectionFieldName = 'd';
-constexpr char kInsertSectionFieldName = 'i';
-constexpr char kUpdateSectionFieldName = 'u';
+constexpr StringData kDeleteSectionFieldName = "d"_sd;
+constexpr StringData kInsertSectionFieldName = "i"_sd;
+constexpr StringData kUpdateSectionFieldName = "u"_sd;
 constexpr char kSubDiffSectionFieldPrefix = 's';
 // 'l' for length.
 constexpr StringData kResizeSectionFieldName = "l"_sd;

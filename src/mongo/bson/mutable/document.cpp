@@ -1697,6 +1697,14 @@ void Element::writeTo(BSONObjBuilder* const builder) const {
     }
 }
 
+void Element::writeChildrenTo(BSONObjBuilder* const builder) const {
+    invariant(ok());
+    const Document::Impl& impl = getDocument().getImpl();
+    const ElementRep& thisRep = impl.getElementRep(_repIdx);
+    invariant(impl.getType(thisRep) == mongo::Object);
+    impl.writeChildren(_repIdx, builder);
+}
+
 void Element::writeArrayTo(BSONArrayBuilder* const builder) const {
     invariant(ok());
     const Document::Impl& impl = getDocument().getImpl();
