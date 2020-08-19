@@ -16,6 +16,8 @@ var $config = extendWorkload($config, function($config, $super) {
         let pipeline = [{$match: {_id: this.counter}}];
         assertAlways.commandWorkedOrFailedWithCode(db.createCollection("system.views"),
                                                    ErrorCodes.NamespaceExists);
+        // Runs applyOps as non-atomic to avoid 3 way deadlock between applyOps cmd, prepared
+        // transaction and secondary oplog fetcher initiated find command.
         assertAlways.commandWorked(db.adminCommand({
             applyOps: [{
                 op: "i",
@@ -25,18 +27,22 @@ var $config = extendWorkload($config, function($config, $super) {
                     viewOn: this.threadCollName,
                     pipeline: pipeline
                 }
-            }]
+            }],
+            allowAtomic: false
         }));
         this.confirmViewDefinition(db, this.threadViewName, collName, pipeline, this.counter);
     };
 
     $config.states.drop = function drop(db, collName) {
+        // Runs applyOps as non-atomic to avoid 3 way deadlock between applyOps cmd, prepared
+        // transaction and secondary oplog fetcher initiated find command.
         assertAlways.commandWorked(db.adminCommand({
             applyOps: [{
                 op: "d",
                 ns: db.getName() + ".system.views",
                 o: {_id: db.getName() + "." + this.threadViewName}
-            }]
+            }],
+            allowAtomic: false
         }));
 
         let res = db.runCommand({listCollections: 1, filter: {name: this.threadViewName}});

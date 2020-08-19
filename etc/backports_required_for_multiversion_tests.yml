@@ -58,6 +58,8 @@ all:
     test_file: jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
   - ticket: SERVER-49991
     test_file: jstests/replsets/get_replication_info_helper.js
+  - ticket: SERVER-47469
+    test_file: jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
