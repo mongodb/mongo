@@ -23,7 +23,7 @@ t.drop();
 assert.commandWorked(db.createCollection(t.getName(), {validator: {a: 1}}));
 
 assertFailsValidation(t.insert({a: 2}));
-t.insert({a: 1});
+t.insert({_id: 1, a: 1});
 assert.eq(1, t.count());
 
 // test default to strict
@@ -42,10 +42,9 @@ assert.eq(1, t.find({a: 2}).itcount());
 const conn = FixtureHelpers.getPrimaryForNodeHostingDatabase(db);
 const logId = 20294;
 const errInfo = {
-    "operatorName": "$eq",
-    "specifiedAs": {a: 1},
-    "reason": "comparison failed",
-    "consideredValue": 2
+    failingDocumentId: 1,
+    details:
+        {operatorName: "$eq", specifiedAs: {a: 1}, reason: "comparison failed", consideredValue: 2}
 };
 checkLog.containsJson(conn, logId, {
     "errInfo": function(obj) {

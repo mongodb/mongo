@@ -287,4 +287,63 @@ assert.commandWorked(db.createCollection(
     {validator: {$expr: {$eq: ["$a", "foobar"]}}, collation: {locale: "en", strength: 2}}));
 assert.commandWorked(coll.insert({a: "foobar"}));
 assert.commandWorked(coll.insert({a: "fooBAR"}));
+
+// Recreate a collection with a simple validator.
+coll.drop();
+assert.commandWorked(db.createCollection(collName, {validator: {a: 1}}));
+
+// Insert a document that fails validation.
+res = coll.insert({_id: 1, a: 2});
+
+// Verify that the document validation error attribute 'failingDocumentId' equals to the document
+// '_id' attribute.
+assertDocumentValidationFailure(res, coll);
+if (coll.getMongo().writeMode() === 'commands') {
+    const errorInfo = res.getWriteError().errInfo;
+    const expectedError = {
+        failingDocumentId: 1,
+        details: {
+            operatorName: "$eq",
+            specifiedAs: {a: 1},
+            reason: "comparison failed",
+            consideredValue: 2
+        }
+    };
+    assert.docEq(errorInfo, expectedError, tojson(res));
+}
+
+// Insert a valid document.
+assert.commandWorked(coll.insert({_id: 1, a: 1}));
+
+// Issues the update command and returns the response.
+function updateCommand(coll, query, update) {
+    return coll.update(query, update);
+}
+
+// Issues the findAndModify command and returns the response.
+function findAndModifyCommand(coll, query, update) {
+    return coll.runCommand("findAndModify", {query: query, update: update});
+}
+
+for (const command of [updateCommand, findAndModifyCommand]) {
+    // Attempt to update the document by replacing it with a document that does not pass validation.
+    const res = command(coll, {}, {a: 2});
+
+    // Verify that the document validation error attribute 'failingDocumentId' equals to the
+    // document '_id' attribute.
+    assertDocumentValidationFailure(res, coll);
+    if (coll.getMongo().writeMode() === 'commands') {
+        const errorInfo = (res instanceof WriteResult ? res.getWriteError() : res).errInfo;
+        const expectedError = {
+            failingDocumentId: 1,
+            details: {
+                operatorName: "$eq",
+                specifiedAs: {a: 1},
+                reason: "comparison failed",
+                consideredValue: 2
+            }
+        };
+        assert.docEq(errorInfo, expectedError, tojson(res));
+    }
+}
 })();

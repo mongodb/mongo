@@ -1003,7 +1003,16 @@ BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc) 
     // There should be no frames when error generation is complete as the finished error will be
     // stored in 'context'.
     invariant(context.frames.empty());
-    return context.getLatestCompleteError();
+    BSONObjBuilder objBuilder;
+
+    // Add document id to the error object.
+    BSONElement objectIdElement;
+    invariant(doc.getObjectID(objectIdElement));
+    objBuilder.appendAs(objectIdElement, "failingDocumentId"_sd);
+
+    // Add errors from match expressions.
+    objBuilder.append("details"_sd, context.getLatestCompleteError());
+    return objBuilder.obj();
 }
 
 }  // namespace mongo::doc_validation_error
