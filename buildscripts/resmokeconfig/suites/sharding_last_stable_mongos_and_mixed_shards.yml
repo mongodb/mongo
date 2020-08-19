@@ -6,6 +6,8 @@ selector:
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_44
+  - backport_required_multiversion
+  - sharding_last_lts_mongos_and_mixed_shards_backport_required_multiversion
   exclude_files:
   # Requires fix to SERVER-31689
   - jstests/sharding/aggregation_currentop.js
@@ -36,6 +38,10 @@ selector:
   # 'clientOperationKey' which is not recognizable on 'last-stable' shards.
   - jstests/sharding/lookup_on_shard.js
   - jstests/sharding/lookup_stale_mongos.js
+
+  # This tag file can be created using ./buildscripts/evergreen_gen_multiversion_tests.py
+  # or downloaded from the evergreen task.
+  tag_file: multiversion_exclude_tags.yml
 
 executor:
   config:
