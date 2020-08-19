@@ -3,6 +3,10 @@ test_kind: js_test
 selector:
   roots:
   - jstests/change_streams/**/*.js
+  exclude_files:
+  # Expects oplog entries to be in $v:2 format.
+  - jstests/change_streams/pipeline_style_updates_v2_oplog_entries.js
+
   exclude_with_any_tags:
   ##
   # The next tags correspond to the special errors thrown by the
@@ -53,5 +57,5 @@ executor:
       bind_ip_all: ''
       set_parameters:
         enableTestCommands: 1
-        internalQueryEnableLoggingV2OplogEntries: true
+        internalQueryEnableLoggingV2OplogEntries: false
     num_nodes: 2

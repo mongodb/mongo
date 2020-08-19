@@ -47,5 +47,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryEnableLoggingV2OplogEntries: true
+        internalQueryEnableLoggingV2OplogEntries: false
     num_nodes: 2

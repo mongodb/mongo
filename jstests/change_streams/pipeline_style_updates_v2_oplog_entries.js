@@ -9,12 +9,6 @@
 
 load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/discover_topology.js");         // For findNonConfigNodes.
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-
-setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
-                       "internalQueryEnableLoggingV2OplogEntries",
-                       true);
 
 // Drop and recreate the collections to be used in this set of tests.
 assertDropAndRecreateCollection(db, "t1");

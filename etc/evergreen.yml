@@ -5206,13 +5206,13 @@ tasks:
       fallback_num_sub_suites: 4
 
 - <<: *task_template
-  name: change_streams_update_v2_oplog
+  name: change_streams_update_v1_oplog
   tags: ["change_streams"]
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=change_streams_update_v2_oplog --storageEngine=wiredTiger
+      resmoke_args: --suites=change_streams_update_v1_oplog --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_mongos_sessions_passthrough
@@ -5957,7 +5957,7 @@ tasks:
       resmoke_args: --suites=replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
-  name: replica_sets_update_v2_oplog_jscore_passthrough
+  name: replica_sets_update_v1_oplog_jscore_passthrough
   tags: ["replica_sets", "non_maj_read"]
   depends_on:
   - name: jsCore
@@ -5965,7 +5965,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=replica_sets_update_v2_oplog_jscore_passthrough --storageEngine=wiredTiger
+      resmoke_args: --suites=replica_sets_update_v1_oplog_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_initsync_jscore_passthrough
@@ -6741,7 +6741,7 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 15
 
-- name: replica_sets_update_v2_oplog_gen
+- name: replica_sets_update_v1_oplog_gen
   tags: ["replica_sets", "san"]
   commands:
   - func: "generate resmoke tasks"

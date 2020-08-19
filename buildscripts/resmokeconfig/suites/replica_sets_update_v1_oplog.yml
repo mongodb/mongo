@@ -4,6 +4,8 @@ selector:
   roots:
   - jstests/replsets/*.js
   exclude_files:
+  # Expects oplog entries to be in $v:2 format.
+  - jstests/replsets/v2_delta_oplog_entries.js
 
 executor:
   config:
@@ -13,4 +15,4 @@ executor:
       global_vars:
         TestData:
           setParameters:
-            internalQueryEnableLoggingV2OplogEntries: true
+            internalQueryEnableLoggingV2OplogEntries: false

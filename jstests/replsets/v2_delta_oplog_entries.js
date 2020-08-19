@@ -10,11 +10,7 @@
  * @tags: [requires_fcv_47]
  */
 (function() {
-const rst = new ReplSetTest({
-    name: "v2_delta_oplog_entries",
-    nodes: 2,
-    nodeOptions: {setParameter: {internalQueryEnableLoggingV2OplogEntries: true}}
-});
+const rst = new ReplSetTest({name: "v2_delta_oplog_entries", nodes: 2});
 
 rst.startSet();
 rst.initiate();
