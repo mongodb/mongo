@@ -106,6 +106,14 @@ repos:
       - yum/redhat/8/mongodb-org
       - yum/redhat/8Server/mongodb-org
 
+  - name: rhel82
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - yum/redhat/8/mongodb-org
+      - yum/redhat/8Server/mongodb-org
+
   - name: amazon
     type: rpm
     edition: org
@@ -306,6 +314,14 @@ repos:
       - yum/redhat/8Server/mongodb-enterprise
 
   - name: rhel81
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/redhat/8/mongodb-enterprise
+      - yum/redhat/8Server/mongodb-enterprise
+
+  - name: rhel82
     type: rpm
     edition: enterprise
     bucket: repo.mongodb.com

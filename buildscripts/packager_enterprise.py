@@ -137,6 +137,8 @@ class EnterpriseDistro(packager.Distro):
         if arch == "arm64":
             if self.dname == 'ubuntu':
                 return ["ubuntu1604", "ubuntu1804", "ubuntu2004"]
+            if self.dname == 'redhat':
+                return ["rhel82"]
             return []
 
         if re.search("(redhat|fedora|centos)", self.dname):
