@@ -630,6 +630,9 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
 
     tenant_migration_donor::checkIfCanReadOrBlock(opCtx, request.getDatabase());
 
+    // Use the API parameters that were stored when the transaction was initiated.
+    APIParameters::get(opCtx) = txnParticipant.getAPIParameters(opCtx);
+
     try {
         tenant_migration_donor::migrationConflictRetry(
             opCtx,
@@ -1147,6 +1150,13 @@ void execCommandDatabase(OperationContext* opCtx,
         if (startTransaction) {
             opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
             opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+        }
+
+        if (opCtx->inMultiDocumentTransaction() && !startTransaction) {
+            uassert(4937700,
+                    "API parameters are only allowed in the first command of a multi-document "
+                    "transaction",
+                    !APIParameters::get(opCtx).getParamsPassed());
         }
 
         // Remember whether or not this operation is starting a transaction, in case something

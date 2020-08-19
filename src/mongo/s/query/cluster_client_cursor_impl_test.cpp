@@ -263,11 +263,11 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreAPIParameters) {
     ClusterClientCursorParams params(NamespaceString("test"), apiParams, {});
     ClusterClientCursorImpl cursor(
         _opCtx.get(), std::move(mockStage), std::move(params), boost::none);
-    auto storedAPIParams = cursor.getAPIParameters();
 
-    ASSERT_EQ(apiParams.getAPIVersion(), storedAPIParams.getAPIVersion());
-    ASSERT_EQ(apiParams.getAPIStrict(), storedAPIParams.getAPIStrict());
-    ASSERT_EQ(apiParams.getAPIDeprecationErrors(), storedAPIParams.getAPIDeprecationErrors());
+    auto storedAPIParams = cursor.getAPIParameters();
+    ASSERT_EQ("2", storedAPIParams.getAPIVersion());
+    ASSERT_TRUE(storedAPIParams.getAPIStrict());
+    ASSERT_TRUE(storedAPIParams.getAPIDeprecationErrors());
 }
 
 }  // namespace

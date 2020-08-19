@@ -37,6 +37,7 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/ops/update_request.h"
@@ -207,6 +208,13 @@ public:
         void release(OperationContext* opCtx);
 
         /**
+         * Returns the stored API parameters.
+         */
+        const APIParameters& getAPIParameters() const {
+            return _apiParameters;
+        }
+
+        /**
          * Returns the read concern arguments.
          */
         const repl::ReadConcernArgs& getReadConcernArgs() const {
@@ -218,6 +226,7 @@ public:
         std::unique_ptr<Locker> _locker;
         std::unique_ptr<Locker::LockSnapshot> _lockSnapshot;
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
+        APIParameters _apiParameters;
         repl::ReadConcernArgs _readConcernArgs;
         WriteUnitOfWork::RecoveryUnitState _ruState;
         std::shared_ptr<UncommittedCollections::UncommittedCollectionsMap> _uncommittedCollections;
@@ -583,6 +592,12 @@ public:
          */
         void shutdown(OperationContext* opCtx);
 
+        /**
+         * Returns the API parameters stored in the transaction resources stash if it exists and we
+         * are not in a retryable write. Otherwise, returns the API parameters decorating the opCtx.
+         */
+        APIParameters getAPIParameters(OperationContext* opCtx) const;
+
         //
         // Methods for use in C++ unit tests, only. Beware: these methods may not adhere to the
         // concurrency control rules.
@@ -592,22 +607,26 @@ public:
             OperationContext* opCtx,
             const SingleThreadedLockStats* lockStats,
             bool committed,
+            const APIParameters& apiParameters,
             const repl::ReadConcernArgs& readConcernArgs) const {
 
             TerminationCause terminationCause =
                 committed ? TerminationCause::kCommitted : TerminationCause::kAborted;
-            return _transactionInfoForLog(opCtx, lockStats, terminationCause, readConcernArgs);
+            return _transactionInfoForLog(
+                opCtx, lockStats, terminationCause, apiParameters, readConcernArgs);
         }
 
         BSONObj getTransactionInfoBSONForLogForTest(
             OperationContext* opCtx,
             const SingleThreadedLockStats* lockStats,
             bool committed,
+            const APIParameters& apiParameters,
             const repl::ReadConcernArgs& readConcernArgs) const {
 
             TerminationCause terminationCause =
                 committed ? TerminationCause::kCommitted : TerminationCause::kAborted;
-            return _transactionInfoBSONForLog(opCtx, lockStats, terminationCause, readConcernArgs);
+            return _transactionInfoBSONForLog(
+                opCtx, lockStats, terminationCause, apiParameters, readConcernArgs);
         }
 
 
@@ -701,6 +720,7 @@ public:
         void _logSlowTransaction(OperationContext* opCtx,
                                  const SingleThreadedLockStats* lockStats,
                                  TerminationCause terminationCause,
+                                 APIParameters apiParameters,
                                  repl::ReadConcernArgs readConcernArgs);
 
         // This method returns a string with information about a slow transaction. The format of the
@@ -710,17 +730,20 @@ public:
         std::string _transactionInfoForLog(OperationContext* opCtx,
                                            const SingleThreadedLockStats* lockStats,
                                            TerminationCause terminationCause,
+                                           APIParameters apiParameters,
                                            repl::ReadConcernArgs readConcernArgs) const;
 
         void _transactionInfoForLog(OperationContext* opCtx,
                                     const SingleThreadedLockStats* lockStats,
                                     TerminationCause terminationCause,
+                                    APIParameters apiParameters,
                                     repl::ReadConcernArgs readConcernArgs,
                                     logv2::DynamicAttributes* pAttrs) const;
 
         BSONObj _transactionInfoBSONForLog(OperationContext* opCtx,
                                            const SingleThreadedLockStats* lockStats,
                                            TerminationCause terminationCause,
+                                           APIParameters apiParameters,
                                            repl::ReadConcernArgs readConcernArgs) const;
 
         // Bumps up the transaction number of this transaction and perform the necessary cleanup.

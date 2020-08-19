@@ -106,4 +106,10 @@ APIParameters APIParameters::fromClient(const APIParametersFromClient& apiParams
     return apiParameters;
 }
 
+void APIParameters::appendInfo(BSONObjBuilder* builder) const {
+    builder->append(kAPIVersionFieldName, _apiVersion);
+    builder->append(kAPIStrictFieldName, _apiStrict);
+    builder->append(kAPIDeprecationErrorsFieldName, _apiDeprecationErrors);
+}
+
 }  // namespace mongo

@@ -50,9 +50,15 @@ const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody
 class APIParameters {
 
 public:
+    static constexpr StringData kAPIVersionFieldName = "apiVersion"_sd;
+    static constexpr StringData kAPIStrictFieldName = "apiStrict"_sd;
+    static constexpr StringData kAPIDeprecationErrorsFieldName = "apiDeprecationErrors"_sd;
+
     APIParameters();
     static APIParameters& get(OperationContext* opCtx);
     static APIParameters fromClient(const APIParametersFromClient& apiParamsFromClient);
+
+    void appendInfo(BSONObjBuilder* builder) const;
 
     const StringData getAPIVersion() const {
         return _apiVersion;
@@ -82,8 +88,8 @@ public:
         return _paramsPassed;
     }
 
-    void setParamsPassed(bool noParamsPassed) {
-        _paramsPassed = noParamsPassed;
+    void setParamsPassed(bool paramsPassed) {
+        _paramsPassed = paramsPassed;
     }
 
 private:

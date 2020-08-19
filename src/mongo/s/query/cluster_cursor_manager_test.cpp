@@ -983,11 +983,11 @@ TEST_F(ClusterCursorManagerTest, CursorStoresAPIParameters) {
                                                UserNameIterator()));
     auto pinnedCursor =
         assertGet(getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker));
-    auto storedAPIParams = pinnedCursor->getAPIParameters();
 
-    ASSERT_EQ(apiParams.getAPIVersion(), storedAPIParams.getAPIVersion());
-    ASSERT_EQ(apiParams.getAPIStrict(), storedAPIParams.getAPIStrict());
-    ASSERT_EQ(apiParams.getAPIDeprecationErrors(), storedAPIParams.getAPIDeprecationErrors());
+    auto storedAPIParams = pinnedCursor->getAPIParameters();
+    ASSERT_EQ("2", storedAPIParams.getAPIVersion());
+    ASSERT_TRUE(storedAPIParams.getAPIStrict());
+    ASSERT_TRUE(storedAPIParams.getAPIDeprecationErrors());
 }
 
 TEST_F(ClusterCursorManagerTest, CannotRegisterCursorDuringShutdown) {

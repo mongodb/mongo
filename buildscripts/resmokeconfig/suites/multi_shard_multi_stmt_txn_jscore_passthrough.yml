@@ -328,6 +328,9 @@ selector:
   - inspects_whether_plan_cache_entry_is_active
   # $out is not supported in transactions
   - uses_$out
+  # Transaction-continuing commands cannot specify API parameters, so tests that use API parameters
+  # cannot be run with transactions.
+  - uses_api_parameters
 
 executor:
   archive:

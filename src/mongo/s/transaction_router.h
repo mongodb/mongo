@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -82,6 +83,7 @@ public:
     struct SharedTransactionOptions {
         // Set for all distributed transactions.
         TxnNumber txnNumber;
+        APIParameters apiParameters;
         repl::ReadConcernArgs readConcernArgs;
 
         // Only set for transactions with snapshot level read concern.
@@ -646,12 +648,6 @@ public:
         void _logSlowTransaction(OperationContext* opCtx, TerminationCause terminationCause) const;
 
         /**
-         * Returns a string to be logged for slow transactions.
-         */
-        std::string _transactionInfoForLog(OperationContext* opCtx,
-                                           TerminationCause terminationCause) const;
-
-        /**
          * Returns the LastClientInfo object.
          */
         const SingleTransactionStats::LastClientInfo& _getLastClientInfo() const;
@@ -711,6 +707,9 @@ private:
         // until the transaction has targeted a participant, and is set to the first participant
         // targeted. Is reset if the first participant targeted returns a "needs retargeting" error.
         boost::optional<ShardId> coordinatorId;
+
+        // The API parameters the current transaction was started with.
+        APIParameters apiParameters;
 
         // The read concern the current transaction was started with.
         repl::ReadConcernArgs readConcernArgs;
