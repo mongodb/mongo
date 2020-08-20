@@ -281,6 +281,16 @@ tasks:
     vars:
       workload: scale/InsertRemove.yml
 
+- name: genny_execution_UserAcquisition
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+  - func: "start server"
+  - func: "run genny workload"
+    vars:
+      workload: execution/UserAcquisition.yml
+
 - name: compile
   commands:
     # Calling the git.get_project command here will clone the mongodb/mongo repository, as well as
@@ -637,6 +647,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: genny_scale_InsertRemove
+  - name: genny_execution_UserAcquisition
   - name: aggregation
   - name: agg-query-comparison
   - name: query

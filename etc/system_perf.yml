@@ -77,8 +77,10 @@ functions:
         dsi: ${dsi_rev}
         enterprise: ${enterprise_rev}
         linkbench: ${linkbench_rev}
+        linkbench2: ${linkbench2_rev}
         genny: ${genny_rev}
         workloads: ${workloads_rev}
+        wtdevelop: ${wtdevelop_rev}
         mongo-tools: ${mongo-tools_rev}
         signal-processing: ${signal-processing_rev}
 
@@ -110,6 +112,12 @@ functions:
           # We get the raw version string (r1.2.3-45-gabcdef) from git
           MONGO_VERSION=$(git describe --abbrev=7)
 
+          # If we're going to compile the upstream wtdevelop repository for wiredtiger, add
+          # that githash to version string.
+          if [ "${compile-variant|}" = "-wtdevelop" ]; then
+            WT_VERSION=$(cd src/third_party/wtdevelop; git describe --abbrev=7 | cut -c 9-)
+            MONGO_VERSION="$MONGO_VERSION-wtdevelop-$WT_VERSION"
+          fi
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
           if [ "${is_patch|false}" = "true" ]; then
@@ -185,6 +193,21 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile-variant|}.tar.gz
+
+  "use WiredTiger develop":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+        if [ "${compile-variant|}" = "-wtdevelop" ]; then
+          cd src/third_party
+          for wtdir in dist examples ext lang src test tools ; do
+            rm -rf wiredtiger/$wtdir
+            mv wtdevelop/$wtdir wiredtiger/
+          done
+        fi
 
   "write yml config": &write_yml_config
     command: shell.exec
@@ -408,6 +431,7 @@ tasks:
   commands:
     - command: manifest.load
     - func: "git get project"
+    - func: "use WiredTiger develop" # noop if ${compile-variant|} is not "-wtdevelop"
     - func: "compile mongodb"
 
 - name: linkbench
@@ -416,6 +440,46 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "linkbench"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: linkbench_stepdowns
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "linkbench_stepdowns"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: linkbench_rolling_restarts
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "linkbench_rolling_restarts"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: linkbench_non_retryable_writes_stepdowns
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "linkbench_non_retryable_writes_stepdowns"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: linkbench_non_retryable_writes_rolling_restarts
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "linkbench_non_retryable_writes_rolling_restarts"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -483,6 +547,54 @@ tasks:
     - func: "prepare environment"
       vars:
         test: "ycsb-wmajority"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+
+- name: industry_benchmarks_stepdowns
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "ycsb_stepdowns"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+
+- name: industry_benchmarks_rolling_restarts
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "ycsb_rolling_restarts"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+
+- name: industry_benchmarks_non_retryable_writes_stepdowns
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "ycsb_non_retryable_writes_stepdowns"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+
+- name: industry_benchmarks_non_retryable_writes_rolling_restarts
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "ycsb_non_retryable_writes_rolling_restarts"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -709,6 +821,16 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: move_chunk_large_chunk_map_workloads
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "move_chunk_large_chunk_map"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: refine_shard_key_transaction_stress
   priority: 5
   commands:
@@ -764,6 +886,31 @@ tasks:
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
+
+# The following two initial sync logkeeper automation tasks are only used in the commented-out
+# "Linux ReplSet Initial Sync LogKeeper Snapshot Update" variant below and are only intended to be
+# run in patch builds to update FCV for logkeeper datasets.
+- name: initialsync-logkeeper-short-s3-update
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "initialsync-logkeeper-short-s3-update"
+        setup: "initialsync-logkeeper-short-s3-update"
+        # Update this to Logkeeper dataset with FCV set to latest after each LTS release.
+        dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-4.4.tgz"
+    - func: "deploy cluster"
+    - func: "run test"
+
+- name: initialsync-logkeeper-snapshot-update
+  priority: 5
+  exec_timeout_secs: 216000 # 2.5 days
+  commands:
+    - func: "prepare environment"
+      vars:
+        test: "initialsync-logkeeper-snapshot-update"
+    - func: "deploy cluster"
+    - func: "run test"
 
 - name: initialsync-large
   priority: 5
@@ -903,10 +1050,21 @@ modules:
   prefix: workloads
   branch: master
 
+- name: wtdevelop
+  repo: git@github.com:wiredtiger/wiredtiger.git
+  prefix: src/third_party
+  branch: develop
+
 - name: linkbench
   repo: git@github.com:10gen/linkbench.git
   prefix: linkbench
   branch: master
+
+- name: linkbench2
+  repo: git@github.com:mdcallag/linkbench.git
+  prefix: linkbench2
+  branch: master
+  ref: 63207190657737b32eb0e81c5b81ad1b8bad0e5a
 
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
@@ -957,6 +1115,20 @@ buildvariants:
     - name: compile
     - name: genny_generate_all_tasks
 
+# - <<: *compile-amazon2
+#   name: wtdevelop-compile-amazon2
+#   display_name: WT Develop Compile
+#   modules:
+#   - mongo-tools
+#   - wtdevelop
+#   - enterprise
+#   - genny # needed for genny_generate_all_tasks
+#   expansions:
+#     <<: *compile-expansions
+#     compile-variant: -wtdevelop
+#   tasks:
+#     - name: compile
+
 - name: compile-rhel70
   display_name: Compile for Atlas-like
   modules:
@@ -989,6 +1161,7 @@ buildvariants:
     - genny
     - workloads
     - linkbench
+    - linkbench2
     - signal-processing
   expansions:
     setup: single-replica
@@ -1165,6 +1338,7 @@ buildvariants:
     - name: smoke_test
     - name: genny_patch_tasks
     - name: genny_auto_tasks
+    # - name: ycsb_60GB
 
 - name: linux-1-node-replSet-ese-gcm
   display_name: Linux 1-Node ReplSet ESE GCM
@@ -1189,6 +1363,7 @@ buildvariants:
     - name: smoke_test
     - name: genny_patch_tasks
     - name: genny_auto_tasks
+    # - name: ycsb_60GB
 
 - name: linux-1-node-15gbwtcache
   display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache
@@ -1213,6 +1388,31 @@ buildvariants:
     - name: smoke_test
     - name: genny_patch_tasks
     - name: genny_auto_tasks
+
+# - name: linux-3-node-1dayhistory-15gbwtcache
+#   display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache
+#   batchtime: 10080 # 7 days
+#   modules: *modules
+#   expansions:
+#     setup: replica-1dayhistory-15gbwtcache
+#     cluster: replica
+#     platform: linux
+#     project_dir: *project_dir
+#     authentication: enabled
+#     storageEngine: wiredTiger
+#   run_on:
+#     - "rhel70-perf-replset"
+#   depends_on:
+#     - name: compile
+#       variant: compile-amazon2
+#     - name: genny_generate_all_tasks
+#       variant: compile-amazon2
+#   tasks:
+#     - name: crud_workloads
+#     - name: crud_workloads_majority
+#     - name: smoke_test
+#     - name: genny_patch_tasks
+#     - name: genny_auto_tasks
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
@@ -1281,6 +1481,7 @@ buildvariants:
     - name: mixed_workloads
     - name: mongos_workloads
     - name: mongos_large_catalog_workloads
+    # - name: move_chunk_large_chunk_map_workloads
     - name: move_chunk_workloads
     - name: move_chunk_waiting_workloads
     - name: retryable_writes_workloads
@@ -1363,6 +1564,26 @@ buildvariants:
     - name: sb_large_scale
     - name: sb_timeseries
 
+# - name: linux-3-node-replSet-last-continuous-fcv
+#   display_name: Linux 3-Node ReplSet (Last Continuous FCV)
+#   batchtime: 10080 # 7 days
+#   modules: *modules
+#   expansions:
+#     setup: replica-last-continuous-fcv
+#     cluster: replica
+#     platform: linux
+#     project_dir: *project_dir
+#     authentication: enabled
+#     storageEngine: wiredTiger
+#   run_on:
+#       - "rhel70-perf-replset"
+#   depends_on:
+#       - name: compile
+#         variant: compile-amazon2
+#       - name: genny_generate_all_tasks
+#         variant: compile-amazon2
+#   tasks: *3nodetasks
+
 - name: linux-3-node-replSet-noflowcontrol
   display_name: Linux 3-Node ReplSet (Flow Control off)
   batchtime: 10080  # 7 days
@@ -1421,6 +1642,34 @@ buildvariants:
     - name: genny_patch_tasks
     - name: genny_auto_tasks
 
+# - name: linux-3-node-replSet-maintenance-events
+#   display_name: Linux 3-Node ReplSet (Maintenance Events)
+#   batchtime: 10080 # 7 days
+#   modules: *modules
+#   expansions:
+#     setup: replica-maintenance-events
+#     cluster: replica
+#     platform: linux
+#     project_dir: *project_dir
+#     authentication: enabled
+#     storageEngine: wiredTiger
+#   run_on:
+#       - "rhel70-perf-replset"
+#   depends_on:
+#       - name: compile
+#         variant: compile-amazon2
+#       - name: genny_generate_all_tasks
+#         variant: compile-amazon2
+#   tasks:
+#     - name: industry_benchmarks_stepdowns
+#     - name: industry_benchmarks_rolling_restarts
+#     - name: industry_benchmarks_non_retryable_writes_stepdowns
+#     - name: industry_benchmarks_non_retryable_writes_rolling_restarts
+#     - name: linkbench_stepdowns
+#     - name: linkbench_rolling_restarts
+#     - name: linkbench_non_retryable_writes_stepdowns
+#     - name: linkbench_non_retryable_writes_rolling_restarts
+
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
   batchtime: 10080 # 7 days
@@ -1471,6 +1720,53 @@ buildvariants:
     - name: genny_patch_tasks
     - name: genny_auto_tasks
 
+# Uncomment this to run logkeeper FCV updates automatically. This is only intended to be run in
+# patch builds.
+#- name: linux-replSet-initialsync-logkeeper-snapshot-update
+#  display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
+#  batchtime: 10080 # 7 days
+#  modules: *modules
+#  expansions:
+#    setup: initialsync-logkeeper
+#    cluster: initialsync-logkeeper-snapshot-update
+#    # Update this to latest snapshot after each LTS release.
+#    snapshotId: snap-0b0b8b2ad16e8f14e
+#    platform: linux
+#    authentication: disabled
+#    storageEngine: wiredTiger
+#    project_dir: *project_dir
+#  run_on:
+#    - "rhel70-perf-initialsync-logkeeper"
+#  depends_on:
+#    - name: compile
+#      variant: compile-amazon2
+#    - name: genny_generate_all_tasks
+#      variant: compile-amazon2
+#  tasks:
+#    - name: initialsync-logkeeper-snapshot-update
+#    - name: initialsync-logkeeper-short-s3-update
+
+# - name: linux-replSet-auth-delay
+#   display_name: Linux 3-Node ReplSet (Auth Delay)
+#   batchtime: 10080 # 7 days
+#   modules: *modules
+#   expansions:
+#     setup: replica-auth-cluster-delay
+#     cluster: replica
+#     platform: linux
+#     project_dir: *project_dir
+#     authentication: enabled
+#     storageEngine: wiredTiger
+#   run_on:
+#       - "rhel70-perf-replset"
+#   depends_on:
+#       - name: compile
+#         variant: compile-amazon2
+#       - name: genny_generate_all_tasks
+#         variant: compile-amazon2
+#   tasks:
+#     - name: genny_auto_tasks
+
 #######################################
 #  Atlas Like Buildvariants           #
 #######################################
@@ -1519,3 +1815,90 @@ buildvariants:
     - name: linkbench
     - name: genny_patch_tasks
     - name: genny_auto_tasks
+
+
+#######################################
+#  WT Develop Linux Buildvariants     #
+#######################################
+# - name: wtdevelop-1-node-replSet
+#   display_name: WT Develop 1-Node ReplSet
+#   batchtime: 10080 # 7 days
+#   modules: *modules
+#   expansions:
+#     setup: single-replica
+#     cluster: single
+#     platform: linux
+#     project_dir: *project_dir
+#     compile-variant: -wtdevelop
+#     authentication: enabled
+#     storageEngine: wiredTiger
+#   run_on:
+#       - "rhel70-perf-single"
+#   depends_on:
+#       - name: compile
+#         variant: wtdevelop-compile-amazon2
+#       - name: genny_generate_all_tasks
+#         variant: compile-amazon2
+#   tasks: *1nodetasks
+#
+# - name: wtdevelop-standalone
+#   display_name: WT Develop Standalone
+#   batchtime: 10080 # 7 days
+#   modules: *modules
+#   expansions:
+#     setup: standalone
+#     cluster: single
+#     platform: linux
+#     project_dir: *project_dir
+#     compile-variant: -wtdevelop
+#     authentication: enabled
+#     storageEngine: wiredTiger
+#   run_on:
+#       - "rhel70-perf-single"
+#   depends_on:
+#       - name: compile
+#         variant: wtdevelop-compile-amazon2
+#       - name: genny_generate_all_tasks
+#         variant: compile-amazon2
+#   tasks: *standalonetasks
+#
+# - name: wtdevelop-3-node-replSet
+#   display_name: WT Develop 3-Node ReplSet
+#   batchtime: 10080 # 7 days
+#   modules: *modules
+#   expansions:
+#     setup: replica
+#     cluster: replica
+#     platform: linux
+#     project_dir: *project_dir
+#     compile-variant: -wtdevelop
+#     authentication: enabled
+#     storageEngine: wiredTiger
+#   run_on:
+#       - "rhel70-perf-replset"
+#   depends_on:
+#       - name: compile
+#         variant: wtdevelop-compile-amazon2
+#       - name: genny_generate_all_tasks
+#         variant: compile-amazon2
+#   tasks: *3nodetasks
+
+# Disabled: SERVER-35586
+#- name: wtdevelop-shard-lite
+#  display_name: WT Develop Shard Lite Cluster
+#  batchtime: 10080 # 7 days
+#  modules: *modules
+#  expansions:
+#    setup: shard-lite
+#    cluster: shard-lite
+#    platform: linux
+#    project_dir: *project_dir
+#    compile-variant: -wtdevelop
+#    authentication: enabled
+#    storageEngine: wiredTiger
+#  run_on:
+#      - "rhel70-perf-shard-lite"
+#  depends_on:
+#      - name: compile
+#        variant: wtdevelop-compile-amazon2
+#  tasks: *shardlitetasks
