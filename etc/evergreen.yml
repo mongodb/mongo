@@ -6242,6 +6242,17 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 37
 
+- name: tenant_migration_jscore_passthrough_gen
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      depends_on: jsCore
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 10
+
 - name: parallel_gen
   tags: ["misc_js"]
   depends_on:
@@ -8548,6 +8559,7 @@ buildvariants:
   - name: libunwind_tests
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: tenant_migration_jscore_passthrough_gen
   - name: .ocsp
   - name: .read_write_concern
   - name: .replica_sets !.encrypt
@@ -10135,6 +10147,7 @@ buildvariants:
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: tenant_migration_jscore_passthrough_gen
   - name: multiversion_gen
   - name: .query_fuzzer
   - name: .random_multiversion_ds
