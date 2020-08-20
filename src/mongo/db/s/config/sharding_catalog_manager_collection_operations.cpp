@@ -279,7 +279,11 @@ Status commitTxnForConfigDocument(OperationContext* opCtx, TxnNumber txnNumber) 
                                                   .serialize())
                               .response);
 
-    return getStatusFromCommandResult(replyOpMsg.body);
+    auto commandStatus = getStatusFromCommandResult(replyOpMsg.body);
+    if (!commandStatus.isOK()) {
+        return commandStatus;
+    }
+    return getWriteConcernStatusFromCommandResult(replyOpMsg.body);
 }
 
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx, const NamespaceString& nss) {
@@ -839,6 +843,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
             hangRefineCollectionShardKeyBeforeCommit.pauseWhileSet(opCtx);
         }
 
+        // Note this will wait for majority write concern.
         uassertStatusOK(commitTxnForConfigDocument(asr.opCtx(), txnNumber));
     }
 
