@@ -372,7 +372,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> makeAnchorBranchF
 }
 
 /**
- * Builds a recursive sub-tree of the recursive CTE to generate the reminder of the result set
+ * Builds a recursive sub-tree of the recursive CTE to generate the remainder of the result set
  * consisting of valid recordId's and index seek keys to restart the index scan from.
  */
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>

@@ -210,7 +210,16 @@ generateOptimizedOplogScan(OperationContext* opCtx,
     }
 
     if (csn->filter) {
-        stage = generateFilter(csn->filter.get(), std::move(stage), slotIdGenerator, resultSlot);
+        auto relevantSlots = sbe::makeSV(resultSlot, recordIdSlot);
+        if (tsSlot) {
+            relevantSlots.push_back(*tsSlot);
+        }
+
+        stage = generateFilter(csn->filter.get(),
+                               std::move(stage),
+                               slotIdGenerator,
+                               resultSlot,
+                               std::move(relevantSlots));
 
         // We may be requested to stop applying the filter after the first match. This can happen
         // if the query is just a lower bound on 'ts' on a forward scan. In this case every document
@@ -347,7 +356,16 @@ generateGenericCollScan(const Collection* collection,
         // 'generateOptimizedOplogScan()'.
         invariant(!csn->stopApplyingFilterAfterFirstMatch);
 
-        stage = generateFilter(csn->filter.get(), std::move(stage), slotIdGenerator, resultSlot);
+        auto relevantSlots = sbe::makeSV(resultSlot, recordIdSlot);
+        if (tsSlot) {
+            relevantSlots.push_back(*tsSlot);
+        }
+
+        stage = generateFilter(csn->filter.get(),
+                               std::move(stage),
+                               slotIdGenerator,
+                               resultSlot,
+                               std::move(relevantSlots));
     }
 
     return {resultSlot, recordIdSlot, tsSlot, std::move(stage)};

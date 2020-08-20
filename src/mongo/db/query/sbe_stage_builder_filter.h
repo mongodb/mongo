@@ -35,13 +35,16 @@
 
 namespace mongo::stage_builder {
 /**
- * Generates an SBE plan stage sub-tree implementing a filter expression represented by the 'root'
- * expression. The 'stage' parameter defines an input stage to the generate SBE plan stage sub-tree.
- * The 'inputVar' defines a variable to read the input document from.
+ * This function generates an SBE plan stage tree implementing a filter expression represented by
+ * 'root'. The 'stage' parameter provides the input subtree to build on top of. The 'inputSlotIn'
+ * parameter specifies the input slot the filter should use. The 'relevantSlotsIn' parameter
+ * specifies the slots produced by the 'stage' subtree that must remain visible to consumers of
+ * the tree returned by this function.
  */
 std::unique_ptr<sbe::PlanStage> generateFilter(const MatchExpression* root,
                                                std::unique_ptr<sbe::PlanStage> stage,
                                                sbe::value::SlotIdGenerator* slotIdGenerator,
-                                               sbe::value::SlotId inputVar);
+                                               sbe::value::SlotId inputSlotIn,
+                                               sbe::value::SlotVector relevantSlotsIn);
 
 }  // namespace mongo::stage_builder
