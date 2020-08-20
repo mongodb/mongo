@@ -67,7 +67,8 @@ public:
                        const std::vector<HostAndPort>& servers,
                        StringData applicationName,
                        double so_timeout = 0,
-                       MongoURI uri = {});
+                       MongoURI uri = {},
+                       const ClientAPIVersionParameters* apiParameters = nullptr);
 
     /**
      * Returns false if no member of the set were reachable. This object

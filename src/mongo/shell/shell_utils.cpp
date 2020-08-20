@@ -445,6 +445,12 @@ BSONObj shouldUseImplicitSessions(const BSONObj&, void* data) {
     return BSON("" << shellGlobalParams.shouldUseImplicitSessions);
 }
 
+BSONObj apiParameters(const BSONObj&, void* data) {
+    return BSON("" << BSON("apiVersion" << shellGlobalParams.apiVersion << "apiStrict"
+                                        << shellGlobalParams.apiStrict << "apiDeprecationErrors"
+                                        << shellGlobalParams.apiDeprecationErrors));
+}
+
 BSONObj interpreterVersion(const BSONObj& a, void* data) {
     uassert(16453, "interpreterVersion accepts no arguments", a.nFields() == 0);
     return BSON("" << getGlobalScriptEngine()->getInterpreterVersionString());
@@ -496,6 +502,7 @@ void initScope(Scope& scope) {
     scope.injectNative("_readMode", readMode);
     scope.injectNative("_shouldRetryWrites", shouldRetryWrites);
     scope.injectNative("_shouldUseImplicitSessions", shouldUseImplicitSessions);
+    scope.injectNative("_apiParameters", apiParameters);
     scope.externalSetup();
     mongo::shell_utils::installShellUtils(scope);
     scope.execSetup(JSFiles::servers);
@@ -540,7 +547,15 @@ ConnectionRegistry::ConnectionRegistry() = default;
 
 void ConnectionRegistry::registerConnection(DBClientBase& client, StringData uri) {
     BSONObj info;
-    if (client.runCommand("admin", BSON("whatsmyuri" << 1), info)) {
+    BSONObj command;
+    // If apiStrict is set override it, whatsmyuri is not in the Versioned API.
+    if (client.getApiParameters().getStrict()) {
+        command = BSON("whatsmyuri" << 1 << "apiStrict" << false);
+    } else {
+        command = BSON("whatsmyuri" << 1);
+    }
+
+    if (client.runCommand("admin", command, info)) {
         stdx::lock_guard<Latch> lk(_mutex);
         _connectionUris[uri.toString()].insert(info["you"].str());
     }

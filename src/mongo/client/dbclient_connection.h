@@ -95,7 +95,8 @@ public:
     DBClientConnection(bool _autoReconnect = false,
                        double so_timeout = 0,
                        MongoURI uri = {},
-                       const HandshakeValidationHook& hook = HandshakeValidationHook());
+                       const HandshakeValidationHook& hook = HandshakeValidationHook(),
+                       const ClientAPIVersionParameters* apiParameters = nullptr);
 
     virtual ~DBClientConnection() {
         _numConnections.fetchAndAdd(-1);

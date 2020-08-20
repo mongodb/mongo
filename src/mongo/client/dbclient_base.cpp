@@ -45,10 +45,12 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/authenticate.h"
+#include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/config.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/initialize_api_parameters_gen.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/kill_cursors_gen.h"
@@ -194,6 +196,43 @@ DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
     return this;
 }
 
+namespace {
+void appendAPIVersionParameters(BSONObjBuilder& bob,
+                                const ClientAPIVersionParameters& apiParameters) {
+    if (!apiParameters.getVersion()) {
+        return;
+    }
+
+    bool hasVersion = false, hasStrict = false, hasDeprecationErrors = false;
+    BSONObjIterator i = bob.iterator();
+    while (i.more()) {
+        auto elem = i.next();
+        if (elem.fieldNameStringData() == APIParametersFromClient::kApiVersionFieldName) {
+            hasVersion = true;
+        } else if (elem.fieldNameStringData() == APIParametersFromClient::kApiStrictFieldName) {
+            hasStrict = true;
+        } else if (elem.fieldNameStringData() ==
+                   APIParametersFromClient::kApiDeprecationErrorsFieldName) {
+            hasDeprecationErrors = true;
+        }
+    }
+
+    if (!hasVersion) {
+        bob.append(APIParametersFromClient::kApiVersionFieldName, *apiParameters.getVersion());
+    }
+
+    // Include apiStrict/apiDeprecationErrors if they are not boost::none.
+    if (!hasStrict && apiParameters.getStrict()) {
+        bob.append(APIParametersFromClient::kApiStrictFieldName, *apiParameters.getStrict());
+    }
+
+    if (!hasDeprecationErrors && apiParameters.getDeprecationErrors()) {
+        bob.append(APIParametersFromClient::kApiDeprecationErrorsFieldName,
+                   *apiParameters.getDeprecationErrors());
+    }
+}
+}  // namespace
+
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     OpMsgRequest request) {
     // Make sure to reconnect if needed before building our request, since the request depends on
@@ -204,9 +243,13 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     auto host = getServerAddress();
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
-    if (_metadataWriter) {
+
+    if (_metadataWriter || _apiParameters.getVersion()) {
         BSONObjBuilder metadataBob(std::move(request.body));
-        uassertStatusOK(_metadataWriter(opCtx, &metadataBob));
+        if (_metadataWriter) {
+            uassertStatusOK(_metadataWriter(opCtx, &metadataBob));
+        }
+        appendAPIVersionParameters(metadataBob, _apiParameters);
         request.body = metadataBob.obj();
     }
 

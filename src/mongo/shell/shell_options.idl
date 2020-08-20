@@ -78,6 +78,18 @@ configs:
     arg_vartype: String
     cpp_varname: shellGlobalParams.script
 
+  "apiVersion":
+    description: "set the MongoDB API version"
+    arg_vartype: String
+    cpp_varname: shellGlobalParams.apiVersion
+  "apiStrict":
+    description: "disable all features not included in the MongoDB Versioned API"
+    arg_vartype: Switch
+    cpp_varname: shellGlobalParams.apiStrict
+  "apiDeprecationErrors":
+    description: "disable all features deprecated in the MongoDB Versioned API"
+    arg_vartype: Switch
+    cpp_varname: shellGlobalParams.apiDeprecationErrors
   "objcheck":
     description: "inspect client data for validity on receipt"
     arg_vartype: Switch

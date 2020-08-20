@@ -1016,7 +1016,8 @@ shellHelper.show = function(what) {
             dbDeclared = false;
         }
         if (dbDeclared) {
-            var res = db.adminCommand({getLog: "startupWarnings"});
+            var res =
+                db.getSiblingDB("admin")._runCommandWithoutApiStrict({getLog: "startupWarnings"});
             if (res.ok) {
                 if (res.log.length == 0) {
                     return "";

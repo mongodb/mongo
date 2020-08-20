@@ -372,7 +372,7 @@ void runCommand(OperationContext* opCtx,
     auto wc = uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body));
 
     Client* client = opCtx->getClient();
-    auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
+    auto const apiParamsFromClient = initializeAPIParameters(opCtx, request.body, command);
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     Status readConcernParseStatus = Status::OK();

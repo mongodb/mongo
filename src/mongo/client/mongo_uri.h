@@ -46,6 +46,8 @@
 
 namespace mongo {
 
+class ClientAPIVersionParameters;
+
 /**
  * Encode a string for embedding in a URI.
  * Replaces reserved bytes with %xx sequences.
@@ -149,7 +151,8 @@ public:
 
     DBClientBase* connect(StringData applicationName,
                           std::string& errmsg,
-                          boost::optional<double> socketTimeoutSecs = boost::none) const;
+                          boost::optional<double> socketTimeoutSecs = boost::none,
+                          const ClientAPIVersionParameters* apiParameters = nullptr) const;
 
     const std::string& getUser() const {
         return _user;

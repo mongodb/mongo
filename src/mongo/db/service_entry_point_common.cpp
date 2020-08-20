@@ -936,7 +936,7 @@ void execCommandDatabase(OperationContext* opCtx,
         (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
 
     try {
-        const auto apiParamsFromClient = initializeAPIParameters(request.body, command);
+        const auto apiParamsFromClient = initializeAPIParameters(opCtx, request.body, command);
         Client* client = opCtx->getClient();
 
         {

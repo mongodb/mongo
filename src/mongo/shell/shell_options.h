@@ -68,6 +68,10 @@ struct ShellGlobalParams {
 
     std::string script;
 
+    std::string apiVersion;
+    bool apiStrict;
+    bool apiDeprecationErrors;
+
     bool autoKillOp = false;
     bool useWriteCommandsDefault = true;
 
@@ -98,4 +102,6 @@ bool handlePreValidationMongoShellOptions(const moe::Environment& params,
 Status storeMongoShellOptions(const moe::Environment& params, const std::vector<std::string>& args);
 
 void redactPasswordOptions(int argc, char** argv);
+
+std::string getApiParametersJSON();
 }  // namespace mongo

@@ -197,6 +197,16 @@ DB.prototype.adminCommand = function(obj, extra) {
 
 DB.prototype._adminCommand = DB.prototype.adminCommand;  // alias old name
 
+DB.prototype._runCommandWithoutApiStrict = function(command) {
+    let commandWithoutApiStrict = Object.assign({}, command);
+    if (this.getMongo().getApiParameters().strict) {
+        // Permit this command invocation, even if it's not in the requested API version.
+        commandWithoutApiStrict["apiStrict"] = false;
+    }
+
+    return this.runCommand(commandWithoutApiStrict);
+};
+
 DB.prototype._runAggregate = function(cmdObj, aggregateOptions) {
     assert(cmdObj.pipeline instanceof Array, "cmdObj must contain a 'pipeline' array");
     assert(cmdObj.aggregate !== undefined, "cmdObj must contain 'aggregate' field");
@@ -1104,7 +1114,8 @@ DB.prototype.printSecondaryReplicationInfo = function() {
     var L = this.getSiblingDB("local");
 
     if (L.system.replset.count() != 0) {
-        var status = this.adminCommand({'replSetGetStatus': 1});
+        const status =
+            this.getSiblingDB('admin')._runCommandWithoutApiStrict({'replSetGetStatus': 1});
         primary = getPrimary(status.members);
         if (primary) {
             startOptimeDate = primary.optimeDate;
@@ -1126,7 +1137,7 @@ DB.prototype.printSecondaryReplicationInfo = function() {
 };
 
 DB.prototype.serverBuildInfo = function() {
-    return this._adminCommand("buildinfo");
+    return this.getSiblingDB("admin")._runCommandWithoutApiStrict({buildinfo: 1});
 };
 
 // Used to trim entries from the metrics.commands that have never been executed

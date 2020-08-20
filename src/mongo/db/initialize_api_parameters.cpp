@@ -31,14 +31,17 @@
 
 namespace mongo {
 
-const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody,
+const APIParametersFromClient initializeAPIParameters(OperationContext* opCtx,
+                                                      const BSONObj& requestBody,
                                                       Command* command) {
-
     auto apiParamsFromClient =
         APIParametersFromClient::parse("APIParametersFromClient"_sd, requestBody);
 
-    if (gRequireApiVersion.load()) {
-        uassert(498870, "Missing apiVersion parameter", apiParamsFromClient.getApiVersion());
+    if (gRequireApiVersion.load() && !opCtx->getClient()->isInDirectClient()) {
+        uassert(
+            498870,
+            "The apiVersion parameter is required, please configure your MongoClient's API version",
+            apiParamsFromClient.getApiVersion());
     }
 
     if (apiParamsFromClient.getApiDeprecationErrors() || apiParamsFromClient.getApiStrict()) {

@@ -308,7 +308,7 @@ Mongo.prototype.getReadConcern = function() {
     return this._readConcernLevel;
 };
 
-connect = function(url, user, pass) {
+connect = function(url, user, pass, apiParameters) {
     if (url instanceof MongoURI) {
         user = url.user;
         pass = url.password;
@@ -359,7 +359,7 @@ connect = function(url, user, pass) {
     }
     chatty("connecting to: " + safeURL);
     try {
-        var m = new Mongo(url);
+        var m = new Mongo(url, undefined /* encryptedDBClientCallback */, apiParameters);
     } catch (e) {
         var dest;
         if (url.indexOf(".query.mongodb.net") != -1) {

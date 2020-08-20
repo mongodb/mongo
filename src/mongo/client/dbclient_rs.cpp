@@ -133,8 +133,10 @@ DBClientReplicaSet::DBClientReplicaSet(const string& name,
                                        const vector<HostAndPort>& servers,
                                        StringData applicationName,
                                        double so_timeout,
-                                       MongoURI uri)
-    : _setName(name),
+                                       MongoURI uri,
+                                       const ClientAPIVersionParameters* apiParameters)
+    : DBClientBase(apiParameters),
+      _setName(name),
       _applicationName(applicationName.toString()),
       _so_timeout(so_timeout),
       _uri(std::move(uri)) {

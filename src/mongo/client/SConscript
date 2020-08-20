@@ -182,6 +182,7 @@ clientDriverEnv.Library(
         'dbclient_base.cpp',
         'dbclient_cursor.cpp',
         'index_spec.cpp',
+        env.Idlc('client_api_version_parameters.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbmessage',
@@ -196,6 +197,7 @@ clientDriverEnv.Library(
         'connection_string',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
     ],
 )

@@ -818,7 +818,8 @@ int mongo_main(int argc, char* argv[]) {
                 ss << "__quiet = true;" << std::endl;
             }
 
-            ss << "db = connect( \"" << parsedURI.canonicalizeURIAsString() << "\");" << std::endl;
+            ss << "db = connect( \"" << parsedURI.canonicalizeURIAsString()
+               << "\", null, null, {api: " << getApiParametersJSON() << "});" << std::endl;
 
             if (shellGlobalParams.shouldRetryWrites || parsedURI.getRetryWrites()) {
                 // If the --retryWrites cmdline argument or retryWrites URI param was specified,

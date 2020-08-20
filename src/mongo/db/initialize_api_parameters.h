@@ -41,7 +41,9 @@ namespace mongo {
  * This function parses a command's API Version parameters from a request and stores the apiVersion,
  * apiStrict, and apiDeprecationErrors fields.
  */
-const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Command* command);
+const APIParametersFromClient initializeAPIParameters(OperationContext* opCtx,
+                                                      const BSONObj& requestBody,
+                                                      Command* command);
 
 /**
  * Decorates operation context with methods to retrieve apiVersion, apiStrict, and
@@ -65,7 +67,7 @@ public:
     }
 
     void setAPIVersion(StringData apiVersion) {
-        _apiVersion = apiVersion;
+        _apiVersion = apiVersion.toString();
     }
 
     const bool getAPIStrict() const {
@@ -92,8 +94,10 @@ public:
         _paramsPassed = paramsPassed;
     }
 
+    BSONObj toBSON() const;
+
 private:
-    StringData _apiVersion;
+    std::string _apiVersion;
     bool _apiStrict;
     bool _apiDeprecationErrors;
     bool _paramsPassed;

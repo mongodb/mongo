@@ -34,6 +34,7 @@
 #include <memory>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/global_conn_pool.h"
@@ -87,6 +88,7 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMaxWireVersion, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetMember, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isMongos, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getApiParameters, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoExternalInfo),
     JS_FS_END,
 };
@@ -815,6 +817,7 @@ void setEncryptedDBClientCallback(EncryptedDBClientCallback* callback) {
     encryptedDBClientCallback = callback;
 }
 
+// "new Mongo(uri, encryptedDBClientCallback, {options...})"
 void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
@@ -826,9 +829,33 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     auto cs = uassertStatusOK(MongoURI::parse(host));
 
+    ClientAPIVersionParameters apiParameters;
+    if (args.length() > 2 && !args.get(2).isUndefined()) {
+        uassert(4938000,
+                str::stream() << "the 'options' parameter to Mongo() must be an object",
+                args.get(2).isObject());
+        auto options = ValueWriter(cx, args.get(2)).toBSON();
+        if (options.hasField("api")) {
+            uassert(4938001,
+                    "the 'api' option for Mongo() must be an object",
+                    options["api"].isABSONObj());
+            apiParameters = ClientAPIVersionParameters::parse(IDLParserErrorContext("api"_sd),
+                                                              options["api"].Obj());
+            if (apiParameters.getDeprecationErrors().value_or(false) ||
+                apiParameters.getStrict().value_or(false)) {
+                uassert(4938002,
+                        "the 'api' option for Mongo() must include 'version' if it includes "
+                        "'strict' or "
+                        "'deprecationErrors'",
+                        apiParameters.getVersion());
+            }
+        }
+    }
+
     boost::optional<std::string> appname = cs.getAppName();
     std::string errmsg;
-    std::unique_ptr<DBClientBase> conn(cs.connect(appname.value_or("MongoDB Shell"), errmsg));
+    std::unique_ptr<DBClientBase> conn(
+        cs.connect(appname.value_or("MongoDB Shell"), errmsg, boost::none, &apiParameters));
 
     if (!conn.get()) {
         uasserted(ErrorCodes::InternalError, errmsg);
@@ -883,6 +910,11 @@ void MongoBase::Functions::isMongos::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     args.rval().setBoolean(conn->isMongos());
+}
+
+void MongoBase::Functions::getApiParameters::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+    ValueReader(cx, args.rval()).fromBSON(conn->getApiParameters().toBSON(), nullptr, false);
 }
 
 void MongoBase::Functions::_startSession::call(JSContext* cx, JS::CallArgs args) {

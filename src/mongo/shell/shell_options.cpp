@@ -39,6 +39,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
@@ -320,6 +321,13 @@ Status storeMongoShellOptions(const moe::Environment& params,
         }
     }
 
+    // Future API versions may require logic changes in the shell, so ban them for now.
+    if (!shellGlobalParams.apiVersion.empty() && shellGlobalParams.apiVersion != "1") {
+        uasserted(4938003,
+                  str::stream() << "Bad value --apiVersion '" << shellGlobalParams.apiVersion
+                                << "', only API Version 1 is supported");
+    }
+
     if (params.count("setShellParameter")) {
         auto ssp = params["setShellParameter"].as<std::map<std::string, std::string>>();
         auto map = ServerParameterSet::getGlobal()->getMap();
@@ -346,6 +354,23 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
 
     return Status::OK();
+}
+
+std::string getApiParametersJSON() {
+    BSONObjBuilder bob;
+    if (!shellGlobalParams.apiVersion.empty()) {
+        bob.append(ClientAPIVersionParameters::kVersionFieldName, shellGlobalParams.apiVersion);
+    }
+
+    if (shellGlobalParams.apiStrict) {
+        bob.append(ClientAPIVersionParameters::kStrictFieldName, true);
+    }
+
+    if (shellGlobalParams.apiDeprecationErrors) {
+        bob.append(ClientAPIVersionParameters::kDeprecationErrorsFieldName, true);
+    }
+
+    return bob.done().jsonString();
 }
 
 }  // namespace mongo

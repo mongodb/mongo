@@ -46,10 +46,12 @@ namespace mongo {
 Mutex ConnectionString::_connectHookMutex = MONGO_MAKE_LATCH();
 ConnectionString::ConnectionHook* ConnectionString::_connectHook = nullptr;
 
-std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationName,
-                                                        std::string& errmsg,
-                                                        double socketTimeout,
-                                                        const MongoURI* uri) const {
+std::unique_ptr<DBClientBase> ConnectionString::connect(
+    StringData applicationName,
+    std::string& errmsg,
+    double socketTimeout,
+    const MongoURI* uri,
+    const ClientAPIVersionParameters* apiParameters) const {
     MongoURI newURI{};
     if (uri) {
         newURI = *uri;
@@ -58,7 +60,8 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
     switch (_type) {
         case MASTER: {
             for (const auto& server : _servers) {
-                auto c = std::make_unique<DBClientConnection>(true, 0, newURI);
+                auto c = std::make_unique<DBClientConnection>(
+                    true, 0, newURI, DBClientConnection::HandshakeValidationHook(), apiParameters);
 
                 c->setSoTimeout(socketTimeout);
                 LOGV2_DEBUG(20109,
@@ -76,8 +79,12 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
         }
 
         case SET: {
-            auto set = std::make_unique<DBClientReplicaSet>(
-                _setName, _servers, applicationName, socketTimeout, std::move(newURI));
+            auto set = std::make_unique<DBClientReplicaSet>(_setName,
+                                                            _servers,
+                                                            applicationName,
+                                                            socketTimeout,
+                                                            std::move(newURI),
+                                                            apiParameters);
             if (!set->connect()) {
                 errmsg = "connect failed to replica set ";
                 errmsg += toString();
@@ -98,7 +105,8 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(StringData applicationNa
                     _connectHook);
 
             // Double-checked lock, since this will never be active during normal operation
-            auto replacementConn = _connectHook->connect(*this, errmsg, socketTimeout);
+            auto replacementConn =
+                _connectHook->connect(*this, errmsg, socketTimeout, apiParameters);
 
             LOGV2(20111,
                   "Replacing connection to {oldConnString} with {newConnString}",
