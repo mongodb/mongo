@@ -2250,7 +2250,8 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     // new signal from a new primary because we cannot commit. Note that two-phase index builds can
     // retry because a new signal should be received. Single-phase builds will be unable to commit
     // and will self-abort.
-    bool isMaster = replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
+    bool isMaster = replCoord->canAcceptWritesFor(opCtx, dbAndUUID) &&
+        !replCoord->getSettings().shouldRecoverFromOplogAsStandalone();
     if (!isMaster && IndexBuildAction::kCommitQuorumSatisfied == action) {
         return CommitResult::kNoLongerPrimary;
     }
