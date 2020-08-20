@@ -139,12 +139,13 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
 
 std::vector<FieldPath> CommonProcessInterface::collectDocumentKeyFieldsActingAsRouter(
     OperationContext* opCtx, const NamespaceString& nss) const {
-    if (auto chunkManager =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss))
-                .cm()) {
+    auto cri =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+    if (auto chunkManager = cri.cm()) {
         return _shardKeyToDocumentKeyFields(
             chunkManager->getShardKeyPattern().getKeyPatternFields());
     }
+
     // We have no evidence this collection is sharded, so the document key is just _id.
     return {"_id"};
 }
