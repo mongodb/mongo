@@ -1,19 +1,246 @@
 command_type: system
 stepback: false
 
+variables:
+  ###
+  # Leave this section uncommented to enable compile.
+  _real_remote_file: &_remote_file
+      ${project}/${version_id}/${revision}/mongodb${compile-variant|}-${version_id}.tar.gz
+  _real_compile: &_compile
+    - variant: linux-wt-standalone
+      name: compile
+  _real_expansions: &_expansion_updates
+    []
+  ###
+
+  ###
+  # **Or**: Leave this section uncommented to bypass/skip compile.
+  # # This file ↓ came from a microbenchmarks waterfall run.
+  # # https://evergreen.mongodb.com/version/performance_996dcdc3d96346d71f012388eccc79c691619340
+  # # Artifacts eventually expire. If this fails, grab the compile artifacts url and update this.
+  # _skip_remote_file: &_remote_file
+  #     perf/performance_996dcdc3d96346d71f012388eccc79c691619340/996dcdc3d96346d71f012388eccc79c691619340/mongodb-performance_996dcdc3d96346d71f012388eccc79c691619340.tar.gz
+  # _skip_compile: &_compile
+  #     []
+  # _skip_expansions: &_expansion_updates
+  #   []
+  ###
+
+  _src_dir: &src_dir src/mongo
+  _modules: &modules
+    - enterprise
+
+    - dsi
+    - signal-processing
+    - genny
+    - linkbench
+    - linkbench2
+    - workloads
+    - mongo-perf
+
+
+modules:
+- name: enterprise
+  repo: git@github.com:10gen/mongo-enterprise-modules.git
+  prefix: src/mongo/db/modules
+  branch: master
+- name: mongo-perf
+  repo: git@github.com:mongodb/mongo-perf.git
+  prefix: ../../src
+  branch: master
+
+###
+# Same in every DSI project
+- name: dsi
+  repo: git@github.com:10gen/dsi.git
+  prefix: ../../src
+  branch: master
+- name: genny
+  repo: git@github.com:10gen/genny.git
+  prefix: ../../src
+  branch: master
+- name: signal-processing
+  repo: git@github.com:10gen/signal-processing.git
+  prefix: ../../src
+  branch: master
+- name: workloads
+  repo: git@github.com:10gen/workloads.git
+  prefix: workloads
+  branch: master
+- name: wtdevelop
+  repo: git@github.com:wiredtiger/wiredtiger.git
+  prefix: src/third_party
+  branch: develop
+- name: linkbench
+  repo: git@github.com:10gen/linkbench.git
+  prefix: linkbench
+  branch: master
+- name: linkbench2
+  repo: git@github.com:mdcallag/linkbench.git
+  prefix: linkbench2
+  branch: master
+  ref: 63207190657737b32eb0e81c5b81ad1b8bad0e5a
+###
+
+
+###
+# Same in every DSI project
 pre:
+    - func: "f_other_pre_ops"
+    - func: "f_dsi_pre_run"
+post:
+    - func: "f_dsi_post_run"
+    - func: "f_other_post_ops"
+###
+
+functions:
+  ###
+  # Same in every DSI project
+  "f_dsi_pre_run":
     - command: manifest.load
+    - command: expansions.update
+      params:
+        updates: *_expansion_updates
+  "f_run_dsi_workload":
     - command: shell.exec
+      params:
+        script: |
+          rm -rf ./*
+          mkdir src
+    - command: manifest.load
+    - command: git.get_project
+      params:
+        directory: *src_dir
+        revisions:
+          dsi: ${dsi_rev}
+          linkbench: ${linkbench_rev}
+          linkbench2: ${linkbench2_rev}
+          genny: ${genny_rev}
+          workloads: ${workloads_rev}
+          signal-processing: ${signal-processing_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+    - command: shell.exec
+      params:
+        script: ./src/dsi/run-dsi bootstrap
+    - command: shell.exec
+      params:
+        script: ./src/dsi/run-dsi deploy_cluster
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi test_control
+    - command: json.send
+      params:
+        name: "perf"
+        file: "./build/LegacyPerfJson/perf.json"
+    - command: shell.exec
+      type: test
+      params:
+        script: |
+          ./src/dsi/run-dsi analysis
+          # detect outliers needs to run, so defer the post_run_check exit status to later
+          echo $? > post_run_check.status
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          is_patch=${is_patch}
+          task_id=${task_id}
+          perf_jira_user=${perf_jira_user}
+          perf_jira_pw=${perf_jira_pw}
+          analysis_user=${dsi_analysis_atlas_user}
+          analysis_password=${dsi_analysis_atlas_pw}
+          evergreen_api_key=${evergreen_api_key}
+          evergreen_api_user=${evergreen_api_user}
+          source ./src/dsi/src/signal_processing_setup.sh
+    - command: shell.exec
+      params:
+        script: |
+          set -o verbose
+          source ./signal_processing_venv/bin/activate
+          detect-changes --config .signal-processing.yml --mongo-repo=./src/mongo
+    - command: shell.exec
+      params:
+        script: |
+          set -o verbose
+          source ./signal_processing_venv/bin/activate
+          detect-outliers --config .signal-processing.yml
+    - command: shell.exec
+      type: setup
+      params:
+        script: |
+          set -o verbose
+          filename=rejects.json
+          if [ -s "$filename" ]; then
+            echo "Rejecting task due to the following outliers:"
+            cat "$filename"
+            exit ${detected_outlier_exit_code|0}
+          fi
+    - command: shell.exec
+      type: test
+      params:
+        script: |
+          set -o verbose
+          exit $(cat post_run_check.status)
+  "f_dsi_post_run":
+      - command: shell.exec
+        params:
+          script: ./src/dsi/run-dsi infrastructure_teardown
+      - command: shell.exec
+        params:
+          script: ./src/dsi/run-dsi ./src/dsi/src/dsi/make_artifact.sh
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: dsi-artifacts.tgz
+          remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/dsi-artifacts-${task_name}-${build_id}-${execution}.${ext|tgz}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: ${content_type|application/x-gzip}
+          display_name: Dsi Artifacts - Execution ${execution}
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongo/workloads/workloads/jsdoc/jsdocs-redirect.html
+          remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/workloads-${task_name}-${build_id}.html
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/html
+          display_name: workloads documentation
+      - command: attach.results
+        params:
+          file_location: report.json
+      - command: json.send
+        params:
+          name: "perf"
+          file: "./build/LegacyPerfJson/perf.json"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: pip-requirements.txt
+          remote_file: ${project}/${build_variant}/${revision}/pip-requirements-${task_id}-${execution}.txt
+          bucket: mciuploads
+          permissions: public-read
+          content_type: atext-plain
+          display_name: Pip Requirements
+  ###
+
+  "f_other_pre_ops":
+    - &f_other_pre_ops
+      command: shell.exec
       params:
         silent: true
         script: |
-          ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 python2; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
-          exit 0
+          for PS in mongo{,d,s,import,export,dump,restore,stat,files,top,bridge} resmoke.py python{,2} lldb _test; do
+              pkill -9 "$PS"
+          done
 
-post:
-    - command: attach.results
-      params:
-        file_location: src/report.json
+  "f_other_post_ops":
     - command: s3.put
       params:
             aws_key: ${aws_key}
@@ -24,12 +251,7 @@ post:
             permissions: public-read
             content_type: ${content_type|text/plain}
             display_name: mongod.log
-    - command: shell.exec
-      params:
-        silent: true
-        script: |
-          ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 python2; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
-          exit 0
+    - *f_other_pre_ops
     - command: shell.exec
       params:
         working_dir: src
@@ -41,51 +263,14 @@ post:
           if [ -d "${scons_cache_path}" ]; then
               /opt/mongodbtoolchain/v3/bin/python3 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
           fi
-    - func: "upload pip requirements"
 
-
-# Be sure to add the module to git.get_project revisions parameter so the revision in the manifest
-# is the version of the repository that's cloned.
-modules:
-- name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: master
-
-- name: genny
-  repo: git@github.com:mongodb/genny.git
-  branch: master
-
-- name: dsi
-  repo: git@github.com:10gen/dsi.git
-  branch: master
-
-- name: mongo-perf
-  repo: git@github.com:mongodb/mongo-perf.git
-  branch: master
-
-- name: signal-processing
-  repo: git@github.com:10gen/signal-processing.git
-  prefix: signal_processing
-  branch: master
-
-functions:
-  "git get project": &git_get_project
-    command: git.get_project
-    params:
-      directory: src
-      revisions:  # for each module include revision as <module_name> : ${<module_name>_rev}
-        enterprise: ${enterprise_rev}
-        genny: ${genny_rev}
-        dsi: ${dsi_rev}
-        mongo-perf: ${mongo-perf_rev}
-        signal-processing: ${signal-processing_rev}
-  "start server":
+  # This gets replaced by mongodb_setup
+  "f_start_server": &f_start_server
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/${version_id}/${revision}/mongodb${compile-variant|}-${version_id}.tar.gz
+        remote_file: *_remote_file
         bucket: mciuploads
         local_file: src/mongodb.tar.gz
     - command: shell.exec
@@ -138,10 +323,11 @@ functions:
           # print the replset config unless this is a standalone
           ./bin/mongo --eval "if( db.isMaster().hosts ) { printjson(rs.config()); }" --username admin --password password admin
           echo "MONGOD STARTED."
-  "analyze":
+
+  # This gets replaced by subset of f_run_dsi_workload's invocation of analysis
+  "f_run_analysis": &f_run_analysis
     - command: shell.exec
       params:
-        working_dir: src
         silent: true
         script: |
           set -o errexit
@@ -153,17 +339,15 @@ functions:
           analysis_password=${dsi_analysis_atlas_pw}
           evergreen_api_key=${evergreen_api_key}
           evergreen_api_user=${evergreen_api_user}
-          source ./buildscripts/signal_processing_setup.sh
+          source ./src/dsi/src/signal_processing_setup.sh
     - command: shell.exec
       params:
-        working_dir: src
         script: |
           set -o verbose
           source ./signal_processing_venv/bin/activate
-          detect-changes --config .signal-processing.yml
+          detect-changes --config .signal-processing.yml --mongo-repo ./src/mongo
     - command: shell.exec
       params:
-        working_dir: src
         script: |
           set -o errexit
           set -o verbose
@@ -177,11 +361,9 @@ functions:
             is_patch: ${is_patch}
             task_id: ${task_id}
           EOF
-
-          cp ./dsi/configurations/analysis/analysis.microbenchmarks.yml  analysis.yml
+          cp ./src/dsi/configurations/analysis/analysis.microbenchmarks.yml  analysis.yml
     - command: shell.exec
       params:
-        working_dir: src
         silent: true
         script: |
           cat > runtime_secret.yml <<EOF
@@ -192,110 +374,180 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          ./dsi/run-dsi setup
-          source ./dsi/dsi_venv/bin/activate
-          ./dsi/bin/analysis.py
+        script: ./src/dsi/run-dsi analysis
 
-  # Params:
-  #   workload: the path relative to genny/src/workloads to run e.g.
-  #             scale/InsertRemove.yml
-  "run genny workload":
-    # Calling the git.get_project command here will clone the mongodb/mongo repository, as well as
-    # the repositories defined in the build variant's "modules" section. Build variants running a
-    # task which calls this function must include "genny" as a module.
-    - *git_get_project
+  # This gets replaced by test_control
+  f_run_genny_workload:
+    - command: git.get_project
+      params:
+        directory: src/mongo
+        revisions:
+          genny: ${genny_rev}
+          dsi: ${dsi_rev}
+          mongo-perf: ${mongo-perf_rev}
+          signal-processing: ${signal-processing_rev}
     - command: shell.exec
       params:
-        working_dir: src/genny
         script: |
           set -eo pipefail
+          pushd ./src/genny
+              export PATH="/opt/mongodbtoolchain/v3/bin:$PATH"
+              python3 -m virtualenv ./venv
+              source ./venv/bin/activate
+              python3 -m pip install ./src/python
 
-          export PATH="/opt/mongodbtoolchain/v3/bin:$PATH"
-          python3 -m virtualenv ./venv
-          source ./venv/bin/activate
-          python -m pip install ./src/python
-
-          ./scripts/lamp --linux-distro rhel62
-          ./scripts/genny run -w "./dist/etc/genny/workloads/${workload}" -u 'mongodb://admin:password@localhost:27017'
-          genny-metrics-legacy-report --report-file "${workdir}/src/perf.json" build/genny-metrics.csv
-    - command: "json.send"
+              ./scripts/lamp --linux-distro rhel62
+              ./scripts/genny run -w "./dist/etc/genny/workloads/${workload}" -u 'mongodb://admin:password@localhost:27017'
+              genny-metrics-legacy-report --report-file "${workdir}/perf.json" build/genny-metrics.csv
+          popd
+    - command: json.send
       params:
         name: "perf"
-        file: "src/perf.json"
+        file: "./perf.json"
 
-  "run perf tests":
+  f_run_perf_tests:
+    - command: git.get_project
+      params:
+        directory: src/mongo
+        revisions:
+          genny: ${genny_rev}
+          dsi: ${dsi_rev}
+          mongo-perf: ${mongo-perf_rev}
+          signal-processing: ${signal-processing_rev}
     - command: shell.exec
       params:
-        working_dir: src
+        working_dir: src/mongo-perf
         script: |
-          set -e
-          set -v
+          set -ev
           virtualenv ./venv
           source ./venv/bin/activate
           pip install argparse
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        script: |
-          set -e
-          set -v
-          source ./venv/bin/activate
-          cd mongo-perf
-          mkdir -p ../perf
-          #  give mongod a few seconds to start up so that we can connect.
+
           sleep 5
-          ${perf_exec_wrapper} python benchrun.py --shell ../bin/mongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out ../perf/perf.json --exclude-testbed --username admin --password password
+          ${perf_exec_wrapper} python benchrun.py \
+              --shell ../bin/mongo                \
+              -t ${threads}                       \
+              --trialCount 5                      \
+              -f testcases/*.js                   \
+              --readCmd ${readCmd}                \
+              --includeFilter ${includeFilter1}   \
+              --includeFilter ${includeFilter2}   \
+              --excludeFilter ${excludeFilter}    \
+              --out ${workdir}/perf.json          \
+              --exclude-testbed                   \
+              --username admin                    \
+              --password password
+
           echo "Oplog size at end of tests..."
-          ../bin/mongo --username admin --password password --eval "db.getSiblingDB('local').oplog.rs.totalSize()/1024/1024" admin
-    - command: "json.send"
+          ../bin/mongo              \
+              --username admin      \
+              --password password   \
+              --eval "db.getSiblingDB('local').oplog.rs.totalSize()/1024/1024" \
+              admin
+
+    - command: json.send
       params:
         name: "perf"
-        file: "src/perf/perf.json"
-
-  "upload pip requirements":
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: pip-requirements.txt
-      remote_file: ${project}/${build_variant}/${revision}/pip-requirements-${task_id}-${execution}.txt
-      bucket: mciuploads
-      permissions: public-read
-      content_type: atext-plain
-      display_name: Pip Requirements
+        file: "./perf.json"
 
 tasks:
-
-- name: genny_scale_InsertRemove
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+###
+# Same in every DSI project
+- name: genny_generate_all_tasks
   commands:
-  - func: "start server"
-  - func: "run genny workload"
-    vars:
-      workload: scale/InsertRemove.yml
-
-- name: genny_execution_UserAcquisition
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+    - command: git.get_project
+      params:
+        directory: *src_dir
+        revisions:
+          dsi: ${dsi_rev}
+          linkbench: ${linkbench_rev}
+          linkbench2: ${linkbench2_rev}
+          genny: ${genny_rev}
+          workloads: ${workloads_rev}
+          signal-processing: ${signal-processing_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+    - command: shell.exec
+      params:
+        script: ./src/genny/scripts/genny_auto_tasks.sh all_tasks
+    - command: generate.tasks
+      params:
+        files:
+          - build/TaskJSON/Tasks.json
+- name: genny_auto_tasks
   commands:
-  - func: "start server"
-  - func: "run genny workload"
-    vars:
-      workload: execution/UserAcquisition.yml
+    - command: git.get_project
+      params:
+        directory: *src_dir
+        revisions:
+          dsi: ${dsi_rev}
+          linkbench: ${linkbench_rev}
+          linkbench2: ${linkbench2_rev}
+          genny: ${genny_rev}
+          workloads: ${workloads_rev}
+          signal-processing: ${signal-processing_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+    - command: shell.exec
+      params:
+        script: ./src/genny/scripts/genny_auto_tasks.sh variant_tasks
+    - command: generate.tasks
+      params:
+        files:
+          - build/TaskJSON/Tasks.json
+- name: genny_patch_tasks
+  commands:
+    - command: git.get_project
+      params:
+        directory: *src_dir
+        revisions:
+          dsi: ${dsi_rev}
+          linkbench: ${linkbench_rev}
+          linkbench2: ${linkbench2_rev}
+          genny: ${genny_rev}
+          workloads: ${workloads_rev}
+          signal-processing: ${signal-processing_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+    - command: shell.exec
+      params:
+        script: ./src/genny/scripts/genny_auto_tasks.sh patch_tasks
+    - command: generate.tasks
+      params:
+        files:
+          - build/TaskJSON/Tasks.json
+- name: smoke_test
+  priority: 5
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: "short"
+- name: smoke_test_ssl
+  priority: 5
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+          test_control: short
+          mongodb_setup: replica-ssl
+          infrastructure_provisioning: replica
+- name: dsi_integ_test_run_command_simple
+  priority: 5
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: "run_command_simple"
+###
 
 - name: compile
   commands:
-    # Calling the git.get_project command here will clone the mongodb/mongo repository, as well as
-    # the repositories defined in the build variant's "modules" section.
-    - func: "git get project"
+    - command: git.get_project
+      params:
+        directory: src
+        revisions:
+          enterprise: ${enterprise_rev}
     # We create a virtual environment with the Python dependencies for compiling the server
     # installed.
     - command: shell.exec
@@ -304,11 +556,9 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-
           /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python3 "${workdir}/compile_venv"
           /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python2 "${workdir}/venv"
           source "${workdir}/compile_venv/bin/activate"
-
           python -m pip install -r etc/pip/compile-requirements.txt
     - command: shell.exec
       params:
@@ -316,7 +566,6 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-
           # We get the raw version string (r1.2.3-45-gabcdef) from git
           MONGO_VERSION=$(git describe --abbrev=7)
           # If this is a patch build, we add the patch version id to the version string so we know
@@ -324,7 +573,6 @@ tasks:
           if [ "${is_patch|}" = "true" ]; then
             MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
           fi
-
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
           source "${workdir}/compile_venv/bin/activate"
@@ -339,7 +587,6 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-
           source "${workdir}/compile_venv/bin/activate"
           python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} install-mongo{,d} DESTDIR=$(pwd)/mongodb
           tar czf mongodb${compile-variant|}.tar.gz -C mongodb .
@@ -355,271 +602,224 @@ tasks:
         display_name: mongodb${compile-variant|}.tar.gz
 
 
-- name: query
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+- name: genny_scale_InsertRemove
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_genny_workload
+      vars:
+        workload: scale/InsertRemove.yml
+    - func: f_run_analysis
+
+- name: genny_execution_UserAcquisition
+  depends_on: *_compile
+  commands:
+    - func: f_start_server
+    - func: f_run_genny_workload
+      vars:
+        workload: execution/UserAcquisition.yml
+    - func: f_run_analysis
+
+- name: query
+  depends_on: *_compile
+  commands:
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "query"
         includeFilter2: "core regression"
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: views-query
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "query_identityview"
         includeFilter2: "core regression"
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: true
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: views-aggregation
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "aggregation_identityview"
         includeFilter2: "regression"
         excludeFilter: "none"
         threads: "1"
         readCmd: true
-    - func: "analyze"
-      vars:
-        report_analysis: true
+    - func: f_run_analysis
+
 - name: where
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "where"
         includeFilter2: "core regression"
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: update
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "update"
         includeFilter2: "core regression"
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: insert
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "insert"
         includeFilter2: "core regression"
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: wildcard-index-read
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "wildcard_read"
         includeFilter2: "core regression"
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: wildcard-index-write
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "wildcard_write"
         includeFilter2: "core regression"
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: geo
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "geo"
         includeFilter2: "core regression"
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: misc
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "command multi remove mixed"
         includeFilter2: "core regression"
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: singleThreaded
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "single_threaded"
         includeFilter2: "core regression"
         excludeFilter: "none"
         threads: "1"
         readCmd: false
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: aggregation
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "aggregation"
         includeFilter2: "regression"
         excludeFilter: "js"
         threads: "1"
         readCmd: false
-    - func: "analyze"
-      vars:
-        report_analysis: true
+    - func: f_run_analysis
+
 - name: agg-query-comparison
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "agg_query_comparison"
         includeFilter2: "core regression"
         excludeFilter: "single_threaded"
         threads: "1 2 4 8"
         readCmd: false
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: pipeline-updates
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "pipeline-updates"
         includeFilter2: "regression"
         excludeFilter: "none"
         threads: "1 2 4 8"
         readCmd: true
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
 - name: javascript
-  depends_on:
-  - variant: linux-wt-standalone
-    name: compile
+  depends_on: *_compile
   commands:
-    - func: "git get project"
-    - func: "start server"
-    - func: "run perf tests"
+    - func: f_start_server
+    - func: f_run_perf_tests
       vars:
         includeFilter1: "js"
         includeFilter2: "aggregation"
         excludeFilter: "none"
         threads: "1 2 4 8"
         readCmd: true
-    - func: "analyze"
-      vars:
-        reports_analysis: true
+    - func: f_run_analysis
+
+
 buildvariants:
 - name: linux-wt-standalone
   display_name: Standalone Linux inMemory
   batchtime: 90  # 1.5 hours
-  modules:
-    - enterprise
-    - genny
-    - dsi
-    - mongo-perf
-    - signal-processing
+  modules: *modules
   expansions:
     # We are explicitly tracking the rhel62 variant compile options from evergreen.yml for
     # microbenchmarks, since they run on the centos6 boxes.  If we can get proper artifacts directly
@@ -667,11 +867,7 @@ buildvariants:
 - name: linux-wt-repl
   display_name: 1-Node ReplSet Linux inMemory
   batchtime: 90  # 1.5 hours
-  modules:
-    - genny
-    - dsi
-    - mongo-perf
-    - signal-processing
+  modules: *modules
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
