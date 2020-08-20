@@ -197,9 +197,9 @@ Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(BSONObj opt
     return Status::OK();
 }
 
-void TenantMigrationDonorService::Instance::run(
+SemiFuture<void> TenantMigrationDonorService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
-    ExecutorFuture<void>(**executor)
+    return ExecutorFuture<void>(**executor)
         .then([this, executor] {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
@@ -251,26 +251,25 @@ void TenantMigrationDonorService::Instance::run(
             // Wait for the migration to commit or abort.
             return _mtab->onCompletion();
         })
-        .getAsync([this](Status status) {
-            if (!status.isOK()) {
-                if (_abortReason) {
-                    status.addContext(str::stream()
-                                      << "Tenant migration with id \"" << _stateDoc.getId()
-                                      << "\" and dbPrefix \"" << _stateDoc.getDatabasePrefix()
-                                      << "\" aborted due to " << _abortReason);
-                }
-                _completionPromise.setError(status);
-            } else {
-                _completionPromise.emplaceValue();
+        .onError([this](Status status) {
+            if (!status.isOK() && _abortReason) {
+                status.addContext(str::stream()
+                                  << "Tenant migration with id \"" << _stateDoc.getId()
+                                  << "\" and dbPrefix \"" << _stateDoc.getDatabasePrefix()
+                                  << "\" aborted due to " << _abortReason);
             }
-
+            return status;
+        })
+        .onCompletion([this](Status status) {
             LOGV2(5006601,
                   "Tenant migration completed",
                   "migrationId"_attr = _stateDoc.getId(),
                   "dbPrefix"_attr = _stateDoc.getDatabasePrefix(),
                   "status"_attr = status,
                   "abortReason"_attr = _abortReason);
-        });
+            return status;
+        })
+        .semi();
 }
 
 }  // namespace mongo

@@ -70,7 +70,8 @@ public:
     public:
         Instance(ServiceContext* serviceContext, const BSONObj& initialState);
 
-        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
+        SemiFuture<void> run(
+            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
 
         /**
          * To be called on the instance returned by PrimaryOnlyService::getOrCreate. Returns an
@@ -78,10 +79,6 @@ public:
          * an instance with the options given in 'options'.
          */
         Status checkIfOptionsConflict(BSONObj options);
-
-        SharedSemiFuture<void> onCompletion() {
-            return _completionPromise.getFuture();
-        }
 
     private:
         const NamespaceString _stateDocumentsNS = NamespaceString::kTenantMigrationDonorsNamespace;
@@ -111,7 +108,6 @@ public:
         TenantMigrationDonorDocument _stateDoc;
 
         std::shared_ptr<TenantMigrationAccessBlocker> _mtab;
-        SharedPromise<void> _completionPromise;
         boost::optional<Status> _abortReason;
     };
 

@@ -277,7 +277,7 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateIns
     invariant(inserted);
 
     // Kick off async work to run the instance
-    it2->second->scheduleRun(_scopedExecutor);
+    _scheduleRun(lk, it2->second);
 
     return it2->second;
 }
@@ -373,25 +373,40 @@ void PrimaryOnlyService::_rebuildInstances() noexcept {
 
         auto [_, inserted] = _instances.emplace(instanceID, instance);
         invariant(inserted);
-        instance->scheduleRun(_scopedExecutor);
+        _scheduleRun(lk, std::move(instance));
     }
     _state = State::kRunning;
     _rebuildCV.notify_all();
 }
 
-void PrimaryOnlyService::Instance::scheduleRun(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
-    invariant(!_running);
-    _running = true;
+void PrimaryOnlyService::_scheduleRun(WithLock wl, std::shared_ptr<Instance> instance) {
+    (*_scopedExecutor)
+        ->schedule([this,
+                    instance = std::move(instance),
+                    scopedExecutor = _scopedExecutor,
+                    executor = _executor](auto status) {
+            if (ErrorCodes::isCancelationError(status) ||
+                ErrorCodes::InterruptedDueToReplStateChange ==  // from kExecutorShutdownStatus
+                    status) {
+                instance->_completionPromise.setError(status);
+                return;
+            }
+            invariant(status);
 
-    (*executor)->schedule([this, executor = std::move(executor)](auto status) {
-        if (ErrorCodes::isCancelationError(status) || ErrorCodes::NotMaster == status) {
-            return;
-        }
-        invariant(status);
+            invariant(!instance->_running);
+            instance->_running = true;
 
-        run(std::move(executor));
-    });
+            instance->run(std::move(scopedExecutor))
+                .thenRunOn(std::move(executor))  // Must use executor for this since scopedExecutor
+                                                 // could be shut down by this point
+                .getAsync([instance](Status status) {
+                    if (status.isOK()) {
+                        instance->_completionPromise.emplaceValue();
+                    } else {
+                        instance->_completionPromise.setError(status);
+                    }
+                });
+        });
 }
 
 }  // namespace repl

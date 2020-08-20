@@ -50,9 +50,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(const
     _reshardingCoordinatorObserver = std::make_shared<ReshardingCoordinatorObserver>();
 }
 
-void ReshardingCoordinatorService::ReshardingCoordinator::run(
+SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
-    ExecutorFuture<void>(**executor)
+    return ExecutorFuture<void>(**executor)
         .then([this, executor] { return _init(executor); })
         .then([this] { _tellAllRecipientsToRefresh(); })
         .then([this, executor] { return _awaitAllRecipientsCreatedCollection(executor); })
@@ -91,16 +91,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::run(
 
             return status;
         })
-        .getAsync([this](Status status) {
-            if (!status.isOK()) {
-                invariant(_stateDoc.getState() == CoordinatorStateEnum::kError);
-                _completionPromise.setError(status);
-                return;
-            }
-
-            invariant(_stateDoc.getState() == CoordinatorStateEnum::kDone);
-            _completionPromise.emplaceValue();
-        });
+        .semi();
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::setInitialChunksAndZones(

@@ -73,11 +73,8 @@ public:
     public:
         explicit ReshardingCoordinator(const BSONObj& state);
 
-        SharedSemiFuture<void> getCompletionPromise() {
-            return _completionPromise.getFuture();
-        }
-
-        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
+        SemiFuture<void> run(
+            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
 
         void setInitialChunksAndZones(std::vector<ChunkType> initialChunks,
                                       std::vector<TagsType> newZones);
@@ -198,9 +195,6 @@ public:
 
         // The updated coordinator state document.
         ReshardingCoordinatorDocument _stateDoc;
-
-        // Fulfilled only after transitioned to kDone or kError
-        SharedPromise<void> _completionPromise;
     };
 };
 

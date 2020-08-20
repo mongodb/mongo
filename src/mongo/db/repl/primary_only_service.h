@@ -42,7 +42,9 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -86,14 +88,13 @@ public:
      */
     class Instance {
     public:
+        friend class PrimaryOnlyService;
+
         virtual ~Instance() = default;
 
-        /**
-         * Schedules work to call this instance's 'run' method against the provided
-         * ScopedTaskExecutor. Also includes checking to ensure that run is only ever scheduled
-         * once.
-         */
-        void scheduleRun(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+        SharedSemiFuture<void> onCompletion() {
+            return _completionPromise.getFuture();
+        }
 
     protected:
         /**
@@ -102,10 +103,14 @@ public:
          * this Instance *must* be scheduled on 'executor'. Instances are responsible for inserting,
          * updating, and deleting their state documents as needed.
          */
-        virtual void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept = 0;
+        virtual SemiFuture<void> run(
+            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept = 0;
 
     private:
         bool _running = false;
+
+        // Promise that gets emplaced when the future returned by run() resolves.
+        SharedPromise<void> _completionPromise;
     };
 
     /**
@@ -234,6 +239,12 @@ private:
      * to run all the newly recreated Instances.
      */
     void _rebuildInstances() noexcept;
+
+    /**
+     * Schedules work to call the provided instance's 'run' method. Must be called while holding
+     * _mutex.
+     */
+    void _scheduleRun(WithLock, std::shared_ptr<Instance> instance);
 
     ServiceContext* const _serviceContext;
 
