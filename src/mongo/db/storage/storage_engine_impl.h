@@ -388,7 +388,8 @@ private:
                                const std::string& ident,
                                InternalIdentReconcilePolicy internalIdentReconcilePolicy,
                                ReconcileResult* reconcileResult,
-                               std::set<std::string>* internalIdentsToDrop);
+                               std::set<std::string>* internalIdentsToDrop,
+                               std::set<std::string>* allInternalIdents);
 
     class RemoveDBChange;
 

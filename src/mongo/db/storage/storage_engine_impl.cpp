@@ -331,10 +331,13 @@ bool StorageEngineImpl::_handleInternalIdents(
     const std::string& ident,
     InternalIdentReconcilePolicy internalIdentReconcilePolicy,
     ReconcileResult* reconcileResult,
-    std::set<std::string>* internalIdentsToDrop) {
+    std::set<std::string>* internalIdentsToDrop,
+    std::set<std::string>* allInternalIdents) {
     if (!_catalog->isInternalIdent(ident)) {
         return false;
     }
+
+    allInternalIdents->insert(ident);
 
     if (InternalIdentReconcilePolicy::kDrop == internalIdentReconcilePolicy ||
         !supportsResumableIndexBuilds()) {
@@ -378,8 +381,6 @@ bool StorageEngineImpl::_handleInternalIdents(
             reconcileResult->indexBuildsToResume.push_back(resumeInfo);
 
             // Once we have parsed the resume info, we can safely drop the internal ident.
-            // TODO SERVER-49846: revisit this logic since this could cause the side tables
-            // associated with the index build to be orphaned if resuming fails.
             internalIdentsToDrop->insert(ident);
 
             LOGV2(4916301,
@@ -435,6 +436,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         catalogIdents.insert(vec.begin(), vec.end());
     }
     std::set<std::string> internalIdentsToDrop;
+    std::set<std::string> allInternalIdents;
 
     auto dropPendingIdents = _dropPendingIdentReaper.getAllIdentNames();
 
@@ -446,8 +448,12 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             continue;
         }
 
-        if (_handleInternalIdents(
-                opCtx, it, internalIdentReconcilePolicy, &reconcileResult, &internalIdentsToDrop)) {
+        if (_handleInternalIdents(opCtx,
+                                  it,
+                                  internalIdentReconcilePolicy,
+                                  &reconcileResult,
+                                  &internalIdentsToDrop,
+                                  &allInternalIdents)) {
             continue;
         }
 
@@ -621,6 +627,11 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             _catalog->putMetaData(opCtx, entry.catalogId, metaData);
             wuow.commit();
         }
+    }
+
+    // If there are no index builds to resume, we should drop all internal idents.
+    if (reconcileResult.indexBuildsToResume.empty()) {
+        internalIdentsToDrop.swap(allInternalIdents);
     }
 
     for (auto&& temp : internalIdentsToDrop) {

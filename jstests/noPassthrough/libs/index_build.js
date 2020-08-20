@@ -575,6 +575,7 @@ const ResumableIndexBuildTest = class {
         // Ensure that the resumable index build failed as expected.
         if (failWhileParsing) {
             assert(RegExp("4916300.*").test(rawMongoProgramOutput()));
+            assert(RegExp("22257.*").test(rawMongoProgramOutput()));
         } else {
             assert(RegExp("4841701.*" + buildUUID).test(rawMongoProgramOutput()));
         }
@@ -584,5 +585,14 @@ const ResumableIndexBuildTest = class {
 
         ResumableIndexBuildTest.checkIndexes(
             rst, dbName, collName, indexName, postIndexBuildInserts);
+
+        // If we fail after parsing, any remaining internal idents will only be cleaned up after
+        // another restart.
+        if (!failWhileParsing) {
+            clearRawMongoProgramOutput();
+            rst.stop(primary);
+            rst.start(primary, {noCleanData: true});
+            assert(RegExp("22257.*").test(rawMongoProgramOutput()));
+        }
     }
 };

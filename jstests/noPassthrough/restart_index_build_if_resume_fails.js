@@ -35,8 +35,6 @@ ResumableIndexBuildTest.runFailToResume(rst,
                                         [{a: 2}, {a: 3}],
                                         [{a: 4}, {a: 5}],
                                         true /* failWhileParsing */);
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: 'failToParseResumeIndexInfo', mode: 'off'}));
 
 ResumableIndexBuildTest.runFailToResume(
     rst, dbName, collName, {a: 1}, "failSetUpResumeIndexBuild", [{a: 6}, {a: 7}], [{a: 8}, {a: 9}]);
