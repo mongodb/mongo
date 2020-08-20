@@ -1510,6 +1510,11 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
       __wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen))
         return (false);
 
+    /* If the metadata page is clean but has modifications that appear too new to evict, skip it. */
+    if (WT_IS_METADATA(S2BT(session)->dhandle) && !modified &&
+      !__wt_txn_visible_all(session, mod->rec_max_txn, mod->rec_max_timestamp))
+        return (false);
+
     return (true);
 }
 
