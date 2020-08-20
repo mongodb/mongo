@@ -2376,6 +2376,20 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
         return;
     }
 
+    // When we are applying a startIndexBuild oplog entry during the oplog application phase of
+    // startup recovery, the last optime here derived from the local oplog may not be a valid
+    // optime to wait on for the majority commit point since the rest of the replica set may
+    // be on a different branch of history.
+    // TODO(SERVER-48419): Examine impact on rollback.
+    if (inReplicationRecovery(opCtx->getServiceContext())) {
+        LOGV2(4984700,
+              "Index build: in replication recovery. Not waiting for last optime before "
+              "interceptors to be majority committed",
+              "buildUUID"_attr = replState->buildUUID,
+              "lastOpTime"_attr = replState->lastOpTimeBeforeInterceptors);
+        return;
+    }
+
     LOGV2(4847600,
           "Index build: waiting for last optime before interceptors to be majority committed",
           "buildUUID"_attr = replState->buildUUID,
