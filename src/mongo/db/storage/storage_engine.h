@@ -503,7 +503,7 @@ public:
     /**
      * Returns the initial data timestamp.
      */
-    virtual Timestamp getInitialDataTimestamp() = 0;
+    virtual Timestamp getInitialDataTimestamp() const = 0;
 
     /**
      * Uses the current stable timestamp to set the oldest timestamp for which the storage engine

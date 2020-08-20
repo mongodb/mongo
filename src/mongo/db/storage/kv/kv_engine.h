@@ -332,7 +332,7 @@ public:
     /**
      * See `StorageEngine::getInitialDataTimestamp`
      */
-    virtual Timestamp getInitialDataTimestamp() {
+    virtual Timestamp getInitialDataTimestamp() const {
         return Timestamp();
     }
 

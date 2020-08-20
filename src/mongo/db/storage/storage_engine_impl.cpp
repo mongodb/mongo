@@ -874,7 +874,7 @@ void StorageEngineImpl::setInitialDataTimestamp(Timestamp initialDataTimestamp) 
     _engine->setInitialDataTimestamp(initialDataTimestamp);
 }
 
-Timestamp StorageEngineImpl::getInitialDataTimestamp() {
+Timestamp StorageEngineImpl::getInitialDataTimestamp() const {
     return _engine->getInitialDataTimestamp();
 }
 

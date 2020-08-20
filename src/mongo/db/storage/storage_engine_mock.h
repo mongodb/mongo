@@ -135,7 +135,7 @@ public:
     }
     void setStableTimestamp(Timestamp stableTimestamp, bool force = false) final {}
     void setInitialDataTimestamp(Timestamp timestamp) final {}
-    Timestamp getInitialDataTimestamp() {
+    Timestamp getInitialDataTimestamp() const override {
         return Timestamp();
     }
     void setOldestTimestampFromStable() final {}

@@ -237,7 +237,7 @@ public:
 
     void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
-    Timestamp getInitialDataTimestamp() override;
+    Timestamp getInitialDataTimestamp() const override;
 
     void setOldestTimestampFromStable() override;
 
