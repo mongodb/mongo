@@ -39,7 +39,9 @@ class InternalSchemaObjectMatchExpression final : public PathMatchExpression {
 public:
     static constexpr StringData kName = "$_internalSchemaObjectMatch"_sd;
 
-    InternalSchemaObjectMatchExpression(StringData path, std::unique_ptr<MatchExpression> expr);
+    InternalSchemaObjectMatchExpression(StringData path,
+                                        std::unique_ptr<MatchExpression> expr,
+                                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     bool matchesSingleElement(const BSONElement& elem, MatchDetails* details = nullptr) const final;
 

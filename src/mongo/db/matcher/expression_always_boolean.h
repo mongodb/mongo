@@ -126,14 +126,15 @@ class AlwaysTrueMatchExpression final : public AlwaysBooleanMatchExpression {
 public:
     static constexpr StringData kName = "$alwaysTrue"_sd;
 
-    AlwaysTrueMatchExpression() : AlwaysBooleanMatchExpression(MatchType::ALWAYS_TRUE, true) {}
+    AlwaysTrueMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : AlwaysBooleanMatchExpression(MatchType::ALWAYS_TRUE, true, std::move(annotation)) {}
 
     StringData name() const final {
         return kName;
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
-        return std::make_unique<AlwaysTrueMatchExpression>();
+        return std::make_unique<AlwaysTrueMatchExpression>(_errorAnnotation);
     }
 
     bool isTriviallyTrue() const final {

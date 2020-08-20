@@ -197,11 +197,14 @@ class InternalSchemaBinDataSubTypeExpression final : public LeafMatchExpression 
 public:
     static constexpr StringData kName = "$_internalSchemaBinDataSubType"_sd;
 
-    InternalSchemaBinDataSubTypeExpression(StringData path, BinDataType binDataSubType)
+    InternalSchemaBinDataSubTypeExpression(StringData path,
+                                           BinDataType binDataSubType,
+                                           clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : LeafMatchExpression(MatchExpression::INTERNAL_SCHEMA_BIN_DATA_SUBTYPE,
                               path,
                               ElementPath::LeafArrayBehavior::kNoTraversal,
-                              ElementPath::NonLeafArrayBehavior::kTraverse),
+                              ElementPath::NonLeafArrayBehavior::kTraverse,
+                              std::move(annotation)),
           _binDataSubType(binDataSubType) {}
 
     StringData name() const {
@@ -214,8 +217,8 @@ public:
     }
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto expr =
-            std::make_unique<InternalSchemaBinDataSubTypeExpression>(path(), _binDataSubType);
+        auto expr = std::make_unique<InternalSchemaBinDataSubTypeExpression>(
+            path(), _binDataSubType, _errorAnnotation);
         if (getTag()) {
             expr->setTag(getTag()->clone());
         }
