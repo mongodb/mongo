@@ -50,6 +50,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(abortTenantMigrationAfterBlockingStarts);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterBlockingStarts);
+MONGO_FAIL_POINT_DEFINE(skipSendingRecipientSyncDataCommand);
 
 const Seconds kRecipientSyncDataTimeout(30);
 
@@ -142,6 +143,10 @@ void TenantMigrationDonorService::Instance::_sendRecipientSyncDataCommand(
     OperationContext* opCtx,
     executor::TaskExecutor* executor,
     RemoteCommandTargeter* recipientTargeter) {
+    if (skipSendingRecipientSyncDataCommand.shouldFail()) {
+        return;
+    }
+
     BSONObj cmdObj = BSONObj([&]() {
         auto donorConnString =
             repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
@@ -199,13 +204,12 @@ void TenantMigrationDonorService::Instance::run(
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
-            auto recipientConnString =
-                ConnectionString(_stateDoc.getRecipientConnectionString().toString(),
-                                 ConnectionString::ConnectionType::SET);
+            auto recipientUri = uassertStatusOK(
+                MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()));
             auto recipientTargeter = std::make_unique<RemoteCommandTargeterRS>(
-                recipientConnString.getSetName(), recipientConnString.getServers());
+                recipientUri.getSetName(), recipientUri.getServers());
             auto removeRecipientReplicaSetMonitorGuard =
-                makeGuard([&] { ReplicaSetMonitor::remove(recipientConnString.getSetName()); });
+                makeGuard([&] { ReplicaSetMonitor::remove(recipientUri.getSetName()); });
 
             // Enter "dataSync" state.
             invariant(_stateDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
@@ -221,9 +225,17 @@ void TenantMigrationDonorService::Instance::run(
 
             pauseTenantMigrationAfterBlockingStarts.pauseWhileSet(opCtx);
 
-            if (abortTenantMigrationAfterBlockingStarts.shouldFail()) {
+            abortTenantMigrationAfterBlockingStarts.execute([&](const BSONObj& data) {
+                if (data.hasField("blockTimeMS")) {
+                    const auto blockTime = Milliseconds{data.getIntField("blockTimeMS")};
+                    LOGV2(5010400,
+                          "Keep migration in blocking state before aborting",
+                          "blockTime"_attr = blockTime);
+                    opCtx->sleepFor(blockTime);
+                }
+
                 uasserted(ErrorCodes::InternalError, "simulate a tenant migration error");
-            }
+            });
 
             // Enter "commit" state.
             _updateStateDocument(opCtx, TenantMigrationDonorStateEnum::kCommitted);
