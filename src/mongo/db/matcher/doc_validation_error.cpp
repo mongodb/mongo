@@ -974,6 +974,10 @@ bool hasErrorAnnotations(const MatchExpression& validatorExpr) {
 }  // namespace
 
 std::shared_ptr<const ErrorExtraInfo> DocumentValidationFailureInfo::parse(const BSONObj& obj) {
+    if (!obj.hasField("errInfo"_sd)) {
+        // TODO SERVER-50524: remove this block when 5.0 becomes last-lts.
+        return nullptr;
+    }
     auto errInfo = obj["errInfo"];
     uassert(4878100,
             "DocumentValidationFailureInfo must have a field 'errInfo' of type object",
@@ -993,7 +997,9 @@ BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc) 
     ValidationErrorInVisitor inVisitor{&context};
     ValidationErrorPostVisitor postVisitor{&context};
     // TODO SERVER-49446: Once all nodes have ErrorAnnotations, this check should be converted to an
-    // invariant check that all nodes have an annotation.
+    // invariant check that all nodes have an annotation. Also add an invariant to the
+    // DocumentValidationFailureInfo constructor to check that it is initialized with a non-empty
+    // object.
     if (!hasErrorAnnotations(validatorExpr)) {
         return BSONObj();
     }
