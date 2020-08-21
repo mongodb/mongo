@@ -39,7 +39,10 @@ be crafted with care and attention.
 
 * Concisely describe what the log line is reporting, providing enough
   context necessary for interpreting attribute field names and values
-* Avoid unnecessary punctuation and do not conclude with punctuation
+* Capitalize the first letter, as in a sentence
+* Avoid unnecessary punctuation, but punctuate between sentences if using 
+  multiple sentences
+* Do not conclude with punctuation
 * For new log messages, do __not__ use a format string/substitution for
   new log messages
 * For updating existing log messages, provide both a format
@@ -53,7 +56,7 @@ should be named very well, as though intended for a very human-readable portion
 of the codebase (like config variable declaration, abstract class definitions,
 etc.)
 
-For `attr` fields, do the following:
+For `attr` field names, do the following:
 
 #### Use camelCased words understandable in the context of the message (msg)
 
@@ -132,6 +135,12 @@ When logging the below information, do so with these specific terms:
       { ..., "id": 1040, "msg": "Replica set state transition on this node",
           "attr": { "oldState": "SECONARY", "newState": "PRIMARY" } }
 
+- For adding STL containers as dynamic attributes, see
+    [RollbackImpl::_summarizeRollback][_summarizeRollback]
+
+- For sharing a string between a log line and a status see [this section of
+    InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp][
+    _lastOplogEntryFetcherCallbackForStopTimestamp]
 
 # Basic Usage
 
@@ -778,3 +787,5 @@ it only when absolutely necessary.
 [relaxed_json_2]: https://github.com/mongodb/specifications/blob/master/source/extended-json.rst
 [libfmt]: https://fmt.dev/6.1.1/index.html
 [libfmt_syn]: https://fmt.dev/6.1.1/syntax.html#formatspec
+[_lastOplogEntryFetcherCallbackForStopTimestamp]: https://github.com/mongodb/mongo/blob/13caf3c499a22c2274bd533043eb7e06e6f8e8a4/src/mongo/db/repl/initial_syncer.cpp#L1500-L1512
+[_summarizeRollback]: https://github.com/mongodb/mongo/blob/13caf3c499a22c2274bd533043eb7e06e6f8e8a4/src/mongo/db/repl/rollback_impl.cpp#L1263-L1305
