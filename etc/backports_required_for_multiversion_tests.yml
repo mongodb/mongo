@@ -73,7 +73,7 @@ all:
     test_file: jstests/sharding/retryable_writes.js
   - ticket: SERVER-31368
     test_file: jstests/sharding/log_remote_op_wait.js
-  - ticket: SERVER-49986
+  - ticket: SERVER-49987
     test_file: jstests/core/ismaster.js
   - ticket: SERVER-49987
     test_file: jstests/replsets/ismaster1.js
@@ -81,7 +81,7 @@ all:
     test_file: jstests/core/views/views_all_commands.js
   - ticket: SERVER-49986
     test_file: jstests/sharding/database_versioning_all_commands.js
-  - ticket: SERVER-49986
+  - ticket: SERVER-49988
     test_file: jstests/sharding/ismaster.js
   - ticket: SERVER-49986
     test_file: jstests/sharding/read_write_concern_defaults_application.js
