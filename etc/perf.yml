@@ -688,6 +688,7 @@ tasks:
 - name: insert
   depends_on: *_compile
   commands:
+    - func: f_start_server
     - func: f_run_perf_tests
       vars:
         includeFilter1: "insert"
