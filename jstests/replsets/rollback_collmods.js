@@ -1,10 +1,6 @@
 /**
  * Tests that collMod commands during every stage of rollback are tracked correctly.
  * This especially targets collection validators that begin partially or fully uninitialized.
- *
- * TODO(SERVER-50183): Unblacklist this test from EMRC=false variants once RollbackTestDeluxe
- * supports RVR.
- * @tags: [requires_majority_read_concern]
  */
 
 (function() {
