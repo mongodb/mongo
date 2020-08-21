@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/scripting/mozjs/jsthread.h"
@@ -36,6 +38,7 @@
 #include <vm/PosixNSPR.h>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/valuereader.h"
@@ -188,6 +191,9 @@ private:
                 thisv->_sharedData->_returnData = scope.callThreadArgs(thisv->_sharedData->_args);
             } catch (...) {
                 auto status = exceptionToStatus();
+                LOGV2_WARNING(4988200,
+                              "JS Thread exiting after catching unhandled exception",
+                              "error"_attr = status);
                 thisv->_sharedData->setErrorStatus(status);
                 thisv->_sharedData->_returnData = BSON("ret" << BSONUndefined);
             }
