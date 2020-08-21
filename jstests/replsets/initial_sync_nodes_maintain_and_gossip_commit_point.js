@@ -41,7 +41,7 @@ function getLastCommittedOpTime(conn) {
 }
 
 const firstCommitPoint = getLastCommittedOpTime(primary);
-jsTestLog(`First commit point: ${firstCommitPoint}`);
+jsTestLog(`First commit point: ${tojson(firstCommitPoint)}`);
 
 // Disconnect the non-voting secondary from the other nodes so that it won't update its commit point
 // from the other nodes' heartbeats.
@@ -80,7 +80,7 @@ rst.awaitLastOpCommitted(undefined, [primary, secondary]);
 
 const secondCommitPointPrimary = getLastCommittedOpTime(primary);
 const secondCommitPointSecondary = getLastCommittedOpTime(secondary);
-jsTestLog(`Second commit point: ${secondCommitPointPrimary}`);
+jsTestLog(`Second commit point: ${tojson(secondCommitPointPrimary)}`);
 
 // Verify that the commit point has advanced on the primary and secondary.
 assert.eq(1, rs.compareOpTimes(secondCommitPointPrimary, firstCommitPoint));
@@ -91,7 +91,7 @@ let commitPointNonVotingSecondary = getLastCommittedOpTime(nonVotingSecondary);
 assert.eq(rs.compareOpTimes(commitPointNonVotingSecondary, secondCommitPointPrimary),
           -1,
           `commit point on the non-voting secondary should not have been advanced: ${
-              commitPointNonVotingSecondary}`);
+              tojson(commitPointNonVotingSecondary)}`);
 
 // Allow the node to proceed to the oplog applying phase of initial sync and ensure that the oplog
 // fetcher thread is still running.
@@ -107,7 +107,7 @@ rst.awaitLastOpCommitted(undefined, [primary, secondary]);
 
 const thirdCommitPointPrimary = getLastCommittedOpTime(primary);
 const thirdCommitPointSecondary = getLastCommittedOpTime(secondary);
-jsTestLog(`Third commit point: ${thirdCommitPointPrimary}`);
+jsTestLog(`Third commit point: ${tojson(thirdCommitPointPrimary)}`);
 
 // Verify that the commit point has advanced on the primary and secondary.
 assert.eq(1, rs.compareOpTimes(thirdCommitPointPrimary, secondCommitPointPrimary));
@@ -118,7 +118,7 @@ commitPointNonVotingSecondary = getLastCommittedOpTime(nonVotingSecondary);
 assert.eq(rs.compareOpTimes(commitPointNonVotingSecondary, thirdCommitPointPrimary),
           -1,
           `commit point on the non-voting secondary should not have been advanced: ${
-              commitPointNonVotingSecondary}`);
+              tojson(commitPointNonVotingSecondary)}`);
 
 // Allow the initial sync node to complete oplog fetching but hang it before it completes initial
 // sync.
@@ -133,7 +133,7 @@ assert.gte(
     rs.compareOpTimes(commitPointInitialSyncNode, secondCommitPointPrimary),
     0,
     `commit point on initial sync node should be at least as up-to-date as the second commit point: ${
-        commitPointInitialSyncNode}`);
+        tojson(commitPointInitialSyncNode)}`);
 
 // Verify that the non-voting secondary has received the updated commit point via heartbeats from
 // the initial sync node.
