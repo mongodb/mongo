@@ -1,4 +1,5 @@
 // Test several different kinds of size limits on user-defined (Javascript) accumulators.
+// @tags: [resource_intensive]
 (function() {
 "use strict";
 
