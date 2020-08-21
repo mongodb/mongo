@@ -302,13 +302,16 @@ PlanStage* buildStages(OperationContext* opCtx,
         }
         case STAGE_SHARDING_FILTER: {
             const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
-            PlanStage* childStage = buildStages(opCtx, collection, cq, qsol, fn->children[0], ws);
+            std::unique_ptr<PlanStage> childStage{
+                buildStages(opCtx, collection, cq, qsol, fn->children[0], ws)};
             if (nullptr == childStage) {
                 return nullptr;
             }
 
             auto css = CollectionShardingState::get(opCtx, collection->ns());
-            return new ShardFilterStage(opCtx, css->getOrphansFilter(opCtx), ws, childStage);
+            auto scopedCollMetadata = css->getOrphansFilter(opCtx);
+            return new ShardFilterStage(
+                opCtx, std::move(scopedCollMetadata), ws, childStage.release());
         }
         case STAGE_DISTINCT_SCAN: {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);
