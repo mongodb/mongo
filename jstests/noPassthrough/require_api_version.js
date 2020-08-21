@@ -3,6 +3,8 @@
  *
  * This test is incompatible with parallel and passthrough suites; concurrent jobs fail while
  * requireApiVersion is true.
+ *
+ * @tags: [requires_journaling]
  */
 
 (function() {
