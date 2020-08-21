@@ -861,21 +861,24 @@ bool runCommandImpl(OperationContext* opCtx,
     // This fail point blocks all commands which are running on the specified namespace, or which
     // are present in the given list of commands.If no namespace or command list are provided,then
     // the failpoint will block all commands.
-    waitAfterCommandFinishesExecution.execute([&](const BSONObj& data) {
-        auto ns = data["ns"].valueStringDataSafe();
-        auto commands =
-            data.hasField("commands") ? data["commands"].Array() : std::vector<BSONElement>();
-
-        // If 'ns' or 'commands' is not set, block for all the namespaces or commands respectively.
-        if ((ns.empty() || invocation->ns().ns() == ns) &&
-            (commands.empty() ||
-             std::any_of(commands.begin(), commands.end(), [&request](auto& element) {
-                 return element.valueStringDataSafe() == request.getCommandName();
-             }))) {
+    waitAfterCommandFinishesExecution.executeIf(
+        [&](const BSONObj& data) {
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &waitAfterCommandFinishesExecution, opCtx, "waitAfterCommandFinishesExecution");
-        }
-    });
+        },
+        [&](const BSONObj& data) {
+            auto ns = data["ns"].valueStringDataSafe();
+            auto commands =
+                data.hasField("commands") ? data["commands"].Array() : std::vector<BSONElement>();
+
+            // If 'ns' or 'commands' is not set, block for all the namespaces or commands
+            // respectively.
+            return (ns.empty() || invocation->ns().ns() == ns) &&
+                (commands.empty() ||
+                 std::any_of(commands.begin(), commands.end(), [&request](auto& element) {
+                     return element.valueStringDataSafe() == request.getCommandName();
+                 }));
+        });
 
     behaviors.waitForLinearizableReadConcern(opCtx);
     tenant_migration_donor::checkIfLinearizableReadWasAllowedOrThrow(opCtx, request.getDatabase());
