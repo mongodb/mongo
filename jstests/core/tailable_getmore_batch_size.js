@@ -9,6 +9,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.isMongos().
+
 const collName = "tailable_getmore_batch_size";
 const coll = db[collName];
 const batchSize = 2;
@@ -59,11 +61,15 @@ let getMoreRes = assert.commandWorked(
     db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
 assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
 
-// Test that the same is true for a tailable, *awaitData* cursor.
-cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: true});
-getMoreRes = assert.commandWorked(
-    db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
-assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
+// Test that the same is true for a tailable, *awaitData* cursor when not running against
+// mongos. Mongos may return empty batches for tailable + awaitData cursors if its awaitData
+// timeout expires before it has received results from the shards.
+if (!FixtureHelpers.isMongos(db)) {
+    cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: true});
+    getMoreRes = assert.commandWorked(
+        db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+    assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
+}
 
 // Test that specifying a batch size to a getMore on a tailable cursor returns all
 // new results immediately, even if the batch size is larger than the number of new results.
@@ -74,27 +80,43 @@ getMoreRes = assert.commandWorked(
     db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
 assert.eq(getMoreRes.cursor.nextBatch.length, batchSize - 1);
 
-// Test that the same is true for a tailable, *awaitData* cursor.
-cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: true});
-getMoreRes = assert.commandWorked(
-    db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
-assert.eq(getMoreRes.cursor.nextBatch.length, batchSize - 1);
+// Test that the same is true for a tailable, *awaitData* cursor when run directly against
+// mongod. Mongos may return empty batches for tailable + awaitData cursors if its awaitData
+// timeout expires before it has received results from the shards.
+if (!FixtureHelpers.isMongos(db)) {
+    cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: true});
+    getMoreRes = assert.commandWorked(
+        db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+    assert.eq(getMoreRes.cursor.nextBatch.length, batchSize - 1);
+}
 
 // Test that using a smaller batch size than there are results will return all results without
 // empty batches in between (SERVER-30799).
-dropAndRecreateColl({numDocs: batchSize * 3});
-cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: false});
-getMoreRes = assert.commandWorked(
-    db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
-assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
-getMoreRes = assert.commandWorked(
-    db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
-assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
-getMoreRes = assert.commandWorked(
-    db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
-assert.eq(getMoreRes.cursor.nextBatch.length, 0);
+function checkNoIntermediateEmptyBatchesWhenBatchSizeSmall(awaitData) {
+    dropAndRecreateColl({numDocs: batchSize * 3});
+    cursorId = openCursor({batchSize: batchSize, tailable: true, awaitData: awaitData});
+    getMoreRes = assert.commandWorked(
+        db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+    assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
+    getMoreRes = assert.commandWorked(
+        db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+    assert.eq(getMoreRes.cursor.nextBatch.length, batchSize);
+    getMoreRes = assert.commandWorked(
+        db.runCommand({getMore: cursorId, collection: collName, batchSize: batchSize}));
+    assert.eq(getMoreRes.cursor.nextBatch.length, 0);
 
-// Avoid leaving the cursor open. Cursors above are killed by drops, but we'll avoid dropping
-// the collection at the end so other consistency checks like validate can be run against it.
-assert.commandWorked(db.runCommand({killCursors: collName, cursors: [getMoreRes.cursor.id]}));
+    // Avoid leaving the cursor open. Cursors above are killed by drops, but we'll avoid dropping
+    // the collection at the end so other consistency checks like validate can be run against it.
+    assert.commandWorked(db.runCommand({killCursors: collName, cursors: [getMoreRes.cursor.id]}));
+}
+
+checkNoIntermediateEmptyBatchesWhenBatchSizeSmall(false);
+
+// When using a tailable cursor with a smaller batch size than there are results will *generally*
+// return all results with no empty batches in between. However, this is not guaranteed when
+// using a tailable + awaitData cursor against mongos, as mongos may return an empty batch if
+// its awaitData timeout expires before it has received results from the shards.
+if (!FixtureHelpers.isMongos(db)) {
+    checkNoIntermediateEmptyBatchesWhenBatchSizeSmall(true);
+}
 }());
