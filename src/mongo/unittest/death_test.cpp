@@ -120,6 +120,9 @@ void DeathTestBase::_doTest() {
             if (fclose(pf) != 0)
                 logAndThrowWithErrno("fclose(pf)");
         });
+        LOGV2(5042601, "Death test starting");
+        auto alwaysLogExit = makeGuard([] { LOGV2(5042602, "Death test finishing"); });
+
         char* lineBuf = nullptr;
         size_t lineBufSize = 0;
         auto lineBufGuard = makeGuard([&] { free(lineBuf); });
@@ -179,6 +182,7 @@ void DeathTestBase::_doTest() {
                 ASSERT_STRING_CONTAINS(os.str(), _doGetPattern())
                     << " @" << _getFile() << ":" << _getLine();
             }
+            LOGV2(5042603, "Death test test died as expected");
             return;
         } else {
             invariant(!WIFSTOPPED(stat));
