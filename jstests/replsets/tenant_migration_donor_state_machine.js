@@ -2,7 +2,12 @@
  * Tests the TenantMigrationAccessBlocker and donor state document are updated correctly after
  * the donorStartMigration command is run.
  *
- * @tags: [requires_fcv_47]
+ * Tenant migrations are not expected to be run on servers with ephemeralForTest, and in particular
+ * this test fails on ephemeralForTest because the donor has to wait for the write to set the
+ * migration state to "committed" and "aborted" to be majority committed but it cannot do that on
+ * ephemeralForTest.
+ *
+ * @tags: [requires_fcv_47, incompatible_with_eft]
  */
 
 (function() {
