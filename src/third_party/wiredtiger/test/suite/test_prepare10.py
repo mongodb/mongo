@@ -133,7 +133,7 @@ class test_prepare10(wttest.WiredTigerTestCase):
         cursor3.reset()
         session3.begin_transaction()
 
-        # Remove the updates from a prepare session and and keep it open.
+        # Insert the updates from a prepare session and keep it open.
         session_p = self.conn.open_session()
         cursor_p = session_p.open_cursor(uri)
         session_p.begin_transaction()

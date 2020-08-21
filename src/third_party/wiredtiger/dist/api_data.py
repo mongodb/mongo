@@ -1450,11 +1450,11 @@ methods = {
     Config('name', '', r'''
         name of the transaction for tracing and debugging'''),
     Config('operation_timeout_ms', '0', r'''
-        when non-zero, a requested limit on the number of elapsed real time milliseconds taken
-        to complete database operations in this transaction.  Time is measured from the start
-        of each WiredTiger API call.  There is no guarantee any operation will not take longer
-        than this amount of time. If WiredTiger notices the limit has been exceeded, an operation
-        may return a WT_ROLLBACK error. Default is to have no limit''',
+        when non-zero, a requested limit on the time taken to complete operations in this
+        transaction. Time is measured in real time milliseconds from the start of each WiredTiger
+        API call. There is no guarantee any operation will not take longer than this amount of time.
+        If WiredTiger notices the limit has been exceeded, an operation may return a WT_ROLLBACK
+        error. Default is to have no limit''',
         min=1),
     Config('priority', 0, r'''
         priority of the transaction for resolving conflicts.
@@ -1501,6 +1501,13 @@ methods = {
         current transaction.  The value must also not be older than the
         current stable timestamp.  See
         @ref transaction_timestamps'''),
+    Config('operation_timeout_ms', '0', r'''
+        when non-zero, a requested limit on the time taken to complete operations in this
+        transaction. Time is measured in real time milliseconds from the start of each WiredTiger
+        API call. There is no guarantee any operation will not take longer than this amount of time.
+        If WiredTiger notices the limit has been exceeded, an operation may return a WT_ROLLBACK
+        error. Default is to have no limit''',
+        min=1),
     Config('sync', '', r'''
         override whether to sync log records when the transaction commits,
         inherited from ::wiredtiger_open \c transaction_sync.
@@ -1542,7 +1549,15 @@ methods = {
         for a transaction. See @ref transaction_timestamps'''),
 ]),
 
-'WT_SESSION.rollback_transaction' : Method([]),
+'WT_SESSION.rollback_transaction' : Method([
+    Config('operation_timeout_ms', '0', r'''
+        when non-zero, a requested limit on the time taken to complete operations in this
+        transaction. Time is measured in real time milliseconds from the start of each WiredTiger
+        API call. There is no guarantee any operation will not take longer than this amount of time.
+        If WiredTiger notices the limit has been exceeded, an operation may return a WT_ROLLBACK
+        error. Default is to have no limit''',
+        min=1),
+]),
 
 'WT_SESSION.checkpoint' : Method([
     Config('drop', '', r'''

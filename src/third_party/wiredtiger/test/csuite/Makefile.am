@@ -121,8 +121,7 @@ all_TESTS += test_wt3874_pad_byte_collator
 
 test_wt4105_large_doc_small_upd_SOURCES = wt4105_large_doc_small_upd/main.c
 noinst_PROGRAMS += test_wt4105_large_doc_small_upd
-# Temporarily disabled (WT-5579)
-# all_TESTS += test_wt4105_large_doc_small_upd
+all_TESTS += test_wt4105_large_doc_small_upd
 
 test_wt4117_checksum_SOURCES = wt4117_checksum/main.c
 noinst_PROGRAMS += test_wt4117_checksum

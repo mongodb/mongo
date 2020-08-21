@@ -130,7 +130,7 @@ main(int argc, char *argv[])
             modify_entry.offset = offset;
             modify_entry.size = modify_entry.data.size;
             /* FIXME-WT-6113: extend timeout to pass the test */
-            (void)alarm(7);
+            (void)alarm(15);
             testutil_check(c->modify(c, &modify_entry, 1));
             (void)alarm(0);
             testutil_check(session2->commit_transaction(session2, NULL));

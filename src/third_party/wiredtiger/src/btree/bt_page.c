@@ -633,6 +633,20 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
             tombstone->prepare_state = WT_PREPARE_INPROGRESS;
             F_SET(tombstone, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
             F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
+
+            /*
+             * Mark the update also as in-progress if the update and tombstone are from same
+             * transaction by comparing both the transaction and timestamps as the transaction
+             * information gets lost after restart.
+             */
+            if (unpack.tw.start_ts == unpack.tw.stop_ts &&
+              unpack.tw.durable_start_ts == unpack.tw.durable_stop_ts &&
+              unpack.tw.start_txn == unpack.tw.stop_txn) {
+                upd->durable_ts = WT_TS_NONE;
+                upd->prepare_state = WT_PREPARE_INPROGRESS;
+                F_SET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS);
+            }
+
             tombstone->next = upd;
         } else {
             upd->durable_ts = WT_TS_NONE;
