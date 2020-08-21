@@ -214,6 +214,17 @@ Status updateShardingCatalogEntryForCollectionInTxn(OperationContext* opCtx,
 }
 
 Status commitTxnForConfigDocument(OperationContext* opCtx, TxnNumber txnNumber) {
+    // Swap out the clients in order to get a fresh opCtx. Previous operations in this transaction
+    // that have been run on this opCtx would have set the timeout in the locker on the opCtx, but
+    // commit should not have a lock timeout.
+    auto newClient = getGlobalServiceContext()->makeClient("commitRefineShardKey");
+    AlternativeClientRegion acr(newClient);
+    auto commitOpCtx = cc().makeOperationContext();
+    AuthorizationSession::get(commitOpCtx.get()->getClient())
+        ->grantInternalAuthorization(commitOpCtx.get()->getClient());
+    commitOpCtx.get()->setLogicalSessionId(opCtx->getLogicalSessionId().get());
+    commitOpCtx.get()->setTxnNumber(txnNumber);
+
     BSONObjBuilder bob;
     bob.append("commitTransaction", true);
     bob.append("autocommit", false);
@@ -221,15 +232,15 @@ Status commitTxnForConfigDocument(OperationContext* opCtx, TxnNumber txnNumber) 
     bob.append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::Majority);
 
     BSONObjBuilder lsidBuilder(bob.subobjStart("lsid"));
-    opCtx->getLogicalSessionId()->serialize(&bob);
+    commitOpCtx->getLogicalSessionId()->serialize(&bob);
     lsidBuilder.doneFast();
 
     const auto cmdObj = bob.obj();
 
     const auto replyOpMsg =
-        OpMsg::parseOwned(opCtx->getServiceContext()
+        OpMsg::parseOwned(commitOpCtx->getServiceContext()
                               ->getServiceEntryPoint()
-                              ->handleRequest(opCtx,
+                              ->handleRequest(commitOpCtx.get(),
                                               OpMsgRequest::fromDBAndBody(
                                                   NamespaceString::kAdminDb.toString(), cmdObj)
                                                   .serialize())
