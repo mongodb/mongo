@@ -31,8 +31,8 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
-#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"

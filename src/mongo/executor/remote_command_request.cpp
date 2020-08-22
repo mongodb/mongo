@@ -34,6 +34,7 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/platform/atomic_word.h"
@@ -84,6 +85,12 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
     if (hedgeOptions) {
         operationKey.emplace(UUID::gen());
         cmdObj = cmdObj.addField(BSON("clientOperationKey" << operationKey.get()).firstElement());
+    }
+
+    if (opCtx && APIParameters::get(opCtx).getParamsPassed()) {
+        BSONObjBuilder bob(std::move(cmdObj));
+        APIParameters::get(opCtx).appendInfo(&bob);
+        cmdObj = bob.obj();
     }
 
     _updateTimeoutFromOpCtxDeadline(opCtx);

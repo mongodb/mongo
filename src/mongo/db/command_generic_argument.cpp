@@ -56,9 +56,9 @@ static constexpr std::array<SpecialArgRecord, 34> specials{{
     //                                       /-isGeneric
     //                                       |  /-stripFromRequest
     //                                       |  |  /-stripFromReply
-    {"apiVersion"_sd,                        1, 0, 0},
-    {"apiStrict"_sd,                         1, 0, 0},
-    {"apiDeprecationErrors"_sd,              1, 0, 0},
+    {"apiVersion"_sd,                        1, 1, 0},
+    {"apiStrict"_sd,                         1, 1, 0},
+    {"apiDeprecationErrors"_sd,              1, 1, 0},
     {"$audit"_sd,                            1, 1, 0},
     {"$client"_sd,                           1, 1, 0},
     {"$configServerState"_sd,                1, 1, 1},

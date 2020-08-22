@@ -772,6 +772,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         StatusWith<ClusterQueryResult> next =
             Status{ErrorCodes::InternalError, "uninitialized cluster query result"};
         try {
+            IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
             next = pinnedCursor.getValue()->next(context);
         } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
             // This exception is thrown when a $changeStream stage encounters an event

@@ -32,8 +32,8 @@
 #include <boost/optional.hpp>
 
 #include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"

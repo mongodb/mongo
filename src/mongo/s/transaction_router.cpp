@@ -125,7 +125,6 @@ BSONObj appendReadConcernForTxn(BSONObj cmd,
 }
 
 BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
-                                               APIParameters apiParameters,
                                                repl::ReadConcernArgs readConcernArgs,
                                                boost::optional<LogicalTime> atClusterTime,
                                                bool doAppendStartTransaction) {
@@ -134,8 +133,6 @@ BSONObjBuilder appendFieldsForStartTransaction(BSONObj cmd,
         appendReadConcernForTxn(std::move(cmd), readConcernArgs, atClusterTime);
 
     BSONObjBuilder bob(std::move(cmdWithReadConcern));
-
-    apiParameters.appendInfo(&bob);
     if (doAppendStartTransaction) {
         bob.append(OperationSessionInfoFromClient::kStartTransactionFieldName, true);
     }
@@ -433,7 +430,6 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
 
     BSONObjBuilder newCmd = mustStartTransaction
         ? appendFieldsForStartTransaction(std::move(cmd),
-                                          sharedOptions.apiParameters,
                                           sharedOptions.readConcernArgs,
                                           sharedOptions.atClusterTime,
                                           !hasStartTxn)
@@ -1203,6 +1199,8 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
                 "txnNumber"_attr = o().txnNumber,
                 "numParticipantShards"_attr = o().participants.size());
 
+    // Omit API parameters from abortTransaction.
+    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto responses = gatherResponses(opCtx,
                                            NamespaceString::kAdminDb,
                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},

@@ -31,6 +31,7 @@ env.Library(
         'remote_command_response.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/api_parameters',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/util/net/network',
     ]

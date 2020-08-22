@@ -27,47 +27,53 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/util/time_support.h"
-
-#include <ctime>
 
 namespace mongo {
 
-/**
- * A service context decoration that stores metrics related to the API version used by applications.
- */
-class APIVersionMetrics {
-public:
-    using APIVersionMetricsMap =
-        stdx::unordered_map<std::string, stdx::unordered_map<std::string, Date_t>>;
+const OperationContext::Decoration<APIParameters> APIParameters::get =
+    OperationContext::declareDecoration<APIParameters>();
 
-    static APIVersionMetrics& get(ServiceContext* svc);
+APIParameters APIParameters::fromClient(const APIParametersFromClient& apiParamsFromClient) {
+    APIParameters apiParameters = APIParameters();
+    auto apiVersion = apiParamsFromClient.getApiVersion();
+    auto apiStrict = apiParamsFromClient.getApiStrict();
+    auto apiDeprecationErrors = apiParamsFromClient.getApiDeprecationErrors();
 
-    APIVersionMetrics() = default;
+    if (apiVersion) {
+        apiParameters.setAPIVersion(apiVersion.value());
+    }
 
-    // Update the timestamp for the API version used by the application.
-    void update(const std::string appName, const APIParameters& apiParams);
+    if (apiStrict) {
+        apiParameters.setAPIStrict(apiStrict.value());
+    }
 
-    void appendAPIVersionMetricsInfo(BSONObjBuilder* b);
+    if (apiDeprecationErrors) {
+        apiParameters.setAPIDeprecationErrors(apiDeprecationErrors.value());
+    }
 
-    APIVersionMetricsMap getAPIVersionMetrics_forTest();
+    return apiParameters;
+}
 
-private:
-    class APIVersionMetricsSSM;
+APIParameters APIParameters::fromBSON(const BSONObj& cmdObj) {
+    return APIParameters::fromClient(
+        APIParametersFromClient::parse("APIParametersFromClient"_sd, cmdObj));
+}
 
-    void _removeStaleTimestamps(WithLock lk, Date_t now);
-
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("APIVersionMetrics::_mutex");
-
-    // Map of maps for API version metrics. For every application, for each API version, we store
-    // the most recent timestamp that a command was invoked with that API version.
-    APIVersionMetricsMap _apiVersionMetrics;
-};
+void APIParameters::appendInfo(BSONObjBuilder* builder) const {
+    if (_apiVersion) {
+        builder->append(kAPIVersionFieldName, *_apiVersion);
+    }
+    if (_apiStrict) {
+        builder->append(kAPIStrictFieldName, *_apiStrict);
+    }
+    if (_apiDeprecationErrors) {
+        builder->append(kAPIDeprecationErrorsFieldName, *_apiDeprecationErrors);
+    }
+}
 
 }  // namespace mongo

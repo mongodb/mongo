@@ -32,10 +32,10 @@
 #include <boost/optional.hpp>
 #include <functional>
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
-#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/query/plan_executor.h"

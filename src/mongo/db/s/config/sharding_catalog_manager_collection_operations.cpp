@@ -42,6 +42,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
@@ -398,6 +399,7 @@ void sendSSVToAllShards(OperationContext* opCtx, const NamespaceString& nss) {
 
     auto* const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
+    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     for (const auto& shardEntry : allShards) {
         const auto& shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardEntry.getName()));
 
@@ -417,6 +419,7 @@ void sendSSVToAllShards(OperationContext* opCtx, const NamespaceString& nss) {
 }
 
 void removeChunksAndTagsForDroppedCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // Remove chunk data
@@ -502,6 +505,8 @@ void ShardingCatalogManager::ensureDropCollectionCompleted(OperationContext* opC
                 "Ensuring config entries from previous dropCollection are cleared",
                 "namespace"_attr = nss.ns());
     sendDropCollectionToAllShards(opCtx, nss);
+
+    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     removeChunksAndTagsForDroppedCollection(opCtx, nss);
     sendSSVToAllShards(opCtx, nss);
 }

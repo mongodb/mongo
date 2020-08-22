@@ -36,10 +36,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
-#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/cursor_response.h"

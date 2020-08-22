@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/initialize_api_parameters.h"
 
 namespace mongo {
 

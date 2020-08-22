@@ -867,6 +867,14 @@ Command::Command(StringData name, std::vector<StringData> aliases)
     globalCommandRegistry()->registerCommand(this, _name, _aliases);
 }
 
+const std::set<std::string>& Command::apiVersions() const {
+    return kNoApiVersions;
+}
+
+const std::set<std::string>& Command::deprecatedApiVersions() const {
+    return kNoApiVersions;
+}
+
 bool Command::hasAlias(const StringData& alias) const {
     return globalCommandRegistry()->findCommand(alias) == this;
 }

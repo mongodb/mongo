@@ -179,6 +179,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/api_parameters",
         "$BUILD_DIR/mongo/db/catalog/collection_catalog",
         # TODO: This dependency edge can be removed when the 'allowDiskUse' option no longer depends
         # on enabling test commands.

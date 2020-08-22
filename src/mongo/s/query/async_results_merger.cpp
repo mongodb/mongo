@@ -462,8 +462,11 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
         cmdObj = newCmdBob.obj();
     }
 
+    // Never pass API parameters with getMore.
+    IgnoreAPIParametersBlock ignoreApiParametersBlock(_opCtx);
     executor::RemoteCommandRequest request(
         remote.getTargetHost(), remote.cursorNss.db().toString(), cmdObj, _opCtx);
+    ignoreApiParametersBlock.release();
 
     auto callbackStatus =
         _executor->scheduleRemoteCommand(request, [this, remoteIndex](auto const& cbData) {
