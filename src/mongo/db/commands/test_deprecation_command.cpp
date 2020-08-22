@@ -72,9 +72,7 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        result.append("apiVersion", APIParameters::get(opCtx).getAPIVersion());
-        result.append("apiStrict", APIParameters::get(opCtx).getAPIStrict());
-        result.append("apiDeprecationErrors", APIParameters::get(opCtx).getAPIDeprecationErrors());
+        APIParameters::get(opCtx).appendInfo(&result);
         return true;
     }
 };

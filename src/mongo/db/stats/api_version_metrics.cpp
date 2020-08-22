@@ -45,8 +45,8 @@ APIVersionMetrics& APIVersionMetrics::get(ServiceContext* svc) {
 void APIVersionMetrics::update(std::string appName, const APIParameters& apiParams) {
     Date_t now = getGlobalServiceContext()->getFastClockSource()->now();
     stdx::lock_guard<Latch> lk(_mutex);
-    if (apiParams.getParamsPassed()) {
-        _apiVersionMetrics[appName][apiParams.getAPIVersion().toString()] = now;
+    if (apiParams.getAPIVersion()) {
+        _apiVersionMetrics[appName][*apiParams.getAPIVersion()] = now;
     } else {
         _apiVersionMetrics[appName]["default"] = now;
     }

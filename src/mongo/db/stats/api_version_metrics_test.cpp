@@ -97,7 +97,7 @@ TEST_F(APIVersionMetricsTest, StoresDefaultMetrics) {
 }
 
 TEST_F(APIVersionMetricsTest, StoresNonDefaultMetrics) {
-    apiParams.setParamsPassed(true);
+    apiParams.setAPIVersion("1");
     ASSERT_TRUE(apiParams.getParamsPassed());
 
     getMetrics().update(appName, apiParams);
@@ -121,7 +121,7 @@ TEST_F(APIVersionMetricsTest, RemovesStaleMetrics) {
     advanceTime(timeToAdvance);
 
     // Insert a timestamp with API version 1.
-    apiParams.setParamsPassed(true);
+    apiParams.setAPIVersion("1");
     getMetrics().update(appName, apiParams);
 
     // Verify that both metrics are still within the map.

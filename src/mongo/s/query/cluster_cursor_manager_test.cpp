@@ -985,9 +985,9 @@ TEST_F(ClusterCursorManagerTest, CursorStoresAPIParameters) {
         assertGet(getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker));
 
     auto storedAPIParams = pinnedCursor->getAPIParameters();
-    ASSERT_EQ("2", storedAPIParams.getAPIVersion());
-    ASSERT_TRUE(storedAPIParams.getAPIStrict());
-    ASSERT_TRUE(storedAPIParams.getAPIDeprecationErrors());
+    ASSERT_EQ("2", *storedAPIParams.getAPIVersion());
+    ASSERT_TRUE(*storedAPIParams.getAPIStrict());
+    ASSERT_TRUE(*storedAPIParams.getAPIDeprecationErrors());
 }
 
 TEST_F(ClusterCursorManagerTest, CannotRegisterCursorDuringShutdown) {

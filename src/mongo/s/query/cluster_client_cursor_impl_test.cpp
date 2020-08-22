@@ -265,9 +265,9 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreAPIParameters) {
         _opCtx.get(), std::move(mockStage), std::move(params), boost::none);
 
     auto storedAPIParams = cursor.getAPIParameters();
-    ASSERT_EQ("2", storedAPIParams.getAPIVersion());
-    ASSERT_TRUE(storedAPIParams.getAPIStrict());
-    ASSERT_TRUE(storedAPIParams.getAPIDeprecationErrors());
+    ASSERT_EQ("2", *storedAPIParams.getAPIVersion());
+    ASSERT_TRUE(*storedAPIParams.getAPIStrict());
+    ASSERT_TRUE(*storedAPIParams.getAPIDeprecationErrors());
 }
 
 }  // namespace

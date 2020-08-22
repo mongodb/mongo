@@ -1322,9 +1322,9 @@ TEST_F(TxnParticipantTest, CorrectlyStashAPIParameters) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     auto defaultAPIParams = txnParticipant.getAPIParameters(opCtx());
-    ASSERT_EQ("1", defaultAPIParams.getAPIVersion());
-    ASSERT_FALSE(defaultAPIParams.getAPIStrict());
-    ASSERT_FALSE(defaultAPIParams.getAPIDeprecationErrors());
+    ASSERT_FALSE(defaultAPIParams.getAPIVersion().is_initialized());
+    ASSERT_FALSE(defaultAPIParams.getAPIStrict().is_initialized());
+    ASSERT_FALSE(defaultAPIParams.getAPIDeprecationErrors().is_initialized());
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -1336,9 +1336,9 @@ TEST_F(TxnParticipantTest, CorrectlyStashAPIParameters) {
 
     // Verify that API parameters on the opCtx were updated correctly.
     auto opCtxAPIParams = APIParameters::get(opCtx());
-    ASSERT_EQ("2", opCtxAPIParams.getAPIVersion());
-    ASSERT_TRUE(opCtxAPIParams.getAPIStrict());
-    ASSERT_TRUE(opCtxAPIParams.getAPIDeprecationErrors());
+    ASSERT_EQ("2", *opCtxAPIParams.getAPIVersion());
+    ASSERT_TRUE(*opCtxAPIParams.getAPIStrict());
+    ASSERT_TRUE(*opCtxAPIParams.getAPIDeprecationErrors());
 
     txnParticipant.stashTransactionResources(opCtx());
 
@@ -1347,9 +1347,9 @@ TEST_F(TxnParticipantTest, CorrectlyStashAPIParameters) {
 
     // Verify that 'getAPIParameters()' will return the stashed API parameters.
     APIParameters storedAPIParams = txnParticipant.getAPIParameters(opCtx());
-    ASSERT_EQ("2", storedAPIParams.getAPIVersion());
-    ASSERT_TRUE(storedAPIParams.getAPIStrict());
-    ASSERT_TRUE(storedAPIParams.getAPIDeprecationErrors());
+    ASSERT_EQ("2", *storedAPIParams.getAPIVersion());
+    ASSERT_TRUE(*storedAPIParams.getAPIStrict());
+    ASSERT_TRUE(*storedAPIParams.getAPIDeprecationErrors());
 }
 
 /**
@@ -2907,9 +2907,9 @@ TEST_F(TransactionsMetricsTest, UseAPIParametersOnOpCtxForARetryableWrite) {
     // 'getAPIParameters()' should return the API parameters decorating opCtx if we are in a
     // retryable write.
     APIParameters storedAPIParameters = txnParticipant.getAPIParameters(opCtx());
-    ASSERT_EQ("3", storedAPIParameters.getAPIVersion());
-    ASSERT_FALSE(storedAPIParameters.getAPIStrict());
-    ASSERT_FALSE(storedAPIParameters.getAPIDeprecationErrors());
+    ASSERT_EQ("3", *storedAPIParameters.getAPIVersion());
+    ASSERT_FALSE(storedAPIParameters.getAPIStrict().is_initialized());
+    ASSERT_FALSE(storedAPIParameters.getAPIDeprecationErrors().is_initialized());
 
     // Stash secondAPIParameters.
     txnParticipant.stashTransactionResources(opCtx());
@@ -2921,7 +2921,9 @@ TEST_F(TransactionsMetricsTest, UseAPIParametersOnOpCtxForARetryableWrite) {
     // 'getAPIParameters()' should still return API parameters, even if there are stashed API
     // parameters in TxnResources.
     storedAPIParameters = txnParticipant.getAPIParameters(opCtx());
-    ASSERT_EQ("4", storedAPIParameters.getAPIVersion());
+    ASSERT_EQ("4", *storedAPIParameters.getAPIVersion());
+    ASSERT_FALSE(storedAPIParameters.getAPIStrict().is_initialized());
+    ASSERT_FALSE(storedAPIParameters.getAPIDeprecationErrors().is_initialized());
 }
 
 namespace {
@@ -3053,11 +3055,13 @@ void buildParametersInfoString(StringBuilder* sb,
     BSONObjBuilder lsidBuilder;
     sessionId.serialize(&lsidBuilder);
     auto autocommitString = autocommitVal ? "true" : "false";
-    auto apiStrictString = apiParameters.getAPIStrict() ? "true" : "false";
-    auto apiDeprecationErrorsString = apiParameters.getAPIDeprecationErrors() ? "true" : "false";
+    auto apiVersionString = apiParameters.getAPIVersion().value_or("1");
+    auto apiStrictString = apiParameters.getAPIStrict().value_or(false) ? "true" : "false";
+    auto apiDeprecationErrorsString =
+        apiParameters.getAPIDeprecationErrors().value_or(false) ? "true" : "false";
     (*sb) << "parameters:{ lsid: " << lsidBuilder.done().toString() << ", txnNumber: " << txnNum
-          << ", autocommit: " << autocommitString << ", apiVersion: \""
-          << apiParameters.getAPIVersion() << "\", apiStrict: " << apiStrictString
+          << ", autocommit: " << autocommitString << ", apiVersion: \"" << apiVersionString
+          << "\", apiStrict: " << apiStrictString
           << ", apiDeprecationErrors: " << apiDeprecationErrorsString
           << ", readConcern: " << readConcernArgs.toBSON().getObjectField("readConcern") << " },";
 }

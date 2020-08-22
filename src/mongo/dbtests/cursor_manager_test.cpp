@@ -435,9 +435,9 @@ TEST_F(CursorManagerTest, CursorStoresAPIParameters) {
          PrivilegeVector()});
 
     auto storedAPIParams = cursorPin->getAPIParameters();
-    ASSERT_EQ("2", storedAPIParams.getAPIVersion());
-    ASSERT_TRUE(storedAPIParams.getAPIStrict());
-    ASSERT_TRUE(storedAPIParams.getAPIDeprecationErrors());
+    ASSERT_EQ("2", *storedAPIParams.getAPIVersion());
+    ASSERT_TRUE(*storedAPIParams.getAPIStrict());
+    ASSERT_TRUE(*storedAPIParams.getAPIDeprecationErrors());
 }
 
 /**

@@ -95,9 +95,6 @@ APIParameters& APIParameters::get(OperationContext* opCtx) {
     return handle(opCtx);
 }
 
-APIParameters::APIParameters()
-    : _apiVersion("1"), _apiStrict(false), _apiDeprecationErrors(false), _paramsPassed(false) {}
-
 APIParameters APIParameters::fromClient(const APIParametersFromClient& apiParamsFromClient) {
     APIParameters apiParameters = APIParameters();
     auto apiVersion = apiParamsFromClient.getApiVersion();
@@ -106,7 +103,6 @@ APIParameters APIParameters::fromClient(const APIParametersFromClient& apiParams
 
     if (apiVersion) {
         apiParameters.setAPIVersion(apiVersion.value());
-        apiParameters.setParamsPassed(true);
     }
 
     if (apiStrict) {
@@ -121,9 +117,15 @@ APIParameters APIParameters::fromClient(const APIParametersFromClient& apiParams
 }
 
 void APIParameters::appendInfo(BSONObjBuilder* builder) const {
-    builder->append(kAPIVersionFieldName, _apiVersion);
-    builder->append(kAPIStrictFieldName, _apiStrict);
-    builder->append(kAPIDeprecationErrorsFieldName, _apiDeprecationErrors);
+    if (_apiVersion) {
+        builder->append(kAPIVersionFieldName, *_apiVersion);
+    }
+    if (_apiStrict) {
+        builder->append(kAPIStrictFieldName, *_apiStrict);
+    }
+    if (_apiDeprecationErrors) {
+        builder->append(kAPIDeprecationErrorsFieldName, *_apiDeprecationErrors);
+    }
 }
 
 }  // namespace mongo
