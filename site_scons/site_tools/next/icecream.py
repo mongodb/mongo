@@ -20,14 +20,14 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import SCons
-
 import os
 import re
 import subprocess
 import urllib
 
 from pkg_resources import parse_version
+
+import SCons
 
 _icecream_version_min = parse_version("1.1rc2")
 _icecream_version_gcc_remote_cpp = parse_version("1.2")
@@ -64,27 +64,31 @@ def icecc_create_env(env, target, source, for_signature):
     # wrinkles around the mapped case so we have opted to leave it as
     # just interpreting the env for now.
     for addfile in env.get('ICECC_CREATE_ENV_ADDFILES', []):
-        if (type(addfile) == tuple
-            and len(addfile) == 2):
-            if env['ICECREAM_VERSION'] > parse_version('1.1'):
-                raise Exception("This version of icecream does not support addfile remapping.")
-            create_env += " --addfile {}={}".format(
-                env.File(addfile[0]).srcnode().abspath,
-                env.File(addfile[1]).srcnode().abspath)
-            env.Depends(target, addfile[1])
-        elif type(addfile) == str:
-            create_env += " --addfile {}".format(env.File(addfile).srcnode().abspath)
-            env.Depends(target, addfile)
+        if isinstance(addfile, tuple):
+            if len(addfile) == 2:
+                if env['ICECREAM_VERSION'] > parse_version('1.1'):
+                    raise Exception("This version of icecream does not support addfile remapping.")
+                create_env += " --addfile {}={}".format(
+                    env.File(addfile[0]).srcnode().abspath,
+                    env.File(addfile[1]).srcnode().abspath)
+                env.Depends(target, addfile[1])
+            else:
+                raise Exception(f"Found incorrect icecream addfile format: {str(addfile)}" +
+                                f"\ntuple must two elements of the form" +
+                                f"\n('chroot dest path', 'source file path')")
         else:
-            # NOTE: abspath is required by icecream because of
-            # this line in icecc-create-env:
-            # https://github.com/icecc/icecream/blob/10b9468f5bd30a0fdb058901e91e7a29f1bfbd42/client/icecc-create-env.in#L534
-            # which cuts out the two files based off the equals sign and
-            # starting slash of the second file
-            raise Exception("Found incorrect icecream addfile format: {}" +
-                "\nicecream addfiles must be a single path or tuple path format: " +
-                "('chroot dest path', 'source file path')".format(
-                str(addfile)))
+            try:
+                create_env += f" --addfile {env.File(addfile).srcnode().abspath}"
+                env.Depends(target, addfile)
+            except:
+                # NOTE: abspath is required by icecream because of
+                # this line in icecc-create-env:
+                # https://github.com/icecc/icecream/blob/10b9468f5bd30a0fdb058901e91e7a29f1bfbd42/client/icecc-create-env.in#L534
+                # which cuts out the two files based off the equals sign and
+                # starting slash of the second file
+                raise Exception(f"Found incorrect icecream addfile format: {type(addfile)}" +
+                                f"\nvalue provided cannot be converted to a file path")
+
     create_env += " | awk '/^creating .*\\.tar\\.gz/ { print $$2 }')"
 
     # Simply move our tarball to the expected locale.
@@ -95,11 +99,7 @@ def icecc_create_env(env, target, source, for_signature):
     return cmdline
 
 
-def generate(env, verbose=True):
-
-    if not exists(env):
-        return
-
+def generate(env):
     # icecc lower then 1.1 supports addfile remapping accidentally
     # and above it adds an empty cpuinfo so handle cpuinfo issues for icecream
     # below version 1.1
@@ -108,38 +108,34 @@ def generate(env, verbose=True):
         and os.path.exists('/proc/cpuinfo')):
         env.AppendUnique(ICECC_CREATE_ENV_ADDFILES=[('/proc/cpuinfo', '/dev/null')])
 
-    # If we are going to load the ccache tool, but we haven't done so
-    # yet, then explicitly do it now. We need the ccache tool to be in
-    # place before we setup icecream because we need to do things a
-    # little differently if ccache is in play. If you don't use the
-    # TOOLS variable to configure your tools, you should explicitly
-    # load the ccache tool before you load icecream.
-    ccache_enabled = "CCACHE_VERSION" in env
-    if "ccache" in env["TOOLS"] and not ccache_enabled:
-        env.Tool("ccache")
-
     # Absoluteify, so we can derive ICERUN
     env["ICECC"] = env.WhereIs("$ICECC")
 
-    if not "ICERUN" in env:
-        env["ICERUN"] = env.File("$ICECC").File("icerun")
+    if "ICERUN" in env:
+        # Absoluteify, for parity with ICECC
+        icerun = env.WhereIs("$ICERUN")
+    else:
+        icerun = env.File("$ICECC").File("icerun")
+    env["ICERUN"] = icerun
 
-    # Absoluteify, for parity with ICECC
-    env["ICERUN"] = env.WhereIs("$ICERUN")
+    if "ICECC_CREATE_ENV" in env:
+        icecc_create_env_bin = env.WhereIs("$ICECC_CREATE_ENV")
+    else:
+        icecc_create_env_bin = env.File("ICECC").File("icecc-create-env")
+    env["ICECC_CREATE_ENV"] = icecc_create_env_bin
 
-    if not "ICECC_CREATE_ENV" in env:
-        env["ICECC_CREATE_ENV"] = env.File("$ICECC").File("icecc-create-env")
-
-    # Absoluteify, for parity with ICECC
-    env["ICECC_CREATE_ENV"] = env.WhereIs("$ICECC_CREATE_ENV")
-
-    # Make CC and CXX absolute paths too. It is better for icecc.
+    # Make CC and CXX absolute paths too. This ensures the correct paths to
+    # compilers get passed to icecc-create-env rather than letting it
+    # potentially discover something we don't expect via PATH.
     env["CC"] = env.WhereIs("$CC")
     env["CXX"] = env.WhereIs("$CXX")
 
+    # Set up defaults for configuration options
     env['ICECREAM_TARGET_DIR'] = env.Dir(
-        env.get('ICECREAM_TARGET_DIR', '#/.icecream')
+        env.get('ICECREAM_TARGET_DIR', '#./.icecream')
     )
+    verbose = env.get('ICECREAM_VERBOSE', False)
+    env['ICECREAM_DEBUG'] = env.get('ICECREAM_DEBUG', False)
 
     # We have a lot of things to build and run that the final user
     # environment doesn't need to see or know about. Make a custom env
@@ -420,6 +416,13 @@ def generate(env, verbose=True):
                 [base, icecc_toolchain_dependency_emitter]
             )
 
+    # Check whether ccache is requested and is a valid tool.
+    if "CCACHE" in env:
+        ccache = SCons.Tool.Tool('ccache')
+        ccache_enabled = bool(ccache) and ccache.exists(env)
+    else:
+        ccache_enabled = False
+
     if env.ToolchainIs("clang"):
         env["ENV"]["ICECC_CLANG_REMOTE_CPP"] = 1
     elif env.ToolchainIs("gcc"):
@@ -428,36 +431,13 @@ def generate(env, verbose=True):
             # 1.1 doesn't offer it. We disallow fallback to local
             # builds because the fallback is serial execution.
             env["ENV"]["ICECC_CARET_WORKAROUND"] = 0
-        else:
-            if ccache_enabled:
-                # Newer versions of Icecream will drop -fdirectives-only from
-                # preprocessor and compiler flags if it does not find a remote
-                # build host to build on. ccache, on the other hand, will not
-                # pass the flag to the compiler if CCACHE_NOCPP2=1, but it will
-                # pass it to the preprocessor. The combination of setting
-                # CCACHE_NOCPP2=1 and passing the flag can lead to build
-                # failures.
-
-                # See: https://jira.mongodb.org/browse/SERVER-48443
-
-                # We have an open issue with Icecream and ccache to resolve the
-                # cause of these build failures. Once the bug is resolved and
-                # the fix is deployed, we can remove this entire conditional
-                # branch and make it like the one for clang.
-                # TODO: https://github.com/icecc/icecream/issues/550
-                env["ENV"].pop("CCACHE_NOCPP2", None)
-                env["ENV"]["CCACHE_CPP2"] = 1
-                try:
-                    env["CCFLAGS"].remove("-fdirectives-only")
-                except ValueError:
-                    pass
-            else:
-                # If we can, we should make Icecream do its own preprocessing
-                # to reduce concurrency on the local host. We should not do
-                # this when ccache is in use because ccache will execute
-                # Icecream to do its own preprocessing and then execute
-                # Icecream as the compiler on the preprocessed source.
-                env["ENV"]["ICECC_REMOTE_CPP"] = 1
+        elif not ccache_enabled:
+            # If we can, we should make Icecream do its own preprocessing
+            # to reduce concurrency on the local host. We should not do
+            # this when ccache is in use because ccache will execute
+            # Icecream to do its own preprocessing and then execute
+            # Icecream as the compiler on the preprocessed source.
+            env["ENV"]["ICECC_REMOTE_CPP"] = 1
 
     if "ICECC_SCHEDULER" in env:
         env["ENV"]["USE_SCHEDULER"] = env["ICECC_SCHEDULER"]
@@ -475,16 +455,16 @@ def generate(env, verbose=True):
         # If the path to CCACHE_PREFIX isn't absolute, then it will
         # look it up in PATH. That isn't what we want here, we make
         # the path absolute.
-        env["ENV"]["CCACHE_PREFIX"] = _BoundSubstitution(env, "${ICECREAM_RUN_ICECC.abspath}")
+        env['ENV']['CCACHE_PREFIX'] = _BoundSubstitution(env, "${ICECREAM_RUN_ICECC.abspath}")
     else:
         # Make a generator to expand to ICECC in the case where we are
-        # not a conftest. We never want to run conftests
-        # remotely. Ideally, we would do this for the CCACHE_PREFIX
-        # case above, but unfortunately if we did we would never
-        # actually see the conftests, because the BoundSubst means
-        # that we will never have a meaningful `target` variable when
-        # we are in ENV. Instead, rely on the ccache.py tool to do
-        # it's own filtering out of conftests.
+        # not a conftest. We never want to run conftests remotely.
+        # Ideally, we would do this for the CCACHE_PREFIX case above,
+        # but unfortunately if we did we would never actually see the
+        # conftests, because the BoundSubst means that we will never
+        # have a meaningful `target` variable when we are in ENV.
+        # Instead, rely on the ccache.py tool to do it's own filtering
+        # out of conftests.
         def icecc_generator(target, source, env, for_signature):
             if "conftest" not in str(target[0]):
                 return '$ICECREAM_RUN_ICECC'
@@ -517,21 +497,28 @@ def generate(env, verbose=True):
             env[command] = " ".join(["$( $ICERUN $)", env[command]])
 
     # Uncomment these to debug your icecc integration
-    # env['ENV']['ICECC_DEBUG'] = 'debug'
-    # env['ENV']['ICECC_LOGFILE'] = 'icecc.log'
+    if env['ICECREAM_DEBUG']:
+        env['ENV']['ICECC_DEBUG'] = 'debug'
+        env['ENV']['ICECC_LOGFILE'] = 'icecc.log'
 
 
 def exists(env):
-    # Assume the tool has run if we already know the version.
-    if "ICECREAM_VERSION" in env:
-        return True
+    if not env.subst("$ICECC"):
+        return False
 
-    icecc = env.get("ICECC", False)
+    icecc = env.WhereIs("$ICECC")
     if not icecc:
+        # TODO: We should not be printing here because we don't always know the
+        # use case for loading this tool. It may be that the user desires
+        # writing this output to a log file or not even displaying it at all.
+        # We should instead be invoking a callback to SConstruct that it can
+        # interpret as needed. Or better yet, we should use some SCons logging
+        # and error API, if and when one should emerge.
+        print(f"Error: icecc not found at {env['ICECC']}")
         return False
-    icecc = env.WhereIs(icecc)
-    if not icecc:
-        return False
+
+    if 'ICECREAM_VERSION' in env and env['ICECREAM_VERSION'] >= _icecream_version_min:
+        return True
 
     pipe = SCons.Action._subproc(
         env,
@@ -542,9 +529,26 @@ def exists(env):
     )
 
     if pipe.wait() != 0:
+        print(f"Error: failed to execute '{env['ICECC']}'")
         return False
 
     validated = False
+
+    if "ICERUN" in env:
+        # Absoluteify, for parity with ICECC
+        icerun = env.WhereIs("$ICERUN")
+    else:
+        icerun = env.File("$ICECC").File("icerun")
+    if not icerun:
+        print(f"Error: the icerun wrapper does not exist at {icerun} as expected")
+
+    if "ICECC_CREATE_ENV" in env:
+        icecc_create_env_bin = env.WhereIs("$ICECC_CREATE_ENV")
+    else:
+        icecc_create_env_bin = env.File("ICECC").File("icecc-create-env")
+    if not icecc_create_env_bin:
+        print(f"Error: the icecc-create-env utility does not exist at {icecc_create_env_bin} as expected")
+
     for line in pipe.stdout:
         line = line.decode("utf-8")
         if validated:
@@ -561,5 +565,7 @@ def exists(env):
 
     if validated:
         env['ICECREAM_VERSION'] = icecc_version
+    else:
+        print(f"Error: failed to verify icecream version >= {_icecream_version_min}, found {icecc_version}")
 
     return validated
