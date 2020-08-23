@@ -774,6 +774,10 @@ env_vars.Add('ICECC_CREATE_ENV',
     help='Tell SCons where icecc-create-env tool is',
     default='icecc-create-env')
 
+env_vars.Add('ICECC_DEBUG',
+    help='Tell ICECC to create debug logs (auto, on/off true/false 1/0)',
+    default=False)
+
 env_vars.Add('ICECC_SCHEDULER',
     help='Tell ICECC where the sceduler daemon is running')
 
@@ -1136,17 +1140,31 @@ def conf_error(env, msg, *args):
 env.AddMethod(fatal_error, 'FatalError')
 env.AddMethod(conf_error, 'ConfError')
 
+def to_boolean(s):
+    if isinstance(s, bool):
+        return s
+    elif s.lower() in ('1', "on", "true", "yes"):
+        return True
+    elif s.lower() in ('0', "off", "false", "no"):
+        return False
+    raise ValueError(f'Invalid value {s}, must be a boolean-like string')
+
 # Normalize the VERBOSE Option, and make its value available as a
 # function.
 if env['VERBOSE'] == "auto":
     env['VERBOSE'] = not sys.stdout.isatty()
-elif env['VERBOSE'] in ('1', "ON", "on", "True", "true", True):
-    env['VERBOSE'] = True
-elif env['VERBOSE'] in ('0', "OFF", "off", "False", "false", False):
-    env['VERBOSE'] = False
 else:
-    env.FatalError("Invalid value {0} for VERBOSE Variable", env['VERBOSE'])
+    try:
+        env['VERBOSE'] = to_boolean(env['VERBOSE'])
+    except ValueError as e:
+        env.FatalError(f"Error setting VERBOSE variable: {e}")
 env.AddMethod(lambda env: env['VERBOSE'], 'Verbose')
+
+# Normalize the ICECC_DEBUG option
+try:
+    env['ICECC_DEBUG'] = to_boolean(env['ICECC_DEBUG'])
+except ValueError as e:
+    env.FatalError("Error setting ICECC_DEBUG variable: {e}")
 
 if has_option('variables-help'):
     print(env_vars.GenerateHelpText(env))
@@ -3937,20 +3955,28 @@ env = doConfigure( env )
 env["NINJA_SYNTAX"] = "#site_scons/third_party/ninja_syntax.py"
 
 
-# Now that we are done with configure checks, enable ccache and
-# icecream if requested. If *both* icecream and ccache are requested,
-# ccache must be loaded first.
-env.Tool('ccache')
-
 if env.ToolchainIs("clang"):
     env["ICECC_COMPILER_TYPE"] = "clang"
 elif env.ToolchainIs("gcc"):
     env["ICECC_COMPILER_TYPE"] = "gcc"
 
+# Now that we are done with configure checks, enable ccache and
+# icecream if requested.
 if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
-    env['ICECREAM_TARGET_DIR'] = '$BUILD_ROOT/scons/icecream'
-    env.Tool('icecream', verbose=env.Verbose())
+    if 'CCACHE' in env and env['CCACHE']:
+        ccache = Tool('ccache')
+        if not ccache.exists(env):
+            env.FatalError(f"Failed to load ccache tool with CCACHE={env['CCACHE']}")
+        ccache(env)
+    if 'ICECC' in env and env['ICECC']:
+        env['ICECREAM_VERBOSE'] = env.Verbose()
+        env['ICECREAM_TARGET_DIR'] = '$BUILD_ROOT/scons/icecream'
+        icecream = Tool('icecream')
+        if not icecream.exists(env):
+            env.FatalError(f"Failed to load icecream tool with ICECC={env['ICECC']}")
+        icecream(env)
 else:
+    env.Tool('ccache')
     env.Tool('icecream')
 
 # Defaults for SCons provided flags. SetOption only sets the option to our value
