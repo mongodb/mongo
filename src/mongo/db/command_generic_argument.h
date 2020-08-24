@@ -41,11 +41,6 @@ namespace mongo {
 bool isGenericArgument(StringData arg);
 
 /**
- * Returns true if the provided argument is related to the MongoDB Versioned API.
- */
-bool isApiParameter(StringData arg);
-
-/**
  * Returns true if arg must be stripped from requests that are forwarded to shards.
  * Only generic arguments are stripped, and some of them are not.
  * See 'CommandHelpers::filterCommandRequestForPassthrough'.
