@@ -656,10 +656,15 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         createOplogSlot = repl::getNextOpTime(opCtx);
     }
 
-    if (MONGO_unlikely(hangAndFailAfterCreateCollectionReservesOpTime.shouldFail())) {
-        hangAndFailAfterCreateCollectionReservesOpTime.pauseWhileSet(opCtx);
-        uasserted(51267, "hangAndFailAfterCreateCollectionReservesOpTime fail point enabled");
-    }
+    hangAndFailAfterCreateCollectionReservesOpTime.executeIf(
+        [&](const BSONObj&) {
+            hangAndFailAfterCreateCollectionReservesOpTime.pauseWhileSet(opCtx);
+            uasserted(51267, "hangAndFailAfterCreateCollectionReservesOpTime fail point enabled");
+        },
+        [&](const BSONObj& data) {
+            auto fpNss = data["nss"].str();
+            return fpNss.empty() || fpNss == nss.toString();
+        });
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
     assertMovePrimaryInProgress(opCtx, nss);
