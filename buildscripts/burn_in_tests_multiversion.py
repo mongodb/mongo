@@ -160,7 +160,7 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
 
     resmoke_cmd = _set_resmoke_cmd(repeat_config, list(resmoke_args))
 
-    changed_tests = find_changed_tests(repos)
+    changed_tests = find_changed_tests(repos, evg_api=evg_api, task_id=task_id)
     tests_by_task = create_tests_by_task(generate_config.build_variant, evg_conf, changed_tests)
     LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
