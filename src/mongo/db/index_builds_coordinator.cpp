@@ -366,6 +366,28 @@ repl::OpTime getLatestOplogOpTime(OperationContext* opCtx) {
     return optime.getValue();
 }
 
+/**
+ * Returns true if the index build is resumable.
+ */
+bool isIndexBuildResumable(OperationContext* opCtx,
+                           const ReplIndexBuildState& replState,
+                           const IndexBuildsCoordinator::IndexBuildOptions& indexBuildOptions) {
+
+    if (replState.protocol != IndexBuildProtocol::kTwoPhase) {
+        return false;
+    }
+
+    if (indexBuildOptions.applicationMode != IndexBuildsCoordinator::ApplicationMode::kNormal) {
+        return false;
+    }
+
+    if (!opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds()) {
+        return false;
+    }
+
+    return true;
+}
+
 }  // namespace
 
 const auto getIndexBuildsCoord =
@@ -2057,9 +2079,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         throw;
     }
 
-    if (replState->protocol == IndexBuildProtocol::kTwoPhase &&
-        indexBuildOptions.applicationMode == ApplicationMode::kNormal &&
-        opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds()) {
+    if (isIndexBuildResumable(opCtx, *replState, indexBuildOptions)) {
         // We should only set this value if this is a hybrid index build.
         invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
 
