@@ -534,6 +534,7 @@ env.Library(
     source=[
         'insert_group.cpp',
         'oplog_applier_impl.cpp',
+        'oplog_applier_utils.cpp',
         'session_update_tracker.cpp',
     ],
     LIBDEPS=[
@@ -1652,7 +1653,9 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         'abstract_async_component',
+        'cloner_utils',
         'oplog',
+        'oplog_application',
         'oplog_application_interface',
     ],
 )

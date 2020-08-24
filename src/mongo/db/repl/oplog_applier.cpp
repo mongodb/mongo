@@ -140,9 +140,13 @@ std::unique_ptr<ThreadPool> makeReplWriterPool() {
 }
 
 std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount) {
+    return makeReplWriterPool(replWriterThreadCount, "ReplWriterWorker"_sd);
+}
+
+std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount, StringData name) {
     ThreadPool::Options options;
-    options.threadNamePrefix = "ReplWriterWorker-";
-    options.poolName = "ReplWriterWorkerThreadPool";
+    options.threadNamePrefix = name + "-";
+    options.poolName = name + "ThreadPool";
     options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
     options.onCreateThread = [](const std::string&) {
         Client::initThread(getThreadName());

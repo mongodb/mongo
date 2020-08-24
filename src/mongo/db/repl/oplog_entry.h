@@ -363,10 +363,16 @@ public:
     bool isSingleOplogEntryTransactionWithCommand() const;
 
     /**
-     * Returns if the oplog entry is for a CRUD operation.
+     * Returns true if the oplog entry is for a CRUD operation.
      */
     static bool isCrudOpType(OpTypeEnum opType);
     bool isCrudOpType() const;
+
+    /**
+     * Returns true if the oplog entry is for a command related to indexes.
+     * i.e createIndexes, dropIndexes, startIndexBuild, commitIndexBuild, abortIndexBuild.
+     */
+    bool isIndexCommandType() const;
 
     /**
      * Returns if the operation should be prepared. Must be called on an 'applyOps' entry.

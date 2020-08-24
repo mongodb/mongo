@@ -50,15 +50,21 @@ class InsertGroup {
 public:
     using ConstIterator = std::vector<const OplogEntry*>::const_iterator;
     using Mode = OplogApplication::Mode;
+    typedef std::function<Status(
+        OperationContext*, const OplogEntryOrGroupedInserts&, OplogApplication::Mode)>
+        ApplyFunc;
 
-    InsertGroup(std::vector<const OplogEntry*>* ops, OperationContext* opCtx, Mode mode);
+    InsertGroup(std::vector<const OplogEntry*>* ops,
+                OperationContext* opCtx,
+                Mode mode,
+                ApplyFunc applyOplogEntryOrGroupedInserts);
 
     /**
      * Attempts to group insert operations starting at 'iter'.
      * If the grouped insert is applied successfully, returns the iterator to the last standalone
      * insert operation included in the applied grouped insert.
      */
-    StatusWith<ConstIterator> groupAndApplyInserts(ConstIterator oplogEntriesIterator);
+    StatusWith<ConstIterator> groupAndApplyInserts(ConstIterator oplogEntriesIterator) noexcept;
 
 private:
     // _doNotGroupBeforePoint is used to prevent retrying bad group inserts by marking the final op
@@ -68,9 +74,12 @@ private:
     // Used for constructing search bounds when grouping inserts.
     ConstIterator _end;
 
-    // Passed to applyOplogEntryOrGroupedInserts when applying grouped inserts.
+    // Passed to _applyOplogEntryOrGroupedInserts when applying grouped inserts.
     OperationContext* _opCtx;
     Mode _mode;
+
+    // The function that does the actual oplog application.
+    ApplyFunc _applyOplogEntryOrGroupedInserts;
 };
 
 }  // namespace repl

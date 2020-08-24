@@ -234,10 +234,15 @@ public:
 extern NoopOplogApplierObserver noopOplogApplierObserver;
 
 /**
- * Creates thread pool for writer tasks.
+ * Creates the default thread pool for writer tasks.
  */
 std::unique_ptr<ThreadPool> makeReplWriterPool();
 std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount);
+
+/**
+ * Creates a thread pool suitable for writer tasks, with the specified name
+ */
+std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount, StringData name);
 
 }  // namespace repl
 }  // namespace mongo

@@ -166,13 +166,13 @@ Status OplogBufferMock::seekToTimestamp(OperationContext* opCtx, const Timestamp
 /**
  * Generates an insert oplog entry with the given number used for the timestamp.
  */
-OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss) {
+OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss, boost::optional<UUID> uuid) {
     BSONObj oField = BSON("_id" << t << "a" << t);
     return OplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                       boost::none,                 // hash
                       OpTypeEnum::kInsert,         // op type
                       nss,                         // namespace
-                      boost::none,                 // uuid
+                      uuid,                        // uuid
                       boost::none,                 // fromMigrate
                       OplogEntry::kOplogVersion,   // version
                       oField,                      // o

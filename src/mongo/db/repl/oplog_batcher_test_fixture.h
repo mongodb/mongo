@@ -77,7 +77,9 @@ private:
 
 
 // Convenience routines for creating oplog entries to test with.
-OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss);
+OplogEntry makeInsertOplogEntry(int t,
+                                const NamespaceString& nss,
+                                boost::optional<UUID> uuid = boost::none);
 OplogEntry makeApplyOpsOplogEntry(int t,
                                   bool prepare,
                                   const std::vector<OplogEntry>& innerOps = {});

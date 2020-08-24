@@ -86,10 +86,12 @@ public:
      */
     OpTimePair getLastBatchCompletedOpTimes();
 
-    void applyOplogBatch_forTest();
-
     void setBatchLimits_forTest(TenantOplogBatcher::BatchLimits limits) {
         _limits = limits;
+    }
+
+    void setThreadCount_forTest(int threadCount) {
+        _applierThreadCount = threadCount;
     }
 
 private:
@@ -100,13 +102,21 @@ private:
     void _applyLoop(TenantOplogBatch batch);
     void _handleError(Status status);
 
-    void _applyOplogBatch(const TenantOplogBatch& batch);
-    OpTimePair _writeNoOpEntries(const TenantOplogBatch& batch);
+    void _applyOplogBatch(TenantOplogBatch* batch);
+    Status _applyOplogBatchPerWorker(std::vector<const OplogEntry*>* ops);
+    void _checkNsAndUuidsBelongToTenant(OperationContext* opCtx, const TenantOplogBatch& batch);
+    OpTimePair _writeNoOpEntries(OperationContext* opCtx, const TenantOplogBatch& batch);
     void _writeNoOpsForRange(OpObserver* opObserver,
                              std::vector<TenantOplogEntry>::const_iterator begin,
                              std::vector<TenantOplogEntry>::const_iterator end,
                              std::vector<OplogSlot>::iterator firstSlot);
-    void _makeWriterPool_inlock(int threadCount);
+
+    Status _applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
+                                            const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
+                                            OplogApplication::Mode oplogApplicationMode);
+    std::vector<std::vector<const OplogEntry*>> _fillWriterVectors(OperationContext* opCtx,
+                                                                   TenantOplogBatch* batch);
+
     OpTime _getRecipientOpTime(const OpTime& donorOpTime);
     // This is a convenience call for getRecipientOpTime which handles boost::none and nulls.
     boost::optional<OpTime> _maybeGetRecipientOpTime(const boost::optional<OpTime>);
@@ -130,7 +140,7 @@ private:
     std::unique_ptr<TenantOplogBatcher> _oplogBatcher;                    // (R)
     const UUID _migrationUuid;                                            // (R)
     const std::string _tenantId;                                          // (R)
-    const OpTime _applyFromOpTime;                                        // (R)
+    const OpTime _beginApplyingAfterOpTime;                               // (R)
     RandomAccessOplogBuffer* _oplogBuffer;                                // (R)
     std::shared_ptr<executor::TaskExecutor> _executor;                    // (R)
     std::unique_ptr<ThreadPool> _writerPool;                              // (S)
@@ -139,6 +149,8 @@ private:
     TenantOplogBatcher::BatchLimits _limits;                              // (R)
     std::map<OpTime, SharedPromise<OpTimePair>> _opTimeNotificationList;  // (M)
     Status _finalStatus = Status::OK();                                   // (M)
+    stdx::unordered_set<UUID, UUID::Hash> _knownGoodUuids;                // (X)
+    int _applierThreadCount;  // (R) -- set for testing only
 };
 
 }  // namespace repl

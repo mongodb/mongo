@@ -196,5 +196,47 @@ void checkTxnTable(OperationContext* opCtx,
 
 bool docExists(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc);
 
+/**
+ * Creates an OplogEntry with given parameters and preset defaults for this test suite.
+ */
+OplogEntry makeOplogEntry(OpTypeEnum opType,
+                          NamespaceString nss,
+                          OptionalCollectionUUID uuid,
+                          BSONObj o,
+                          boost::optional<BSONObj> o2 = boost::none);
+
+OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollectionUUID uuid);
+
+/**
+ * Creates collection options suitable for oplog.
+ */
+CollectionOptions createOplogCollectionOptions();
+
+/*
+ * Creates collection options for recording pre-images for testing deletes.
+ */
+CollectionOptions createRecordPreImageCollectionOptions();
+
+/**
+ * Create test collection.
+ */
+void createCollection(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      const CollectionOptions& options);
+/**
+ * Create test collection with UUID.
+ */
+UUID createCollectionWithUuid(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Create test database.
+ */
+void createDatabase(OperationContext* opCtx, StringData dbName);
+
+/**
+ * Returns true if collection exists.
+ */
+bool collectionExists(OperationContext* opCtx, const NamespaceString& nss);
+
 }  // namespace repl
 }  // namespace mongo

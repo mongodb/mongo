@@ -52,6 +52,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -160,10 +161,14 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& 
     repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, args.updateArgs.stmtId);
 
     OpTimeBundle opTimes;
+    // We never want to store pre- or post- images when we're migrating oplog entries from another
+    // replica set.
+    const auto& migrationRecipientInfo = repl::tenantMigrationRecipientInfo(opCtx);
     const auto storePreImageForRetryableWrite =
         (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage &&
          opCtx->getTxnNumber());
-    if (storePreImageForRetryableWrite || args.updateArgs.preImageRecordingEnabledForCollection) {
+    if ((storePreImageForRetryableWrite || args.updateArgs.preImageRecordingEnabledForCollection) &&
+        !migrationRecipientInfo) {
         MutableOplogEntry noopEntry = oplogEntry;
         invariant(args.updateArgs.preImageDoc);
         noopEntry.setOpType(repl::OpTypeEnum::kNoop);
@@ -176,7 +181,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& 
 
     // This case handles storing the post image for retryable findAndModify's.
     if (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PostImage &&
-        opCtx->getTxnNumber()) {
+        opCtx->getTxnNumber() && !migrationRecipientInfo) {
         MutableOplogEntry noopEntry = oplogEntry;
         noopEntry.setOpType(repl::OpTypeEnum::kNoop);
         noopEntry.setObject(args.updateArgs.updatedDoc);
@@ -216,7 +221,10 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, stmtId);
 
     OpTimeBundle opTimes;
-    if (deletedDoc) {
+    // We never want to store pre-images when we're migrating oplog entries from another
+    // replica set.
+    const auto& migrationRecipientInfo = repl::tenantMigrationRecipientInfo(opCtx);
+    if (deletedDoc && !migrationRecipientInfo) {
         MutableOplogEntry noopEntry = oplogEntry;
         noopEntry.setOpType(repl::OpTypeEnum::kNoop);
         noopEntry.setObject(*deletedDoc);
@@ -1018,8 +1026,11 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
 
     prevWriteOpTime.writeOpTime = txnParticipant.getLastWriteOpTime();
     auto currOplogSlot = oplogSlots.begin();
+    // We never want to store pre-images when we're migrating oplog entries from another
+    // replica set.
+    const auto& migrationRecipientInfo = repl::tenantMigrationRecipientInfo(opCtx);
 
-    if (numberOfPreImagesToWrite > 0) {
+    if (numberOfPreImagesToWrite > 0 && !migrationRecipientInfo) {
         for (auto& statement : *stmts) {
             if (statement.getPreImage().isEmpty()) {
                 continue;

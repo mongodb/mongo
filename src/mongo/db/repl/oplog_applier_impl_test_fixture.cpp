@@ -32,6 +32,7 @@
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -345,5 +346,87 @@ bool docExists(OperationContext* opCtx, const NamespaceString& nss, const BSONOb
     auto result = client.findOne(nss.ns(), {doc});
     return !result.isEmpty();
 }
+
+/**
+ * Creates an OplogEntry with given parameters and preset defaults for this test suite.
+ */
+OplogEntry makeOplogEntry(OpTypeEnum opType,
+                          NamespaceString nss,
+                          OptionalCollectionUUID uuid,
+                          BSONObj o,
+                          boost::optional<BSONObj> o2) {
+    return OplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
+                      boost::none,                 // hash
+                      opType,                      // opType
+                      nss,                         // namespace
+                      uuid,                        // uuid
+                      boost::none,                 // fromMigrate
+                      OplogEntry::kOplogVersion,   // version
+                      o,                           // o
+                      o2,                          // o2
+                      {},                          // sessionInfo
+                      boost::none,                 // upsert
+                      Date_t(),                    // wall clock time
+                      boost::none,                 // statement id
+                      boost::none,   // optime of previous write within same transaction
+                      boost::none,   // pre-image optime
+                      boost::none,   // post-image optime
+                      boost::none);  // ShardId of resharding recipient
+}
+
+OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollectionUUID uuid) {
+    return makeOplogEntry(opType, nss, uuid, BSON("_id" << 0), boost::none);
+}
+
+CollectionOptions createOplogCollectionOptions() {
+    CollectionOptions options;
+    options.capped = true;
+    options.cappedSize = 64 * 1024 * 1024LL;
+    options.autoIndexId = CollectionOptions::NO;
+    return options;
+}
+
+CollectionOptions createRecordPreImageCollectionOptions() {
+    CollectionOptions options;
+    options.recordPreImages = true;
+    return options;
+}
+
+void createCollection(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      const CollectionOptions& options) {
+    writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
+        Lock::DBLock dblk(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLk(opCtx, nss, MODE_X);
+        OldClientContext ctx(opCtx, nss.ns());
+        auto db = ctx.db();
+        ASSERT_TRUE(db);
+        mongo::WriteUnitOfWork wuow(opCtx);
+        auto coll = db->createCollection(opCtx, nss, options);
+        ASSERT_TRUE(coll);
+        wuow.commit();
+    });
+}
+
+UUID createCollectionWithUuid(OperationContext* opCtx, const NamespaceString& nss) {
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    createCollection(opCtx, nss, options);
+    return options.uuid.get();
+}
+
+void createDatabase(OperationContext* opCtx, StringData dbName) {
+    Lock::GlobalWrite globalLock(opCtx);
+    bool justCreated;
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto db = databaseHolder->openDb(opCtx, dbName, &justCreated);
+    ASSERT_TRUE(db);
+    ASSERT_TRUE(justCreated);
+}
+
+bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
+    return AutoGetCollectionForRead(opCtx, nss).getCollection() != nullptr;
+}
+
 }  // namespace repl
 }  // namespace mongo

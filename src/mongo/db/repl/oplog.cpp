@@ -1051,21 +1051,34 @@ Status applyOperation_inlock(OperationContext* opCtx,
             if (opOrGroupedInserts.isGroupedInserts()) {
                 // Grouped inserts.
 
-                // Cannot apply an array insert with applyOps command. No support for wiping out the
-                // provided timestamps and using new ones for oplog.
+                // Cannot apply an array insert with applyOps command.  But can apply grouped
+                // inserts on primary as part of a tenant migration.
                 uassert(ErrorCodes::OperationFailed,
                         "Cannot apply an array insert with applyOps",
-                        !opCtx->writesAreReplicated());
+                        !opCtx->writesAreReplicated() || tenantMigrationRecipientInfo(opCtx));
 
                 std::vector<InsertStatement> insertObjs;
                 const auto insertOps = opOrGroupedInserts.getGroupedInserts();
-                for (const auto iOp : insertOps) {
-                    invariant(iOp->getTerm());
-                    insertObjs.emplace_back(
-                        iOp->getObject(), iOp->getTimestamp(), iOp->getTerm().get());
+                WriteUnitOfWork wuow(opCtx);
+                if (!opCtx->writesAreReplicated()) {
+                    for (const auto iOp : insertOps) {
+                        invariant(iOp->getTerm());
+                        insertObjs.emplace_back(
+                            iOp->getObject(), iOp->getTimestamp(), iOp->getTerm().get());
+                    }
+                } else {
+                    // Applying grouped inserts on the primary as part of a tenant migration.
+                    // We assign new optimes as the optimes on the donor are not relevant to
+                    // the recipient.
+                    std::vector<OplogSlot> slots = getNextOpTimes(opCtx, insertOps.size());
+                    auto slotIter = slots.begin();
+                    for (const auto iOp : insertOps) {
+                        insertObjs.emplace_back(
+                            iOp->getObject(), slotIter->getTimestamp(), slotIter->getTerm());
+                        slotIter++;
+                    }
                 }
 
-                WriteUnitOfWork wuow(opCtx);
                 OpDebug* const nullOpDebug = nullptr;
                 Status status = collection->insertDocuments(opCtx,
                                                             insertObjs.begin(),

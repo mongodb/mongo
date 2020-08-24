@@ -410,6 +410,15 @@ bool OplogEntry::isSingleOplogEntryTransactionWithCommand() const {
     return false;
 }
 
+bool OplogEntry::isIndexCommandType() const {
+    return getOpType() == OpTypeEnum::kCommand &&
+        ((getCommandType() == CommandType::kCreateIndexes) ||
+         (getCommandType() == CommandType::kStartIndexBuild) ||
+         (getCommandType() == CommandType::kCommitIndexBuild) ||
+         (getCommandType() == CommandType::kAbortIndexBuild) ||
+         (getCommandType() == CommandType::kDropIndexes));
+}
+
 BSONElement OplogEntry::getIdElement() const {
     invariant(isCrudOpType());
     if (getOpType() == OpTypeEnum::kUpdate) {

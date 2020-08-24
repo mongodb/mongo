@@ -58,10 +58,16 @@ constexpr auto kInsertGroupMaxOpCount = 64;
 
 InsertGroup::InsertGroup(std::vector<const OplogEntry*>* ops,
                          OperationContext* opCtx,
-                         InsertGroup::Mode mode)
-    : _doNotGroupBeforePoint(ops->cbegin()), _end(ops->cend()), _opCtx(opCtx), _mode(mode) {}
+                         InsertGroup::Mode mode,
+                         ApplyFunc applyOplogEntryOrGroupedInserts)
+    : _doNotGroupBeforePoint(ops->cbegin()),
+      _end(ops->cend()),
+      _opCtx(opCtx),
+      _mode(mode),
+      _applyOplogEntryOrGroupedInserts(applyOplogEntryOrGroupedInserts) {}
 
-StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIterator it) {
+StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
+    ConstIterator it) noexcept {
     const auto& entry = **it;
 
     // The following conditions must be met before attempting to group the oplog entries starting
@@ -126,7 +132,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     OplogEntryOrGroupedInserts groupedInserts(it, endOfGroupableOpsIterator);
     try {
         // Apply the group of inserts by passing in groupedInserts.
-        uassertStatusOK(applyOplogEntryOrGroupedInserts(_opCtx, groupedInserts, _mode));
+        uassertStatusOK(_applyOplogEntryOrGroupedInserts(_opCtx, groupedInserts, _mode));
         // It succeeded, advance the oplogEntriesIterator to the end of the
         // group of inserts.
         return endOfGroupableOpsIterator - 1;
