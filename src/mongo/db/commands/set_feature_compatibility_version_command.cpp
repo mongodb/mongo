@@ -230,13 +230,9 @@ public:
             CommandHelpers::appendCommandWCStatus(result, waitForWCStatus, res);
         });
 
-        {
-            // Acquire the global IX lock and then immediately release it to ensure this operation
-            // will be killed by the RstlKillOpThread during step-up or stepdown. Note that the
-            // RstlKillOpThread kills any operations on step-up or stepdown for which
-            // Locker::wasGlobalLockTakenInModeConflictingWithWrites() returns true.
-            Lock::GlobalLock lk(opCtx, MODE_IX);
-        }
+        // Ensure that this operation will be killed by the RstlKillOpThread during step-up or
+        // stepdown.
+        opCtx->setAlwaysInterruptAtStepDownOrUp();
 
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
         invariant(!opCtx->lockState()->isLocked());
