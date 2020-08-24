@@ -2118,8 +2118,9 @@ env.Library(
         'ttl_d',
         'vector_clock',
     ],
-    LIBDEPS=[
-        # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
+    LIBDEPS_TAGS=[
+        # NOTE: This library must not link publicly. Please only add to LIBDEPS_PRIVATE
+        'lint-no-public-deps',
     ],
 )
 

@@ -548,7 +548,10 @@ gperftoolsEnv.Library(
         # be considered a leaf node to ensure the system allocator
         # is not linked in before tcmalloc. This tag allows nodes tagged as
         # leaf nodes to still get the correct allocator.
-        'lint-leaf-node-allowed-dep'
+        'lint-leaf-node-allowed-dep',
+        # This tag allows the allocator to be linked to nodes marked as not
+        # allowed to have public dependencies.
+        'lint-public-dep-allowed'
     ],
 )
 

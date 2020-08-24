@@ -230,6 +230,30 @@ class LibdepLinter(object):
             ))
 
     @linter_rule
+    def linter_rule_no_public_deps(self, libdep):
+        """
+        LIBDEP RULE:
+            Nodes explicitly marked as not allowed to have public dependencies, should not
+            have public dependencies, unless the dependency is explicitly marked as allowed.
+        """
+        if not self._check_for_lint_tags('lint-no-public-deps', inclusive_tag=True):
+            return
+
+        if libdep.dependency_type != dependency.Private:
+            # Check if the libdep exempts itself from this rule.
+            if self._check_for_lint_tags('lint-public-dep-allowed', libdep.target_node.env):
+                return
+
+            target_type = self.target[0].builder.get_name(self.env)
+            lib = os.path.basename(str(libdep))
+            self._raise_libdep_lint_exception(
+                textwrap.dedent(f"""\
+                    {target_type} '{self.target[0]}' has public dependency '{lib}'
+                    while being marked as not allowed to have public dependencies
+                    and '{lib}' does not exempt itself."""
+                ))
+
+    @linter_rule
     def linter_rule_no_dups(self, libdep):
         """
         LIBDEP RULE:
