@@ -61,8 +61,8 @@ Status stepDownForShutdown(OperationContext* opCtx,
                 LOGV2(4695100, "hangInShutdownAfterStepdown failpoint enabled");
                 hangInShutdownAfterStepdown.pauseWhileSet(opCtx);
             }
-        } catch (const ExceptionFor<ErrorCodes::NotMaster>&) {
-            // Ignore not master errors.
+        } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+            // Ignore NotWritablePrimary errors.
         } catch (const DBException& e) {
             if (!forceShutdown) {
                 return e.toStatus();

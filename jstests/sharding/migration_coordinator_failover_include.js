@@ -22,7 +22,7 @@ function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
                expectAbortDecisionWithCode + "; ns is " + ns);
 
     // Wait for mongos to see a primary node on the primary shard, because mongos does not retry
-    // writes on NotMaster errors, and we are about to insert docs through mongos.
+    // writes on NotPrimary errors, and we are about to insert docs through mongos.
     awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
 
     // Insert some docs into the collection so that the migration leaves orphans on either the

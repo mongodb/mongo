@@ -79,7 +79,7 @@ Status checkReplState(OperationContext* opCtx,
     bool writesAreReplicatedAndNotPrimary = opCtx->writesAreReplicated() && !canAcceptWrites;
 
     if (writesAreReplicatedAndNotPrimary) {
-        return Status(ErrorCodes::NotMaster,
+        return Status(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while dropping indexes on database "
                                     << dbAndUUID.db() << " with collection " << dbAndUUID.uuid());
     }

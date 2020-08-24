@@ -235,7 +235,7 @@ protected:
      * new Instance (by calling constructInstance()), registers it in _instances, and returns it.
      * It is illegal to call this more than once with 'initialState' documents that have the same
      * _id but are otherwise not completely identical.
-     * Throws NotMaster if the node is not currently primary.
+     * Throws NotWritablePrimary if the node is not currently primary.
      */
     std::shared_ptr<Instance> getOrCreateInstance(BSONObj initialState);
 

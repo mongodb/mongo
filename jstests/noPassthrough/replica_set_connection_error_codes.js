@@ -1,6 +1,6 @@
 /**
- * Tests that DBClientRS performs re-targeting when it sees an ErrorCodes.NotMaster error response
- * from a command even if "not master" doesn't appear in the message.
+ * Tests that DBClientRS performs re-targeting when it sees an ErrorCodes.NotWritablePrimary error
+ * response from a command even if "not master" doesn't appear in the message.
  * @tags: [requires_replication]
  */
 (function() {
@@ -49,12 +49,12 @@ const awaitShell = stepDownPrimary(rst);
 rst.getPrimary();
 rst.awaitNodesAgreeOnPrimary();
 
-// DBClientRS should discover the current primary eventually and get NotMaster errors in the
-// meantime.
+// DBClientRS should discover the current primary eventually and get NotWritablePrimary errors in
+// the meantime.
 assert.soon(() => {
     const res = rsConn.getDB("test").runCommand({create: "mycoll"});
     if (!res.ok) {
-        assert(res.code == ErrorCodes.NotMaster);
+        assert(res.code == ErrorCodes.NotWritablePrimary);
     }
     return res.ok;
 });

@@ -431,8 +431,8 @@ public:
                 // Convert the error code to be more specific.
                 uasserted(ErrorCodes::CurrentConfigNotCommittedYet, status.reason());
             } else if (status == ErrorCodes::PrimarySteppedDown) {
-                // Return NotMaster since the command has no side effect yet.
-                status = {ErrorCodes::NotMaster, status.reason()};
+                // Return NotWritablePrimary since the command has no side effect yet.
+                status = {ErrorCodes::NotWritablePrimary, status.reason()};
             }
             uassertStatusOK(status);
         }

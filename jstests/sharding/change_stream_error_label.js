@@ -32,7 +32,7 @@ const expectedStopShardErrors = [
     ErrorCodes.SocketException,
     ErrorCodes.ShutdownInProgress,
     ErrorCodes.PrimarySteppedDown,
-    ErrorCodes.NotMaster,
+    ErrorCodes.NotWritablePrimary,
     ErrorCodes.InterruptedAtShutdown,
     ErrorCodes.InterruptedDueToReplStateChange,
     ErrorCodes.NotMasterNoSlaveOk,

@@ -707,7 +707,7 @@ void DBClientReplicaSet::isntMaster() {
     // monitor doesn't exist.
     _rsm->failedHost(
         _masterHost,
-        {ErrorCodes::NotMaster, str::stream() << "got not master for: " << _masterHost});
+        {ErrorCodes::NotWritablePrimary, str::stream() << "got not master for: " << _masterHost});
 
     resetMaster();
 }

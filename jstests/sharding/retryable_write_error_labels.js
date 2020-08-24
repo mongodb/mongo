@@ -124,7 +124,7 @@ function runTest(errorCode, isWCError) {
 const retryableCodes = [
     ErrorCodes.InterruptedAtShutdown,
     ErrorCodes.InterruptedDueToReplStateChange,
-    ErrorCodes.NotMaster,
+    ErrorCodes.NotWritablePrimary,
     ErrorCodes.NotMasterNoSlaveOk,
     ErrorCodes.NotMasterOrSecondary,
     ErrorCodes.PrimarySteppedDown,

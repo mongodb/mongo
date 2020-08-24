@@ -2152,7 +2152,7 @@ TEST_F(TopoCoordTest, PrepareStepDownAttemptFailsIfNotLeader) {
                       << "protocolVersion" << 1),
                  0);
     getTopoCoord().changeMemberState_forTest(MemberState::RS_SECONDARY);
-    Status expectedStatus(ErrorCodes::NotMaster, "This node is not a primary. ");
+    Status expectedStatus(ErrorCodes::NotWritablePrimary, "This node is not a primary. ");
 
     ASSERT_EQUALS(expectedStatus, getTopoCoord().prepareForStepDownAttempt().getStatus());
 }

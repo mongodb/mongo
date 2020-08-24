@@ -164,7 +164,7 @@ private:
 /**
  * Maintains the set of all shards known to the instance and their connections and exposes
  * functionality to run commands against shards. All commands which this registry executes are
- * retried on NotMaster class of errors and in addition all read commands are retried on network
+ * retried on NotPrimary class of errors and in addition all read commands are retried on network
  * errors automatically as well.
  */
 class ShardRegistry {

@@ -135,8 +135,8 @@ private:
     };
 
     /**
-     * Returns the current catalog + scheduler if stepUp has started, otherwise throws a NotMaster
-     * exception.
+     * Returns the current catalog + scheduler if stepUp has started, otherwise throws a
+     * NotWritablePrimary exception.
      */
     std::shared_ptr<CatalogAndScheduler> _getCatalogAndScheduler(OperationContext* opCtx);
 

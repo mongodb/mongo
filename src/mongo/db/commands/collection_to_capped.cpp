@@ -119,7 +119,7 @@ public:
         Lock::CollectionLock collLock(opCtx, toNs, MODE_X);
 
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, toNs)) {
-            uasserted(ErrorCodes::NotMaster,
+            uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while cloning collection " << from << " to "
                                     << to << " (as capped)");
         }

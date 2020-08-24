@@ -373,7 +373,7 @@ TEST_F(PrimaryOnlyServiceTest, CreateWhenNotPrimary) {
     ASSERT_THROWS_CODE(
         TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0)),
         DBException,
-        ErrorCodes::NotMaster);
+        ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(PrimaryOnlyServiceTest, CreateWithoutID) {
@@ -484,7 +484,7 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforeRebuildingInstances) {
 
     // Let the previous stepUp attempt continue and realize that the node has since stepped down.
     PrimaryOnlyServiceHangBeforeRebuildingInstances.setMode(FailPoint::off);
-    ASSERT_THROWS_CODE(getInstanceFuture.get(), DBException, ErrorCodes::NotMaster);
+    ASSERT_THROWS_CODE(getInstanceFuture.get(), DBException, ErrorCodes::NotWritablePrimary);
 
     // Now do another stepUp that is allowed to complete this time.
     stateOneFPTimesEntered = TestServiceHangDuringStateOne.setMode(FailPoint::alwaysOn);
@@ -536,7 +536,7 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
     ASSERT_THROWS_CODE(
         TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0)),
         DBException,
-        ErrorCodes::NotMaster);
+        ErrorCodes::NotWritablePrimary);
 
     // Allow the next stepUp to succeed.
     PrimaryOnlyServiceFailRebuildingInstances.setMode(FailPoint::off);
@@ -564,5 +564,5 @@ TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByStepdown) {
     stepDown();
     TestServiceHangBeforeWritingStateDoc.setMode(FailPoint::off);
 
-    ASSERT_EQ(ErrorCodes::NotMaster, instance->getCompletionFuture().getNoThrow());
+    ASSERT_EQ(ErrorCodes::NotWritablePrimary, instance->getCompletionFuture().getNoThrow());
 }

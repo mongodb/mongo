@@ -46,7 +46,7 @@ jsTestLog("Test that prepare fails on a secondary");
 const txnNumber = NumberLong(priSession.getTxnNumber_forTesting());
 assert.commandFailedWithCode(secSession.getDatabase('admin').adminCommand(
                                  {prepareTransaction: 1, txnNumber: txnNumber, autocommit: false}),
-                             ErrorCodes.NotMaster);
+                             ErrorCodes.NotWritablePrimary);
 
 const prepareTimestamp = PrepareHelpers.prepareTransaction(priSession);
 rst.awaitReplication();
@@ -60,12 +60,12 @@ assert.commandFailedWithCode(secSession.getDatabase('admin').adminCommand({
     txnNumber: txnNumber,
     autocommit: false
 }),
-                             ErrorCodes.NotMaster);
+                             ErrorCodes.NotWritablePrimary);
 
 jsTestLog("Test that prepared abort fails on a secondary");
 assert.commandFailedWithCode(secSession.getDatabase('admin').adminCommand(
                                  {abortTransaction: 1, txnNumber: txnNumber, autocommit: false}),
-                             ErrorCodes.NotMaster);
+                             ErrorCodes.NotWritablePrimary);
 
 jsTestLog("Test that we can still commit the transaction");
 assert.commandWorked(PrepareHelpers.commitTransaction(priSession, commitTimestamp));

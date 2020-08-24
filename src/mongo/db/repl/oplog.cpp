@@ -226,7 +226,7 @@ void _logOpsInner(OperationContext* opCtx,
             ss << "(" << record.id << ", " << redact(record.data.toBson()) << ") ";
         }
         ss << "]";
-        uasserted(ErrorCodes::NotMaster, ss);
+        uasserted(ErrorCodes::NotWritablePrimary, ss);
     }
 
     // TODO (SERVER-50598): Not allow tenant migration donor to write "commitIndexBuild" and

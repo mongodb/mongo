@@ -194,7 +194,7 @@ function runTest() {
         testCommit(conn, isCausal, true /*expectRetry*/);
 
         // Network error on commit attempt.
-        mockFirstCommitResponse = {ok: 0, code: ErrorCodes.NotMaster};
+        mockFirstCommitResponse = {ok: 0, code: ErrorCodes.NotWritablePrimary};
         testCommit(conn, isCausal, true /*expectRetry*/);
     }
 }

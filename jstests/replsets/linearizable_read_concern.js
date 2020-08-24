@@ -66,7 +66,7 @@ var badCmd = assert.commandFailed(secondaries[0].getDB("test").runCommand(
     {"find": "foo", readConcern: {level: "linearizable"}, "maxTimeMS": 60000}));
 
 assert.eq(badCmd.errmsg, "cannot satisfy linearizable read concern on non-primary node");
-assert.eq(badCmd.code, ErrorCodes.NotMaster);
+assert.eq(badCmd.code, ErrorCodes.NotWritablePrimary);
 
 // This fails because you cannot specify 'afterOpTime' for linearizable read.
 var opTimeCmd = assert.commandFailed(primary.getDB("test").runCommand({

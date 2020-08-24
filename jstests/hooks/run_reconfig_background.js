@@ -16,7 +16,7 @@ load('jstests/libs/parallelTester.js');     // For Thread.
  * Returns true if the error code is transient.
  */
 function isIgnorableError(codeName) {
-    if (codeName == "NotMaster" || codeName == "InterruptedDueToReplStateChange" ||
+    if (codeName == "NotWritablePrimary" || codeName == "InterruptedDueToReplStateChange" ||
         codeName == "PrimarySteppedDown" || codeName === "NodeNotFound" ||
         codeName === "ShutdownInProgress") {
         return true;

@@ -474,7 +474,7 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
         (wcCode && ErrorCodes::isA<ErrorCategory::ShutdownError>(*wcCode));
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    // NotMaster errors always include a topologyVersion, since we increment topologyVersion on
+    // NotPrimary errors always include a topologyVersion, since we increment topologyVersion on
     // stepdown. ShutdownErrors only include a topologyVersion if the server is in quiesce mode,
     // since we only increment the topologyVersion at shutdown and alert waiting isMaster commands
     // if the server enters quiesce mode.
@@ -1059,9 +1059,9 @@ void execCommandDatabase(OperationContext* opCtx,
             }
 
             if (MONGO_unlikely(respondWithNotPrimaryInCommandDispatch.shouldFail())) {
-                uassert(ErrorCodes::NotMaster, "not primary", canRunHere);
+                uassert(ErrorCodes::NotWritablePrimary, "not primary", canRunHere);
             } else {
-                uassert(ErrorCodes::NotMaster, "not master", canRunHere);
+                uassert(ErrorCodes::NotWritablePrimary, "not master", canRunHere);
             }
 
             if (!command->maintenanceOk() &&
@@ -1428,7 +1428,7 @@ DbResponse receivedCommands(OperationContext* opCtx,
         if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
             if (c && c->getReadWriteType() == Command::ReadWriteType::kWrite)
                 notMasterUnackWrites.increment();
-            uasserted(ErrorCodes::NotMaster,
+            uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream()
                           << "Not-master error while processing '" << request.getCommandName()
                           << "' operation  on '" << request.getDatabase() << "' database via "
@@ -1779,12 +1779,13 @@ Future<DbResponse> ServiceEntryPointCommon::handleRequest(OperationContext* opCt
                         "error"_attr = redact(ue));
             debug.errInfo = ue.toStatus();
         }
-        // A NotMaster error can be set either within receivedInsert/receivedUpdate/receivedDelete
-        // or within the AssertionException handler above.  Either way, we want to throw an
-        // exception here, which will cause the client to be disconnected.
+        // A NotWritablePrimary error can be set either within
+        // receivedInsert/receivedUpdate/receivedDelete or within the AssertionException handler
+        // above.  Either way, we want to throw an exception here, which will cause the client to be
+        // disconnected.
         if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
             notMasterLegacyUnackWrites.increment();
-            uasserted(ErrorCodes::NotMaster,
+            uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream()
                           << "Not-master error while processing '" << networkOpToString(op)
                           << "' operation  on '" << nsString << "' namespace via legacy "

@@ -71,7 +71,7 @@ Status _checkNssAndReplState(OperationContext* opCtx, Database* db, const std::s
         opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
     if (userInitiatedWritesAndNotPrimary) {
-        return Status(ErrorCodes::NotMaster,
+        return Status(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while dropping database " << dbName);
     }
 

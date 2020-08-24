@@ -95,7 +95,7 @@ struct Cloner::Fun {
     void operator()(DBClientCursorBatchIterator& i) {
         boost::optional<Lock::DBLock> dbLock;
         dbLock.emplace(opCtx, _dbName, MODE_X);
-        uassert(ErrorCodes::NotMaster,
+        uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Not primary while cloning collection " << nss,
                 !opCtx->writesAreReplicated() ||
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
@@ -529,7 +529,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
     }
 
     uassert(
-        ErrorCodes::NotMaster,
+        ErrorCodes::NotWritablePrimary,
         str::stream() << "Not primary while cloning database " << dBName
                       << " (after getting list of collections to clone)",
         !opCtx->writesAreReplicated() ||

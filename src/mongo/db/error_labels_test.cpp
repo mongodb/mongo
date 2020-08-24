@@ -51,8 +51,9 @@ TEST(IsTransientTransactionErrorTest, NetworkErrorsAreNotTransientOnCommit) {
 }
 
 TEST(IsTransientTransactionErrorTest, RetryableWriteErrorsAreNotTransientOnAbort) {
-    ASSERT_FALSE(isTransientTransactionError(
-        ErrorCodes::NotMaster, false /* hasWriteConcernError */, true /* isCommitOrAbort */));
+    ASSERT_FALSE(isTransientTransactionError(ErrorCodes::NotWritablePrimary,
+                                             false /* hasWriteConcernError */,
+                                             true /* isCommitOrAbort */));
 }
 
 TEST(IsTransientTransactionErrorTest,
@@ -129,7 +130,7 @@ TEST_F(ErrorLabelBuilderTest, NonTransientTransactionErrorsHaveNoTransientTransa
     sessionInfo.setAutocommit(false);
     std::string commandName = "commitTransaction";
     ErrorLabelBuilder builder(
-        opCtx(), sessionInfo, commandName, ErrorCodes::NotMaster, boost::none, false);
+        opCtx(), sessionInfo, commandName, ErrorCodes::NotWritablePrimary, boost::none, false);
     ASSERT_FALSE(builder.isTransientTransactionError());
 }
 
@@ -147,7 +148,7 @@ TEST_F(ErrorLabelBuilderTest, NonRetryableWritesHaveNoRetryableWriteErrorLabel) 
     OperationSessionInfoFromClient sessionInfo;
     std::string commandName = "insert";
     ErrorLabelBuilder builder(
-        opCtx(), sessionInfo, commandName, ErrorCodes::NotMaster, boost::none, false);
+        opCtx(), sessionInfo, commandName, ErrorCodes::NotWritablePrimary, boost::none, false);
 
     // Test regular writes.
     ASSERT_FALSE(builder.isRetryableWriteError());
@@ -172,7 +173,7 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsHaveRetryableWriteErrorLabel) 
     sessionInfo.setTxnNumber(1);
     std::string commandName = "update";
     ErrorLabelBuilder builder(
-        opCtx(), sessionInfo, commandName, ErrorCodes::NotMaster, boost::none, false);
+        opCtx(), sessionInfo, commandName, ErrorCodes::NotWritablePrimary, boost::none, false);
     ASSERT_TRUE(builder.isRetryableWriteError());
 }
 
@@ -182,7 +183,7 @@ TEST_F(ErrorLabelBuilderTest,
     sessionInfo.setTxnNumber(1);
     std::string commandName = "update";
     ErrorLabelBuilder builder(
-        opCtx(), sessionInfo, commandName, ErrorCodes::NotMaster, boost::none, true);
+        opCtx(), sessionInfo, commandName, ErrorCodes::NotWritablePrimary, boost::none, true);
     ASSERT_FALSE(builder.isRetryableWriteError());
 }
 
@@ -222,17 +223,17 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsOnCommitAbortHaveRetryableWrit
 
     commandName = "commitTransaction";
     ErrorLabelBuilder commitBuilder(
-        opCtx(), sessionInfo, commandName, ErrorCodes::NotMaster, boost::none, false);
+        opCtx(), sessionInfo, commandName, ErrorCodes::NotWritablePrimary, boost::none, false);
     ASSERT_TRUE(commitBuilder.isRetryableWriteError());
 
     commandName = "coordinateCommitTransaction";
     ErrorLabelBuilder coordinateCommitBuilder(
-        opCtx(), sessionInfo, commandName, ErrorCodes::NotMaster, boost::none, false);
+        opCtx(), sessionInfo, commandName, ErrorCodes::NotWritablePrimary, boost::none, false);
     ASSERT_TRUE(coordinateCommitBuilder.isRetryableWriteError());
 
     commandName = "abortTransaction";
     ErrorLabelBuilder abortBuilder(
-        opCtx(), sessionInfo, commandName, ErrorCodes::NotMaster, boost::none, false);
+        opCtx(), sessionInfo, commandName, ErrorCodes::NotWritablePrimary, boost::none, false);
     ASSERT_TRUE(abortBuilder.isRetryableWriteError());
 }
 

@@ -367,7 +367,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                                 << connectionString.toString() << " as a shard");
     }
     if (!isMaster) {
-        return {ErrorCodes::NotMaster,
+        return {ErrorCodes::NotWritablePrimary,
                 str::stream()
                     << connectionString.toString()
                     << " does not have a master. If this is a replica set, ensure that it has a"

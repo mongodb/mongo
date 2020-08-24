@@ -174,7 +174,7 @@ private:
      * useMultiUpdate is true) in the specified namespace on the config server. Must only be used
      * for updates to the 'config' database.
      *
-     * This method retries the operation on NotMaster or network errors, so it should only be used
+     * This method retries the operation on NotPrimary or network errors, so it should only be used
      * with modifications which are idempotent.
      *
      * Returns non-OK status if the command failed to run for some reason. If the command was

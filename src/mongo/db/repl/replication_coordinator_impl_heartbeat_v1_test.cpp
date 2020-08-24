@@ -1216,7 +1216,7 @@ TEST_F(ReplCoordHBV1Test, LastCommittedOpTimeOnlyUpdatesFromHeartbeatIfNotInStar
  * Tests assert that stepdown via heartbeat completed, and the tests that send the new config via
  * heartbeat assert that the new config was stored. Tests that send the new config with the
  * replSetReconfig command don't check that it was stored; if the stepdown finished first then the
- * replSetReconfig was rejected with a NotMaster error.
+ * replSetReconfig was rejected with a NotWritablePrimary error.
  */
 class HBStepdownAndReconfigTest : public ReplCoordHBV1Test {
 protected:
@@ -1360,7 +1360,7 @@ Future<void> HBStepdownAndReconfigTest::startReconfigCommand() {
             BSONObjBuilder result;
             auto status = Status::OK();
             try {
-                // OK for processReplSetReconfig to return, throw NotMaster-like error, or succeed.
+                // OK for processReplSetReconfig to return, throw NotPrimary-like error, or succeed.
                 status = coord->processReplSetReconfig(opCtx.get(), args, &result);
             } catch (const DBException&) {
                 status = exceptionToStatus();

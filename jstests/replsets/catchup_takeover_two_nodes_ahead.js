@@ -52,9 +52,9 @@ assert.eq(ReplSetTest.State.PRIMARY,
 jsTestLog('node 2 is now primary, but cannot accept writes');
 
 // Make sure that node 2 cannot write anything. Because it is lagged and replication
-// has been stopped, it shouldn't be able to become master.
+// has been stopped, it shouldn't be able to become primary.
 assert.commandFailedWithCode(nodes[2].getDB(name).bar.insert({z: 100}, writeConcern),
-                             ErrorCodes.NotMaster);
+                             ErrorCodes.NotWritablePrimary);
 
 // Confirm that the most up-to-date node becomes primary after the default catchup delay.
 replSet.waitForState(0, ReplSetTest.State.PRIMARY, 60 * 1000);

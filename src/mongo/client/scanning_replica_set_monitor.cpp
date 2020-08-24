@@ -850,7 +850,7 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
     // since they don't have the same ordering with pv1 electionId.
     if (reply.configVersion < _set->configVersion) {
         return {
-            ErrorCodes::NotMaster,
+            ErrorCodes::NotWritablePrimary,
             str::stream() << "Node " << from << " believes it is primary, but its config version "
                           << reply.configVersion << " is older than the most recent config version "
                           << _set->configVersion};
@@ -863,7 +863,7 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
         if (reply.configVersion == _set->configVersion && _set->maxElectionId.isSet() &&
             _set->maxElectionId.compare(reply.electionId) > 0) {
             return {
-                ErrorCodes::NotMaster,
+                ErrorCodes::NotWritablePrimary,
                 str::stream() << "Node " << from << " believes it is primary, but its election id "
                               << reply.electionId << " is older than the most recent election id "
                               << _set->maxElectionId};

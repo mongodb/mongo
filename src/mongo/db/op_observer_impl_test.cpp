@@ -456,7 +456,8 @@ TEST_F(OpObserverTest, MustBePrimaryToWriteOplogEntries) {
     WriteUnitOfWork wunit(opCtx.get());
 
     // No-op writes should be prohibited.
-    ASSERT_THROWS_CODE(opObserver.onOpMessage(opCtx.get(), {}), DBException, ErrorCodes::NotMaster);
+    ASSERT_THROWS_CODE(
+        opObserver.onOpMessage(opCtx.get(), {}), DBException, ErrorCodes::NotWritablePrimary);
 }
 
 /**

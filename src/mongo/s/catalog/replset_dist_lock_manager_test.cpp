@@ -1236,7 +1236,7 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfElectionIdChanged) {
 
 /**
  * 1. Try to grab lock multiple times.
- * 2. For each attempt, attempting to check the ping document results in NotMaster error.
+ * 2. For each attempt, attempting to check the ping document results in NotWritablePrimary error.
  * 3. All of the previous attempt should result in lock busy.
  * 4. Try to grab lock again when the ping was not updated and lock expiration has elapsed.
  */
@@ -1285,7 +1285,7 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfNoMaster) {
         } else {
             getMockCatalog()->expectGetServerInfo(
                 [&getServerInfoCallCount]() { getServerInfoCallCount++; },
-                {ErrorCodes::NotMaster, "not master"});
+                {ErrorCodes::NotWritablePrimary, "not master"});
         }
 
         auto status = distLock()->lock(operationContext(), "bar", "", Milliseconds(0)).getStatus();

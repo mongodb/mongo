@@ -102,8 +102,8 @@ auto SessionsCollectionRS::_dispatch(const NamespaceString& ns,
 
     // There is a window here where we may transition from Primary to Secondary after we release
     // the locks we take in _isStandaloneOrPrimary(). In this case, the callback we run below
-    // may throw a NotMaster error, or a stale read. However, this is preferable to running the
-    // callback while we hold locks, since that can lead to a deadlock.
+    // may throw a NotWritablePrimary error, or a stale read. However, this is preferable to running
+    // the callback while we hold locks, since that can lead to a deadlock.
 
     auto conn = _makePrimaryConnection(opCtx);
     DBClientBase* client = conn->get();

@@ -439,8 +439,8 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
     OperationContext* opCtx,
     const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
     OplogApplication::Mode oplogApplicationMode) {
-    // We must ensure the opCtx uses replicated writes, because that will ensure we get a NotMaster
-    // error if a stepdown occurs.
+    // We must ensure the opCtx uses replicated writes, because that will ensure we get a
+    // NotWritablePrimary error if a stepdown occurs.
     invariant(opCtx->writesAreReplicated());
 
     // Ensure context matches that of _applyOplogBatchPerWorker.

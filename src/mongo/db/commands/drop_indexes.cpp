@@ -107,7 +107,7 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         // Even though reIndex is a standalone-only command, this will return that the command is
         // allowed on secondaries so that it will fail with a more useful error message to the user
-        // rather than with a NotMaster error.
+        // rather than with a NotWritablePrimary error.
         return AllowedOnSecondary::kAlways;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

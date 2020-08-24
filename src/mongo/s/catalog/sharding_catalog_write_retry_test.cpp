@@ -350,7 +350,7 @@ TEST_F(UpdateRetryTest, Success) {
     future.default_timed_get();
 }
 
-TEST_F(UpdateRetryTest, NotMasterErrorReturnedPersistently) {
+TEST_F(UpdateRetryTest, NotWritablePrimaryErrorReturnedPersistently) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     BSONObj objToUpdate = BSON("_id" << 1 << "Value"
@@ -366,13 +366,14 @@ TEST_F(UpdateRetryTest, NotMasterErrorReturnedPersistently) {
                                                   updateExpr,
                                                   false,
                                                   ShardingCatalogClient::kMajorityWriteConcern);
-        ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+        ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, status);
     });
 
     for (int i = 0; i < 3; ++i) {
         onCommand([](const RemoteCommandRequest& request) {
             BSONObjBuilder bb;
-            CommandHelpers::appendCommandStatusNoThrow(bb, {ErrorCodes::NotMaster, "not master"});
+            CommandHelpers::appendCommandStatusNoThrow(
+                bb, {ErrorCodes::NotWritablePrimary, "not master"});
             return bb.obj();
         });
     }
@@ -380,8 +381,8 @@ TEST_F(UpdateRetryTest, NotMasterErrorReturnedPersistently) {
     future.default_timed_get();
 }
 
-TEST_F(UpdateRetryTest, NotMasterReturnedFromTargeter) {
-    configTargeter()->setFindHostReturnValue(Status(ErrorCodes::NotMaster, "not master"));
+TEST_F(UpdateRetryTest, NotWritablePrimaryReturnedFromTargeter) {
+    configTargeter()->setFindHostReturnValue(Status(ErrorCodes::NotWritablePrimary, "not master"));
 
     BSONObj objToUpdate = BSON("_id" << 1 << "Value"
                                      << "TestValue");
@@ -396,13 +397,13 @@ TEST_F(UpdateRetryTest, NotMasterReturnedFromTargeter) {
                                                   updateExpr,
                                                   false,
                                                   ShardingCatalogClient::kMajorityWriteConcern);
-        ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+        ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, status);
     });
 
     future.default_timed_get();
 }
 
-TEST_F(UpdateRetryTest, NotMasterOnceSuccessAfterRetry) {
+TEST_F(UpdateRetryTest, NotWritablePrimaryOnceSuccessAfterRetry) {
     HostAndPort host1("TestHost1");
     HostAndPort host2("TestHost2");
     configTargeter()->setFindHostReturnValue(host1);
@@ -433,11 +434,12 @@ TEST_F(UpdateRetryTest, NotMasterOnceSuccessAfterRetry) {
         ASSERT_EQUALS(host1, request.target);
 
         // Ensure that when the catalog manager tries to retarget after getting the
-        // NotMaster response, it will get back a new target.
+        // NotWritablePrimary response, it will get back a new target.
         configTargeter()->setFindHostReturnValue(host2);
 
         BSONObjBuilder bb;
-        CommandHelpers::appendCommandStatusNoThrow(bb, {ErrorCodes::NotMaster, "not master"});
+        CommandHelpers::appendCommandStatusNoThrow(bb,
+                                                   {ErrorCodes::NotWritablePrimary, "not master"});
         return bb.obj();
     });
 

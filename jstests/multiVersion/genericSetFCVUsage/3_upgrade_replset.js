@@ -81,7 +81,8 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
 
     // Since the primary from before the upgrade took place was restarted as part of the
     // upgrade/downgrade process, we explicitly reconnect to it so that sending it an update
-    // operation silently fails with an unchecked NotMaster error rather than a network error.
+    // operation silently fails with an unchecked NotWritablePrimary error rather than a network
+    // error.
     reconnect(oldPrimary.getDB("admin"));
     joinFindInsert();
 

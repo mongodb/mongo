@@ -489,7 +489,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
             // the rest of the replica set, so it physically can't become the primary.
             assert.soon(() => {
                 const res = curPrimary.adminCommand({replSetStepDown: 1, force: true});
-                return (res.ok || res.code === ErrorCodes.NotMaster);
+                return (res.ok || res.code === ErrorCodes.NotWritablePrimary);
             });
         } catch (e) {
             // Stepdown may fail if the node has already started stepping down.

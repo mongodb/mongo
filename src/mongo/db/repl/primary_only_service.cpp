@@ -110,7 +110,7 @@ public:
         // ensure the OpCtx starts off immediately interrupted.
         if (!clientState.allowOpCtxWhenServiceNotRunning &&
             !clientState.primaryOnlyService->isRunning()) {
-            opCtx->markKilled(ErrorCodes::NotMaster);
+            opCtx->markKilled(ErrorCodes::NotWritablePrimary);
         }
     }
     void onDestroyOperationContext(OperationContext* opCtx) override {}
@@ -373,7 +373,7 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateIns
         uassertStatusOK(_rebuildStatus);
     }
     uassert(
-        ErrorCodes::NotMaster,
+        ErrorCodes::NotWritablePrimary,
         str::stream() << "Not Primary when trying to create a new instance of PrimaryOnlyService "
                       << getServiceName(),
         _state == State::kRunning);

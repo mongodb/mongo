@@ -46,7 +46,7 @@ let res = secondarySessionDb.runCommand({
     startTransaction: true,
     autocommit: false
 });
-assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
+assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
 jsTest.log("failCommand with errorLabels but without errorCode or writeConcernError should not " +
@@ -66,7 +66,7 @@ res = secondarySessionDb.runCommand({
     startTransaction: true,
     autocommit: false
 });
-assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
+assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 // Server should continue to return TransientTransactionError label.
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 assert.commandWorked(secondary.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
@@ -77,7 +77,7 @@ txnNumber++;
 res = secondarySessionDb.runCommand(
     {insert: collName, documents: [{_id: "insert-1"}], txnNumber: NumberLong(txnNumber)});
 
-assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
+assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 secondarySession.endSession();
 
@@ -116,24 +116,25 @@ assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-jsTest.log("NotMaster returned by commitTransaction command is not TransientTransactionError but" +
-           " RetryableWriteError");
+jsTest.log(
+    "NotWritablePrimary returned by commitTransaction command is not TransientTransactionError but" +
+    " RetryableWriteError");
 // commitTransaction will attempt to perform a noop write in response to a NoSuchTransaction
-// error and non-empty writeConcern. This will throw NotMaster.
+// error and non-empty writeConcern. This will throw NotWritablePrimary.
 res = secondarySessionDb.adminCommand({
     commitTransaction: 1,
     txnNumber: NumberLong(secondarySession.getTxnNumber_forTesting() + 1),
     autocommit: false,
     writeConcern: {w: "majority"}
 });
-assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
+assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 
 jsTest.log(
-    "NotMaster returned by coordinateCommitTransaction command is not TransientTransactionError" +
+    "NotWritablePrimary returned by coordinateCommitTransaction command is not TransientTransactionError" +
     " but RetryableWriteError");
 // coordinateCommitTransaction will attempt to perform a noop write in response to a
-// NoSuchTransaction error and non-empty writeConcern. This will throw NotMaster.
+// NoSuchTransaction error and non-empty writeConcern. This will throw NotWritablePrimary.
 res = secondarySessionDb.adminCommand({
     coordinateCommitTransaction: 1,
     participants: [],
@@ -141,7 +142,7 @@ res = secondarySessionDb.adminCommand({
     autocommit: false,
     writeConcern: {w: "majority"}
 });
-assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
+assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 
 jsTest.log("ShutdownInProgress returned by write commands is TransientTransactionError");

@@ -48,7 +48,8 @@ assert.eq(0, metrics.totalCommitted);
 assert.eq(0, metrics.totalStarted);
 
 jsTestLog("Run transaction statement.");
-assert.eq(assert.throws(() => secDb[collName].findOne({_id: 0})).code, ErrorCodes.NotMaster);
+assert.eq(assert.throws(() => secDb[collName].findOne({_id: 0})).code,
+                       ErrorCodes.NotWritablePrimary);
 
 // The metrics are not affected.
 metrics = assert.commandWorked(secondary.adminCommand({serverStatus: 1, repl: 0, metrics: 0}))
@@ -61,7 +62,8 @@ assert.eq(0, metrics.totalCommitted);
 assert.eq(0, metrics.totalStarted);
 
 jsTestLog("Abort the transaction.");
-assert.commandFailedWithCode(secondarySession.abortTransaction_forTesting(), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(secondarySession.abortTransaction_forTesting(),
+                             ErrorCodes.NotWritablePrimary);
 
 // The metrics are not affected.
 metrics = assert.commandWorked(secondary.adminCommand({serverStatus: 1, repl: 0, metrics: 0}))

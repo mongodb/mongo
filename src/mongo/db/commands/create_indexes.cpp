@@ -513,7 +513,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         Lock::DBLock dbLock(opCtx, ns.db(), MODE_IS);
         checkDatabaseShardingState(opCtx, ns);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
-            uasserted(ErrorCodes::NotMaster,
+            uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while creating indexes in " << ns.ns());
         }
 
@@ -662,7 +662,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
             if (indexBuildsCoord->abortIndexBuildByBuildUUID(
                     opCtx, buildUUID, IndexBuildAction::kPrimaryAbort, abortReason)) {
                 LOGV2(20446,
-                      "Index build: aborted due to NotMaster error",
+                      "Index build: aborted due to NotPrimary error",
                       "buildUUID"_attr = buildUUID);
             } else {
                 // The index build may already be in the midst of tearing down.

@@ -506,8 +506,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                           "error"_attr = redact(status));
             if (status == ErrorCodes::AuthSchemaIncompatible) {
                 exitCleanly(EXIT_NEED_UPGRADE);
-            } else if (status == ErrorCodes::NotMaster) {
-                // Try creating the indexes if we become master.  If we do not become master,
+            } else if (status == ErrorCodes::NotWritablePrimary) {
+                // Try creating the indexes if we become primary.  If we do not become primary,
                 // the master will create the indexes and we will replicate them.
             } else {
                 quickExit(EXIT_FAILURE);
