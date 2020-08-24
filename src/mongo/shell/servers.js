@@ -872,7 +872,8 @@ MongoRunner.runMongod = function(opts) {
 
         if (opts.forceLock)
             removeFile(opts.dbpath + "/mongod.lock");
-        if ((opts.cleanData || opts.startClean) || (!opts.restart && !opts.noCleanData)) {
+        if ((opts.cleanData || opts.startClean) || (!opts.restart && !opts.noCleanData) ||
+            !pathExists(opts.dbpath)) {
             print("Resetting db path '" + opts.dbpath + "'");
             resetDbpath(opts.dbpath);
         } else {
