@@ -51,12 +51,12 @@ var $config = (function() {
                                                     ErrorCodes.SnapshotUnavailable,
                                                     ErrorCodes.SnapshotTooOld,
                                                     ErrorCodes.NoMatchingDocument,
-                                                    ErrorCodes.NotMaster,
+                                                    ErrorCodes.NotWritablePrimary,
                                                 ],
                                                 [
                                                     ErrorCodes.IndexBuildAborted,
                                                     ErrorCodes.NoMatchingDocument,
-                                                    ErrorCodes.NotMaster,
+                                                    ErrorCodes.NotWritablePrimary,
                                                 ]);
         }
 

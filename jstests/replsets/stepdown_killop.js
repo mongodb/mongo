@@ -2,7 +2,8 @@
 // 1. Start up a 3 node set (1 arbiter).
 // 2. Stop replication on the SECONDARY using a fail point.
 // 3. Do one write and then spin up a second shell which asks the PRIMARY to StepDown.
-// 4. Once StepDown has begun, attempt to do writes and confirm that they fail with NotMaster.
+// 4. Once StepDown has begun, attempt to do writes and confirm that they fail with
+// NotWritablePrimary.
 // 5. Kill the stepDown operation.
 // 6. Writes should become allowed again and the primary should stay primary.
 
@@ -59,13 +60,14 @@ assert.soon(function() {
     return false;
 }, "No pending stepdown command found");
 
-jsTestLog("Ensure that writes start failing with NotMaster errors");
+jsTestLog("Ensure that writes start failing with NotWritablePrimary errors");
 assert.soonNoExcept(function() {
-    assert.commandFailedWithCode(primary.getDB(name).foo.insert({x: 2}), ErrorCodes.NotMaster);
+    assert.commandFailedWithCode(primary.getDB(name).foo.insert({x: 2}),
+                                 ErrorCodes.NotWritablePrimary);
     return true;
 });
 
-jsTestLog("Ensure that even though writes are failing with NotMaster, we still report " +
+jsTestLog("Ensure that even though writes are failing with NotWritablePrimary, we still report " +
           "ourselves as PRIMARY");
 assert.eq(ReplSetTest.State.PRIMARY, primary.adminCommand('replSetGetStatus').myState);
 

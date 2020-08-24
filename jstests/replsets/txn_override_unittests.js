@@ -339,28 +339,28 @@ const retryOnNetworkErrorTests = [
         }
     },
     {
-        name: "retry on NotMaster",
+        name: "retry on NotWritablePrimary",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotWritablePrimary});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
         }
     },
     {
-        name: "retry on NotMaster ordered",
+        name: "retry on NotWritablePrimary ordered",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotWritablePrimary});
             assert.commandFailed(
                 testDB.runCommand({insert: collName1, documents: [{_id: 2}], ordered: true}));
         }
     },
     {
-        name: "retry on NotMaster with object change",
+        name: "retry on NotWritablePrimary with object change",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             let obj1 = {_id: 1, x: 5};
             let obj2 = {_id: 2, x: 5};
             assert.commandWorked(coll1.insert(obj1));
@@ -375,7 +375,7 @@ const retryOnNetworkErrorTests = [
         name: "implicit collection creation with stepdown",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotWritablePrimary});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -386,9 +386,10 @@ const retryOnNetworkErrorTests = [
         name: "implicit collection creation with WriteConcernError",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(
-                ["insert"],
-                {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
+            failCommandWithFailPoint(["insert"], {
+                writeConcernError:
+                    {code: ErrorCodes.NotWritablePrimary, codeName: "NotWritablePrimary"}
+            });
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -399,8 +400,11 @@ const retryOnNetworkErrorTests = [
         name: "implicit collection creation with WriteConcernError and normal stepdown error",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithErrorAndWCENoRun(
-                "insert", ErrorCodes.NotMaster, "NotMaster", ErrorCodes.NotMaster, "NotMaster");
+            failCommandWithErrorAndWCENoRun("insert",
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary",
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -413,8 +417,8 @@ const retryOnNetworkErrorTests = [
             failCommandWithErrorAndWCENoRun("insert",
                                             ErrorCodes.OperationFailed,
                                             "OperationFailed",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -443,7 +447,7 @@ const retryOnNetworkErrorTests = [
         name: "implicit collection creation with WriteConcernError no success",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithWCENoRun("insert", ErrorCodes.NotMaster, "NotMaster");
+            failCommandWithWCENoRun("insert", ErrorCodes.NotWritablePrimary, "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -454,7 +458,7 @@ const retryOnNetworkErrorTests = [
         name: "update with stepdown",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().toArray(), [{_id: 1}]);
             assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
@@ -487,7 +491,7 @@ const retryOnNetworkErrorTests = [
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
             failCommandWithFailPoint(["update"],
-                                     {errorCode: ErrorCodes.NotMaster, mode: {times: 2}});
+                                     {errorCode: ErrorCodes.NotWritablePrimary, mode: {times: 2}});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().toArray(), [{_id: 1}]);
             assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
@@ -500,10 +504,10 @@ const retryOnNetworkErrorTests = [
         name: "update with chained stepdown errors",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             // Chain multiple update errors together.
             attachPostCmdFunction("update", function() {
-                failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+                failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             });
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().toArray(), [{_id: 1}]);
@@ -533,7 +537,7 @@ const retryOnNetworkErrorTests = [
             const session = testDB.getSession();
 
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
 
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().toArray(), [{_id: 1}]);
@@ -541,7 +545,7 @@ const retryOnNetworkErrorTests = [
             session.startTransaction();
             assert.commandFailedWithCode(
                 testDB.runCommand({update: collName1, updates: [{q: {_id: 1}, u: {$inc: {x: 1}}}]}),
-                ErrorCodes.NotMaster);
+                ErrorCodes.NotWritablePrimary);
             assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                          ErrorCodes.NoSuchTransaction);
 
@@ -577,7 +581,8 @@ const retryOnNetworkErrorTests = [
             const session = testDB.getSession();
 
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["commitTransaction"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["commitTransaction"],
+                                     {errorCode: ErrorCodes.NotWritablePrimary});
 
             session.startTransaction();
             assert.commandWorked(coll1.insert({_id: 1}));
@@ -658,7 +663,8 @@ const retryOnNetworkErrorTests = [
             const session = testDB.getSession();
 
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["abortTransaction"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["abortTransaction"],
+                                     {errorCode: ErrorCodes.NotWritablePrimary});
 
             session.startTransaction();
             assert.commandWorked(coll1.insert({_id: 1}));
@@ -743,7 +749,7 @@ const retryOnNetworkErrorTests = [
             setCommandMockResponse("createIndexes", {
                 ok: 0,
                 raw: {
-                    shardOne: {code: ErrorCodes.NotMaster, errmsg: "dummy"},
+                    shardOne: {code: ErrorCodes.NotWritablePrimary, errmsg: "dummy"},
                     shardTwo: {code: ErrorCodes.InternalError, errmsg: "dummy"}
                 }
             });
@@ -767,7 +773,7 @@ const retryOnNetworkErrorTests = [
                 raw: {
                     // Raw responses only omit a top-level code if more than one error was
                     // returned from a shard, so a third shard is needed.
-                    shardOne: {code: ErrorCodes.NotMaster, errmsg: "dummy"},
+                    shardOne: {code: ErrorCodes.NotWritablePrimary, errmsg: "dummy"},
                     shardTwo: {ok: 1},
                     shardThree: {code: ErrorCodes.InternalError, errmsg: "dummy"},
                 }
@@ -1067,7 +1073,7 @@ const txnOverrideTests = [
         name: "update with stepdown",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().toArray(), [{_id: 1}]);
             assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
@@ -1116,7 +1122,7 @@ const txnOverrideTests = [
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
             failCommandWithFailPoint(["update"],
-                                     {errorCode: ErrorCodes.NotMaster, mode: {times: 2}});
+                                     {errorCode: ErrorCodes.NotWritablePrimary, mode: {times: 2}});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().toArray(), [{_id: 1}]);
             assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
@@ -1132,10 +1138,10 @@ const txnOverrideTests = [
         name: "update with chained stepdown errors",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             // Chain multiple update errors together.
             attachPostCmdFunction("update", function() {
-                failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+                failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             });
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().toArray(), [{_id: 1}]);
@@ -1172,7 +1178,8 @@ const txnOverrideTests = [
         name: "commit transaction with stepdown",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["commitTransaction"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["commitTransaction"],
+                                     {errorCode: ErrorCodes.NotWritablePrimary});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
             assert.throws(() => endCurrentTransactionIfOpen());
@@ -1182,9 +1189,10 @@ const txnOverrideTests = [
         name: "commit transaction with WriteConcernError",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(
-                ["commitTransaction"],
-                {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
+            failCommandWithFailPoint(["commitTransaction"], {
+                writeConcernError:
+                    {code: ErrorCodes.NotWritablePrimary, codeName: "NotWritablePrimary"}
+            });
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
             assert.throws(() => endCurrentTransactionIfOpen());
@@ -1195,10 +1203,10 @@ const txnOverrideTests = [
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
             failCommandWithErrorAndWCENoRun("commitTransaction",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary",
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
             assert.throws(() => endCurrentTransactionIfOpen());
@@ -1211,8 +1219,8 @@ const txnOverrideTests = [
             failCommandWithErrorAndWCENoRun("commitTransaction",
                                             ErrorCodes.OperationFailed,
                                             "OperationFailed",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
             assert.throws(() => endCurrentTransactionIfOpen());
@@ -1236,8 +1244,8 @@ const txnOverrideTests = [
             failCommandWithErrorAndWCENoRun("commitTransaction",
                                             ErrorCodes.NoSuchTransaction,
                                             "NoSuchTransaction",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
             assert.throws(() => endCurrentTransactionIfOpen());
@@ -1270,7 +1278,8 @@ const txnOverrideTests = [
         name: "commit transaction with WriteConcernError no success",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithWCENoRun("commitTransaction", ErrorCodes.NotMaster, "NotMaster");
+            failCommandWithWCENoRun(
+                "commitTransaction", ErrorCodes.NotWritablePrimary, "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
             assert.throws(() => endCurrentTransactionIfOpen());
@@ -1330,24 +1339,28 @@ const txnOverrideTestsFcv42 = [
             // findAndModify inside of a transaction will fail and this suite will attempt to
             // explicitly create the collection outside of a transaction, and then retry the
             // entire transaction.
-            failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.NotWritablePrimary});
             assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
         name: "implicit collection creation with WriteConcernError",
         test: function() {
-            failCommandWithFailPoint(
-                ["create"],
-                {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
+            failCommandWithFailPoint(["create"], {
+                writeConcernError:
+                    {code: ErrorCodes.NotWritablePrimary, codeName: "NotWritablePrimary"}
+            });
             assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
     {
         name: "implicit collection creation with WriteConcernError and normal stepdown error",
         test: function() {
-            failCommandWithErrorAndWCENoRun(
-                "create", ErrorCodes.NotMaster, "NotMaster", ErrorCodes.NotMaster, "NotMaster");
+            failCommandWithErrorAndWCENoRun("create",
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary",
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
@@ -1357,8 +1370,8 @@ const txnOverrideTestsFcv42 = [
             failCommandWithErrorAndWCENoRun("create",
                                             ErrorCodes.OperationFailed,
                                             "OperationFailed",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
@@ -1379,7 +1392,7 @@ const txnOverrideTestsFcv42 = [
     {
         name: "implicit collection creation with WriteConcernError no success",
         test: function() {
-            failCommandWithWCENoRun("create", ErrorCodes.NotMaster, "NotMaster");
+            failCommandWithWCENoRun("create", ErrorCodes.NotWritablePrimary, "NotWritablePrimary");
             assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     }
@@ -1397,10 +1410,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
             failCommandWithErrorAndWCENoRun("drop",
                                             ErrorCodes.NamespaceNotFound,
                                             "NamespaceNotFound",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             coll1.drop();
-            failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotWritablePrimary});
 
             assert.commandWorked(coll1.insert({a: 2, b: {c: 7, d: "d is good"}}));
             const cursor = coll1.find({
@@ -1432,10 +1445,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         }
     },
     {
-        name: "retry on NotMaster",
+        name: "retry on NotWritablePrimary",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["insert"], {errorCode: ErrorCodes.NotWritablePrimary});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
 
@@ -1444,10 +1457,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         }
     },
     {
-        name: "retry on NotMaster with object change",
+        name: "retry on NotWritablePrimary with object change",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             let obj1 = {_id: 1, x: 5};
             let obj2 = {_id: 2, x: 5};
             assert.commandWorked(coll1.insert(obj1));
@@ -1465,7 +1478,7 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         name: "update with stepdown",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().toArray(), [{_id: 1}]);
             assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
@@ -1518,7 +1531,7 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
             failCommandWithFailPoint(["update"],
-                                     {errorCode: ErrorCodes.NotMaster, mode: {times: 2}});
+                                     {errorCode: ErrorCodes.NotWritablePrimary, mode: {times: 2}});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().toArray(), [{_id: 1}]);
             assert.commandWorked(coll1.update({_id: 1}, {$inc: {x: 1}}));
@@ -1534,10 +1547,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         name: "update with chained stepdown errors",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             // Chain multiple update errors together.
             attachPostCmdFunction("update", function() {
-                failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotMaster});
+                failCommandWithFailPoint(["update"], {errorCode: ErrorCodes.NotWritablePrimary});
             });
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.eq(coll1.find().toArray(), [{_id: 1}]);
@@ -1554,7 +1567,8 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         name: "commit transaction with stepdown",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["commitTransaction"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["commitTransaction"],
+                                     {errorCode: ErrorCodes.NotWritablePrimary});
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -1569,9 +1583,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         name: "commit transaction with WriteConcernError",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(
-                ["commitTransaction"],
-                {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
+            failCommandWithFailPoint(["commitTransaction"], {
+                writeConcernError:
+                    {code: ErrorCodes.NotWritablePrimary, codeName: "NotWritablePrimary"}
+            });
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -1587,10 +1602,10 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
             failCommandWithErrorAndWCENoRun("commitTransaction",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary",
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -1608,8 +1623,8 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
             failCommandWithErrorAndWCENoRun("commitTransaction",
                                             ErrorCodes.OperationFailed,
                                             "OperationFailed",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -1626,8 +1641,8 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
             failCommandWithErrorAndWCENoRun("commitTransaction",
                                             ErrorCodes.OperationFailed,
                                             "OperationFailed",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             // After commitTransaction fails, fail it again with just the ordinary error.
             attachPostCmdFunction("commitTransaction", function() {
                 failCommandWithFailPoint(["commitTransaction"],
@@ -1660,8 +1675,8 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
             failCommandWithErrorAndWCENoRun("commitTransaction",
                                             ErrorCodes.NoSuchTransaction,
                                             "NoSuchTransaction",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -1706,7 +1721,8 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
         name: "commit transaction with WriteConcernError no success",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithWCENoRun("commitTransaction", ErrorCodes.NotMaster, "NotMaster");
+            failCommandWithWCENoRun(
+                "commitTransaction", ErrorCodes.NotWritablePrimary, "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1}));
             assert.commandWorked(coll2.insert({_id: 1}));
             assert.eq(coll1.find().itcount(), 1);
@@ -1765,7 +1781,7 @@ const txnOverridePlusRetryOnNetworkErrorTestsFcv42 = [
         name: "implicit collection creation with stepdown",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.NotMaster});
+            failCommandWithFailPoint(["create"], {errorCode: ErrorCodes.NotWritablePrimary});
             let resDoc1 = coll1.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
             assert.eq(resDoc1.a, 1);
             let resDoc2 = coll2.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
@@ -1782,9 +1798,10 @@ const txnOverridePlusRetryOnNetworkErrorTestsFcv42 = [
         name: "implicit collection creation with WriteConcernError",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(
-                ["create"],
-                {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
+            failCommandWithFailPoint(["create"], {
+                writeConcernError:
+                    {code: ErrorCodes.NotWritablePrimary, codeName: "NotWritablePrimary"}
+            });
             let resDoc1 = coll1.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
             assert.eq(resDoc1.a, 1);
             let resDoc2 = coll2.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
@@ -1801,8 +1818,11 @@ const txnOverridePlusRetryOnNetworkErrorTestsFcv42 = [
         name: "implicit collection creation with WriteConcernError and normal stepdown error",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithErrorAndWCENoRun(
-                "create", ErrorCodes.NotMaster, "NotMaster", ErrorCodes.NotMaster, "NotMaster");
+            failCommandWithErrorAndWCENoRun("create",
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary",
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             let resDoc1 = coll1.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
             assert.eq(resDoc1.a, 1);
             let resDoc2 = coll2.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
@@ -1821,8 +1841,8 @@ const txnOverridePlusRetryOnNetworkErrorTestsFcv42 = [
             failCommandWithErrorAndWCENoRun("create",
                                             ErrorCodes.OperationFailed,
                                             "OperationFailed",
-                                            ErrorCodes.NotMaster,
-                                            "NotMaster");
+                                            ErrorCodes.NotWritablePrimary,
+                                            "NotWritablePrimary");
             assert.throws(() => coll1.findAndModify(({update: {a: 1}, upsert: true})));
         }
     },
@@ -1854,7 +1874,7 @@ const txnOverridePlusRetryOnNetworkErrorTestsFcv42 = [
         name: "implicit collection creation with WriteConcernError no success",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithWCENoRun("create", ErrorCodes.NotMaster, "NotMaster");
+            failCommandWithWCENoRun("create", ErrorCodes.NotWritablePrimary, "NotWritablePrimary");
             let resDoc1 = coll1.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
             assert.eq(resDoc1.a, 1);
             let resDoc2 = coll2.findAndModify(({update: {a: 1}, upsert: true, 'new': true}));
@@ -1871,9 +1891,10 @@ const txnOverridePlusRetryOnNetworkErrorTestsFcv42 = [
         name: "commitTransaction fails with SERVER-38856",
         test: function() {
             assert.commandWorked(testDB.createCollection(collName1));
-            failCommandWithFailPoint(
-                ["create"],
-                {writeConcernError: {code: ErrorCodes.NotMaster, codeName: "NotMaster"}});
+            failCommandWithFailPoint(["create"], {
+                writeConcernError:
+                    {code: ErrorCodes.NotWritablePrimary, codeName: "NotWritablePrimary"}
+            });
 
             // After commitTransaction fails, abort the transaction and drop the collection
             // as if the transaction were being retried on a different node.
@@ -1882,7 +1903,8 @@ const txnOverridePlusRetryOnNetworkErrorTestsFcv42 = [
                 assert.commandWorked(mongoRunCommandOriginal.apply(testDB.getMongo(),
                                                                    [dbName, {drop: collName2}, 0]));
             });
-            failCommandWithWCENoRun("commitTransaction", ErrorCodes.NotMaster, "NotMaster");
+            failCommandWithWCENoRun(
+                "commitTransaction", ErrorCodes.NotWritablePrimary, "NotWritablePrimary");
             assert.commandWorked(coll1.insert({_id: 1, x: 2}));
             let resDoc2 = coll2.findAndModify(({update: {_id: 1}, upsert: true, 'new': true}));
             assert.eq(resDoc2._id, 1);

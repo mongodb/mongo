@@ -326,7 +326,7 @@ jsTestLog("Testing standalone replica set...");
     assert.commandFailedWithCode(
         rst.getSecondary().adminCommand(
             {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
-        ErrorCodes.NotMaster);
+        ErrorCodes.NotWritablePrimary);
 
     rst.stopSet();
 }
@@ -349,7 +349,7 @@ jsTestLog("Testing sharded cluster...");
     assert.commandFailedWithCode(
         st.rs0.getSecondary().adminCommand(
             {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
-        ErrorCodes.NotMaster);
+        ErrorCodes.NotWritablePrimary);
 
     // Config server primary succeeds.
     verifyDefaultRWCommandsValidInput(st.configRS.getPrimary());
@@ -361,7 +361,7 @@ jsTestLog("Testing sharded cluster...");
     assert.commandFailedWithCode(
         st.configRS.getSecondary().adminCommand(
             {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
-        ErrorCodes.NotMaster);
+        ErrorCodes.NotWritablePrimary);
 
     st.stop();
 }

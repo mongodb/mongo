@@ -192,7 +192,7 @@ TEST(OpMsg, DocumentSequenceMaxWriteBatchWorks) {
     conn->dropCollection("test.collection");
 }
 
-TEST(OpMsg, CloseConnectionOnFireAndForgetNotMasterError) {
+TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
     const auto connStr = unittest::getFixtureConnectionString();
 
     // This test only works against a replica set.
@@ -219,14 +219,14 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotMasterError) {
         })"))
                            .serialize();
 
-        // Round-trip command fails with NotMaster error. Note that this failure is in command
-        // dispatch which ignores w:0.
+        // Round-trip command fails with NotWritablePrimary error. Note that this failure is in
+        // command dispatch which ignores w:0.
         Message reply;
         ASSERT(conn.call(request, reply, /*assertOK*/ true, nullptr));
         ASSERT_EQ(
             getStatusFromCommandResult(
                 conn.parseCommandReplyMessage(conn.getServerAddress(), reply)->getCommandReply()),
-            ErrorCodes::NotMaster);
+            ErrorCodes::NotWritablePrimary);
 
         // Fire-and-forget closes connection when it sees that error. Note that this is using call()
         // rather than say() so that we get an error back when the connection is closed. Normally
@@ -893,7 +893,8 @@ TEST(OpMsg, ExhaustIsMasterMetricDecrementsOnNewOpAfterTerminatingExhaustStream)
                                    << "failCommand"
                                    << "mode" << BSON("times" << 1) << "data"
                                    << BSON("threadName" << threadName << "errorCode"
-                                                        << ErrorCodes::NotMaster << "failCommands"
+                                                        << ErrorCodes::NotWritablePrimary
+                                                        << "failCommands"
                                                         << BSON_ARRAY("isMaster")));
     auto response = conn2->runCommand(OpMsgRequest::fromDBAndBody("admin", failPointObj));
     ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));
@@ -983,7 +984,8 @@ TEST(OpMsg, ExhaustIsMasterMetricOnNewExhaustIsMasterAfterTerminatingExhaustStre
                                    << "failCommand"
                                    << "mode" << BSON("times" << 1) << "data"
                                    << BSON("threadName" << threadName << "errorCode"
-                                                        << ErrorCodes::NotMaster << "failCommands"
+                                                        << ErrorCodes::NotWritablePrimary
+                                                        << "failCommands"
                                                         << BSON_ARRAY("isMaster")));
     auto response = conn2->runCommand(OpMsgRequest::fromDBAndBody("admin", failPointObj));
     ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));

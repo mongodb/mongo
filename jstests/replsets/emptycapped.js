@@ -40,7 +40,7 @@ assert.eq(primaryTestDB.capped.find().itcount(),
 
 // Truncate a capped collection on a secondary.
 assert.commandFailedWithCode(secondaryTestDB.runCommand({emptycapped: 'capped'}),
-                             ErrorCodes.NotMaster);
+                             ErrorCodes.NotWritablePrimary);
 
 // Truncate the oplog.
 assert.commandFailedWithCode(primaryLocalDB.runCommand({emptycapped: "oplog.rs"}),

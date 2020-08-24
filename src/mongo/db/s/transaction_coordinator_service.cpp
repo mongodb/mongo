@@ -92,8 +92,8 @@ void TransactionCoordinatorService::reportCoordinators(OperationContext* opCtx,
     std::shared_ptr<CatalogAndScheduler> cas;
     try {
         cas = _getCatalogAndScheduler(opCtx);
-    } catch (ExceptionFor<ErrorCodes::NotMaster>&) {
-        // If we are not master, don't include any output for transaction coordinators in
+    } catch (ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+        // If we are not primary, don't include any output for transaction coordinators in
         // the curOp command.
         return;
     }
@@ -275,8 +275,9 @@ void TransactionCoordinatorService::onShardingInitialization(OperationContext* o
 std::shared_ptr<TransactionCoordinatorService::CatalogAndScheduler>
 TransactionCoordinatorService::_getCatalogAndScheduler(OperationContext* opCtx) {
     stdx::unique_lock<Latch> ul(_mutex);
-    uassert(
-        ErrorCodes::NotMaster, "Transaction coordinator is not a primary", _catalogAndScheduler);
+    uassert(ErrorCodes::NotWritablePrimary,
+            "Transaction coordinator is not a primary",
+            _catalogAndScheduler);
 
     return _catalogAndScheduler;
 }

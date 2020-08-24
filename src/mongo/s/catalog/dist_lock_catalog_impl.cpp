@@ -147,7 +147,7 @@ StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
                                       << hostContacted};
             }
 
-            return {ErrorCodes::NotMaster, "only primary can have electionId"};
+            return {ErrorCodes::NotWritablePrimary, "only primary can have electionId"};
         }
 
         return {ErrorCodes::UnsupportedFormat, electionIdStatus.reason()};

@@ -1027,7 +1027,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
 
             if (IndexBuildAction::kPrimaryAbort == signalAction &&
                 !replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
-                uassertStatusOK({ErrorCodes::NotMaster,
+                uassertStatusOK({ErrorCodes::NotWritablePrimary,
                                  str::stream()
                                      << "Unable to abort index build because we are not primary: "
                                      << buildUUID});
@@ -1744,7 +1744,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
     // so we must fail the index build. During initial sync, there is no commit timestamp set.
     if (replSetAndNotPrimary &&
         indexBuildOptions.applicationMode != ApplicationMode::kInitialSync) {
-        uassert(ErrorCodes::NotMaster,
+        uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Replication state changed while setting up the index build: "
                               << replState->buildUUID,
                 !startTimestamp.isNull());
@@ -2297,7 +2297,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         if (!isMaster && IndexBuildAction::kSinglePhaseCommit == action &&
             !indexBuildOptions.replSetAndNotPrimaryAtStart) {
             uassertStatusOK(
-                {ErrorCodes::NotMaster,
+                {ErrorCodes::NotWritablePrimary,
                  str::stream() << "Unable to commit index build because we are no longer primary: "
                                << replState->buildUUID});
         }

@@ -1,5 +1,5 @@
 /**
- * This tests that NotMaster errors include a TopologyVersion field.
+ * This tests that NotPrimary errors include a TopologyVersion field.
  *
  * @tags: [requires_fcv_44]
  */
@@ -12,13 +12,13 @@ rst.startSet();
 rst.initiate();
 
 const dbName = "test";
-const collName = "notmaster_errors_return_topology_version";
+const collName = "notprimary_errors_return_topology_version";
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
 
-const notMasterErrorCodes = [
+const notPrimaryErrorCodes = [
     ErrorCodes.InterruptedDueToReplStateChange,
-    ErrorCodes.NotMaster,
+    ErrorCodes.NotWritablePrimary,
     ErrorCodes.NotMasterNoSlaveOk,
     ErrorCodes.NotMasterOrSecondary,
     ErrorCodes.PrimarySteppedDown
@@ -53,8 +53,8 @@ function runFailInCommandDispatch(errorCode, isWCError) {
 
     const res = primaryDB.runCommand({insert: collName, documents: [{x: 1}]});
     assert.commandFailedWithCode(res, errorCode);
-    // Only NotMaster errors should return TopologyVersion in the response.
-    if (notMasterErrorCodes.includes(errorCode)) {
+    // Only NotPrimary errors should return TopologyVersion in the response.
+    if (notPrimaryErrorCodes.includes(errorCode)) {
         assert(res.hasOwnProperty("topologyVersion"), tojson(res));
     } else {
         assert(!res.hasOwnProperty("topologyVersion"), tojson(res));
@@ -76,8 +76,8 @@ function runFailInRunCommand(errorCode) {
 
     const res = primaryDB.runCommand({insert: collName, documents: [{x: 1}]});
     assert.commandFailedWithCode(res, errorCode);
-    // Only NotMaster errors should return TopologyVersion in the response.
-    if (notMasterErrorCodes.includes(errorCode)) {
+    // Only NotPrimary errors should return TopologyVersion in the response.
+    if (notPrimaryErrorCodes.includes(errorCode)) {
         assert(res.hasOwnProperty("topologyVersion"), tojson(res));
     } else {
         assert(!res.hasOwnProperty("topologyVersion"), tojson(res));
@@ -88,18 +88,18 @@ function runFailInRunCommand(errorCode) {
         primary.adminCommand({configureFailPoint: "failWithErrorCodeInRunCommand", mode: "off"}));
 }
 
-notMasterErrorCodes.forEach(function(code) {
+notPrimaryErrorCodes.forEach(function(code) {
     runFailInCommandDispatch(code, true /* isWCError */);
     runFailInCommandDispatch(code, false /* isWCError */);
 });
 
-// Test that errors that are not NotMaster errors will not return a TopologyVersion.
+// Test that errors that are not NotPrimary errors will not return a TopologyVersion.
 otherErrorCodes.forEach(function(code) {
     runFailInCommandDispatch(code, true /* isWCError */);
     runFailInCommandDispatch(code, false /* isWCError */);
 });
 
-notMasterErrorCodes.forEach(function(code) {
+notPrimaryErrorCodes.forEach(function(code) {
     runFailInRunCommand(code);
 });
 otherErrorCodes.forEach(function(code) {

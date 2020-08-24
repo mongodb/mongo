@@ -95,7 +95,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (opCtx->writesAreReplicated() && !replCoord->canAcceptWritesFor(opCtx, source))
-        return Status(ErrorCodes::NotMaster,
+        return Status(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while renaming collection " << source << " to "
                                     << target);
 

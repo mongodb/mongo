@@ -747,7 +747,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
 
         // Checks that the collection's UUID matches the donor's.
         auto checkUUIDsMatch = [&](const Collection* collection) {
-            uassert(ErrorCodes::NotMaster,
+            uassert(ErrorCodes::NotWritablePrimary,
                     str::stream() << "Unable to create collection " << nss.ns()
                                   << " because the node is not primary",
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));

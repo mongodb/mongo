@@ -281,7 +281,7 @@ void _logOpsInner(OperationContext* opCtx,
             ss << "(" << record.id << ", " << redact(record.data.toBson()) << ") ";
         }
         ss << "]";
-        uasserted(ErrorCodes::NotMaster, ss);
+        uasserted(ErrorCodes::NotWritablePrimary, ss);
     }
 
     Status result = oplogCollection->insertDocumentsForOplog(opCtx, records, timestamps);

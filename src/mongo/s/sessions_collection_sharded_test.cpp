@@ -139,13 +139,13 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
         response.addToErrDetails([&] {
             WriteErrorDetail* errDetail = new WriteErrorDetail();
             errDetail->setIndex(0);
-            errDetail->setStatus({ErrorCodes::NotMaster, "not master"});
+            errDetail->setStatus({ErrorCodes::NotWritablePrimary, "not master"});
             return errDetail;
         }());
         return response.toBSON();
     });
 
-    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotMaster);
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(SessionsCollectionShardedTest, RemoveOneSessionOKTest) {
@@ -194,13 +194,13 @@ TEST_F(SessionsCollectionShardedTest, RemoveOneSessionWriteErrTest) {
         response.addToErrDetails([&] {
             WriteErrorDetail* errDetail = new WriteErrorDetail();
             errDetail->setIndex(0);
-            errDetail->setStatus({ErrorCodes::NotMaster, "not master"});
+            errDetail->setStatus({ErrorCodes::NotWritablePrimary, "not master"});
             return errDetail;
         }());
         return response.toBSON();
     });
 
-    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotMaster);
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotWritablePrimary);
 }
 
 }  // namespace

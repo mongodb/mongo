@@ -329,7 +329,7 @@ void TransactionParticipant::performNoopWrite(OperationContext* opCtx, StringDat
 
     {
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-        uassert(ErrorCodes::NotMaster,
+        uassert(ErrorCodes::NotWritablePrimary,
                 "Not primary when performing noop write for {}"_format(msg),
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
 
@@ -495,7 +495,7 @@ void TransactionParticipant::Participant::beginOrContinue(OperationContext* opCt
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
     if (opCtx->writesAreReplicated()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        uassert(ErrorCodes::NotMaster,
+        uassert(ErrorCodes::NotWritablePrimary,
                 "Not primary so we cannot begin or continue a transaction",
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
         // Disallow multi-statement transactions on shard servers that have
@@ -1351,7 +1351,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     if (opCtx->writesAreReplicated()) {
-        uassert(ErrorCodes::NotMaster,
+        uassert(ErrorCodes::NotWritablePrimary,
                 "Not primary so we cannot commit a prepared transaction",
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
     }
@@ -1525,7 +1525,7 @@ void TransactionParticipant::Participant::_abortActivePreparedTransaction(Operat
 
     if (opCtx->writesAreReplicated()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        uassert(ErrorCodes::NotMaster,
+        uassert(ErrorCodes::NotWritablePrimary,
                 "Not primary so we cannot abort a prepared transaction",
                 replCoord->canAcceptWritesForDatabase(opCtx, "admin"));
     }

@@ -54,7 +54,7 @@ namespace mongo {
 
 namespace {
 
-// Maximum number of retries for network and replication notMaster errors (per host).
+// Maximum number of retries for network and replication NotPrimary errors (per host).
 const int kMaxNumFailedHostRetryAttempts = 3;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeSchedulingRemoteCommand);

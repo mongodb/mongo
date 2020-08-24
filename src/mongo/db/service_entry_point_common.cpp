@@ -1041,9 +1041,9 @@ void execCommandDatabase(OperationContext* opCtx,
             }
 
             if (MONGO_unlikely(respondWithNotPrimaryInCommandDispatch.shouldFail())) {
-                uassert(ErrorCodes::NotMaster, "not primary", canRunHere);
+                uassert(ErrorCodes::NotWritablePrimary, "not primary", canRunHere);
             } else {
-                uassert(ErrorCodes::NotMaster, "not master", canRunHere);
+                uassert(ErrorCodes::NotWritablePrimary, "not master", canRunHere);
             }
 
             if (!command->maintenanceOk() &&
@@ -1417,7 +1417,7 @@ DbResponse receivedCommands(OperationContext* opCtx,
         if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
             if (c && c->getReadWriteType() == Command::ReadWriteType::kWrite)
                 notMasterUnackWrites.increment();
-            uasserted(ErrorCodes::NotMaster,
+            uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream()
                           << "Not-master error while processing '" << request.getCommandName()
                           << "' operation  on '" << request.getDatabase() << "' database via "
@@ -1772,12 +1772,13 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
                         "error"_attr = redact(ue));
             debug.errInfo = ue.toStatus();
         }
-        // A NotMaster error can be set either within receivedInsert/receivedUpdate/receivedDelete
-        // or within the AssertionException handler above.  Either way, we want to throw an
-        // exception here, which will cause the client to be disconnected.
+        // A NotWritablePrimary error can be set either within
+        // receivedInsert/receivedUpdate/receivedDelete or within the AssertionException handler
+        // above.  Either way, we want to throw an exception here, which will cause the client to be
+        // disconnected.
         if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
             notMasterLegacyUnackWrites.increment();
-            uasserted(ErrorCodes::NotMaster,
+            uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream()
                           << "Not-master error while processing '" << networkOpToString(op)
                           << "' operation  on '" << nsString << "' namespace via legacy "

@@ -30,23 +30,23 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 // Configure failCommand again and verify that it still works correctly.
 assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test switching command sets.
@@ -54,17 +54,17 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["isMaster"],
         threadName: threadName,
     }
@@ -132,12 +132,12 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test that only commands specified in failCommands fail.
@@ -175,14 +175,14 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: {skip: 2},
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(testDB.runCommand({ping: 1}));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test times when failing with a particular error code.
@@ -190,13 +190,13 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: {times: 2},
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
@@ -520,19 +520,19 @@ assert.commandWorked(adminDB.runCommand({
     mode: "alwaysOn",
     data: {
         failCommands: ["ping"],
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         threadName: threadName,
         appName: appName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 
 assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
         failCommands: ["ping"],
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         threadName: threadName,
         appName: "made up app name",
     }
@@ -553,7 +553,7 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: {times: 1},
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["insert"],
         errorLabels: ["Foo"],
         threadName: threadName
@@ -563,7 +563,7 @@ assert.commandWorked(adminDB.runCommand({
 res = assert.commandFailedWithCode(
     testDB.runCommand(
         {insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)}),
-    ErrorCodes.NotMaster);
+    ErrorCodes.NotWritablePrimary);
 // Test that failCommand overrides the error label to "Foo".
 assert.eq(res.errorLabels, ["Foo"], res);
 
@@ -572,7 +572,7 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: {times: 1},
     data: {
-        writeConcernError: {code: ErrorCodes.NotMaster, errmsg: "hello"},
+        writeConcernError: {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"},
         failCommands: ["insert"],
         errorLabels: ["Foo"],
         threadName: threadName
@@ -581,7 +581,7 @@ assert.commandWorked(adminDB.runCommand({
 // This normally fails with RetryableWriteError label.
 res = testDB.runCommand(
     {insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)});
-assert.eq(res.writeConcernError, {code: ErrorCodes.NotMaster, errmsg: "hello"});
+assert.eq(res.writeConcernError, {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"});
 // Test that failCommand overrides the error label to "Foo".
 assert.eq(res.errorLabels, ["Foo"], res);
 
@@ -590,7 +590,7 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: {times: 1},
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["insert"],
         errorLabels: [],
         threadName: threadName
@@ -600,7 +600,7 @@ assert.commandWorked(adminDB.runCommand({
 res = assert.commandFailedWithCode(
     testDB.runCommand(
         {insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)}),
-    ErrorCodes.NotMaster);
+    ErrorCodes.NotWritablePrimary);
 // There should be no errorLabels field if no error labels provided in failCommand.
 assert(!res.hasOwnProperty("errorLabels"), res);
 
@@ -609,7 +609,7 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: {times: 1},
     data: {
-        writeConcernError: {code: ErrorCodes.NotMaster, errmsg: "hello"},
+        writeConcernError: {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"},
         failCommands: ["insert"],
         errorLabels: [],
         threadName: threadName
@@ -618,7 +618,7 @@ assert.commandWorked(adminDB.runCommand({
 // This normally fails with RetryableWriteError label.
 res = testDB.runCommand(
     {insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)});
-assert.eq(res.writeConcernError, {code: ErrorCodes.NotMaster, errmsg: "hello"});
+assert.eq(res.writeConcernError, {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"});
 // There should be no errorLabels field if no error labels provided in failCommand.
 assert(!res.hasOwnProperty("errorLabels"), res);
 }());

@@ -111,7 +111,7 @@ public:
         ErrorCodes::NotMasterOrSecondary,
         ErrorCodes::PrimarySteppedDown,
         ErrorCodes::ShutdownInProgress,
-        ErrorCodes::NotMaster,
+        ErrorCodes::NotWritablePrimary,
         ErrorCodes::NotMasterNoSlaveOk};
 
     inline static const std::string kSetName = "setName";

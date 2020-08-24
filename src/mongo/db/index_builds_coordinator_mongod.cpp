@@ -141,7 +141,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
                 Lock::GlobalLock globalLk(opCtx, MODE_IX);
 
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-                uassert(ErrorCodes::NotMaster,
+                uassert(ErrorCodes::NotWritablePrimary,
                         "Not primary while waiting to start an index build",
                         replCoord->canAcceptWritesFor(opCtx, nssOrUuid));
             }

@@ -198,17 +198,17 @@ TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsFailBeforeStep
     ASSERT_THROWS_CODE(service()->createCoordinator(
                            operationContext(), makeLogicalSessionIdForTest(), 0, kCommitDeadline),
                        AssertionException,
-                       ErrorCodes::NotMaster);
+                       ErrorCodes::NotWritablePrimary);
 
     ASSERT_THROWS_CODE(service()->coordinateCommit(
                            operationContext(), makeLogicalSessionIdForTest(), 0, kTwoShardIdSet),
                        AssertionException,
-                       ErrorCodes::NotMaster);
+                       ErrorCodes::NotWritablePrimary);
 
     ASSERT_THROWS_CODE(
         service()->recoverCommit(operationContext(), makeLogicalSessionIdForTest(), 0),
         AssertionException,
-        ErrorCodes::NotMaster);
+        ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(TransactionCoordinatorServiceStepUpStepDownTest, OperationsBlockBeforeStepUpCompletes) {

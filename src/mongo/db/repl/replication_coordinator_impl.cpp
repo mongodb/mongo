@@ -2236,7 +2236,7 @@ StatusWith<OpTime> ReplicationCoordinatorImpl::getLatestWriteOpTime(OperationCon
     Lock::GlobalLock globalLock(opCtx, MODE_IS);
     // Check if the node is primary after acquiring global IS lock.
     if (!canAcceptNonLocalWrites()) {
-        return {ErrorCodes::NotMaster, "Not primary so can't get latest write optime"};
+        return {ErrorCodes::NotWritablePrimary, "Not primary so can't get latest write optime"};
     }
     auto oplog = LocalOplogInfo::get(opCtx)->getCollection();
     if (!oplog) {
@@ -2471,7 +2471,9 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // Note this check is inherently racy - it's always possible for the node to stepdown from some
     // other path before we acquire the global exclusive lock.  This check is just to try to save us
     // from acquiring the global X lock unnecessarily.
-    uassert(ErrorCodes::NotMaster, "not primary so can't step down", getMemberState().primary());
+    uassert(ErrorCodes::NotWritablePrimary,
+            "not primary so can't step down",
+            getMemberState().primary());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &stepdownHangBeforeRSTLEnqueue, opCtx, "stepdownHangBeforeRSTLEnqueue");
@@ -2819,7 +2821,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
 
     if (opCtx->inMultiDocumentTransaction()) {
         if (!_readWriteAbility->canAcceptNonLocalWrites_UNSAFE()) {
-            return Status(ErrorCodes::NotMaster,
+            return Status(ErrorCodes::NotWritablePrimary,
                           "Multi-document transactions are only allowed on replica set primaries.");
         }
     }
@@ -2973,7 +2975,7 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result,
     result->append("config", _rsConfig.toBSON());
 
     if (commitmentStatus) {
-        uassert(ErrorCodes::NotMaster,
+        uassert(ErrorCodes::NotWritablePrimary,
                 "commitmentStatus is only supported on primary.",
                 _readWriteAbility->canAcceptNonLocalWrites(lock));
         auto configWriteConcern = _getConfigReplicationWriteConcern();
@@ -3197,7 +3199,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
 
     if (!force && !_readWriteAbility->canAcceptNonLocalWrites(lk)) {
         return Status(
-            ErrorCodes::NotMaster,
+            ErrorCodes::NotWritablePrimary,
             str::stream()
                 << "Safe reconfig is only allowed on a writable PRIMARY. Current state is "
                 << _getMemberState_inlock().toString());
@@ -3324,7 +3326,7 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     {
         Lock::GlobalLock globalLock(opCtx, LockMode::MODE_IX);
         if (!force && !_readWriteAbility->canAcceptNonLocalWrites(opCtx)) {
-            return {ErrorCodes::NotMaster, "Stepped down when persisting new config"};
+            return {ErrorCodes::NotWritablePrimary, "Stepped down when persisting new config"};
         }
 
         // Don't write no-op for internal and external force reconfig.

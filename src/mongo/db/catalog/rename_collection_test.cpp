@@ -535,12 +535,12 @@ TEST_F(RenameCollectionTest,
     ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
 }
 
-TEST_F(RenameCollectionTest, RenameCollectionReturnsNotMasterIfNotPrimary) {
+TEST_F(RenameCollectionTest, RenameCollectionReturnsNotWritablePrimaryIfNotPrimary) {
     _createCollection(_opCtx.get(), _sourceNss);
     ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _sourceNss.db()));
-    ASSERT_EQUALS(ErrorCodes::NotMaster,
+    ASSERT_EQUALS(ErrorCodes::NotWritablePrimary,
                   renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
 }
 

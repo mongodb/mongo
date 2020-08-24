@@ -250,14 +250,15 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetryNoPrimary) {
     auto future = launchAsync([this] {
         auto dbResult = catalogClient()->getDatabase(
             operationContext(), "NonExistent", repl::ReadConcernLevel::kMajorityReadConcern);
-        ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NotMaster);
+        ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NotWritablePrimary);
     });
 
     // Return empty result set as if the database wasn't found
     onFindCommand([this, &testHost](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(testHost, request.target);
-        // Make it so when it attempts to retarget and retry it will get a NotMaster error.
-        configTargeter()->setFindHostReturnValue(Status(ErrorCodes::NotMaster, "no config master"));
+        // Make it so when it attempts to retarget and retry it will get a NotWritablePrimary error.
+        configTargeter()->setFindHostReturnValue(
+            Status(ErrorCodes::NotWritablePrimary, "no config master"));
         return vector<BSONObj>{};
     });
 
@@ -692,7 +693,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConce
     future.default_timed_get();
 }
 
-TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMaster) {
+TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimary) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
@@ -706,14 +707,14 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMaster) {
         ASSERT_FALSE(ok);
 
         Status commandStatus = getStatusFromCommandResult(responseBuilder.obj());
-        ASSERT_EQUALS(ErrorCodes::NotMaster, commandStatus);
+        ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, commandStatus);
     });
 
     for (int i = 0; i < 3; ++i) {
         onCommand([](const RemoteCommandRequest& request) {
             BSONObjBuilder responseBuilder;
-            CommandHelpers::appendCommandStatusNoThrow(responseBuilder,
-                                                       Status(ErrorCodes::NotMaster, "not master"));
+            CommandHelpers::appendCommandStatusNoThrow(
+                responseBuilder, Status(ErrorCodes::NotWritablePrimary, "not master"));
             return responseBuilder.obj();
         });
     }
@@ -722,7 +723,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMaster) {
     future.default_timed_get();
 }
 
-TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMasterRetrySuccess) {
+TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimaryRetrySuccess) {
     HostAndPort host1("TestHost1");
     HostAndPort host2("TestHost2");
 
@@ -746,11 +747,11 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMasterRetrySuc
         ASSERT_EQUALS(host1, request.target);
 
         BSONObjBuilder responseBuilder;
-        CommandHelpers::appendCommandStatusNoThrow(responseBuilder,
-                                                   Status(ErrorCodes::NotMaster, "not master"));
+        CommandHelpers::appendCommandStatusNoThrow(
+            responseBuilder, Status(ErrorCodes::NotWritablePrimary, "not master"));
 
         // Ensure that when the catalog manager tries to retarget after getting the
-        // NotMaster response, it will get back a new target.
+        // NotWritablePrimary response, it will get back a new target.
         configTargeter()->setFindHostReturnValue(host2);
         return responseBuilder.obj();
     });

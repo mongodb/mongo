@@ -593,11 +593,11 @@ public:
      * when we receive a stepdown command (which can fail if not enough secondaries are caught up)
      * to ensure that we never process more than one stepdown request at a time.
      * Returns OK if it is safe to continue with the stepdown attempt, or returns:
-     * - NotMaster if this node is not a leader.
+     * - NotWritablePrimary if this node is not a leader.
      * - ConflictingOperationInProgess if this node is already processing a stepdown request of any
      * kind.
      * On an OK return status also returns a function object that can be called to abort the
-     * pending stepdown attempt and return this node to normal primary/master state.
+     * pending stepdown attempt and return this node to normal (writable) primary state.
      */
     StatusWith<StepDownAttemptAbortFn> prepareForStepDownAttempt();
 

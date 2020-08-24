@@ -1,6 +1,6 @@
 /**
  * Tests that when $out/$merge is run on a secondary and the primary steps down, the command
- * will fail with a `NotMaster` error.
+ * will fail with a `NotWritablePrimary` error.
  *
  * @tags: [requires_replication]
  */
@@ -32,8 +32,8 @@ replTest.awaitReplication();
 /**
  * Given an agg 'writeStage' (an $out or $merge), passed as a string, enables and waits for
  * 'failpoint' to be reached by the aggregate containing 'writeStage' running on a secondary and
- * verifies that the aggregate fails with a 'NotMaster' error when the primary is forced to step
- * down.
+ * verifies that the aggregate fails with a 'NotWritablePrimary' error when the primary is forced to
+ * step down.
  */
 let runTest = function(writeStage, failpoint) {
     let outFn = `

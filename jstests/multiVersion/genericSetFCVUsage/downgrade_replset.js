@@ -63,8 +63,8 @@ function runDowngradeTest() {
     printjson(rst.status());
 
     // Since the old primary was restarted as part of the downgrade process, we explicitly reconnect
-    // to it so that sending it an update operation silently fails with an unchecked NotMaster error
-    // rather than a network error.
+    // to it so that sending it an update operation silently fails with an unchecked
+    // NotWritablePrimary error rather than a network error.
     reconnect(oldPrimary.getDB("admin"));
     joinFindInsert();
     rst.stopSet();

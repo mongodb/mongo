@@ -65,17 +65,18 @@ function refreshCluster(version, components, singleShard) {
 // assert.soon timeout. This is necessary because there is a period after one shard's Primary steps
 // down during upgrade where a $merge on the other shard may still target the previous Primary.
 // TODO SERVER-44883: this workaround will no longer be necessary once SERVER-44883 is fixed.
-function tryWhileNotMaster(sourceColl, targetColl, pipeline, options) {
+function tryWhileNotPrimary(sourceColl, targetColl, pipeline, options) {
     assert.soonNoExcept(() => {
         const aggCmdParams = Object.assign({pipeline: pipeline, cursor: {}}, options);
         const cmdRes = sourceColl.runCommand("aggregate", aggCmdParams);
         if (cmdRes.ok) {
             return true;
         }
-        // The only errors we are prepared to swallow are ErrorCodes.NotMaster and CursorNotFound.
-        // The latter can be thrown as a consequence of a NotMaster on one shard when the $merge
-        // stage is dispatched to a merging shard as part of the latter half of the pipeline.
-        const errorsToSwallow = [ErrorCodes.NotMaster, ErrorCodes.CursorNotFound];
+        // The only errors we are prepared to swallow are ErrorCodes.NotWritablePrimary and
+        // CursorNotFound. The latter can be thrown as a consequence of a NotWritablePrimary on one
+        // shard when the $merge stage is dispatched to a merging shard as part of the latter half
+        // of the pipeline.
+        const errorsToSwallow = [ErrorCodes.NotWritablePrimary, ErrorCodes.CursorNotFound];
         assert(errorsToSwallow.includes(cmdRes.code), () => tojson(cmdRes));
         // TODO SERVER-43851: this may be susceptible to zombie writes. Ditto for all other
         // occurrences of remove({}) throughout this test.
@@ -166,7 +167,7 @@ function runAllTestCases(expectedOutput) {
         }
 
         // Run the test case and confirm that the target collection matches the expected output.
-        tryWhileNotMaster(testCase.sourceColl(), testCase.targetColl(), finalPipeline, aggOptions);
+        tryWhileNotPrimary(testCase.sourceColl(), testCase.targetColl(), finalPipeline, aggOptions);
         assert.sameMembers(testCase.targetColl().find().toArray(), expectedOutput);
         assert.commandWorked(testCase.targetColl().remove({}));
     }

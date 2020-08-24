@@ -295,7 +295,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
         }
 
         if (!replCoord->getMemberState().primary()) {
-            return {ErrorCodes::NotMaster,
+            return {ErrorCodes::NotWritablePrimary,
                     "cannot satisfy linearizable read concern on non-primary node"};
         }
     }
@@ -427,7 +427,7 @@ Status waitForLinearizableReadConcernImpl(OperationContext* opCtx, const int rea
     {
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
-            return {ErrorCodes::NotMaster,
+            return {ErrorCodes::NotWritablePrimary,
                     "No longer primary when waiting for linearizable read concern"};
         }
 

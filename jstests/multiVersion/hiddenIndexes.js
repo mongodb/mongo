@@ -20,7 +20,7 @@ TestData.skipCheckDBHashes = true;  // Skip db hashes when restarting the replse
 // When checking UUID consistency, the shell attempts to run a command on the node it believes is
 // primary in each shard. However, this test restarts shards, and the node that is elected primary
 // after the restart may be different from the original primary. Since the shell does not retry on
-// NotMaster errors, and whether or not it detects the new primary before issuing the command is
+// NotPrimaryErrors, and whether or not it detects the new primary before issuing the command is
 // nondeterministic, skip the consistency check for this test.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
