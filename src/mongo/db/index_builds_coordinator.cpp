@@ -382,6 +382,33 @@ bool isIndexBuildResumable(OperationContext* opCtx,
         return false;
     }
 
+    // This check may be unnecessary due to current criteria for resumable index build support in
+    // storage engine.
+    if (!serverGlobalParams.enableMajorityReadConcern) {
+        return false;
+    }
+
+    // The last optime could be null if the node is in initial sync while building the index.
+    // This check may be redundant with the 'applicationMode' check and the replication requirement
+    // for two phase index builds.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeNone) {
+        return false;
+    }
+
+    // When we are applying a startIndexBuild oplog entry during the oplog application phase of
+    // startup recovery, the last optime here derived from the local oplog may not be a valid
+    // optime to wait on for the majority commit point since the rest of the replica set may
+    // be on a different branch of history.
+    // TODO(SERVER-48419): Examine impact on rollback.
+    if (inReplicationRecovery(opCtx->getServiceContext())) {
+        LOGV2(5039100,
+              "Index build: in replication recovery. Not waiting for last optime before "
+              "interceptors to be majority committed",
+              "buildUUID"_attr = replState.buildUUID);
+        return false;
+    }
+
     if (!opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds()) {
         return false;
     }
@@ -2411,23 +2438,7 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     // The last optime could be null if the node is in initial sync while building the index.
-    if (!serverGlobalParams.enableMajorityReadConcern ||
-        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeNone ||
-        replState->lastOpTimeBeforeInterceptors.isNull()) {
-        return;
-    }
-
-    // When we are applying a startIndexBuild oplog entry during the oplog application phase of
-    // startup recovery, the last optime here derived from the local oplog may not be a valid
-    // optime to wait on for the majority commit point since the rest of the replica set may
-    // be on a different branch of history.
-    // TODO(SERVER-48419): Examine impact on rollback.
-    if (inReplicationRecovery(opCtx->getServiceContext())) {
-        LOGV2(4984700,
-              "Index build: in replication recovery. Not waiting for last optime before "
-              "interceptors to be majority committed",
-              "buildUUID"_attr = replState->buildUUID,
-              "lastOpTime"_attr = replState->lastOpTimeBeforeInterceptors);
+    if (replState->lastOpTimeBeforeInterceptors.isNull()) {
         return;
     }
 
