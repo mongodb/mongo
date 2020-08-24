@@ -549,6 +549,12 @@ const ResumableIndexBuildTest = class {
         const coll = primary.getDB(dbName).getCollection(collName);
         const indexName = "resumable_index_build";
 
+        // Create and drop an index so that the Sorter file name used by the index build
+        // interrupted for shutdown is not the same as the Sorter file name used when the index
+        // build is restarted.
+        assert.commandWorked(coll.createIndex({unused: 1}));
+        assert.commandWorked(coll.dropIndex({unused: 1}));
+
         const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
             rst, function(collName, indexSpec, indexName) {
                 assert.commandFailedWithCode(
@@ -565,8 +571,8 @@ const ResumableIndexBuildTest = class {
                                         primary,
                                         coll,
                                         indexName,
-                                        "hangIndexBuildBeforeWaitingUntilMajorityOpTime",
-                                        {} /* failPointData */,
+                                        "hangIndexBuildDuringBulkLoadPhase",
+                                        {iteration: 0},
                                         false /* shouldComplete */,
                                         failpointAfterStartup);
 
@@ -586,9 +592,13 @@ const ResumableIndexBuildTest = class {
         ResumableIndexBuildTest.checkIndexes(
             rst, dbName, collName, indexName, postIndexBuildInserts);
 
-        // If we fail after parsing, any remaining internal idents will only be cleaned up after
-        // another restart.
         if (!failWhileParsing) {
+            // Ensure that the persisted Sorter data was cleaned up after failing to resume. This
+            // cleanup does not occur if parsing failed.
+            assert.eq(listFiles(primary.dbpath + "/_tmp").length, 0);
+
+            // If we fail after parsing, any remaining internal idents will only be cleaned up
+            // after another restart.
             clearRawMongoProgramOutput();
             rst.stop(primary);
             rst.start(primary, {noCleanData: true});

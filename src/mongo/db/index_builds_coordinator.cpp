@@ -64,6 +64,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <boost/filesystem/operations.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
 namespace mongo {
@@ -1509,6 +1510,24 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
                   "Failed to resume index build, restarting instead",
                   "buildUUID"_attr = buildUUID,
                   "error"_attr = e);
+
+            // Clean up the persisted Sorter data since resuming failed.
+            for (const auto& index : resumeInfo.getIndexes()) {
+                LOGV2(5043100,
+                      "Removing resumable index build temp file",
+                      "file"_attr = index.getFileName(),
+                      "buildUUID"_attr = buildUUID);
+
+                boost::system::error_code ec;
+                boost::filesystem::remove(index.getFileName()->toString(), ec);
+
+                if (ec) {
+                    LOGV2(5043101,
+                          "Failed to remove resumable index build temp file",
+                          "file"_attr = index.getFileName(),
+                          "error"_attr = ec.message());
+                }
+            }
         }
     }
 
