@@ -384,12 +384,11 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 
     lv2Config.timestampFormat = serverGlobalParams.logTimestampFormat;
     Status result = lv2Manager.getGlobalDomainInternal().configure(lv2Config);
-    if (result.isOK() && writeServerRestartedAfterLogConfig)
-        LOGV2_WARNING_OPTIONS(
-            20698, {logv2::LogTag::kStartupWarnings}, "***** SERVER RESTARTED *****");
-    return result;
+    if (result.isOK() && writeServerRestartedAfterLogConfig) {
+        LOGV2(20698, "***** SERVER RESTARTED *****");
+    }
 
-    return Status::OK();
+    return result;
 }
 
 /**
