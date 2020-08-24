@@ -474,9 +474,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc)) ||
                MONGO_unlikely(hangAfterStartingIndexBuild.shouldFail())) {
-            auto interruptStatus = opCtx->checkForInterruptNoAssert();
-            if (!interruptStatus.isOK())
-                return interruptStatus;
+            opCtx->checkForInterrupt();
 
             if (PlanExecutor::ADVANCED != state) {
                 continue;
@@ -484,21 +482,16 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 
             progress->setTotalWhileRunning(collection->numRecords(opCtx));
 
-            interruptStatus =
+            uassertStatusOK(
                 failPointHangDuringBuild(opCtx,
                                          &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion,
                                          "before",
                                          objToIndex,
-                                         n);
-            if (!interruptStatus.isOK())
-                return interruptStatus;
+                                         n));
 
             // The external sorter is not part of the storage engine and therefore does not need a
             // WriteUnitOfWork to write keys.
-            Status ret = insertSingleDocumentForInitialSyncOrRecovery(opCtx, objToIndex, loc);
-            if (!ret.isOK()) {
-                return ret;
-            }
+            uassertStatusOK(insertSingleDocumentForInitialSyncOrRecovery(opCtx, objToIndex, loc));
 
             failPointHangDuringBuild(opCtx,
                                      &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
@@ -511,9 +504,29 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
             progress->hit();
             n++;
         }
-    } catch (...) {
-        _phase = IndexBuildPhaseEnum::kInitialized;
-        return exceptionToStatus();
+    } catch (DBException& ex) {
+        if (ex.isA<ErrorCategory::Interruption>() || ex.isA<ErrorCategory::ShutdownError>()) {
+            // If the collection scan is stopped because due to an interrupt or shutdown event, we
+            // leave the internal state intact to ensure we have the correct information for
+            // resuming this index build during startup and rollback.
+        } else {
+            // Restore pre-collection scan state.
+            _phase = IndexBuildPhaseEnum::kInitialized;
+        }
+
+        auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+        LOGV2(4984704,
+              "Index build: collection scan stopped",
+              "buildUUID"_attr = _buildUUID,
+              "totalRecords"_attr = n,
+              "duration"_attr = duration_cast<Milliseconds>(Seconds(t.seconds())),
+              "readSource"_attr = RecoveryUnit::toString(readSource),
+              "error"_attr = ex);
+        ex.addContext(str::stream()
+                      << "collection scan stopped. totalRecords: " << n
+                      << "; durationMillis: " << duration_cast<Milliseconds>(Seconds(t.seconds()))
+                      << "; readSource: " << RecoveryUnit::toString(readSource));
+        return ex.toStatus();
     }
 
     if (MONGO_unlikely(leaveIndexBuildUnfinishedForShutdown.shouldFail())) {
@@ -550,6 +563,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
           "Index build: collection scan done",
           "buildUUID"_attr = _buildUUID,
           "totalRecords"_attr = n,
+          "readSource"_attr =
+              RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
           "duration"_attr = duration_cast<Milliseconds>(Seconds(t.seconds())));
 
     Status ret = dumpInsertsFromBulk(opCtx);
