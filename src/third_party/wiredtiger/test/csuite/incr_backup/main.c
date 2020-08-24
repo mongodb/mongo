@@ -59,7 +59,7 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static bool slow_incremental = false;
 
 static bool do_drop = true;
-static bool do_rename = true;
+static bool do_rename = false;
 
 #define VERBOSE(level, fmt, ...)      \
     do {                              \

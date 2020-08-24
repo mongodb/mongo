@@ -1027,6 +1027,8 @@ static const char *const __stats_connection_desc[] = {
   "connection: auto adjusting condition wait raced to update timeout and skipped updating",
   "connection: detected system time went backwards",
   "connection: files currently open",
+  "connection: hash bucket array size for data handles",
+  "connection: hash bucket array size general",
   "connection: memory allocations",
   "connection: memory frees",
   "connection: memory re-allocations",
@@ -1296,6 +1298,12 @@ static const char *const __stats_connection_desc[] = {
   "transaction: transaction checkpoint history store file duration (usecs)",
   "transaction: transaction checkpoint max time (msecs)",
   "transaction: transaction checkpoint min time (msecs)",
+  "transaction: transaction checkpoint most recent duration for gathering all handles (usecs)",
+  "transaction: transaction checkpoint most recent duration for gathering applied handles (usecs)",
+  "transaction: transaction checkpoint most recent duration for gathering skipped handles (usecs)",
+  "transaction: transaction checkpoint most recent handles applied",
+  "transaction: transaction checkpoint most recent handles skipped",
+  "transaction: transaction checkpoint most recent handles walked",
   "transaction: transaction checkpoint most recent time (msecs)",
   "transaction: transaction checkpoint prepare currently running",
   "transaction: transaction checkpoint prepare max time (msecs)",
@@ -1547,6 +1555,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cond_auto_wait_skipped = 0;
     stats->time_travel = 0;
     /* not clearing file_open */
+    /* not clearing buckets_dh */
+    /* not clearing buckets */
     stats->memory_allocation = 0;
     stats->memory_free = 0;
     stats->memory_grow = 0;
@@ -1814,6 +1824,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->txn_hs_ckpt_duration = 0;
     /* not clearing txn_checkpoint_time_max */
     /* not clearing txn_checkpoint_time_min */
+    /* not clearing txn_checkpoint_handle_duration */
+    /* not clearing txn_checkpoint_handle_duration_apply */
+    /* not clearing txn_checkpoint_handle_duration_skip */
+    stats->txn_checkpoint_handle_applied = 0;
+    stats->txn_checkpoint_handle_skipped = 0;
+    stats->txn_checkpoint_handle_walked = 0;
     /* not clearing txn_checkpoint_time_recent */
     /* not clearing txn_checkpoint_prep_running */
     /* not clearing txn_checkpoint_prep_max */
@@ -2061,6 +2077,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cond_auto_wait_skipped += WT_STAT_READ(from, cond_auto_wait_skipped);
     to->time_travel += WT_STAT_READ(from, time_travel);
     to->file_open += WT_STAT_READ(from, file_open);
+    to->buckets_dh += WT_STAT_READ(from, buckets_dh);
+    to->buckets += WT_STAT_READ(from, buckets);
     to->memory_allocation += WT_STAT_READ(from, memory_allocation);
     to->memory_free += WT_STAT_READ(from, memory_free);
     to->memory_grow += WT_STAT_READ(from, memory_grow);
@@ -2337,6 +2355,14 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_hs_ckpt_duration += WT_STAT_READ(from, txn_hs_ckpt_duration);
     to->txn_checkpoint_time_max += WT_STAT_READ(from, txn_checkpoint_time_max);
     to->txn_checkpoint_time_min += WT_STAT_READ(from, txn_checkpoint_time_min);
+    to->txn_checkpoint_handle_duration += WT_STAT_READ(from, txn_checkpoint_handle_duration);
+    to->txn_checkpoint_handle_duration_apply +=
+      WT_STAT_READ(from, txn_checkpoint_handle_duration_apply);
+    to->txn_checkpoint_handle_duration_skip +=
+      WT_STAT_READ(from, txn_checkpoint_handle_duration_skip);
+    to->txn_checkpoint_handle_applied += WT_STAT_READ(from, txn_checkpoint_handle_applied);
+    to->txn_checkpoint_handle_skipped += WT_STAT_READ(from, txn_checkpoint_handle_skipped);
+    to->txn_checkpoint_handle_walked += WT_STAT_READ(from, txn_checkpoint_handle_walked);
     to->txn_checkpoint_time_recent += WT_STAT_READ(from, txn_checkpoint_time_recent);
     to->txn_checkpoint_prep_running += WT_STAT_READ(from, txn_checkpoint_prep_running);
     to->txn_checkpoint_prep_max += WT_STAT_READ(from, txn_checkpoint_prep_max);

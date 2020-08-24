@@ -480,6 +480,8 @@ struct __wt_connection_stats {
     int64_t cond_auto_wait_skipped;
     int64_t time_travel;
     int64_t file_open;
+    int64_t buckets_dh;
+    int64_t buckets;
     int64_t memory_allocation;
     int64_t memory_free;
     int64_t memory_grow;
@@ -747,6 +749,12 @@ struct __wt_connection_stats {
     int64_t txn_hs_ckpt_duration;
     int64_t txn_checkpoint_time_max;
     int64_t txn_checkpoint_time_min;
+    int64_t txn_checkpoint_handle_duration;
+    int64_t txn_checkpoint_handle_duration_apply;
+    int64_t txn_checkpoint_handle_duration_skip;
+    int64_t txn_checkpoint_handle_applied;
+    int64_t txn_checkpoint_handle_skipped;
+    int64_t txn_checkpoint_handle_walked;
     int64_t txn_checkpoint_time_recent;
     int64_t txn_checkpoint_prep_running;
     int64_t txn_checkpoint_prep_max;
