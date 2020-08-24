@@ -43,6 +43,7 @@ def get_expansions_data():
             "repeat_tests_secs": 600,
             "revision": "fake_sha",
             "project": "fake_project",
+            "task_id": "task id",
     }  # yapf: disable
 
 
@@ -110,7 +111,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
         }  # yapf: disable
         shrub_config = ShrubProject()
         evergreen_api = MagicMock()
-        repo = MagicMock()
+        repo = MagicMock(working_dir=os.getcwd())
         under_test._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
                                        buildvariant_map, [repo], evg_conf_mock)
 
@@ -136,7 +137,7 @@ class TestGenerateEvgTasks(unittest.TestCase):
         }  # yapf: disable
         shrub_config = ShrubProject.empty()
         evergreen_api = MagicMock()
-        repo = MagicMock()
+        repo = MagicMock(working_dir=os.getcwd())
         evergreen_api.test_stats_by_project.return_value = [
             MagicMock(test_file="dir/test2.js", avg_duration_pass=10)
         ]
@@ -158,7 +159,7 @@ EXPANSIONS_FILE_DATA = {
     "revision": "badf00d000000000000000000000000000000000", "max_revisions": "1000",
     "branch_name": "mongodb-mongo-master", "is_patch": "false", "distro_id": "rhel62-small",
     "repeat_tests_min": "2", "repeat_tests_max": "1000", "repeat_tests_secs": "600", "project":
-        "mongodb-mongo-master"
+        "mongodb-mongo-master", "task_id": "task id"
 }
 
 CREATE_EVG_BUILD_VARIANT_MAP = {
@@ -210,7 +211,7 @@ class TestAcceptance(unittest.TestCase):
         When burn_in_tags is run,
         Then no tests are discovered to run.
         """
-        repos = [MagicMock()]
+        repos = [MagicMock(working_dir=os.getcwd())]
         evg_conf_mock = MagicMock()
         find_changed_tests_mock.return_value = {}
 
@@ -237,7 +238,7 @@ class TestAcceptance(unittest.TestCase):
         """
         create_test_membership_map_mock.return_value = defaultdict(list, CREATE_TEST_MEMBERSHIP_MAP)
 
-        repos = [MagicMock()]
+        repos = [MagicMock(working_dir=os.getcwd())]
         evg_conf = get_evergreen_config()
         create_evg_build_variant_map_mock.return_value = CREATE_EVG_BUILD_VARIANT_MAP
         find_changed_tests_mock.return_value = {

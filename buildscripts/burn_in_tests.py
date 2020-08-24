@@ -9,7 +9,7 @@ import subprocess
 import sys
 from collections import defaultdict
 from math import ceil
-from typing import Optional, Set, Tuple, List, Dict, Iterable
+from typing import Optional, Set, Tuple, List, Dict
 
 import click
 import requests
@@ -26,7 +26,8 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # pylint: disable=wrong-import-position
-from buildscripts.patch_builds.change_data import find_changed_files_in_repos
+from buildscripts.patch_builds.change_data import generate_revision_map, \
+    generate_revision_map_from_manifest, RevisionMap, find_changed_files_in_repos
 import buildscripts.resmokelib.parser
 from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get_suites
 from buildscripts.resmokelib.utils import default_if_none, globstar
@@ -201,25 +202,29 @@ def is_file_a_test_file(file_path: str) -> bool:
     return True
 
 
-def get_revision_map(repos: Iterable[Repo], origin_rev: Optional[str] = None) -> Set[str]:
+def _create_revision_map(repos: List[Repo], origin_rev: Optional[str], evg_api: EvergreenApi,
+                         task_id: Optional[str]) -> RevisionMap:
     """
-    If origin_rev is specified, compare changes against this revision in the mongo repo.
+    Create a map of the repos and the given revisions to diff against.
 
-    :param repos: List of repos containing changed files.
-    :param origin_rev: The revision that local changes will be compared against.
-    :returns: Set of changed tests.
+    :param repos: Repositories to include in the map.
+    :param origin_rev: User specified revision to compare against.
+    :param evg_api: Evergreen API client.
+    :param task_id: Evergreen task ID.
+    :return: Map of repositories to revisions.
     """
     if origin_rev:
-        mongo_repo_dir = [
-            repo.git_dir for repo in repos if os.path.basename(repo.working_dir) == "mongo"
-        ]
-        if len(mongo_repo_dir) != 1:
-            raise Exception("Mongo repo not found in repos list")
-        return {mongo_repo_dir[0]: origin_rev}
-    return None
+        return generate_revision_map(repos, {"mongo": origin_rev})
+
+    if evg_api and task_id:
+        return generate_revision_map_from_manifest(repos, task_id, evg_api)
+
+    return {}
 
 
-def find_changed_tests(repos: Iterable[Repo], origin_rev: Optional[str] = None) -> Set[str]:
+def find_changed_tests(repos: List[Repo], origin_rev: Optional[str] = None,
+                       evg_api: Optional[EvergreenApi] = None,
+                       task_id: Optional[str] = None) -> Set[str]:
     """
     Find the changed tests.
 
@@ -228,9 +233,11 @@ def find_changed_tests(repos: Iterable[Repo], origin_rev: Optional[str] = None) 
 
     :param repos: List of repos containing changed files.
     :param origin_rev: The revision that local changes will be compared against.
-    :returns: Set of changed tests.
+    :param evg_api: Evergreen API client.
+    :param task_id: Evergreen task ID.
+    :return: Set of changed tests.
     """
-    revision_map = get_revision_map(repos, origin_rev)
+    revision_map = _create_revision_map(repos, origin_rev, evg_api, task_id)
     LOGGER.info("Calculated revision map", revision_map=revision_map)
     changed_files = find_changed_files_in_repos(repos, revision_map)
     return {os.path.normpath(path) for path in changed_files if is_file_a_test_file(path)}
@@ -755,7 +762,7 @@ def _get_evg_api(evg_api_config: str, local_mode: bool) -> Optional[EvergreenApi
 
 def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmoke_args: str,
             generate_tasks_file: str, no_exec: bool, evg_conf: EvergreenProjectConfig,
-            repos: Iterable[Repo], evg_api: EvergreenApi, origin_rev: Optional[str]) -> None:
+            repos: List[Repo], evg_api: EvergreenApi, origin_rev: Optional[str]) -> None:
     """
     Run burn_in_tests with the given configuration.
 
@@ -770,7 +777,7 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
     :param project: Evergreen project to query.
     :param origin_rev: The revision that local changes will be compared against.
     """
-    changed_tests = find_changed_tests(repos, origin_rev)
+    changed_tests = find_changed_tests(repos, origin_rev, evg_api, generate_config.task_id)
     LOGGER.info("Found changed tests", files=changed_tests)
 
     # Populate the config values in order to use the helpers from resmokelib.suitesconfig.
@@ -871,6 +878,7 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
     :param local_mode: Don't call out to the evergreen API (used for testing).
     :param evg_api_config: Location of configuration file to connect to evergreen.
     :param verbose: Log extra debug information.
+    :param task_id: Id of evergreen task being run in.
     :param origin_rev: The revision that local changes will be compared against.
     """
     _configure_logging(verbose)

@@ -1,14 +1,59 @@
 """Tools for detecting changes in a commit."""
 import os
 from itertools import chain
-from typing import Any, Iterable, Set, Optional, Dict
+from typing import Any, Dict, Iterable, Set, Optional, List
 
 import structlog
-from structlog.stdlib import LoggerFactory
+from evergreen import EvergreenApi
 from git import DiffIndex, Repo
 
-structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.get_logger(__name__)
+
+RevisionMap = Dict[str, str]
+
+
+def _get_id_from_repo(repo: Repo) -> str:
+    """
+    Get the identifier of the given repo.
+
+    :param repo: Repository to get id for.
+    :return: Identifier for repository.
+    """
+    if repo.working_dir == os.getcwd():
+        return "mongo"
+    return os.path.basename(repo.working_dir)
+
+
+def generate_revision_map(repos: List[Repo], revisions_data: Dict[str, str]) -> RevisionMap:
+    """
+    Generate a revision map for the given repositories using the revisions in the given file.
+
+    :param repos: Repositories to generate map for.
+    :param revisions_data: Dictionary of revisions to use for repositories.
+    :return: Map of repositories to revisions
+    """
+    revision_map = {repo.git_dir: revisions_data.get(_get_id_from_repo(repo)) for repo in repos}
+    return {k: v for k, v in revision_map.items() if v}
+
+
+def generate_revision_map_from_manifest(repos: List[Repo], task_id: str,
+                                        evg_api: EvergreenApi) -> RevisionMap:
+    """
+    Generate a revision map for the given repositories using the revisions from the manifest.
+
+    :param repos: Repositories to generate map for.
+    :param task_id: Id of evergreen task running.
+    :param evg_api: Evergreen API object.
+    :return: Map of repositories to revisions
+    """
+    manifest = evg_api.manifest_for_task(task_id)
+    revisions_data = {
+        module_name: module.revision
+        for module_name, module in manifest.modules.items()
+    }
+    revisions_data["mongo"] = manifest.revision
+
+    return generate_revision_map(repos, revisions_data)
 
 
 def _paths_for_iter(diff, iter_type):
@@ -47,7 +92,7 @@ def _modified_files_for_diff(diff: DiffIndex, log: Any) -> Set:
     return modified_files.union(added_files).union(renamed_files).union(deleted_files)
 
 
-def find_changed_files(repo: Repo, revision_map: Optional[Dict[str, str]] = None) -> Set[str]:
+def find_changed_files(repo: Repo, revision_map: Optional[RevisionMap] = None) -> Set[str]:
     """
     Find files that were new or added to the repository between commits.
 
@@ -71,20 +116,20 @@ def find_changed_files(repo: Repo, revision_map: Optional[Dict[str, str]] = None
 
     paths = work_tree_files.union(index_files).union(untracked_files)
 
-    return [
+    return {
         os.path.relpath(f"{repo.working_dir}/{os.path.normpath(path)}", os.getcwd())
         for path in paths
-    ]
+    }
 
 
 def find_changed_files_in_repos(repos: Iterable[Repo],
-                                revision_map: Optional[Dict[str, str]] = None) -> Set[str]:
+                                revision_map: Optional[RevisionMap] = None) -> Set[str]:
     """
     Find the changed files.
 
     Use git to find which files have changed in this patch.
     :param repos: List of repos containing changed files.
     :param revision_map: Map of revisions to compare against for repos.
-    :returns: Set of changed files.
+    :return: Set of changed files.
     """
     return set(chain.from_iterable([find_changed_files(repo, revision_map) for repo in repos]))

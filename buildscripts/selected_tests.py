@@ -15,6 +15,9 @@ from git import Repo
 from shrub.v2 import ShrubProject, BuildVariant
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
+from buildscripts.patch_builds.change_data import find_changed_files_in_repos, \
+    generate_revision_map_from_manifest
+
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -39,12 +42,12 @@ from buildscripts.evergreen_generate_resmoke_tasks import (
     remove_gen_suffix,
     write_file_dict,
 )
-from buildscripts.patch_builds.change_data import find_changed_files_in_repos
 from buildscripts.patch_builds.selected_tests_service import SelectedTestsService
 
 structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.getLogger(__name__)
 
+TASK_ID_EXPANSION = "task_id"
 EVERGREEN_FILE = "etc/evergreen.yml"
 EVG_CONFIG_FILE = ".evergreen.yml"
 EXTERNAL_LOGGERS = {
@@ -407,7 +410,9 @@ def run(evg_api: EvergreenApi, evg_conf: EvergreenProjectConfig,
     """
     config_dict_of_suites_and_tasks = {}
 
-    changed_files = find_changed_files_in_repos(repos)
+    task_id = selected_tests_variant_expansions[TASK_ID_EXPANSION]
+    revision_map = generate_revision_map_from_manifest(repos, task_id, evg_api)
+    changed_files = find_changed_files_in_repos(repos, revision_map)
     changed_files = {_remove_repo_path_prefix(file_path) for file_path in changed_files}
     LOGGER.debug("Found changed files", files=changed_files)
 

@@ -72,7 +72,8 @@ class TestAcceptance(unittest.TestCase):
         selected_tests_service_mock.get_test_mappings.return_value = []
         selected_tests_variant_expansions = {
             "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master"
+            "build_id": "my_build_id", "project": "mongodb-mongo-master",
+            "version_id": "my_version", "task_id": "task_id"
         }
         repos = [mock_changed_git_files([])]
         origin_build_variants = ["enterprise-rhel-62-64-bit"]
@@ -98,7 +99,8 @@ class TestAcceptance(unittest.TestCase):
         ]
         selected_tests_variant_expansions = {
             "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master"
+            "build_id": "my_build_id", "project": "mongodb-mongo-master",
+            "version_id": "my_version", "task_id": "task_id"
         }
         repos = [mock_changed_git_files(["src/file1.cpp"])]
         origin_build_variants = ["enterprise-rhel-62-64-bit"]
@@ -132,7 +134,8 @@ class TestAcceptance(unittest.TestCase):
         ]
         selected_tests_variant_expansions = {
             "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master"
+            "build_id": "my_build_id", "project": "mongodb-mongo-master",
+            "version_id": "my_version", "task_id": "task id"
         }
         repos = [mock_changed_git_files(["src/file1.cpp"])]
         origin_build_variants = ["enterprise-rhel-62-64-bit"]

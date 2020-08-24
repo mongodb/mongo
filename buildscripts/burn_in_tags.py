@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Generate burn in tests to run on certain build variants."""
-
 from collections import namedtuple
 import os
 import sys
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, List
 
 import click
 
@@ -30,6 +29,7 @@ CONFIG_FILE = "burn_in_tags_gen.json"
 EVERGREEN_FILE = "etc/evergreen.yml"
 EVG_CONFIG_FILE = ".evergreen.yml"
 COMPILE_TASK = "compile_without_package_TG"
+TASK_ID_EXPANSION = "task_id"
 
 ConfigOptions = namedtuple("ConfigOptions", [
     "build_variant",
@@ -123,7 +123,7 @@ def _generate_evg_build_variant(
 # pylint: disable=too-many-arguments
 def _generate_evg_tasks(evergreen_api: EvergreenApi, shrub_project: ShrubProject,
                         task_expansions: Dict[str, Any], build_variant_map: Dict[str, str],
-                        repos: Iterable[Repo], evg_conf: EvergreenProjectConfig) -> None:
+                        repos: List[Repo], evg_conf: EvergreenProjectConfig) -> None:
     """
     Generate burn in tests tasks for a given shrub config and group of build variants.
 
@@ -135,7 +135,8 @@ def _generate_evg_tasks(evergreen_api: EvergreenApi, shrub_project: ShrubProject
     """
     for build_variant, run_build_variant in build_variant_map.items():
         config_options = _get_config_options(task_expansions, build_variant, run_build_variant)
-        changed_tests = find_changed_tests(repos)
+        task_id = task_expansions[TASK_ID_EXPANSION]
+        changed_tests = find_changed_tests(repos, evg_api=evergreen_api, task_id=task_id)
         tests_by_task = create_tests_by_task(build_variant, evg_conf, changed_tests)
         if tests_by_task:
             shrub_build_variant = _generate_evg_build_variant(
@@ -153,12 +154,12 @@ def _generate_evg_tasks(evergreen_api: EvergreenApi, shrub_project: ShrubProject
 
 
 def burn_in(task_expansions: Dict[str, Any], evg_conf: EvergreenProjectConfig,
-            evergreen_api: RetryingEvergreenApi, repos: Iterable[Repo]):
+            evergreen_api: RetryingEvergreenApi, repos: List[Repo]):
     """
     Execute main program.
 
     :param task_expansions: Dictionary of expansions for the running task.
-    :param evergreen_conf: Evergreen configuration.
+    :param evg_conf: Evergreen configuration.
     :param evergreen_api: Evergreen.py object.
     :param repos: Git repositories.
     """
