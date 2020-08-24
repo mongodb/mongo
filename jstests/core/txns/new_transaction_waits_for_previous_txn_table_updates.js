@@ -76,8 +76,11 @@ function runConcurrentTransactionOnSession(dbName, collName, lsid) {
 
 function runConcurrentCollectionCreate(dbName, collName) {
     // Turn on failpoint that the createCollection will hit after reserving an oplog slot.
+    // Make sure we specify the collection we are testing on to avoid triggering the failpoint
+    // on unrelated createCollection commands that happen to run concurrently.
+    const fpData = {nss: dbName + "." + collName};
     const hangCreateFailPoint =
-        configureFailPoint(db, "hangAndFailAfterCreateCollectionReservesOpTime");
+        configureFailPoint(db, "hangAndFailAfterCreateCollectionReservesOpTime", fpData);
 
     function runCollCreate(dbName, collName) {
         assert.commandFailedWithCode(db.getSiblingDB(dbName).createCollection(collName), 51267);
