@@ -1546,7 +1546,7 @@ public:
                 if (state.isOnDisk()) {
                     // This means that it will be doing a write operation, make sure it is safe to
                     // do so
-                    uassert(ErrorCodes::NotMaster,
+                    uassert(ErrorCodes::NotWritablePrimary,
                             "not master",
                             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
                                 opCtx, config.nss));

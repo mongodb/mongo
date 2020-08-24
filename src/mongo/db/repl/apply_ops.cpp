@@ -395,7 +395,7 @@ Status applyOps(OperationContext* opCtx,
         opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
     if (userInitiatedWritesAndNotPrimary)
-        return Status(ErrorCodes::NotMaster,
+        return Status(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while applying ops to database " << dbName);
 
     if (auto preCondition = info.getPreCondition()) {

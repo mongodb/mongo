@@ -130,7 +130,7 @@ struct Cloner::Fun {
         boost::optional<Lock::DBLock> dbLock;
         dbLock.emplace(opCtx, _dbName, MODE_X);
         uassert(
-            ErrorCodes::NotMaster,
+            ErrorCodes::NotWritablePrimary,
             str::stream() << "Not primary while cloning collection " << from_collection.ns()
                           << " to " << to_collection.ns(),
             !opCtx->writesAreReplicated() ||
@@ -773,7 +773,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
     }
 
     uassert(
-        ErrorCodes::NotMaster,
+        ErrorCodes::NotWritablePrimary,
         str::stream() << "Not primary while cloning database " << opts.fromDB
                       << " (after getting list of collections to clone)",
         !opCtx->writesAreReplicated() ||

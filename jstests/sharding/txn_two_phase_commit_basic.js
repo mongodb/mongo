@@ -84,7 +84,7 @@ const startSimulatingNetworkFailures = function(connArray) {
             configureFailPoint: "failCommand",
             mode: {times: 10},
             data: {
-                errorCode: ErrorCodes.NotMaster,
+                errorCode: ErrorCodes.NotWritablePrimary,
                 failCommands: ["prepareTransaction", "abortTransaction", "commitTransaction"]
             }
         }));

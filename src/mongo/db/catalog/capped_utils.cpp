@@ -63,7 +63,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName);
 
     if (userInitiatedWritesAndNotPrimary) {
-        return Status(ErrorCodes::NotMaster,
+        return Status(ErrorCodes::NotWritablePrimary,
                       str::stream()
                           << "Not primary while truncating collection: " << collectionName);
     }
@@ -250,7 +250,7 @@ void convertToCapped(OperationContext* opCtx,
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName);
 
-    uassert(ErrorCodes::NotMaster,
+    uassert(ErrorCodes::NotWritablePrimary,
             str::stream() << "Not primary while converting " << collectionName
                           << " to a capped collection",
             !userInitiatedWritesAndNotPrimary);

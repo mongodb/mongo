@@ -696,7 +696,7 @@ void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
     ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(_parentReplSetName);
     if (monitor) {
         monitor->failedHost(_serverAddress,
-                            {ErrorCodes::NotMaster,
+                            {ErrorCodes::NotWritablePrimary,
                              str::stream() << "got not master from: " << _serverAddress
                                            << " of repl set: " << _parentReplSetName});
     }

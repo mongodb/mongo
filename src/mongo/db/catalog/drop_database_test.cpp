@@ -212,12 +212,12 @@ TEST_F(DropDatabaseTest, DropDatabaseReturnsNamespaceNotFoundIfDatabaseDoesNotEx
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, dropDatabase(_opCtx.get(), _nss.db().toString()));
 }
 
-TEST_F(DropDatabaseTest, DropDatabaseReturnsNotMasterIfNotPrimary) {
+TEST_F(DropDatabaseTest, DropDatabaseReturnsNotWritablePrimaryIfNotPrimary) {
     _createCollection(_opCtx.get(), _nss);
     ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.db()));
-    ASSERT_EQUALS(ErrorCodes::NotMaster, dropDatabase(_opCtx.get(), _nss.db().toString()));
+    ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, dropDatabase(_opCtx.get(), _nss.db().toString()));
 }
 
 /**

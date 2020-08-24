@@ -140,7 +140,7 @@ void ReplSetDistLockManager::doTask() {
             auto opCtx = cc().makeOperationContext();
             auto pingStatus = _catalog->ping(opCtx.get(), _processID, Date_t::now());
 
-            if (!pingStatus.isOK() && pingStatus != ErrorCodes::NotMaster) {
+            if (!pingStatus.isOK() && pingStatus != ErrorCodes::NotWritablePrimary) {
                 warning() << "pinging failed for distributed lock pinger" << causedBy(pingStatus);
             }
 
@@ -173,7 +173,7 @@ void ReplSetDistLockManager::doTask() {
                     warning() << "Failed to unlock lock with " << LocksType::lockID() << ": "
                               << toUnlock.first << nameMessage << causedBy(unlockStatus);
                     // Queue another attempt, unless the problem was no longer being primary.
-                    if (unlockStatus != ErrorCodes::NotMaster) {
+                    if (unlockStatus != ErrorCodes::NotWritablePrimary) {
                         queueUnlock(toUnlock.first, toUnlock.second);
                     }
                 } else {
@@ -217,7 +217,7 @@ StatusWith<bool> ReplSetDistLockManager::isLockExpired(OperationContext* opCtx,
     Timer timer(_serviceContext->getTickSource());
     auto serverInfoStatus = _catalog->getServerInfo(opCtx);
     if (!serverInfoStatus.isOK()) {
-        if (serverInfoStatus.getStatus() == ErrorCodes::NotMaster) {
+        if (serverInfoStatus.getStatus() == ErrorCodes::NotWritablePrimary) {
             return false;
         }
 

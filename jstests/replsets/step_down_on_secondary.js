@@ -45,7 +45,7 @@ const joinStepDownThread = startParallelShell(() => {
 
     const freezeSecs = 24 * 60 * 60;  // 24 hours
     assert.commandFailedWithCode(db.adminCommand({"replSetStepDown": freezeSecs, "force": true}),
-                                 ErrorCodes.NotMaster);
+                                 ErrorCodes.NotWritablePrimary);
 }, primary.port);
 
 waitForCurOpByFailPointNoNS(primaryDB, "stepdownHangBeforeRSTLEnqueue");

@@ -396,7 +396,7 @@ bool runCreateIndexes(OperationContext* opCtx,
     // Do not use AutoGetOrCreateDb because we may relock the database in mode X.
     Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
     if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
-        uasserted(ErrorCodes::NotMaster,
+        uasserted(ErrorCodes::NotWritablePrimary,
                   str::stream() << "Not primary while creating indexes in " << ns.ns());
     }
 
@@ -591,7 +591,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         // Do not use AutoGetOrCreateDb because we may relock the database in mode X.
         Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
-            uasserted(ErrorCodes::NotMaster,
+            uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while creating indexes in " << ns.ns());
         }
 

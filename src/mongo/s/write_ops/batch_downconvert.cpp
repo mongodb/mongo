@@ -82,7 +82,8 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
                || code == 16805 /* replicatedToNum no longer primary */
                || code == 14830 /* gle wmode changed / invalid */
                // 2.6 Error codes
-               || code == ErrorCodes::NotMaster || code == ErrorCodes::UnknownReplWriteConcern ||
+               || code == ErrorCodes::NotWritablePrimary ||
+               code == ErrorCodes::UnknownReplWriteConcern ||
                code == ErrorCodes::WriteConcernFailed || code == ErrorCodes::PrimarySteppedDown) {
         // Write concern errors that get returned as regular errors (result may not be ok: 1.0)
         errors->wcError.reset(new WriteConcernErrorDetail());

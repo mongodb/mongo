@@ -170,7 +170,7 @@ void appendCommandResponse(const PlanExecutor* exec,
 }
 
 void assertCanWrite(OperationContext* opCtx, const NamespaceString& nsString) {
-    uassert(ErrorCodes::NotMaster,
+    uassert(ErrorCodes::NotWritablePrimary,
             str::stream() << "Not primary while running findAndModify command on collection "
                           << nsString.ns(),
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nsString));

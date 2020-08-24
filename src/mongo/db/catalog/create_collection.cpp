@@ -75,7 +75,7 @@ Status _createView(OperationContext* opCtx,
 
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
-            return Status(ErrorCodes::NotMaster,
+            return Status(ErrorCodes::NotWritablePrimary,
                           str::stream() << "Not primary while creating collection " << nss);
         }
 
@@ -111,7 +111,7 @@ Status _createCollection(OperationContext* opCtx,
 
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
-            return Status(ErrorCodes::NotMaster,
+            return Status(ErrorCodes::NotWritablePrimary,
                           str::stream() << "Not primary while creating collection " << nss);
         }
 

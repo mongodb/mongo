@@ -49,8 +49,8 @@ Status stepDownForShutdown(OperationContext* opCtx,
     if (replCoord->getConfig().getNumMembers() != 1) {
         try {
             replCoord->stepDown(opCtx, false /* force */, waitTime, Seconds(120));
-        } catch (const ExceptionFor<ErrorCodes::NotMaster>&) {
-            // Ignore not master errors.
+        } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+            // Ignore NotWritablePrimary errors.
         } catch (const DBException& e) {
             if (!forceShutdown) {
                 return e.toStatus();

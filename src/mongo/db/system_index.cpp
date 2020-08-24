@@ -102,7 +102,7 @@ SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats> generateSystemIndexForE
     const IndexSpec& spec) {
     // Do not try to generate any system indexes on a secondary.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    uassert(ErrorCodes::NotMaster,
+    uassert(ErrorCodes::NotWritablePrimary,
             "Not primary while creating authorization index",
             replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
                 replCoord->canAcceptWritesForDatabase(opCtx, ns.db()));

@@ -68,7 +68,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotYetInitializedWhenReconfigReceivedPriorToIni
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
-TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileSecondary) {
+TEST_F(ReplCoordTest, NodeReturnsNotWritablePrimaryWhenReconfigReceivedWhileSecondary) {
     // start up, become secondary, receive reconfig
     init();
     assertStartSuccess(BSON("_id"
@@ -88,7 +88,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileSecondary) {
     ReplSetReconfigArgs args;
     args.force = false;
     const auto opCtx = makeOperationContext();
-    ASSERT_EQUALS(ErrorCodes::NotMaster,
+    ASSERT_EQUALS(ErrorCodes::NotWritablePrimary,
                   getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
     ASSERT_TRUE(result.obj().isEmpty());
 }
@@ -609,7 +609,7 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")));
     const auto opCtx = makeOperationContext();
-    ASSERT_EQUALS(ErrorCodes::NotMaster,
+    ASSERT_EQUALS(ErrorCodes::NotWritablePrimary,
                   getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result));
 
     // forced should succeed

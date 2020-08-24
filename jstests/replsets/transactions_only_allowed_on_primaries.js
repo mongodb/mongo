@@ -60,7 +60,8 @@ function testCommands(session, commands, expectedErrorCode, readPref) {
 
         // Call abort for good measure, even though the transaction should have already been
         // aborted on the server.
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NotMaster);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NotWritablePrimary);
     }
 }
 
@@ -84,17 +85,17 @@ let readCommands = [
 
 jsTestLog("Testing read commands.");
 // Make sure read commands can not start transactions with any supported read preference.
-testCommands(secondarySession, readCommands, ErrorCodes.NotMaster, "secondary");
-testCommands(secondarySession, readCommands, ErrorCodes.NotMaster, "secondaryPreferred");
-testCommands(secondarySession, readCommands, ErrorCodes.NotMaster, "primaryPreferred");
-testCommands(secondarySession, readCommands, ErrorCodes.NotMaster, null);
+testCommands(secondarySession, readCommands, ErrorCodes.NotWritablePrimary, "secondary");
+testCommands(secondarySession, readCommands, ErrorCodes.NotWritablePrimary, "secondaryPreferred");
+testCommands(secondarySession, readCommands, ErrorCodes.NotWritablePrimary, "primaryPreferred");
+testCommands(secondarySession, readCommands, ErrorCodes.NotWritablePrimary, null);
 
 // Test one write command. Normal write commands should already be
 // disallowed on secondaries so we don't test them exhaustively here.
 let writeCommands = [{insert: collName, documents: [{_id: 0}]}];
 
 jsTestLog("Testing write commands.");
-testCommands(secondarySession, writeCommands, ErrorCodes.NotMaster, "secondary");
+testCommands(secondarySession, writeCommands, ErrorCodes.NotWritablePrimary, "secondary");
 
 secondarySession.endSession();
 

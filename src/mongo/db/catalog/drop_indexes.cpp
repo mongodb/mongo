@@ -199,7 +199,7 @@ Status dropIndexes(OperationContext* opCtx,
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);
 
         if (userInitiatedWritesAndNotPrimary) {
-            return Status(ErrorCodes::NotMaster,
+            return Status(ErrorCodes::NotWritablePrimary,
                           str::stream() << "Not primary while dropping indexes in " << nss);
         }
 

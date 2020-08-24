@@ -85,7 +85,7 @@ var res = assert.commandFailed(testDB.runReadCommand({
     readConcern: {level: "linearizable"},
     maxTimeMS: shard0ReplTest.kDefaultTimeoutMS
 }));
-assert.eq(res.code, ErrorCodes.NotMaster);
+assert.eq(res.code, ErrorCodes.NotWritablePrimary);
 
 jsTestLog("Testing linearizable read from primaries.");
 

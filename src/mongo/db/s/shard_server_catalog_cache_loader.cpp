@@ -487,7 +487,7 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
     boost::optional<uint64_t> taskNumToWait;
 
     while (true) {
-        uassert(ErrorCodes::NotMaster,
+        uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Unable to wait for collection metadata flush for " << nss.ns()
                               << " because the node's replication role changed.",
                 _role == ReplicaSetRole::Primary && _term == initialTerm);
@@ -538,7 +538,7 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
     boost::optional<uint64_t> taskNumToWait;
 
     while (true) {
-        uassert(ErrorCodes::NotMaster,
+        uassert(ErrorCodes::NotWritablePrimary,
                 str::stream() << "Unable to wait for database metadata flush for "
                               << dbName.toString()
                               << " because the node's replication role changed.",

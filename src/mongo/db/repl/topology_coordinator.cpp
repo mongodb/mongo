@@ -1360,7 +1360,7 @@ TopologyCoordinator::prepareForStepDownAttempt() {
     }
 
     if (_leaderMode == LeaderMode::kNotLeader) {
-        return Status{ErrorCodes::NotMaster, "This node is not a primary."};
+        return Status{ErrorCodes::NotWritablePrimary, "This node is not a primary."};
     }
 
     invariant(_leaderMode == LeaderMode::kMaster || _leaderMode == LeaderMode::kLeaderElect);

@@ -251,7 +251,7 @@ TEST(TransactionCoordinatorFuturesUtilTest,
     promises[0].setError(errorStatus1);
     ASSERT(!resultFuture.isReady());
 
-    Status errorStatus2{ErrorCodes::NotMaster, "dummy error"};
+    Status errorStatus2{ErrorCodes::NotWritablePrimary, "dummy error"};
     promises[1].setError(errorStatus2);
     ASSERT(!resultFuture.isReady());
 
@@ -643,11 +643,11 @@ TEST_F(AsyncWorkSchedulerTest, DestroyingSchedulerCapturedInFutureCallback) {
     future.get();
 }
 
-TEST_F(AsyncWorkSchedulerTest, NotifiesRemoteCommandTargeter_CmdResponseNotMasterError) {
+TEST_F(AsyncWorkSchedulerTest, NotifiesRemoteCommandTargeter_CmdResponseNotWritablePrimaryError) {
     ASSERT_EQ(0UL, getShardTargeterMock(kShardIds[1])->getAndClearMarkedDownHosts().size());
 
     scheduleAWSRemoteCommandWithResponse(kShardIds[1],
-                                         BSON("ok" << 0 << "code" << ErrorCodes::NotMaster
+                                         BSON("ok" << 0 << "code" << ErrorCodes::NotWritablePrimary
                                                    << "errmsg"
                                                    << "dummy"));
 

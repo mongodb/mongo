@@ -51,7 +51,7 @@ const BSONObj AsyncResultsMerger::kWholeSortKeySortPattern = BSON(kSortKeyField 
 
 namespace {
 
-// Maximum number of retries for network and replication notMaster errors (per host).
+// Maximum number of retries for network and replication NotPrimary errors (per host).
 const int kMaxNumFailedHostRetryAttempts = 3;
 
 /**

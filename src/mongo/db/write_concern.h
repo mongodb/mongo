@@ -94,7 +94,7 @@ struct WriteConcernResult {
  * if this opTime.isNull() no replication-related write concern options will be enforced.
  *
  * Returns result of the write concern if successful.
- * Returns NotMaster if the host steps down while waiting for replication
+ * Returns NotWritablePrimary if the host steps down while waiting for replication
  * Returns UnknownReplWriteConcern if the wMode specified was not enforceable
  */
 Status waitForWriteConcern(OperationContext* opCtx,

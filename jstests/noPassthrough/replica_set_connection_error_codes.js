@@ -1,6 +1,6 @@
 /**
- * Tests that DBClientRS performs re-targeting when it sees an ErrorCodes.NotMaster error response
- * from a command even if "not master" doesn't appear in the message.
+ * Tests that DBClientRS performs re-targeting when it sees an ErrorCodes.NotWritablePrimary error
+ * response from a command even if "not master" doesn't appear in the message.
  * @tags: [requires_replication]
  */
 (function() {
@@ -59,10 +59,10 @@ rst.awaitNodesAgreeOnPrimary();
 // DBClientRS will continue to send command requests to the node it believed to be primary even
 // after it stepped down so long as it hasn't closed its connection.
 assert.commandFailedWithCode(rsConn.getDB("test").runCommand({create: "mycoll"}),
-                             ErrorCodes.NotMaster);
+                             ErrorCodes.NotWritablePrimary);
 
-// However, once the server responds back with a ErrorCodes.NotMaster error, DBClientRS will
-// cause the ReplicaSetMonitor to attempt to discover the current primary.
+// However, once the server responds back with a ErrorCodes.NotWritablePrimary error, DBClientRS
+// will cause the ReplicaSetMonitor to attempt to discover the current primary.
 assert.commandWorked(rsConn.getDB("test").runCommand({create: "mycoll"}));
 
 try {

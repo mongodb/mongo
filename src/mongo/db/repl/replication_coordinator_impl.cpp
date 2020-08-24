@@ -2030,7 +2030,9 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     // Note this check is inherently racy - it's always possible for the node to stepdown from some
     // other path before we acquire the global exclusive lock.  This check is just to try to save us
     // from acquiring the global X lock unnecessarily.
-    uassert(ErrorCodes::NotMaster, "not primary so can't step down", getMemberState().primary());
+    uassert(ErrorCodes::NotWritablePrimary,
+            "not primary so can't step down",
+            getMemberState().primary());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &stepdownHangBeforeRSTLEnqueue, opCtx, "stepdownHangBeforeRSTLEnqueue");
@@ -2335,7 +2337,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
 
     if (opCtx->inMultiDocumentTransaction()) {
         if (!_readWriteAbility->canAcceptNonLocalWrites_UNSAFE()) {
-            return Status(ErrorCodes::NotMaster,
+            return Status(ErrorCodes::NotWritablePrimary,
                           "Multi-document transactions are only allowed on replica set primaries.");
         }
     }
@@ -2636,7 +2638,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     invariant(_rsConfig.isInitialized());
 
     if (!args.force && !_getMemberState_inlock().primary()) {
-        return Status(ErrorCodes::NotMaster,
+        return Status(ErrorCodes::NotWritablePrimary,
                       str::stream()
                           << "replSetReconfig should only be run on PRIMARY, but my state is "
                           << _getMemberState_inlock().toString()

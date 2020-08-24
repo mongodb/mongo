@@ -213,7 +213,7 @@ public:
             autoDb.emplace(opCtx, nss.db(), MODE_IS);
 
             // Slave nodes cannot support set shard version
-            uassert(ErrorCodes::NotMaster,
+            uassert(ErrorCodes::NotWritablePrimary,
                     str::stream() << "setShardVersion with collection version is only supported "
                                      "against primary nodes, but it was received for namespace "
                                   << nss.ns(),

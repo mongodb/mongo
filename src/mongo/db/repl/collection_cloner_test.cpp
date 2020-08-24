@@ -469,10 +469,10 @@ TEST_F(CollectionClonerTest, CollectionClonerReturnsLastRetriableErrorOnExceedin
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
         processNetworkResponse(ErrorCodes::HostNotFound, "");
         processNetworkResponse(ErrorCodes::NetworkTimeout, "");
-        processNetworkResponse(ErrorCodes::NotMaster, "");
+        processNetworkResponse(ErrorCodes::NotWritablePrimary, "");
     }
     collectionCloner->join();
-    ASSERT_EQUALS(ErrorCodes::NotMaster, getStatus());
+    ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, getStatus());
 }
 
 TEST_F(CollectionClonerTest, CollectionClonerReturnsNoSuchKeyOnMissingDocumentCountFieldName) {

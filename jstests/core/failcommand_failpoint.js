@@ -27,23 +27,23 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 // Configure failCommand again and verify that it still works correctly.
 assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test switching command sets.
@@ -51,17 +51,17 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["isMaster"],
         threadName: threadName,
     }
@@ -92,12 +92,12 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test that only commands specified in failCommands fail.
@@ -135,14 +135,14 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: {skip: 2},
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(testDB.runCommand({ping: 1}));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test times when failing with a particular error code.
@@ -150,13 +150,13 @@ assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: {times: 2},
     data: {
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         failCommands: ["ping"],
         threadName: threadName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
@@ -406,19 +406,19 @@ assert.commandWorked(adminDB.runCommand({
     mode: "alwaysOn",
     data: {
         failCommands: ["ping"],
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         threadName: threadName,
         appName: appName,
     }
 }));
-assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 
 assert.commandWorked(adminDB.runCommand({
     configureFailPoint: "failCommand",
     mode: "alwaysOn",
     data: {
         failCommands: ["ping"],
-        errorCode: ErrorCodes.NotMaster,
+        errorCode: ErrorCodes.NotWritablePrimary,
         threadName: threadName,
         appName: "made up app name",
     }

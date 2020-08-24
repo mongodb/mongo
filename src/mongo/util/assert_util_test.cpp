@@ -87,26 +87,29 @@ TEST(AssertUtils, UassertNamedCodeWithoutCategories) {
     ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionForCat<ErrorCategory::Interruption>);
 }
 
-// NotMaster - NotMasterError, RetriableError
-MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::NotMaster>,
+// NotWritablePrimary - NotMasterError, RetriableError
+MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::NotWritablePrimary>,
                                  error_details::CategoryList<ErrorCategory::NotMasterError,
                                                              ErrorCategory::RetriableError>>());
-MONGO_STATIC_ASSERT(std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::NotMaster>>());
+MONGO_STATIC_ASSERT(
+    std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::NotWritablePrimary>>());
 MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
-                                     ExceptionFor<ErrorCodes::NotMaster>>());
+                                     ExceptionFor<ErrorCodes::NotWritablePrimary>>());
 MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotMasterError>,
-                                    ExceptionFor<ErrorCodes::NotMaster>>());
+                                    ExceptionFor<ErrorCodes::NotWritablePrimary>>());
 MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
-                                     ExceptionFor<ErrorCodes::NotMaster>>());
+                                     ExceptionFor<ErrorCodes::NotWritablePrimary>>());
 
 TEST(AssertUtils, UassertNamedCodeWithOneCategory) {
-    ASSERT_CATCHES(ErrorCodes::NotMaster, DBException);
-    ASSERT_CATCHES(ErrorCodes::NotMaster, AssertionException);
-    ASSERT_CATCHES(ErrorCodes::NotMaster, ExceptionFor<ErrorCodes::NotMaster>);
-    ASSERT_NOT_CATCHES(ErrorCodes::NotMaster, ExceptionFor<ErrorCodes::DuplicateKey>);
-    ASSERT_NOT_CATCHES(ErrorCodes::NotMaster, ExceptionForCat<ErrorCategory::NetworkError>);
-    ASSERT_CATCHES(ErrorCodes::NotMaster, ExceptionForCat<ErrorCategory::NotMasterError>);
-    ASSERT_NOT_CATCHES(ErrorCodes::NotMaster, ExceptionForCat<ErrorCategory::Interruption>);
+    ASSERT_CATCHES(ErrorCodes::NotWritablePrimary, DBException);
+    ASSERT_CATCHES(ErrorCodes::NotWritablePrimary, AssertionException);
+    ASSERT_CATCHES(ErrorCodes::NotWritablePrimary, ExceptionFor<ErrorCodes::NotWritablePrimary>);
+    ASSERT_NOT_CATCHES(ErrorCodes::NotWritablePrimary, ExceptionFor<ErrorCodes::DuplicateKey>);
+    ASSERT_NOT_CATCHES(ErrorCodes::NotWritablePrimary,
+                       ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_CATCHES(ErrorCodes::NotWritablePrimary, ExceptionForCat<ErrorCategory::NotMasterError>);
+    ASSERT_NOT_CATCHES(ErrorCodes::NotWritablePrimary,
+                       ExceptionForCat<ErrorCategory::Interruption>);
 }
 
 // InterruptedDueToReplStateChange - NotMasterError, Interruption, RetriableError

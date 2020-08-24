@@ -49,11 +49,11 @@ jsTestLog("Start a read-only transaction on the secondary.");
 session.startTransaction({readConcern: {level: "snapshot"}});
 
 // Try to read a document (the first statement in the transaction) and verify that this fails.
-assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.NotWritablePrimary);
 
-// The check for "NotMaster" supercedes the check for "NoSuchTransaction" in this case.
+// The check for "NotWritablePrimary" supercedes the check for "NoSuchTransaction" in this case.
 jsTestLog("Make sure we are not allowed to run the commitTransaction command on the secondary.");
-assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NotWritablePrimary);
 
 /**
  * Test starting a transaction and issuing an abortTransaction command.
@@ -63,18 +63,18 @@ jsTestLog("Start a different read-only transaction on the secondary.");
 session.startTransaction({readConcern: {level: "snapshot"}});
 
 // Try to read a document (the first statement in the transaction) and verify that this fails.
-assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(sessionDb.runCommand({find: collName}), ErrorCodes.NotWritablePrimary);
 
-// The check for "NotMaster" supercedes the check for "NoSuchTransaction" in this case.
+// The check for "NotWritablePrimary" supercedes the check for "NoSuchTransaction" in this case.
 jsTestLog("Make sure we are not allowed to run the abortTransaction command on the secondary.");
-assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NotWritablePrimary);
 
 /**
  * Test starting a retryable write.
  */
 
 jsTestLog("Start a retryable write");
-assert.commandFailedWithCode(sessionDb.foo.insert({_id: 0}), ErrorCodes.NotMaster);
+assert.commandFailedWithCode(sessionDb.foo.insert({_id: 0}), ErrorCodes.NotWritablePrimary);
 
 /**
  * Test starting a read with txnNumber, but without autocommit. This fails in general because

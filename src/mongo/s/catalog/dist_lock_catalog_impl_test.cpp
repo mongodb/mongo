@@ -469,7 +469,7 @@ TEST_F(DistLockCatalogTest, GrabLockWriteConcernError) {
         auto status = distLockCatalog()
                           ->grabLock(operationContext(), "", OID::gen(), "", "", Date_t::now(), "")
                           .getStatus();
-        ASSERT_EQUALS(ErrorCodes::NotMaster, status.code());
+        ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
@@ -1280,7 +1280,7 @@ TEST_F(DistLockCatalogTest, GetServerNoGLEStats) {
 TEST_F(DistLockCatalogTest, GetServerNoElectionId) {
     auto future = launchOnSeparateThread([this](OperationContext* opCtx) {
         auto status = distLockCatalog()->getServerInfo(operationContext()).getStatus();
-        ASSERT_EQUALS(ErrorCodes::NotMaster, status.code());
+        ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 

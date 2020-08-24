@@ -713,7 +713,7 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONO
             responseStatus = args.response;
         });
 
-    // TODO: Update RemoteCommandTargeter on NotMaster errors.
+    // TODO: Update RemoteCommandTargeter on NotWritablePrimary errors.
     if (!scheduleStatus.isOK()) {
         return scheduleStatus.getStatus();
     }

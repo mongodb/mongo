@@ -66,7 +66,7 @@ Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData not
 
     // Its a proxy for being a primary passing "local" will cause it to return true on secondary
     if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
-        return {ErrorCodes::NotMaster, "Not a primary"};
+        return {ErrorCodes::NotWritablePrimary, "Not a primary"};
     }
 
     writeConflictRetry(opCtx, note, NamespaceString::kRsOplogNamespace.ns(), [&opCtx, &msgObj] {

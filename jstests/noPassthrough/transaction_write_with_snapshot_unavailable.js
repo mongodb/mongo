@@ -3,8 +3,8 @@
  * TransientTransactionError and the error is reported at the top level, not in a writeErrors array.
  *
  * Other transient transaction errors are tested elsewhere: WriteConflict is tested in
- * transactions_write_conflicts.js, NotMaster is tested in transient_txn_error_labels.js, and
- * NoSuchTransaction is tested in transient_txn_error_labels_with_write_concern.js.
+ * transactions_write_conflicts.js, NotWritablePrimary is tested in transient_txn_error_labels.js,
+ * and NoSuchTransaction is tested in transient_txn_error_labels_with_write_concern.js.
  *
  * @tags: [uses_transactions]
  */

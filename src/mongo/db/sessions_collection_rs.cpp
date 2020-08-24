@@ -95,7 +95,7 @@ auto runIfStandaloneOrPrimary(const NamespaceString& ns, OperationContext* opCtx
 
         // There is a window here where we may transition from Primary to
         // Secondary after we release the locks we take above. In this case,
-        // the callback we run below may return a NotMaster error, or a stale
+        // the callback we run below may return a NotWritablePrimary error, or a stale
         // read. However, this is preferable to running the callback while
         // we hold locks, since that can lead to a deadlock.
         isStandaloneOrPrimary = coord->canAcceptWritesForDatabase(opCtx, ns.db());

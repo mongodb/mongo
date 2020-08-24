@@ -259,7 +259,7 @@ MONGO_REGISTER_SHIM(waitForReadConcern)
         }
 
         if (!replCoord->getMemberState().primary()) {
-            return {ErrorCodes::NotMaster,
+            return {ErrorCodes::NotWritablePrimary,
                     "cannot satisfy linearizable read concern on non-primary node"};
         }
     }
@@ -391,7 +391,7 @@ MONGO_REGISTER_SHIM(waitForLinearizableReadConcern)
         Lock::CollectionLock lock(opCtx, NamespaceString("local.oplog.rs"), MODE_IX);
 
         if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {
-            return {ErrorCodes::NotMaster,
+            return {ErrorCodes::NotWritablePrimary,
                     "No longer primary when waiting for linearizable read concern"};
         }
 

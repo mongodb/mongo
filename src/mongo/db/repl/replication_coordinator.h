@@ -199,7 +199,7 @@ public:
      *     the data has been sufficiently replicated
      * ErrorCodes::ExceededTimeLimit if the opCtx->getMaxTimeMicrosRemaining is reached before
      *     the data has been sufficiently replicated
-     * ErrorCodes::NotMaster if the node is not Primary/Master
+     * ErrorCodes::NotWritablePrimary if the node is not a writable primary
      * ErrorCodes::UnknownReplWriteConcern if the writeConcern.wMode contains a write concern
      *     mode that is not known
      * ErrorCodes::ShutdownInProgress if we are mid-shutdown

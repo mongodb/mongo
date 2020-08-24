@@ -936,8 +936,9 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortFails) {
 
     ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
         repl::MemberState::RS_SECONDARY));
-    ASSERT_THROWS_CODE(
-        txnParticipant.abortTransaction(opCtx()), AssertionException, ErrorCodes::NotMaster);
+    ASSERT_THROWS_CODE(txnParticipant.abortTransaction(opCtx()),
+                       AssertionException,
+                       ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitFails) {
@@ -952,7 +953,7 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitFails) {
         repl::MemberState::RS_SECONDARY));
     ASSERT_THROWS_CODE(txnParticipant.commitPreparedTransaction(opCtx(), commitTS, {}),
                        AssertionException,
-                       ErrorCodes::NotMaster);
+                       ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortReleasesRSTL) {
@@ -992,8 +993,9 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortReleasesRSTL) {
               MODE_NONE);
     ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
         repl::MemberState::RS_SECONDARY));
-    ASSERT_THROWS_CODE(
-        txnParticipant.abortTransaction(opCtx()), AssertionException, ErrorCodes::NotMaster);
+    ASSERT_THROWS_CODE(txnParticipant.abortTransaction(opCtx()),
+                       AssertionException,
+                       ErrorCodes::NotWritablePrimary);
 
     ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
               MODE_NONE);
@@ -1047,7 +1049,7 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitReleasesRSTL) {
     ASSERT_THROWS_CODE(
         txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, boost::none),
         AssertionException,
-        ErrorCodes::NotMaster);
+        ErrorCodes::NotWritablePrimary);
 
     ASSERT_EQ(opCtx()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
               MODE_NONE);
@@ -1105,7 +1107,7 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionIfNotPrimary) {
     ASSERT_THROWS_CODE(
         txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, true),
         AssertionException,
-        ErrorCodes::NotMaster);
+        ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(TxnParticipantTest, CannotStartRetryableWriteIfNotPrimary) {
@@ -1119,7 +1121,7 @@ TEST_F(TxnParticipantTest, CannotStartRetryableWriteIfNotPrimary) {
     ASSERT_THROWS_CODE(
         txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), boost::none, true),
         AssertionException,
-        ErrorCodes::NotMaster);
+        ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(TxnParticipantTest, CannotContinueTransactionIfNotPrimary) {
@@ -1136,7 +1138,7 @@ TEST_F(TxnParticipantTest, CannotContinueTransactionIfNotPrimary) {
     ASSERT_THROWS_CODE(
         txnParticipant.beginOrContinue(opCtx(), *opCtx()->getTxnNumber(), false, false),
         AssertionException,
-        ErrorCodes::NotMaster);
+        ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(TxnParticipantTest, OlderTransactionFailsOnSessionWithNewerTransaction) {

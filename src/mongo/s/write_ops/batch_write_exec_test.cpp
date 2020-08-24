@@ -1069,7 +1069,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
     request.setWriteConcern(BSONObj());
 
     BatchedCommandResponse retryableErrResponse;
-    retryableErrResponse.setStatus({ErrorCodes::NotMaster, "mock retryable error"});
+    retryableErrResponse.setStatus({ErrorCodes::NotWritablePrimary, "mock retryable error"});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
@@ -1111,7 +1111,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorTxnNumber) {
     operationContext()->setTxnNumber(5);
 
     BatchedCommandResponse retryableErrResponse;
-    retryableErrResponse.setStatus({ErrorCodes::NotMaster, "mock retryable error"});
+    retryableErrResponse.setStatus({ErrorCodes::NotWritablePrimary, "mock retryable error"});
 
     auto future = launchAsync([&] {
         BatchedCommandResponse response;

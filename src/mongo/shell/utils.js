@@ -95,7 +95,7 @@ function isRetryableError(error) {
         "HostNotFound",
         "NetworkTimeout",
         "SocketException",
-        "NotMaster",
+        "NotWritablePrimary",
         "NotMasterNoSlaveOk",
         "NotMasterOrSecondary",
         "PrimarySteppedDown",

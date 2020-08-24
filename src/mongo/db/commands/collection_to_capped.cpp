@@ -116,7 +116,7 @@ public:
 
         NamespaceString nss(dbname, to);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
-            uasserted(ErrorCodes::NotMaster,
+            uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while cloning collection " << from << " to "
                                     << to << " (as capped)");
         }

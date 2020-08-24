@@ -52,7 +52,7 @@ const dbName = "test";
 const collName = "auto_retry";
 
 // The override requires the connection to be run under a session. Use the replica set URL to
-// allow automatic re-targeting of the primary on NotMaster errors.
+// allow automatic re-targeting of the primary on NotWritablePrimary errors.
 const db = new Mongo(rst.getURL()).startSession({retryWrites: true}).getDatabase(dbName);
 
 // Commands with no disconnections should work as normal.
