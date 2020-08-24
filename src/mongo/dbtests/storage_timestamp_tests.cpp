@@ -3475,7 +3475,8 @@ public:
         const auto clusterTime = currentTime.clusterTime();
         firstOplogEntryTs = clusterTime.addTicks(1).asTimestamp();
         prepareEntryTs = clusterTime.addTicks(2).asTimestamp();
-        commitEntryTs = clusterTime.addTicks(3).asTimestamp();
+        commitTs = clusterTime.addTicks(3).asTimestamp();
+        commitEntryTs = clusterTime.addTicks(4).asTimestamp();
     }
 
     void run() {
@@ -3570,7 +3571,7 @@ public:
 
         {
             FailPointEnableBlock failPointBlock("skipCommitTxnCheckPrepareMajorityCommitted");
-            txnParticipant.commitPreparedTransaction(_opCtx, commitEntryTs, {});
+            txnParticipant.commitPreparedTransaction(_opCtx, commitTs, {});
         }
 
         txnParticipant.stashTransactionResources(_opCtx);
@@ -3657,7 +3658,7 @@ public:
     }
 
 protected:
-    Timestamp firstOplogEntryTs, secondOplogEntryTs, prepareEntryTs;
+    Timestamp firstOplogEntryTs, secondOplogEntryTs, prepareEntryTs, commitTs;
 
 private:
     MultiOplogScopedSettings multiOplogSettings;
@@ -3780,7 +3781,8 @@ public:
         const auto currentTime = _clock->getTime();
         const auto clusterTime = currentTime.clusterTime();
         const auto prepareTs = clusterTime.addTicks(1).asTimestamp();
-        commitEntryTs = clusterTime.addTicks(2).asTimestamp();
+        const auto commitTs = clusterTime.addTicks(2).asTimestamp();
+        commitEntryTs = clusterTime.addTicks(3).asTimestamp();
         LOGV2(22514, "Prepare TS: {prepareTs}", "prepareTs"_attr = prepareTs);
         logTimestamps();
 
@@ -3832,7 +3834,7 @@ public:
 
         {
             FailPointEnableBlock failPointBlock("skipCommitTxnCheckPrepareMajorityCommitted");
-            txnParticipant.commitPreparedTransaction(_opCtx, commitEntryTs, {});
+            txnParticipant.commitPreparedTransaction(_opCtx, commitTs, {});
         }
 
         assertNoStartOpTime();

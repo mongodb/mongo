@@ -64,6 +64,7 @@
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant_gen.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_with_sampling.h"
@@ -1392,11 +1393,16 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         OplogSlot commitOplogSlot;
         boost::optional<OplogSlotReserver> oplogSlotReserver;
 
-        // On primary, we reserve an oplog slot before committing the transaction so that no
-        // writes that are causally related to the transaction commit enter the oplog at a
-        // timestamp earlier than the commit oplog entry.
         if (opCtx->writesAreReplicated()) {
             invariant(!commitOplogEntryOpTime);
+            // When this receiving node is not in a readable state, the cluster time gossiping
+            // protocol is not enabled, thus it is necessary to advance it explicitely,
+            // so that causal consistency is maintained in these situations.
+            VectorClockMutable::get(opCtx)->tickClusterTimeTo(LogicalTime(commitTimestamp));
+
+            // On primary, we reserve an oplog slot before committing the transaction so that no
+            // writes that are causally related to the transaction commit enter the oplog at a
+            // timestamp earlier than the commit oplog entry.
             oplogSlotReserver.emplace(opCtx);
             commitOplogSlot = oplogSlotReserver->getLastSlot();
             invariant(commitOplogSlot.getTimestamp() >= commitTimestamp,
