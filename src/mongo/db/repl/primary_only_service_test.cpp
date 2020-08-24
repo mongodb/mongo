@@ -412,17 +412,18 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstanceOnStepUp) {
     stepDown();
 
     TestServiceHangDuringStateTwo.setMode(FailPoint::off);
-    auto completionFPTimesEntered = TestServiceHangDuringCompletion.setMode(FailPoint::alwaysOn);
+    // Cannot use TestServiceHangDuringCompletion FP as at that point the Instance has deleted its
+    // state document and been removed from the service's registry.
+    stateOneFPTimesEntered = TestServiceHangDuringStateOne.setMode(FailPoint::alwaysOn);
 
     stepUp();
 
     recreatedInstance = TestService::Instance::lookup(_service, BSON("_id" << 0)).get();
     ASSERT_EQ(TestService::State::kTwo, recreatedInstance->getInitialState());
-    TestServiceHangDuringCompletion.waitForTimesEntered(++completionFPTimesEntered);
-    ASSERT_EQ(TestService::State::kDone, recreatedInstance->getState());
-
-    TestServiceHangDuringCompletion.setMode(FailPoint::off);
+    TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
+    TestServiceHangDuringStateOne.setMode(FailPoint::off);
     recreatedInstance->waitForCompletion();
+    ASSERT_EQ(TestService::State::kDone, recreatedInstance->getState());
 
     auto nonExistentInstance = TestService::Instance::lookup(_service, BSON("_id" << 0));
     ASSERT(!nonExistentInstance.is_initialized());
