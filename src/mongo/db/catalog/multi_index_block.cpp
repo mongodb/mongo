@@ -845,7 +845,10 @@ boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(Operation
     auto action = TemporaryRecordStore::FinalizationAction::kDelete;
     boost::optional<ResumeIndexInfo> resumeInfo;
 
-    if (_isResumable(opCtx)) {
+    if (isResumable) {
+        invariant(_buildUUID);
+        invariant(_method == IndexBuildMethod::kHybrid);
+
         if (shutdown) {
             _writeStateToDisk(opCtx);
 
@@ -865,11 +868,6 @@ boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(Operation
     _buildIsCleanedUp = true;
 
     return resumeInfo;
-}
-
-bool MultiIndexBlock::_isResumable(OperationContext* opCtx) const {
-    return _buildUUID && !_buildIsCleanedUp && _method == IndexBuildMethod::kHybrid &&
-        opCtx->getServiceContext()->getStorageEngine()->supportsResumableIndexBuilds();
 }
 
 void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) const {

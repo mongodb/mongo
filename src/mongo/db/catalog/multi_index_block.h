@@ -319,8 +319,6 @@ private:
                                                           bool shutdown,
                                                           bool isResumable);
 
-    bool _isResumable(OperationContext* opCtx) const;
-
     void _writeStateToDisk(OperationContext* opCtx) const;
 
     BSONObj _constructStateObject() const;
