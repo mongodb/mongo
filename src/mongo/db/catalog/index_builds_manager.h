@@ -164,7 +164,8 @@ public:
      */
     bool abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
                                                   Collection* collection,
-                                                  const UUID& buildUUID);
+                                                  const UUID& buildUUID,
+                                                  bool isResumable);
 
     /**
      * The same as abortIndexBuildWithoutCleanupForRollback above, but additionally writes the
@@ -173,7 +174,8 @@ public:
      */
     bool abortIndexBuildWithoutCleanupForShutdown(OperationContext* opCtx,
                                                   Collection* collection,
-                                                  const UUID& buildUUID);
+                                                  const UUID& buildUUID,
+                                                  bool isResumable);
 
     /**
      * Returns true if the index build supports background writes while building an index. This is

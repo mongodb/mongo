@@ -1333,8 +1333,9 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
         case IndexBuildAction::kRollbackAbort: {
             invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
             invariant(replCoord->getMemberState().rollback());
+            auto isResumable = !replState->lastOpTimeBeforeInterceptors.isNull();
             _indexBuildsManager.abortIndexBuildWithoutCleanupForRollback(
-                opCtx, coll, replState->buildUUID);
+                opCtx, coll, replState->buildUUID, isResumable);
             break;
         }
         case IndexBuildAction::kNoAction:
@@ -1367,8 +1368,9 @@ void IndexBuildsCoordinator::_completeAbortForShutdown(
     std::shared_ptr<ReplIndexBuildState> replState,
     Collection* collection) {
     // Leave it as-if kill -9 happened. Startup recovery will restart the index build.
+    auto isResumable = !replState->lastOpTimeBeforeInterceptors.isNull();
     _indexBuildsManager.abortIndexBuildWithoutCleanupForShutdown(
-        opCtx, collection, replState->buildUUID);
+        opCtx, collection, replState->buildUUID, isResumable);
 
     {
         // Promise should be set at least once before it's getting destroyed.

@@ -147,7 +147,8 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
         operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(), {}, {}));
-    indexer->abortWithoutCleanupForRollback(operationContext());
+    auto isResumable = false;
+    indexer->abortWithoutCleanupForRollback(operationContext(), isResumable);
 }
 
 TEST_F(MultiIndexBlockTest, InitWriteConflictException) {

@@ -332,7 +332,8 @@ bool IndexBuildsManager::abortIndexBuild(OperationContext* opCtx,
 
 bool IndexBuildsManager::abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
                                                                   Collection* collection,
-                                                                  const UUID& buildUUID) {
+                                                                  const UUID& buildUUID,
+                                                                  bool isResumable) {
     auto builder = _getBuilder(buildUUID);
     if (!builder.isOK()) {
         return false;
@@ -343,7 +344,7 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanupForRollback(OperationConte
           "Index build aborted without cleanup for rollback",
           "buildUUID"_attr = buildUUID);
 
-    if (auto resumeInfo = builder.getValue()->abortWithoutCleanupForRollback(opCtx)) {
+    if (auto resumeInfo = builder.getValue()->abortWithoutCleanupForRollback(opCtx, isResumable)) {
         _resumeInfos.push_back(std::move(*resumeInfo));
     }
 
@@ -352,7 +353,8 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanupForRollback(OperationConte
 
 bool IndexBuildsManager::abortIndexBuildWithoutCleanupForShutdown(OperationContext* opCtx,
                                                                   Collection* collection,
-                                                                  const UUID& buildUUID) {
+                                                                  const UUID& buildUUID,
+                                                                  bool isResumable) {
     auto builder = _getBuilder(buildUUID);
     if (!builder.isOK()) {
         return false;
@@ -361,7 +363,7 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanupForShutdown(OperationConte
     LOGV2(
         4841500, "Index build aborted without cleanup for shutdown", "buildUUID"_attr = buildUUID);
 
-    builder.getValue()->abortWithoutCleanupForShutdown(opCtx);
+    builder.getValue()->abortWithoutCleanupForShutdown(opCtx, isResumable);
     return true;
 }
 

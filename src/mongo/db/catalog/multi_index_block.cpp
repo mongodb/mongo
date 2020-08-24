@@ -749,12 +749,12 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
 }
 
 boost::optional<ResumeIndexInfo> MultiIndexBlock::abortWithoutCleanupForRollback(
-    OperationContext* opCtx) {
-    return _abortWithoutCleanup(opCtx, false /* shutdown */);
+    OperationContext* opCtx, bool isResumable) {
+    return _abortWithoutCleanup(opCtx, false /* shutdown */, isResumable);
 }
 
-void MultiIndexBlock::abortWithoutCleanupForShutdown(OperationContext* opCtx) {
-    _abortWithoutCleanup(opCtx, true /* shutdown */);
+void MultiIndexBlock::abortWithoutCleanupForShutdown(OperationContext* opCtx, bool isResumable) {
+    _abortWithoutCleanup(opCtx, true /* shutdown */, isResumable);
 }
 
 MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn = [](const BSONObj& spec) {};
@@ -831,7 +831,8 @@ void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {
 }
 
 boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(OperationContext* opCtx,
-                                                                       bool shutdown) {
+                                                                       bool shutdown,
+                                                                       bool isResumable) {
     invariant(!_buildIsCleanedUp);
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     // Lock if it's not already locked, to ensure storage engine cannot be destructed out from

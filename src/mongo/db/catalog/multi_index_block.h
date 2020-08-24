@@ -276,7 +276,8 @@ public:
      *
      * This should only be used during rollback.
      */
-    boost::optional<ResumeIndexInfo> abortWithoutCleanupForRollback(OperationContext* opCtx);
+    boost::optional<ResumeIndexInfo> abortWithoutCleanupForRollback(OperationContext* opCtx,
+                                                                    bool isResumable);
 
     /**
      * May be called at any time after construction but before a successful commit(). Suppresses
@@ -287,7 +288,7 @@ public:
      *
      * This should only be used during shutdown.
      */
-    void abortWithoutCleanupForShutdown(OperationContext* opCtx);
+    void abortWithoutCleanupForShutdown(OperationContext* opCtx, bool isResumable);
 
     /**
      * Returns true if this build block supports background writes while building an index. This is
@@ -310,11 +311,13 @@ private:
 
     /**
      * This function should be used for shutdown and rollback. When called for shutdown, writes the
-     * resumable index build state to disk if resuamble index builds are supported. When called for
-     * rollback, returns the information to resume the index build if resuamble index builds are
+     * resumable index build state to disk if resumable index builds are supported. When called for
+     * rollback, returns the information to resume the index build if resumable index builds are
      * supported.
      */
-    boost::optional<ResumeIndexInfo> _abortWithoutCleanup(OperationContext* opCtx, bool shutdown);
+    boost::optional<ResumeIndexInfo> _abortWithoutCleanup(OperationContext* opCtx,
+                                                          bool shutdown,
+                                                          bool isResumable);
 
     bool _isResumable(OperationContext* opCtx) const;
 
