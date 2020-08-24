@@ -313,6 +313,10 @@ public:
                     isStandaloneWithEmptyTransactionsTable);
         }
 
+        // Ensure that this operation will be killed by the RstlKillOpThread during step-up or
+        // stepdown.
+        opCtx->setAlwaysInterruptAtStepDownOrUp();
+
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
         invariant(!opCtx->lockState()->isLocked());
         Lock::ExclusiveLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);

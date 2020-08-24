@@ -360,6 +360,22 @@ public:
     bool isIgnoringInterrupts() const;
 
     /**
+     * Sets that this operation should always get killed during stepDown and stepUp, regardless of
+     * whether or not it's taken a write lock.
+     */
+    void setAlwaysInterruptAtStepDownOrUp() {
+        _alwaysInterruptAtStepDownOrUp.store(true);
+    }
+
+    /**
+     * Indicates that this operation should always get killed during stepDown and stepUp, regardless
+     * of whether or not it's taken a write lock.
+     */
+    bool shouldAlwaysInterruptAtStepDownOrUp() {
+        return _alwaysInterruptAtStepDownOrUp.load();
+    }
+
+    /**
      * Clears metadata associated with a multi-document transaction.
      */
     void resetMultiDocumentTransactionState() {
@@ -515,6 +531,10 @@ private:
     bool _writesAreReplicated = true;
     bool _shouldParticipateInFlowControl = true;
     bool _inMultiDocumentTransaction = false;
+
+    // If true, this OpCtx will get interrupted during replica set stepUp and stepDown, regardless
+    // of what locks it's taken.
+    AtomicWord<bool> _alwaysInterruptAtStepDownOrUp{false};
 };
 
 namespace repl {
