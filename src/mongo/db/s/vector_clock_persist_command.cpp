@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock_mutable.h"
 
 namespace mongo {
@@ -61,6 +62,9 @@ public:
              const std::string& dbname_unused,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        auto const shardingState = ShardingState::get(opCtx);
+        uassertStatusOK(shardingState->canAcceptShardedCommands());
+
         VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
 
         return true;
