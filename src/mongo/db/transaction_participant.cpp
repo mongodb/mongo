@@ -816,6 +816,10 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     readConcernArgs = _readConcernArgs;
 }
 
+void TransactionParticipant::TxnResources::setNoEvictionAfterRollback() {
+    _recoveryUnit->setNoEvictionAfterRollback();
+}
+
 TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationContext* opCtx)
     : _opCtx(opCtx) {
     // Do nothing if we are already in a SideTransactionBlock. We can tell we are already in a
@@ -1658,6 +1662,9 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
                                                      : TransactionState::kAbortedWithoutPrepare;
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
+    if (o().txnResourceStash && opCtx->recoveryUnit()->getNoEvictionAfterRollback()) {
+        o(lk).txnResourceStash->setNoEvictionAfterRollback();
+    }
     _resetTransactionState(lk, nextState);
 }
 

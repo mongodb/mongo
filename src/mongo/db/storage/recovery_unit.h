@@ -507,8 +507,18 @@ public:
 
     virtual void setOrderedCommit(bool orderedCommit) = 0;
 
+    void setNoEvictionAfterRollback() {
+        _noEvictionAfterRollback = true;
+    }
+
+    bool getNoEvictionAfterRollback() const {
+        return _noEvictionAfterRollback;
+    }
+
 protected:
     RecoveryUnit() {}
+
+    bool _noEvictionAfterRollback = false;
 };
 
 }  // namespace mongo
