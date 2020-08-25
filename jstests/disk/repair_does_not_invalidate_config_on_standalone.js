@@ -21,6 +21,8 @@ const port = mongod.port;
 let testColl = mongod.getDB(dbName)[collName];
 
 assert.commandWorked(testColl.insert({_id: 0, foo: "bar"}));
+// SERVER-50534: Also verify that running --repair with a view doesn't crash.
+assert.commandWorked(mongod.getDB(dbName).createView("viewName", collName, []));
 
 let collUri = getUriForColl(testColl);
 let collFile = dbpath + "/" + collUri + ".wt";

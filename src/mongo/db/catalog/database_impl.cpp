@@ -179,20 +179,24 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
             collection->init(opCtx);
     }
 
-    // At construction time of the viewCatalog, the CollectionCatalog map wasn't initialized yet,
-    // so no system.views collection would be found. Now that we're sufficiently initialized, reload
-    // the viewCatalog to populate its in-memory state. If there are problems with the catalog
-    // contents as might be caused by incorrect mongod versions or similar, they are found right
-    // away.
-    auto views = ViewCatalog::get(this);
-    Status reloadStatus = views->reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
-    if (!reloadStatus.isOK()) {
-        LOGV2_WARNING_OPTIONS(20326,
-                              {logv2::LogTag::kStartupWarnings},
-                              "Unable to parse views; remove any invalid views "
-                              "from the collection to restore server functionality",
-                              "error"_attr = redact(reloadStatus),
-                              "namespace"_attr = _viewsName);
+    // When in repair mode, record stores are not loaded. Thus the ViewsCatalog cannot be reloaded.
+    if (!storageGlobalParams.repair) {
+        // At construction time of the viewCatalog, the CollectionCatalog map wasn't initialized
+        // yet, so no system.views collection would be found. Now that we're sufficiently
+        // initialized, reload the viewCatalog to populate its in-memory state. If there are
+        // problems with the catalog contents as might be caused by incorrect mongod versions or
+        // similar, they are found right away.
+        auto views = ViewCatalog::get(this);
+        Status reloadStatus =
+            views->reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
+        if (!reloadStatus.isOK()) {
+            LOGV2_WARNING_OPTIONS(20326,
+                                  {logv2::LogTag::kStartupWarnings},
+                                  "Unable to parse views; remove any invalid views "
+                                  "from the collection to restore server functionality",
+                                  "error"_attr = redact(reloadStatus),
+                                  "namespace"_attr = _viewsName);
+        }
     }
 }
 
