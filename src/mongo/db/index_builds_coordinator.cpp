@@ -413,6 +413,28 @@ bool isIndexBuildResumable(OperationContext* opCtx,
         return false;
     }
 
+    // IndexBuildsOptions::commitQuorum will be set if we are primary. Otherwise, we have to check
+    // the config.system.indexBuilds collection.
+    if (indexBuildOptions.commitQuorum) {
+        if (indexBuildOptions.commitQuorum->numNodes == CommitQuorumOptions::kDisabled) {
+            return false;
+        }
+    } else {
+        auto swCommitQuorum = indexbuildentryhelpers::getCommitQuorum(opCtx, replState.buildUUID);
+        if (!swCommitQuorum.isOK()) {
+            LOGV2(5044600,
+                  "Index build: cannot read commit quorum from config db. "
+                  "Index build will not be resumable.",
+                  "buildUUID"_attr = replState.buildUUID,
+                  "error"_attr = swCommitQuorum.getStatus());
+            return false;
+        }
+        auto commitQuorum = swCommitQuorum.getValue();
+        if (commitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
+            return false;
+        }
+    }
+
     return true;
 }
 
