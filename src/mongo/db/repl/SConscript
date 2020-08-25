@@ -1535,6 +1535,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/util/clock_source_mock',
+        'repl_server_parameters',
         'replmocks',
         'initial_sync_cloners',
         'repl_sync_shared_data',

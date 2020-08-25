@@ -75,6 +75,7 @@ TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
       _sourceNss(sourceNss),
       _collectionOptions(collectionOptions),
       _sourceDbAndUuid(NamespaceString("UNINITIALIZED")),
+      _collectionClonerBatchSize(collectionClonerBatchSize),
       _countStage("count", this, &TenantCollectionCloner::countStage),
       _listIndexesStage("listIndexes", this, &TenantCollectionCloner::listIndexesStage),
       _createCollectionStage(
