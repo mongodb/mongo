@@ -221,6 +221,8 @@ public:
             return _readConcernArgs;
         }
 
+        void setNoEvictionAfterRollback();
+
     private:
         bool _released = false;
         std::unique_ptr<Locker> _locker;
