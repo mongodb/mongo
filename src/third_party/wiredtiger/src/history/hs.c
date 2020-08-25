@@ -1172,7 +1172,7 @@ __wt_hs_cursor_search_near(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int *exa
  */
 int
 __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_format, uint64_t recno,
-  WT_UPDATE_VALUE *upd_value, bool allow_prepare, WT_ITEM *on_disk_buf)
+  WT_UPDATE_VALUE *upd_value, bool allow_prepare, WT_ITEM *on_disk_buf, WT_TIME_WINDOW *on_disk_tw)
 {
     WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE *hs_cbt;
@@ -1347,6 +1347,21 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
             WT_ERR(__wt_compare(session, NULL, &hs_key, key, &cmp));
 
             if (cmp != 0) {
+                /* Fallback to the onpage value as the base value. */
+                orig_hs_value_buf = hs_value;
+                hs_value = on_disk_buf;
+                upd_type = WT_UPDATE_STANDARD;
+                break;
+            }
+
+            /*
+             * If we find a history store record that either corresponds to the on-disk value or is
+             * newer than it then we should use the on-disk value as the base value and apply our
+             * modifies on top of it.
+             */
+            if (on_disk_tw->start_ts < hs_start_ts_tmp ||
+              (on_disk_tw->start_ts == hs_start_ts_tmp &&
+                on_disk_tw->start_txn <= hs_cbt->upd_value->tw.start_txn)) {
                 /* Fallback to the onpage value as the base value. */
                 orig_hs_value_buf = hs_value;
                 hs_value = on_disk_buf;

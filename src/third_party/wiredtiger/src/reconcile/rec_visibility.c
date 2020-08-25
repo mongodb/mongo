@@ -286,9 +286,15 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
          * a concurrent transaction commits or rolls back while we are examining its updates. This
          * check is not required for history store updates as they are implicitly committed. As
          * prepared transaction IDs are globally visible, need to check the update state as well.
+         *
+         * If an earlier reconciliation chose this update (it is marked as being destined for the
+         * data store), we should select it regardless of visibility if we haven't already selected
+         * one. This is important as it is never ok to shift the on-disk value backwards in the
+         * update chain.
          */
-        if (!is_hs_page && (F_ISSET(r, WT_REC_VISIBLE_ALL) ? WT_TXNID_LE(r->last_running, txnid) :
-                                                             !__txn_visible_id(session, txnid))) {
+        if (!F_ISSET(upd, WT_UPDATE_DS) && !is_hs_page &&
+          (F_ISSET(r, WT_REC_VISIBLE_ALL) ? WT_TXNID_LE(r->last_running, txnid) :
+                                            !__txn_visible_id(session, txnid))) {
             /*
              * Rare case: when applications run at low isolation levels, eviction may see a
              * committed update followed by uncommitted updates. Give up in that case because we
@@ -521,6 +527,15 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
           upd_select->upd != NULL && upd_select->upd->type == WT_UPDATE_TOMBSTONE ? NULL :
                                                                                     upd_select->upd,
           supd_restore, upd_memsize));
+        /*
+         * Mark the selected update (and potentially the tombstone preceding it) as being destined
+         * for the data store. Subsequent reconciliations should know that they can select this
+         * update regardless of visibility.
+         */
+        if (upd_select->upd != NULL)
+            F_SET(upd_select->upd, WT_UPDATE_DS);
+        if (tombstone != NULL)
+            F_SET(tombstone, WT_UPDATE_DS);
         upd_saved = upd_select->upd_saved = true;
     }
 
