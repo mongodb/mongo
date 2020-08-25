@@ -36,6 +36,8 @@ ResumableIndexBuildTest.run(rst,
                             {a: 1},
                             "hangIndexBuildDuringDrainWritesPhase",
                             {iteration: 0},
+                            "drain writes",
+                            {skippedPhaseLogID: 20392},
                             [{a: 2}, {a: 3}],
                             [{a: 4}, {a: 5}]);
 ResumableIndexBuildTest.run(rst,
@@ -44,6 +46,8 @@ ResumableIndexBuildTest.run(rst,
                             {a: 1},
                             "hangIndexBuildDuringDrainWritesPhase",
                             {iteration: 1},
+                            "drain writes",
+                            {skippedPhaseLogID: 20392},
                             [{a: 6}, {a: 7}],
                             [{a: 8}, {a: 9}]);
 

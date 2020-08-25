@@ -1548,7 +1548,8 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
               logAttrs(nss.get()),
               "collectionUUID"_attr = collUUID,
               "buildUUID"_attr = buildUUID,
-              "specs"_attr = indexSpecs);
+              "specs"_attr = indexSpecs,
+              "phase"_attr = IndexBuildPhase_serializer(resumeInfo.getPhase()));
 
         try {
             // This spawns a new thread and returns immediately. These index builds will resume and

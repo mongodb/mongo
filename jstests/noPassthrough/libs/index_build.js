@@ -271,7 +271,8 @@ const ResumableIndexBuildTest = class {
 
     /**
      * Restarts the given node, ensuring that the the index build with name indexName has its state
-     * written to disk upon shutdown and is completed upon startup.
+     * written to disk upon shutdown and is completed upon startup. Returns the buildUUID of the
+     * index build that was interrupted for shutdown.
      */
     static restart(rst,
                    conn,
@@ -324,16 +325,21 @@ const ResumableIndexBuildTest = class {
         // Ensure that the resumable index build state was written to disk upon clean shutdown.
         assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput()));
 
-        const setParameter = failPointAfterStartup ? {
-            ["failpoint." + failPointAfterStartup]: tojson({mode: "alwaysOn"}),
+        const setParameter = {logComponentVerbosity: tojson({index: 1})};
+        if (failPointAfterStartup) {
+            Object.extend(setParameter, {
+                ["failpoint." + failPointAfterStartup]: tojson({mode: "alwaysOn"}),
+            });
         }
-                                                   : {};
+
         rst.start(conn, {noCleanData: true, setParameter: setParameter});
 
         if (shouldComplete) {
             // Ensure that the index build was completed upon the node starting back up.
             ResumableIndexBuildTest.assertCompleted(conn, coll, buildUUID, 2, ["_id_", indexName]);
         }
+
+        return buildUUID;
     }
 
     /**
@@ -368,6 +374,8 @@ const ResumableIndexBuildTest = class {
                indexSpec,
                failPointName,
                failPointData,
+               expectedResumePhase,
+               {numScannedAferResume, skippedPhaseLogID},
                sideWrites = [],
                postIndexBuildInserts = []) {
         const primary = rst.getPrimary();
@@ -387,10 +395,41 @@ const ResumableIndexBuildTest = class {
                     ErrorCodes.InterruptedDueToReplStateChange);
             }, coll, indexSpec, indexName, sideWrites, {hangBeforeBuildingIndex: true});
 
-        ResumableIndexBuildTest.restart(
+        const buildUUID = ResumableIndexBuildTest.restart(
             rst, primary, coll, indexName, failPointName, failPointData);
 
         awaitCreateIndex();
+
+        // Ensure that the resume info contains the correct phase to resume from.
+        checkLog.containsJson(primary, 4841700, {
+            buildUUID: function(uuid) {
+                return uuid["uuid"]["$uuid"] === buildUUID;
+            },
+            phase: expectedResumePhase
+        });
+
+        if (numScannedAferResume) {
+            // Ensure that the resumed index build resumed the collection scan from the correct
+            // location.
+            checkLog.containsJson(primary, 20391, {
+                buildUUID: function(uuid) {
+                    return uuid["uuid"]["$uuid"] === buildUUID;
+                },
+                totalRecords: numScannedAferResume
+            });
+        }
+
+        if (skippedPhaseLogID) {
+            // Ensure that the resumed index build does not perform a phase that it already
+            // completed before being interrupted for shutdown.
+            assert(!checkLog.checkContainsOnceJson(primary, skippedPhaseLogID, {
+                buildUUID: function(uuid) {
+                    return uuid["uuid"]["$uuid"] === buildUUID;
+                }
+            }),
+                   "Found log " + skippedPhaseLogID + " for index build " + buildUUID +
+                       " when this phase should not have run after resuming");
+        }
 
         ResumableIndexBuildTest.checkIndexes(
             rst, dbName, collName, indexName, postIndexBuildInserts);
@@ -499,21 +538,15 @@ const ResumableIndexBuildTest = class {
 
         resumeNodeFp.wait();
 
-        const buildUUID = extractUUIDFromObject(
-            IndexBuildTest
-                .assertIndexes(
-                    resumeNodeColl, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName]
-                .buildUUID);
-
         // We should only check that the index build completes after a restart if the index build is
         // not paused on the primary.
-        ResumableIndexBuildTest.restart(rst,
-                                        resumeNode,
-                                        resumeNodeColl,
-                                        indexName,
-                                        resumeNodeFailPointName,
-                                        resumeNodeFailPointData,
-                                        !primaryFp /* shouldComplete */);
+        const buildUUID = ResumableIndexBuildTest.restart(rst,
+                                                          resumeNode,
+                                                          resumeNodeColl,
+                                                          indexName,
+                                                          resumeNodeFailPointName,
+                                                          resumeNodeFailPointData,
+                                                          !primaryFp /* shouldComplete */);
 
         if (primaryFp) {
             primaryFp.off();
@@ -562,19 +595,14 @@ const ResumableIndexBuildTest = class {
                     ErrorCodes.InterruptedDueToReplStateChange);
             }, coll, indexSpec, indexName, sideWrites, {hangBeforeBuildingIndex: true});
 
-        const buildUUID = extractUUIDFromObject(
-            IndexBuildTest
-                .assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName]
-                .buildUUID);
-
-        ResumableIndexBuildTest.restart(rst,
-                                        primary,
-                                        coll,
-                                        indexName,
-                                        "hangIndexBuildDuringBulkLoadPhase",
-                                        {iteration: 0},
-                                        false /* shouldComplete */,
-                                        failpointAfterStartup);
+        const buildUUID = ResumableIndexBuildTest.restart(rst,
+                                                          primary,
+                                                          coll,
+                                                          indexName,
+                                                          "hangIndexBuildDuringBulkLoadPhase",
+                                                          {iteration: 0},
+                                                          false /* shouldComplete */,
+                                                          failpointAfterStartup);
 
         awaitCreateIndex();
 

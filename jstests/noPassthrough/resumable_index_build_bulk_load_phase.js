@@ -23,8 +23,14 @@ rst.initiate();
 const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName());
 assert.commandWorked(coll.insert([{a: 1}, {a: 2}]));
 
-ResumableIndexBuildTest.run(rst, dbName, coll.getName(), {a: 1}, failPointName, {iteration: 0});
-ResumableIndexBuildTest.run(rst, dbName, coll.getName(), {a: 1}, failPointName, {iteration: 1});
+ResumableIndexBuildTest.run(
+    rst, dbName, coll.getName(), {a: 1}, failPointName, {iteration: 0}, "bulk load", {
+        skippedPhaseLogID: 20391
+    });
+ResumableIndexBuildTest.run(
+    rst, dbName, coll.getName(), {a: 1}, failPointName, {iteration: 1}, "bulk load", {
+        skippedPhaseLogID: 20391
+    });
 
 rst.stopSet();
 })();

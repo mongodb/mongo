@@ -22,7 +22,9 @@ rst.initiate();
 const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName());
 assert.commandWorked(coll.insert({a: 1}));
 
-ResumableIndexBuildTest.run(rst, dbName, coll.getName(), {a: 1}, failPointName, {});
+ResumableIndexBuildTest.run(rst, dbName, coll.getName(), {a: 1}, failPointName, {}, "initialized", {
+    numScannedAferResume: 1
+});
 
 rst.stopSet();
 })();

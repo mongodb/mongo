@@ -630,11 +630,11 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
             ? !_indexes[i].block->getEntry()->descriptor()->unique()
             : _indexes[i].options.dupsAllowed;
         IndexCatalogEntry* entry = _indexes[i].block->getEntry();
-        LOGV2_DEBUG(
-            20392,
-            1,
-            "index build: inserting from external sorter into index: {entry_descriptor_indexName}",
-            "entry_descriptor_indexName"_attr = entry->descriptor()->indexName());
+        LOGV2_DEBUG(20392,
+                    1,
+                    "Index build: inserting from external sorter into index",
+                    "index"_attr = entry->descriptor()->indexName(),
+                    "buildUUID"_attr = _buildUUID);
 
         // SERVER-41918 This call to commitBulk() results in file I/O that may result in an
         // exception.
