@@ -215,6 +215,11 @@ public:
  */
 class RandomAccessOplogBuffer : public OplogBuffer {
 public:
+    enum SeekStrategy {
+        kInexact = 0,
+        kExact = 1,
+    };
+
     /**
      * Retrieves an oplog entry by timestamp. Returns ErrorCodes::NoSuchKey if no such entry is
      * found.  Does not change current position of oplog buffer.
@@ -228,7 +233,7 @@ public:
      */
     virtual Status seekToTimestamp(OperationContext* opCtx,
                                    const Timestamp& ts,
-                                   bool exact = true) = 0;
+                                   SeekStrategy exact = SeekStrategy::kExact) = 0;
 };
 
 }  // namespace repl

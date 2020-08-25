@@ -147,7 +147,9 @@ StatusWith<OplogBufferMock::Value> OplogBufferMock::findByTimestamp(OperationCon
             str::stream() << "No such timestamp in collection: " << ts.toString()};
 }
 
-Status OplogBufferMock::seekToTimestamp(OperationContext* opCtx, const Timestamp& ts, bool exact) {
+Status OplogBufferMock::seekToTimestamp(OperationContext* opCtx,
+                                        const Timestamp& ts,
+                                        SeekStrategy exact) {
     stdx::unique_lock<Latch> lk(_mutex);
     for (std::size_t i = 0; i < _data.size(); i++) {
         if (_data[i]["ts"].timestamp() == ts) {
@@ -158,7 +160,7 @@ Status OplogBufferMock::seekToTimestamp(OperationContext* opCtx, const Timestamp
             break;
         }
     }
-    if (!exact)
+    if (exact != SeekStrategy::kExact)
         return Status::OK();
     return {ErrorCodes::KeyNotFound, str::stream() << "Timestamp not found: " << ts.toString()};
 }

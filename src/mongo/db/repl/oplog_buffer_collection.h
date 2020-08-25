@@ -46,7 +46,7 @@ class StorageInterface;
  * Oplog buffer backed by a temporary collection. This collection is created in startup() and
  * removed in shutdown(). The documents will be popped and peeked in timestamp order.
  */
-class OplogBufferCollection : public OplogBuffer {
+class OplogBufferCollection : public RandomAccessOplogBuffer {
 public:
     /**
      * Structure used to configure an instance of OplogBufferCollection.
@@ -72,30 +72,16 @@ public:
 
     /**
      * Creates and returns a document suitable for storing in the collection together with the
-     * associated timestamp and sentinel count that determines the position of this document in the
-     * _id index.
+     * associated timestamp that determines the position of this document in the _id index.
      *
-     * If 'orig' is a valid oplog entry, the '_id' field of the returned BSONObj will be:
+     * The '_id' field of the returned BSONObj will be:
      * {
      *     ts: 'ts' field of the provided document,
-     *     s: 0
      * }
-     * The timestamp returned will be equal to as the 'ts' field in the BSONObj.
-     * Assumes there is a 'ts' field in the original document.
      *
-     * If 'orig' is an empty document (ie. we're inserting a sentinel value), the '_id' field will
-     * be generated based on the timestamp of the last document processed and the total number of
-     * sentinels with the same timestamp (including the document about to be inserted. For example,
-     * the first sentinel to be inserted after a valid oplog entry will have the following '_id'
-     * field:
-     * {
-     *     ts: 'ts' field of the last inserted valid oplog entry,
-     *     s: 1
-     * }
-     * The sentinel counter will be reset to 0 on inserting the next valid oplog entry.
+     * The oplog entry itself will be stored in the 'entry' field of the returned BSONObj.
      */
-    static std::tuple<BSONObj, Timestamp, std::size_t> addIdToDocument(
-        const BSONObj& orig, const Timestamp& lastTimestamp, std::size_t sentinelCount);
+    static std::tuple<BSONObj, Timestamp> addIdToDocument(const BSONObj& orig);
 
     explicit OplogBufferCollection(StorageInterface* storageInterface, Options options = Options());
     OplogBufferCollection(StorageInterface* storageInterface,
@@ -128,8 +114,15 @@ public:
     bool peek(OperationContext* opCtx, Value* value) override;
     boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const override;
 
+    // ---- Random access API ----
+    StatusWith<Value> findByTimestamp(OperationContext* opCtx, const Timestamp& ts) final;
+    // Note: once you use seekToTimestamp, calling getSize() is no longer legal.
+    Status seekToTimestamp(OperationContext* opCtx,
+                           const Timestamp& ts,
+                           SeekStrategy exact = SeekStrategy::kExact) final;
+
+
     // ---- Testing API ----
-    std::size_t getSentinelCount_forTest() const;
     Timestamp getLastPushedTimestamp_forTest() const;
     Timestamp getLastPoppedTimestamp_forTest() const;
     std::queue<BSONObj> getPeekCache_forTest() const;
@@ -166,6 +159,16 @@ private:
      */
     boost::optional<Value> _lastDocumentPushed_inlock(OperationContext* opCtx) const;
 
+    /**
+     * Returns the document with the given timestamp, or ErrorCodes::NoSuchKey if not found.
+     */
+    StatusWith<BSONObj> _getDocumentWithTimestamp(OperationContext* opCtx, const Timestamp& ts);
+
+    /**
+     * Returns the key for the document with the given timestamp.
+     */
+    static BSONObj _keyForTimestamp(const Timestamp& ts);
+
     // The namespace for the oplog buffer collection.
     const NamespaceString _nss;
 
@@ -185,9 +188,6 @@ private:
     // Size of documents in buffer.
     std::size_t _size = 0;
 
-    // Number of sentinel values inserted so far with the same timestamp as '_lastPoppedKey'.
-    std::size_t _sentinelCount = 0;
-
     Timestamp _lastPushedTimestamp;
 
     BSONObj _lastPoppedKey;
@@ -195,6 +195,10 @@ private:
     // Used by _peek_inlock() to hold results of the read ahead query that will be used for pop/peek
     // results.
     std::queue<BSONObj> _peekCache;
+
+    // Whether or not the size() method can be called.  This is set to false on seek, because
+    // we do not know how much we skipped when seeking.
+    bool _sizeIsValid = true;
 };
 
 }  // namespace repl
