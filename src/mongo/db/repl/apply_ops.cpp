@@ -260,7 +260,7 @@ Status _applyOps(OperationContext* opCtx,
                 result->append("codeName", ErrorCodes::errorString(ex.code()));
                 result->append("errmsg", ex.what());
                 result->append("results", ab.arr());
-                return Status(ex.code(), ex.what());
+                return ex.toStatus();
             }
         }
 
