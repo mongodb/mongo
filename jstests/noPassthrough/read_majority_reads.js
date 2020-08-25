@@ -11,7 +11,7 @@
  * Each operation is tested on a single node, and (if supported) through mongos on both sharded and
  * unsharded collections. Mongos doesn't directly handle readConcern majority, but these tests
  * should ensure that it correctly propagates the setting to the shards when running commands.
- * @tags: [requires_sharding, requires_majority_read_concern, resumable_index_build_incompatible]
+ * @tags: [requires_sharding, requires_majority_read_concern]
  */
 
 (function() {
@@ -123,7 +123,7 @@ function runTests(coll, mongodConnection) {
         assert.commandWorked(mongodConnection.adminCommand({"setCommittedSnapshot": snapshot}));
     }
 
-    assert.commandWorked(coll.createIndex({point: '2dsphere'}));
+    assert.commandWorked(coll.createIndex({point: '2dsphere'}, {}, 0));
     for (var testName in cursorTestCases) {
         jsTestLog('Running ' + testName + ' against ' + coll.toString());
         var getCursor = cursorTestCases[testName];
@@ -155,7 +155,7 @@ function runTests(coll, mongodConnection) {
         assert.eq(oldCursor.next().state, 'after');
     }
 
-    assert.commandWorked(coll.ensureIndex({point: 'geoHaystack', _id: 1}, {bucketSize: 1}));
+    assert.commandWorked(coll.createIndex({point: 'geoHaystack', _id: 1}, {bucketSize: 1}, 0));
     for (var testName in nonCursorTestCases) {
         jsTestLog('Running ' + testName + ' against ' + coll.toString());
         var getResult = nonCursorTestCases[testName].run;

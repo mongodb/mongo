@@ -11,7 +11,7 @@
  *
  * All of this requires support for committed reads, so this test will be skipped if the storage
  * engine does not support them.
- * @tags: [requires_majority_read_concern, resumable_index_build_incompatible]
+ * @tags: [requires_majority_read_concern]
  */
 
 load("jstests/libs/analyze_plan.js");
@@ -147,7 +147,7 @@ function testReadConcernLevel(level) {
 
     // Adding an index bumps the min snapshot for a collection as of SERVER-20260. This may
     // change to just filter that index out from query planning as part of SERVER-20439.
-    t.ensureIndex({version: 1});
+    t.createIndex({version: 1}, {}, 0);
     assertNoSnapshotAvailableForReadConcernLevel();
 
     // To use the index, a snapshot created after the index was completed must be marked
