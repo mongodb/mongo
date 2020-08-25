@@ -568,6 +568,7 @@ DB.prototype.help = function() {
         "\tdb.getWriteConcern() - returns the write concern used for any operations on this db, inherited from server object if set");
     print("\tdb.hostInfo() get details about the server's host");
     print("\tdb.isMaster() check replica primary status");
+    print("\tdb.hello() check replica primary status");
     print("\tdb.killOp(opid) kills the current operation in the db");
     print("\tdb.listCommands() lists all the db commands");
     print("\tdb.loadServerScripts() loads all the scripts in db.system.js");
@@ -898,6 +899,10 @@ DB.prototype.toString = function() {
 
 DB.prototype.isMaster = function() {
     return this.runCommand("isMaster");
+};
+
+DB.prototype.hello = function() {
+    return this.runCommand("hello");
 };
 
 var commandUnsupported = function(res) {
