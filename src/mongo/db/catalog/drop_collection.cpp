@@ -181,10 +181,6 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
         autoDb.emplace(opCtx, startingNss.db(), MODE_IX);
         collLock.emplace(opCtx, dbAndUUID, MODE_X);
 
-        // Serialize the drop with refreshes to prevent dropping a collection and creating the same
-        // nss as a view while refreshing.
-        CollectionShardingState::get(opCtx, startingNss)->checkShardVersionOrThrow(opCtx);
-
         // Abandon the snapshot as the index catalog will compare the in-memory state to the
         // disk state, which may have changed when we released the collection lock temporarily.
         opCtx->recoveryUnit()->abandonSnapshot();
@@ -209,6 +205,10 @@ Status _abortIndexBuildsAndDropCollection(OperationContext* opCtx,
     if (resolvedNss.isDropPendingNamespace()) {
         return Status::OK();
     }
+
+    // Serialize the drop with refreshes to prevent dropping a collection and creating the same
+    // nss as a view while refreshing.
+    CollectionShardingState::get(opCtx, resolvedNss)->checkShardVersionOrThrow(opCtx);
 
     WriteUnitOfWork wunit(opCtx);
 
