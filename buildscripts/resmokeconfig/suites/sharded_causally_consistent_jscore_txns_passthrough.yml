@@ -30,9 +30,6 @@ selector:
   # attached to statements in a transaction beyond the first one.
   - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
 
-    # TODO SERVER-46187: maxTimeMS doesn't work correctly for insert on mongos.
-  - jstests/core/txns/write_conflicts_with_non_txns.js
-
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - does_not_support_causal_consistency
