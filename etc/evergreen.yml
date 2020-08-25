@@ -5014,7 +5014,7 @@ tasks:
   name: aggregation_ese
   tags: ["aggregation", "encrypt"]
   depends_on:
-  - name: jsCore
+  - name: aggregation
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5025,7 +5025,7 @@ tasks:
   name: aggregation_ese_gcm
   tags: ["aggregation", "encrypt", "gcm"]
   depends_on:
-  - name: jsCore
+  - name: aggregation
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5736,6 +5736,8 @@ tasks:
 - <<: *task_template
   name: jsCore_txns
   tags: ["jscore", "common", "txns"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5745,6 +5747,8 @@ tasks:
 - <<: *task_template
   name: jsCore_txns_large_txns_format
   tags: ["jscore", "txns", "multi_oplog"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5754,6 +5758,8 @@ tasks:
 - <<: *task_template
   name: jsCore_slot_based_execution
   tags: ["jscore", "common", "sbe"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5763,6 +5769,8 @@ tasks:
 - <<: *task_template
   name: sharded_jscore_txns
   tags: ["sharding", "jscore", "txns"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5772,6 +5780,8 @@ tasks:
 - <<: *task_template
   name: sharded_jscore_op_query_txns
   tags: ["sharding", "jscore", "txns"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5781,6 +5791,8 @@ tasks:
 - <<: *task_template
   name: sharded_jscore_txns_without_snapshot
   tags: ["sharding", "wo_snapshot", "jscore"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5790,6 +5802,8 @@ tasks:
 - <<: *task_template
   name: sharded_jscore_txns_sharded_collections
   tags: ["sharding", "jscore", "txns"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5808,6 +5822,8 @@ tasks:
 - <<: *task_template
   name: causally_consistent_jscore_txns_passthrough
   tags: ["causally_consistent"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5816,32 +5832,43 @@ tasks:
 
 - name: sharded_causally_consistent_jscore_txns_passthrough_gen
   tags: ["sharding", "jscore", "causally_consistent", "txns"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
+      dependsOn: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 1
 
 - name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
   tags: ["sharding", "wo_snapshot", "causally_consistent", "jscore"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
+      dependsOn: jsCore
       suite: sharded_causally_consistent_jscore_txns_passthrough
       resmoke_args: --storageEngine=wiredTiger --excludeWithAnyTags=uses_snapshot_read_concern
       fallback_num_sub_suites: 1
 
 - name: causally_consistent_hedged_reads_jscore_passthrough_gen
   tags: ["causally_consistent"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "generate resmoke tasks"
     vars:
+      dependsOn: jsCore
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 40
 
 - <<: *task_template
   name: sharded_collections_causally_consistent_jscore_txns_passthrough
   tags: ["sharding", "jscore", "causally_consistent", "txns"]
+  depends_on:
+    - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
