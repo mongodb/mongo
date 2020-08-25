@@ -8,6 +8,9 @@ integration in unit tests, compatibility with advanced sanitizers, such as
 Storage API, its modularity and our understanding of it, by having an alternate implementation that
 can be used as testbed for new ideas.
 
+For more context and information on how this storage engine is used, see the
+[Execution Architecture Guide](https://github.com/mongodb/mongo/blob/master/src/mongo/db/catalog/README.md).
+
 ## Architecture
 
 The architecture of the storage engine has parallels to and is in part inspired by the `git` version

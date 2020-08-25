@@ -20,6 +20,9 @@ module would at least have the following files:
 
 See <https://github.com/mongodb-partners/mongo-rocks> for a good example of the structure.
 
+For more context and information on how this API is used, see the
+[Execution Architecture Guide](https://github.com/mongodb/mongo/blob/master/src/mongo/db/catalog/README.md).
+
 
 Concepts
 --------

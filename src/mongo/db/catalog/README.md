@@ -21,6 +21,12 @@ index implementations found in the [**index/**][] directory; and the sorter foun
 [**index/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/index
 [**sorter/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/sorter
 
+For more information on the Storage Engine API, see the [storage/README][]. For additional
+specifics on the Ephemeral for Test storage engine, see the [ephemeral_for_test/README][].
+
+[storage/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/README.md
+[ephemeral_for_test/README]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/ephemeral_for_test/README.md
+
 # The Catalog
 
 The catalog is where MongoDB stores information about the collections and indexes for a MongoDB
@@ -160,7 +166,7 @@ _Code spelunking starting points:_
 
 # Storage Transactions
 
-Through the pluggable storage engine API, MongoDB executes reads and writes on its storage engine
+Through the pluggable [storage engine API](https://github.com/mongodb/mongo/blob/master/src/mongo/db/storage/README.md), MongoDB executes reads and writes on its storage engine
 with [snapshot isolation](#glossary).  The structure used to achieve this is the [RecoveryUnit
 class](../storage/recovery_unit.h).
 
