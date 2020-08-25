@@ -199,13 +199,4 @@ void TrialStage::doReattachToOperationContext() {
     }
 }
 
-void TrialStage::doDispose() {
-    if (_backupPlan) {
-        _backupPlan->dispose(opCtx());
-    }
-    if (_queuedData) {
-        _queuedData->dispose(opCtx());
-    }
-}
-
 }  // namespace mongo

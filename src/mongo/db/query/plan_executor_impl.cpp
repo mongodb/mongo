@@ -471,7 +471,6 @@ void PlanExecutorImpl::dispose(OperationContext* opCtx) {
         return;
     }
 
-    _root->dispose(opCtx);
     _currentState = kDisposed;
 }
 

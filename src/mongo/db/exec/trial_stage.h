@@ -95,7 +95,6 @@ public:
 protected:
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
-    void doDispose() final;
 
 private:
     void _replaceCurrentPlan(std::unique_ptr<PlanStage>& newPlan);
