@@ -10396,6 +10396,7 @@ buildvariants:
     - rhel62-large
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
+  - name: .rollbackfuzzer
 
 # This build variant is used to run multiversion tests as part of burn_in_tags as these tests are
 # currently only run on our daily builders.
