@@ -304,6 +304,11 @@ DEATH_TEST_F(PrimaryOnlyServiceTest,
     registry.registerService(std::move(service2));
 }
 
+TEST_F(PrimaryOnlyServiceTest, StepUpAfterShutdown) {
+    _registry->shutdown();
+    stepUp();
+}
+
 TEST_F(PrimaryOnlyServiceTest, BasicCreateInstance) {
     auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
     ASSERT(instance.get());

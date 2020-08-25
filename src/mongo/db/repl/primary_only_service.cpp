@@ -166,6 +166,12 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
 
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
+
+    stdx::lock_guard lk(_mutex);
+    if (_state == State::kShutdown) {
+        return;
+    }
+
     _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(threadPoolOptions),
         executor::makeNetworkInterface(getServiceName() + "Network", nullptr, std::move(hookList)));
@@ -178,6 +184,10 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
         std::make_shared<executor::ScopedTaskExecutor>(_executor, kExecutorShutdownStatus);
     {
         stdx::lock_guard lk(_mutex);
+
+        if (_state == State::kShutdown) {
+            return;
+        }
 
         auto newTerm = stepUpOpTime.getTerm();
         invariant(newTerm > _term,
@@ -213,6 +223,9 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
 
 void PrimaryOnlyService::onStepDown() {
     stdx::lock_guard lk(_mutex);
+    if (_state == State::kShutdown) {
+        return;
+    }
 
     if (_scopedExecutor) {
         (*_scopedExecutor)->shutdown();
@@ -346,7 +359,9 @@ void PrimaryOnlyService::_rebuildInstances() noexcept {
                               << getStateDocumentsNS() << "\" failed");
 
             stdx::lock_guard lk(_mutex);
-            _state = State::kRebuildFailed;
+            if (_state != State::kShutdown) {
+                _state = State::kRebuildFailed;
+            }
             _rebuildStatus = std::move(status);
             _rebuildCV.notify_all();
             return;
