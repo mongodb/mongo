@@ -108,7 +108,7 @@ CNode disambiguateCompoundProjection(CNode project) {
     auto projectionType = boost::optional<ProjectionType>{};
     auto cNode = replaceCNode(project, projectionType);
     if (!cNode)
-        return std::move(project);
+        return project;
     switch (*projectionType) {
         case ProjectionType::inclusion:
             return CNode{CompoundInclusionKey{std::make_unique<CNode>(*std::move(cNode))}};
