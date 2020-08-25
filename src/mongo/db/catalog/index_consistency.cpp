@@ -447,6 +447,7 @@ bool IndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* result) {
     ss << "Not all index entry inconsistencies are reported due to memory limitations. "
        << memoryLimitMessage.str();
     result->errors.push_back(ss.str());
+    result->valid = false;
 
     return true;
 }
