@@ -187,6 +187,11 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
         ownedPipeline = nullptr;
     } else {
         auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
+        // If we need execution stats, this runs the plan in order to gather the stats.
+        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            while (pipelineWithCursor->getNext()) {
+            }
+        }
         pipelineVec = pipelineWithCursor->writeExplainOps(verbosity);
     }
     BSONArrayBuilder bab;

@@ -698,7 +698,6 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
 }
 
 Status dispatchPipelineAndMerge(OperationContext* opCtx,
-                                std::shared_ptr<executor::TaskExecutor> executor,
                                 AggregationTargeter targeter,
                                 Document serializedCommand,
                                 long long batchSize,

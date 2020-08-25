@@ -117,7 +117,6 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
  * necessary on either mongos or a randomly designated shard.
  */
 Status dispatchPipelineAndMerge(OperationContext* opCtx,
-                                std::shared_ptr<executor::TaskExecutor>,
                                 AggregationTargeter targeter,
                                 Document serializedCommand,
                                 long long batchSize,
