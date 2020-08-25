@@ -214,15 +214,16 @@ bool FeatureCompatibilityVersion::isCleanStartUp() {
 void FeatureCompatibilityVersion::updateMinWireVersion() {
     WireSpec& wireSpec = WireSpec::instance();
 
-    if (serverGlobalParams.featureCompatibility.isGreaterThan(
-            FeatureCompatibilityParams::kLastContinuous)) {
-        // FCV == kLatest
+    if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            FeatureCompatibilityParams::kLatest) ||
+        serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        // FCV == kLatest or FCV is upgrading/downgrading.
         WireSpec::Specification newSpec = *wireSpec.get();
         newSpec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
         newSpec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
         wireSpec.reset(std::move(newSpec));
-    } else if (serverGlobalParams.featureCompatibility.isGreaterThan(
-                   FeatureCompatibilityParams::kLastLTS)) {
+    } else if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                   FeatureCompatibilityParams::kLastContinuous)) {
         // FCV == kLastContinuous
         WireSpec::Specification newSpec = *wireSpec.get();
         newSpec.incomingInternalClient.minWireVersion = LAST_CONT_WIRE_VERSION;

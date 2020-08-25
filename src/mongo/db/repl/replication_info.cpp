@@ -325,6 +325,7 @@ public:
         auto internalClientElement = cmdObj["internalClient"];
         if (internalClientElement) {
             sessionTagsToSet |= transport::Session::kInternalClient;
+            sessionTagsToUnset |= transport::Session::kExternalClientKeepOpen;
 
             uassert(ErrorCodes::TypeMismatch,
                     str::stream() << "'internalClient' must be of type Object, but was of type "

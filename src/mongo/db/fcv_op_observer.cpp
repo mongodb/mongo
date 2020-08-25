@@ -56,7 +56,10 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     FeatureCompatibilityVersion::updateMinWireVersion();
 
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    if (newVersion != ServerGlobalParams::FeatureCompatibility::kLastLTS) {
+    if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            FeatureCompatibilityParams::kLatest) ||
+        serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        // minWireVersion == maxWireVersion on kLatest FCV or upgrading/downgrading FCV.
         // Close all incoming connections from internal clients with binary versions lower than
         // ours.
         opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
