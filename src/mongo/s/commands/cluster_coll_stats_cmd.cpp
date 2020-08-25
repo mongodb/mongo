@@ -111,13 +111,13 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        auto routingInfo =
+        const auto cm =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        if (routingInfo.cm()) {
+        if (cm.isSharded()) {
             result.appendBool("sharded", true);
         } else {
             result.appendBool("sharded", false);
-            result.append("primary", routingInfo.db().primaryId().toString());
+            result.append("primary", cm.dbPrimary().toString());
         }
 
         int scale = 1;
@@ -138,7 +138,7 @@ public:
             opCtx,
             nss.db(),
             nss,
-            routingInfo,
+            cm,
             applyReadWriteConcern(
                 opCtx,
                 this,
@@ -261,7 +261,7 @@ public:
         result.append("maxSize", maxSize / scale);
         result.append("nindexes", nindexes);
         result.append("scaleFactor", scale);
-        result.append("nchunks", (routingInfo.cm() ? routingInfo.cm()->numChunks() : 1));
+        result.append("nchunks", cm.numChunks());
         result.append("shards", shardStats.obj());
 
         return true;

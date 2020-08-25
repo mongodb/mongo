@@ -39,11 +39,6 @@
 
 namespace mongo {
 
-class BSONObj;
-class ChunkManager;
-class CollatorInterface;
-class ShardKeyPattern;
-
 class CatalogCacheTestFixture : public ShardingTestFixture {
 protected:
     void setUp() override;
@@ -70,7 +65,7 @@ protected:
      * std::future with the MSVC STL library, which requires the templated type to be default
      * constructible.
      */
-    executor::NetworkTestEnv::FutureHandle<boost::optional<CachedCollectionRoutingInfo>>
+    executor::NetworkTestEnv::FutureHandle<boost::optional<ChunkManager>>
     scheduleRoutingInfoForcedRefresh(const NamespaceString& nss);
 
     /**
@@ -84,7 +79,7 @@ protected:
      * std::future with the MSVC STL library, which requires the templated type to be default
      * constructible.
      */
-    executor::NetworkTestEnv::FutureHandle<boost::optional<CachedCollectionRoutingInfo>>
+    executor::NetworkTestEnv::FutureHandle<boost::optional<ChunkManager>>
     scheduleRoutingInfoUnforcedRefresh(const NamespaceString& nss);
 
     /**
@@ -99,18 +94,18 @@ protected:
      * Triggers a refresh for the given namespace and mocks network calls to simulate loading
      * metadata with two chunks: [minKey, 0) and [0, maxKey) on two shards with ids: "0" and "1".
      */
-    CachedCollectionRoutingInfo loadRoutingTableWithTwoChunksAndTwoShards(NamespaceString nss);
+    ChunkManager loadRoutingTableWithTwoChunksAndTwoShards(NamespaceString nss);
 
     /**
      * Same as the above method but the sharding key is hashed.
      */
-    CachedCollectionRoutingInfo loadRoutingTableWithTwoChunksAndTwoShardsHash(NamespaceString nss);
+    ChunkManager loadRoutingTableWithTwoChunksAndTwoShardsHash(NamespaceString nss);
 
     /**
      * The common implementation for any shard key.
      */
-    CachedCollectionRoutingInfo loadRoutingTableWithTwoChunksAndTwoShardsImpl(
-        NamespaceString nss, const BSONObj& shardKey);
+    ChunkManager loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString nss,
+                                                               const BSONObj& shardKey);
 
     /**
      * Mocks network responses for loading a sharded database and collection from the config server.

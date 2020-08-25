@@ -164,7 +164,11 @@ protected:
             CollectionShardingRuntime::get(operationContext(), kNss)
                 ->setFilteringMetadata(
                     operationContext(),
-                    CollectionMetadata(ChunkManager(rt, boost::none), ShardId("dummyShardId")));
+                    CollectionMetadata(ChunkManager(ShardId("dummyShardId"),
+                                                    DatabaseVersion(UUID::gen(), 1),
+                                                    rt,
+                                                    boost::none),
+                                       ShardId("dummyShardId")));
         }();
 
         _client->createIndex(kNss.ns(), kShardKeyPattern);

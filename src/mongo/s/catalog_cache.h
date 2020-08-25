@@ -29,17 +29,13 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/database_version_gen.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -50,7 +46,6 @@ namespace mongo {
 
 class BSONObjBuilder;
 class CachedDatabaseInfo;
-class CachedCollectionRoutingInfo;
 class OperationContext;
 
 static constexpr int kMaxNumStaleVersionRetries = 10;
@@ -242,49 +237,11 @@ public:
 
 private:
     friend class CatalogCache;
+
     CachedDatabaseInfo(DatabaseType dbt, std::shared_ptr<Shard> primaryShard);
 
     DatabaseType _dbt;
     std::shared_ptr<Shard> _primaryShard;
-};
-
-/**
- * Constructed exclusively by the CatalogCache.
- *
- * This RoutingInfo can be considered a "package" of routing info for the database and for the
- * collection. Once unsharded collections are treated as sharded collections with a single chunk,
- * they will also have a ChunkManager with a "chunk distribution." At that point, this "package" can
- * be dismantled: routing for commands that route by database can directly retrieve the
- * CachedDatabaseInfo, while routing for commands that route by collection can directly retrieve the
- * ChunkManager.
- */
-class CachedCollectionRoutingInfo {
-public:
-    CachedDatabaseInfo db() const {
-        return _db;
-    }
-
-    const ChunkManager* cm() const {
-        return _cm.get_ptr();
-    }
-
-private:
-    friend class CatalogCache;
-    friend class CachedDatabaseInfo;
-
-    CachedCollectionRoutingInfo(NamespaceString nss,
-                                CachedDatabaseInfo db,
-                                boost::optional<ChunkManager> cm);
-
-    NamespaceString _nss;
-
-    // Copy of the database's cached info.
-    CachedDatabaseInfo _db;
-
-    // Shared reference to the collection's cached chunk distribution if sharded, otherwise
-    // boost::none. This is a shared reference rather than a copy because the chunk distribution can
-    // be large.
-    boost::optional<ChunkManager> _cm;
 };
 
 /**
@@ -318,9 +275,9 @@ public:
      * If the given atClusterTime is so far in the past that it is not possible to construct routing
      * info, returns a StaleClusterTime error.
      */
-    StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoAt(OperationContext* opCtx,
-                                                                       const NamespaceString& nss,
-                                                                       Timestamp atClusterTime);
+    StatusWith<ChunkManager> getCollectionRoutingInfoAt(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        Timestamp atClusterTime);
 
     /**
      * Same as the getCollectionRoutingInfoAt call above, but returns the latest known routing
@@ -330,8 +287,8 @@ public:
      * guaranteed to never return StaleClusterTime, because the latest routing information should
      * always be available.
      */
-    StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
-                                                                     const NamespaceString& nss);
+    StatusWith<ChunkManager> getCollectionRoutingInfo(OperationContext* opCtx,
+                                                      const NamespaceString& nss);
 
     /**
      * Same as getDatbase above, but in addition forces the database entry to be refreshed.
@@ -352,7 +309,7 @@ public:
      * collection version to decide when a refresh is necessary and provide
      * proper causal consistency
      */
-    StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoWithRefresh(
+    StatusWith<ChunkManager> getCollectionRoutingInfoWithRefresh(
         OperationContext* opCtx,
         const NamespaceString& nss,
         bool forceRefreshFromThisThread = false);
@@ -361,8 +318,8 @@ public:
      * Same as getCollectionRoutingInfoWithRefresh above, but in addition returns a
      * NamespaceNotSharded error if the collection is not sharded.
      */
-    StatusWith<CachedCollectionRoutingInfo> getShardedCollectionRoutingInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
+    StatusWith<ChunkManager> getShardedCollectionRoutingInfoWithRefresh(OperationContext* opCtx,
+                                                                        const NamespaceString& nss);
 
     /**
      * Advances the version in the cache for the given database.
@@ -374,14 +331,6 @@ public:
      */
     void onStaleDatabaseVersion(const StringData dbName,
                                 const boost::optional<DatabaseVersion>& wantedVersion);
-
-    /**
-     * Non-blocking method that marks the current cached collection entry as needing refresh if its
-     * collectionVersion matches the input's ChunkManager's collectionVersion.
-     *
-     * To be called if using the input routing info caused a StaleShardVersion to be received.
-     */
-    void onStaleShardVersion(CachedCollectionRoutingInfo&&, const ShardId& staleShardId);
 
     /**
      * Gets whether this operation should block behind a catalog cache refresh.
@@ -470,7 +419,6 @@ public:
 private:
     // Make the cache entries friends so they can access the private classes below
     friend class CachedDatabaseInfo;
-    friend class CachedCollectionRoutingInfo;
 
     /**
      * Cache entry describing a collection.
@@ -573,7 +521,7 @@ private:
      */
     struct RefreshResult {
         // Status containing result of refresh
-        StatusWith<CachedCollectionRoutingInfo> statusWithInfo;
+        StatusWith<ChunkManager> statusWithInfo;
         RefreshAction actionTaken;
     };
 

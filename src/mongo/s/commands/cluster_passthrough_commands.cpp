@@ -49,24 +49,17 @@ namespace {
 bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
                                             StringData dbName,
                                             const NamespaceString& nss,
-                                            const CachedCollectionRoutingInfo& routingInfo,
+                                            const ChunkManager& cm,
                                             const BSONObj& cmdObj,
                                             Shard::RetryPolicy retryPolicy,
                                             BSONObjBuilder* out) {
     const StringData cmdName(cmdObj.firstElementFieldName());
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Can't do command: " << cmdName << " on a sharded collection",
-            !routingInfo.cm());
+            !cm.isSharded());
 
-    auto responses = scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                                dbName,
-                                                                nss,
-                                                                routingInfo,
-                                                                cmdObj,
-                                                                ReadPreferenceSetting::get(opCtx),
-                                                                retryPolicy,
-                                                                {},
-                                                                {});
+    auto responses = scatterGatherVersionedTargetByRoutingTable(
+        opCtx, dbName, nss, cm, cmdObj, ReadPreferenceSetting::get(opCtx), retryPolicy, {}, {});
     invariant(responses.size() == 1);
 
     const auto cmdResponse = uassertStatusOK(std::move(responses.front().swResponse));
@@ -119,23 +112,23 @@ public:
                 str::stream() << "Invalid target namespace: " << toNss.ns(),
                 toNss.isValid());
 
-        const auto fromRoutingInfo = uassertStatusOK(
+        const auto fromCM = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, fromNss));
-        uassert(13138, "You can't rename a sharded collection", !fromRoutingInfo.cm());
+        uassert(13138, "You can't rename a sharded collection", !fromCM.isSharded());
 
-        const auto toRoutingInfo = uassertStatusOK(
+        const auto toCM = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, toNss));
-        uassert(13139, "You can't rename to a sharded collection", !toRoutingInfo.cm());
+        uassert(13139, "You can't rename to a sharded collection", !toCM.isSharded());
 
         uassert(13137,
                 "Source and destination collections must be on same shard",
-                fromRoutingInfo.db().primaryId() == toRoutingInfo.db().primaryId());
+                fromCM.dbPrimary() == toCM.dbPrimary());
 
         return nonShardedCollectionCommandPassthrough(
             opCtx,
             NamespaceString::kAdminDb,
             fromNss,
-            fromRoutingInfo,
+            fromCM,
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             Shard::RetryPolicy::kNoRetry,
@@ -173,11 +166,11 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
-        const auto routingInfo =
+        const auto cm =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         uassert(ErrorCodes::IllegalOperation,
                 "You can't convertToCapped a sharded collection",
-                !routingInfo.cm());
+                !cm.isSharded());
 
         // convertToCapped creates a temp collection and renames it at the end. It will require
         // special handling for create collection.
@@ -185,7 +178,7 @@ public:
             opCtx,
             dbName,
             nss,
-            routingInfo,
+            cm,
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             Shard::RetryPolicy::kIdempotent,
@@ -230,13 +223,11 @@ public:
                 "Performing splitVector across dbs isn't supported via mongos",
                 nss.db() == dbName);
 
-        const auto routingInfo =
+        const auto cm =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "can't do command: " << getName() << " on sharded collection",
-                !routingInfo.cm());
-
-        const auto primaryShard = routingInfo.db().primary();
+                !cm.isSharded());
 
         // Here, we first filter the command before appending an UNSHARDED shardVersion, because
         // "shardVersion" is one of the fields that gets filtered out.
@@ -245,11 +236,14 @@ public:
         BSONObj filteredCmdObjWithVersion(
             appendShardVersion(filteredCmdObj, ChunkVersion::UNSHARDED()));
 
-        auto commandResponse = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
+        auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
+        auto commandResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting::get(opCtx),
             dbName,
-            primaryShard->isConfig() ? filteredCmdObj : filteredCmdObjWithVersion,
+            cm.dbPrimary() == ShardRegistry::kConfigServerShardId ? filteredCmdObj
+                                                                  : filteredCmdObjWithVersion,
             Shard::RetryPolicy::kIdempotent));
 
         uassert(ErrorCodes::IllegalOperation,
@@ -260,7 +254,7 @@ public:
 
         if (!commandResponse.writeConcernStatus.isOK()) {
             appendWriteConcernErrorToCmdResponse(
-                primaryShard->getId(), commandResponse.response["writeConcernError"], result);
+                cm.dbPrimary(), commandResponse.response["writeConcernError"], result);
         }
         result.appendElementsUnique(
             CommandHelpers::filterCommandReplyForPassthrough(std::move(commandResponse.response)));

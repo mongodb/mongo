@@ -109,8 +109,8 @@ public:
             return response;
         }());
 
-        auto routingInfo = future.default_timed_get();
-        ASSERT(routingInfo->cm());
+        const auto cm = future.default_timed_get();
+        ASSERT(cm->isSharded());
     }
 
 protected:

@@ -182,18 +182,15 @@ Status MigrationManager::executeManualMigration(
                                                             &scopedMigrationRequests)
                                                       ->get();
 
-    auto routingInfoStatus =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-            opCtx, migrateInfo.nss);
-    if (!routingInfoStatus.isOK()) {
-        return routingInfoStatus.getStatus();
+    auto swCM = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+        opCtx, migrateInfo.nss);
+    if (!swCM.isOK()) {
+        return swCM.getStatus();
     }
 
-    auto& routingInfo = routingInfoStatus.getValue();
+    const auto& cm = swCM.getValue();
 
-    const auto chunk =
-        routingInfo.cm()->findIntersectingChunkWithSimpleCollation(migrateInfo.minKey);
-
+    const auto chunk = cm.findIntersectingChunkWithSimpleCollation(migrateInfo.minKey);
 
     Status commandStatus = remoteCommandResponse.status;
 
@@ -333,10 +330,9 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
         auto& migrateInfos = nssAndMigrateInfos.second;
         invariant(!migrateInfos.empty());
 
-        auto routingInfoStatus =
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                         nss);
-        if (!routingInfoStatus.isOK()) {
+        auto swCM = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+            opCtx, nss);
+        if (!swCM.isOK()) {
             // This shouldn't happen because the collection was intact and sharded when the previous
             // config primary was active and the dist locks have been held by the balancer
             // throughout. Abort migration recovery.
@@ -345,11 +341,11 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
                   "recovery. Abandoning recovery: {error}",
                   "Unable to reload chunk metadata for collection during balancer recovery",
                   "namespace"_attr = nss,
-                  "error"_attr = redact(routingInfoStatus.getStatus()));
+                  "error"_attr = redact(swCM.getStatus()));
             return;
         }
 
-        auto& routingInfo = routingInfoStatus.getValue();
+        const auto& cm = swCM.getValue();
 
         int scheduledMigrations = 0;
 
@@ -359,8 +355,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
             auto waitForDelete = migrationType.getWaitForDelete();
             migrateInfos.pop_front();
 
-            const auto chunk =
-                routingInfo.cm()->findIntersectingChunkWithSimpleCollation(migrationInfo.minKey);
+            const auto chunk = cm.findIntersectingChunkWithSimpleCollation(migrationInfo.minKey);
 
             if (chunk.getShardId() != migrationInfo.from) {
                 // Chunk is no longer on the source shard specified by this migration. Erase the

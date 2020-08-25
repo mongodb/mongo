@@ -63,9 +63,9 @@ ShardServerProcessInterface::ShardServerProcessInterface(
 }
 
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    auto routingInfo =
+    const auto cm =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    return static_cast<bool>(routingInfo.cm());
+    return cm.isSharded();
 }
 
 void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
@@ -85,17 +85,17 @@ ShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(Operati
     invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
     auto* const catalogCache = Grid::get(opCtx)->catalogCache();
-    auto swCollectionRoutingInfo = catalogCache->getCollectionRoutingInfo(opCtx, nss);
-    if (swCollectionRoutingInfo.isOK()) {
-        auto cm = swCollectionRoutingInfo.getValue().cm();
-        if (cm && cm->uuidMatches(uuid)) {
+    auto swCM = catalogCache->getCollectionRoutingInfo(opCtx, nss);
+    if (swCM.isOK()) {
+        const auto& cm = swCM.getValue();
+        if (cm.isSharded() && cm.uuidMatches(uuid)) {
             // Unpack the shard key. Collection is now sharded so the document key fields will never
             // change, mark as final.
-            return {_shardKeyToDocumentKeyFields(cm->getShardKeyPattern().getKeyPatternFields()),
+            return {_shardKeyToDocumentKeyFields(cm.getShardKeyPattern().getKeyPatternFields()),
                     true};
         }
-    } else if (swCollectionRoutingInfo != ErrorCodes::NamespaceNotFound) {
-        uassertStatusOK(std::move(swCollectionRoutingInfo));
+    } else if (swCM != ErrorCodes::NamespaceNotFound) {
+        uassertStatusOK(std::move(swCM));
     }
 
     // An unsharded collection can still become sharded so is not final. If the uuid doesn't match

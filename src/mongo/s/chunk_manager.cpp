@@ -338,7 +338,7 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey, const BSONObj
         for (BSONElement elt : shardKey) {
             uassert(ErrorCodes::ShardKeyNotFound,
                     str::stream() << "Cannot target single shard due to collation of key "
-                                  << elt.fieldNameStringData() << " for namespace " << getns(),
+                                  << elt.fieldNameStringData() << " for namespace " << _rt->nss(),
                     !CollationIndexKey::isCollatableType(elt.type()));
         }
     }
@@ -347,7 +347,7 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey, const BSONObj
 
     uassert(ErrorCodes::ShardKeyNotFound,
             str::stream() << "Cannot target single shard using key " << shardKey
-                          << " for namespace " << getns(),
+                          << " for namespace " << _rt->nss(),
             chunkInfo && chunkInfo->containsKey(shardKey));
 
     return Chunk(*chunkInfo, _clusterTime);
@@ -370,7 +370,7 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        std::set<ShardId>* shardIds) const {
-    auto qr = std::make_unique<QueryRequest>(_rt->getns());
+    auto qr = std::make_unique<QueryRequest>(_rt->nss());
     qr->setFilter(query);
 
     if (auto uuid = getUUID())
@@ -643,6 +643,10 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
     }
 
     return bounds;
+}
+
+std::string ChunkManager::toString() const {
+    return _rt ? _rt->toString() : "UNSHARDED";
 }
 
 bool RoutingTableHistory::compatibleWith(const RoutingTableHistory& other,

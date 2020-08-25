@@ -47,7 +47,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/net/socket_utils.h"
 
@@ -139,11 +138,10 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
 
 std::vector<FieldPath> CommonProcessInterface::collectDocumentKeyFieldsActingAsRouter(
     OperationContext* opCtx, const NamespaceString& nss) const {
-    auto cri =
+    const auto cm =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    if (auto chunkManager = cri.cm()) {
-        return _shardKeyToDocumentKeyFields(
-            chunkManager->getShardKeyPattern().getKeyPatternFields());
+    if (cm.isSharded()) {
+        return _shardKeyToDocumentKeyFields(cm.getShardKeyPattern().getKeyPatternFields());
     }
 
     // We have no evidence this collection is sharded, so the document key is just _id.
@@ -187,12 +185,12 @@ bool CommonProcessInterface::keyPatternNamesExactPaths(const BSONObj& keyPattern
 boost::optional<ChunkVersion> CommonProcessInterface::refreshAndGetCollectionVersion(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) const {
     const bool forceRefreshFromThisThread = false;
-    auto routingInfo = uassertStatusOK(
+    auto cm = uassertStatusOK(
         Grid::get(expCtx->opCtx)
             ->catalogCache()
             ->getCollectionRoutingInfoWithRefresh(expCtx->opCtx, nss, forceRefreshFromThisThread));
-    if (auto chunkManager = routingInfo.cm()) {
-        return chunkManager->getVersion();
+    if (cm.isSharded()) {
+        return cm.getVersion();
     }
     return boost::none;
 }

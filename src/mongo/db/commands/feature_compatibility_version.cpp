@@ -54,8 +54,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
 #include "mongo/transport/service_entry_point.h"
 
 namespace mongo {

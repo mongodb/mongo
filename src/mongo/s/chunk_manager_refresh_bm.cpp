@@ -41,6 +41,8 @@
 namespace mongo {
 namespace {
 
+const NamespaceString kNss("test", "foo");
+
 ChunkRange getRangeForChunk(int i, int nChunks) {
     invariant(i >= 0);
     invariant(nChunks > 0);
@@ -55,24 +57,27 @@ ChunkRange getRangeForChunk(int i, int nChunks) {
 }
 
 template <typename ShardSelectorFn>
-auto makeChunkManagerWithShardSelector(int nShards, uint32_t nChunks, ShardSelectorFn selectShard) {
+CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
+                                                     uint32_t nChunks,
+                                                     ShardSelectorFn selectShard) {
     const auto collEpoch = OID::gen();
-    const auto collName = NamespaceString("test.foo");
     const auto shardKeyPattern = KeyPattern(BSON("_id" << 1));
 
     std::vector<ChunkType> chunks;
     chunks.reserve(nChunks);
     for (uint32_t i = 0; i < nChunks; ++i) {
-        chunks.emplace_back(collName,
+        chunks.emplace_back(kNss,
                             getRangeForChunk(i, nChunks),
                             ChunkVersion{i + 1, 0, collEpoch},
                             selectShard(i, nShards, nChunks));
     }
 
     auto routingTableHistory = RoutingTableHistory::makeNew(
-        collName, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, chunks);
-    return std::make_unique<CollectionMetadata>(ChunkManager(routingTableHistory, boost::none),
-                                                ShardId("shard0"));
+        kNss, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, chunks);
+    return CollectionMetadata(
+        ChunkManager(
+            ShardId("Shard0"), DatabaseVersion(UUID::gen(), 1), routingTableHistory, boost::none),
+        ShardId("shard0"));
 }
 
 ShardId pessimalShardSelector(int i, int nShards, int nChunks) {
@@ -98,22 +103,22 @@ MONGO_COMPILER_NOINLINE auto makeChunkManagerWithOptimalBalancedDistribution(int
 MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
                                                   const std::vector<ChunkType>& newChunks) {
     auto rt = cm.getChunkManager()->getRoutingHistory()->makeUpdated(newChunks);
-    return std::make_unique<CollectionMetadata>(ChunkManager(rt, boost::none), ShardId("shard0"));
+    return std::make_unique<CollectionMetadata>(
+        ChunkManager(ShardId("shard0"), DatabaseVersion(UUID::gen(), 1), rt, boost::none),
+        ShardId("shard0"));
 }
 
 void BM_IncrementalRefreshWithNoChange(benchmark::State& state) {
     const int nShards = state.range(0);
     const int nChunks = state.range(1);
-    auto cm = makeChunkManagerWithOptimalBalancedDistribution(nShards, nChunks);
+    auto metadata = makeChunkManagerWithOptimalBalancedDistribution(nShards, nChunks);
 
-    auto postMoveVersion = cm->getChunkManager()->getVersion();
-    const auto collName = NamespaceString(cm->getChunkManager()->getns());
+    auto postMoveVersion = metadata.getChunkManager()->getVersion();
     std::vector<ChunkType> newChunks;
-    newChunks.emplace_back(
-        collName, getRangeForChunk(1, nChunks), postMoveVersion, ShardId("shard0"));
+    newChunks.emplace_back(kNss, getRangeForChunk(1, nChunks), postMoveVersion, ShardId("shard0"));
 
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(runIncrementalUpdate(*cm, newChunks));
+        benchmark::DoNotOptimize(runIncrementalUpdate(metadata, newChunks));
     }
 }
 
@@ -125,20 +130,17 @@ BENCHMARK(BM_IncrementalRefreshWithNoChange)
 void BM_IncrementalRefreshOfPessimalBalancedDistribution(benchmark::State& state) {
     const int nShards = state.range(0);
     const int nChunks = state.range(1);
-    auto cm = makeChunkManagerWithPessimalBalancedDistribution(nShards, nChunks);
+    auto metadata = makeChunkManagerWithPessimalBalancedDistribution(nShards, nChunks);
 
-    auto postMoveVersion = cm->getChunkManager()->getVersion();
-    const auto collName = NamespaceString(cm->getChunkManager()->getns());
+    auto postMoveVersion = metadata.getChunkManager()->getVersion();
     std::vector<ChunkType> newChunks;
     postMoveVersion.incMajor();
-    newChunks.emplace_back(
-        collName, getRangeForChunk(1, nChunks), postMoveVersion, ShardId("shard0"));
+    newChunks.emplace_back(kNss, getRangeForChunk(1, nChunks), postMoveVersion, ShardId("shard0"));
     postMoveVersion.incMajor();
-    newChunks.emplace_back(
-        collName, getRangeForChunk(3, nChunks), postMoveVersion, ShardId("shard1"));
+    newChunks.emplace_back(kNss, getRangeForChunk(3, nChunks), postMoveVersion, ShardId("shard1"));
 
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(runIncrementalUpdate(*cm, newChunks));
+        benchmark::DoNotOptimize(runIncrementalUpdate(metadata, newChunks));
     }
 }
 
@@ -168,8 +170,11 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
     for (auto keepRunning : state) {
         auto routingTableHistory = RoutingTableHistory::makeNew(
             collName, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, chunks);
-        benchmark::DoNotOptimize(
-            CollectionMetadata(ChunkManager(routingTableHistory, boost::none), ShardId("shard0")));
+        benchmark::DoNotOptimize(CollectionMetadata(ChunkManager(ShardId("shard0"),
+                                                                 DatabaseVersion(UUID::gen(), 1),
+                                                                 routingTableHistory,
+                                                                 boost::none),
+                                                    ShardId("shard0")));
     }
 }
 
@@ -257,13 +262,13 @@ void BM_FindIntersectingChunk(benchmark::State& state,
     const int nShards = state.range(0);
     const int nChunks = state.range(1);
 
-    auto cm = makeCollectionMetadata(nShards, nChunks);
+    auto metadata = makeCollectionMetadata(nShards, nChunks);
     auto keys = makeKeys(nChunks);
     auto keysIter = makeCircularIterator(keys);
 
     for (auto keepRunning : state) {
         benchmark::DoNotOptimize(
-            cm->getChunkManager()->findIntersectingChunkWithSimpleCollation(*keysIter));
+            metadata.getChunkManager()->findIntersectingChunkWithSimpleCollation(*keysIter));
         ++keysIter;
     }
 
@@ -276,14 +281,14 @@ void BM_GetShardIdsForRange(benchmark::State& state,
     const int nShards = state.range(0);
     const int nChunks = state.range(1);
 
-    auto cm = makeCollectionMetadata(nShards, nChunks);
+    auto metadata = makeCollectionMetadata(nShards, nChunks);
     auto keys = makeKeys(nChunks);
     auto ranges = makeRanges(keys);
     auto rangesIter = makeCircularIterator(ranges);
 
     for (auto keepRunning : state) {
         std::set<ShardId> shardIds;
-        cm->getChunkManager()->getShardIdsForRange(
+        metadata.getChunkManager()->getShardIdsForRange(
             rangesIter->first, rangesIter->second, &shardIds);
         ++rangesIter;
     }
@@ -297,13 +302,13 @@ void BM_GetShardIdsForRangeMinKeyToMaxKey(benchmark::State& state,
     const int nShards = state.range(0);
     const int nChunks = state.range(1);
 
-    auto cm = makeCollectionMetadata(nShards, nChunks);
+    auto metadata = makeCollectionMetadata(nShards, nChunks);
     auto min = BSON("_id" << MINKEY);
     auto max = BSON("_id" << MAXKEY);
 
     for (auto keepRunning : state) {
         std::set<ShardId> shardIds;
-        cm->getChunkManager()->getShardIdsForRange(min, max, &shardIds);
+        metadata.getChunkManager()->getShardIdsForRange(min, max, &shardIds);
     }
 
     state.SetItemsProcessed(state.iterations());
@@ -315,14 +320,14 @@ void BM_KeyBelongsToMe(benchmark::State& state,
     const int nShards = state.range(0);
     const int nChunks = state.range(1);
 
-    auto cm = makeCollectionMetadata(nShards, nChunks);
+    auto metadata = makeCollectionMetadata(nShards, nChunks);
     auto keys = makeKeys(nChunks);
     auto keysIter = makeCircularIterator(keys);
 
     size_t nOwned = 0;
 
     for (auto keepRunning : state) {
-        if (cm->keyBelongsToMe(*keysIter)) {
+        if (metadata.keyBelongsToMe(*keysIter)) {
             ++nOwned;
         }
         ++keysIter;
@@ -338,7 +343,7 @@ void BM_RangeOverlapsChunk(benchmark::State& state,
     const int nShards = state.range(0);
     const int nChunks = state.range(1);
 
-    auto cm = makeCollectionMetadata(nShards, nChunks);
+    auto metadata = makeCollectionMetadata(nShards, nChunks);
     auto keys = makeKeys(nChunks);
     auto ranges = makeRanges(keys);
     auto rangesIter = makeCircularIterator(ranges);
@@ -346,7 +351,7 @@ void BM_RangeOverlapsChunk(benchmark::State& state,
     size_t nOverlapped = 0;
 
     for (auto keepRunning : state) {
-        if (cm->rangeOverlapsChunk(ChunkRange(rangesIter->first, rangesIter->second))) {
+        if (metadata.rangeOverlapsChunk(ChunkRange(rangesIter->first, rangesIter->second))) {
             ++nOverlapped;
         }
         ++rangesIter;

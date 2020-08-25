@@ -37,7 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {
 

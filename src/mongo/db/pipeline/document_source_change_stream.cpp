@@ -52,8 +52,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
 
 namespace mongo {
 

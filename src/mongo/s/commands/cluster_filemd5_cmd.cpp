@@ -85,16 +85,15 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        const auto routingInfo =
+        const auto cm =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
-        const auto callShardFn = [opCtx, &nss, &routingInfo](const BSONObj& cmdObj,
-                                                             const BSONObj& routingQuery) {
+        const auto callShardFn = [&](const BSONObj& cmdObj, const BSONObj& routingQuery) {
             auto shardResults =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
                                                            nss.db(),
                                                            nss,
-                                                           routingInfo,
+                                                           cm,
                                                            cmdObj,
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,
@@ -113,9 +112,9 @@ public:
         // If the collection is not sharded, or is sharded only on the 'files_id' field, we only
         // need to target a single shard, because the files' chunks can only be contained in a
         // single sharded chunk
-        if (!routingInfo.cm() ||
-            SimpleBSONObjComparator::kInstance.evaluate(
-                routingInfo.cm()->getShardKeyPattern().toBSON() == BSON("files_id" << 1))) {
+        if (!cm.isSharded() ||
+            SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() ==
+                                                        BSON("files_id" << 1))) {
             CommandHelpers::filterCommandReplyForPassthrough(
                 callShardFn(
                     applyReadWriteConcern(
@@ -130,9 +129,8 @@ public:
         uassert(ErrorCodes::IllegalOperation,
                 "The GridFS fs.chunks collection must be sharded on either {files_id:1} or "
                 "{files_id:1, n:1}",
-                SimpleBSONObjComparator::kInstance.evaluate(
-                    routingInfo.cm()->getShardKeyPattern().toBSON() ==
-                    BSON("files_id" << 1 << "n" << 1)));
+                SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() ==
+                                                            BSON("files_id" << 1 << "n" << 1)));
 
         // Theory of operation:
         //

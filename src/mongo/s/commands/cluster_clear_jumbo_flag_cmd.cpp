@@ -73,10 +73,9 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-            auto routingInfo = uassertStatusOK(
+            const auto cm = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
                                                                                              ns()));
-            const auto cm = routingInfo.cm();
 
             uassert(ErrorCodes::InvalidOptions,
                     "bounds can only have exactly 2 elements",
@@ -93,21 +92,20 @@ public:
             boost::optional<Chunk> chunk;
 
             if (request().getFind()) {
-                BSONObj shardKey =
-                    uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(
-                        opCtx, ns(), *request().getFind()));
+                BSONObj shardKey = uassertStatusOK(cm.getShardKeyPattern().extractShardKeyFromQuery(
+                    opCtx, ns(), *request().getFind()));
                 uassert(51260,
                         str::stream()
                             << "no shard key found in chunk query " << *request().getFind(),
                         !shardKey.isEmpty());
 
-                chunk.emplace(cm->findIntersectingChunkWithSimpleCollation(shardKey));
+                chunk.emplace(cm.findIntersectingChunkWithSimpleCollation(shardKey));
             } else {
                 auto boundsArray = *request().getBounds();
-                BSONObj minKey = cm->getShardKeyPattern().normalizeShardKey(boundsArray.front());
-                BSONObj maxKey = cm->getShardKeyPattern().normalizeShardKey(boundsArray.back());
+                BSONObj minKey = cm.getShardKeyPattern().normalizeShardKey(boundsArray.front());
+                BSONObj maxKey = cm.getShardKeyPattern().normalizeShardKey(boundsArray.back());
 
-                chunk.emplace(cm->findIntersectingChunkWithSimpleCollation(minKey));
+                chunk.emplace(cm.findIntersectingChunkWithSimpleCollation(minKey));
 
                 uassert(51261,
                         str::stream() << "no chunk found with the shard key bounds "
@@ -117,7 +115,7 @@ public:
             }
 
             ConfigsvrClearJumboFlag configCmd(
-                ns(), cm->getVersion().epoch(), chunk->getMin(), chunk->getMax());
+                ns(), cm.getVersion().epoch(), chunk->getMin(), chunk->getMax());
             configCmd.setDbName(request().getDbName());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();

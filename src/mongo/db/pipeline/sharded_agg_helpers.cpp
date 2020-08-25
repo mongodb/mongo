@@ -154,25 +154,23 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     return cmdForShards.freeze().toBson();
 }
 
-std::vector<RemoteCursor> establishShardCursors(
-    OperationContext* opCtx,
-    std::shared_ptr<executor::TaskExecutor> executor,
-    const NamespaceString& nss,
-    bool hasChangeStream,
-    boost::optional<CachedCollectionRoutingInfo>& routingInfo,
-    const std::set<ShardId>& shardIds,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref) {
+std::vector<RemoteCursor> establishShardCursors(OperationContext* opCtx,
+                                                std::shared_ptr<executor::TaskExecutor> executor,
+                                                const NamespaceString& nss,
+                                                bool mustRunOnAll,
+                                                boost::optional<ChunkManager>& cm,
+                                                const std::set<ShardId>& shardIds,
+                                                const BSONObj& cmdObj,
+                                                const ReadPreferenceSetting& readPref) {
     LOGV2_DEBUG(20904,
                 1,
                 "Dispatching command {cmdObj} to establish cursors on shards",
                 "cmdObj"_attr = redact(cmdObj));
 
-    const bool mustRunOnAll = mustRunOnAllShards(nss, hasChangeStream);
     std::vector<std::pair<ShardId, BSONObj>> requests;
 
     // If we don't need to run on all shards, then we should always have a valid routing table.
-    invariant(routingInfo || mustRunOnAll);
+    invariant(cm || mustRunOnAll);
 
     if (mustRunOnAll) {
         // The pipeline contains a stage which must be run on all shards. Skip versioning and
@@ -180,22 +178,21 @@ std::vector<RemoteCursor> establishShardCursors(
         for (const auto& shardId : shardIds) {
             requests.emplace_back(shardId, cmdObj);
         }
-    } else if (routingInfo->cm()) {
+    } else if (cm->isSharded()) {
         // The collection is sharded. Use the routing table to decide which shards to target
         // based on the query and collation, and build versioned requests for them.
         for (const auto& shardId : shardIds) {
-            auto versionedCmdObj =
-                appendShardVersion(cmdObj, routingInfo->cm()->getVersion(shardId));
+            auto versionedCmdObj = appendShardVersion(cmdObj, cm->getVersion(shardId));
             requests.emplace_back(shardId, std::move(versionedCmdObj));
         }
     } else {
         // The collection is unsharded. Target only the primary shard for the database.
         // Don't append shard version info when contacting the config servers.
-        const auto cmdObjWithShardVersion = !routingInfo->db().primary()->isConfig()
+        const auto cmdObjWithShardVersion = cm->dbPrimary() != ShardRegistry::kConfigServerShardId
             ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
             : cmdObj;
-        requests.emplace_back(routingInfo->db().primaryId(),
-                              appendDbVersionIfPresent(cmdObjWithShardVersion, routingInfo->db()));
+        requests.emplace_back(cm->dbPrimary(),
+                              appendDbVersionIfPresent(cmdObjWithShardVersion, cm->dbVersion()));
     }
 
     if (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
@@ -218,7 +215,7 @@ std::vector<RemoteCursor> establishShardCursors(
 
 std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expCtx,
                                     bool mustRunOnAllShards,
-                                    const boost::optional<CachedCollectionRoutingInfo>& routingInfo,
+                                    const boost::optional<ChunkManager>& cm,
                                     const BSONObj shardQuery,
                                     const BSONObj collation) {
     if (mustRunOnAllShards) {
@@ -228,10 +225,8 @@ std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expC
         return {std::make_move_iterator(shardIds.begin()), std::make_move_iterator(shardIds.end())};
     }
 
-    // If we don't need to run on all shards, then we should always have a valid routing table.
-    invariant(routingInfo);
-
-    return getTargetedShardsForQuery(expCtx, *routingInfo, shardQuery, collation);
+    invariant(cm);
+    return getTargetedShardsForQuery(expCtx, *cm, shardQuery, collation);
 }
 
 /**
@@ -657,9 +652,9 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
         return boost::none;
     }
 
-    const auto routingInfo =
+    const auto cm =
         uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, mergeStage->getOutputNs()));
-    if (!routingInfo.cm()) {
+    if (!cm.isSharded()) {
         return boost::none;
     }
 
@@ -671,7 +666,7 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
     // inserted on. With this ability we can insert an exchange on the shards to partition the
     // documents based on which shard will end up owning them. Then each shard can perform a merge
     // of only those documents which belong to it (optimistically, barring chunk migrations).
-    return walkPipelineBackwardsTrackingShardKey(opCtx, mergePipeline, *routingInfo.cm());
+    return walkPipelineBackwardsTrackingShardKey(opCtx, mergePipeline, cm);
 }
 
 SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline) {
@@ -794,7 +789,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
     auto executionNsRoutingInfo = executionNsRoutingInfoStatus.isOK()
         ? std::move(executionNsRoutingInfoStatus.getValue())
-        : boost::optional<CachedCollectionRoutingInfo>{};
+        : boost::optional<ChunkManager>{};
 
     // Determine whether we can run the entire aggregation on a single shard.
     const auto collationObj = expCtx->getCollatorBSON();
@@ -808,7 +803,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     // - The pipeline contains one or more stages which must always merge on mongoS.
     const bool needsSplit = (shardIds.size() > 1u || needsMongosMerge ||
                              (needsPrimaryShardMerge && executionNsRoutingInfo &&
-                              *(shardIds.begin()) != executionNsRoutingInfo->db().primaryId()));
+                              *(shardIds.begin()) != executionNsRoutingInfo->dbPrimary()));
 
     boost::optional<ShardedExchangePolicy> exchangeSpec;
     boost::optional<SplitPipeline> splitPipelines;
@@ -898,7 +893,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
         cursors = establishShardCursors(opCtx,
                                         expCtx->mongoProcessInterface->taskExecutor,
                                         expCtx->ns,
-                                        hasChangeStream,
+                                        mustRunOnAll,
                                         executionNsRoutingInfo,
                                         shardIds,
                                         targetedCommand,
@@ -926,7 +921,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     // must increment the number of involved shards.
     CurOp::get(opCtx)->debug().nShards = shardIds.size() +
         (needsPrimaryShardMerge && executionNsRoutingInfo &&
-         !shardIds.count(executionNsRoutingInfo->db().primaryId()));
+         !shardIds.count(executionNsRoutingInfo->dbPrimary()));
 
     return DispatchShardPipelineResults{needsPrimaryShardMerge,
                                         std::move(ownedCursors),
@@ -1099,8 +1094,8 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     return BSON("pipeline" << explainBuilder.done());
 }
 
-StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
-                                                                  const NamespaceString& execNss) {
+StatusWith<ChunkManager> getExecutionNsRoutingInfo(OperationContext* opCtx,
+                                                   const NamespaceString& execNss) {
     // First, verify that there are shards present in the cluster. If not, then we return the
     // stronger 'ShardNotFound' error rather than 'NamespaceNotFound'. We must do this because
     // $changeStream aggregations ignore NamespaceNotFound in order to allow streams to be opened on
@@ -1109,12 +1104,11 @@ StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationConte
     // aggregations do when the database does not exist.
     std::vector<ShardId> shardIds;
     Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx, &shardIds);
-    if (shardIds.size() == 0) {
+    if (shardIds.empty()) {
         return {ErrorCodes::ShardNotFound, "No shards are present in the cluster"};
     }
 
-    // This call to getCollectionRoutingInfoForTxnCmd will return !OK if the database does not
-    // exist.
+    // This call to getCollectionRoutingInfoForTxnCmd will return !OK if the database does not exist
     return getCollectionRoutingInfoForTxnCmd(opCtx, execNss);
 }
 

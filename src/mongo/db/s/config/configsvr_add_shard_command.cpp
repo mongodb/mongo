@@ -44,14 +44,11 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/request_types/add_shard_request_type.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
-
-using std::string;
 
 const long long kMaxSizeMBDefault = 0;
 
@@ -122,7 +119,7 @@ public:
                            parsedRequest.hasMaxSize() ? parsedRequest.getMaxSize()
                                                       : kMaxSizeMBDefault);
 
-        StatusWith<string> addShardResult = ShardingCatalogManager::get(opCtx)->addShard(
+        StatusWith<std::string> addShardResult = ShardingCatalogManager::get(opCtx)->addShard(
             opCtx,
             parsedRequest.hasName() ? &parsedRequest.getName() : nullptr,
             parsedRequest.getConnString(),

@@ -103,10 +103,9 @@ public:
                    BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto routingInfo = uassertStatusOK(
+        const auto cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
                                                                                          nss));
-        const auto cm = routingInfo.cm();
 
         vector<BSONObj> bounds;
         if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {
@@ -136,19 +135,19 @@ public:
             return false;
         }
 
-        if (!cm->getShardKeyPattern().isShardKey(minKey) ||
-            !cm->getShardKeyPattern().isShardKey(maxKey)) {
+        if (!cm.getShardKeyPattern().isShardKey(minKey) ||
+            !cm.getShardKeyPattern().isShardKey(maxKey)) {
             errmsg = str::stream()
                 << "shard key bounds "
                 << "[" << minKey << "," << maxKey << ")"
-                << " are not valid for shard key pattern " << cm->getShardKeyPattern().toBSON();
+                << " are not valid for shard key pattern " << cm.getShardKeyPattern().toBSON();
             return false;
         }
 
-        minKey = cm->getShardKeyPattern().normalizeShardKey(minKey);
-        maxKey = cm->getShardKeyPattern().normalizeShardKey(maxKey);
+        minKey = cm.getShardKeyPattern().normalizeShardKey(minKey);
+        maxKey = cm.getShardKeyPattern().normalizeShardKey(maxKey);
 
-        const auto firstChunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
+        const auto firstChunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
 
         BSONObjBuilder remoteCmdObjB;
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::nsField()]);
@@ -158,7 +157,7 @@ public:
             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
         remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(),
                              firstChunk.getShardId().toString());
-        remoteCmdObjB.append("epoch", cm->getVersion().epoch());
+        remoteCmdObjB.append("epoch", cm.getVersion().epoch());
 
         BSONObj remoteResult;
 
@@ -175,10 +174,10 @@ public:
             Shard::RetryPolicy::kNotIdempotent));
         uassertStatusOK(response.commandStatus);
 
-        Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(routingInfo),
-                                                              firstChunk.getShardId());
-        CommandHelpers::filterCommandReplyForPassthrough(response.response, &result);
+        Grid::get(opCtx)->catalogCache()->invalidateShardForShardedCollection(
+            nss, firstChunk.getShardId());
 
+        CommandHelpers::filterCommandReplyForPassthrough(response.response, &result);
         return true;
     }
 

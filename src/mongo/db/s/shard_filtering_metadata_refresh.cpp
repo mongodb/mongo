@@ -321,14 +321,14 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
     auto* const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->canAcceptShardedCommands());
 
-    auto routingInfo = uassertStatusOK(
+    const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss, true));
 
-    if (!routingInfo.cm()) {
+    if (!cm.isSharded()) {
         return CollectionMetadata();
     }
 
-    return CollectionMetadata(*routingInfo.cm(), shardingState->shardId());
+    return CollectionMetadata(cm, shardingState->shardId());
 }
 
 ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
@@ -344,13 +344,12 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     auto* const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->canAcceptShardedCommands());
 
-    auto routingInfo =
+    const auto cm =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
             opCtx, nss, forceRefreshFromThisThread));
-    auto cm = routingInfo.cm();
 
-    if (!cm) {
-        // No chunk manager, so unsharded. Avoid using AutoGetCollection() as it returns the
+    if (!cm.isSharded()) {
+        // The collection is not sharded. Avoid using AutoGetCollection() as it returns the
         // InvalidViewDefinition error code if an invalid view is in the 'system.views' collection.
         AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
@@ -373,8 +372,8 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         if (optMetadata) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
-                metadata.getCollVersion().epoch() == cm->getVersion().epoch() &&
-                metadata.getCollVersion() >= cm->getVersion()) {
+                metadata.getCollVersion().epoch() == cm.getVersion().epoch() &&
+                metadata.getCollVersion() >= cm.getVersion()) {
                 LOGV2_DEBUG(
                     22063,
                     1,
@@ -384,7 +383,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
                     "metadata",
                     "namespace"_attr = nss,
                     "latestCollectionVersion"_attr = metadata.getCollVersion(),
-                    "refreshedCollectionVersion"_attr = cm->getVersion());
+                    "refreshedCollectionVersion"_attr = cm.getVersion());
                 return metadata.getShardVersion();
             }
         }
@@ -404,8 +403,8 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         if (optMetadata) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
-                metadata.getCollVersion().epoch() == cm->getVersion().epoch() &&
-                metadata.getCollVersion() >= cm->getVersion()) {
+                metadata.getCollVersion().epoch() == cm.getVersion().epoch() &&
+                metadata.getCollVersion() >= cm.getVersion()) {
                 LOGV2_DEBUG(
                     22064,
                     1,
@@ -415,13 +414,13 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
                     "metadata",
                     "namespace"_attr = nss,
                     "latestCollectionVersion"_attr = metadata.getCollVersion(),
-                    "refreshedCollectionVersion"_attr = cm->getVersion());
+                    "refreshedCollectionVersion"_attr = cm.getVersion());
                 return metadata.getShardVersion();
             }
         }
     }
 
-    CollectionMetadata metadata(*cm, shardingState->shardId());
+    CollectionMetadata metadata(cm, shardingState->shardId());
     const auto newShardVersion = metadata.getShardVersion();
 
     csr->setFilteringMetadata(opCtx, std::move(metadata));

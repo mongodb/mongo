@@ -55,7 +55,7 @@ const auto getIsMigrating = OperationContext::declareDecoration<bool>();
  * restarted.
  */
 void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
-                                        CollectionMetadata const& metadata,
+                                        const CollectionMetadata& metadata,
                                         const BSONObj& doc) {
     const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
     if (!atClusterTime)
@@ -64,8 +64,9 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
     auto shardKey = metadata.getShardKeyPattern().extractShardKeyFromDoc(doc);
 
     // We can assume the simple collation because shard keys do not support non-simple collations.
-    ChunkManager chunkManagerAtClusterTime(metadata.getChunkManager()->getRoutingHistory(),
-                                           atClusterTime->asTimestamp());
+    auto cm = metadata.getChunkManager();
+    ChunkManager chunkManagerAtClusterTime(
+        cm->dbPrimary(), cm->dbVersion(), cm->getRoutingHistory(), atClusterTime->asTimestamp());
     auto chunk = chunkManagerAtClusterTime.findIntersectingChunkWithSimpleCollation(shardKey);
 
     // Throws if the chunk has moved since the timestamp of the running transaction's atClusterTime

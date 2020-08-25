@@ -58,7 +58,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/database_version_helpers.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"

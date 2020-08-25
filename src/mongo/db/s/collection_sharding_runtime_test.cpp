@@ -52,6 +52,8 @@ CollectionMetadata makeShardedMetadata(OperationContext* opCtx, UUID uuid = UUID
     auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
     auto chunk = ChunkType(kTestNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
     ChunkManager cm(
+        ShardId("0"),
+        DatabaseVersion(UUID::gen(), 1),
         RoutingTableHistory::makeNew(
             kTestNss, uuid, kShardKeyPattern, nullptr, false, epoch, {std::move(chunk)}),
         boost::none);

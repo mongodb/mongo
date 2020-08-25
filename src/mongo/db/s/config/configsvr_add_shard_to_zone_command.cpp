@@ -38,7 +38,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/request_types/add_shard_to_zone_request_type.h"
 #include "mongo/util/str.h"
 

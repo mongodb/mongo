@@ -57,8 +57,6 @@
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
 
 namespace mongo {
 

@@ -58,12 +58,12 @@ namespace {
 
 auto makeExpressionContext(OperationContext* opCtx,
                            const MapReduce& parsedMr,
-                           boost::optional<CachedCollectionRoutingInfo> routingInfo,
+                           const ChunkManager& cm,
                            boost::optional<ExplainOptions::Verbosity> verbosity) {
     // Populate the collection UUID and the appropriate collation to use.
     auto nss = parsedMr.getNamespace();
     auto [collationObj, uuid] = cluster_aggregation_planner::getCollationAndUUID(
-        routingInfo, nss, parsedMr.getCollation().get_value_or(BSONObj()));
+        opCtx, cm, nss, parsedMr.getCollation().get_value_or(BSONObj()));
 
     std::unique_ptr<CollatorInterface> resolvedCollator;
     if (!collationObj.isEmpty()) {
@@ -154,9 +154,9 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         involvedNamespaces.insert(resolvedOutNss);
     }
 
-    auto routingInfo = uassertStatusOK(
+    auto cm = uassertStatusOK(
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
-    auto expCtx = makeExpressionContext(opCtx, parsedMr, routingInfo, verbosity);
+    auto expCtx = makeExpressionContext(opCtx, parsedMr, cm, verbosity);
 
     const auto pipelineBuilder = [&]() {
         return map_reduce_common::translateFromMR(parsedMr, expCtx);
@@ -176,7 +176,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         cluster_aggregation_planner::AggregationTargeter::make(opCtx,
                                                                parsedMr.getNamespace(),
                                                                pipelineBuilder,
-                                                               routingInfo,
+                                                               cm,
                                                                involvedNamespaces,
                                                                false,  // hasChangeStream
                                                                true);  // allowedToPassthrough
@@ -187,14 +187,14 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 // needed in the normal aggregation path. For this translation, though, we need to
                 // build the pipeline to serialize and send to the primary shard.
                 auto serialized = serializeToCommand(cmd, parsedMr, pipelineBuilder().get());
-                uassertStatusOK(cluster_aggregation_planner::runPipelineOnPrimaryShard(
-                    expCtx,
-                    namespaces,
-                    targeter.routingInfo->db(),
-                    verbosity,
-                    std::move(serialized),
-                    privileges,
-                    &tempResults));
+                uassertStatusOK(
+                    cluster_aggregation_planner::runPipelineOnPrimaryShard(expCtx,
+                                                                           namespaces,
+                                                                           *targeter.cm,
+                                                                           verbosity,
+                                                                           std::move(serialized),
+                                                                           privileges,
+                                                                           &tempResults));
                 break;
             }
 

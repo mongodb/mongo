@@ -101,13 +101,11 @@ public:
             result.append("version", cachedDbInfo.databaseVersion().toBSON());
         } else {
             // Return the collection's information.
-            auto cachedCollInfo =
-                uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            const auto cm = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
             uassert(ErrorCodes::NamespaceNotSharded,
                     str::stream() << "Collection " << nss.ns() << " is not sharded.",
-                    cachedCollInfo.cm());
-            const auto cm = cachedCollInfo.cm();
-            cm->getVersion().appendLegacyWithField(&result, "version");
+                    cm.isSharded());
+            cm.getVersion().appendLegacyWithField(&result, "version");
 
             if (cmdObj["fullMetadata"].trueValue()) {
                 BSONArrayBuilder chunksArrBuilder;
@@ -116,9 +114,9 @@ public:
                 LOGV2(22753,
                       "Routing info requested by getShardVersion: {routingInfo}",
                       "Routing info requested by getShardVersion",
-                      "routingInfo"_attr = redact(cm->toString()));
+                      "routingInfo"_attr = redact(cm.toString()));
 
-                cm->forEachChunk([&](const auto& chunk) {
+                cm.forEachChunk([&](const auto& chunk) {
                     if (!exceedsSizeLimit) {
                         BSONArrayBuilder chunkBB(chunksArrBuilder.subarrayStart());
                         chunkBB.append(chunk.getMin());

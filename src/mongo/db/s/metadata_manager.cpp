@@ -42,13 +42,13 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
+
 using TaskExecutor = executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 
@@ -136,9 +136,9 @@ std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMet
             lg, shared_from_this(), std::move(activeMetadataTracker));
     }
 
-    auto chunkManager = activeMetadata->getChunkManager();
-    ChunkManager chunkManagerAtClusterTime =
-        ChunkManager(chunkManager->getRoutingHistory(), atClusterTime->asTimestamp());
+    auto cm = activeMetadata->getChunkManager();
+    ChunkManager chunkManagerAtClusterTime = ChunkManager(
+        cm->dbPrimary(), cm->dbVersion(), cm->getRoutingHistory(), atClusterTime->asTimestamp());
 
     class MetadataAtTimestamp : public ScopedCollectionDescription::Impl {
     public:

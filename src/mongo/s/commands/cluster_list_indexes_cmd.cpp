@@ -41,14 +41,14 @@ namespace {
 
 bool cursorCommandPassthroughShardWithMinKeyChunk(OperationContext* opCtx,
                                                   const NamespaceString& nss,
-                                                  const CachedCollectionRoutingInfo& routingInfo,
+                                                  const ChunkManager& cm,
                                                   const BSONObj& cmdObj,
                                                   BSONObjBuilder* out,
                                                   const PrivilegeVector& privileges) {
     auto response = executeCommandAgainstShardWithMinKeyChunk(
         opCtx,
         nss,
-        routingInfo,
+        cm,
         CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
         ReadPreferenceSetting::get(opCtx),
         Shard::RetryPolicy::kIdempotent);
@@ -121,13 +121,13 @@ public:
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
         const NamespaceString nss(parseNs(dbName, cmdObj));
-        const auto routingInfo =
+        const auto cm =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
         return cursorCommandPassthroughShardWithMinKeyChunk(
             opCtx,
             nss,
-            routingInfo,
+            cm,
             applyReadWriteConcern(opCtx, this, cmdObj),
             &result,
             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)});

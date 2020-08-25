@@ -208,27 +208,25 @@ public:
         const BSONObj& cmdObj = request.body;
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
-        auto routingInfo =
+        const auto cm =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
-        boost::optional<ChunkManager> chunkMgr;
         std::shared_ptr<Shard> shard;
 
-        if (!routingInfo.cm()) {
-            shard = routingInfo.db().primary();
-        } else {
-            chunkMgr.emplace(*routingInfo.cm());
-
+        if (cm.isSharded()) {
             const BSONObj query = cmdObj.getObjectField("query");
             const BSONObj collation = getCollation(cmdObj);
             const auto let = getLet(cmdObj);
             const auto rc = getRuntimeConstants(cmdObj);
             const BSONObj shardKey =
-                getShardKey(opCtx, *chunkMgr, nss, query, collation, verbosity, let, rc);
-            const auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
+                getShardKey(opCtx, cm, nss, query, collation, verbosity, let, rc);
+            const auto chunk = cm.findIntersectingChunk(shardKey, collation);
 
             shard = uassertStatusOK(
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShardId()));
+        } else {
+            shard =
+                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));
         }
 
         const auto explainCmd = ClusterExplain::wrapAsExplain(
@@ -238,10 +236,10 @@ public:
         Timer timer;
         BSONObjBuilder bob;
 
-        if (chunkMgr) {
+        if (cm.isSharded()) {
             _runCommand(opCtx,
                         shard->getId(),
-                        chunkMgr->getVersion(shard->getId()),
+                        cm.getVersion(shard->getId()),
                         boost::none,
                         nss,
                         applyReadWriteConcern(opCtx, false, false, explainCmd),
@@ -250,7 +248,7 @@ public:
             _runCommand(opCtx,
                         shard->getId(),
                         ChunkVersion::UNSHARDED(),
-                        routingInfo.db().databaseVersion(),
+                        cm.dbVersion(),
                         nss,
                         applyReadWriteConcern(opCtx, false, false, explainCmd),
                         &bob);
@@ -286,31 +284,30 @@ public:
         // Append mongoS' runtime constants to the command object before forwarding it to the shard.
         auto cmdObjForShard = appendRuntimeConstantsToCommandObject(opCtx, cmdObj);
 
-        const auto routingInfo = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-        if (!routingInfo.cm()) {
+        const auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+        if (!cm.isSharded()) {
             _runCommand(opCtx,
-                        routingInfo.db().primaryId(),
+                        cm.dbPrimary(),
                         ChunkVersion::UNSHARDED(),
-                        routingInfo.db().databaseVersion(),
+                        cm.dbVersion(),
                         nss,
                         applyReadWriteConcern(opCtx, this, cmdObjForShard),
                         &result);
             return true;
         }
 
-        const auto chunkMgr = routingInfo.cm();
-
         const BSONObj query = cmdObjForShard.getObjectField("query");
         const BSONObj collation = getCollation(cmdObjForShard);
         const auto let = getLet(cmdObjForShard);
         const auto rc = getRuntimeConstants(cmdObjForShard);
         const BSONObj shardKey =
-            getShardKey(opCtx, *chunkMgr, nss, query, collation, boost::none, let, rc);
-        auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
+            getShardKey(opCtx, cm, nss, query, collation, boost::none, let, rc);
+
+        auto chunk = cm.findIntersectingChunk(shardKey, collation);
 
         _runCommand(opCtx,
                     chunk.getShardId(),
-                    chunkMgr->getVersion(chunk.getShardId()),
+                    cm.getVersion(chunk.getShardId()),
                     boost::none,
                     nss,
                     applyReadWriteConcern(opCtx, this, cmdObjForShard),

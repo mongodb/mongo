@@ -162,7 +162,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                                const ClusterAggregate::Namespaces& namespaces,
                                Document serializedCommand,
                                long long batchSize,
-                               const boost::optional<CachedCollectionRoutingInfo>& routingInfo,
+                               const boost::optional<ChunkManager>& cm,
                                DispatchShardPipelineResults&& shardDispatchResults,
                                BSONObjBuilder* result,
                                const PrivilegeVector& privileges,
@@ -200,12 +200,10 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
 
     // If we are not merging on mongoS, then this is not a $changeStream aggregation, and we
     // therefore must have a valid routing table.
-    invariant(routingInfo);
+    invariant(cm);
 
-    const ShardId mergingShardId = pickMergingShard(opCtx,
-                                                    shardDispatchResults.needsPrimaryShardMerge,
-                                                    targetedShards,
-                                                    routingInfo->db().primaryId());
+    const ShardId mergingShardId = pickMergingShard(
+        opCtx, shardDispatchResults.needsPrimaryShardMerge, targetedShards, cm->dbPrimary());
     const bool mergingShardContributesData =
         std::find(targetedShards.begin(), targetedShards.end(), mergingShardId) !=
         targetedShards.end();
@@ -481,8 +479,11 @@ ClusterClientCursorGuard convertPipelineToRouterStages(
 /**
  * Returns the output of the listCollections command filtered to the namespace 'nss'.
  */
-BSONObj getUnshardedCollInfo(const Shard* primaryShard, const NamespaceString& nss) {
-    ScopedDbConnection conn(primaryShard->getConnString());
+BSONObj getUnshardedCollInfo(OperationContext* opCtx,
+                             const ShardId& shardId,
+                             const NamespaceString& nss) {
+    auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+    ScopedDbConnection conn(shard->getConnString());
     std::list<BSONObj> all =
         conn->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
     if (all.empty()) {
@@ -491,7 +492,6 @@ BSONObj getUnshardedCollInfo(const Shard* primaryShard, const NamespaceString& n
     }
     return all.front();
 }
-
 
 /**
  * Returns the collection default collation or the simple collator if there is no default. If the
@@ -551,7 +551,7 @@ AggregationTargeter AggregationTargeter::make(
     OperationContext* opCtx,
     const NamespaceString& executionNss,
     const std::function<std::unique_ptr<Pipeline, PipelineDeleter>()> buildPipelineFn,
-    boost::optional<CachedCollectionRoutingInfo> routingInfo,
+    boost::optional<ChunkManager> cm,
     stdx::unordered_set<NamespaceString> involvedNamespaces,
     bool hasChangeStream,
     bool allowedToPassthrough) {
@@ -559,9 +559,9 @@ AggregationTargeter AggregationTargeter::make(
     // Check if any of the involved collections are sharded.
     bool involvesShardedCollections = [&]() {
         for (const auto& nss : involvedNamespaces) {
-            const auto resolvedNsRoutingInfo =
+            const auto resolvedNsCM =
                 uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-            if (resolvedNsRoutingInfo.cm()) {
+            if (resolvedNsCM.isSharded()) {
                 return true;
             }
         }
@@ -573,7 +573,7 @@ AggregationTargeter AggregationTargeter::make(
         sharded_agg_helpers::mustRunOnAllShards(executionNss, hasChangeStream);
 
     // If we don't have a routing table, then this is a $changeStream which must run on all shards.
-    invariant(routingInfo || (mustRunOnAll && hasChangeStream));
+    invariant(cm || (mustRunOnAll && hasChangeStream));
 
     // A pipeline is allowed to passthrough to the primary shard iff the following conditions are
     // met:
@@ -585,20 +585,20 @@ AggregationTargeter AggregationTargeter::make(
     //    $currentOp.
     // 4. Doesn't need transformation via DocumentSource::serialize(). For example, list sessions
     //    needs to include information about users that can only be deduced on mongos.
-    if (routingInfo && !routingInfo->cm() && !mustRunOnAll && allowedToPassthrough &&
+    if (cm && !cm->isSharded() && !mustRunOnAll && allowedToPassthrough &&
         !involvesShardedCollections) {
-        return AggregationTargeter{TargetingPolicy::kPassthrough, nullptr, routingInfo};
+        return AggregationTargeter{TargetingPolicy::kPassthrough, nullptr, cm};
     } else {
         auto pipeline = buildPipelineFn();
         auto policy = pipeline->requiredToRunOnMongos() ? TargetingPolicy::kMongosRequired
                                                         : TargetingPolicy::kAnyShard;
-        return AggregationTargeter{policy, std::move(pipeline), routingInfo};
+        return AggregationTargeter{policy, std::move(pipeline), cm};
     }
 }
 
 Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  const ClusterAggregate::Namespaces& namespaces,
-                                 const CachedDatabaseInfo& dbInfo,
+                                 const ChunkManager& cm,
                                  boost::optional<ExplainOptions::Verbosity> explain,
                                  Document serializedCommand,
                                  const PrivilegeVector& privileges,
@@ -615,7 +615,7 @@ Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& 
             sharded_agg_helpers::createPassthroughCommandForShard(
                 expCtx, serializedCommand, explain, boost::none, nullptr, BSONObj())));
 
-    const auto shardId = dbInfo.primary()->getId();
+    const auto shardId = cm.dbPrimary();
     const auto cmdObjWithShardVersion = (shardId != ShardRegistry::kConfigServerShardId)
         ? appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED())
         : std::move(cmdObj);
@@ -624,7 +624,7 @@ Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& 
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
         namespaces.executionNss.db().toString(),
-        {{shardId, appendDbVersionIfPresent(cmdObjWithShardVersion, dbInfo)}},
+        {{shardId, appendDbVersionIfPresent(cmdObjWithShardVersion, cm.dbVersion())}},
         ReadPreferenceSetting::get(opCtx),
         Shard::RetryPolicy::kIdempotent);
     auto response = ars.next();
@@ -746,7 +746,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                    namespaces,
                                    serializedCommand,
                                    batchSize,
-                                   targeter.routingInfo,
+                                   targeter.cm,
                                    std::move(shardDispatchResults),
                                    result,
                                    privileges,
@@ -754,11 +754,12 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
 }
 
 std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
-    const boost::optional<CachedCollectionRoutingInfo>& routingInfo,
+    OperationContext* opCtx,
+    const boost::optional<ChunkManager>& cm,
     const NamespaceString& nss,
     const BSONObj& collation) {
-    const bool collectionIsSharded = (routingInfo && routingInfo->cm());
-    const bool collectionIsNotSharded = (routingInfo && !routingInfo->cm());
+    const bool collectionIsSharded = (cm && cm->isSharded());
+    const bool collectionIsNotSharded = (cm && !cm->isSharded());
 
     // If this is a collectionless aggregation, we immediately return the user-
     // defined collation if one exists, or an empty BSONObj otherwise. Collectionless aggregations
@@ -770,14 +771,13 @@ std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
     }
 
     // If the collection is unsharded, obtain collInfo from the primary shard.
-    const auto unshardedCollInfo = collectionIsNotSharded
-        ? getUnshardedCollInfo(routingInfo->db().primary().get(), nss)
-        : BSONObj();
+    const auto unshardedCollInfo =
+        collectionIsNotSharded ? getUnshardedCollInfo(opCtx, cm->dbPrimary(), nss) : BSONObj();
 
     // Return the collection UUID if available, or boost::none otherwise.
     const auto getUUID = [&]() -> auto {
         if (collectionIsSharded) {
-            return routingInfo->cm()->getUUID();
+            return cm->getUUID();
         } else {
             return unshardedCollInfo["info"] && unshardedCollInfo["info"]["uuid"]
                 ? boost::optional<UUID>{uassertStatusOK(
@@ -796,9 +796,8 @@ std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
         if (collectionIsNotSharded) {
             return getDefaultCollationForUnshardedCollection(unshardedCollInfo);
         } else {
-            return routingInfo->cm()->getDefaultCollator()
-                ? routingInfo->cm()->getDefaultCollator()->getSpec().toBSON()
-                : CollationSpec::kSimpleSpec;
+            return cm->getDefaultCollator() ? cm->getDefaultCollator()->getSpec().toBSON()
+                                            : CollationSpec::kSimpleSpec;
         }
     };
 

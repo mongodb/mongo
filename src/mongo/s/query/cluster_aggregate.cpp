@@ -142,9 +142,9 @@ void appendEmptyResultSetWithStatus(OperationContext* opCtx,
 
 void updateHostsTargetedMetrics(OperationContext* opCtx,
                                 const NamespaceString& executionNss,
-                                boost::optional<CachedCollectionRoutingInfo> executionNsRoutingInfo,
+                                const boost::optional<ChunkManager>& cm,
                                 stdx::unordered_set<NamespaceString> involvedNamespaces) {
-    if (!executionNsRoutingInfo)
+    if (!cm)
         return;
 
     // Create a set of ShardIds that own a chunk belonging to any of the collections involved in
@@ -153,9 +153,9 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
     std::set<ShardId> shardsOwningChunks = [&]() {
         std::set<ShardId> shardsIds;
 
-        if (executionNsRoutingInfo->cm()) {
+        if (cm->isSharded()) {
             std::set<ShardId> shardIdsForNs;
-            executionNsRoutingInfo->cm()->getAllShardIds(&shardIdsForNs);
+            cm->getAllShardIds(&shardIdsForNs);
             for (const auto& shardId : shardIdsForNs) {
                 shardsIds.insert(shardId);
             }
@@ -165,11 +165,11 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
             if (nss == executionNss)
                 continue;
 
-            const auto resolvedNsRoutingInfo =
+            const auto resolvedNsCM =
                 uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-            if (resolvedNsRoutingInfo.cm()) {
+            if (resolvedNsCM.isSharded()) {
                 std::set<ShardId> shardIdsForNs;
-                resolvedNsRoutingInfo.cm()->getAllShardIds(&shardIdsForNs);
+                resolvedNsCM.getAllShardIds(&shardIdsForNs);
                 for (const auto& shardId : shardIdsForNs) {
                     shardsIds.insert(shardId);
                 }
@@ -219,9 +219,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             !request.getCollectionUUID());
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
-        const auto resolvedNsRoutingInfo =
-            uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-        return bool(resolvedNsRoutingInfo.cm());
+        const auto resolvedNsCM = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+        return resolvedNsCM.isSharded();
     };
 
     liteParsedPipeline.verifyIsSupported(
@@ -235,11 +234,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // $changeStream, we allow the operation to continue so that stream cursors can be established
     // on the given namespace before the database or collection is actually created. If the database
     // does not exist and this is not a $changeStream, then we return an empty cursor.
-    boost::optional<CachedCollectionRoutingInfo> routingInfo;
+    boost::optional<ChunkManager> cm;
     auto executionNsRoutingInfoStatus =
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, namespaces.executionNss);
     if (executionNsRoutingInfoStatus.isOK()) {
-        routingInfo = std::move(executionNsRoutingInfoStatus.getValue());
+        cm = std::move(executionNsRoutingInfoStatus.getValue());
     } else if (!(hasChangeStream &&
                  executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
         appendEmptyResultSetWithStatus(
@@ -261,7 +260,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             }
 
             return cluster_aggregation_planner::getCollationAndUUID(
-                routingInfo, namespaces.executionNss, request.getCollation());
+                opCtx, cm, namespaces.executionNss, request.getCollation());
         }();
 
         // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
@@ -280,7 +279,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         opCtx,
         namespaces.executionNss,
         pipelineBuilder,
-        routingInfo,
+        cm,
         involvedNamespaces,
         hasChangeStream,
         liteParsedPipeline.allowedToPassthroughFromMongos());
@@ -306,7 +305,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 return cluster_aggregation_planner::runPipelineOnPrimaryShard(
                     expCtx,
                     namespaces,
-                    targeter.routingInfo->db(),
+                    *targeter.cm,
                     request.getExplain(),
                     request.serializeToCommandObj(),
                     privileges,
@@ -352,7 +351,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }();
 
     if (status.isOK()) {
-        updateHostsTargetedMetrics(opCtx, namespaces.executionNss, routingInfo, involvedNamespaces);
+        updateHostsTargetedMetrics(opCtx, namespaces.executionNss, cm, involvedNamespaces);
         // Report usage statistics for each stage in the pipeline.
         liteParsedPipeline.tickGlobalStageCounters();
     }

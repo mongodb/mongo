@@ -176,10 +176,10 @@ public:
                 CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
         }
 
-        const auto routingInfo = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+        const auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
         if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
                 repl::ReadConcernLevel::kSnapshotReadConcern &&
-            !opCtx->inMultiDocumentTransaction() && routingInfo.cm()) {
+            !opCtx->inMultiDocumentTransaction() && cm.isSharded()) {
             uasserted(ErrorCodes::InvalidOptions,
                       "readConcern level \"snapshot\" prohibited for \"distinct\" command on"
                       " sharded collection");
@@ -191,7 +191,7 @@ public:
                 opCtx,
                 nss.db(),
                 nss,
-                routingInfo,
+                cm,
                 applyReadWriteConcern(
                     opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
                 ReadPreferenceSetting::get(opCtx),
@@ -226,12 +226,11 @@ public:
             return true;
         }
 
-        BSONObjComparator bsonCmp(
-            BSONObj(),
-            BSONObjComparator::FieldNamesMode::kConsider,
-            !collation.isEmpty()
-                ? collator.get()
-                : (routingInfo.cm() ? routingInfo.cm()->getDefaultCollator() : nullptr));
+        BSONObjComparator bsonCmp(BSONObj(),
+                                  BSONObjComparator::FieldNamesMode::kConsider,
+                                  !collation.isEmpty()
+                                      ? collator.get()
+                                      : (cm.isSharded() ? cm.getDefaultCollator() : nullptr));
         BSONObjSet all = bsonCmp.makeBSONObjSet();
 
         for (const auto& response : shardResponses) {

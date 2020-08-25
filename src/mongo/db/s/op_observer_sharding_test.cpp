@@ -66,7 +66,9 @@ CollectionMetadata makeAMetadata(BSONObj const& keyPattern) {
     auto rt = RoutingTableHistory::makeNew(
         kTestNss, UUID::gen(), KeyPattern(keyPattern), nullptr, false, epoch, {std::move(chunk)});
 
-    return CollectionMetadata(ChunkManager(rt, Timestamp(100, 0)), ShardId("this"));
+    return CollectionMetadata(
+        ChunkManager(ShardId("this"), DatabaseVersion(UUID::gen(), 1), rt, Timestamp(100, 0)),
+        ShardId("this"));
 }
 
 class DeleteStateTest : public ShardServerTestFixture {};

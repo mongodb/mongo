@@ -172,7 +172,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
  */
 std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
     OperationContext* opCtx,
-    const CachedCollectionRoutingInfo& routingInfo,
+    const ChunkManager& cm,
     const std::set<ShardId>& shardIds,
     const CanonicalQuery& query,
     bool appendGeoNearDistanceProjection) {
@@ -202,12 +202,11 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
         BSONObjBuilder cmdBuilder;
         qrToForward->asFindCommand(&cmdBuilder);
 
-        if (routingInfo.cm()) {
-            routingInfo.cm()->getVersion(shardId).appendToCommand(&cmdBuilder);
+        if (cm.isSharded()) {
+            cm.getVersion(shardId).appendToCommand(&cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
             ChunkVersion::UNSHARDED().appendToCommand(&cmdBuilder);
-            auto dbVersion = routingInfo.db().databaseVersion();
-            cmdBuilder.append("databaseVersion", dbVersion.toBSON());
+            cmdBuilder.append("databaseVersion", cm.dbVersion().toBSON());
         }
 
         if (opCtx->getTxnNumber()) {
@@ -221,11 +220,11 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
 }
 
 void updateNumHostsTargetedMetrics(OperationContext* opCtx,
-                                   const CachedCollectionRoutingInfo& routingInfo,
+                                   const ChunkManager& cm,
                                    int nTargetedShards) {
     int nShardsOwningChunks = 0;
-    if (routingInfo.cm()) {
-        nShardsOwningChunks = routingInfo.cm()->getNShardsOwningChunks();
+    if (cm.isSharded()) {
+        nShardsOwningChunks = cm.getNShardsOwningChunks();
     }
 
     auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
@@ -237,12 +236,12 @@ void updateNumHostsTargetedMetrics(OperationContext* opCtx,
 CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
-                                 const CachedCollectionRoutingInfo& routingInfo,
+                                 const ChunkManager& cm,
                                  std::vector<BSONObj>* results,
                                  bool* partialResultsReturned) {
     // Get the set of shards on which we will run the query.
     auto shardIds = getTargetedShardsForQuery(query.getExpCtx(),
-                                              routingInfo,
+                                              cm,
                                               query.getQueryRequest().getFilter(),
                                               query.getQueryRequest().getCollation());
 
@@ -306,8 +305,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Construct the requests that we will use to establish cursors on the targeted shards,
     // attaching the shardVersion and txnNumber, if necessary.
 
-    auto requests = constructRequestsForShards(
-        opCtx, routingInfo, shardIds, query, appendGeoNearDistanceProjection);
+    auto requests =
+        constructRequestsForShards(opCtx, cm, shardIds, query, appendGeoNearDistanceProjection);
 
     // Establish the cursors with a consistent shardVersion across shards.
     params.remotes = establishCursors(opCtx,
@@ -398,7 +397,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         CurOp::get(opCtx)->debug().cursorExhausted = true;
 
         if (shardIds.size() > 0) {
-            updateNumHostsTargetedMetrics(opCtx, routingInfo, shardIds.size());
+            updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
         }
         return CursorId(0);
     }
@@ -419,7 +418,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     CurOp::get(opCtx)->debug().cursorid = cursorId;
 
     if (shardIds.size() > 0) {
-        updateNumHostsTargetedMetrics(opCtx, routingInfo, shardIds.size());
+        updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
     }
 
     return cursorId;

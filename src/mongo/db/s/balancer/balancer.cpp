@@ -50,7 +50,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
@@ -612,13 +611,13 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
             return routingInfoStatus.getStatus();
         }
 
-        auto cm = routingInfoStatus.getValue().cm();
+        const auto& cm = routingInfoStatus.getValue();
 
         auto splitStatus =
             shardutil::splitChunkAtMultiplePoints(opCtx,
                                                   splitInfo.shardId,
                                                   splitInfo.nss,
-                                                  cm->getShardKeyPattern(),
+                                                  cm.getShardKeyPattern(),
                                                   splitInfo.collectionVersion,
                                                   ChunkRange(splitInfo.minKey, splitInfo.maxKey),
                                                   splitInfo.splitKeys);
@@ -701,17 +700,16 @@ int Balancer::_moveChunks(OperationContext* opCtx,
 void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const BSONObj& minKey) {
-    auto routingInfo = uassertStatusOK(
+    const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
-    const auto cm = routingInfo.cm();
-    auto chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
+    auto chunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
 
     try {
         const auto splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
             opCtx,
             chunk.getShardId(),
             nss,
-            cm->getShardKeyPattern(),
+            cm.getShardKeyPattern(),
             ChunkRange(chunk.getMin(), chunk.getMax()),
             Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
             boost::none));
@@ -747,8 +745,8 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
             shardutil::splitChunkAtMultiplePoints(opCtx,
                                                   chunk.getShardId(),
                                                   nss,
-                                                  cm->getShardKeyPattern(),
-                                                  cm->getVersion(),
+                                                  cm.getShardKeyPattern(),
+                                                  cm.getVersion(),
                                                   ChunkRange(chunk.getMin(), chunk.getMax()),
                                                   splitPoints));
     } catch (const DBException&) {

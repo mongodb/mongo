@@ -33,13 +33,10 @@
 
 #include "mongo/db/pipeline/pipeline_d.h"
 
-#include <memory>
-
 #include "mongo/base/exact_cast.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -75,19 +72,12 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/transaction_participant.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

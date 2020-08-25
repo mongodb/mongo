@@ -51,7 +51,7 @@ protected:
      * the expected vector.
      */
     void runBuildVersionedRequestsExpect(
-        const CachedCollectionRoutingInfo& routingInfo,
+        const ChunkManager& cm,
         const std::set<ShardId>& shardsToSkip,
         const BSONObj& cmdObj,
         const BSONObj& query,
@@ -59,7 +59,7 @@ protected:
         const std::vector<AsyncRequestsSender::Request>& expectedRequests) {
 
         const auto actualRequests = buildVersionedRequestsForTargetedShards(
-            operationContext(), kNss, routingInfo, shardsToSkip, cmdObj, query, collation);
+            operationContext(), kNss, cm, shardsToSkip, cmdObj, query, collation);
 
         ASSERT_EQ(expectedRequests.size(), actualRequests.size());
         _assertShardIdsMatch(expectedRequests, actualRequests);
@@ -112,10 +112,10 @@ TEST_F(BuildVersionedRequestsForTargetedShardsTest, ReturnPrimaryShardForUnshard
     expectGetDatabaseUnsharded();
     expectGetCollectionUnsharded();
 
-    auto routingInfo = future.default_timed_get();
+    auto cm = future.default_timed_get();
 
     AsyncRequestsSender::Request expectedRequest{ShardId(_shards[0].getName()), {}};
-    runBuildVersionedRequestsExpect(*routingInfo, {}, {}, {}, {}, {expectedRequest});
+    runBuildVersionedRequestsExpect(*cm, {}, {}, {}, {}, {expectedRequest});
 }
 
 TEST_F(BuildVersionedRequestsForTargetedShardsTest,
@@ -125,9 +125,9 @@ TEST_F(BuildVersionedRequestsForTargetedShardsTest,
     expectGetDatabaseUnsharded();
     expectGetCollectionUnsharded();
 
-    auto routingInfo = future.default_timed_get();
+    auto cm = future.default_timed_get();
 
-    runBuildVersionedRequestsExpect(*routingInfo, {ShardId(_shards[0].getName())}, {}, {}, {}, {});
+    runBuildVersionedRequestsExpect(*cm, {ShardId(_shards[0].getName())}, {}, {}, {}, {});
 }
 
 }  // namespace mongo

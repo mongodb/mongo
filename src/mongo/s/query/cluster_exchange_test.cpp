@@ -44,8 +44,8 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
 namespace {
+
 using MergeStrategyDescriptor = DocumentSourceMerge::MergeStrategyDescriptor;
 using WhenMatched = MergeStrategyDescriptor::WhenMatched;
 using WhenNotMatched = MergeStrategyDescriptor::WhenNotMatched;
@@ -608,5 +608,6 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
 
     future.default_timed_get();
 }
+
 }  // namespace
 }  // namespace mongo

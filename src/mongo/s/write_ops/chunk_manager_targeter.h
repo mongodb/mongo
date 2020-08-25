@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
@@ -151,7 +151,7 @@ private:
     bool _needsTargetingRefresh;
 
     // The latest loaded routing cache entry
-    boost::optional<CachedCollectionRoutingInfo> _routingInfo;
+    boost::optional<ChunkManager> _cm;
 
     // Set to the epoch of the namespace we are targeting. If we ever refresh the catalog cache and
     // find a new epoch, we immediately throw a StaleEpoch exception.

@@ -35,8 +35,6 @@
 #include "mongo/s/query/owned_remote_cursor.h"
 
 namespace mongo {
-class CachedCollectionRoutingInfo;
-
 namespace sharded_agg_helpers {
 
 /**
@@ -172,8 +170,8 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
  * Returns 'ShardNotFound' or 'NamespaceNotFound' if there are no shards in the cluster or if
  * collection 'execNss' does not exist, respectively.
  */
-StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
-                                                                  const NamespaceString& execNss);
+StatusWith<ChunkManager> getExecutionNsRoutingInfo(OperationContext* opCtx,
+                                                   const NamespaceString& execNss);
 
 /**
  * Returns true if an aggregation over 'nss' must run on all shards.

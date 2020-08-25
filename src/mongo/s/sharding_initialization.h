@@ -82,7 +82,6 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                                      rpc::ShardingEgressMetadataHookBuilder hookBuilder,
                                      boost::optional<size_t> taskExecutorPoolSize);
 
-
 /**
  * Loads cluster ID and waits for the reload of the Shard Registry.
  */

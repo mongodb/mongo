@@ -38,6 +38,7 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/database_version_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -46,15 +47,13 @@ namespace mongo {
 
 class CanonicalQuery;
 struct QuerySolutionNode;
-class OperationContext;
 class ChunkManager;
 
 struct ShardVersionTargetingInfo {
-    // Indicates whether the shard is stale and thus needs a catalog cache refresh. Is false by
-    // default.
-    AtomicWord<bool> isStale;
+    // Indicates whether the shard is stale and thus needs a catalog cache refresh
+    AtomicWord<bool> isStale{false};
 
-    // Max chunk version for the shard.
+    // Max chunk version for the shard
     ChunkVersion shardVersion;
 
     ShardVersionTargetingInfo(const OID& epoch);
@@ -64,9 +63,11 @@ struct ShardVersionTargetingInfo {
 // shard is currently marked as needing a catalog cache refresh (stale).
 using ShardVersionMap = stdx::unordered_map<ShardId, ShardVersionTargetingInfo, ShardId::Hasher>;
 
-// This class serves as a Facade around how the mapping of ranges to chunks is represented. It also
-// provides a simpler, high-level interface for domain specific operations without exposing the
-// underlying implementation.
+/**
+ * This class serves as a Facade around how the mapping of ranges to chunks is represented. It also
+ * provides a simpler, high-level interface for domain specific operations without exposing the
+ * underlying implementation.
+ */
 class ChunkMap {
     // Vector of chunks ordered by max key.
     using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
@@ -168,7 +169,7 @@ public:
      */
     std::shared_ptr<RoutingTableHistory> makeUpdated(const std::vector<ChunkType>& changedChunks);
 
-    const NamespaceString& getns() const {
+    const NamespaceString& nss() const {
         return _nss;
     }
 
@@ -261,6 +262,8 @@ public:
     }
 
 private:
+    friend class ChunkManager;
+
     RoutingTableHistory(NamespaceString nss,
                         boost::optional<UUID> uuid,
                         KeyPattern shardKeyPattern,
@@ -294,8 +297,6 @@ private:
     // Note: this declaration must not be moved before _chunkMap since it is initialized by using
     // the _chunkMap instance.
     ShardVersionMap _shardVersions;
-
-    friend class ChunkManager;
 };
 
 /**
@@ -303,12 +304,36 @@ private:
  */
 class ChunkManager {
 public:
-    ChunkManager(std::shared_ptr<RoutingTableHistory> rt, boost::optional<Timestamp> clusterTime)
-        : _rt(std::move(rt)), _clusterTime(std::move(clusterTime)) {}
+    ChunkManager(ShardId dbPrimary,
+                 DatabaseVersion dbVersion,
+                 std::shared_ptr<RoutingTableHistory> rt,
+                 boost::optional<Timestamp> clusterTime)
+        : _dbPrimary(std::move(dbPrimary)),
+          _dbVersion(std::move(dbVersion)),
+          _rt(std::move(rt)),
+          _clusterTime(std::move(clusterTime)) {}
 
-    const NamespaceString& getns() const {
-        return _rt->getns();
+    // Methods supported on both sharded and unsharded collections
+
+    bool isSharded() const {
+        return bool(_rt);
     }
+
+    const ShardId& dbPrimary() const {
+        return _dbPrimary;
+    }
+
+    const DatabaseVersion& dbVersion() const {
+        return _dbVersion;
+    }
+
+    int numChunks() const {
+        return _rt ? _rt->numChunks() : 1;
+    }
+
+    std::string toString() const;
+
+    // Methods only supported on sharded collections (caller must check isSharded())
 
     const ShardKeyPattern& getShardKeyPattern() const {
         return _rt->getShardKeyPattern();
@@ -343,10 +368,6 @@ public:
 
                 return true;
             });
-    }
-
-    int numChunks() const {
-        return _rt->numChunks();
     }
 
     /**
@@ -452,10 +473,6 @@ public:
         return _rt->compatibleWith(*other._rt, shard);
     }
 
-    std::string toString() const {
-        return _rt->toString();
-    }
-
     bool uuidMatches(UUID uuid) const {
         return _rt->uuidMatches(uuid);
     }
@@ -469,7 +486,11 @@ public:
     }
 
 private:
+    ShardId _dbPrimary;
+    DatabaseVersion _dbVersion;
+
     std::shared_ptr<RoutingTableHistory> _rt;
+
     boost::optional<Timestamp> _clusterTime;
 };
 

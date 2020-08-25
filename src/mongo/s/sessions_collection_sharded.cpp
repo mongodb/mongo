@@ -62,19 +62,17 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
 
 std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwningShard(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
-    auto routingInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+    const auto cm = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
         opCtx, NamespaceString::kLogicalSessionsNamespace));
-    auto cm = routingInfo.cm();
-
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Collection " << NamespaceString::kLogicalSessionsNamespace
                           << " is not sharded",
-            cm);
+            cm.isSharded());
 
     std::multimap<ShardId, LogicalSessionId> sessionIdsByOwningShard;
     for (const auto& session : sessions) {
         sessionIdsByOwningShard.emplace(
-            cm->findIntersectingChunkWithSimpleCollation(session.getId().toBSON()).getShardId(),
+            cm.findIntersectingChunkWithSimpleCollation(session.getId().toBSON()).getShardId(),
             session);
     }
 
@@ -89,19 +87,17 @@ std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwnin
 
 std::vector<LogicalSessionRecord> SessionsCollectionSharded::_groupSessionRecordsByOwningShard(
     OperationContext* opCtx, const LogicalSessionRecordSet& sessions) {
-    auto routingInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+    const auto cm = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
         opCtx, NamespaceString::kLogicalSessionsNamespace));
-    auto cm = routingInfo.cm();
-
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Collection " << NamespaceString::kLogicalSessionsNamespace
                           << " is not sharded",
-            cm);
+            cm.isSharded());
 
     std::multimap<ShardId, LogicalSessionRecord> sessionsByOwningShard;
     for (const auto& session : sessions) {
         sessionsByOwningShard.emplace(
-            cm->findIntersectingChunkWithSimpleCollation(session.getId().toBSON()).getShardId(),
+            cm.findIntersectingChunkWithSimpleCollation(session.getId().toBSON()).getShardId(),
             session);
     }
 
@@ -124,12 +120,11 @@ void SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* 
             Grid::get(opCtx)->isShardingInitialized());
 
     // If the collection doesn't exist, fail. Only the config servers generate it.
-    const auto routingInfo = uassertStatusOK(
+    const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
             opCtx, NamespaceString::kLogicalSessionsNamespace));
 
-    uassert(
-        ErrorCodes::NamespaceNotFound, "config.system.sessions does not exist", routingInfo.cm());
+    uassert(ErrorCodes::NamespaceNotFound, "config.system.sessions does not exist", cm.isSharded());
 }
 
 void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,

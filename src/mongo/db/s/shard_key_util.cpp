@@ -231,16 +231,16 @@ void ValidationBehaviorsShardCollection::createShardKeyIndex(
 ValidationBehaviorsRefineShardKey::ValidationBehaviorsRefineShardKey(OperationContext* opCtx,
                                                                      const NamespaceString& nss)
     : _opCtx(opCtx) {
-    auto routingInfo = uassertStatusOK(
+    const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "refineCollectionShardKey namespace " << nss.toString()
                           << " is not sharded",
-            routingInfo.cm());
-    const auto minKeyShardId = routingInfo.cm()->getMinKeyShardIdWithSimpleCollation();
+            cm.isSharded());
+    const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation();
     _indexShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId));
-    _cm.emplace(*routingInfo.cm());
+    _cm = std::move(cm);
 }
 
 std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(

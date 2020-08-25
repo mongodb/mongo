@@ -87,7 +87,8 @@ protected:
             epoch,
             {ChunkType{kNss, range, ChunkVersion(1, 0, epoch), kOtherShard}});
 
-        return CollectionMetadata(ChunkManager(rt, boost::none), kThisShard);
+        return CollectionMetadata(
+            ChunkManager(kThisShard, DatabaseVersion(UUID::gen(), 1), rt, boost::none), kThisShard);
     }
 
     /**
@@ -129,7 +130,8 @@ protected:
 
         auto rt = cm->getRoutingHistory()->makeUpdated(splitChunks);
 
-        return CollectionMetadata(ChunkManager(rt, boost::none), kThisShard);
+        return CollectionMetadata(ChunkManager(cm->dbPrimary(), cm->dbVersion(), rt, boost::none),
+                                  kThisShard);
     }
 
     static CollectionMetadata cloneMetadataMinusChunk(const CollectionMetadata& metadata,
@@ -150,7 +152,8 @@ protected:
         auto rt = cm->getRoutingHistory()->makeUpdated(
             {ChunkType(kNss, ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
 
-        return CollectionMetadata(ChunkManager(rt, boost::none), kThisShard);
+        return CollectionMetadata(ChunkManager(cm->dbPrimary(), cm->dbVersion(), rt, boost::none),
+                                  kThisShard);
     }
 
     std::shared_ptr<MetadataManager> _manager;

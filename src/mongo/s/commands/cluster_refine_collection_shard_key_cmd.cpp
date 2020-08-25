@@ -54,7 +54,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             const NamespaceString& nss = ns();
 
-            const auto routingInfo = uassertStatusOK(
+            const auto cm = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
                                                                                              nss));
 
@@ -64,7 +64,7 @@ public:
             }
 
             ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(
-                nss, request().getKey(), routingInfo.cm()->getVersion().epoch());
+                nss, request().getKey(), cm.getVersion().epoch());
             configsvrRefineCollShardKey.setDbName(request().getDbName());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();

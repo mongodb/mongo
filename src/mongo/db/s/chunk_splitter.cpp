@@ -111,14 +111,14 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
  */
 void moveChunk(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& minKey) {
     // We need to have the most up-to-date view of the chunk we are about to move.
-    const auto routingInfo =
+    const auto cm =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
     uassert(ErrorCodes::NamespaceNotSharded,
             "Could not move chunk. Collection is no longer sharded",
-            routingInfo.cm());
+            cm.isSharded());
 
-    const auto suggestedChunk = routingInfo.cm()->findIntersectingChunkWithSimpleCollation(minKey);
+    const auto suggestedChunk = cm.findIntersectingChunkWithSimpleCollation(minKey);
 
     ChunkType chunkToMove;
     chunkToMove.setNS(nss);
@@ -297,18 +297,17 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
 
     try {
         const auto opCtx = cc().makeOperationContext();
-        const auto routingInfo = uassertStatusOK(
-            Grid::get(opCtx.get())->catalogCache()->getCollectionRoutingInfo(opCtx.get(), nss));
 
-        const auto cm = routingInfo.cm();
+        const auto cm = uassertStatusOK(
+            Grid::get(opCtx.get())->catalogCache()->getCollectionRoutingInfo(opCtx.get(), nss));
         uassert(ErrorCodes::NamespaceNotSharded,
                 "Could not split chunk. Collection is no longer sharded",
-                cm);
+                cm.isSharded());
 
         // Best effort checks that the chunk we're splitting hasn't changed bounds or moved shards
         // since the auto split task was scheduled. Best effort because the chunk metadata may
         // change after this point.
-        const auto chunk = cm->findIntersectingChunkWithSimpleCollation(min);
+        const auto chunk = cm.findIntersectingChunkWithSimpleCollation(min);
         uassert(4860100,
                 "Chunk to be auto split has different boundaries than when the split was initiated",
                 chunk.getRange() == ChunkRange(min, max));
@@ -316,7 +315,7 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
                 "Chunk to be auto split isn't owned by this shard",
                 ShardingState::get(opCtx.get())->shardId() == chunk.getShardId());
 
-        const auto& shardKeyPattern = cm->getShardKeyPattern();
+        const auto& shardKeyPattern = cm.getShardKeyPattern();
 
         const auto balancerConfig = Grid::get(opCtx.get())->getBalancerConfiguration();
         // Ensure we have the most up-to-date balancer configuration
@@ -395,7 +394,7 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
                                                    chunk.getShardId(),
                                                    nss,
                                                    shardKeyPattern,
-                                                   cm->getVersion(),
+                                                   cm.getVersion(),
                                                    chunk.getRange(),
                                                    splitPoints));
         chunkSplitStateDriver->commitSplit();

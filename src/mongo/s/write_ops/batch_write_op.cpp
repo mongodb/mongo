@@ -39,7 +39,6 @@
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 

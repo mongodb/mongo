@@ -91,7 +91,7 @@ public:
                 validateZones(request().getZones().get(), authoritativeTags);
             }
 
-            const auto routingInfo = uassertStatusOK(
+            const auto cm = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
                                                                                              nss));
 
@@ -112,8 +112,7 @@ public:
                     chunks, opCtx, ShardKeyPattern(request().getKey()).getKeyPattern());
                 numInitialChunks = chunks.size();
             } else {
-                numInitialChunks =
-                    request().getNumInitialChunks().get_value_or(routingInfo.cm()->numChunks());
+                numInitialChunks = request().getNumInitialChunks().get_value_or(cm.numChunks());
             }
         }
 

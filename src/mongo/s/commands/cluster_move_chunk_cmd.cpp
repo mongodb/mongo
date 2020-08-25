@@ -99,10 +99,9 @@ public:
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto routingInfo = uassertStatusOK(
+        const auto cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
                                                                                          nss));
-        const auto cm = routingInfo.cm();
 
         const auto toElt = cmdObj["to"];
         uassert(ErrorCodes::TypeMismatch,
@@ -149,29 +148,29 @@ public:
 
         if (!find.isEmpty()) {
             // find
-            BSONObj shardKey = uassertStatusOK(
-                cm->getShardKeyPattern().extractShardKeyFromQuery(opCtx, nss, find));
+            BSONObj shardKey =
+                uassertStatusOK(cm.getShardKeyPattern().extractShardKeyFromQuery(opCtx, nss, find));
             if (shardKey.isEmpty()) {
                 errmsg = str::stream() << "no shard key found in chunk query " << find;
                 return false;
             }
 
-            chunk.emplace(cm->findIntersectingChunkWithSimpleCollation(shardKey));
+            chunk.emplace(cm.findIntersectingChunkWithSimpleCollation(shardKey));
         } else {
             // bounds
-            if (!cm->getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
-                !cm->getShardKeyPattern().isShardKey(bounds[1].Obj())) {
+            if (!cm.getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
+                !cm.getShardKeyPattern().isShardKey(bounds[1].Obj())) {
                 errmsg = str::stream()
                     << "shard key bounds "
                     << "[" << bounds[0].Obj() << "," << bounds[1].Obj() << ")"
-                    << " are not valid for shard key pattern " << cm->getShardKeyPattern().toBSON();
+                    << " are not valid for shard key pattern " << cm.getShardKeyPattern().toBSON();
                 return false;
             }
 
-            BSONObj minKey = cm->getShardKeyPattern().normalizeShardKey(bounds[0].Obj());
-            BSONObj maxKey = cm->getShardKeyPattern().normalizeShardKey(bounds[1].Obj());
+            BSONObj minKey = cm.getShardKeyPattern().normalizeShardKey(bounds[0].Obj());
+            BSONObj maxKey = cm.getShardKeyPattern().normalizeShardKey(bounds[1].Obj());
 
-            chunk.emplace(cm->findIntersectingChunkWithSimpleCollation(minKey));
+            chunk.emplace(cm.findIntersectingChunkWithSimpleCollation(minKey));
 
             if (chunk->getMin().woCompare(minKey) != 0 || chunk->getMax().woCompare(maxKey) != 0) {
                 errmsg = str::stream() << "no chunk found with the shard key bounds "
@@ -188,7 +187,7 @@ public:
         chunkType.setMin(chunk->getMin());
         chunkType.setMax(chunk->getMax());
         chunkType.setShard(chunk->getShardId());
-        chunkType.setVersion(cm->getVersion());
+        chunkType.setVersion(cm.getVersion());
 
         uassertStatusOK(configsvr_client::moveChunk(opCtx,
                                                     chunkType,

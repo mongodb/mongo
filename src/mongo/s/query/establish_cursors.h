@@ -82,4 +82,5 @@ void killRemoteCursor(OperationContext* opCtx,
                       executor::TaskExecutor* executor,
                       RemoteCursor&& cursor,
                       const NamespaceString& nss);
+
 }  // namespace mongo
