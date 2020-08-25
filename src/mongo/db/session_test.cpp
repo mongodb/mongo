@@ -1080,7 +1080,7 @@ TEST_F(SessionTest, AbortClearsStoredStatements) {
     // The transaction machinery cannot store an empty locker.
     { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     session.stashTransactionResources(opCtx());
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
     ASSERT_TRUE(session.transactionOperationsForTest().empty());
     ASSERT_TRUE(session.transactionIsAborted());
 }
@@ -1119,7 +1119,7 @@ TEST_F(SessionTest, EmptyTransactionAbort) {
     // The transaction machinery cannot store an empty locker.
     { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     session.stashTransactionResources(opCtx());
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
     ASSERT_TRUE(session.transactionIsAborted());
 }
 
@@ -1134,7 +1134,7 @@ TEST_F(SessionTest, ConcurrencyOfUnstashAndAbort) {
     session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "find");
 
     // The transaction may be aborted without checking out the session.
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
 
     // An unstash after an abort should uassert.
     ASSERT_THROWS_CODE(session.unstashTransactionResources(opCtx(), "find"),
@@ -1182,7 +1182,7 @@ TEST_F(SessionTest, ConcurrencyOfStashAndAbort) {
     session.unstashTransactionResources(opCtx(), "find");
 
     // The transaction may be aborted without checking out the session.
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
 
     // A stash after an abort should be a noop.
     session.stashTransactionResources(opCtx());
@@ -1225,7 +1225,7 @@ TEST_F(SessionTest, ConcurrencyOfAddTransactionOperationAndAbort) {
     session.unstashTransactionResources(opCtx(), "insert");
 
     // The transaction may be aborted without checking out the session.
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
 
     // An addTransactionOperation() after an abort should uassert.
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
@@ -1272,7 +1272,7 @@ TEST_F(SessionTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndAbort) {
     session.unstashTransactionResources(opCtx(), "insert");
 
     // The transaction may be aborted without checking out the session.
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
 
     // An endTransactionAndRetrieveOperations() after an abort should uassert.
     ASSERT_THROWS_CODE(session.endTransactionAndRetrieveOperations(opCtx()),
@@ -1318,7 +1318,7 @@ TEST_F(SessionTest, ConcurrencyOfCommitTransactionAndAbort) {
     session.unstashTransactionResources(opCtx(), "commitTransaction");
 
     // The transaction may be aborted without checking out the session.
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
 
     // An commitTransaction() after an abort should uassert.
     ASSERT_THROWS_CODE(
@@ -1428,7 +1428,7 @@ TEST_F(SessionTest, IncrementTotalAbortedUponAbort) {
     unsigned long long beforeAbortCount =
         ServerTransactionsMetrics::get(opCtx())->getTotalAborted();
 
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
 
     // Assert that the aborted counter is incremented by 1.
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalAborted(), beforeAbortCount + 1U);
@@ -1459,7 +1459,7 @@ TEST_F(SessionTest, TrackTotalOpenTransactionsWithAbort) {
               beforeTransactionStart + 1U);
 
     // Tests that aborting a transaction decrements the open transactions counter by 1.
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentOpen(), beforeTransactionStart);
 }
 
@@ -1576,7 +1576,7 @@ TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithStashedAbort) {
               beforeInactiveCounter + 1U);
 
     // Tests that aborting a stashed transaction decrements the inactive counter only.
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
 }
@@ -1608,7 +1608,7 @@ TEST_F(SessionTest, TrackTotalActiveAndInactiveTransactionsWithUnstashedAbort) {
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
 
     // Tests that aborting a stashed transaction decrements the active counter only.
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentActive(), beforeActiveCounter);
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getCurrentInactive(), beforeInactiveCounter);
 }
@@ -1726,7 +1726,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldBeSetUponAbo
     sleepmillis(10);
 
     unsigned long long timeBeforeTxnAbort = curTimeMicros64();
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
     unsigned long long timeAfterTxnAbort = curTimeMicros64();
 
     ASSERT_GTE(session.getSingleTransactionStats()->getDuration(curTimeMicros64()),
@@ -1796,7 +1796,7 @@ TEST_F(TransactionsMetricsTest, SingleTransactionStatsDurationShouldKeepIncreasi
     ASSERT_GT(session.getSingleTransactionStats()->getDuration(curTimeMicros64()),
               txnDurationAfterStart);
     sleepmillis(10);
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
     // Sleep here to allow enough time to elapse.
     sleepmillis(10);
 
@@ -1876,7 +1876,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndAbort) 
     session.unstashTransactionResources(opCtx(), "insert");
     // Sleep here to allow enough time to elapse.
     sleepmillis(10);
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
 
     // Time active should have increased.
     ASSERT_GT(session.getSingleTransactionStats()->getTimeActiveMicros(curTimeMicros64()),
@@ -1905,7 +1905,7 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldNotBeSetUponAbortOnly) {
     ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(curTimeMicros64()),
               Microseconds{0});
 
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
 
     // Time active should not have increased.
     ASSERT_EQ(session.getSingleTransactionStats()->getTimeActiveMicros(curTimeMicros64()),
@@ -2234,7 +2234,7 @@ TEST_F(TransactionsMetricsTest, TimeInactiveMicrosShouldBeSetUponUnstashAndAbort
               timeInactiveSoFar);
 
     session.unstashTransactionResources(opCtx(), "insert");
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
 
     timeInactiveSoFar =
         session.getSingleTransactionStats()->getTimeInactiveMicros(curTimeMicros64());
@@ -2737,7 +2737,7 @@ TEST_F(TransactionsMetricsTest, LogTransactionInfoAfterSlowStashedAbort) {
     sleepmillis(5 * serverGlobalParams.slowMS);
 
     startCapturingLogMessages();
-    session.abortArbitraryTransaction();
+    session.abortArbitraryTransaction(opCtx());
     stopCapturingLogMessages();
 
     std::string expectedTransactionInfo = "transaction " +

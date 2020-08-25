@@ -363,8 +363,16 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         wtRet = s->commit_transaction(s, nullptr);
         LOG(3) << "WT commit_transaction for snapshot id " << _mySnapshotId;
     } else {
-        wtRet = s->rollback_transaction(s, nullptr);
-        invariant(!wtRet);
+        StringBuilder config;
+        if (_noEvictionAfterRollback) {
+            // The only point at which rollback_transaction() can time out is in the bonus-eviction
+            // phase. If the timeout expires here, the function will stop the eviction and return
+            // success. It cannot return an error due to timeout.
+            config << "operation_timeout_ms=1,";
+        }
+
+        wtRet = s->rollback_transaction(s, config.str().c_str());
+
         LOG(3) << "WT rollback_transaction for snapshot id " << _mySnapshotId;
     }
 
