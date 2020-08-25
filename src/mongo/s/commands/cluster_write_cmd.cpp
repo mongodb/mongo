@@ -509,9 +509,14 @@ private:
                 }
                 catalogCache->checkAndRecordOperationBlockedByRefresh(opCtx,
                                                                       mongo::LogicalOp::opUpdate);
-                debug.upsert = response.isUpsertDetailsSet();
-                debug.additiveMetrics.nMatched =
-                    response.getN() - (debug.upsert ? response.sizeUpsertDetails() : 0);
+
+                // The response.getN() count is the sum of documents matched and upserted.
+                if (response.isUpsertDetailsSet()) {
+                    debug.additiveMetrics.nMatched = response.getN() - response.sizeUpsertDetails();
+                    debug.additiveMetrics.nUpserted = response.sizeUpsertDetails();
+                } else {
+                    debug.additiveMetrics.nMatched = response.getN();
+                }
                 debug.additiveMetrics.nModified = response.getNModified();
 
                 invariant(_updateMetrics);

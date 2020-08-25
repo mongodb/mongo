@@ -3,6 +3,7 @@
 //   requires_non_retryable_writes,
 //   requires_profiling,
 //   sbe_incompatible,
+//   requires_fcv_47,
 // ]
 
 // Confirms that profiled update execution contains all expected metrics with proper values.
@@ -108,10 +109,53 @@ assert.eq(profileObj.docsExamined, 0, tojson(profileObj));
 assert.eq(profileObj.keysInserted, 2, tojson(profileObj));
 assert.eq(profileObj.nMatched, 0, tojson(profileObj));
 assert.eq(profileObj.nModified, 0, tojson(profileObj));
-assert.eq(profileObj.upsert, true, tojson(profileObj));
+assert.eq(profileObj.nUpserted, 1, tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { _id: 1 }", tojson(profileObj));
 assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+
+//
+// Confirm metrics for batch insert on update with "upsert: true".
+//
+coll.drop();
+for (i = 0; i < 10; ++i) {
+    assert.commandWorked(coll.insert({a: i}));
+}
+assert.commandWorked(coll.createIndex({a: 1}));
+
+assert.commandWorked(testDB.runCommand({
+    update: coll.getName(),
+    updates: [
+        {q: {_id: "new value 4", a: 4}, u: {$inc: {b: 1}}, upsert: true},
+        {q: {_id: "new value 5", a: 5}, u: {$inc: {b: 1}}, upsert: true},
+        {q: {_id: "new value 6", a: 6}, u: {$inc: {b: 1}}, upsert: true}
+    ],
+    ordered: true
+}));
+
+// We need to check profiles for each individual update because they are logged separately.
+const profiles = getNLatestProfilerEntries(testDB, 3);
+assert.eq(profiles.length, 3, tojson(profiles));
+
+const indices = [6, 5, 4];
+for (var i = 0; i < indices.length; i++) {
+    const profileObj = profiles[i];
+    const index = indices[i];
+
+    assert.eq(
+        profileObj.command,
+        {q: {_id: `new value ${index}`, a: index}, u: {$inc: {b: 1}}, multi: false, upsert: true},
+        tojson(profileObj));
+    assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
+    assert.eq(profileObj.docsExamined, 0, tojson(profileObj));
+    assert.eq(profileObj.keysInserted, 2, tojson(profileObj));
+    assert.eq(profileObj.nMatched, 0, tojson(profileObj));
+    assert.eq(profileObj.nModified, 0, tojson(profileObj));
+    assert.eq(profileObj.nUpserted, 1, tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { _id: 1 }", tojson(profileObj));
+    assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
+    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+}
 
 //
 // Confirm "fromMultiPlanner" metric.

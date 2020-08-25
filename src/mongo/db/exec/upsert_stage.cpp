@@ -61,7 +61,7 @@ UpsertStage::UpsertStage(ExpressionContext* expCtx,
 
 // We're done when updating is finished and we have either matched or inserted.
 bool UpsertStage::isEOF() {
-    return UpdateStage::isEOF() && (_specificStats.nMatched > 0 || _specificStats.inserted);
+    return UpdateStage::isEOF() && (_specificStats.nMatched > 0 || _specificStats.nUpserted > 0);
 }
 
 PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
@@ -83,9 +83,9 @@ PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
     invariant(updateState == PlanStage::IS_EOF && !isEOF());
 
     // Since this is an insert, we will be logging it as such in the oplog. We don't need the
-    // driver's help to build the oplog record. We also set the 'inserted' stats flag here.
+    // driver's help to build the oplog record. We also set the 'nUpserted' stats counter here.
     _params.driver->setLogOp(false);
-    _specificStats.inserted = true;
+    _specificStats.nUpserted = 1;
 
     // Generate the new document to be inserted.
     _specificStats.objInserted = _produceNewDocumentForInsert();

@@ -2,6 +2,7 @@
 // @tags: [
 //   requires_profiling,
 //   sbe_incompatible,
+//   requires_fcv_47,
 // ]
 
 (function() {
@@ -94,7 +95,7 @@ assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 0, tojson(profileObj));
 assert.eq(profileObj.nMatched, 0, tojson(profileObj));
 assert.eq(profileObj.nModified, 0, tojson(profileObj));
-assert.eq(profileObj.upsert, true, tojson(profileObj));
+assert.eq(profileObj.nUpserted, 1, tojson(profileObj));
 assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 

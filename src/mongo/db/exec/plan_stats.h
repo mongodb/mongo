@@ -722,7 +722,7 @@ struct NearStats : public SpecificStats {
 };
 
 struct UpdateStats : public SpecificStats {
-    UpdateStats() : nMatched(0), nModified(0), isModUpdate(false), inserted(false) {}
+    UpdateStats() : nMatched(0), nModified(0), isModUpdate(false), nUpserted(0) {}
 
     SpecificStats* clone() const final {
         return new UpdateStats(*this);
@@ -741,8 +741,8 @@ struct UpdateStats : public SpecificStats {
     // True iff this is a $mod update.
     bool isModUpdate;
 
-    // Is this an {upsert: true} update that did an insert?
-    bool inserted;
+    // Will be 1 if this is an {upsert: true} update that did an insert, 0 otherwise.
+    size_t nUpserted;
 
     // The object that was inserted. This is an empty document if no insert was performed.
     BSONObj objInserted;

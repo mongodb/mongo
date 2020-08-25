@@ -7,6 +7,7 @@
  *   does_not_support_stepdowns,
  *   requires_fastcount,
  *   sbe_incompatible,
+ *   requires_fcv_47,
  * ]
  */
 
@@ -342,7 +343,7 @@ if ("SHARD_WRITE" === stage.stage) {
     stage = stage.shards[0].executionStages;
 }
 assert.eq(stage.stage, "UPDATE");
-assert(stage.wouldInsert);
+assert(stage.nWouldUpsert == 1);
 
 // Make sure that the insert didn't actually happen.
 assert.eq(10, t.count());
@@ -355,7 +356,7 @@ if ("SHARD_WRITE" === stage.stage) {
     stage = stage.shards[0].executionStages;
 }
 assert.eq(stage.stage, "UPDATE");
-assert(stage.wouldInsert);
+assert(stage.nWouldUpsert == 1);
 assert.eq(0, stage.nMatched);
 
 // Make sure that the insert didn't actually happen.
@@ -369,7 +370,7 @@ if ("SHARD_WRITE" === stage.stage) {
     stage = stage.shards[0].executionStages;
 }
 assert.eq(stage.stage, "UPDATE");
-assert(!stage.wouldInsert);
+assert(stage.nWouldUpsert == 0);
 assert.eq(3, stage.nMatched);
 assert.eq(3, stage.nWouldModify);
 
@@ -381,7 +382,7 @@ if ("SHARD_WRITE" === stage.stage) {
     stage = stage.shards[0].executionStages;
 }
 assert.eq(stage.stage, "UPDATE");
-assert(!stage.wouldInsert);
+assert(stage.nWouldUpsert == 0);
 assert.eq(3, stage.nMatched);
 assert.eq(3, stage.nWouldModify);
 
@@ -414,7 +415,7 @@ if ("SINGLE_SHARD" === stage.stage) {
     stage = stage.shards[0].executionStages;
 }
 assert.eq(stage.stage, "UPDATE");
-assert(stage.wouldInsert);
+assert(stage.nWouldUpsert == 1);
 
 // Make sure that the insert didn't actually happen.
 assert.eq(10, t.count());

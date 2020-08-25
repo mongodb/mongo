@@ -73,6 +73,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.ninserted = 0;
     currentAdditiveMetrics.ndeleted = 3;
     additiveMetricsToAdd.ndeleted = 2;
+    currentAdditiveMetrics.nUpserted = 7;
+    additiveMetricsToAdd.nUpserted = 8;
     currentAdditiveMetrics.keysInserted = 6;
     additiveMetricsToAdd.keysInserted = 5;
     currentAdditiveMetrics.keysDeleted = 4;
@@ -100,6 +102,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
               *additiveMetricsBeforeAdd.ninserted + *additiveMetricsToAdd.ninserted);
     ASSERT_EQ(*currentAdditiveMetrics.ndeleted,
               *additiveMetricsBeforeAdd.ndeleted + *additiveMetricsToAdd.ndeleted);
+    ASSERT_EQ(*currentAdditiveMetrics.nUpserted,
+              *additiveMetricsBeforeAdd.nUpserted + *additiveMetricsToAdd.nUpserted);
     ASSERT_EQ(*currentAdditiveMetrics.keysInserted,
               *additiveMetricsBeforeAdd.keysInserted + *additiveMetricsToAdd.keysInserted);
     ASSERT_EQ(*currentAdditiveMetrics.keysDeleted,
@@ -147,6 +151,10 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     // object to add were not initialized, so nMatched should still be uninitialized after the add.
     ASSERT_EQ(currentAdditiveMetrics.nMatched, boost::none);
 
+    // The 'nUpserted' field for both the current AdditiveMetrics object and the AdditiveMetrics
+    // object to add were not initialized, so nUpserted should still be uninitialized after the add.
+    ASSERT_EQ(currentAdditiveMetrics.nUpserted, boost::none);
+
     // The following field values should have changed after adding.
     ASSERT_EQ(*currentAdditiveMetrics.keysInserted,
               *additiveMetricsBeforeAdd.keysInserted + *additiveMetricsToAdd.keysInserted);
@@ -173,12 +181,14 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     additiveMetrics.incrementKeysInserted(5);
     additiveMetrics.incrementKeysDeleted(0);
     additiveMetrics.incrementNinserted(3);
+    additiveMetrics.incrementNUpserted(6);
     additiveMetrics.incrementPrepareReadConflicts(2);
 
     ASSERT_EQ(additiveMetrics.writeConflicts.load(), 2);
     ASSERT_EQ(*additiveMetrics.keysInserted, 7);
     ASSERT_EQ(*additiveMetrics.keysDeleted, 0);
     ASSERT_EQ(*additiveMetrics.ninserted, 3);
+    ASSERT_EQ(*additiveMetrics.nUpserted, 6);
     ASSERT_EQ(additiveMetrics.prepareReadConflicts.load(), 8);
 }
 

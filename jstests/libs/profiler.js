@@ -35,16 +35,21 @@ function buildCommandProfile(command, sharded) {
     return commandProfile;
 }
 
-// Retrieve latest system.profile entry.
-function getLatestProfilerEntry(profileDB, filter) {
+// Retrieve N latest system.profile entries.
+function getNLatestProfilerEntries(profileDB, count, filter) {
     if (filter === null) {
         filter = {};
     }
-    var cursor = profileDB.system.profile.find(filter).sort({$natural: -1});
+    var cursor = profileDB.system.profile.find(filter).sort({$natural: -1}).limit(count);
     assert(
         cursor.hasNext(),
         "could not find any entries in the profile collection matching filter: " + tojson(filter));
-    return cursor.next();
+    return cursor.toArray();
+}
+
+// Retrieve latest system.profile entry.
+function getLatestProfilerEntry(profileDB, filter) {
+    return getNLatestProfilerEntries(profileDB, 1, filter)[0];
 }
 
 // Returns a string representing the wire protocol used for commands run on the given connection.

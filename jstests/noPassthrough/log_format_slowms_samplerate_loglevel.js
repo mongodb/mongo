@@ -276,7 +276,7 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
                 ordered: true,
                 nMatched: 0,
                 nModified: 0,
-                upsert: 1,
+                nUpserted: 1,
                 nShards: 1
             }
                                  : {
@@ -288,7 +288,7 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
                                        docsExamined: 0,
                                        nMatched: 0,
                                        nModified: 0,
-                                       upsert: 1
+                                       nUpserted: 1
                                    })
         },
         {
@@ -342,6 +342,29 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
             },
             logFields:
                 {command: "aggregate", aggregate: coll.getName(), hasSortStage: 1, usedDisk: 1}
+        },
+        {
+            test: function(db) {
+                assert.commandWorked(db.runCommand({
+                    update: "test",
+                    updates: [
+                        {q: {_id: 200}, u: {$inc: {c: 1}}, upsert: true},
+                        {q: {_id: 201}, u: {$inc: {c: 1}}, upsert: true},
+                        {q: {_id: 202}, u: {$inc: {c: 1}}, upsert: true}
+                    ],
+                    ordered: true
+                }));
+            },
+            logFields: (isMongos ? {
+                command: "update",
+                update: coll.getName(),
+                ordered: true,
+                nMatched: 0,
+                nModified: 0,
+                nUpserted: 3,
+                nShards: 1
+            }
+                                 : {command: "update", ns: `${db.getName()}.$cmd`})
         }
     ];
 
@@ -379,19 +402,20 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
     for (let cmdName in originatingCommands) {
         const cmdObj = originatingCommands[cmdName];
         const cmdRes = assert.commandWorked(db.runCommand(cmdObj));
+        const expectedCountOfDocuments = 14;
 
         testList.push({
             test: function(db) {
                 const cursor = new DBCommandCursor(db, cmdRes);
-                assert.eq(cursor.itcount(), 11);
+                assert.eq(cursor.itcount(), expectedCountOfDocuments);
             },
             logFields: Object.assign({getMore: cmdRes.cursor.id}, cmdObj, {
                 cursorid: cmdRes.cursor.id,
                 planSummary: "COLLSCAN",
                 cursorExhausted: 1,
-                docsExamined: 11,
+                docsExamined: expectedCountOfDocuments,
                 keysExamined: 0,
-                nreturned: 11,
+                nreturned: expectedCountOfDocuments,
                 nShards: stParams.shards
             })
         });

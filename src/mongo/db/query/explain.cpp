@@ -542,7 +542,7 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("nMatched", spec->nMatched);
             bob->appendNumber("nWouldModify", spec->nModified);
-            bob->appendBool("wouldInsert", spec->inserted);
+            bob->appendNumber("nWouldUpsert", spec->nUpserted);
         }
     }
 

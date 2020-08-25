@@ -1016,7 +1016,7 @@ void recordUpdateResultInOpDebug(const UpdateResult& updateResult, OpDebug* opDe
     invariant(opDebug);
     opDebug->additiveMetrics.nMatched = updateResult.numMatched;
     opDebug->additiveMetrics.nModified = updateResult.numDocsModified;
-    opDebug->upsert = !updateResult.upsertedId.isEmpty();
+    opDebug->additiveMetrics.nUpserted = static_cast<long long>(!updateResult.upsertedId.isEmpty());
 }
 
 namespace {

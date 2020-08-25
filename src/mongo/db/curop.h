@@ -112,6 +112,11 @@ public:
         void incrementNinserted(long long n);
 
         /**
+         * Increments nUpserted by n.
+         */
+        void incrementNUpserted(long long n);
+
+        /**
          * Increments prepareReadConflicts by n.
          */
         void incrementPrepareReadConflicts(long long n);
@@ -135,6 +140,7 @@ public:
         boost::optional<long long> nModified;
         boost::optional<long long> ninserted;
         boost::optional<long long> ndeleted;
+        boost::optional<long long> nUpserted;
 
         // Number of index keys inserted.
         boost::optional<long long> keysInserted;
@@ -217,7 +223,6 @@ public:
     // True if a replan was triggered during the execution of this operation.
     std::optional<std::string> replanReason;
 
-    bool upsert{false};  // true if the update actually did an insert
     bool cursorExhausted{
         false};  // true if the cursor has been closed at end a find/getMore operation
 
