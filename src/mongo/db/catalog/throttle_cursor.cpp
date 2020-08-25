@@ -41,6 +41,7 @@ namespace mongo {
 // Used to change the 'dataSize' passed into DataThrottle::awaitIfNeeded() to be a fixed size of
 // 512KB.
 MONGO_FAIL_POINT_DEFINE(fixedCursorDataSizeOf512KBForDataThrottle);
+MONGO_FAIL_POINT_DEFINE(fixedCursorDataSizeOf2MBForDataThrottle);
 
 SeekableRecordThrottleCursor::SeekableRecordThrottleCursor(OperationContext* opCtx,
                                                            const RecordStore* rs,
@@ -142,9 +143,13 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
         _bytesProcessed = 0;
     }
 
-    _bytesProcessed += MONGO_unlikely(fixedCursorDataSizeOf512KBForDataThrottle.shouldFail())
-        ? /*512KB*/ 1 * 1024 * 512
-        : dataSize;
+    if (MONGO_unlikely(fixedCursorDataSizeOf512KBForDataThrottle.shouldFail())) {
+        _bytesProcessed += /* 512KB */ 1024 * 512;
+    } else if (MONGO_unlikely(fixedCursorDataSizeOf2MBForDataThrottle.shouldFail())) {
+        _bytesProcessed += /* 2MB */ 2 * 1024 * 1024;
+    } else {
+        _bytesProcessed += dataSize;
+    }
 
     if (_shouldNotThrottle) {
         return;
@@ -160,15 +165,19 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
         return;
     }
 
-    // Sleep until the second rolls over the starting point.
+    // Wait a period of time proportional to how much extra data we have read. For example, if we
+    // read one 5 MB document and maxValidateBytesPerSec is 1, we should not be waiting until the
+    // next 1 second period. We should wait 5 seconds to maintain proper throughput.
+    int64_t maxWaitMs = 1000 * std::max(1.0, double(_bytesProcessed) / maxValidateBytesPerSec);
+
     do {
-        int64_t millisToSleep = 1000 - (currentMillis - _startMillis);
+        int64_t millisToSleep = maxWaitMs - (currentMillis - _startMillis);
         invariant(millisToSleep >= 0);
 
         opCtx->sleepFor(Milliseconds(millisToSleep));
         currentMillis =
             opCtx->getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch();
-    } while (currentMillis < _startMillis + 1000);
+    } while (currentMillis < _startMillis + maxWaitMs);
 }
 
 }  // namespace mongo
