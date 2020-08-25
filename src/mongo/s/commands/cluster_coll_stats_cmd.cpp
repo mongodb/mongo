@@ -40,6 +40,39 @@
 namespace mongo {
 namespace {
 
+auto fieldIsAnyOf = [](StringData v, std::initializer_list<StringData> il) {
+    auto ei = il.end();
+    return std::find(il.begin(), ei, v) != ei;
+};
+
+BSONObj scaleIndividualShardStatistics(const BSONObj& shardStats, int scale) {
+    BSONObjBuilder builder;
+
+    for (const auto& element : shardStats) {
+        std::string fieldName = element.fieldName();
+
+        if (fieldIsAnyOf(fieldName,
+                         {"size", "maxSize", "storageSize", "totalIndexSize", "totalSize"})) {
+            builder.appendNumber(fieldName, element.numberLong() / scale);
+        } else if (fieldName == "scaleFactor") {
+            // Explicitly change the scale factor as we removed the scaling before getting the
+            // individual shards statistics.
+            builder.appendNumber(fieldName, scale);
+        } else if (fieldName == "indexSizes") {
+            BSONObjBuilder indexSizesBuilder(builder.subobjStart(fieldName));
+            for (const auto& entry : shardStats.getField(fieldName).Obj()) {
+                indexSizesBuilder.appendNumber(entry.fieldName(), entry.numberLong() / scale);
+            }
+            indexSizesBuilder.done();
+        } else {
+            // All the other fields that do not require further scaling.
+            builder.append(element);
+        }
+    }
+
+    return builder.obj();
+}
+
 class CollectionStats : public BasicCommand {
 public:
     CollectionStats() : BasicCommand("collStats", "collstats") {}
@@ -87,13 +120,29 @@ public:
             result.append("primary", routingInfo.db().primaryId().toString());
         }
 
-        auto shardResults = scatterGatherVersionedTargetByRoutingTable(
+        int scale = 1;
+        if (cmdObj["scale"].isNumber()) {
+            scale = cmdObj["scale"].numberInt();
+            uassert(4390200, "scale has to be >= 1", scale >= 1);
+        } else if (cmdObj["scale"].trueValue()) {
+            uasserted(4390201, "scale has to be a number >= 1");
+        }
+
+        // Re-construct the command's BSONObj without any scaling to be applied.
+        BSONObj cmdObjWithoutScale = cmdObj.removeField("scale");
+
+        // Unscaled individual shard results. This is required to apply scaling after summing the
+        // statistics from individual shards as opposed to adding the summation of the scaled
+        // statistics.
+        auto unscaledShardResults = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
             nss.db(),
             nss,
             routingInfo,
             applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                opCtx,
+                this,
+                CommandHelpers::filterCommandRequestForPassthrough(cmdObjWithoutScale)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent,
             {},
@@ -109,7 +158,7 @@ public:
         int nindexes = 0;
         bool warnedAboutIndexes = false;
 
-        for (const auto& shardResult : shardResults) {
+        for (const auto& shardResult : unscaledShardResults) {
             const auto& shardId = shardResult.shardId;
             const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
             uassertStatusOK(shardResponse.status);
@@ -121,10 +170,6 @@ public:
             // until we've iterated through all the fields before updating unscaledCollSize
             const auto shardObjCount = static_cast<long long>(res["count"].Number());
 
-            auto fieldIsAnyOf = [](StringData v, std::initializer_list<StringData> il) {
-                auto ei = il.end();
-                return std::find(il.begin(), ei, v) != ei;
-            };
             for (const auto& e : res) {
                 StringData fieldName = e.fieldNameStringData();
                 if (fieldIsAnyOf(fieldName, {"ns", "ok", "lastExtentSize", "paddingFactor"})) {
@@ -184,19 +229,24 @@ public:
                 }
             }
 
-            shardStats.append(shardId.toString(), res);
+            shardStats.append(shardId.toString(), scaleIndividualShardStatistics(res, scale));
         }
 
         result.append("ns", nss.ns());
 
         for (const auto& countEntry : counts) {
-            result.appendNumber(countEntry.first, countEntry.second);
+            if (fieldIsAnyOf(countEntry.first,
+                             {"size", "storageSize", "totalIndexSize", "totalSize"})) {
+                result.appendNumber(countEntry.first, countEntry.second / scale);
+            } else {
+                result.appendNumber(countEntry.first, countEntry.second);
+            }
         }
 
         {
             BSONObjBuilder ib(result.subobjStart("indexSizes"));
             for (const auto& entry : indexSizes) {
-                ib.appendNumber(entry.first, entry.second);
+                ib.appendNumber(entry.first, entry.second / scale);
             }
             ib.done();
         }
@@ -208,8 +258,9 @@ public:
         else
             result.append("avgObjSize", 0.0);
 
-        result.append("maxSize", maxSize);
+        result.append("maxSize", maxSize / scale);
         result.append("nindexes", nindexes);
+        result.append("scaleFactor", scale);
         result.append("nchunks", (routingInfo.cm() ? routingInfo.cm()->numChunks() : 1));
         result.append("shards", shardStats.obj());
 
