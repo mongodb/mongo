@@ -36,7 +36,7 @@
 namespace mongo::sbe {
 /**
  * This stage delivers results from either 'then' or 'else' branch depending on the value of the
- * 'filer' expression as evaluated during the open() call.
+ * 'filter' expression as evaluated during the open() call.
  */
 class BranchStage final : public PlanStage {
 public:
