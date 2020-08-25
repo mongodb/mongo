@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 #include <pcrecpp.h>
@@ -94,6 +95,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isArray
     0,  // isString
     0,  // isNumber
+    0,  // isBinData
     0,  // typeMatch
 
     0,  // function is special, the stack offset is encoded in the instruction itself
@@ -306,6 +308,10 @@ void CodeFragment::appendIsString() {
 
 void CodeFragment::appendIsNumber() {
     appendSimpleInstruction(Instruction::isNumber);
+}
+
+void CodeFragment::appendIsBinData() {
+    appendSimpleInstruction(Instruction::isBinData);
 }
 
 void CodeFragment::appendTypeMatch(uint32_t typeMask) {
@@ -1077,6 +1083,119 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateWeekYear(ui
         timezoneTuple);
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition(uint8_t arity) {
+    invariant(arity == 3);
+
+    auto [ownedMask, maskTag, maskValue] = getFromStack(0);
+    auto [ownedInput, valueTag, value] = getFromStack(1);
+
+    // Carries a flag to indicate the desired testing behavior this was invoked under. The testing
+    // behavior is used to determine if we need to bail out of the bit position comparison early in
+    // the depending if a bit is found to be set or unset.
+    auto [_, tagBitTestBehavior, valueBitTestBehavior] = getFromStack(2);
+    invariant(tagBitTestBehavior == value::TypeTags::NumberInt32);
+
+    if (!value::isArray(maskTag) || !value::isBinData(valueTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto bitPositions = value::getArrayView(maskValue);
+    auto binDataSize = value::getBSONBinDataSize(valueTag, value);
+    auto binData = value::getBSONBinData(valueTag, value);
+    auto bitTestBehavior = BitTestBehavior{value::bitcastTo<int32_t>(valueBitTestBehavior)};
+
+    auto isBitSet = false;
+    for (size_t idx = 0; idx < bitPositions->size(); ++idx) {
+        auto [tagBitPosition, valueBitPosition] = bitPositions->getAt(idx);
+        auto bitPosition = value::bitcastTo<uint64_t>(valueBitPosition);
+        if (bitPosition >= binDataSize * 8) {
+            // If position to test is longer than the data to test against, zero-extend.
+            isBitSet = false;
+        } else {
+            // Convert the bit position to a byte position within a byte. Note that byte positions
+            // start at position 0 in the document's value BinData array representation, and bit
+            // positions start at the least significant bit.
+            auto byteIdx = bitPosition / 8;
+            auto currentBit = bitPosition % 8;
+            auto currentByte = binData[byteIdx];
+
+            isBitSet = currentByte & (1 << currentBit);
+        }
+
+        // Bail out early if we succeed with the any case or fail with the all case. To do this, we
+        // negate a test to determine if we need to continue looping over the bit position list. So
+        // the first part of the disjunction checks when a bit is set and the test is invoked by the
+        // AllSet or AnyClear expressions. The second test checks if a bit isn't set and we are
+        // checking the AllClear or the AnySet cases.
+        if (!((isBitSet &&
+               (bitTestBehavior == BitTestBehavior::AllSet ||
+                bitTestBehavior == BitTestBehavior::AnyClear)) ||
+              (!isBitSet &&
+               (bitTestBehavior == BitTestBehavior::AllClear ||
+                bitTestBehavior == BitTestBehavior::AnySet)))) {
+            return {false,
+                    value::TypeTags::Boolean,
+                    bitTestBehavior == BitTestBehavior::AnyClear ||
+                        bitTestBehavior == BitTestBehavior::AnySet};
+        }
+    }
+    return {false,
+            value::TypeTags::Boolean,
+            bitTestBehavior == BitTestBehavior::AllSet ||
+                bitTestBehavior == BitTestBehavior::AllClear};
+}
+
+
+// Converts the value to a NumberInt64 tag/value and checks if the mask tab/value pair is a number.
+// If the inputs aren't numbers or the value can't be converted to a 64-bit integer, or if it's
+// outside of the range where the `lhsTag` type can represent consecutive integers precisely Nothing
+// is returned.
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::convertBitTestValue(
+    value::TypeTags maskTag, value::Value maskVal, value::TypeTags valueTag, value::Value value) {
+    if (!value::isNumber(maskTag) || !value::isNumber(valueTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    // Bail out if the input can't be converted to a 64-bit integer, or if it's outside of the range
+    // where the `lhsTag` type can represent consecutive integers precisely.
+    auto [numTag, numVal] = genericNumConvertToPreciseInt64(valueTag, value);
+    if (numTag != value::TypeTags::NumberInt64) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    return {false, numTag, numVal};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestZero(uint8_t arity) {
+    invariant(arity == 2);
+
+    auto [ownedMask, maskTag, maskValue] = getFromStack(0);
+    auto [ownedInput, valueTag, value] = getFromStack(1);
+
+    auto [ownedNum, numTag, numVal] = convertBitTestValue(maskTag, maskValue, valueTag, value);
+    if (numTag == value::TypeTags::Nothing) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto result =
+        (value::numericCast<int64_t>(maskTag, maskValue) & value::bitcastTo<int64_t>(numVal)) == 0;
+    return {false, value::TypeTags::Boolean, result};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestMask(uint8_t arity) {
+    invariant(arity == 2);
+
+    auto [ownedMask, maskTag, maskValue] = getFromStack(0);
+    auto [ownedInput, valueTag, value] = getFromStack(1);
+
+    auto [ownedNum, numTag, numVal] = convertBitTestValue(maskTag, maskValue, valueTag, value);
+    if (numTag == value::TypeTags::Nothing) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto numMask = value::numericCast<int64_t>(maskTag, maskValue);
+    auto result = (numMask & value::bitcastTo<int64_t>(numVal)) == numMask;
+    return {false, value::TypeTags::Boolean, result};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
@@ -1104,6 +1223,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinAddToSet(arity);
         case Builtin::doubleDoubleSum:
             return builtinDoubleDoubleSum(arity);
+        case Builtin::bitTestZero:
+            return builtinBitTestZero(arity);
+        case Builtin::bitTestMask:
+            return builtinBitTestMask(arity);
+        case Builtin::bitTestPosition:
+            return builtinBitTestPosition(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -1652,6 +1777,18 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
 
                     if (tag != value::TypeTags::Nothing) {
                         topStack(false, value::TypeTags::Boolean, value::isNumber(tag));
+                    }
+
+                    if (owned) {
+                        value::releaseValue(tag, val);
+                    }
+                    break;
+                }
+                case Instruction::isBinData: {
+                    auto [owned, tag, val] = getFromStack(0);
+
+                    if (tag != value::TypeTags::Nothing) {
+                        topStack(false, value::TypeTags::Boolean, value::isBinData(tag));
                     }
 
                     if (owned) {

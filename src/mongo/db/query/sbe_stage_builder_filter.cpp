@@ -520,6 +520,81 @@ void generateAlwaysBoolean(MatchExpressionVisitorContext* context, bool value) {
 }
 
 /**
+ * Generates a SBE plan stage sub-tree which implements the bitwise match expression 'expr'. The
+ * various bit test expressions accept a numeric, BinData or position list bitmask. Here we handle
+ * building an EExpression for both the numeric and BinData or position list forms of the bitmask.
+ */
+void generateTraverseForBitTests(MatchExpressionVisitorContext* context,
+                                 const BitTestMatchExpression* expr,
+                                 const sbe::BitTestBehavior& bitTestBehavior) {
+    auto makeEExprFn = [expr, bitTestBehavior](sbe::value::SlotId inputSlot) {
+        auto bitPositions = expr->getBitPositions();
+
+        // Build an array set of bit positions for the bitmask, and remove duplicates in the
+        // bitPositions vector since duplicates aren't handled in the match expression parser by
+        // checking if an item has already been seen.
+        auto [bitPosTag, bitPosVal] = sbe::value::makeNewArray();
+        auto arr = sbe::value::getArrayView(bitPosVal);
+        arr->reserve(bitPositions.size());
+
+        std::set<int> seenBits;
+        for (size_t index = 0; index < bitPositions.size(); ++index) {
+            auto currentBit = bitPositions[index];
+            if (auto result = seenBits.insert(currentBit); result.second) {
+                arr->push_back(sbe::value::TypeTags::NumberInt64, currentBit);
+            }
+        }
+
+        // An EExpression for the BinData and position list for the binary case of
+        // BitTestMatchExpressions. This function will be applied to values carrying BinData
+        // elements.
+        auto binaryBitTestEExpr = sbe::makeE<sbe::EFunction>(
+            "bitTestPosition",
+            sbe::makeEs(sbe::makeE<sbe::EConstant>(bitPosTag, bitPosVal),
+                        sbe::makeE<sbe::EVariable>(inputSlot),
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                   static_cast<int32_t>(bitTestBehavior))));
+
+        // Build An EExpression for the numeric bitmask case. The AllSet case tests if (mask &
+        // value) == mask, and AllClear case tests if (mask & value) == 0. The AnyClear and the
+        // AnySet case is the negation of the AllSet and AllClear cases, respectively.
+        auto numericBitTestEExpr =
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, expr->getBitMask());
+        if (bitTestBehavior == sbe::BitTestBehavior::AllSet ||
+            bitTestBehavior == sbe::BitTestBehavior::AnyClear) {
+            numericBitTestEExpr = sbe::makeE<sbe::EFunction>(
+                "bitTestMask",
+                sbe::makeEs(std::move(numericBitTestEExpr), sbe::makeE<sbe::EVariable>(inputSlot)));
+
+            // The AnyClear case is the negation of the AllSet case.
+            if (bitTestBehavior == sbe::BitTestBehavior::AnyClear) {
+                numericBitTestEExpr = sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
+                                                                  std::move(numericBitTestEExpr));
+            }
+        } else if (bitTestBehavior == sbe::BitTestBehavior::AllClear ||
+                   bitTestBehavior == sbe::BitTestBehavior::AnySet) {
+            numericBitTestEExpr = sbe::makeE<sbe::EFunction>(
+                "bitTestZero",
+                sbe::makeEs(std::move(numericBitTestEExpr), sbe::makeE<sbe::EVariable>(inputSlot)));
+
+            // The AnySet case is the negation of the AllClear case.
+            if (bitTestBehavior == sbe::BitTestBehavior::AnySet) {
+                numericBitTestEExpr = sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
+                                                                  std::move(numericBitTestEExpr));
+            }
+        } else {
+            MONGO_UNREACHABLE;
+        }
+        return sbe::makeE<sbe::EIf>(
+            sbe::makeE<sbe::EFunction>("isBinData",
+                                       sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot))),
+            std::move(binaryBitTestEExpr),
+            std::move(numericBitTestEExpr));
+    };
+    generateTraverse(context, expr, std::move(makeEExprFn));
+}
+
+/**
  * A match expression pre-visitor used for maintaining nested logical expressions while traversing
  * the match expression tree.
  */
@@ -532,18 +607,10 @@ public:
     void visit(const AndMatchExpression* expr) final {
         _context->nestedLogicalExprs.push({expr, expr->numChildren()});
     }
-    void visit(const BitsAllClearMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
-    void visit(const BitsAllSetMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
-    void visit(const BitsAnyClearMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
-    void visit(const BitsAnySetMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
+    void visit(const BitsAllClearMatchExpression* expr) final {}
+    void visit(const BitsAllSetMatchExpression* expr) final {}
+    void visit(const BitsAnyClearMatchExpression* expr) final {}
+    void visit(const BitsAnySetMatchExpression* expr) final {}
     void visit(const ElemMatchObjectMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
@@ -696,10 +763,22 @@ public:
         generateLogicalAnd(_context, expr);
     }
 
-    void visit(const BitsAllClearMatchExpression* expr) final {}
-    void visit(const BitsAllSetMatchExpression* expr) final {}
-    void visit(const BitsAnyClearMatchExpression* expr) final {}
-    void visit(const BitsAnySetMatchExpression* expr) final {}
+    void visit(const BitsAllClearMatchExpression* expr) final {
+        generateTraverseForBitTests(_context, expr, sbe::BitTestBehavior::AllClear);
+    }
+
+    void visit(const BitsAllSetMatchExpression* expr) final {
+        generateTraverseForBitTests(_context, expr, sbe::BitTestBehavior::AllSet);
+    }
+
+    void visit(const BitsAnyClearMatchExpression* expr) final {
+        generateTraverseForBitTests(_context, expr, sbe::BitTestBehavior::AnyClear);
+    }
+
+    void visit(const BitsAnySetMatchExpression* expr) final {
+        generateTraverseForBitTests(_context, expr, sbe::BitTestBehavior::AnySet);
+    }
+
     void visit(const ElemMatchObjectMatchExpression* expr) final {}
     void visit(const ElemMatchValueMatchExpression* expr) final {}
 

@@ -155,4 +155,68 @@ assertQueryCorrect({
                    1);
 
 coll.drop();
+
+// Test that NaNs and non-integral ints are filtered out.
+assert.commandWorked(coll.insert({a: 0}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: 54}));
+assert.commandWorked(coll.insert({a: 88}));
+assert.commandWorked(coll.insert({a: 255}));
+assert.commandWorked(coll.insert({a: NaN}));
+assert.commandWorked(coll.insert({a: 1.1}));
+assert.commandWorked(coll.insert({a: -1.1}));
+assert.commandWorked(coll.insert({a: -Infinity}));
+assert.commandWorked(coll.insert({a: +Infinity}));
+assert.commandWorked(coll.createIndex({a: 1}));
+
+assertQueryCorrect({a: {$bitsAllSet: 0}}, 5);
+assertQueryCorrect({a: {$bitsAllSet: 1}}, 2);
+assertQueryCorrect({a: {$bitsAllSet: 16}}, 3);
+assertQueryCorrect({a: {$bitsAllSet: 54}}, 2);
+assertQueryCorrect({a: {$bitsAllSet: 55}}, 1);
+assertQueryCorrect({a: {$bitsAllSet: 88}}, 2);
+assertQueryCorrect({a: {$bitsAllSet: 255}}, 1);
+assertQueryCorrect({a: {$bitsAllClear: 0}}, 5);
+assertQueryCorrect({a: {$bitsAllClear: 1}}, 3);
+assertQueryCorrect({a: {$bitsAllClear: 16}}, 2);
+assertQueryCorrect({a: {$bitsAllClear: 129}}, 3);
+assertQueryCorrect({a: {$bitsAllClear: 255}}, 1);
+assertQueryCorrect({a: {$bitsAnySet: 0}}, 0);
+assertQueryCorrect({a: {$bitsAnySet: 9}}, 3);
+assertQueryCorrect({a: {$bitsAnySet: 255}}, 4);
+assertQueryCorrect({a: {$bitsAnyClear: 0}}, 0);
+assertQueryCorrect({a: {$bitsAnyClear: 18}}, 3);
+assertQueryCorrect({a: {$bitsAnyClear: 24}}, 3);
+assertQueryCorrect({a: {$bitsAnyClear: 255}}, 4);
+assert(coll.drop());
+
+// Test variable length binary bitmasks.
+assert.commandWorked(coll.insert({a: BinData(0, "ZG9n")}));
+assert.commandWorked(coll.insert({a: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}));
+assert.commandWorked(coll.insert({a: BinData(1, "JA4A8gAxqTwciCuF5GGzAA==")}));
+assert.commandWorked(
+    coll.insert({a: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}));
+assert.commandWorked(
+    coll.insert({a: BinData(2, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}));
+
+assertQueryCorrect({a: {$bitsAllSet: BinData(0, "ZG9n")}}, 1);
+assertQueryCorrect({a: {$bitsAllSet: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 2);
+assertQueryCorrect({a: {$bitsAllSet: BinData(2, "JA4A8gAxqTwciCuF5GGzAA==")}}, 2);
+assertQueryCorrect(
+    {a: {$bitsAllSet: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}},
+    2);
+assertQueryCorrect(
+    {a: {$bitsAllSet: BinData(2, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}},
+    2);
+assertQueryCorrect({a: {$bitsAllClear: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, 5);
+assertQueryCorrect({a: {$bitsAllClear: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 0);
+assertQueryCorrect({a: {$bitsAnySet: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, 0);
+assertQueryCorrect({a: {$bitsAnySet: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 5);
+assertQueryCorrect({a: {$bitsAnyClear: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, 0);
+assertQueryCorrect({
+    a: {$bitsAnyClear: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}
+},
+                   3);
+
+assert(coll.drop());
 })();

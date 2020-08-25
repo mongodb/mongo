@@ -360,6 +360,10 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"addToSet", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::addToSet, true}},
     {"doubleDoubleSum",
      BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::doubleDoubleSum, true}},
+    {"bitTestZero", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::bitTestZero, false}},
+    {"bitTestMask", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::bitTestMask, false}},
+    {"bitTestPosition",
+     BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::bitTestPosition, false}},
 };
 
 /**
@@ -395,6 +399,8 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
      InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsString, false}},
     {"isNumber",
      InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsNumber, false}},
+    {"isBinData",
+     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsBinData, false}},
     {"sum", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendSum, true}},
     {"min", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMin, true}},
     {"max", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMax, true}},

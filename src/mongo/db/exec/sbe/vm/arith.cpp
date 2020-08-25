@@ -377,7 +377,7 @@ std::pair<value::TypeTags, value::Value> ByteCode::genericNumConvertToPreciseInt
     // fit in an int64_t.
     if (lhsTag == value::TypeTags::NumberDouble) {
         auto d = value::bitcastTo<double>(lhsValue);
-        if (d > kDoubleLargestConsecutiveInteger || d < -kDoubleLargestConsecutiveInteger) {
+        if (d >= kDoubleLargestConsecutiveInteger || d <= -kDoubleLargestConsecutiveInteger) {
             return {value::TypeTags::Nothing, 0};
         }
     }
@@ -491,7 +491,6 @@ std::pair<value::TypeTags, value::Value> ByteCode::compare3way(value::TypeTags l
 
     return value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue);
 }
-
 }  // namespace vm
 }  // namespace sbe
 }  // namespace mongo

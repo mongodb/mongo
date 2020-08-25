@@ -562,5 +562,15 @@ private:
     uint32_t _typeMask;
 };
 
+/**
+ * Behavior variants for bit tests supported by match expressions $bitsAllClear, $bitsAllSet,
+ * $bitsAnyClear, $bitsAnySet.
+ */
+enum class BitTestBehavior : int32_t {
+    AllSet,
+    AnyClear,
+    AllClear,
+    AnySet,
+};
 }  // namespace sbe
 }  // namespace mongo

@@ -148,6 +148,7 @@ struct Instruction {
         isArray,
         isString,
         isNumber,
+        isBinData,
         typeMatch,
 
         function,
@@ -181,6 +182,9 @@ enum class Builtin : uint8_t {
     addToArray,       // agg function to append to an array
     addToSet,         // agg function to append to a set
     doubleDoubleSum,  // special double summation
+    bitTestZero,      // test bitwise mask & value is zero
+    bitTestMask,      // test bitwise mask & value is mask
+    bitTestPosition,  // test BinData with a bit position list
 };
 
 class CodeFragment {
@@ -253,6 +257,7 @@ public:
     void appendIsArray();
     void appendIsString();
     void appendIsNumber();
+    void appendIsBinData();
     void appendTypeMatch(uint32_t typeMask);
     void appendFunction(Builtin f, uint8_t arity);
     void appendJump(int jumpOffset);
@@ -397,6 +402,10 @@ private:
                                                             value::Value accValue,
                                                             value::TypeTags fieldTag,
                                                             value::Value fieldValue);
+    std::tuple<bool, value::TypeTags, value::Value> convertBitTestValue(value::TypeTags maskTag,
+                                                                        value::Value maskValue,
+                                                                        value::TypeTags valueTag,
+                                                                        value::Value value);
 
     std::tuple<bool, value::TypeTags, value::Value> builtinSplit(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDate(uint8_t arity);
@@ -410,6 +419,9 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToArray(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToSet(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinBitTestZero(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinBitTestMask(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinBitTestPosition(uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 
