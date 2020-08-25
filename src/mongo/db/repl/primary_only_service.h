@@ -210,6 +210,13 @@ public:
      */
     void releaseAllInstances();
 
+    /**
+     * Returns whether this service is currently running.  This is true only when the node is in
+     * state PRIMARY *and* this service has finished all asynchronous work associated with resuming
+     * after stepUp.
+     */
+    bool isRunning() const;
+
 protected:
     /**
      * Constructs a new Instance object with the given initial state.
@@ -248,7 +255,7 @@ private:
 
     ServiceContext* const _serviceContext;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("PrimaryOnlyService::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("PrimaryOnlyService::_mutex");
 
     // Condvar to receive notifications when _rebuildInstances has completed after stepUp.
     stdx::condition_variable _rebuildCV;

@@ -358,7 +358,9 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
     }
 
     if (auto status = ErrorCodes::OK; _killCode.compareAndSwap(&status, killCode)) {
-        _baton->notify();
+        if (_baton) {
+            _baton->notify();
+        }
     }
 }
 

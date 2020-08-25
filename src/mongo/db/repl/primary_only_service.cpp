@@ -69,6 +69,82 @@ const auto _registryRegisterer =
 
 const Status kExecutorShutdownStatus(ErrorCodes::InterruptedDueToReplStateChange,
                                      "PrimaryOnlyService executor shut down due to stepDown");
+
+/**
+ * Client decoration used by Clients that are a part of a PrimaryOnlyService.
+ */
+struct PrimaryOnlyServiceClientState {
+    PrimaryOnlyService* primaryOnlyService = nullptr;
+    bool allowOpCtxWhenServiceNotRunning = false;
+};
+
+const auto primaryOnlyServiceStateForClient =
+    Client::declareDecoration<PrimaryOnlyServiceClientState>();
+
+/**
+ * A ClientObserver that adds a hook for every time an OpCtx is created on a thread that is part of
+ * a PrimaryOnlyService and ensures that the OpCtx is immediately interrupted if the associated
+ * service is not running at the time that the OpCtx is created.  This protects against the case
+ * where work for a service is scheduled and then the node steps down and back up before the work
+ * creates an OpCtx. This works because even though the node has stepped back up already, the
+ * service isn't "running" until it's finished its recovery which involves waiting for all work
+ * from the previous term as primary to complete.
+ */
+class PrimaryOnlyServiceClientObserver final : public ServiceContext::ClientObserver {
+public:
+    void onCreateClient(Client* client) override {}
+    void onDestroyClient(Client* client) override {}
+
+    void onCreateOperationContext(OperationContext* opCtx) override {
+        auto client = opCtx->getClient();
+        auto clientState = primaryOnlyServiceStateForClient(client);
+        if (!clientState.primaryOnlyService) {
+            // This OpCtx/Client is not a part of a PrimaryOnlyService
+            return;
+        }
+
+        // Ensure this OpCtx will get interrupted at stepDown.
+        opCtx->setAlwaysInterruptAtStepDownOrUp();
+
+        // If the PrimaryOnlyService this OpCtx is a part of isn't running when it's created, then
+        // ensure the OpCtx starts off immediately interrupted.
+        if (!clientState.allowOpCtxWhenServiceNotRunning &&
+            !clientState.primaryOnlyService->isRunning()) {
+            opCtx->markKilled(ErrorCodes::NotMaster);
+        }
+    }
+    void onDestroyOperationContext(OperationContext* opCtx) override {}
+};
+
+ServiceContext::ConstructorActionRegisterer primaryOnlyServiceClientObserverRegisterer{
+    "PrimaryOnlyServiceClientObserver", [](ServiceContext* service) {
+        service->registerClientObserver(std::make_unique<PrimaryOnlyServiceClientObserver>());
+    }};
+
+/**
+ * Allows OpCtxs created on PrimaryOnlyService threads to remain uninterrupted, even if the service
+ * they are associated with isn't running. Used during the stepUp process to allow the database
+ * read required to rebuild a service and get it running in the first place.
+ * Does not prevent other forms of OpCtx interruption, such as from stepDown or calls to killOp.
+ */
+class AllowOpCtxWhenServiceNotRunningBlock {
+public:
+    explicit AllowOpCtxWhenServiceNotRunningBlock(Client* client)
+        : _client(client), _clientState(&primaryOnlyServiceStateForClient(_client)) {
+        invariant(_clientState->primaryOnlyService);
+        invariant(_clientState->allowOpCtxWhenServiceNotRunning == false);
+        _clientState->allowOpCtxWhenServiceNotRunning = true;
+    }
+    ~AllowOpCtxWhenServiceNotRunningBlock() {
+        invariant(_clientState->allowOpCtxWhenServiceNotRunning == true);
+        _clientState->allowOpCtxWhenServiceNotRunning = false;
+    }
+
+private:
+    Client* _client;
+    PrimaryOnlyServiceClientState* _clientState;
+};
+
 }  // namespace
 
 PrimaryOnlyServiceRegistry* PrimaryOnlyServiceRegistry::get(ServiceContext* serviceContext) {
@@ -152,6 +228,11 @@ void PrimaryOnlyServiceRegistry::shutdown() {
 PrimaryOnlyService::PrimaryOnlyService(ServiceContext* serviceContext)
     : _serviceContext(serviceContext) {}
 
+bool PrimaryOnlyService::isRunning() const {
+    stdx::lock_guard lk(_mutex);
+    return _state == State::kRunning;
+}
+
 void PrimaryOnlyService::startup(OperationContext* opCtx) {
     // Initialize the thread pool options with the service-specific limits on pool size.
     ThreadPool::Options threadPoolOptions(getThreadPoolLimits());
@@ -159,9 +240,16 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
     // Now add the options that are fixed for all PrimaryOnlyServices.
     threadPoolOptions.threadNamePrefix = getServiceName() + "-";
     threadPoolOptions.poolName = getServiceName() + "ThreadPool";
-    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+    threadPoolOptions.onCreateThread = [this](const std::string& threadName) {
         Client::initThread(threadName.c_str());
-        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+        auto client = Client::getCurrent();
+        AuthorizationSession::get(*client)->grantInternalAuthorization(&cc());
+
+        stdx::lock_guard<Client> lk(*client);
+        client->setSystemOperationKillableByStepdown(lk);
+
+        // Associate this Client with this PrimaryOnlyService
+        primaryOnlyServiceStateForClient(client).primaryOnlyService = this;
     };
 
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
@@ -206,7 +294,7 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     // Ensure that all tasks from the previous term have completed before allowing tasks to be
     // scheduled on the new executor.
     if (newThenOldScopedExecutor) {
-        // Shutdown happens in onStepDown of previous term, so we only need to join() here.
+        // shutdown() happens in onStepDown of previous term, so we only need to join() here.
         (*newThenOldScopedExecutor)->join();
     }
 
@@ -332,6 +420,12 @@ void PrimaryOnlyService::releaseAllInstances() {
 void PrimaryOnlyService::_rebuildInstances() noexcept {
     std::vector<BSONObj> stateDocuments;
     {
+        // The PrimaryOnlyServiceClientObserver will make any OpCtx created as part of a
+        // PrimaryOnlyService immediately get interrupted if the service is not in state kRunning.
+        // Since we are in State::kRebuilding here, we need to install a
+        // AllowOpCtxWhenServiceNotRunningBlock so that the database read we need to do can complete
+        // successfully.
+        AllowOpCtxWhenServiceNotRunningBlock allowOpCtxBlock(Client::getCurrent());
         auto opCtx = cc().makeOperationContext();
         DBDirectClient client(opCtx.get());
         try {

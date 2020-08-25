@@ -59,6 +59,7 @@ MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringInitialization);
 MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringStateOne);
 MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringStateTwo);
 MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringCompletion);
+MONGO_FAIL_POINT_DEFINE(TestServiceHangBeforeWritingStateDoc);
 }  // namespace
 
 class TestService final : public PrimaryOnlyService {
@@ -170,6 +171,12 @@ public:
 
             lk.unlock();
 
+            // Hang before creating OpCtx so that we can test that OpCtxs created after stepping
+            // down still get interrupted.
+            if (MONGO_unlikely(TestServiceHangBeforeWritingStateDoc.shouldFail())) {
+                TestServiceHangBeforeWritingStateDoc.pauseWhileSet();
+            }
+
             auto opCtx = cc().makeOperationContext();
             DBDirectClient client(opCtx.get());
             if (targetState == State::kDone) {
@@ -248,8 +255,6 @@ public:
     }
 
     void stepDown() {
-        ASSERT_OK(ReplicationCoordinator::get(getServiceContext())
-                      ->setFollowerMode(MemberState::RS_SECONDARY));
         _registry->onStepDown();
     }
 
@@ -542,4 +547,17 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
     TestServiceHangDuringStateOne.setMode(FailPoint::off);
     instance->onCompletion().get();
     ASSERT_EQ(TestService::State::kDone, instance->getState());
+}
+
+TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByStepdown) {
+    // Ensure that if work has already been scheduled on the executor, but hasn't yet created an
+    // OpCtx, and then we stepDown, that the OpCtx that gets created still gets interrupted.
+    auto timesEntered = TestServiceHangBeforeWritingStateDoc.setMode(FailPoint::alwaysOn);
+
+    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+    TestServiceHangBeforeWritingStateDoc.waitForTimesEntered(++timesEntered);
+    stepDown();
+    TestServiceHangBeforeWritingStateDoc.setMode(FailPoint::off);
+
+    ASSERT_EQ(ErrorCodes::NotMaster, instance->onCompletion().getNoThrow());
 }
