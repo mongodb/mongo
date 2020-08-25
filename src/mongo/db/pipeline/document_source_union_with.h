@@ -62,7 +62,14 @@ public:
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
-        : DocumentSource(kStageName, expCtx), _pipeline(std::move(pipeline)) {}
+        : DocumentSource(kStageName, expCtx), _pipeline(std::move(pipeline)) {
+        // If this pipeline is being run as part of explain, then cache a copy to use later during
+        // serialization.
+        if (expCtx->explain >= ExplainOptions::Verbosity::kExecStats) {
+            _cachedPipeline =
+                Pipeline::create(_pipeline->getSources(), _pipeline->getContext()).release();
+        }
+    }
 
     ~DocumentSourceUnionWith();
 
@@ -155,6 +162,7 @@ private:
     void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    Pipeline* _cachedPipeline = nullptr;
     bool _usedDisk = false;
     ExecutionProgress _executionState = ExecutionProgress::kIteratingSource;
 };

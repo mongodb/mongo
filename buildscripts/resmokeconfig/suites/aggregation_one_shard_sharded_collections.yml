@@ -15,8 +15,6 @@ selector:
   # TODO SERVER-32309: Enable once $lookup with pipeline supports sharded foreign collections.
   - jstests/aggregation/sources/lookup/lookup_subpipeline.js
   - jstests/aggregation/sources/graphLookup/variables.js
-  # TODO SERVER-50246 Investigate and remove.
-  - jstests/aggregation/sources/unionWith/unionWith_explain.js
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_against_mongod_not_mongos

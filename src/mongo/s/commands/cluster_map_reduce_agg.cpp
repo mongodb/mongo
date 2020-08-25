@@ -217,7 +217,6 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 // a pointer to the constructed ExpressionContext.
                 uassertStatusOK(cluster_aggregation_planner::dispatchPipelineAndMerge(
                     opCtx,
-                    expCtx->mongoProcessInterface->taskExecutor,
                     std::move(targeter),
                     std::move(serialized),
                     std::numeric_limits<long long>::max(),

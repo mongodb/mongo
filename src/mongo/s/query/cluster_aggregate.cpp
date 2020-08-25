@@ -332,7 +332,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kAnyShard: {
                 return cluster_aggregation_planner::dispatchPipelineAndMerge(
                     opCtx,
-                    expCtx->mongoProcessInterface->taskExecutor,
                     std::move(targeter),
                     request.serializeToCommandObj(),
                     request.getBatchSize(),

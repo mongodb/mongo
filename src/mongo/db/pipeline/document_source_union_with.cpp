@@ -68,7 +68,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
     auto unionExpCtx = expCtx->copyForSubPipeline(resolvedNs.ns);
 
     if (resolvedNs.pipeline.empty()) {
-        return Pipeline::parse(std::move(currentPipeline), unionExpCtx, validatorCallback);
+        return Pipeline::parse(currentPipeline, unionExpCtx, validatorCallback);
     }
     auto resolvedPipeline = std::move(resolvedNs.pipeline);
     resolvedPipeline.reserve(currentPipeline.size() + resolvedPipeline.size());
@@ -253,18 +253,40 @@ void DocumentSourceUnionWith::doDispose() {
 
 Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {
+        // There are several different possible states depending on the explain verbosity as well as
+        // the other stages in the pipeline:
+        //  * If verbosity is queryPlanner, then the sub-pipeline should be untouched and we can
+        //  explain it directly.
+        //  * If verbosity is execStats or allPlansExecution, then whether or not to explain the
+        //  sub-pipeline depends on if we've started reading from it. For instance, there could be a
+        //  $limit stage after the $unionWith which results in only reading from the base collection
+        //  branch and not the sub-pipeline.
+        Pipeline* pipeCopy = nullptr;
+        if (*explain == ExplainOptions::Verbosity::kQueryPlanner) {
+            pipeCopy = Pipeline::create(_pipeline->getSources(), _pipeline->getContext()).release();
+        } else if (*explain >= ExplainOptions::Verbosity::kExecStats &&
+                   _executionState > ExecutionProgress::kIteratingSource) {
+            // We've either exhausted the sub-pipeline or at least started iterating it. Use the
+            // cached pipeline to get the explain output since the '_pipeline' may have been
+            // modified for any optimizations or pushdowns into the initial $cursor stage.
+            pipeCopy = _cachedPipeline;
+        } else {
+            // The plan does not require reading from the sub-pipeline, so just include the
+            // serialization in the explain output.
+            BSONArrayBuilder bab;
+            for (auto&& stage : _pipeline->serialize())
+                bab << stage;
+            return Value(DOC(getSourceName() << DOC("coll" << _pipeline->getContext()->ns.coll()
+                                                           << "pipeline" << bab.arr())));
+        }
 
-        auto pipeCopy = Pipeline::create(_pipeline->getSources(), _pipeline->getContext());
-
-        // If we have already started getting documents from the sub-pipeline, this is an explain
-        // that has done some execution. We don't want to serialize the mergeCursors stage, so if
-        // we have a cursor stage we tell the process interface to remove it in the case it is a
-        // mergeCursors stage.
+        invariant(pipeCopy);
         BSONObj explainLocal =
-            pExpCtx->mongoProcessInterface->preparePipelineAndExplain(pipeCopy.release(), *explain);
+            pExpCtx->mongoProcessInterface->preparePipelineAndExplain(pipeCopy, *explain);
         LOGV2_DEBUG(4553501, 3, "$unionWith attached cursor to pipeline for explain");
         // We expect this to be an explanation of a pipeline -- there should only be one field.
         invariant(explainLocal.nFields() == 1);
+
         return Value(
             DOC(getSourceName() << DOC("coll" << _pipeline->getContext()->ns.coll() << "pipeline"
                                               << explainLocal.firstElement())));

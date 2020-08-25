@@ -8,6 +8,7 @@
 "use strict";
 load("jstests/aggregation/extras/utils.js");  // arrayEq, documentEq
 load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
+load("jstests/libs/analyze_plan.js");         // For getAggPlanStage.
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
@@ -16,17 +17,25 @@ const collB = testDB.B;
 collB.drop();
 const collC = testDB.C;
 collC.drop();
-for (let i = 0; i < 5; i++) {
+const docsPerColl = 5;
+for (let i = 0; i < docsPerColl; i++) {
     assert.commandWorked(collA.insert({a: i, val: i, groupKey: i}));
     assert.commandWorked(collB.insert({b: i, val: i * 2, groupKey: i}));
     assert.commandWorked(collC.insert({c: i, val: 10 - i, groupKey: i}));
 }
-function getUnionWithStage(pipeline) {
-    for (let i = 0; i < pipeline.length; i++) {
-        const stage = pipeline[i];
-        if (stage.hasOwnProperty("$unionWith")) {
-            return stage;
+function getUnionWithStage(explain) {
+    if (explain.splitPipeline != null) {
+        // If there is only one shard, the whole pipeline will run on that shard.
+        const subAggPipe = explain.splitPipeline === null ? explain.shards["shard-rs0"].stages
+                                                          : explain.splitPipeline.mergerPart;
+        for (let i = 0; i < subAggPipe.length; i++) {
+            const stage = subAggPipe[i];
+            if (stage.hasOwnProperty("$unionWith")) {
+                return stage;
+            }
         }
+    } else {
+        return getAggPlanStage(explain, "$unionWith");
     }
 }
 
@@ -47,13 +56,11 @@ function docEqWithIgnoredFields(union, regular) {
 }
 
 function assertExplainEq(unionExplain, regularExplain) {
+    const unionStage = getUnionWithStage(unionExplain);
+    assert(unionStage);
+    const unionSubExplain = unionStage.$unionWith.pipeline;
     if (FixtureHelpers.isMongos(testDB)) {
         const splitPipe = unionExplain.splitPipeline;
-        // If there is only one shard, the whole pipeline will run on that shard.
-        const subAggPipe =
-            splitPipe === null ? unionExplain.shards["shard-rs0"].stages : splitPipe.mergerPart;
-        const unionStage = getUnionWithStage(subAggPipe);
-        const unionSubExplain = unionStage.$unionWith.pipeline;
         if (splitPipe === null) {
             assert.eq(unionSubExplain.splitPipeline,
                       regularExplain.splitPipeline,
@@ -69,8 +76,6 @@ function assertExplainEq(unionExplain, regularExplain) {
         assert(docEqWithIgnoredFields(unionSubExplain.shards, regularExplain.shards),
                buildErrorString(unionSubExplain, regularExplain, "shards"));
     } else {
-        const unionStage = getUnionWithStage(unionExplain.stages);
-        const unionSubExplain = unionStage.$unionWith.pipeline;
         if ("executionStats" in unionSubExplain[0].$cursor) {
             const unionSubStats =
                 unionStage.$unionWith.pipeline[0].$cursor.executionStats.executionStages;
@@ -140,7 +145,7 @@ assert.commandWorked(testDB.runCommand({
 }));
 
 // Ensure that $unionWith can still execute explain if followed by a stage that calls dispose().
-var result = assert.commandWorked(testDB.runCommand({
+let result = assert.commandWorked(testDB.runCommand({
     explain: {
         aggregate: collA.getName(),
         pipeline: [{$unionWith: collB.getName()}, {$limit: 1}],
@@ -150,29 +155,61 @@ var result = assert.commandWorked(testDB.runCommand({
 
 // Test that execution stats inner cursor is populated.
 result = collA.explain("executionStats").aggregate([{"$unionWith": collB.getName()}]);
-var expectedResult = collB.explain("executionStats").aggregate([]);
-assert(result.ok, result);
-assert(expectedResult.ok, result);
-// If we attached a fresh cursor stage, the number returned would still be zero.
+assert.commandWorked(result);
+let expectedResult = collB.explain("executionStats").aggregate([]);
+assert.commandWorked(expectedResult);
+let unionStage = getUnionWithStage(result);
+assert(unionStage, result);
 if (FixtureHelpers.isMongos(testDB)) {
-    if (result.splitPipeline != null) {
-        const pipeline = result.splitPipeline.mergerPart;
-        const unionStage = getUnionWithStage(pipeline);
-        assert(docEqWithIgnoredFields(expectedResult.shards, unionStage.$unionWith.pipeline.shards),
-               buildErrorString(unionStage, expectedResult));
-    }
+    assert(docEqWithIgnoredFields(expectedResult.shards, unionStage.$unionWith.pipeline.shards),
+           buildErrorString(unionStage, expectedResult));
+    // TODO SERVER-50597 Fix unionWith nReturned stat in sharded cluster
+    // assert.eq(unionStage.nReturned, docsPerColl, unionStage);
 } else {
-    assert(result.stages[1].$unionWith.pipeline[0].$cursor.executionStats.nreturned != 0, result);
+    assert.eq(unionStage.nReturned, docsPerColl * 2, unionStage);
+    assert.eq(unionStage.$unionWith.pipeline[0].$cursor.executionStats.nReturned,
+              docsPerColl,
+              unionStage);
+}
+
+// Test explain with executionStats when the $unionWith stage doesn't need to read from it's
+// sub-pipeline.
+result = collA.explain("executionStats").aggregate([{"$unionWith": collB.getName()}, {$limit: 1}]);
+assert.commandWorked(result);
+unionStage = getUnionWithStage(result);
+assert(unionStage, result);
+if (!FixtureHelpers.isSharded(collB)) {
+    assert.eq(unionStage.nReturned, 1, unionStage);
+    assert.eq(unionStage.$unionWith, {coll: "B", pipeline: []}, unionStage);
+}
+
+// Test explain with executionStats when the $unionWith stage partially reads from it's
+// sub-pipeline.
+result = collA.explain("executionStats")
+             .aggregate([{"$unionWith": collB.getName()}, {$limit: docsPerColl + 1}]);
+assert.commandWorked(result);
+unionStage = getUnionWithStage(result);
+assert(unionStage, result);
+if (!FixtureHelpers.isSharded(collB)) {
+    assert.eq(unionStage.nReturned, docsPerColl + 1, unionStage);
+    // TODO SERVER-50597 Fix the executionStats of $unionWith sub-pipeline, the actual result should
+    // be 1 instead of docsPerColl.
+    assert.eq(unionStage.$unionWith.pipeline[0].$cursor.executionStats.nReturned,
+              docsPerColl,
+              unionStage);
 }
 
 // Test an index scan.
 const indexedColl = testDB.indexed;
 assert.commandWorked(indexedColl.createIndex({val: 1}));
 indexedColl.insert([{val: 0}, {val: 1}, {val: 2}, {val: 3}]);
+
 result = collA.explain("executionStats").aggregate([
     {$unionWith: {coll: indexedColl.getName(), pipeline: [{$match: {val: {$gt: 2}}}]}}
 ]);
 expectedResult = indexedColl.explain("executionStats").aggregate([{$match: {val: {$gt: 2}}}]);
-
 assertExplainEq(result, expectedResult);
+
+// Test a nested $unionWith which itself should perform an index scan.
+testPipeline([{$unionWith: {coll: indexedColl.getName(), pipeline: [{$match: {val: {$gt: 0}}}]}}]);
 })();
