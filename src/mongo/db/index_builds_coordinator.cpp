@@ -58,6 +58,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -406,6 +407,11 @@ bool isIndexBuildResumable(OperationContext* opCtx,
               "Index build: in replication recovery. Not waiting for last optime before "
               "interceptors to be majority committed",
               "buildUUID"_attr = replState.buildUUID);
+        return false;
+    }
+
+    // TODO(SERVER-50479): Remove this check when resumable index builds work with ESE in GCM mode.
+    if (EncryptionHooks::get(opCtx->getServiceContext())->enabled()) {
         return false;
     }
 
