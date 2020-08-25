@@ -263,7 +263,7 @@ public:
             curOp->setPlanSummary_inlock(exec->getPlanSummary());
         }
 
-        exec->executePlan();
+        auto countResult = exec->executeCount();
 
         PlanSummaryStats summaryStats;
         exec->getSummaryStats(&summaryStats);
@@ -276,12 +276,7 @@ public:
             curOp->debug().execStats = exec->getStats();
         }
 
-        // Plan is done executing. We just need to pull the count out of the root stage.
-        invariant(STAGE_COUNT == exec->getRootStage()->stageType() ||
-                  STAGE_RECORD_STORE_FAST_COUNT == exec->getRootStage()->stageType());
-        auto* countStats = static_cast<const CountStats*>(exec->getRootStage()->getSpecificStats());
-
-        result.appendNumber("n", countStats->nCounted);
+        result.appendNumber("n", countResult);
         return true;
     }
 

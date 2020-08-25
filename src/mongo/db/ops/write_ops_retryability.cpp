@@ -139,14 +139,14 @@ void parseOplogEntryForFindAndModify(OperationContext* opCtx,
                 1,
                 request.shouldReturnNew() ? oplogEntry.getObject() : boost::optional<BSONObj>(),
                 false,
-                oplogEntry.getObject(),
+                oplogEntry.getObject()["_id"],
                 builder);
         case repl::OpTypeEnum::kUpdate:
             return find_and_modify::serializeUpsert(
                 1, extractPreOrPostImage(opCtx, oplogWithCorrectLinks), true, {}, builder);
         case repl::OpTypeEnum::kDelete:
             return find_and_modify::serializeRemove(
-                1, extractPreOrPostImage(opCtx, oplogWithCorrectLinks), builder);
+                extractPreOrPostImage(opCtx, oplogWithCorrectLinks), builder);
         default:
             MONGO_UNREACHABLE;
     }

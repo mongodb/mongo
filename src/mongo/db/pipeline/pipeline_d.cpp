@@ -103,12 +103,17 @@ namespace {
  * Returns a PlanExecutor which uses a random cursor to sample documents if successful. Returns {}
  * if the storage engine doesn't support random cursors, or if 'sampleSize' is a large enough
  * percentage of the collection.
+ *
+ * If needed, adds DocumentSourceSampleFromRandomCursor to the front of the pipeline, replacing the
+ * $sample stage. This is needed if we select an optimized plan for $sample taking advantage of
+ * storage engine support for random cursors.
  */
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorExecutor(
     const Collection* coll,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     long long sampleSize,
-    long long numRecords) {
+    long long numRecords,
+    Pipeline* pipeline) {
     OperationContext* opCtx = expCtx->opCtx;
 
     // Verify that we are already under a collection lock. We avoid taking locks ourselves in this
@@ -140,6 +145,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
             ->getOwnershipFilter(
                 opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
 
+    TrialStage* trialStage = nullptr;
+
     // Because 'numRecords' includes orphan documents, our initial decision to optimize the $sample
     // cursor may have been mistaken. For sharded collections, build a TRIAL plan that will switch
     // to a collection scan if the ratio of orphaned to owned documents encountered over the first
@@ -168,10 +175,24 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
                                             std::move(collScanPlan),
                                             kMaxPresampleSize,
                                             minWorkAdvancedRatio);
+        trialStage = static_cast<TrialStage*>(root.get());
     }
 
-    return plan_executor_factory::make(
+    auto exec = plan_executor_factory::make(
         expCtx, std::move(ws), std::move(root), coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+
+    // For sharded collections, the root of the plan tree is a TrialStage that may have chosen
+    // either a random-sampling cursor trial plan or a COLLSCAN backup plan. We can only optimize
+    // the $sample aggregation stage if the trial plan was chosen.
+    if (!trialStage || !trialStage->pickedBackupPlan()) {
+        // Replace $sample stage with $sampleFromRandomCursor stage.
+        pipeline->popFront();
+        std::string idString = coll->ns().isOplog() ? "ts" : "_id";
+        pipeline->addInitialSource(
+            DocumentSourceSampleFromRandomCursor::create(expCtx, sampleSize, idString, numRecords));
+    }
+
+    return exec;
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
@@ -325,28 +346,13 @@ PipelineD::buildInnerQueryExecutor(const Collection* collection,
             const long long sampleSize = sampleStage->getSampleSize();
             const long long numRecords = collection->getRecordStore()->numRecords(expCtx->opCtx);
             auto exec = uassertStatusOK(
-                createRandomCursorExecutor(collection, expCtx, sampleSize, numRecords));
+                createRandomCursorExecutor(collection, expCtx, sampleSize, numRecords, pipeline));
             if (exec) {
-                // For sharded collections, the root of the plan tree is a TrialStage that may have
-                // chosen either a random-sampling cursor trial plan or a COLLSCAN backup plan. We
-                // can only optimize the $sample aggregation stage if the trial plan was chosen.
-                auto* trialStage = (exec->getRootStage()->stageType() == StageType::STAGE_TRIAL
-                                        ? static_cast<TrialStage*>(exec->getRootStage())
-                                        : nullptr);
-                if (!trialStage || !trialStage->pickedBackupPlan()) {
-                    // Replace $sample stage with $sampleFromRandomCursor stage.
-                    pipeline->popFront();
-                    std::string idString = collection->ns().isOplog() ? "ts" : "_id";
-                    pipeline->addInitialSource(DocumentSourceSampleFromRandomCursor::create(
-                        expCtx, sampleSize, idString, numRecords));
-                }
-
                 // The order in which we evaluate these arguments is significant. We'd like to be
                 // sure that the DocumentSourceCursor is created _last_, because if we run into a
                 // case where a DocumentSourceCursor has been created (yet hasn't been put into a
                 // Pipeline) and an exception is thrown, an invariant will trigger in the
                 // DocumentSourceCursor. This is a design flaw in DocumentSourceCursor.
-
                 auto deps = pipeline->getDependencies(DepsTracker::kAllMetadata);
                 const auto cursorType = deps.hasNoRequirements()
                     ? DocumentSourceCursor::CursorType::kEmptyDocuments

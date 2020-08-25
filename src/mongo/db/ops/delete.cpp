@@ -60,9 +60,7 @@ long long deleteObjects(OperationContext* opCtx,
     auto exec = uassertStatusOK(getExecutorDelete(
         &CurOp::get(opCtx)->debug(), collection, &parsedDelete, boost::none /* verbosity */));
 
-    exec->executePlan();
-
-    return DeleteStage::getNumDeleted(*exec);
+    return exec->executeDelete();
 }
 
 }  // namespace mongo

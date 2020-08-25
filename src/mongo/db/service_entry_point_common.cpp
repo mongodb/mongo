@@ -1544,7 +1544,7 @@ void receivedInsert(OperationContext* opCtx, const NamespaceString& nsString, co
         audit::logInsertAuthzCheck(opCtx->getClient(), nsString, obj, status.code());
         uassertStatusOK(status);
     }
-    performInserts(opCtx, insertOp);
+    write_ops_exec::performInserts(opCtx, insertOp);
 }
 
 void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
@@ -1567,7 +1567,7 @@ void receivedUpdate(OperationContext* opCtx, const NamespaceString& nsString, co
                                status.code());
     uassertStatusOK(status);
 
-    performUpdates(opCtx, updateOp);
+    write_ops_exec::performUpdates(opCtx, updateOp);
 }
 
 void receivedDelete(OperationContext* opCtx, const NamespaceString& nsString, const Message& m) {
@@ -1580,7 +1580,7 @@ void receivedDelete(OperationContext* opCtx, const NamespaceString& nsString, co
     audit::logDeleteAuthzCheck(opCtx->getClient(), nsString, singleDelete.getQ(), status.code());
     uassertStatusOK(status);
 
-    performDeletes(opCtx, deleteOp);
+    write_ops_exec::performDeletes(opCtx, deleteOp);
 }
 
 DbResponse receivedGetMore(OperationContext* opCtx,

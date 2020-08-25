@@ -64,7 +64,6 @@ public:
                      PlanYieldPolicy::YieldPolicy yieldPolicy);
 
     virtual ~PlanExecutorImpl();
-    PlanStage* getRootStage() const final;
     CanonicalQuery* getCanonicalQuery() const final;
     const NamespaceString& nss() const final;
     OperationContext* getOpCtx() const final;
@@ -75,7 +74,10 @@ public:
     ExecState getNextDocument(Document* objOut, RecordId* dlOut) final;
     ExecState getNext(BSONObj* out, RecordId* dlOut) final;
     bool isEOF() final;
-    void executePlan() final;
+    long long executeCount() override;
+    UpdateResult executeUpdate() override;
+    UpdateResult getUpdateResult() const override;
+    long long executeDelete() override;
     void markAsKilled(Status killStatus) final;
     void dispose(OperationContext* opCtx) final;
     void enqueue(const BSONObj& obj) final;
@@ -101,7 +103,18 @@ public:
      */
     MultiPlanStage* getMultiPlanStage() const;
 
+    PlanStage* getRootStage() const;
+
 private:
+    /**
+     *  Executes the underlying PlanStage tree until it indicates EOF. Throws an exception if the
+     *  plan results in an error.
+     *
+     *  Useful for cases where the caller wishes to execute the plan and extract stats from it (e.g.
+     *  the result of a count or update) rather than returning a set of resulting documents.
+     */
+    void _executePlan();
+
     /**
      * Called on construction in order to ensure that when callers receive a new instance of a
      * 'PlanExecutorImpl', plan selection has already been completed.

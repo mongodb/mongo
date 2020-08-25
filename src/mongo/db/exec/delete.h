@@ -99,6 +99,8 @@ class DeleteStage final : public RequiresMutableCollectionStage {
     DeleteStage& operator=(const DeleteStage&) = delete;
 
 public:
+    static constexpr StringData kStageType = "DELETE"_sd;
+
     DeleteStage(ExpressionContext* expCtx,
                 std::unique_ptr<DeleteStageParams> params,
                 WorkingSet* ws,
@@ -115,15 +117,6 @@ public:
     std::unique_ptr<PlanStageStats> getStats() final;
 
     const SpecificStats* getSpecificStats() const final;
-
-    static const char* kStageType;
-
-    /**
-     * Extracts the number of documents deleted by the delete plan 'exec'.
-     *
-     * Should only be called if the root plan stage of 'exec' is DELETE and if 'exec' is EOF.
-     */
-    static long long getNumDeleted(const PlanExecutor& exec);
 
 protected:
     void doSaveStateRequiresCollection() final {}

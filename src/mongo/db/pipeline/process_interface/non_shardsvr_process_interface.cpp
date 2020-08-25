@@ -71,7 +71,7 @@ Status NonShardServerProcessInterface::insert(const boost::intrusive_ptr<Express
                                               std::vector<BSONObj>&& objs,
                                               const WriteConcernOptions& wc,
                                               boost::optional<OID> targetEpoch) {
-    auto writeResults = performInserts(
+    auto writeResults = write_ops_exec::performInserts(
         expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
 
     // Need to check each result in the batch since the writes are unordered.
@@ -91,8 +91,8 @@ StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::
     UpsertType upsert,
     bool multi,
     boost::optional<OID> targetEpoch) {
-    auto writeResults =
-        performUpdates(expCtx->opCtx, buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
+    auto writeResults = write_ops_exec::performUpdates(
+        expCtx->opCtx, buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
 
     // Need to check each result in the batch since the writes are unordered.
     UpdateResult updateResult;

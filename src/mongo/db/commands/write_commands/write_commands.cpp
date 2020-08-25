@@ -90,7 +90,7 @@ void serializeReply(OperationContext* opCtx,
                     ReplyStyle replyStyle,
                     bool continueOnError,
                     size_t opsInBatch,
-                    WriteResult result,
+                    write_ops_exec::WriteResult result,
                     BSONObjBuilder* out) {
     if (shouldSkipOutput(opCtx))
         return;
@@ -307,7 +307,7 @@ private:
         }
 
         void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
-            auto reply = performInserts(opCtx, _batch);
+            auto reply = write_ops_exec::performInserts(opCtx, _batch);
             serializeReply(opCtx,
                            ReplyStyle::kNotUpdate,
                            !_batch.getWriteCommandBase().getOrdered(),
@@ -405,7 +405,7 @@ private:
         }
 
         void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
-            auto reply = performUpdates(opCtx, _batch);
+            auto reply = write_ops_exec::performUpdates(opCtx, _batch);
             serializeReply(opCtx,
                            ReplyStyle::kUpdate,
                            !_batch.getWriteCommandBase().getOrdered(),
@@ -516,7 +516,7 @@ private:
         }
 
         void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
-            auto reply = performDeletes(opCtx, _batch);
+            auto reply = write_ops_exec::performDeletes(opCtx, _batch);
             serializeReply(opCtx,
                            ReplyStyle::kNotUpdate,
                            !_batch.getWriteCommandBase().getOrdered(),

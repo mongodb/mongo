@@ -44,6 +44,7 @@
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -354,7 +355,13 @@ public:
         getRecordIds(&recordIds, coll);
 
         auto exec = makePlanExecutorWithSortStage(coll);
-        SortStage* ss = static_cast<SortStageDefault*>(exec->getRootStage());
+
+        // This test is specifically for the classic PlanStage execution engine, so assert that we
+        // have the right kind of PlanExecutor.
+        auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
+        ASSERT(execImpl);
+
+        SortStage* ss = static_cast<SortStageDefault*>(execImpl->getRootStage());
         SortKeyGeneratorStage* keyGenStage =
             static_cast<SortKeyGeneratorStage*>(ss->getChildren()[0].get());
         QueuedDataStage* queuedDataStage =
@@ -463,7 +470,13 @@ public:
         getRecordIds(&recordIds, coll);
 
         auto exec = makePlanExecutorWithSortStage(coll);
-        SortStage* ss = static_cast<SortStageDefault*>(exec->getRootStage());
+
+        // This test is specifically for the classic PlanStage execution engine, so assert that we
+        // have the right kind of PlanExecutor.
+        auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
+        ASSERT(execImpl);
+
+        SortStage* ss = static_cast<SortStageDefault*>(execImpl->getRootStage());
         SortKeyGeneratorStage* keyGenStage =
             static_cast<SortKeyGeneratorStage*>(ss->getChildren()[0].get());
         QueuedDataStage* queuedDataStage =

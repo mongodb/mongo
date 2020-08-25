@@ -148,12 +148,6 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
     }
 }
 
-void PlanExecutorPipeline::executePlan() {
-    while (_getNext()) {
-        // Run the pipeline to completion, but discard the results.
-    }
-}
-
 std::string PlanExecutorPipeline::getPlanSummary() const {
     return PipelineD::getPlanSummaryStr(_pipeline.get());
 }

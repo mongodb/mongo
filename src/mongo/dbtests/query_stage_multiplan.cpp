@@ -50,6 +50,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -502,7 +503,9 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
                                                     ctx.getCollection(),
                                                     PlanYieldPolicy::YieldPolicy::NO_YIELD));
 
-    auto root = static_cast<MultiPlanStage*>(exec->getRootStage());
+    auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
+    ASSERT(execImpl);
+    auto root = static_cast<MultiPlanStage*>(execImpl->getRootStage());
     ASSERT_TRUE(root->bestPlanChosen());
     // The first candidate plan should have won.
     ASSERT_EQ(root->bestPlanIdx(), 0);
@@ -551,9 +554,18 @@ TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
     auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
     auto exec = uassertStatusOK(
         getExecutor(opCtx(), coll, std::move(cq), PlanYieldPolicy::YieldPolicy::NO_YIELD, 0));
-    ASSERT_EQ(exec->getRootStage()->stageType(), STAGE_MULTI_PLAN);
 
-    exec->executePlan();
+    auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
+    ASSERT(execImpl);
+    ASSERT_EQ(execImpl->getRootStage()->stageType(), StageType::STAGE_MULTI_PLAN);
+
+    // Execute the plan executor util EOF, discarding the results.
+    {
+        BSONObj obj;
+        while (exec->getNext(&obj, nullptr) == PlanExecutor::ADVANCED) {
+            // Do nothing with the documents produced by the executor.
+        }
+    }
 
     PlanSummaryStats stats;
     exec->getSummaryStats(&stats);

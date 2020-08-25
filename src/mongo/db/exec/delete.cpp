@@ -68,15 +68,12 @@ bool shouldRestartDeleteIfNoLongerMatches(const DeleteStageParams* params) {
 
 }  // namespace
 
-// static
-const char* DeleteStage::kStageType = "DELETE";
-
 DeleteStage::DeleteStage(ExpressionContext* expCtx,
                          std::unique_ptr<DeleteStageParams> params,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : RequiresMutableCollectionStage(kStageType, expCtx, collection),
+    : RequiresMutableCollectionStage(kStageType.rawData(), expCtx, collection),
       _params(std::move(params)),
       _ws(ws),
       _idRetrying(WorkingSet::INVALID_ID),
@@ -268,36 +265,6 @@ unique_ptr<PlanStageStats> DeleteStage::getStats() {
 
 const SpecificStats* DeleteStage::getSpecificStats() const {
     return &_specificStats;
-}
-
-// static
-long long DeleteStage::getNumDeleted(const PlanExecutor& exec) {
-    invariant(exec.getRootStage()->isEOF());
-
-    // If we're deleting from a non-existent collection, then the delete plan may have an EOF as the
-    // root stage.
-    if (exec.getRootStage()->stageType() == STAGE_EOF) {
-        return 0LL;
-    }
-
-    // If the collection exists, the delete plan may either have a delete stage at the root, or (for
-    // findAndModify) a projection stage wrapping a delete stage.
-    switch (exec.getRootStage()->stageType()) {
-        case StageType::STAGE_PROJECTION_DEFAULT:
-        case StageType::STAGE_PROJECTION_COVERED:
-        case StageType::STAGE_PROJECTION_SIMPLE: {
-            invariant(exec.getRootStage()->getChildren().size() == 1U);
-            invariant(StageType::STAGE_DELETE == exec.getRootStage()->child()->stageType());
-            const SpecificStats* stats = exec.getRootStage()->child()->getSpecificStats();
-            return static_cast<const DeleteStats*>(stats)->docsDeleted;
-        }
-        default: {
-            invariant(StageType::STAGE_DELETE == exec.getRootStage()->stageType());
-            const auto* deleteStats =
-                static_cast<const DeleteStats*>(exec.getRootStage()->getSpecificStats());
-            return deleteStats->docsDeleted;
-        }
-    }
 }
 
 PlanStage::StageState DeleteStage::prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out) {

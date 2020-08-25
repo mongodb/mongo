@@ -248,7 +248,7 @@ public:
             txnParticipant.beginOrContinue(
                 innerOpCtx.get(), *sessionInfo.getTxnNumber(), boost::none, boost::none);
 
-            const auto reply = performInserts(innerOpCtx.get(), insertRequest);
+            const auto reply = write_ops_exec::performInserts(innerOpCtx.get(), insertRequest);
             ASSERT(reply.results.size() == 1);
             ASSERT(reply.results[0].isOK());
         });

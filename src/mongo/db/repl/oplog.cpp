@@ -1230,7 +1230,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         }
 
                         UpdateResult res = update(opCtx, db, request);
-                        if (res.numMatched == 0 && res.upserted.isEmpty()) {
+                        if (res.numMatched == 0 && res.upsertedId.isEmpty()) {
                             LOGV2_ERROR(21257,
                                         "No document was updated even though we got a DuplicateKey "
                                         "error when inserting");
@@ -1326,7 +1326,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 }
 
                 UpdateResult ur = update(opCtx, db, request);
-                if (ur.numMatched == 0 && ur.upserted.isEmpty()) {
+                if (ur.numMatched == 0 && ur.upsertedId.isEmpty()) {
                     if (collection && collection->isCapped() &&
                         mode == OplogApplication::Mode::kSecondary) {
                         // We can't assume there was a problem when the collection is capped,
@@ -1377,7 +1377,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         }
                     }
                 } else if (mode == OplogApplication::Mode::kSecondary && !upsertOplogEntry &&
-                           !ur.upserted.isEmpty() && !(collection && collection->isCapped())) {
+                           !ur.upsertedId.isEmpty() && !(collection && collection->isCapped())) {
                     // This indicates we upconverted an update to an upsert, and it did indeed
                     // upsert.  In steady state mode this is unexpected.
                     LOGV2_WARNING(2170001,

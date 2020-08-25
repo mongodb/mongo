@@ -73,6 +73,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -81,7 +82,7 @@
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 
-namespace mongo {
+namespace mongo::write_ops_exec {
 
 // Convention in this file: generic helpers go in the anonymous namespace. Helpers that are for a
 // single type of operation are static functions defined above their caller.
@@ -672,7 +673,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanSummary());
     }
 
-    exec->executePlan();
+    auto updateResult = exec->executeUpdate();
 
     PlanSummaryStats summary;
     exec->getSummaryStats(&summary);
@@ -684,19 +685,18 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         curOp.debug().execStats = exec->getStats();
     }
 
-    const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
-    UpdateStage::recordUpdateStatsInOpDebug(updateStats, &curOp.debug());
+    recordUpdateResultInOpDebug(updateResult, &curOp.debug());
     curOp.debug().setPlanSummaryMetrics(summary);
-    UpdateResult res = UpdateStage::makeUpdateResult(updateStats);
 
-    const bool didInsert = !res.upserted.isEmpty();
-    const long long nMatchedOrInserted = didInsert ? 1 : res.numMatched;
-    LastError::get(opCtx->getClient()).recordUpdate(res.existing, nMatchedOrInserted, res.upserted);
+    const bool didInsert = !updateResult.upsertedId.isEmpty();
+    const long long nMatchedOrInserted = didInsert ? 1 : updateResult.numMatched;
+    LastError::get(opCtx->getClient())
+        .recordUpdate(updateResult.existing, nMatchedOrInserted, updateResult.upsertedId);
 
     SingleWriteResult result;
     result.setN(nMatchedOrInserted);
-    result.setNModified(res.numDocsModified);
-    result.setUpsertedId(res.upserted);
+    result.setNModified(updateResult.numDocsModified);
+    result.setUpsertedId(updateResult.upsertedId);
 
     return result;
 }
@@ -753,8 +753,8 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
                 uassertStatusOK(parsedUpdate.parseQueryToCQ());
             }
 
-            if (!UpdateStage::shouldRetryDuplicateKeyException(
-                    parsedUpdate, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
+            if (!shouldRetryDuplicateKeyException(parsedUpdate,
+                                                  *ex.extraInfo<DuplicateKeyErrorInfo>())) {
                 throw;
             }
 
@@ -910,9 +910,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanSummary());
     }
 
-    exec->executePlan();
-    long long n = DeleteStage::getNumDeleted(*exec);
-    curOp.debug().additiveMetrics.ndeleted = n;
+    auto nDeleted = exec->executeDelete();
+    curOp.debug().additiveMetrics.ndeleted = nDeleted;
 
     PlanSummaryStats summary;
     exec->getSummaryStats(&summary);
@@ -925,10 +924,10 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         curOp.debug().execStats = exec->getStats();
     }
 
-    LastError::get(opCtx->getClient()).recordDelete(n);
+    LastError::get(opCtx->getClient()).recordDelete(nDeleted);
 
     SingleWriteResult result;
-    result.setN(n);
+    result.setN(nDeleted);
     return result;
 }
 
@@ -1013,4 +1012,93 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     return out;
 }
 
-}  // namespace mongo
+void recordUpdateResultInOpDebug(const UpdateResult& updateResult, OpDebug* opDebug) {
+    invariant(opDebug);
+    opDebug->additiveMetrics.nMatched = updateResult.numMatched;
+    opDebug->additiveMetrics.nModified = updateResult.numDocsModified;
+    opDebug->upsert = !updateResult.upsertedId.isEmpty();
+}
+
+namespace {
+/**
+ * Returns whether a given MatchExpression contains is a MatchType::EQ or a MatchType::AND node with
+ * only MatchType::EQ children.
+ */
+bool matchContainsOnlyAndedEqualityNodes(const MatchExpression& root) {
+    if (root.matchType() == MatchExpression::EQ) {
+        return true;
+    }
+
+    if (root.matchType() == MatchExpression::AND) {
+        for (size_t i = 0; i < root.numChildren(); ++i) {
+            if (root.getChild(i)->matchType() != MatchExpression::EQ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    return false;
+}
+}  // namespace
+
+bool shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
+                                      const DuplicateKeyErrorInfo& errorInfo) {
+    invariant(parsedUpdate.hasParsedQuery());
+
+    const auto updateRequest = parsedUpdate.getRequest();
+
+    // In order to be retryable, the update must be an upsert with multi:false.
+    if (!updateRequest->isUpsert() || updateRequest->isMulti()) {
+        return false;
+    }
+
+    auto matchExpr = parsedUpdate.getParsedQuery()->root();
+    invariant(matchExpr);
+
+    // In order to be retryable, the update query must contain no expressions other than AND and EQ.
+    if (!matchContainsOnlyAndedEqualityNodes(*matchExpr)) {
+        return false;
+    }
+
+    // In order to be retryable, the update equality field paths must be identical to the unique
+    // index key field paths. Also, the values that triggered the DuplicateKey error must match the
+    // values used in the upsert query predicate.
+    pathsupport::EqualityMatches equalities;
+    auto status = pathsupport::extractEqualityMatches(*matchExpr, &equalities);
+    if (!status.isOK()) {
+        return false;
+    }
+
+    auto keyPattern = errorInfo.getKeyPattern();
+    if (equalities.size() != static_cast<size_t>(keyPattern.nFields())) {
+        return false;
+    }
+
+    auto keyValue = errorInfo.getDuplicatedKeyValue();
+
+    BSONObjIterator keyPatternIter(keyPattern);
+    BSONObjIterator keyValueIter(keyValue);
+    while (keyPatternIter.more() && keyValueIter.more()) {
+        auto keyPatternElem = keyPatternIter.next();
+        auto keyValueElem = keyValueIter.next();
+
+        auto keyName = keyPatternElem.fieldNameStringData();
+        if (!equalities.count(keyName)) {
+            return false;
+        }
+
+        // Comparison which obeys field ordering but ignores field name.
+        BSONElementComparator cmp{BSONElementComparator::FieldNamesMode::kIgnore, nullptr};
+        if (cmp.evaluate(equalities[keyName]->getData() != keyValueElem)) {
+            return false;
+        }
+    }
+    invariant(!keyPatternIter.more());
+    invariant(!keyValueIter.more());
+
+    return true;
+}
+
+}  // namespace mongo::write_ops_exec

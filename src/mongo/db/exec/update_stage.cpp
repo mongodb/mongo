@@ -105,10 +105,6 @@ CollectionUpdateArgs::StoreDocOption getStoreDocMode(const UpdateRequest& update
 }
 }  // namespace
 
-const char* UpdateStage::kStageType = "UPDATE";
-
-const UpdateStats UpdateStage::kEmptyUpdateStats;
-
 // Public constructor.
 UpdateStage::UpdateStage(ExpressionContext* expCtx,
                          const UpdateStageParams& params,
@@ -126,7 +122,7 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
                          Collection* collection)
-    : RequiresMutableCollectionStage(kStageType, expCtx, collection),
+    : RequiresMutableCollectionStage(kStageType.rawData(), expCtx, collection),
       _params(params),
       _ws(ws),
       _doc(params.driver->getDocument()),
@@ -354,82 +350,6 @@ void UpdateStage::_assertPathsNotArray(const mb::Document& document, const Field
     }
 }
 
-bool UpdateStage::matchContainsOnlyAndedEqualityNodes(const MatchExpression& root) {
-    if (root.matchType() == MatchExpression::EQ) {
-        return true;
-    }
-
-    if (root.matchType() == MatchExpression::AND) {
-        for (size_t i = 0; i < root.numChildren(); ++i) {
-            if (root.getChild(i)->matchType() != MatchExpression::EQ) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    return false;
-}
-
-bool UpdateStage::shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
-                                                   const DuplicateKeyErrorInfo& errorInfo) {
-    invariant(parsedUpdate.hasParsedQuery());
-
-    const auto updateRequest = parsedUpdate.getRequest();
-
-    // In order to be retryable, the update must be an upsert with multi:false.
-    if (!updateRequest->isUpsert() || updateRequest->isMulti()) {
-        return false;
-    }
-
-    auto matchExpr = parsedUpdate.getParsedQuery()->root();
-    invariant(matchExpr);
-
-    // In order to be retryable, the update query must contain no expressions other than AND and EQ.
-    if (!matchContainsOnlyAndedEqualityNodes(*matchExpr)) {
-        return false;
-    }
-
-    // In order to be retryable, the update equality field paths must be identical to the unique
-    // index key field paths. Also, the values that triggered the DuplicateKey error must match the
-    // values used in the upsert query predicate.
-    pathsupport::EqualityMatches equalities;
-    auto status = pathsupport::extractEqualityMatches(*matchExpr, &equalities);
-    if (!status.isOK()) {
-        return false;
-    }
-
-    auto keyPattern = errorInfo.getKeyPattern();
-    if (equalities.size() != static_cast<size_t>(keyPattern.nFields())) {
-        return false;
-    }
-
-    auto keyValue = errorInfo.getDuplicatedKeyValue();
-
-    BSONObjIterator keyPatternIter(keyPattern);
-    BSONObjIterator keyValueIter(keyValue);
-    while (keyPatternIter.more() && keyValueIter.more()) {
-        auto keyPatternElem = keyPatternIter.next();
-        auto keyValueElem = keyValueIter.next();
-
-        auto keyName = keyPatternElem.fieldNameStringData();
-        if (!equalities.count(keyName)) {
-            return false;
-        }
-
-        // Comparison which obeys field ordering but ignores field name.
-        BSONElementComparator cmp{BSONElementComparator::FieldNamesMode::kIgnore, nullptr};
-        if (cmp.evaluate(equalities[keyName]->getData() != keyValueElem)) {
-            return false;
-        }
-    }
-    invariant(!keyPatternIter.more());
-    invariant(!keyValueIter.more());
-
-    return true;
-}
-
 bool UpdateStage::isEOF() {
     // We're done updating if either the child has no more results to give us, or we've
     // already gotten a result back and we're not a multi-update.
@@ -640,47 +560,6 @@ unique_ptr<PlanStageStats> UpdateStage::getStats() {
 const SpecificStats* UpdateStage::getSpecificStats() const {
     return &_specificStats;
 }
-
-const UpdateStats* UpdateStage::getUpdateStats(const PlanExecutor* exec) {
-    invariant(exec->getRootStage()->isEOF());
-
-    // If we're updating a non-existent collection, then the delete plan may have an EOF as the root
-    // stage.
-    if (exec->getRootStage()->stageType() == STAGE_EOF) {
-        return &kEmptyUpdateStats;
-    }
-
-    // If the collection exists, then we expect the root of the plan tree to either be an update
-    // stage, or (for findAndModify) a projection stage wrapping an update stage.
-    switch (exec->getRootStage()->stageType()) {
-        case StageType::STAGE_PROJECTION_DEFAULT:
-        case StageType::STAGE_PROJECTION_COVERED:
-        case StageType::STAGE_PROJECTION_SIMPLE: {
-            invariant(exec->getRootStage()->getChildren().size() == 1U);
-            invariant(StageType::STAGE_UPDATE == exec->getRootStage()->child()->stageType());
-            const SpecificStats* stats = exec->getRootStage()->child()->getSpecificStats();
-            return static_cast<const UpdateStats*>(stats);
-        }
-        default:
-            invariant(StageType::STAGE_UPDATE == exec->getRootStage()->stageType());
-            return static_cast<const UpdateStats*>(exec->getRootStage()->getSpecificStats());
-    }
-}
-
-void UpdateStage::recordUpdateStatsInOpDebug(const UpdateStats* updateStats, OpDebug* opDebug) {
-    invariant(opDebug);
-    opDebug->additiveMetrics.nMatched = updateStats->nMatched;
-    opDebug->additiveMetrics.nModified = updateStats->nModified;
-    opDebug->upsert = updateStats->inserted;
-}
-
-UpdateResult UpdateStage::makeUpdateResult(const UpdateStats* updateStats) {
-    return UpdateResult(updateStats->nMatched > 0 /* Did we update at least one obj? */,
-                        updateStats->isModUpdate /* Is this a $mod update? */,
-                        updateStats->nModified /* number of modified docs, no no-ops */,
-                        updateStats->nMatched /* # of docs matched/updated, even no-ops */,
-                        updateStats->objInserted);
-};
 
 PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out) {
     _idRetrying = idToRetry;

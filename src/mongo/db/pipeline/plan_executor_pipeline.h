@@ -46,10 +46,6 @@ public:
                          std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                          bool isChangeStream);
 
-    PlanStage* getRootStage() const override {
-        MONGO_UNREACHABLE;
-    }
-
     CanonicalQuery* getCanonicalQuery() const override {
         return nullptr;
     }
@@ -81,7 +77,20 @@ public:
 
     bool isEOF() override;
 
-    void executePlan() override;
+    // DocumentSource execution is only used for executing aggregation commands, so the interfaces
+    // for executing other CRUD operations are not supported.
+    long long executeCount() override {
+        MONGO_UNREACHABLE;
+    }
+    UpdateResult executeUpdate() override {
+        MONGO_UNREACHABLE;
+    }
+    UpdateResult getUpdateResult() const override {
+        MONGO_UNREACHABLE;
+    }
+    long long executeDelete() override {
+        MONGO_UNREACHABLE;
+    }
 
     void dispose(OperationContext* opCtx) override {
         _pipeline->dispose(opCtx);

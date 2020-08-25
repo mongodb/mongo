@@ -165,7 +165,7 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
         updateReq.setUpsert();
 
         UpdateResult result = update(opCtx, autoGetOrCreateDb->getDb(), updateReq);
-        invariant(result.numDocsModified == 1 || !result.upserted.isEmpty());
+        invariant(result.numDocsModified == 1 || !result.upsertedId.isEmpty());
         invariant(result.numMatched <= 1);
 
         // Wait until the majority write concern has been satisfied, but do it outside of lock

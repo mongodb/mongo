@@ -474,7 +474,7 @@ void PlanExecutorImpl::dispose(OperationContext* opCtx) {
     _currentState = kDisposed;
 }
 
-void PlanExecutorImpl::executePlan() {
+void PlanExecutorImpl::_executePlan() {
     invariant(_currentState == kUsable);
     Document obj;
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
@@ -488,6 +488,82 @@ void PlanExecutorImpl::executePlan() {
 
     invariant(!isMarkedAsKilled());
     invariant(PlanExecutor::IS_EOF == state);
+}
+
+long long PlanExecutorImpl::executeCount() {
+    invariant(_root->stageType() == StageType::STAGE_COUNT ||
+              _root->stageType() == StageType::STAGE_RECORD_STORE_FAST_COUNT);
+
+    _executePlan();
+    auto countStats = static_cast<const CountStats*>(_root->getSpecificStats());
+    return countStats->nCounted;
+}
+
+UpdateResult PlanExecutorImpl::executeUpdate() {
+    _executePlan();
+    return getUpdateResult();
+}
+
+UpdateResult PlanExecutorImpl::getUpdateResult() const {
+    auto updateStatsToResult = [](const UpdateStats& updateStats) -> UpdateResult {
+        return UpdateResult(updateStats.nMatched > 0 /* Did we update at least one obj? */,
+                            updateStats.isModUpdate /* Is this a $mod update? */,
+                            updateStats.nModified /* number of modified docs, no no-ops */,
+                            updateStats.nMatched /* # of docs matched/updated, even no-ops */,
+                            updateStats.objInserted);
+    };
+
+    // If we're updating a non-existent collection, then the delete plan may have an EOF as the root
+    // stage.
+    if (_root->stageType() == STAGE_EOF) {
+        const auto stats = std::make_unique<UpdateStats>();
+        return updateStatsToResult(static_cast<const UpdateStats&>(*stats));
+    }
+
+    // If the collection exists, then we expect the root of the plan tree to either be an update
+    // stage, or (for findAndModify) a projection stage wrapping an update stage.
+    switch (_root->stageType()) {
+        case StageType::STAGE_PROJECTION_DEFAULT:
+        case StageType::STAGE_PROJECTION_COVERED:
+        case StageType::STAGE_PROJECTION_SIMPLE: {
+            invariant(_root->getChildren().size() == 1U);
+            invariant(StageType::STAGE_UPDATE == _root->child()->stageType());
+            const SpecificStats* stats = _root->child()->getSpecificStats();
+            return updateStatsToResult(static_cast<const UpdateStats&>(*stats));
+        }
+        default:
+            invariant(StageType::STAGE_UPDATE == _root->stageType());
+            const auto stats = _root->getSpecificStats();
+            return updateStatsToResult(static_cast<const UpdateStats&>(*stats));
+    }
+}
+
+long long PlanExecutorImpl::executeDelete() {
+    _executePlan();
+
+    // If we're deleting from a non-existent collection, then the delete plan may have an EOF as the
+    // root stage.
+    if (_root->stageType() == STAGE_EOF) {
+        return 0LL;
+    }
+
+    // If the collection exists, the delete plan may either have a delete stage at the root, or (for
+    // findAndModify) a projection stage wrapping a delete stage.
+    switch (_root->stageType()) {
+        case StageType::STAGE_PROJECTION_DEFAULT:
+        case StageType::STAGE_PROJECTION_COVERED:
+        case StageType::STAGE_PROJECTION_SIMPLE: {
+            invariant(_root->getChildren().size() == 1U);
+            invariant(StageType::STAGE_DELETE == _root->child()->stageType());
+            const SpecificStats* stats = _root->child()->getSpecificStats();
+            return static_cast<const DeleteStats*>(stats)->docsDeleted;
+        }
+        default: {
+            invariant(StageType::STAGE_DELETE == _root->stageType());
+            const auto* deleteStats = static_cast<const DeleteStats*>(_root->getSpecificStats());
+            return deleteStats->docsDeleted;
+        }
+    }
 }
 
 void PlanExecutorImpl::enqueue(const BSONObj& obj) {

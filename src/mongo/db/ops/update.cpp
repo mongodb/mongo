@@ -95,10 +95,6 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     auto exec = uassertStatusOK(
         getExecutorUpdate(nullOpDebug, collection, &parsedUpdate, boost::none /* verbosity */));
 
-    exec->executePlan();
-
-    const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
-
-    return UpdateStage::makeUpdateResult(updateStats);
+    return exec->executeUpdate();
 }
 }  // namespace mongo

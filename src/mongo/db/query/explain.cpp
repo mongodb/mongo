@@ -184,6 +184,19 @@ unique_ptr<PlanStageStats> getWinningPlanStatsTree(const PlanExecutorImpl* exec)
                : std::move(exec->getRootStage()->getStats());
 }
 
+/**
+ * Executes the given plan executor, discarding the resulting documents, until it reaches EOF. If a
+ * runtime error occur or execution is killed, throws a DBException.
+ *
+ * If 'exec' is configured for yielding, then a call to this helper could result in a yield.
+ */
+void executePlan(PlanExecutor* exec) {
+    BSONObj obj;
+    while (exec->getNext(&obj, nullptr) == PlanExecutor::ADVANCED) {
+        // Discard the resulting documents.
+    }
+}
+
 }  // namespace
 
 namespace mongo {
@@ -811,7 +824,7 @@ void Explain::explainPipelineExecutor(PlanExecutorPipeline* exec,
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         // TODO SERVER-32732: An execution error should be reported in explain, but should not
         // cause the explain itself to fail.
-        exec->executePlan();
+        executePlan(exec);
     }
 
     *out << "stages" << Value(exec->writeExplainOps(verbosity));
@@ -835,7 +848,7 @@ void Explain::explainStages(PlanExecutor* exec,
     // If we need execution stats, then run the plan in order to gather the stats.
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         try {
-            exec->executePlan();
+            executePlan(exec);
         } catch (const DBException&) {
             executePlanStatus = exceptionToStatus();
         }

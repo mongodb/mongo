@@ -1013,7 +1013,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                     return toInsert;
                 }());
 
-                const WriteResult reply = performInserts(opCtx, insertOp, true);
+                const auto reply = write_ops_exec::performInserts(opCtx, insertOp, true);
 
                 for (unsigned long i = 0; i < reply.results.size(); ++i) {
                     uassertStatusOKWithContext(

@@ -385,7 +385,9 @@ private:
                                                  direction);
 
         try {
-            exec->executePlan();
+            const auto numDeleted = exec->executeDelete();
+            ttlDeletedDocuments.increment(numDeleted);
+            LOGV2_DEBUG(22536, 1, "deleted: {numDeleted}", "numDeleted"_attr = numDeleted);
         } catch (const ExceptionFor<ErrorCodes::QueryPlanKilled>&) {
             // It is expected that a collection drop can kill a query plan while the TTL monitor is
             // deleting an old document, so ignore this error.
@@ -398,10 +400,6 @@ private:
                           "error"_attr = redact(exception.toStatus()));
             return;
         }
-
-        const long long numDeleted = DeleteStage::getNumDeleted(*exec);
-        ttlDeletedDocuments.increment(numDeleted);
-        LOGV2_DEBUG(22536, 1, "deleted: {numDeleted}", "numDeleted"_attr = numDeleted);
     }
 
     // Protects the state below.

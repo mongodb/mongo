@@ -39,12 +39,12 @@ class BSONObjBuilder;
 
 namespace find_and_modify {
 
-void serializeRemove(size_t n, const boost::optional<BSONObj>& value, BSONObjBuilder* builder);
+void serializeRemove(const boost::optional<BSONObj>& value, BSONObjBuilder* builder);
 
 void serializeUpsert(size_t n,
                      const boost::optional<BSONObj>& value,
                      bool updatedExisting,
-                     const BSONObj& objInserted,
+                     BSONElement idInserted,
                      BSONObjBuilder* builder);
 
 }  // namespace find_and_modify

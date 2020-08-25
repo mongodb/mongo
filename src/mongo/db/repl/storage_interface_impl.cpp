@@ -937,7 +937,8 @@ Status _updateWithQuery(OperationContext* opCtx,
         auto planExecutor = std::move(planExecutorResult.getValue());
 
         try {
-            planExecutor->executePlan();
+            // The update result is ignored.
+            [[maybe_unused]] auto updateResult = planExecutor->executeUpdate();
         } catch (const WriteConflictException&) {
             // Re-throw the WCE, since it will get caught and retried at a higher level.
             throw;
@@ -1010,7 +1011,8 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
                                                               parsedUpdate.yieldPolicy());
 
         try {
-            planExecutor->executePlan();
+            // The update result is ignored.
+            [[maybe_unused]] auto updateResult = planExecutor->executeUpdate();
         } catch (const WriteConflictException&) {
             // Re-throw the WCE, since it will get caught and retried at a higher level.
             throw;
@@ -1088,7 +1090,8 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
         auto planExecutor = std::move(planExecutorResult.getValue());
 
         try {
-            planExecutor->executePlan();
+            // The count of deleted documents is ignored.
+            [[maybe_unused]] auto nDeleted = planExecutor->executeDelete();
         } catch (const WriteConflictException&) {
             // Re-throw the WCE, since it will get caught and retried at a higher level.
             throw;

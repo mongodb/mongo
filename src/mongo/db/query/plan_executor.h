@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/update_result.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -148,11 +149,6 @@ public:
     virtual ~PlanExecutor() = default;
 
     /**
-     * Get the stage tree wrapped by this executor, without transferring ownership.
-     */
-    virtual PlanStage* getRootStage() const = 0;
-
-    /**
      * Get the query that this executor is executing, without transferring ownership.
      */
     virtual CanonicalQuery* getCanonicalQuery() const = 0;
@@ -246,14 +242,33 @@ public:
     virtual bool isEOF() = 0;
 
     /**
-     * Execute the plan to completion, throwing out the results. Used when you want to work the
-     * underlying tree without getting results back.
-     *
-     * If a YIELD_AUTO policy is set on this executor, then this will automatically yield.
-     *
-     * Throws an exception if this plan results in a runtime error or is killed.
+     * If this plan executor was constructed to execute a count implementation, e.g. it was obtained
+     * by calling 'getExecutorCount()', then executes the count operation and returns the result.
+     * Illegal to call on other plan executors.
      */
-    virtual void executePlan() = 0;
+    virtual long long executeCount() = 0;
+
+    /**
+     * If this plan executor was constructed to execute an update, e.g. it was obtained by calling
+     * 'getExecutorUpdate()', then executes the update operation and returns an 'UpdateResult'
+     * describing the outcome. Illegal to call on other plan executors.
+     */
+    virtual UpdateResult executeUpdate() = 0;
+
+    /**
+     * If this plan executor has already executed an update operation, returns the an 'UpdateResult'
+     * describing the outcome of the update. Illegal to call if either 1) the PlanExecutor is not
+     * an update PlanExecutor, or 2) the PlanExecutor has not yet been executed either with
+     * 'executeUpdate()' or by calling 'getNext()' until end-of-stream.
+     */
+    virtual UpdateResult getUpdateResult() const = 0;
+
+    /**
+     * If this plan executor was constructed to execute a delete, e.g. it was obtained by calling
+     * 'getExecutorDelete()', then executes the delete operation and returns the number of documents
+     * that were deleted. Illegal to call on other plan executors.
+     */
+    virtual long long executeDelete() = 0;
 
     //
     // Concurrency-related methods.

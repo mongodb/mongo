@@ -49,10 +49,6 @@ public:
         boost::optional<std::queue<std::pair<BSONObj, boost::optional<RecordId>>>> stash,
         std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 
-    PlanStage* getRootStage() const override {
-        return nullptr;
-    }
-
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();
     }
@@ -78,7 +74,22 @@ public:
         return _state == State::kClosed;
     }
 
-    void executePlan() override {
+    long long executeCount() override {
+        // Using SBE to execute a count command is not yet supported.
+        MONGO_UNREACHABLE;
+    }
+
+    UpdateResult executeUpdate() override {
+        // Using SBE to execute an update command is not yet supported.
+        MONGO_UNREACHABLE;
+    }
+    UpdateResult getUpdateResult() const override {
+        // Using SBE to execute an update command is not yet supported.
+        MONGO_UNREACHABLE;
+    }
+
+    long long executeDelete() override {
+        // Using SBE to execute a delete command is not yet supported.
         MONGO_UNREACHABLE;
     }
 

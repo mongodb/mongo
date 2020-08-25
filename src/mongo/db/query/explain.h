@@ -145,8 +145,9 @@ public:
      * If exec's root stage is a MultiPlanStage, returns the stats for the trial period of of the
      * winning plan. Otherwise, returns nullptr.
      *
-     * Must be called _before_ calling PlanExecutor::executePlan() or PlanExecutor::getNext().
-     **/
+     * Must be called _before_ executing the plan with PlanExecutor::getNext()
+     * or the PlanExecutor::execute*() methods.
+     */
     static std::unique_ptr<PlanStageStats> getWinningPlanTrialStats(PlanExecutor* exec);
 
     /**
@@ -220,12 +221,13 @@ private:
                             BSONObjBuilder* topLevelBob);
 
     /**
-     * Adds the "executionStats" field to out. Assumes PlanExecutor::executePlan() has been called
-     * and that verbosity >= kExecStats.
+     * Adds the "executionStats" field to out. Assumes that the PlanExecutor has already been
+     * executed to the point of reaching EOF. Also assumes that verbosity >= kExecStats.
      *
      * If verbosity >= kExecAllPlans, it will include the "allPlansExecution" array.
      *
-     * - 'execPlanStatus' is the value returned after executing the query.
+     * - 'execPlanStatus' is OK if the query was exected successfully, or a non-OK status if there
+     *   was a runtime error.
      * - 'winningPlanTrialStats' may be nullptr.
      **/
     static void generateExecutionInfo(PlanExecutor* exec,

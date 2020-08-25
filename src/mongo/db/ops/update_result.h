@@ -34,28 +34,29 @@
 namespace mongo {
 
 struct UpdateResult {
-    UpdateResult(bool existing_,
-                 bool modifiers_,
-                 unsigned long long numDocsModified_,
-                 unsigned long long numMatched_,
-                 const BSONObj& upsertedObject_);
+    UpdateResult(bool existing,
+                 bool modifiers,
+                 unsigned long long numDocsModified,
+                 unsigned long long numMatched,
+                 const BSONObj& upsertedObject);
 
     std::string toString() const;
 
-    // if existing objects were modified
+    // True if at least one pre-existing document was modified.
     const bool existing;
 
-    // was this a $ mod
+    // True if this was a modifier-style update, not a replacement update or a pipeline-style
+    // update.
     const bool modifiers;
 
-    // how many docs updated
     const long long numDocsModified;
 
-    // how many docs seen by update
     const long long numMatched;
 
-    // if something was upserted, the new _id of the object
-    BSONObj upserted;
+    // If either the operation was not an upsert, or the upsert did not result in an insert, then
+    // this is the empty object. If an insert occurred as the result of an upsert operation, then
+    // this is a single-element object containing the _id of the document inserted.
+    BSONObj upsertedId;
 };
 
 }  // namespace mongo
