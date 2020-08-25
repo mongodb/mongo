@@ -88,7 +88,7 @@ reconfig(st.configRS, replConfig);
 st.rs0.restart(0, {shardsvr: ''});
 st.rs0.restart(1, {shardsvr: ''});
 
-st.rs0.waitForMaster();
+st.rs0.waitForPrimary();
 st.rs0.awaitSecondaryNodes();
 
 assert.soon(function() {

@@ -34,7 +34,7 @@ delayedConfigSecondary.getDB('admin').adminCommand(
 // Do one metadata write in order to bump the optime on mongos
 assert.commandWorked(st.getDB('config').TestConfigColl.insert({TestKey: 'Test value'}));
 
-st.configRS.stopMaster();
+st.configRS.stopPrimary();
 MongoRunner.stopMongod(configSecondaryToKill);
 
 // Clears all cached info so mongos will be forced to query from the config.

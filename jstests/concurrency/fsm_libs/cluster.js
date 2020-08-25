@@ -556,7 +556,7 @@ var Cluster = function(options) {
             var res;
 
             // Use '_master' instead of getPrimary() to avoid the detection of a new primary.
-            var primary = rst._master;
+            var primary = rst.getPrimary();
 
             if (shouldCheckDBHashes) {
                 jsTest.log('Starting consistency checks for replica set with ' + primary.host +

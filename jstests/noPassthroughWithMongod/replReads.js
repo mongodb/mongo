@@ -12,7 +12,7 @@ function testReadLoadBalancing(numReplicas) {
 
     s.getDB("test").foo.insert({a: 123});
 
-    primary = s.rs0._master;
+    primary = s.rs0.getPrimary();
     secondaries = s.rs0._slaves;
 
     function rsStats() {

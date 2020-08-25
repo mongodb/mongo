@@ -40,8 +40,8 @@ var shardIdentityUpdate = {
 assert.commandWorked(primaryConn.getDB('admin').system.version.update(
     shardIdentityQuery, shardIdentityUpdate, {upsert: true, writeConcern: {w: 'majority'}}));
 
-replTest.stopMaster();
-replTest.waitForMaster(30000);
+replTest.stopPrimary();
+replTest.waitForPrimary(30000);
 
 primaryConn = replTest.getPrimary();
 

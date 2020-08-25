@@ -239,7 +239,7 @@ assert.soon(function() {
 replTest.add();
 print("\ncheck shutdown command");
 
-master = replTest._master;
+master = replTest.getPrimary();
 var slave = replTest._slaves[0];
 
 try {

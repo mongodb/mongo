@@ -51,7 +51,7 @@ assert.eq(shardIdentityDoc.shardName, res.shardName);
 assert.eq(shardIdentityDoc.clusterId, res.clusterId);
 
 replTest.restart(replTest.getNodeId(secConn));
-replTest.waitForMaster();
+replTest.waitForPrimary();
 replTest.awaitSecondaryNodes();
 
 secConn = replTest.getSecondary();
