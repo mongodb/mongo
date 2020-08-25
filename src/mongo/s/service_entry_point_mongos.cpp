@@ -33,6 +33,7 @@
 
 #include "mongo/s/service_entry_point_mongos.h"
 
+#include "mongo/client/server_is_master_monitor.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -91,9 +92,17 @@ Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCt
     if (op == dbMsg || (op == dbQuery && NamespaceString(dbm.getns()).isCommand())) {
         auto dbResponse = Strategy::clientCommand(opCtx, message);
 
+        // Hello should take kMaxAwaitTimeMs at most, log if it takes twice that.
+        boost::optional<long long> slowMsOverride;
+        if (auto command = CurOp::get(opCtx)->getCommand();
+            command && (command->getName() == "hello")) {
+            slowMsOverride =
+                2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTime);
+        }
+
         // Mark the op as complete, populate the response length, and log it if appropriate.
         CurOp::get(opCtx)->completeAndLogOperation(
-            opCtx, logv2::LogComponent::kCommand, dbResponse.response.size());
+            opCtx, logv2::LogComponent::kCommand, dbResponse.response.size(), slowMsOverride);
 
         return Future<DbResponse>::makeReady(std::move(dbResponse));
     }

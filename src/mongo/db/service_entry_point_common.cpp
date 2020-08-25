@@ -1725,7 +1725,7 @@ Future<DbResponse> ServiceEntryPointCommon::handleRequest(OperationContext* opCt
     DbResponse dbresponse;
     if (op == dbMsg || (op == dbQuery && isCommand)) {
         dbresponse = receivedCommands(opCtx, m, behaviors);
-        // IsMaster should take kMaxAwaitTimeMs at most, log if it takes twice that.
+        // Hello should take kMaxAwaitTimeMs at most, log if it takes twice that.
         if (auto command = currentOp.getCommand(); command && (command->getName() == "hello")) {
             slowMsOverride =
                 2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTime);
