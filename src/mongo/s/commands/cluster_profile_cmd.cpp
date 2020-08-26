@@ -29,8 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/profile_common.h"
+#include "mongo/db/commands/profile_gen.h"
+#include "mongo/db/profile_filter_impl.h"
 
 namespace mongo {
 namespace {
@@ -39,26 +42,41 @@ class ProfileCmd : public ProfileCmdBase {
 public:
     ProfileCmd() = default;
 
-    // On mongoS, the 'profile' command is only used to change the global 'slowms' and 'sampleRate'
-    // parameters. Since it does not apply to any specific database but rather the mongoS as a
-    // whole, we require that it be run on the 'admin' database.
+    // Although mongoS does not have a system.profile collection, the profile command can change the
+    // per-database profile filter, which applies to slow-query log lines just like on mongoD.
     bool adminOnly() const final {
-        return true;
+        return false;
     }
 
 protected:
-    int _applyProfilingLevel(OperationContext* opCtx,
-                             const std::string& dbName,
-                             int profilingLevel) const final {
-        // Because mongoS does not allow profiling, but only uses the 'profile' command to change
-        // 'slowms' and 'sampleRate' for logging purposes, we do not apply the profiling level here.
-        // Instead, we validate that the user is not attempting to set a "real" profiling level.
+    CollectionCatalog::ProfileSettings _applyProfilingLevel(
+        OperationContext* opCtx,
+        const std::string& dbName,
+        const ProfileCmdRequest& request) const final {
+        const auto profilingLevel = request.getCommandParameter();
+
+        // The only valid profiling level for mongoS is 0, because mongoS has no system.profile
+        // collection in which to record the profiling data (because mongoS has no collections
+        // at all).
         uassert(ErrorCodes::BadValue,
                 "Profiling is not permitted on mongoS: the 'profile' field should be 0 to change "
-                "'slowms' and 'sampleRate' settings for logging, or -1 to view current values",
+                "'slowms', 'sampleRate', or 'filter' settings for logging, or -1 to view current "
+                "values",
                 profilingLevel == -1 || profilingLevel == 0);
 
-        return 0;
+        const auto oldSettings = CollectionCatalog::get(opCtx).getDatabaseProfileSettings(dbName);
+
+        if (auto filterOrUnset = request.getFilter()) {
+            auto newSettings = oldSettings;
+            if (auto filter = filterOrUnset->obj) {
+                newSettings.filter = std::make_shared<ProfileFilterImpl>(*filter);
+            } else {
+                newSettings.filter = nullptr;
+            }
+            CollectionCatalog::get(opCtx).setDatabaseProfileSettings(dbName, newSettings);
+        }
+
+        return oldSettings;
     }
 
 } profileCmd;

@@ -494,7 +494,7 @@ public:
         // Fill out OpDebug with the number of deleted docs.
         opDebug->additiveMetrics.ndeleted = docFound ? 1 : 0;
 
-        if (curOp->shouldDBProfile()) {
+        if (curOp->shouldDBProfile(opCtx)) {
             curOp->debug().execStats = exec->getStats();
         }
         recordStatsForTopCommand(opCtx);
@@ -571,7 +571,7 @@ public:
         write_ops_exec::recordUpdateResultInOpDebug(exec->getUpdateResult(), opDebug);
         opDebug->setPlanSummaryMetrics(summaryStats);
 
-        if (curOp->shouldDBProfile()) {
+        if (curOp->shouldDBProfile(opCtx)) {
             curOp->debug().execStats = exec->getStats();
         }
         recordStatsForTopCommand(opCtx);

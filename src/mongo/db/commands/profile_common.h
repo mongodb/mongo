@@ -29,10 +29,16 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/status.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 
 namespace mongo {
+
+class ProfileCmdRequest;
+
 /**
  * An abstract base class which implements all functionality common to the mongoD and mongoS
  * 'profile' command, and defines a number of virtual functions through which it delegates any
@@ -68,10 +74,20 @@ public:
              BSONObjBuilder& result) final;
 
 protected:
-    // Applies the given profiling level, or throws if the profiling level could not be set. On
-    // success, returns an integer indicating the previous profiling level.
-    virtual int _applyProfilingLevel(OperationContext* opCtx,
-                                     const std::string& dbName,
-                                     int profilingLevel) const = 0;
+    // Applies the given profiling level and filter, or throws if the profiling level could not be
+    // set. On success, returns a struct indicating the previous profiling level and filter.
+    virtual CollectionCatalog::ProfileSettings _applyProfilingLevel(
+        OperationContext* opCtx,
+        const std::string& dbName,
+        const ProfileCmdRequest& request) const = 0;
 };
+
+struct ObjectOrUnset {
+    boost::optional<BSONObj> obj;
+};
+ObjectOrUnset parseObjectOrUnset(const BSONElement& element);
+void serializeObjectOrUnset(const ObjectOrUnset& obj,
+                            StringData fieldName,
+                            BSONObjBuilder* builder);
+
 }  // namespace mongo

@@ -140,7 +140,7 @@ void endQueryOp(OperationContext* opCtx,
         CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
     }
 
-    if (curOp->shouldDBProfile()) {
+    if (curOp->shouldDBProfile(opCtx)) {
         curOp->debug().execStats = exec.getStats();
     }
 }
@@ -488,7 +488,7 @@ Message getMore(OperationContext* opCtx,
     // need 'execStats' and we do not want to generate the stats eagerly for all operations due to
     // cost.
     if (cursorPin->getExecutor()->lockPolicy() != PlanExecutor::LockPolicy::kLocksInternally &&
-        curOp.shouldDBProfile()) {
+        curOp.shouldDBProfile(opCtx)) {
         curOp.debug().execStats = exec->getStats();
     }
 

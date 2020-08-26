@@ -522,6 +522,7 @@ env.Library(
     source=[
         'profile_common.cpp',
         env.Idlc('profile.idl')[0],
+        '$BUILD_DIR/mongo/db/profile_filter_impl.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
@@ -529,6 +530,8 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/server_options_core',
     ],
 )

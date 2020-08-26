@@ -623,15 +623,18 @@ TEST_F(CollectionCatalogTest, DatabaseProfileLevel) {
 
     // Requesting a profile level that is not in the _databaseProfileLevel map should return the
     // default server-wide setting
-    ASSERT_EQ(catalog.getDatabaseProfileLevel(testDBNameFirst), serverGlobalParams.defaultProfile);
-
+    ASSERT_EQ(catalog.getDatabaseProfileSettings(testDBNameFirst).level,
+              serverGlobalParams.defaultProfile);
     // Setting the default profile level should have not change the result.
-    catalog.setDatabaseProfileLevel(testDBNameFirst, serverGlobalParams.defaultProfile);
-    ASSERT_EQ(catalog.getDatabaseProfileLevel(testDBNameFirst), serverGlobalParams.defaultProfile);
+    catalog.setDatabaseProfileSettings(testDBNameFirst,
+                                       {serverGlobalParams.defaultProfile, nullptr});
+    ASSERT_EQ(catalog.getDatabaseProfileSettings(testDBNameFirst).level,
+              serverGlobalParams.defaultProfile);
 
     // Changing the profile level should make fetching it different.
-    catalog.setDatabaseProfileLevel(testDBNameSecond, serverGlobalParams.defaultProfile + 1);
-    ASSERT_EQ(catalog.getDatabaseProfileLevel(testDBNameSecond),
+    catalog.setDatabaseProfileSettings(testDBNameSecond,
+                                       {serverGlobalParams.defaultProfile + 1, nullptr});
+    ASSERT_EQ(catalog.getDatabaseProfileSettings(testDBNameSecond).level,
               serverGlobalParams.defaultProfile + 1);
 }
 

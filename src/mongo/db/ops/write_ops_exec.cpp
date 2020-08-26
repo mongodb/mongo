@@ -137,10 +137,10 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
 
         // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
         // this op should be sampled for profiling.
-        const bool shouldSample =
+        const bool shouldProfile =
             curOp->completeAndLogOperation(opCtx, MONGO_LOGV2_DEFAULT_COMPONENT);
 
-        if (curOp->shouldDBProfile(shouldSample)) {
+        if (shouldProfile) {
             // Stash the current transaction so that writes to the profile collection are not
             // done as part of the transaction.
             TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
@@ -681,7 +681,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
 
-    if (curOp.shouldDBProfile()) {
+    if (curOp.shouldDBProfile(opCtx)) {
         curOp.debug().execStats = exec->getStats();
     }
 
@@ -920,7 +920,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     }
     curOp.debug().setPlanSummaryMetrics(summary);
 
-    if (curOp.shouldDBProfile()) {
+    if (curOp.shouldDBProfile(opCtx)) {
         curOp.debug().execStats = exec->getStats();
     }
 

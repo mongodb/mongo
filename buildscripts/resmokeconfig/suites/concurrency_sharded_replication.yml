@@ -111,6 +111,8 @@ selector:
   exclude_with_any_tags:
   - requires_replication
   - assumes_balancer_on
+  # mongos has no system.profile collection.
+  - requires_profiling
 
 executor:
   archive:

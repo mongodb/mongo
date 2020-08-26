@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,58 +29,24 @@
 
 #pragma once
 
+#include "mongo/db/profile_filter.h"
 
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/match_details.h"
-
+#include "mongo/db/curop.h"
+#include "mongo/db/matcher/matcher.h"
 
 namespace mongo {
 
-class CollatorInterface;
-
-/**
- * Matcher is a simple wrapper around a BSONObj and the MatchExpression created from it.
- */
-class Matcher {
-    Matcher(const Matcher&) = delete;
-    Matcher& operator=(const Matcher&) = delete;
-
+class ProfileFilterImpl final : public ProfileFilter {
 public:
-    /**
-     * 'collator' must outlive the returned Matcher and any MatchExpression cloned from it.
-     */
-    Matcher(const BSONObj& pattern,
-            const boost::intrusive_ptr<ExpressionContext>& expCtx,
-            const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
-            MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-                MatchExpressionParser::kDefaultSpecialFeatures);
-
-    bool matches(const BSONObj& doc, MatchDetails* details = nullptr) const;
-
-    const BSONObj* getQuery() const {
-        return &_pattern;
-    };
-
-    std::string toString() const {
-        return _pattern.toString();
-    }
-
-    MatchExpression* getMatchExpression() {
-        return _expression.get();
-    }
-
-    const MatchExpression* getMatchExpression() const {
-        return _expression.get();
+    ProfileFilterImpl(BSONObj expr);
+    bool matches(OperationContext* opCtx, const OpDebug& op, const CurOp& curop) const override;
+    BSONObj serialize() const override {
+        return _matcher.getMatchExpression()->serialize();
     }
 
 private:
-    BSONObj _pattern;
-
-    std::unique_ptr<MatchExpression> _expression;
+    Matcher _matcher;
+    std::function<BSONObj(ProfileFilter::Args)> _makeBSON;
 };
 
 }  // namespace mongo

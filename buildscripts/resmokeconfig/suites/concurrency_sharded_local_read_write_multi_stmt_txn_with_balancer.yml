@@ -148,6 +148,8 @@ selector:
   # Tests which expect commands to fail and catch the error can cause transactions to abort and
   # retry indefinitely.
   - catches_command_failures
+  # mongos has no system.profile collection.
+  - requires_profiling
 
 executor:
   archive:

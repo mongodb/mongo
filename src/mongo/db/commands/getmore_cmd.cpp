@@ -619,7 +619,7 @@ public:
             // generate the stats eagerly for all operations due to cost.
             if (cursorPin->getExecutor()->lockPolicy() !=
                     PlanExecutor::LockPolicy::kLocksInternally &&
-                curOp->shouldDBProfile()) {
+                curOp->shouldDBProfile(opCtx)) {
                 curOp->debug().execStats = exec->getStats();
             }
 

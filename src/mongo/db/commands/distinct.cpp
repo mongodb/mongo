@@ -301,7 +301,7 @@ public:
         }
         curOp->debug().setPlanSummaryMetrics(stats);
 
-        if (curOp->shouldDBProfile()) {
+        if (curOp->shouldDBProfile(opCtx)) {
             curOp->debug().execStats = executor.getValue()->getStats();
         }
 

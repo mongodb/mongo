@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,60 +27,36 @@
  *    it in the license file.
  */
 
+
 #pragma once
 
-
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/match_details.h"
-
 
 namespace mongo {
 
-class CollatorInterface;
+class CurOp;
+class OpDebug;
+class OperationContext;
 
-/**
- * Matcher is a simple wrapper around a BSONObj and the MatchExpression created from it.
- */
-class Matcher {
-    Matcher(const Matcher&) = delete;
-    Matcher& operator=(const Matcher&) = delete;
-
+class ProfileFilter {
 public:
-    /**
-     * 'collator' must outlive the returned Matcher and any MatchExpression cloned from it.
-     */
-    Matcher(const BSONObj& pattern,
-            const boost::intrusive_ptr<ExpressionContext>& expCtx,
-            const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
-            MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-                MatchExpressionParser::kDefaultSpecialFeatures);
+    struct Args {
+        Args(OperationContext* opCtx, const OpDebug& op, const CurOp& curop)
+            : opCtx(opCtx), op(op), curop(curop) {}
 
-    bool matches(const BSONObj& doc, MatchDetails* details = nullptr) const;
-
-    const BSONObj* getQuery() const {
-        return &_pattern;
+        OperationContext* opCtx;
+        const OpDebug& op;
+        const CurOp& curop;
     };
 
-    std::string toString() const {
-        return _pattern.toString();
-    }
+    virtual bool matches(OperationContext*, const OpDebug&, const CurOp&) const = 0;
+    virtual BSONObj serialize() const = 0;
+    virtual ~ProfileFilter() = default;
 
-    MatchExpression* getMatchExpression() {
-        return _expression.get();
-    }
+    static std::shared_ptr<ProfileFilter> getDefault();
 
-    const MatchExpression* getMatchExpression() const {
-        return _expression.get();
-    }
-
-private:
-    BSONObj _pattern;
-
-    std::unique_ptr<MatchExpression> _expression;
+    // Not thread-safe: should only be called during initialization.
+    static void setDefault(std::shared_ptr<ProfileFilter>);
 };
 
 }  // namespace mongo

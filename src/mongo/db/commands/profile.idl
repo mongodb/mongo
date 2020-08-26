@@ -28,9 +28,18 @@
 
 global:
   cpp_namespace: "mongo"
+  cpp_includes: "mongo/db/commands/profile_common.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
+
+types:
+  ObjectOrUnset:
+    bson_serialization_type: any
+    description: "Either an object or the special string 'unset'."
+    cpp_type: mongo::ObjectOrUnset
+    serializer: "::mongo::serializeObjectOrUnset"
+    deserializer: "::mongo::parseObjectOrUnset"
 
 commands:
 
@@ -48,4 +57,10 @@ commands:
       sampleRate:
         type: double
         description: "The fraction of eligible ops, in the range [0,1), to be logged/profiled."
+        optional: true
+      filter:
+        type: ObjectOrUnset
+        description: "A query predicate that determines which ops are logged/profiled.  This is
+                      an alternative to slowms and sampleRate. The special value 'unset' removes
+                      the filter."
         optional: true
