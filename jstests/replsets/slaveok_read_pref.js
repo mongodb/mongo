@@ -37,9 +37,9 @@ for (let readMode of ["commands", "legacy"]) {
             const cursor = (readPref ? secDB.test.find().readPref(readPref) : secDB.test.find());
 
             if (readPref === "primary" || (!readPref && !slaveOk)) {
-                // Attempting to run the query throws an error of type NotMasterNoSlaveOk.
+                // Attempting to run the query throws an error of type NotPrimaryNoSecondaryOk.
                 const slaveOkErr = assert.throws(() => cursor.itcount(), [], tojson(testType));
-                assert.commandFailedWithCode(slaveOkErr, ErrorCodes.NotMasterNoSlaveOk);
+                assert.commandFailedWithCode(slaveOkErr, ErrorCodes.NotPrimaryNoSecondaryOk);
             } else {
                 // Succeeds for all non-primary readPrefs, and for no readPref iff slaveOk.
                 const docCount = assert.doesNotThrow(() => cursor.itcount(), [], tojson(testType));

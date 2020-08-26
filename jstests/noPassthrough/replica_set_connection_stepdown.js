@@ -41,7 +41,7 @@ const error = assert.throws(function() {
     // throw if the ReplicaSetMonitor's backgroud refresh has already noticed that this node is
     // no longer primary.
     assert.commandFailedWithCode(rsConn.getDB("test").runCommand({find: "mycoll"}),
-                                 ErrorCodes.NotMasterNoSlaveOk);
+                                 ErrorCodes.NotPrimaryNoSecondaryOk);
 
     // However, once the server responds back with a "not master" error, DBClientRS will cause
     // the ReplicaSetMonitor to attempt to discover the current primary, which will cause this

@@ -17,9 +17,9 @@ const testDB = rst.getSecondary().getDB(jsTestName());
 testDB.getMongo().setSlaveOk(false);
 const coll = testDB.test;
 
-// Issue a change stream. We should fail with a NotMasterNoSlaveOk error.
+// Issue a change stream. We should fail with a NotPrimaryNoSecondaryOk error.
 const err = assert.throws(() => coll.watch([]));
-assert.commandFailedWithCode(err, ErrorCodes.NotMasterNoSlaveOk);
+assert.commandFailedWithCode(err, ErrorCodes.NotPrimaryNoSecondaryOk);
 
 // Confirm that the response includes the "ResumableChangeStreamError" error label.
 assert("errorLabels" in err, err);
