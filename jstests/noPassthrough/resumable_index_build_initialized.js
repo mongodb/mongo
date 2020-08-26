@@ -3,6 +3,7 @@
  * build has been initialized but has not yet begun the collection scan phase.
  *
  * @tags: [
+ *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
  * ]

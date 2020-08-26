@@ -6,7 +6,11 @@
  * For this test, the secondary is ineligible to become primary, but still has a vote so it is
  * required for the commit quorum to be satisfied.
  *
- * @tags: [requires_persistence, requires_replication]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ *   requires_replication,
+ * ]
  */
 (function() {
 "use strict";

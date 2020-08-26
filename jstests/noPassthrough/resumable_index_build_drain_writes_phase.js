@@ -4,6 +4,7 @@
  * subsequently completed when the node is started back up.
  *
  * @tags: [
+ *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
  * ]

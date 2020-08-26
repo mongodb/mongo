@@ -3,7 +3,11 @@
  * build is in the drain writes phase on a primary, and that the index build is subsequently
  * completed when the node is started back up.
  *
- * @tags: [requires_persistence, requires_replication]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_persistence,
+ *   requires_replication,
+ * ]
  */
 (function() {
 "use strict";
