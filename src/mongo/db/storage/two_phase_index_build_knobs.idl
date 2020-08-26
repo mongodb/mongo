@@ -53,6 +53,21 @@ server_parameters:
     validator:
       gte: 0
 
+  resumableIndexBuildMajorityOpTimeTimeoutMillis:
+    description: >
+      Time in milliseconds a node waits for the last optime before installing the interceptors to
+      be majority committed for a resumable index build. Once the interceptors are installed, the
+      index build process will start the collection scan phase.
+      If the majority commit point is not reached by the end of this waiting period, the index
+      build will proceed as a non-resumable index build.
+      Set to 0 to skip the wait. This will also disable resumable index builds.
+      Set to a negative value to wait indefinitely for the majority commit point.
+      TODO(SERVER-50519): Set default to -1.
+    set_at: startup
+    cpp_vartype: long long
+    cpp_varname: gResumableIndexBuildMajorityOpTimeTimeoutMillis
+    default: 10000
+
   enableResumableIndexBuilds:
     description: "Support for using resumable index builds."
     set_at: startup

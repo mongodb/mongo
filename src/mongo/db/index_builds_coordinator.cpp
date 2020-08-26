@@ -60,6 +60,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_util.h"
+#include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
@@ -2471,9 +2472,33 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
         return;
     }
 
+    auto timeoutMillis = gResumableIndexBuildMajorityOpTimeTimeoutMillis;
+    if (timeoutMillis == 0) {
+        // Disable resumable index build.
+        replState->lastOpTimeBeforeInterceptors = {};
+        return;
+    }
+
+    Milliseconds timeout;
+    Date_t deadline;
+    if (timeoutMillis > 0) {
+        timeout = Milliseconds(timeoutMillis);
+        deadline = opCtx->getServiceContext()->getFastClockSource()->now() + timeout;
+    } else {
+        // Wait indefinitely for majority commit point.
+        // Setting 'deadline' to Date_t::max() achieves the same effect as boost::none in
+        // ReplicationCoordinatorImpl::waitUntilMajorityOpTime(). Additionally, providing a
+        // 'deadline' of Date_t::max() is given special treatment in
+        // OperationContext::waitForConditionOrInterruptNoAssertUntil().
+        timeout = Milliseconds::max();
+        deadline = Date_t::max();
+    }
+
     LOGV2(4847600,
           "Index build: waiting for last optime before interceptors to be majority committed",
           "buildUUID"_attr = replState->buildUUID,
+          "deadline"_attr = deadline,
+          "timeout"_attr = timeout,
           "lastOpTime"_attr = replState->lastOpTimeBeforeInterceptors);
 
     if (MONGO_unlikely(hangIndexBuildBeforeWaitingUntilMajorityOpTime.shouldFail())) {
@@ -2483,9 +2508,20 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
         hangIndexBuildBeforeWaitingUntilMajorityOpTime.pauseWhileSet(opCtx);
     }
 
-    auto status =
-        replCoord->waitUntilMajorityOpTime(opCtx, replState->lastOpTimeBeforeInterceptors);
-    uassertStatusOK(status);
+    auto status = replCoord->waitUntilMajorityOpTime(
+        opCtx, replState->lastOpTimeBeforeInterceptors, deadline);
+    if (!status.isOK()) {
+        replState->lastOpTimeBeforeInterceptors = {};
+        LOGV2(5053900,
+              "Index build: timed out waiting for the last optime before interceptors to be "
+              "majority committed. Continuing as a non-resumable index build.",
+              "buildUUID"_attr = replState->buildUUID,
+              "deadline"_attr = deadline,
+              "timeout"_attr = timeout,
+              "lastOpTime"_attr = replState->lastOpTimeBeforeInterceptors,
+              "waitStatus"_attr = status);
+        return;
+    }
 
     // Since we waited for all the writes before the interceptors were established to be majority
     // committed, if we read at the majority commit point for the collection scan, then none of the
