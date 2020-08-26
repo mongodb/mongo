@@ -35,6 +35,7 @@
 
 #include <iostream>
 #include <malloc.h>
+#include <pcrecpp.h>
 #include <sched.h>
 #include <stdio.h>
 #include <sys/mman.h>
@@ -53,28 +54,28 @@
 #include <boost/filesystem.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <fmt/format.h>
 #include <pcrecpp.h>
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/file.h"
+#include "mongo/util/static_immortal.h"
 
 #define KLONG long
 #define KLF "l"
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 class LinuxProc {
 public:
     LinuxProc(ProcessId pid) {
-        char name[128];
-        sprintf(name, "/proc/%d/stat", pid.asUInt32());
-
-        FILE* f = fopen(name, "r");
+        auto name = "/proc/{}/stat"_format(pid.asUInt32());
+        FILE* f = fopen(name.c_str(), "r");
         if (!f) {
-            std::stringstream ss;
-            ss << "couldn't open [" << name << "] " << errnoWithDescription();
-            std::string s = ss.str();
-            msgasserted(13538, s.c_str());
+            auto e = errno;
+            msgasserted(13538, "couldn't open [{}] {}"_format(name, errnoWithDescription(e)));
         }
         int found = fscanf(f,
                            "%d %127s %c "
@@ -134,9 +135,7 @@ public:
                              &_rtprio, &_sched
                            */
         );
-        if (found == 0) {
-            std::cout << "system error: reading proc info" << std::endl;
-        }
+        massert(13539, "couldn't parse [{}]"_format(name).c_str(), found != 0);
         fclose(f);
     }
 
@@ -313,6 +312,43 @@ void appendMountInfo(BSONObjBuilder& bob) {
     }
 }
 
+class CpuInfoParser {
+public:
+    struct LineProcessor {
+        pcrecpp::RE regex;
+        std::function<void(const std::string&)> f;
+    };
+    std::vector<LineProcessor> lineProcessors;
+    std::function<void()> recordProcessor;
+    void run() {
+        std::ifstream f("/proc/cpuinfo");
+        if (!f)
+            return;
+
+        bool readSuccess;
+        bool unprocessed = false;
+        static StaticImmortal<pcrecpp::RE> lineRegex(R"re((.*?)\s*:\s*(.*))re");
+        do {
+            std::string fstr;
+            readSuccess = f && std::getline(f, fstr);
+            if (readSuccess && !fstr.empty()) {
+                std::string key;
+                std::string value;
+                if (!lineRegex->FullMatch(fstr, &key, &value))
+                    continue;
+                for (auto&& [lpr, lpf] : lineProcessors) {
+                    if (lpr.FullMatch(key))
+                        lpf(value);
+                }
+                unprocessed = true;
+            } else if (unprocessed) {
+                recordProcessor();
+                unprocessed = false;
+            }
+        } while (readSuccess);
+    }
+};
+
 }  // namespace
 
 class LinuxSysHelper {
@@ -333,30 +369,63 @@ public:
         return fstr;
     }
 
+
+    /**
+     * count the number of physical cores
+     */
+    static void getNumPhysicalCores(int& physicalCores) {
+
+        /* In /proc/cpuinfo core ids are only unique within a particular physical unit, AKA a cpu
+         * package, so to count the total cores we need to count the unique pairs of core id and
+         * physical id*/
+        struct CpuId {
+            std::string core;
+            std::string physical;
+        };
+
+        CpuId parsedCpuId;
+
+        auto cmp = [](auto&& a, auto&& b) {
+            auto tupLens = [](auto&& o) { return std::tie(o.core, o.physical); };
+            return tupLens(a) < tupLens(b);
+        };
+        std::set<CpuId, decltype(cmp)> cpuIds(cmp);
+
+        CpuInfoParser cpuInfoParser{
+            {
+                {"physical id", [&](const std::string& value) { parsedCpuId.physical = value; }},
+                {"core id", [&](const std::string& value) { parsedCpuId.core = value; }},
+            },
+            [&]() {
+                cpuIds.insert(parsedCpuId);
+                parsedCpuId = CpuId{};
+            }};
+        cpuInfoParser.run();
+
+        physicalCores = cpuIds.size();
+    }
+
     /**
      * Get some details about the CPU
      */
     static void getCpuInfo(int& procCount, std::string& freq, std::string& features) {
-        FILE* f;
-        char fstr[1024] = {0};
+
         procCount = 0;
 
-        f = fopen("/proc/cpuinfo", "r");
-        if (f == nullptr)
-            return;
-
-        while (fgets(fstr, 1023, f) != nullptr && !feof(f)) {
-            // until the end of the file
-            fstr[strlen(fstr) < 1 ? 0 : strlen(fstr) - 1] = '\0';
-            if (strncmp(fstr, "processor ", 10) == 0 || strncmp(fstr, "processor\t:", 11) == 0)
-                ++procCount;
-            if (strncmp(fstr, "cpu MHz\t\t:", 10) == 0)
-                freq = fstr + 11;
-            if (strncmp(fstr, "flags\t\t:", 8) == 0)
-                features = fstr + 9;
-        }
-
-        fclose(f);
+        CpuInfoParser cpuInfoParser{
+            {
+#ifdef __s390x__
+                {R"re(processor\s+\d+)re", [&](const std::string& value) { procCount++; }},
+                {"cpu MHz static", [&](const std::string& value) { freq = value; }},
+                {"features", [&](const std::string& value) { features = value; }},
+#else
+                {"processor", [&](const std::string& value) { procCount++; }},
+                {"cpu MHz", [&](const std::string& value) { freq = value; }},
+                {"flags", [&](const std::string& value) { features = value; }},
+#endif
+            },
+            []() {}};
+        cpuInfoParser.run();
     }
 
     /**
@@ -585,15 +654,18 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     std::string distroName, distroVersion;
     std::string cpuFreq, cpuFeatures;
     int cpuCount;
+    int physicalCores;
 
     std::string verSig = LinuxSysHelper::readLineFromFile("/proc/version_signature");
     LinuxSysHelper::getCpuInfo(cpuCount, cpuFreq, cpuFeatures);
+    LinuxSysHelper::getNumPhysicalCores(physicalCores);
     LinuxSysHelper::getLinuxDistro(distroName, distroVersion);
 
     if (uname(&unameData) == -1) {
+        auto e = errno;
         LOGV2(23339,
-              "Unable to collect detailed system information: {strerror_errno}",
-              "strerror_errno"_attr = strerror(errno));
+              "Unable to collect detailed system information",
+              "error"_attr = errnoWithDescription(e));
     }
 
     osType = "Linux";
@@ -630,6 +702,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     bExtra.append("pageSize", static_cast<long long>(pageSize));
     bExtra.append("numPages", static_cast<int>(sysconf(_SC_PHYS_PAGES)));
     bExtra.append("maxOpenFiles", static_cast<int>(sysconf(_SC_OPEN_MAX)));
+    bExtra.append("physicalCores", physicalCores);
 
     appendMountInfo(bExtra);
 
@@ -648,10 +721,9 @@ bool ProcessInfo::checkNumaEnabled() {
         hasNumaMaps = boost::filesystem::exists("/proc/self/numa_maps");
     } catch (boost::filesystem::filesystem_error& e) {
         LOGV2(23340,
-              "WARNING: Cannot detect if NUMA interleaving is enabled. Failed to probe "
-              "\"{e_path1_string}\": {e_code_message}",
-              "e_path1_string"_attr = e.path1().string(),
-              "e_code_message"_attr = e.code().message());
+              "WARNING: Cannot detect if NUMA interleaving is enabled. Failed to probe",
+              "path"_attr = e.path1().string(),
+              "reason"_attr = e.code().message());
         return false;
     }
 
@@ -677,9 +749,8 @@ bool ProcessInfo::blockCheckSupported() {
 bool ProcessInfo::blockInMemory(const void* start) {
     unsigned char x = 0;
     if (mincore(const_cast<void*>(alignToStartOfPage(start)), getPageSize(), &x)) {
-        LOGV2(23341,
-              "mincore failed: {errnoWithDescription}",
-              "errnoWithDescription"_attr = errnoWithDescription());
+        auto e = errno;
+        LOGV2(23341, "mincore failed", "error"_attr = errnoWithDescription(e));
         return 1;
     }
     return x & 0x1;
@@ -690,9 +761,8 @@ bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, std::vector<
     if (mincore(const_cast<void*>(alignToStartOfPage(start)),
                 numPages * getPageSize(),
                 reinterpret_cast<unsigned char*>(&out->front()))) {
-        LOGV2(23342,
-              "mincore failed: {errnoWithDescription}",
-              "errnoWithDescription"_attr = errnoWithDescription());
+        auto e = errno;
+        LOGV2(23342, "mincore failed", "error"_attr = errnoWithDescription(e));
         return false;
     }
     for (size_t i = 0; i < numPages; ++i) {
