@@ -23,17 +23,17 @@ config.members[2].priority = 0;
 reconfig(replTest, config);
 
 //
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 replTest.awaitSecondaryNodes();
 var testDB = "foo";
 
 // Initial replication
-master.getDB("barDB").bar.save({a: 1});
+primary.getDB("barDB").bar.save({a: 1});
 replTest.awaitReplication();
 
 // These writes should be replicated immediately
 var docNum = 5000;
-var bulk = master.getDB(testDB).foo.initializeUnorderedBulkOp();
+var bulk = primary.getDB(testDB).foo.initializeUnorderedBulkOp();
 for (var n = 0; n < docNum; n++) {
     bulk.insert({n: n});
 }
@@ -54,30 +54,32 @@ if (wcError != null) {
     return;
 }
 
-var slaves = replTest._slaves;
-slaves[0].setSlaveOk();
-slaves[1].setSlaveOk();
+var secondaries = replTest.getSecondaries();
+secondaries[0].setSlaveOk();
+secondaries[1].setSlaveOk();
 
-var slave0count = slaves[0].getDB(testDB).foo.find().itcount();
-assert(slave0count == docNum, "Slave 0 has " + slave0count + " of " + docNum + " documents!");
+var secondary0Count = secondaries[0].getDB(testDB).foo.find().itcount();
+assert(secondary0Count == docNum,
+       "Slave 0 has " + secondary0Count + " of " + docNum + " documents!");
 
-var slave1count = slaves[1].getDB(testDB).foo.find().itcount();
-assert(slave1count == docNum, "Slave 1 has " + slave1count + " of " + docNum + " documents!");
+var secondary1Count = secondaries[1].getDB(testDB).foo.find().itcount();
+assert(secondary1Count == docNum,
+       "Slave 1 has " + secondary1Count + " of " + docNum + " documents!");
 
-var master1count = master.getDB(testDB).foo.find().itcount();
-assert(master1count == docNum, "Master has " + master1count + " of " + docNum + " documents!");
+var primary1Count = primary.getDB(testDB).foo.find().itcount();
+assert(primary1Count == docNum, "Master has " + primary1Count + " of " + docNum + " documents!");
 
 print("replset5.js reconfigure with hidden=1");
-config = master.getDB("local").system.replset.findOne();
+config = primary.getDB("local").system.replset.findOne();
 
 assert.eq(15, config.settings.heartbeatTimeoutSecs);
 
 config.version++;
 config.members[2].hidden = 1;
 
-master = reconfig(replTest, config);
+primary = reconfig(replTest, config);
 
-config = master.getSiblingDB("local").system.replset.findOne();
+config = primary.getSiblingDB("local").system.replset.findOne();
 assert.eq(config.members[2].hidden, true);
 
 replTest.stopSet();

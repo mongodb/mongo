@@ -13,7 +13,7 @@ function testReadLoadBalancing(numReplicas) {
     s.getDB("test").foo.insert({a: 123});
 
     primary = s.rs0.getPrimary();
-    secondaries = s.rs0._slaves;
+    secondaries = s.rs0.getSecondaries();
 
     function rsStats() {
         return s.getDB("admin").runCommand("connPoolStats")["replicaSets"][s.rs0.name];
@@ -99,7 +99,7 @@ function testReadLoadBalancing(numReplicas) {
     }, "one slave not ok", 180000, 5000);
 
     // Secondaries may change here
-    secondaries = s.rs0._slaves;
+    secondaries = s.rs0.getSecondaries();
 
     for (var i = 0; i < secondaries.length * 10; i++) {
         conn = new Mongo(s._mongos[0].host);

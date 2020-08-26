@@ -148,6 +148,7 @@ var agreeOnPrimaryAndSetVersion = function(setVersion) {
 };
 
 var primary = replTest.getPrimary();
+var secondaries = replTest.getSecondaries();
 var expectedVersion = replTest.getReplSetConfigFromNode().version;
 assert.soon(function() {
     return agreeOnPrimaryAndSetVersion(expectedVersion);
@@ -180,7 +181,7 @@ runHelloCmdAndAliases({
 });
 
 runHelloCmdAndAliases({
-    conn: replTest._slaves[0],
+    conn: secondaries[0],
     name: "secondary",
     goodValues: {
         setName: "hello_and_aliases",
@@ -204,7 +205,7 @@ runHelloCmdAndAliases({
 });
 
 runHelloCmdAndAliases({
-    conn: replTest._slaves[1],
+    conn: secondaries[1],
     name: "delayed_secondary",
     goodValues: {
         setName: "hello_and_aliases",
@@ -222,7 +223,7 @@ runHelloCmdAndAliases({
 });
 
 runHelloCmdAndAliases({
-    conn: replTest._slaves[2],
+    conn: secondaries[2],
     name: "arbiter",
     goodValues: {
         setName: "hello_and_aliases",
@@ -266,6 +267,7 @@ try {
 }
 
 primary = replTest.getPrimary();
+secondaries = replTest.getSecondaries();
 expectedVersion = config.version;
 assert.soon(function() {
     return agreeOnPrimaryAndSetVersion(expectedVersion);
@@ -297,7 +299,7 @@ runHelloCmdAndAliases({
 });
 
 runHelloCmdAndAliases({
-    conn: replTest._slaves[0],
+    conn: secondaries[0],
     name: "first_secondary",
     goodValues: {
         setName: "hello_and_aliases",
@@ -321,7 +323,7 @@ runHelloCmdAndAliases({
 });
 
 runHelloCmdAndAliases({
-    conn: replTest._slaves[1],
+    conn: secondaries[1],
     name: "very_delayed_secondary",
     goodValues: {
         setName: "hello_and_aliases",
@@ -340,7 +342,7 @@ runHelloCmdAndAliases({
 });
 
 runHelloCmdAndAliases({
-    conn: replTest._slaves[2],
+    conn: secondaries[2],
     name: "arbiter",
     goodValues: {
         setName: "hello_and_aliases",

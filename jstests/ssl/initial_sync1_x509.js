@@ -36,12 +36,12 @@ function runInitialSyncTest() {
         Object.extend(replTest.getReplSetConfig(),
                       {writeConcernMajorityJournalDefault: wcMajorityJournalDefault}));
 
-    var master = replTest.getPrimary();
-    var foo = master.getDB("foo");
-    var admin = master.getDB("admin");
+    var primary = replTest.getPrimary();
+    var foo = primary.getDB("foo");
+    var admin = primary.getDB("admin");
 
-    var slave1 = replTest._slaves[0];
-    var admin_s1 = slave1.getDB("admin");
+    var secondary1 = replTest.getSecondary();
+    var admin_s1 = secondary1.getDB("admin");
 
     print("2. Create a root user.");
     admin.createUser({user: "root", pwd: "pass", roles: ["root"]});
@@ -60,7 +60,7 @@ function runInitialSyncTest() {
     replTest.awaitReplication();
 
     print("5. Insert some stuff");
-    master = replTest.getPrimary();
+    primary = replTest.getPrimary();
     bulk = foo.bar.initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
         bulk.insert({date: new Date(), x: i, str: "all the talk on the market"});

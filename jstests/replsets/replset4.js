@@ -1,30 +1,30 @@
 doTest = function(signal) {
-    // Test orphaned master steps down
+    // Test orphaned primary steps down
     var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 
     replTest.startSet();
     replTest.initiate();
 
-    var master = replTest.getPrimary();
+    var primary = replTest.getPrimary();
 
-    // Kill both slaves, simulating a network partition
-    var slaves = replTest._slaves;
-    for (var i = 0; i < slaves.length; i++) {
-        var slave_id = replTest.getNodeId(slaves[i]);
-        replTest.stop(slave_id);
+    // Kill both secondaries, simulating a network partition
+    var secondaries = replTest.getSecondaries();
+    for (var i = 0; i < secondaries.length; i++) {
+        var secondary_id = replTest.getNodeId(secondaries[i]);
+        replTest.stop(secondary_id);
     }
 
     print("replset4.js 1");
 
     assert.soon(function() {
         try {
-            var result = master.getDB("admin").runCommand({ismaster: 1});
+            var result = primary.getDB("admin").runCommand({ismaster: 1});
             return (result['ok'] == 1 && result['ismaster'] == false);
         } catch (e) {
             print("replset4.js caught " + e);
             return false;
         }
-    }, "Master fails to step down when orphaned.");
+    }, "Primary fails to step down when orphaned.");
 
     print("replset4.js worked, stopping");
     replTest.stopSet(signal);

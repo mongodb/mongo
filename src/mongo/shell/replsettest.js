@@ -129,13 +129,13 @@ var ReplSetTest = function(opts) {
      * Invokes the 'hello' command via it's alias 'ismaster' on each individual node and returns the
      * current primary, or false if none is found. Populates the following cached values:
      * '_primary': the current primary
-     * '_slaves': all nodes other than '_primary' (note this includes arbiters)
+     * '_secondaries': all nodes other than '_primary' (note this includes arbiters)
      * '_liveNodes': all currently reachable nodes
      */
     function _callHello() {
         self._liveNodes = [];
         self._primary = null;
-        self._slaves = [];
+        self._secondaries = [];
 
         var twoPrimaries = false;
         let canAcceptWrites = false;
@@ -155,11 +155,11 @@ var ReplSetTest = function(opts) {
                         canAcceptWrites = n.ismaster;
                     }
                 } else {
-                    self._slaves.push(node);
+                    self._secondaries.push(node);
                 }
             } catch (err) {
                 print("ReplSetTest Could not call ismaster on node " + node + ": " + tojson(err));
-                self._slaves.push(node);
+                self._secondaries.push(node);
             }
         });
         if (twoPrimaries || !self._primary || !canAcceptWrites) {
@@ -175,7 +175,7 @@ var ReplSetTest = function(opts) {
      */
     function _determineLiveSecondaries() {
         _callHello();
-        return self._slaves.filter(function(n) {
+        return self._secondaries.filter(function(n) {
             return self._liveNodes.indexOf(n) !== -1;
         });
     }
@@ -690,7 +690,7 @@ var ReplSetTest = function(opts) {
             // Reload who the current secondaries are
             self.getPrimary(timeout);
 
-            var secondariesToCheck = secondaries || self._slaves;
+            var secondariesToCheck = secondaries || self._secondaries;
             var len = secondariesToCheck.length;
             var ready = true;
 
@@ -1909,7 +1909,7 @@ var ReplSetTest = function(opts) {
     // on all secondary nodes or just 'secondaries', if specified. The timeout will reset if any of
     // the secondaries makes progress.
     this.awaitReplication = function(timeout, secondaryOpTimeType, secondaries, retryIntervalMS) {
-        if (secondaries !== undefined && secondaries !== self._slaves) {
+        if (secondaries !== undefined && secondaries !== self._secondaries) {
             print("ReplSetTest awaitReplication: going to check only " +
                   secondaries.map(s => s.host));
         }
@@ -1955,7 +1955,7 @@ var ReplSetTest = function(opts) {
               ", is " + tojson(primaryLatestOpTime));
 
         let nodesCaughtUp = false;
-        let secondariesToCheck = secondaries || self._slaves;
+        let secondariesToCheck = secondaries || self._secondaries;
         let nodeProgress = Array(secondariesToCheck.length);
 
         const Progress = Object.freeze({
@@ -2249,7 +2249,7 @@ var ReplSetTest = function(opts) {
     this.getHashes = function(dbName, secondaries) {
         assert.neq(dbName, 'local', 'Cannot run getHashes() on the "local" database');
 
-        // _determineLiveSecondaries() repopulates both 'self._slaves' and 'self._primary'. If
+        // _determineLiveSecondaries() repopulates both 'self._secondaries' and 'self._primary'. If
         // we're passed an explicit set of secondaries we don't want to do that.
         secondaries = secondaries || _determineLiveSecondaries();
 
@@ -2377,7 +2377,7 @@ var ReplSetTest = function(opts) {
             // We don't expect the local database to match because some of its
             // collections are not replicated.
             dbBlacklist.push('local');
-            secondaries = secondaries || rst._slaves;
+            secondaries = secondaries || rst._secondaries;
 
             var success = true;
             var hasDumpedOplog = false;
@@ -2641,7 +2641,7 @@ var ReplSetTest = function(opts) {
      * is exhausted on any node being checked.
      */
     function checkOplogs(rst, secondaries, msgPrefix = 'checkOplogs') {
-        secondaries = secondaries || rst._slaves;
+        secondaries = secondaries || rst._secondaries;
         const kCappedPositionLostSentinel = Object.create(null);
         const OplogReader = function(mongo) {
             this._safelyPerformCursorOperation = function(name, operation, onCappedPositionLost) {

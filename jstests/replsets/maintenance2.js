@@ -16,35 +16,35 @@ var nodes = replTest.startSet();
 replTest.initiate();
 
 // Call getPrimary to return a reference to the node that's been
-// elected master.
-var master = replTest.getPrimary();
+// elected primary.
+var primary = replTest.getPrimary();
 
 // save some records
 var len = 100;
 for (var i = 0; i < len; ++i) {
-    master.getDB("foo").foo.save({a: i});
+    primary.getDB("foo").foo.save({a: i});
 }
 
-// This method will check the oplogs of the master
-// and slaves in the set and wait until the change has replicated.
+// This method will check the oplogs of the primary
+// and secondaries in the set and wait until the change has replicated.
 // replTest.awaitReplication();
 
-var slaves = replTest._slaves;
-assert.eq(2, slaves.length, "Expected 2 slaves but length was " + slaves.length);
+var secondaries = replTest.getSecondaries();
+assert.eq(2, secondaries.length, "Expected 2 secondaries but length was " + secondaries.length);
 
-slaves.forEach(function(slave) {
-    // put slave into maintenance (recovery) mode
-    assert.commandWorked(slave.getDB("foo").adminCommand({replSetMaintenance: 1}));
+secondaries.forEach(function(secondary) {
+    // put secondary into maintenance (recovery) mode
+    assert.commandWorked(secondary.getDB("foo").adminCommand({replSetMaintenance: 1}));
 
-    var stats = slave.getDB("foo").adminCommand({replSetGetStatus: 1});
-    assert.eq(stats.myState, 3, "Slave should be in recovering state.");
+    var stats = secondary.getDB("foo").adminCommand({replSetGetStatus: 1});
+    assert.eq(stats.myState, 3, "Secondary should be in recovering state.");
 
     print("count should fail in recovering state...");
-    slave.slaveOk = true;
-    assert.commandFailed(slave.getDB("foo").runCommand({count: "foo"}));
+    secondary.slaveOk = true;
+    assert.commandFailed(secondary.getDB("foo").runCommand({count: "foo"}));
 
     // unset maintenance mode when done
-    assert.commandWorked(slave.getDB("foo").adminCommand({replSetMaintenance: 0}));
+    assert.commandWorked(secondary.getDB("foo").adminCommand({replSetMaintenance: 0}));
 });
 
 // Shut down the set and finish the test.

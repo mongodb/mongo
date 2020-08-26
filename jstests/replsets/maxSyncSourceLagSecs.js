@@ -21,36 +21,37 @@ replTest.startSet();
 replTest.initiate();
 replTest.awaitNodesAgreeOnPrimary();
 
-var master = replTest.getPrimary();
-var slaves = replTest._slaves;
-syncFrom(slaves[0], master, replTest);
-syncFrom(slaves[1], master, replTest);
-master.getDB("foo").bar.save({a: 1});
+var primary = replTest.getPrimary();
+var secondaries = replTest.getSecondaries();
+syncFrom(secondaries[0], primary, replTest);
+syncFrom(secondaries[1], primary, replTest);
+primary.getDB("foo").bar.save({a: 1});
 replTest.awaitReplication();
 
-jsTestLog("Setting sync target of slave 2 to slave 1");
-syncFrom(slaves[1], slaves[0], replTest);
+jsTestLog("Setting sync target of secondary 2 to secondary 1");
+syncFrom(secondaries[1], secondaries[0], replTest);
 printjson(replTest.status());
 
 // need to put at least maxSyncSourceLagSecs b/w first op and subsequent ops
 // so that the shouldChangeSyncSource logic goes into effect
 sleep(4000);
 
-jsTestLog("Lock slave 1 and add some docs. Force sync target for slave 2 to change to primary");
-assert.commandWorked(slaves[0].getDB("admin").runCommand({fsync: 1, lock: 1}));
+jsTestLog(
+    "Lock secondary 1 and add some docs. Force sync target for secondary 2 to change to primary");
+assert.commandWorked(secondaries[0].getDB("admin").runCommand({fsync: 1, lock: 1}));
 
 assert.soon(function() {
-    master.getDB("foo").bar.insert({a: 2});
-    var res = slaves[1].getDB("admin").runCommand({"replSetGetStatus": 1});
-    return res.syncSourceHost === master.name;
+    primary.getDB("foo").bar.insert({a: 2});
+    var res = secondaries[1].getDB("admin").runCommand({"replSetGetStatus": 1});
+    return res.syncSourceHost === primary.name;
 }, "sync target not changed back to primary", 100 * 1000, 2 * 1000);
 printjson(replTest.status());
 
 assert.soon(function() {
-    return (slaves[1].getDB("foo").bar.count({a: 1}) > 0 &&
-            slaves[1].getDB("foo").bar.count({a: 2}) > 0);
-}, "slave should have caught up after syncing to primary.");
+    return (secondaries[1].getDB("foo").bar.count({a: 1}) > 0 &&
+            secondaries[1].getDB("foo").bar.count({a: 2}) > 0);
+}, "secondary should have caught up after syncing to primary.");
 
-assert.commandWorked(slaves[0].getDB("admin").fsyncUnlock());
+assert.commandWorked(secondaries[0].getDB("admin").fsyncUnlock());
 replTest.stopSet();
 }());

@@ -15,44 +15,44 @@ doTest = function(signal) {
 
     replTest.initiate(config);
 
-    var master = replTest.getPrimary().getDB(name);
-    var slaveConns = replTest._slaves;
-    var slaves = [];
-    for (var i in slaveConns) {
-        var d = slaveConns[i].getDB(name);
-        slaves.push(d);
+    var primary = replTest.getPrimary().getDB(name);
+    var secondaryConns = replTest.getSecondaries();
+    var secondaries = [];
+    for (var i in secondaryConns) {
+        var d = secondaryConns[i].getDB(name);
+        secondaries.push(d);
     }
 
-    waitForAllMembers(master);
+    waitForAllMembers(primary);
 
     // insert a record
-    assert.commandWorked(master.foo.insert({x: 1}, {writeConcern: {w: 2}}));
+    assert.commandWorked(primary.foo.insert({x: 1}, {writeConcern: {w: 2}}));
 
-    var doc = master.foo.findOne();
+    var doc = primary.foo.findOne();
     assert.eq(doc.x, 1);
 
-    // make sure slave has it
-    var doc = slaves[0].foo.findOne();
+    // make sure secondary has it
+    var doc = secondaries[0].foo.findOne();
     assert.eq(doc.x, 1);
 
-    // make sure delayed slave doesn't have it
+    // make sure delayed secondary doesn't have it
     for (var i = 0; i < 8; i++) {
-        assert.eq(slaves[1].foo.findOne(), null);
+        assert.eq(secondaries[1].foo.findOne(), null);
         sleep(1000);
     }
 
-    // within 120 seconds delayed slave should have it
+    // within 120 seconds delayed secondary should have it
     assert.soon(function() {
-        var z = slaves[1].foo.findOne();
+        var z = secondaries[1].foo.findOne();
         return z && z.x == 1;
-    }, 'waiting for inserted document ' + tojson(doc) + ' on delayed slave', 120 * 1000);
+    }, 'waiting for inserted document ' + tojson(doc) + ' on delayed secondary', 120 * 1000);
 
     /************* Part 2 *******************/
 
     // how about if we add a new server?  will it sync correctly?
     conn = replTest.add();
 
-    config = master.getSiblingDB("local").system.replset.findOne();
+    config = primary.getSiblingDB("local").system.replset.findOne();
     printjson(config);
     config.version++;
     config.members.push({
@@ -62,10 +62,10 @@ doTest = function(signal) {
         slaveDelay: 30
     });
 
-    master = reconfig(replTest, config);
-    master = master.getSiblingDB(name);
+    primary = reconfig(replTest, config);
+    primary = primary.getSiblingDB(name);
 
-    assert.commandWorked(master.foo.insert(
+    assert.commandWorked(primary.foo.insert(
         {_id: 123, x: 'foo'}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     for (var i = 0; i < 8; i++) {
@@ -86,7 +86,7 @@ doTest = function(signal) {
     config.members[3].slaveDelay = 15;
 
     reconfig(replTest, config);
-    master = replTest.getPrimary().getDB(name);
+    primary = replTest.getPrimary().getDB(name);
     assert.soon(function() {
         return conn.getDB("local").system.replset.findOne().version == config.version;
     });
@@ -99,8 +99,8 @@ doTest = function(signal) {
     });
 
     print("testing insert");
-    master.foo.insert({_id: 124, "x": "foo"});
-    assert(master.foo.findOne({_id: 124}) != null);
+    primary.foo.insert({_id: 124, "x": "foo"});
+    assert(primary.foo.findOne({_id: 124}) != null);
 
     for (var i = 0; i < 10; i++) {
         assert.eq(conn.getDB(name).foo.findOne({_id: 124}), null);

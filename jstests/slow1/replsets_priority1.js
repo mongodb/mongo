@@ -134,21 +134,22 @@ for (var i = 0; i < n; i++) {
     assert.soon(() => isConfigCommitted(master));
     assert.commandWorked(master.adminCommand({replSetReconfig: config}));
 
-    jsTestLog("replsets_priority1.js wait for 2 slaves");
+    jsTestLog("replsets_priority1.js wait for 2 secondaries");
 
     assert.soon(function() {
         rs.getPrimary();
-        return rs._slaves.length == 2;
-    }, "2 slaves");
+        return rs.getSecondaries().length == 2;
+    }, "2 secondaries");
 
     jsTestLog("replsets_priority1.js wait for new config version " + config.version);
 
     assert.soon(function() {
         var versions = [0, 0];
-        rs._slaves[0].setSlaveOk();
-        versions[0] = rs._slaves[0].getDB("local").system.replset.findOne().version;
-        rs._slaves[1].setSlaveOk();
-        versions[1] = rs._slaves[1].getDB("local").system.replset.findOne().version;
+        var secondaries = rs.getSecondaries();
+        secondaries[0].setSlaveOk();
+        versions[0] = secondaries[0].getDB("local").system.replset.findOne().version;
+        secondaries[1].setSlaveOk();
+        versions[1] = secondaries[1].getDB("local").system.replset.findOne().version;
         return versions[0] == config.version && versions[1] == config.version;
     });
 
@@ -177,10 +178,10 @@ for (var i = 0; i < n; i++) {
     checkPrimaryIs(second);
 
     // Wait for election oplog entry to be replicated, to avoid rollbacks later on.
-    let liveSlaves = rs.nodes.filter(function(node) {
+    let liveSecondaries = rs.nodes.filter(function(node) {
         return node.host !== max.host && node.host !== second.host;
     });
-    rs.awaitReplication(null, null, liveSlaves);
+    rs.awaitReplication(null, null, liveSecondaries);
 
     jsTestLog("restart max " + max._id);
 

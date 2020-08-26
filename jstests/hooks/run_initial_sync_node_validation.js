@@ -20,7 +20,7 @@ assert(primary, 'calling getPrimary() failed');
 
 // Find the hidden node.
 var hiddenNode;
-for (var secondary of rst._slaves) {
+for (var secondary of rst.getSecondaries()) {
     var isMasterRes = secondary.getDB('admin').isMaster();
     if (isMasterRes.hidden) {
         hiddenNode = secondary;

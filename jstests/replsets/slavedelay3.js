@@ -11,27 +11,27 @@ config.members[1].slaveDelay = 5;
 config.members[2].priority = 0;
 
 replTest.initiate(config);
-var master = replTest.getPrimary().getDB(name);
+var primary = replTest.getPrimary().getDB(name);
 
-var slaveConns = replTest._slaves;
-var slave = [];
-for (var i in slaveConns) {
-    var d = slaveConns[i].getDB(name);
+var secondaryConns = replTest.getSecondaries();
+var secondaries = [];
+for (var i in secondaryConns) {
+    var d = secondaryConns[i].getDB(name);
     d.getMongo().setSlaveOk();
-    slave.push(d);
+    secondaries.push(d);
 }
 
-waitForAllMembers(master);
+waitForAllMembers(primary);
 
 nodes[0].disconnect(nodes[2]);
 
-master.foo.insert({x: 1});
+primary.foo.insert({x: 1});
 
 syncFrom(nodes[1], nodes[0], replTest);
 
-// make sure the record still appears in the remote slave
+// make sure the record still appears in the remote secondary
 assert.soon(function() {
-    return slave[1].foo.findOne() != null;
+    return secondaries[1].foo.findOne() != null;
 });
 
 replTest.stopSet();

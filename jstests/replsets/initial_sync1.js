@@ -34,13 +34,13 @@ var replTest =
 var conns = replTest.startSet();
 replTest.initiate();
 
-var master = replTest.getPrimary();
-var foo = master.getDB("foo");
-var admin = master.getDB("admin");
+var primary = replTest.getPrimary();
+var foo = primary.getDB("foo");
+var admin = primary.getDB("admin");
 
-var slave1 = replTest._slaves[0];
-var admin_s1 = slave1.getDB("admin");
-var local_s1 = slave1.getDB("local");
+var secondary1 = replTest.getSecondary();
+var admin_s1 = secondary1.getDB("admin");
+var local_s1 = secondary1.getDB("local");
 
 print("2. Insert some data");
 var bulk = foo.bar.initializeUnorderedBulkOp();
@@ -59,21 +59,22 @@ admin_s1.runCommand({replSetFreeze: 999999});
 print("6. Bring up #3");
 var hostname = getHostName();
 
-var slave2 = MongoRunner.runMongod(Object.merge({replSet: basename, oplogSize: 2}, x509_options2));
+var secondary2 =
+    MongoRunner.runMongod(Object.merge({replSet: basename, oplogSize: 2}, x509_options2));
 
-var local_s2 = slave2.getDB("local");
-var admin_s2 = slave2.getDB("admin");
+var local_s2 = secondary2.getDB("local");
+var admin_s2 = secondary2.getDB("admin");
 
 var config = replTest.getReplSetConfig();
 config.version = replTest.getReplSetConfigFromNode().version + 1;
-config.members.push({_id: 2, host: slave2.host});
+config.members.push({_id: 2, host: secondary2.host});
 try {
     admin.runCommand({replSetReconfig: config});
 } catch (e) {
     print(e);
 }
-reconnect(slave1);
-reconnect(slave2);
+reconnect(secondary1);
+reconnect(secondary2);
 replTest.waitForAllNewlyAddedRemovals();
 
 print("Config 1: " + tojsononeline(config));
@@ -88,22 +89,22 @@ print("Config 3: " + tojsononeline(config3));
 assert(config3);
 assert.eq(config3.version, (config.version + 1));
 
-replTest.waitForState(slave2, [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING]);
+replTest.waitForState(secondary2, [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING]);
 
 print("7. Kill the secondary in the middle of syncing");
-replTest.stop(slave1);
+replTest.stop(secondary1);
 
 print("8. Eventually the new node should become a secondary");
 print("if initial sync has started, this will cause it to fail and sleep for 5 minutes");
-replTest.waitForState(slave2, ReplSetTest.State.SECONDARY, 60 * 1000);
+replTest.waitForState(secondary2, ReplSetTest.State.SECONDARY, 60 * 1000);
 
 print("9. Bring the secondary back up");
-replTest.start(slave1, {}, true);
-reconnect(slave1);
-replTest.waitForState(slave1, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
+replTest.start(secondary1, {}, true);
+reconnect(secondary1);
+replTest.waitForState(secondary1, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
 
 print("10. Insert some stuff");
-master = replTest.getPrimary();
+primary = replTest.getPrimary();
 bulk = foo.bar.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {
     bulk.insert({date: new Date(), x: i, str: "all the talk on the market"});
@@ -113,5 +114,5 @@ assert.commandWorked(bulk.execute());
 print("11. Everyone happy eventually");
 replTest.awaitReplication();
 
-MongoRunner.stopMongod(slave2);
+MongoRunner.stopMongod(secondary2);
 replTest.stopSet();

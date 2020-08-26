@@ -6,18 +6,18 @@ baseName = "jstests_replsets_replset6";
 var rt = new ReplSetTest({name: "replset6tests", nodes: 2});
 var nodes = rt.startSet();
 rt.initiate();
-var m = rt.getPrimary();
+var p = rt.getPrimary();
 rt.awaitSecondaryNodes();
-var slaves = rt._slaves;
-s = slaves[0];
+var secondaries = rt.getSecondaries();
+s = secondaries[0];
 s.setSlaveOk();
-admin = m.getDB("admin");
+admin = p.getDB("admin");
 
 debug = function(foo) {};  // print( foo ); }
 
 // rename within db
 
-m.getDB(baseName).one.save({a: 1});
+p.getDB(baseName).one.save({a: 1});
 assert.soon(function() {
     v = s.getDB(baseName).one.findOne();
     return v && 1 == v.a;
@@ -44,7 +44,7 @@ assert.eq(-1, s.getDB(baseName).getCollectionNames().indexOf("one"));
 first = baseName + "_first";
 second = baseName + "_second";
 
-m.getDB(first).one.save({a: 1});
+p.getDB(first).one.save({a: 1});
 assert.soon(function() {
     return s.getDB(first).one.findOne() && 1 == s.getDB(first).one.findOne().a;
 });

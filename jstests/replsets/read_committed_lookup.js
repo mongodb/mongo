@@ -35,7 +35,7 @@ const config = {
 
 rst.initiate(config);
 
-let shardSecondary = rst._slaves[0];
+let shardSecondary = rst.getSecondary();
 
 testReadCommittedLookup(rst.getPrimary().getDB("test"), shardSecondary, rst);
 

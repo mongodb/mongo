@@ -18,70 +18,70 @@ doTest = function(signal) {
     var testDB = "repl-test";
 
     // Call getPrimary to return a reference to the node that's been
-    // elected master.
-    var master = replTest.getPrimary();
+    // elected primary.
+    var primary = replTest.getPrimary();
 
     // Wait for replication to a single node
-    master.getDB(testDB).bar.insert({n: 1});
+    primary.getDB(testDB).bar.insert({n: 1});
 
     // Wait for states to become PRI,SEC,SEC
-    waitForAllMembers(master.getDB(testDB));
+    waitForAllMembers(primary.getDB(testDB));
 
-    var slaves = replTest._slaves;
-    slaves.forEach(function(slave) {
-        slave.setSlaveOk();
+    var secondaries = replTest.getSecondaries();
+    secondaries.forEach(function(secondary) {
+        secondary.setSlaveOk();
     });
 
     // Test write concern with multiple inserts.
     print("\n\nreplset2.js **** Try inserting a multiple records -- first insert ****");
 
-    printjson(master.getDB("admin").runCommand("replSetGetStatus"));
+    printjson(primary.getDB("admin").runCommand("replSetGetStatus"));
 
-    var bulk = master.getDB(testDB).foo.initializeUnorderedBulkOp();
+    var bulk = primary.getDB(testDB).foo.initializeUnorderedBulkOp();
     bulk.insert({n: 1});
     bulk.insert({n: 2});
     bulk.insert({n: 3});
 
     print("\nreplset2.js **** TEMP 1 ****");
 
-    printjson(master.getDB("admin").runCommand("replSetGetStatus"));
+    printjson(primary.getDB("admin").runCommand("replSetGetStatus"));
 
     assert.commandWorked(bulk.execute({w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}));
 
     print("replset2.js **** TEMP 1a ****");
 
-    m1 = master.getDB(testDB).foo.findOne({n: 1});
+    m1 = primary.getDB(testDB).foo.findOne({n: 1});
     printjson(m1);
-    assert(m1['n'] == 1, "replset2.js Failed to save to master on multiple inserts");
+    assert(m1['n'] == 1, "replset2.js Failed to save to primary on multiple inserts");
 
     print("replset2.js **** TEMP 1b ****");
 
-    var s0 = slaves[0].getDB(testDB).foo.findOne({n: 1});
-    assert(s0['n'] == 1, "replset2.js Failed to replicate to slave 0 on multiple inserts");
+    var s0 = secondaries[0].getDB(testDB).foo.findOne({n: 1});
+    assert(s0['n'] == 1, "replset2.js Failed to replicate to secondary 0 on multiple inserts");
 
-    var s1 = slaves[1].getDB(testDB).foo.findOne({n: 1});
-    assert(s1['n'] == 1, "replset2.js Failed to replicate to slave 1 on multiple inserts");
+    var s1 = secondaries[1].getDB(testDB).foo.findOne({n: 1});
+    assert(s1['n'] == 1, "replset2.js Failed to replicate to secondary 1 on multiple inserts");
 
     // Test write concern with a simple insert
     print("replset2.js **** Try inserting a single record ****");
-    master.getDB(testDB).dropDatabase();
+    primary.getDB(testDB).dropDatabase();
     var options = {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
-    assert.commandWorked(master.getDB(testDB).foo.insert({n: 1}, options));
+    assert.commandWorked(primary.getDB(testDB).foo.insert({n: 1}, options));
 
-    m1 = master.getDB(testDB).foo.findOne({n: 1});
+    m1 = primary.getDB(testDB).foo.findOne({n: 1});
     printjson(m1);
-    assert(m1['n'] == 1, "replset2.js Failed to save to master");
+    assert(m1['n'] == 1, "replset2.js Failed to save to primary");
 
-    s0 = slaves[0].getDB(testDB).foo.findOne({n: 1});
-    assert(s0['n'] == 1, "replset2.js Failed to replicate to slave 0");
+    s0 = secondaries[0].getDB(testDB).foo.findOne({n: 1});
+    assert(s0['n'] == 1, "replset2.js Failed to replicate to secondary 0");
 
-    s1 = slaves[1].getDB(testDB).foo.findOne({n: 1});
-    assert(s1['n'] == 1, "replset2.js Failed to replicate to slave 1");
+    s1 = secondaries[1].getDB(testDB).foo.findOne({n: 1});
+    assert(s1['n'] == 1, "replset2.js Failed to replicate to secondary 1");
 
     print("replset2.js **** Try inserting many records ****");
     try {
         var bigData = new Array(2000).toString();
-        bulk = master.getDB(testDB).baz.initializeUnorderedBulkOp();
+        bulk = primary.getDB(testDB).baz.initializeUnorderedBulkOp();
         for (var n = 0; n < 1000; n++) {
             bulk.insert({n: n, data: bigData});
         }
@@ -98,20 +98,20 @@ doTest = function(signal) {
 
         print("replset2.js **** V2 ");
 
-        verifyReplication("master", master.getDB(testDB).baz);
-        verifyReplication("slave 0", slaves[0].getDB(testDB).baz);
-        verifyReplication("slave 1", slaves[1].getDB(testDB).baz);
+        verifyReplication("primary", primary.getDB(testDB).baz);
+        verifyReplication("secondary 0", secondaries[0].getDB(testDB).baz);
+        verifyReplication("secondary 1", secondaries[1].getDB(testDB).baz);
     } catch (e) {
         var errstr = "ERROR: " + e;
         errstr += "\nMaster oplog findOne:\n";
         errstr +=
-            tojson(master.getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
-        errstr += "\nSlave 0 oplog findOne:\n";
-        errstr +=
-            tojson(slaves[0].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
-        errstr += "\nSlave 1 oplog findOne:\n";
-        errstr +=
-            tojson(slaves[1].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+            tojson(primary.getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+        errstr += "\nSecondary 0 oplog findOne:\n";
+        errstr += tojson(
+            secondaries[0].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+        errstr += "\nSecondary 1 oplog findOne:\n";
+        errstr += tojson(
+            secondaries[1].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
         assert(false, errstr);
     }
 

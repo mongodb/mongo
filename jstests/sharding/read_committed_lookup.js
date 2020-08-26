@@ -33,7 +33,7 @@ const config = {
 
 rst.initiate(config);
 
-let shardSecondary = rst._slaves[0];
+let shardSecondary = rst.getSecondary();
 
 // Confirm read committed works on a cluster with a database that is not sharding enabled.
 let st = new ShardingTest({

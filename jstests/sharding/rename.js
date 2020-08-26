@@ -75,12 +75,12 @@ jsTest.log("Testing write concern (2)");
 // Kill any node. Don't care if it's a primary or secondary.
 replTest.stop(0);
 
-// Call getPrimary() to populate replTest._slaves.
+// Call getPrimary() to populate replTest._secondaries.
 replTest.getPrimary();
-let liveSlaves = replTest._slaves.filter(function(node) {
+let liveSecondaries = replTest.getSecondaries().filter(function(node) {
     return node.host !== replTest.nodes[0].host;
 });
-replTest.awaitSecondaryNodes(null, liveSlaves);
+replTest.awaitSecondaryNodes(null, liveSecondaries);
 awaitRSClientHosts(s.s, replTest.getPrimary(), {ok: true, ismaster: true}, replTest.name);
 
 assert.commandWorked(db.foo.insert({_id: 4}));

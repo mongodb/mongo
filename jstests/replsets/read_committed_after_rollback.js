@@ -46,9 +46,7 @@ replTest.initiate(config);
 
 // Get connections.
 var oldPrimary = replTest.getPrimary();
-var newPrimary = replTest._slaves[0];
-var pureSecondary = replTest._slaves[1];
-var arbiters = [replTest.nodes[3], replTest.nodes[4]];
+var [newPrimary, pureSecondary, ...arbiters] = replTest.getSecondaries();
 
 // This is the collection that all of the tests will use.
 var collName = name + '.collection';

@@ -70,7 +70,7 @@ replTest.initiate(config);
 
 // Get connections and collection.
 var primary = replTest.getPrimary();
-var secondary = replTest._slaves[0];
+var secondary = replTest.getSecondary();
 var coll = primary.getDB(name)[name];
 var secondaryColl = secondary.getDB(name)[name];
 

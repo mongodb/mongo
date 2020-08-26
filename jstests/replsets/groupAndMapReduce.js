@@ -18,35 +18,35 @@ doTest = function(signal) {
     replTest.initiate();
 
     // Call getPrimary to return a reference to the node that's been
-    // elected master.
-    var master = replTest.getPrimary();
+    // elected primary.
+    var primary = replTest.getPrimary();
 
     // save some records
     var len = 100;
     for (var i = 0; i < len; ++i) {
-        master.getDB("foo").foo.save({a: i});
+        primary.getDB("foo").foo.save({a: i});
     }
 
-    waitForAllMembers(master.getDB("foo"));
-    // This method will check the oplogs of the master
-    // and slaves in the set and wait until the change has replicated.
+    waitForAllMembers(primary.getDB("foo"));
+    // This method will check the oplogs of the primary
+    // and secondaries in the set and wait until the change has replicated.
     replTest.awaitReplication();
 
-    slaves = replTest._slaves;
-    assert(slaves.length == 2, "Expected 2 slaves but length was " + slaves.length);
-    slaves.forEach(function(slave) {
-        // try to read from slave
-        slave.slaveOk = true;
-        var count = slave.getDB("foo").foo.find().itcount();
+    secondaries = replTest.getSecondaries();
+    assert(secondaries.length == 2, "Expected 2 secondaries but length was " + secondaries.length);
+    secondaries.forEach(function(secondary) {
+        // try to read from secondary
+        secondary.slaveOk = true;
+        var count = secondary.getDB("foo").foo.find().itcount();
         printjson(count);
-        assert.eq(len, count, "slave count wrong: " + slave);
+        assert.eq(len, count, "secondary count wrong: " + secondary);
 
         print("Doing a findOne to verify we can get a row");
-        var one = slave.getDB("foo").foo.findOne();
+        var one = secondary.getDB("foo").foo.findOne();
         printjson(one);
 
         print("Calling inline mr() with slaveOk=true, must succeed");
-        slave.slaveOk = true;
+        secondary.slaveOk = true;
         map = function() {
             emit(this.a, 1);
         };
@@ -57,28 +57,28 @@ doTest = function(signal) {
             }
             return sum;
         };
-        slave.getDB("foo").foo.mapReduce(map, reduce, {out: {"inline": 1}});
+        secondary.getDB("foo").foo.mapReduce(map, reduce, {out: {"inline": 1}});
 
         print("Calling mr() to collection with slaveOk=true, must fail");
         try {
-            slave.getDB("foo").foo.mapReduce(map, reduce, "output");
-            assert(false, "mapReduce() to collection succeeded on slave");
+            secondary.getDB("foo").foo.mapReduce(map, reduce, "output");
+            assert(false, "mapReduce() to collection succeeded on secondary");
         } catch (e) {
             print("Received exception: " + e);
         }
 
         print("Calling inline mr() with slaveOk=false, must fail");
-        slave.slaveOk = false;
+        secondary.slaveOk = false;
         try {
-            slave.getDB("foo").foo.mapReduce(map, reduce, {out: {"inline": 1}});
-            assert(false, "mapReduce() succeeded on slave with slaveOk=false");
+            secondary.getDB("foo").foo.mapReduce(map, reduce, {out: {"inline": 1}});
+            assert(false, "mapReduce() succeeded on secondary with slaveOk=false");
         } catch (e) {
             print("Received exception: " + e);
         }
         print("Calling mr() to collection with slaveOk=false, must fail");
         try {
-            slave.getDB("foo").foo.mapReduce(map, reduce, "output");
-            assert(false, "mapReduce() to collection succeeded on slave with slaveOk=false");
+            secondary.getDB("foo").foo.mapReduce(map, reduce, "output");
+            assert(false, "mapReduce() to collection succeeded on secondary with slaveOk=false");
         } catch (e) {
             print("Received exception: " + e);
         }

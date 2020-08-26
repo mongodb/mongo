@@ -57,7 +57,7 @@ function isUUID(val) {
 assert.eq(isUUID(last_register.payload.uuid['local.oplog.rs']), true);
 
 // Restart the secondary
-var s1 = rst._slaves[0];
+var s1 = rst.getSecondary();
 var s1Id = rst.getNodeId(s1);
 
 rst.stop(s1Id);
@@ -77,7 +77,7 @@ WaitForFreeMonServerStatusState(rst.getPrimary(), 'disabled');
 WaitForFreeMonServerStatusState(rst.getSecondary(), 'disabled');
 
 // Restart the secondary with it disabled
-var s1 = rst._slaves[0];
+var s1 = rst.getSecondary();
 var s1Id = rst.getNodeId(s1);
 
 rst.stop(s1Id);

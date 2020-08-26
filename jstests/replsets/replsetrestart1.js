@@ -38,15 +38,14 @@ replTest.initiate();
 replTest.awaitSecondaryNodes();
 
 // Call getPrimary to return a reference to the node that's been
-// elected master.
-var master = replTest.getPrimary();
-var config1 = master.getDB("local").system.replset.findOne();
+// elected primary.
+var primary = replTest.getPrimary();
+var config1 = primary.getDB("local").system.replset.findOne();
 
 // Now we're going to shut down all nodes
-var mId = replTest.getNodeId(master);
-var s1 = replTest._slaves[0];
+var pId = replTest.getNodeId(primary);
+var [s1, s2] = replTest.getSecondaries();
 var s1Id = replTest.getNodeId(s1);
-var s2 = replTest._slaves[1];
 var s2Id = replTest.getNodeId(s2);
 
 replTest.stop(s1Id);
@@ -54,17 +53,17 @@ replTest.stop(s2Id);
 replTest.waitForState(s1, ReplSetTest.State.DOWN);
 replTest.waitForState(s2, ReplSetTest.State.DOWN);
 
-replTest.stop(mId);
+replTest.stop(pId);
 
 // Now let's restart these nodes
-replTest.restart(mId);
+replTest.restart(pId);
 replTest.restart(s1Id);
 replTest.restart(s2Id);
 
-// Make sure that a new master comes up
-master = replTest.getPrimary();
+// Make sure that a new primary comes up
+primary = replTest.getPrimary();
 replTest.awaitSecondaryNodes();
-var config2 = master.getDB("local").system.replset.findOne();
+var config2 = primary.getDB("local").system.replset.findOne();
 compare_configs(config1, config2);
 replTest.stopSet();
 }());

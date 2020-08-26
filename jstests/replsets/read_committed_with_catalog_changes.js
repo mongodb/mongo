@@ -224,7 +224,7 @@ replTest.initiate(config);
 
 // Get connections.
 var primary = replTest.getPrimary();
-var secondary = replTest._slaves[0];
+var secondary = replTest.getSecondary();
 
 // This is the DB that all of the tests will use.
 var mainDB = primary.getDB('mainDB');

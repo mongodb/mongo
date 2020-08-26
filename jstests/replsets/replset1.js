@@ -26,23 +26,23 @@ var doTest = function(signal) {
     replTest.initiate();
 
     // Call getPrimary to return a reference to the node that's been
-    // elected master.
-    var master = replTest.getPrimary();
+    // elected primary.
+    var primary = replTest.getPrimary();
 
     // Check that both the 'called' and 'successful' fields of the 'electionTimeout' election reason
     // counter have been incremented in serverStatus.
-    const primaryStatus = assert.commandWorked(master.adminCommand({serverStatus: 1}));
+    const primaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
     verifyServerStatusElectionReasonCounterValue(
         primaryStatus.electionMetrics, "electionTimeout", 1);
 
     // Ensure the primary logs an n-op to the oplog upon transitioning to primary.
-    assert.gt(master.getDB("local").oplog.rs.count({op: 'n', o: {msg: 'new primary'}}), 0);
+    assert.gt(primary.getDB("local").oplog.rs.count({op: 'n', o: {msg: 'new primary'}}), 0);
 
-    // Here's how you save something to master
-    master.getDB("foo").foo.save({a: 1000});
+    // Here's how you save something to primary
+    primary.getDB("foo").foo.save({a: 1000});
 
-    // This method will check the oplogs of the master
-    // and slaves in the set and wait until the change has replicated.
+    // This method will check the oplogs of the primary
+    // and secondaries in the set and wait until the change has replicated.
     replTest.awaitReplication();
 
     var cppconn = new Mongo(replTest.getURL()).getDB("foo");
@@ -56,68 +56,68 @@ var doTest = function(signal) {
         assert.eq(1000, temp.foo.findOne().a, "cppconn 1");
     }
 
-    // Here's how to stop the master node
-    var master_id = replTest.getNodeId(master);
-    replTest.stop(master_id);
+    // Here's how to stop the primary node
+    var primaryId = replTest.getNodeId(primary);
+    replTest.stop(primaryId);
 
-    // Now let's see who the new master is:
-    var new_master = replTest.getPrimary();
+    // Now let's see who the new primary is:
+    var newPrimary = replTest.getPrimary();
 
-    // Is the new master the same as the old master?
-    var new_master_id = replTest.getNodeId(new_master);
+    // Is the new primary the same as the old primary?
+    var newPrimaryId = replTest.getNodeId(newPrimary);
 
-    assert(master_id != new_master_id, "Old master shouldn't be equal to new master.");
+    assert(primaryId != newPrimaryId, "Old primary shouldn't be equal to new primary.");
 
     reconnect(cppconn);
     assert.eq(1000, cppconn.foo.findOne().a, "cppconn 2");
 
-    // Now let's write some documents to the new master
-    var bulk = new_master.getDB("bar").bar.initializeUnorderedBulkOp();
+    // Now let's write some documents to the new primary
+    var bulk = newPrimary.getDB("bar").bar.initializeUnorderedBulkOp();
     for (var i = 0; i < 1000; i++) {
         bulk.insert({a: i});
     }
     bulk.execute();
 
-    // Here's how to restart the old master node:
-    var slave = replTest.restart(master_id);
+    // Here's how to restart the old primary node:
+    var secondary = replTest.restart(primaryId);
 
-    // Now, let's make sure that the old master comes up as a slave
+    // Now, let's make sure that the old primary comes up as a secondary
     assert.soon(function() {
-        var res = slave.getDB("admin").runCommand({ismaster: 1});
+        var res = secondary.getDB("admin").runCommand({ismaster: 1});
         printjson(res);
         return res['ok'] == 1 && res['ismaster'] == false;
     });
 
     // And we need to make sure that the replset comes back up
     assert.soon(function() {
-        var res = new_master.getDB("admin").runCommand({replSetGetStatus: 1});
+        var res = newPrimary.getDB("admin").runCommand({replSetGetStatus: 1});
         printjson(res);
         return res.myState == 1;
     });
 
-    // And that both slave nodes have all the updates
-    new_master = replTest.getPrimary();
-    assert.eq(1000, new_master.getDB("bar").runCommand({count: "bar"}).n, "assumption 2");
+    // And that both secondary nodes have all the updates
+    newPrimary = replTest.getPrimary();
+    assert.eq(1000, newPrimary.getDB("bar").runCommand({count: "bar"}).n, "assumption 2");
     replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
 
-    var slaves = replTest._slaves;
-    assert(slaves.length == 2, "Expected 2 slaves but length was " + slaves.length);
-    slaves.forEach(function(slave) {
-        slave.setSlaveOk();
-        var count = slave.getDB("bar").runCommand({count: "bar"});
+    var secondaries = replTest.getSecondaries();
+    assert(secondaries.length == 2, "Expected 2 secondaries but length was " + secondaries.length);
+    secondaries.forEach(function(secondary) {
+        secondary.setSlaveOk();
+        var count = secondary.getDB("bar").runCommand({count: "bar"});
         printjson(count);
-        assert.eq(1000, count.n, "slave count wrong: " + slave);
+        assert.eq(1000, count.n, "secondary count wrong: " + secondary);
     });
 
     // last error
-    master = replTest.getPrimary();
-    slaves = replTest._slaves;
+    primary = replTest.getPrimary();
+    secondaries = replTest.getSecondaries();
 
-    var db = master.getDB("foo");
+    var db = primary.getDB("foo");
     var t = db.foo;
 
-    var ts = slaves.map(function(z) {
+    var ts = secondaries.map(function(z) {
         z.setSlaveOk();
         return z.getDB("foo").foo;
     });

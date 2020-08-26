@@ -86,7 +86,7 @@ assert.eq(coll.count(), 1);
 
 //
 // Successful remove on one shard, write concern timeout on the other
-var s0Id = st.rs0.getNodeId(st.rs0._slaves[0]);
+var s0Id = st.rs0.getNodeId(st.rs0.getSecondary());
 st.rs0.stop(s0Id);
 coll.remove({});
 st.rs1.awaitReplication();  // To ensure the first shard won't timeout
@@ -100,7 +100,7 @@ assert.eq(coll.count(), 0);
 //
 // Successful remove on two hosts, write concern timeout on both
 // We don't aggregate two timeouts together
-var s1Id = st.rs1.getNodeId(st.rs1._slaves[0]);
+var s1Id = st.rs1.getNodeId(st.rs1.getSecondary());
 st.rs1.stop(s1Id);
 // new writes to both shards to ensure that remove will do something on both of them
 coll.insert({_id: -1});
