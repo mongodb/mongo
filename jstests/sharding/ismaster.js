@@ -16,15 +16,10 @@ function checkResponseFields(commandString) {
         res.maxMessageSizeBytes && isNumber(res.maxMessageSizeBytes) && res.maxBsonObjectSize > 0,
         "maxMessageSizeBytes possibly missing:" + tojson(res));
 
-    if (commandString === "hello") {
-        assert.eq("boolean",
-                  typeof res.isWritablePrimary,
-                  "isWritablePrimary field is not a boolean" + tojson(res));
-        assert(res.isWritablePrimary === true, "isWritablePrimary field is false" + tojson(res));
-    } else {
-        assert.eq("boolean", typeof res.ismaster, "ismaster field is not a boolean" + tojson(res));
-        assert(res.ismaster === true, "ismaster field is false" + tojson(res));
-    }
+    // TODO SERVER-49988: Check for res.isWritablePrimary instead of res.ismaster if a hello command
+    // was executed.
+    assert.eq("boolean", typeof res.ismaster, "ismaster field is not a boolean" + tojson(res));
+    assert(res.ismaster === true, "ismaster field is false" + tojson(res));
 
     assert(res.localTime, "localTime possibly missing:" + tojson(res));
     assert(res.msg && res.msg == "isdbgrid", "msg possibly missing or wrong:" + tojson(res));
