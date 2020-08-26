@@ -350,6 +350,46 @@ TEST(MatchExpressionParserLeafTest, SimpleMod1) {
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 8)));
 }
 
+TEST(MatchExpressionParserLeafTest, ModFloatTruncate) {
+    auto assertDivisorAndRemainder =
+        [](const BSONObj& query, int expectedDivisor, int expectedRemainder) {
+            boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+            StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+            ASSERT_OK(result.getStatus());
+            auto modExpr = checked_cast<ModMatchExpression*>(result.getValue().get());
+            ASSERT_EQ(modExpr->getDivisor(), expectedDivisor);
+            ASSERT_EQ(modExpr->getRemainder(), expectedRemainder);
+        };
+
+    std::vector<BSONObj> positiveCases = {
+        BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(3LL << 2LL))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(3.2 << 2.2))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(3.7 << 2.7))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("3") << Decimal128("2")))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("3.2") << Decimal128("2.2")))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("3.7") << Decimal128("2.7")))),
+    };
+
+    for (const auto& testCase : positiveCases) {
+        assertDivisorAndRemainder(testCase, 3, 2);
+    }
+
+    std::vector<BSONObj> negativeCases = {
+        BSON("x" << BSON("$mod" << BSON_ARRAY(-3 << -2))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(-3LL << -2LL))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(-3.2 << -2.2))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(-3.7 << -2.7))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("-3") << Decimal128("-2")))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("-3.2") << Decimal128("-2.2")))),
+        BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("-3.7") << Decimal128("-2.7")))),
+    };
+
+    for (const auto& testCase : negativeCases) {
+        assertDivisorAndRemainder(testCase, -3, -2);
+    }
+}
+
 TEST(MatchExpressionParserLeafTest, IdCollation) {
     BSONObj query = BSON("$id"
                          << "string");
