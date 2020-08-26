@@ -188,8 +188,18 @@ ShardingTestFixture::ShardingTestFixture()
 
 ShardingTestFixture::~ShardingTestFixture() {
     CatalogCacheLoader::clearForTests(getServiceContext());
-    if (Grid::get(getServiceContext()) && Grid::get(getServiceContext())->getExecutorPool()) {
-        Grid::get(getServiceContext())->getExecutorPool()->shutdownAndJoin();
+
+    if (auto grid = Grid::get(getServiceContext())) {
+        if (grid->getExecutorPool()) {
+            grid->getExecutorPool()->shutdownAndJoin();
+        }
+        if (grid->catalogClient()) {
+            grid->catalogClient()->shutDown(operationContext());
+        }
+        if (grid->shardRegistry()) {
+            grid->shardRegistry()->shutdown();
+        }
+        grid->clearForUnitTests();
     }
 }
 
