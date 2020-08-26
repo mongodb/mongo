@@ -323,3 +323,11 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: disableSplitHorizonIPCheck
         default: false
+
+    enableTenantMigrations:
+        description: >-
+            If true, enables tenant migration commands.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: enableTenantMigrations
+        default: false

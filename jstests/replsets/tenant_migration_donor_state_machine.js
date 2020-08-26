@@ -24,9 +24,13 @@ const accessState = {
     kReject: 3
 };
 
-const donorRst = new ReplSetTest(
-    {nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}], name: 'donor'});
-const recipientRst = new ReplSetTest({nodes: 1, name: 'recipient'});
+const donorRst = new ReplSetTest({
+    nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+    name: 'donor',
+    nodeOptions: {setParameter: {enableTenantMigrations: true}}
+});
+const recipientRst = new ReplSetTest(
+    {nodes: 1, name: 'recipient', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
 
 const kDBPrefix = 'testDb';
 const kConfigDonorsNS = "config.tenantMigrationDonors";

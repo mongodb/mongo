@@ -29,6 +29,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 
 namespace mongo {
 namespace {
@@ -41,8 +42,12 @@ public:
 
     public:
         using InvocationBase::InvocationBase;
-        void typedRun(OperationContext* opCtx) {}
 
+        void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::CommandNotSupported,
+                    "recipientSyncData command not enabled",
+                    repl::enableTenantMigrations);
+        }
 
         void doCheckAuthorization(OperationContext* opCtx) const {}
 
@@ -56,8 +61,9 @@ public:
     };
 
     std::string help() const {
-        return "";
+        return "Instructs the recipient to sync data as part of a tenant migration.";
     }
+
     bool adminOnly() const override {
         return true;
     }
@@ -68,6 +74,47 @@ public:
 
 } recipientSyncDataCmd;
 
+class RecipientForgetMigrationCmd : public TypedCommand<RecipientForgetMigrationCmd> {
+public:
+    using Request = RecipientForgetMigration;
+
+    class Invocation : public InvocationBase {
+
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::CommandNotSupported,
+                    "recipientForgetMigration command not enabled",
+                    repl::enableTenantMigrations);
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const {}
+
+    private:
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        NamespaceString ns() const {
+            return NamespaceString(request().getDbName(), "");
+        }
+    };
+
+    std::string help() const {
+        return "Interrupts tenant migration data sync and marks that the recipient's durable state "
+               "machine may be garbage collected.";
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return BasicCommand::AllowedOnSecondary::kNever;
+    }
+
+} recipientForgetMigrationCmd;
 
 }  // namespace
 }  // namespace mongo

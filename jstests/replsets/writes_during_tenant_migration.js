@@ -16,8 +16,10 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 
-const donorRst = new ReplSetTest({nodes: 1, name: 'donor'});
-const recipientRst = new ReplSetTest({nodes: 1, name: 'recipient'});
+const donorRst = new ReplSetTest(
+    {nodes: 1, name: 'donor', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
+const recipientRst = new ReplSetTest(
+    {nodes: 1, name: 'recipient', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
 
 donorRst.startSet();
 donorRst.initiate();

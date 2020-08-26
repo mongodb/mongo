@@ -62,3 +62,12 @@ commands:
         description: "If provided, the recipient should return after syncing up to this OpTime. Otherwise, the recipient will return once its copy of the data is consistent."
         type: timestamp
         optional: true
+
+  recipientForgetMigration:
+    description: "Parser for the 'recipientForgetMigration' command."
+    strict: true
+    namespace: ignored
+    fields:
+      migrationId:
+        description: "Unique identifier for the tenant migration."
+        type: uuid

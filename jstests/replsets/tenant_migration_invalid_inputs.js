@@ -9,7 +9,8 @@
 (function() {
 "use strict";
 
-const rst = new ReplSetTest({nodes: 1});
+const rst =
+    new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {enableTenantMigrations: true}}});
 rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
