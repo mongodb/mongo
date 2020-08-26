@@ -81,9 +81,10 @@ public:
     void run();
 
     /**
-     * Signals the thread to quit and then waits until it does.
+     * Signals the thread to quit and then waits until it does. The given 'reason' is returned to
+     * any operations that were waiting for the journal to flush.
      */
-    void shutdown();
+    void shutdown(const Status& reason);
 
     /**
      * Signals an immediate journal flush and leaves.
@@ -121,6 +122,7 @@ private:
 
     bool _flushJournalNow = false;
     bool _shuttingDown = false;
+    Status _shutdownReason = Status::OK();
 
     // New callers get a future from nextSharedPromise. The JournalFlusher thread will swap that to
     // currentSharedPromise at the start of every round of flushing, and reset nextSharedPromise

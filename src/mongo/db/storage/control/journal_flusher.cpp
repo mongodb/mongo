@@ -138,8 +138,8 @@ void JournalFlusher::run() {
 
         if (_shuttingDown) {
             LOGV2_DEBUG(4584702, 1, "stopping {name} thread", "name"_attr = name());
-            _nextSharedPromise->setError(
-                Status(ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."));
+            invariant(!_shutdownReason.isOK());
+            _nextSharedPromise->setError(_shutdownReason);
             stdx::lock_guard<Latch> lk(_opCtxMutex);
             _uniqueCtx.reset();
             return;
@@ -151,11 +151,12 @@ void JournalFlusher::run() {
     }
 }
 
-void JournalFlusher::shutdown() {
+void JournalFlusher::shutdown(const Status& reason) {
     LOGV2(22320, "Shutting down journal flusher thread");
     {
         stdx::lock_guard<Latch> lk(_stateMutex);
         _shuttingDown = true;
+        _shutdownReason = reason;
         _flushJournalNowCV.notify_one();
     }
     wait();

@@ -33,6 +33,7 @@ namespace mongo {
 
 class OperationContext;
 class ServiceContext;
+class Status;
 
 /**
  * Helper functions to manipulate independent processes that perform actions against the storage
@@ -54,13 +55,13 @@ namespace StorageControl {
 void startStorageControls(ServiceContext* serviceContext, bool forTestOnly = false);
 
 /**
- * Stops the processes begun by startStorageControls().
+ * Stops the processes begun by startStorageControls() and relays the reason to them.
  *
  * The JournalFlusher is shut down.
  *
  * Safe to call multiple times, whether or not startStorageControls() has been called.
  */
-void stopStorageControls(ServiceContext* serviceContext);
+void stopStorageControls(ServiceContext* serviceContext, const Status& reason);
 
 /**
  * Prompts an immediate journal flush and returns without waiting for it.
