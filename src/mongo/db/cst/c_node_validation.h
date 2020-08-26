@@ -31,6 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <string>
+#include <vector>
+
 #include "mongo/base/status_with.h"
 #include "mongo/db/cst/c_node.h"
 
@@ -44,6 +47,41 @@ enum class IsInclusion : bool { no, yes };
 
 StatusWith<IsInclusion> validateProjectionAsInclusionOrExclusion(const CNode& projects);
 
-Status validateVariableName(std::string varStr);
+Status validateNoConflictingPathsInProjectFields(const CNode& projects);
+
+/**
+ * Performs the following checks:
+ * * Forbids empty path components.
+ * * Path length is limited to the max allowable BSON depth.
+ * * Forbids dollar characters.
+ * * Forbids null bytes.
+ */
+Status validateAggregationPath(const std::vector<std::string>& pathComponents);
+
+/**
+ * Performs the following checks on the variable prefix:
+ * * Forbides emptiness.
+ * * Requires the first character to be a lowercase character or non-ascii.
+ * * Requires all subsequent characters to be an alphanumeric, underscores or non-ascii.
+ * Performs the following checks on the path components if any:
+ * * Forbids empty path components.
+ * * Path length is limited to the max allowable BSON depth.
+ * * Forbids dollar characters.
+ * * Forbids null bytes.
+ */
+Status validateVariableNameAndPathSuffix(const std::vector<std::string>& nameAndPathComponents);
+
+enum class IsPositional : bool { no, yes };
+
+/**
+ * Determines if the projection is positional and performs the following checks:
+ * * Forbids empty path components.
+ * * Path length is limited to the max allowable BSON depth.
+ * * Forbids dollar characters.
+ * * Forbids null bytes.
+ * 'pathComponents' is expected to contain at least one element.
+ */
+StatusWith<IsPositional> validateProjectionPathAsNormalOrPositional(
+    const std::vector<std::string>& pathComponents);
 
 }  // namespace mongo::c_node_validation

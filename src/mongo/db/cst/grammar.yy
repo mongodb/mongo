@@ -80,10 +80,15 @@
 
 // Cpp only.
 %code {
+    #include <boost/algorithm/string.hpp>
+    #include <iterator>
+    #include <utility>
+
     #include "mongo/db/cst/bson_lexer.h"
     #include "mongo/db/cst/c_node_disambiguation.h"
     #include "mongo/db/cst/c_node_validation.h"
     #include "mongo/db/cst/key_fieldname.h"
+    #include "mongo/db/query/util/make_data_structure.h"
     #include "mongo/platform/decimal128.h"
     #include "mongo/stdx/variant.h"
 
@@ -161,11 +166,14 @@
     EQ
     EXPONENT
     FLOOR
+    GEO_NEAR_DISTANCE "geoNearDistance"
+    GEO_NEAR_POINT "geoNearPoint"
     GT
     GTE
     ID
     INDEX_OF_BYTES
     INDEX_OF_CP
+    INDEX_KEY "indexKey"
     INT_NEGATIVE_ONE "-1 (int)"
     INT_ONE "1 (int)"
     INT_ZERO "zero (int)"
@@ -188,6 +196,7 @@
     OR
     POW
     RAND_VAL "randVal"
+    RECORD_ID "recordId"
     REGEX_FIND
     REGEX_FIND_ALL
     REGEX_MATCH
@@ -195,11 +204,15 @@
     REPLACE_ONE
     ROUND
     RTRIM
+    SEARCH_HIGHLIGHTS "searchHighlights"
+    SEARCH_SCORE "searchScore"
     SET_DIFFERENCE "setDifference"
     SET_EQUALS "setEquals"
     SET_INTERSECTION "setIntersection"
     SET_IS_SUBSET "setIsSubset"
     SET_UNION "setUnion"
+    SLICE "slice"
+    SORT_KEY "sortKey"
     SPLIT
     SQRT
     STAGE_INHIBIT_OPTIMIZATION
@@ -236,7 +249,12 @@
 ;
 
 %token <std::string> FIELDNAME "fieldname"
+// If a token contians dots but is also prefixed by a dollar, it is converted to a DOTTED_FIELDNAME.
+%token <std::vector<std::string>> DOTTED_FIELDNAME "fieldname containing dotted path"
+%token <std::string> DOLLAR_PREF_FIELDNAME "$-prefixed fieldname"
 %token <std::string> STRING "string"
+%token <std::string> DOLLAR_STRING "$-prefixed string"
+%token <std::string> DOLLAR_DOLLAR_STRING "$$-prefixed string"
 %token <BSONBinData> BINARY "BinData"
 %token <UserUndefined> UNDEFINED "undefined"
 %token <OID> OBJECT_ID "ObjectID"
@@ -254,36 +272,38 @@
 %token <Timestamp> TIMESTAMP "Timestamp"
 %token <UserMinKey> MIN_KEY "minKey"
 %token <UserMaxKey> MAX_KEY "maxKey"
-%token <std::string> DOLLAR_STRING "$-prefixed string"
-%token <std::string> DOLLAR_DOLLAR_STRING "$$-prefixed string"
-%token <std::string> DOLLAR_PREF_FIELDNAME "$-prefixed fieldname"
+%token START_PIPELINE START_MATCH START_SORT
 
 //
 // Semantic values (aka the C++ types produced by the actions).
 //
 
-// Possible user fieldnames.
-%nterm <CNode::Fieldname> projectionFieldname expressionFieldname stageAsUserFieldname predFieldname
-%nterm <CNode::Fieldname> argAsUserFieldname aggExprAsUserFieldname invariableUserFieldname
-%nterm <CNode::Fieldname> idAsUserFieldname valueFieldname
-%nterm <std::pair<CNode::Fieldname, CNode>> projectField expressionField valueField
+// Possible fieldnames.
+%nterm <CNode::Fieldname> aggregationProjectionFieldname projectionFieldname expressionFieldname 
+%nterm <CNode::Fieldname> stageAsUserFieldname argAsUserFieldname argAsProjectionPath
+%nterm <CNode::Fieldname> aggExprAsUserFieldname invariableUserFieldname
+%nterm <CNode::Fieldname> idAsUserFieldname idAsProjectionPath valueFieldname predFieldname
+%nterm <std::pair<CNode::Fieldname, CNode>> projectField projectionObjectField expressionField
+%nterm <std::pair<CNode::Fieldname, CNode>> valueField
+%nterm <std::string> arg
 
 // Literals.
 %nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal
-%nterm <CNode> minKey maxKey value string fieldPath binary undefined objectId bool date null regex
-%nterm <CNode> simpleValue compoundValue valueArray valueObject valueFields variable
+%nterm <CNode> minKey maxKey value string aggregationFieldPath binary undefined objectId bool date
+%nterm <CNode> null regex simpleValue compoundValue valueArray valueObject valueFields variable
 
 // Pipeline stages and related non-terminals.
 %nterm <CNode> pipeline stageList stage inhibitOptimization unionWith skip limit project sample
-%nterm <CNode> projectFields projection num
+%nterm <CNode> projectFields projectionObjectFields topLevelProjection projection projectionObject
+%nterm <CNode> num
 
 // Aggregate expressions
-%nterm <CNode> expression compoundExpression exprFixedTwoArg expressionArray expressionObject
-%nterm <CNode> expressionFields maths add atan2 boolExps and or not literalEscapes const literal
-%nterm <CNode> stringExps concat dateFromString dateToString indexOfBytes indexOfCP
-%nterm <CNode> ltrim regexFind regexFindAll regexMatch regexArgs replaceOne replaceAll rtrim
-%nterm <CNode> split strLenBytes strLenCP strcasecmp substr substrBytes substrCP
-%nterm <CNode> toLower toUpper trim
+%nterm <CNode> expression compoundNonObjectExpression exprFixedTwoArg exprFixedThreeArg
+%nterm <CNode> arrayManipulation slice expressionArray expressionObject expressionFields maths meta
+%nterm <CNode> add atan2 boolExprs and or not literalEscapes const literal stringExps concat
+%nterm <CNode> dateFromString dateToString indexOfBytes indexOfCP ltrim regexFind regexFindAll
+%nterm <CNode> regexMatch regexArgs replaceOne replaceAll rtrim split strLenBytes strLenCP
+%nterm <CNode> strcasecmp substr substrBytes substrCP toLower toUpper trim
 %nterm <CNode> compExprs cmp eq gt gte lt lte ne
 %nterm <CNode> typeExpression convert toBool toDate toDecimal toDouble toInt toLong
 %nterm <CNode> toObjectId toString type
@@ -392,6 +412,9 @@ limit:
 project:
     STAGE_PROJECT START_OBJECT projectFields END_OBJECT {
         auto&& fields = $projectFields;
+        if (auto status = c_node_validation::validateNoConflictingPathsInProjectFields(fields);
+            !status.isOK())
+            error(@1, status.reason());
         if (auto inclusion = c_node_validation::validateProjectionAsInclusionOrExclusion(fields);
             inclusion.isOK())
             $$ = CNode{CNode::ObjectChildren{std::pair{inclusion.getValue() ==
@@ -416,11 +439,25 @@ projectFields:
 ;
 
 projectField:
-    ID projection {
-        $$ = {KeyFieldname::id, $projection};
+    ID topLevelProjection {
+        $$ = {KeyFieldname::id, $topLevelProjection};
     }
-    | projectionFieldname projection {
-        $$ = {$projectionFieldname, $projection};
+    | aggregationProjectionFieldname topLevelProjection {
+        $$ = {$aggregationProjectionFieldname, $topLevelProjection};
+    }
+;
+
+topLevelProjection:
+    projection {
+        auto projection = $1;
+        $$ = stdx::holds_alternative<CNode::ObjectChildren>(projection.payload) &&
+            stdx::holds_alternative<FieldnamePath>(projection.objectChildren()[0].first) ?
+            c_node_disambiguation::disambiguateCompoundProjection(std::move(projection)) :
+            std::move(projection);
+        if (stdx::holds_alternative<CompoundInconsistentKey>($$.payload))
+            // TODO SERVER-50498: error() instead of uasserting
+            uasserted(ErrorCodes::FailedToParse, "object project field cannot contain both "
+                                                 "inclusion and exclusion indicators");
     }
 ;
 
@@ -473,10 +510,10 @@ projection:
         $$ = CNode{KeyValue::doubleZeroKey};
     }
     | DECIMAL_ONE {
-        $$ = CNode{NonZeroKey{1.0}};
+        $$ = CNode{NonZeroKey{Decimal128{1.0}}};
     }
     | DECIMAL_NEGATIVE_ONE {
-        $$ = CNode{NonZeroKey{-1.0}};
+        $$ = CNode{NonZeroKey{Decimal128{-1.0}}};
     }
     | DECIMAL_OTHER {
         $$ = CNode{NonZeroKey{$1}};
@@ -493,16 +530,76 @@ projection:
     | timestamp
     | minKey
     | maxKey
-    | compoundExpression {
-        $$ = c_node_disambiguation::disambiguateCompoundProjection($1);
-        if (stdx::holds_alternative<CompoundInconsistentKey>($$.payload))
-            // TODO SERVER-50498: error() instead of uasserting
-            uasserted(ErrorCodes::FailedToParse, "object project field cannot contain both inclusion and exclusion indicators");
+    | projectionObject
+    | compoundNonObjectExpression
+;
+
+// An aggregationProjectionFieldname is a projectionFieldname that is not positional.
+aggregationProjectionFieldname:
+    projectionFieldname {
+        $$ = $1;
+        if (stdx::holds_alternative<PositionalProjectionPath>(stdx::get<FieldnamePath>($$)))
+            error(@1, "positional projection forbidden in $project aggregation pipeline stage");
+    }
+
+// Dollar-prefixed fieldnames are illegal.
+projectionFieldname:
+    FIELDNAME {
+        auto components = make_vector<std::string>($1);
+        if (auto positional =
+            c_node_validation::validateProjectionPathAsNormalOrPositional(components);
+            positional.isOK()) {
+            if (positional.getValue() == c_node_validation::IsPositional::yes)
+                $$ = PositionalProjectionPath{std::move(components)};
+            else
+                $$ = ProjectionPath{std::move(components)};
+        } else {
+            error(@1, positional.getStatus().reason());
+        }
+    }
+    | argAsProjectionPath
+    | DOTTED_FIELDNAME {
+        auto components = $1;
+        if (auto positional =
+            c_node_validation::validateProjectionPathAsNormalOrPositional(components);
+            positional.isOK()) {
+            if (positional.getValue() == c_node_validation::IsPositional::yes)
+                $$ = PositionalProjectionPath{std::move(components)};
+            else
+                $$ = ProjectionPath{std::move(components)};
+        } else {
+            error(@1, positional.getStatus().reason());
+        }
     }
 ;
 
-projectionFieldname:
-    invariableUserFieldname | stageAsUserFieldname | argAsUserFieldname | aggExprAsUserFieldname
+// These are permitted to contain fieldnames with multiple path components such as {"a.b.c": ""}.
+projectionObject:
+    START_OBJECT projectionObjectFields END_OBJECT {
+        $$ = $projectionObjectFields;
+    }
+;
+
+// Projection objects cannot be empty.
+projectionObjectFields:
+    projectionObjectField {
+        $$ = CNode::noopLeaf();
+        $$.objectChildren().emplace_back($projectionObjectField);
+    }
+    | projectionObjectFields[projectArg] projectionObjectField {
+        $$ = $projectArg;
+        $$.objectChildren().emplace_back($projectionObjectField);
+    }
+;
+
+projectionObjectField:
+    // _id is no longer a key when we descend past the directly projected fields.
+    idAsProjectionPath projection {
+        $$ = {$idAsProjectionPath, $projection};
+    }
+    | aggregationProjectionFieldname projection {
+        $$ = {$aggregationProjectionFieldname, $projection};
+    }
 ;
 
 match:
@@ -621,56 +718,78 @@ stageAsUserFieldname:
 ;
 
 argAsUserFieldname:
+    arg {
+        $$ = UserFieldname{$1};
+    }
+;
+
+argAsProjectionPath:
+    arg {
+        auto components = make_vector<std::string>($1);
+        if (auto positional =
+            c_node_validation::validateProjectionPathAsNormalOrPositional(components);
+            positional.isOK()) {
+            if (positional.getValue() == c_node_validation::IsPositional::yes)
+                $$ = PositionalProjectionPath{std::move(components)};
+            else
+                $$ = ProjectionPath{std::move(components)};
+        } else {
+            error(@1, positional.getStatus().reason());
+        }
+    }
+;
+
+arg:
     // Here we need to list all keys representing args passed to operators so they can be converted
     // back to string in contexts where they're not special. It's laborious but this is the
     // perennial Bison way.
     ARG_COLL {
-        $$ = UserFieldname{"coll"};
+        $$ = "coll";
     }
     | ARG_PIPELINE {
-        $$ = UserFieldname{"pipeline"};
+        $$ = "pipeline";
     }
     | ARG_SIZE {
-        $$ = UserFieldname{"size"};
+        $$ = "size";
     }
     | ARG_INPUT {
-        $$ = UserFieldname{"input"};
+        $$ = "input";
     }
     | ARG_TO {
-        $$ = UserFieldname{"to"};
+        $$ = "to";
     }
     | ARG_ON_ERROR {
-        $$ = UserFieldname{"onError"};
+        $$ = "onError";
     }
     | ARG_ON_NULL {
-        $$ = UserFieldname{"onNull"};
+        $$ = "onNull";
     }
     | ARG_DATE_STRING {
-        $$ = UserFieldname{"dateString"};
+        $$ = "dateString";
     }
     | ARG_FORMAT {
-        $$ = UserFieldname{"format"};
+        $$ = "format";
     }
     | ARG_TIMEZONE {
-        $$ = UserFieldname{"timezone"};
+        $$ = "timezone";
     }
     | ARG_DATE {
-        $$ = UserFieldname{"date"};
+        $$ = "date";
     }
     | ARG_CHARS {
-        $$ = UserFieldname{"chars"};
+        $$ = "chars";
     }
     | ARG_REGEX {
-        $$ = UserFieldname{"regex"};
+        $$ = "regex";
     }
     | ARG_OPTIONS {
-        $$ = UserFieldname{"options"};
+        $$ = "options";
     }
     | ARG_FIND {
-        $$ = UserFieldname{"find"};
+        $$ = "find";
     }
     | ARG_REPLACEMENT {
-        $$ = UserFieldname{"replacement"};
+        $$ = "replacement";
     }
     | ARG_FILTER {
         $$ = UserFieldname{"filter"};
@@ -791,6 +910,9 @@ aggExprAsUserFieldname:
     | ROUND {
         $$ = UserFieldname{"$round"};
     }
+    | SLICE {
+       $$ = UserFieldname{"$slice"};
+    }
     | SQRT {
        $$ = UserFieldname{"$sqrt"};
     }
@@ -899,31 +1021,63 @@ string:
     }
     // Here we need to list all keys in value BSON positions so they can be converted back to string
     // in contexts where they're not special. It's laborious but this is the perennial Bison way.
+    | GEO_NEAR_DISTANCE {
+        $$ = CNode{UserString{"geoNearDistance"}};
+    }
+    | GEO_NEAR_POINT {
+        $$ = CNode{UserString{"geoNearPoint"}};
+    }
+    | INDEX_KEY {
+        $$ = CNode{UserString{"indexKey"}};
+    }
     | RAND_VAL {
         $$ = CNode{UserString{"randVal"}};
+    }
+    | RECORD_ID {
+        $$ = CNode{UserString{"recordId"}};
+    }
+    | SEARCH_HIGHLIGHTS {
+        $$ = CNode{UserString{"searchHighlights"}};
+    }
+    | SEARCH_SCORE {
+        $$ = CNode{UserString{"searchScore"}};
+    }
+    | SORT_KEY {
+        $$ = CNode{UserString{"sortKey"}};
     }
     | TEXT_SCORE {
         $$ = CNode{UserString{"textScore"}};
     }
 ;
 
-fieldPath:
+aggregationFieldPath:
     DOLLAR_STRING {
-        std::string str = $1;
-        if (str.size() == 1) {
-            error(@1, "'$' by iteslf is not a valid FieldPath");
-        }
-        $$ = CNode{UserFieldPath{str.substr(1), false}};
+        auto str = $1;
+        auto components = std::vector<std::string>{};
+        auto withoutDollar = std::pair{std::next(str.begin()), str.end()};
+        boost::split(components,
+                     withoutDollar,
+                     [](auto&& c) { return c == '.'; });
+        if (auto status = c_node_validation::validateAggregationPath(components); !status.isOK())
+            error(@1, status.reason());
+        $$ = CNode{AggregationPath{std::move(components)}};
     }
+;
+
 variable:
     DOLLAR_DOLLAR_STRING {
-        std::string str = $1.substr(2);
-        auto status = c_node_validation::validateVariableName(str);
-        if (!status.isOK()) {
+        auto str = $1;
+        auto components = std::vector<std::string>{};
+        auto withoutDollars = std::pair{std::next(std::next(str.begin())), str.end()};
+        boost::split(components,
+                     withoutDollars,
+                     [](auto&& c) { return c == '.'; });
+        if (auto status = c_node_validation::validateVariableNameAndPathSuffix(components); !status.isOK())
             error(@1, status.reason());
-        }
-        $$ = CNode{UserFieldPath{str, true}};
+        $$ = CNode{AggregationVariablePath{std::move(components)}};
     }
+;
+
 binary:
     BINARY {
         $$ = CNode{UserBinary{$1}};
@@ -1073,7 +1227,7 @@ bool:
 
 simpleValue:
     string
-    | fieldPath
+    | aggregationFieldPath
     | variable
     | binary
     | undefined
@@ -1107,17 +1261,41 @@ expressions:
 ;
 
 expression:
-    simpleValue | compoundExpression
+    simpleValue | expressionObject | compoundNonObjectExpression
 ;
 
 // Helper rule for expressions which take exactly two expression arguments.
-exprFixedTwoArg: START_ARRAY expression[expr1] expression[expr2] END_ARRAY {
-    $$ = CNode{CNode::ArrayChildren{$expr1, $expr2}};
-};
+exprFixedTwoArg:
+    START_ARRAY expression[expr1] expression[expr2] END_ARRAY {
+        $$ = CNode{CNode::ArrayChildren{$expr1, $expr2}};
+    }
+;
 
-compoundExpression:
-    expressionArray | expressionObject | maths | boolExps | literalEscapes | compExprs
-    | typeExpression | stringExps | setExpression
+// Helper rule for expressions which take exactly three expression arguments.
+exprFixedThreeArg:
+    START_ARRAY expression[expr1] expression[expr2] expression[expr3] END_ARRAY {
+        $$ = CNode{CNode::ArrayChildren{$expr1, $expr2, $expr3}};
+    }
+;
+
+compoundNonObjectExpression:
+    arrayManipulation | expressionArray | maths | meta | boolExprs
+    | literalEscapes | compExprs | typeExpression | stringExps | setExpression
+;
+
+arrayManipulation:
+    slice
+;
+
+slice :
+    START_OBJECT SLICE exprFixedTwoArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::slice,
+                                          $exprFixedTwoArg}}};
+    }
+    | START_OBJECT SLICE exprFixedThreeArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::slice,
+                                          $exprFixedThreeArg}}};
+    }
 ;
 
 // These are arrays occuring in Expressions outside of $const/$literal. They may contain further
@@ -1163,9 +1341,45 @@ idAsUserFieldname:
     }
 ;
 
+idAsProjectionPath:
+    ID {
+        $$ = ProjectionPath{make_vector<std::string>("_id")};
+    }
+;
+
 maths:
     add | atan2 | abs | ceil | divide | exponent | floor | ln | log | logten | mod | multiply | pow
 | round | sqrt | subtract | trunc
+;
+
+meta:
+    START_OBJECT META GEO_NEAR_DISTANCE END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::geoNearDistance}}}};
+    }
+    | START_OBJECT META GEO_NEAR_POINT END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::geoNearPoint}}}};
+    }
+    | START_OBJECT META INDEX_KEY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::indexKey}}}};
+    }
+    | START_OBJECT META RAND_VAL END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::randVal}}}};
+    }
+    | START_OBJECT META RECORD_ID END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::recordId}}}};
+    }
+    | START_OBJECT META SEARCH_HIGHLIGHTS END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::searchHighlights}}}};
+    }
+    | START_OBJECT META SEARCH_SCORE END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::searchScore}}}};
+    }
+    | START_OBJECT META SORT_KEY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::sortKey}}}};
+    }
+    | START_OBJECT META TEXT_SCORE END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::textScore}}}};
+    }
 ;
 
 add:
@@ -1267,7 +1481,7 @@ trunc:
                                           CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
      }
 ;
-boolExps:
+boolExprs:
     and | or | not
 ;
 

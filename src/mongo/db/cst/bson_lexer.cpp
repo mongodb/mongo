@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/algorithm/string.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/cst/bson_lexer.h"
 #include "mongo/db/cst/parser_gen.hpp"
@@ -40,9 +42,9 @@ using namespace std::string_literals;
 
 namespace {
 
-// Mapping of reserved keywords to BSON token. Any key which is not included in this map is assumed
-// to be a user field name and is treated as a terminal by the parser.
-const StringMap<ParserGen::token_type> reservedKeyLookup = {
+// Mapping of reserved key fieldnames to BSON token. Any key which is not included in this map is
+// assumed to be a user field name.
+const StringMap<ParserGen::token_type> reservedKeyFieldnameLookup = {
     {"_id", ParserGen::token::ID},
     // Stages and their arguments.
     {"$_internalInhibitOptimization", ParserGen::token::STAGE_INHIBIT_OPTIMIZATION},
@@ -92,10 +94,12 @@ const StringMap<ParserGen::token_type> reservedKeyLookup = {
     {"$ln", ParserGen::token::LN},
     {"$log", ParserGen::token::LOG},
     {"$log10", ParserGen::token::LOGTEN},
+    {"$meta", ParserGen::token::META},
     {"$mod", ParserGen::token::MOD},
     {"$multiply", ParserGen::token::MULTIPLY},
     {"$pow", ParserGen::token::POW},
     {"$round", ParserGen::token::ROUND},
+    {"$slice", ParserGen::token::SLICE},
     {"$sqrt", ParserGen::token::SQRT},
     {"$subtract", ParserGen::token::SUBTRACT},
     {"$trunc", ParserGen::token::TRUNC},
@@ -143,10 +147,18 @@ const StringMap<ParserGen::token_type> reservedKeyLookup = {
     {"$setIsSubset", ParserGen::token::SET_IS_SUBSET},
     {"$setUnion", ParserGen::token::SET_UNION},
 };
-// Mapping of reserved keywords to BSON tokens. Any key which is not included in this map is
+
+// Mapping of reserved key values to BSON token. Any key which is not included in this map is
 // assumed to be a user value.
 const StringMap<ParserGen::token_type> reservedKeyValueLookup = {
+    {"geoNearDistance", ParserGen::token::GEO_NEAR_DISTANCE},
+    {"geoNearPoint", ParserGen::token::GEO_NEAR_POINT},
+    {"indexKey", ParserGen::token::INDEX_KEY},
     {"randVal", ParserGen::token::RAND_VAL},
+    {"recordId", ParserGen::token::RECORD_ID},
+    {"searchHighlights", ParserGen::token::SEARCH_HIGHLIGHTS},
+    {"searchScore", ParserGen::token::SEARCH_SCORE},
+    {"sortKey", ParserGen::token::SORT_KEY},
     {"textScore", ParserGen::token::TEXT_SCORE},
 };
 
@@ -225,17 +237,22 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
     boost::optional<ScopedLocationTracker> context;
     // Skipped when we are tokenizing arrays.
     if (includeFieldName) {
-        if (auto it = reservedKeyLookup.find(elem.fieldNameStringData());
-            it != reservedKeyLookup.end()) {
-            // Place the token expected by the parser if this is a reserved keyword.
+        if (auto it = reservedKeyFieldnameLookup.find(elem.fieldNameStringData());
+            it != reservedKeyFieldnameLookup.end()) {
+            // Place the token expected by the parser if this is a reserved key fieldname.
             pushToken(elem.fieldNameStringData(), it->second);
             context.emplace(this, elem.fieldNameStringData());
+        } else if (elem.fieldNameStringData().find('.') != std::string::npos) {
+            auto components = std::vector<std::string>{};
+            boost::split(components, elem.fieldNameStringData(), [](auto&& c) { return c == '.'; });
+            pushToken(elem.fieldNameStringData(),
+                      ParserGen::token::DOTTED_FIELDNAME,
+                      std::move(components));
         } else if (elem.fieldNameStringData()[0] == '$') {
             pushToken(elem.fieldNameStringData(),
                       ParserGen::token::DOLLAR_PREF_FIELDNAME,
                       elem.fieldName());
         } else {
-            // If we don't care about the keyword, then it's treated as a generic fieldname.
             pushToken(elem.fieldNameStringData(), ParserGen::token::FIELDNAME, elem.fieldName());
         }
     }
@@ -272,18 +289,22 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
         case BSONType::String:
             if (auto it = reservedKeyValueLookup.find(elem.valueStringData());
                 it != reservedKeyValueLookup.end()) {
-                pushToken(elem.String(), it->second);
-            } else if (elem.valueStringData()[0] == '$') {
-                if (elem.valueStringData()[1] == '$') {
-                    pushToken(elem.valueStringData(),
-                              ParserGen::token::DOLLAR_DOLLAR_STRING,
-                              elem.String());
-                } else {
-                    pushToken(
-                        elem.valueStringData(), ParserGen::token::DOLLAR_STRING, elem.String());
-                }
+                // Place the token expected by the parser if this is a reserved key value.
+                pushToken(elem.valueStringData(), it->second);
             } else {
-                pushToken(elem.valueStringData(), ParserGen::token::STRING, elem.String());
+                // If we don't care about the keyword, then it's treated as a generic value.
+                if (elem.valueStringData()[0] == '$') {
+                    if (elem.valueStringData()[1] == '$') {
+                        pushToken(elem.valueStringData(),
+                                  ParserGen::token::DOLLAR_DOLLAR_STRING,
+                                  elem.String());
+                    } else {
+                        pushToken(
+                            elem.valueStringData(), ParserGen::token::DOLLAR_STRING, elem.String());
+                    }
+                } else {
+                    pushToken(elem.valueStringData(), ParserGen::token::STRING, elem.String());
+                }
             }
             break;
         case BSONType::BinData: {

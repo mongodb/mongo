@@ -54,11 +54,12 @@ TEST(CstExpressionTest, ParsesProjectWithAnd) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(
-        stages[0].toBson().toString(),
-        "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { andExpr: [ { "
-        "andExpr: [ \"<UserInt 8>\", \"<UserInt 7>\" ] }, \"<UserInt 4>\" ] }, b: { andExpr: "
-        "[ \"<UserInt -3>\", \"<UserInt 2>\" ] } } }");
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type "
+              "double 9.100000>\", <ProjectionPath a>: { <KeyFieldname andExpr>: [ { "
+              "<KeyFieldname andExpr>: [ \"<UserInt 8>\", \"<UserInt 7>\" ] }, \"<UserInt 4>\" ] "
+              "}, <ProjectionPath b>: { <KeyFieldname andExpr>: "
+              "[ \"<UserInt -3>\", \"<UserInt 2>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesProjectWithOr) {
@@ -72,10 +73,11 @@ TEST(CstExpressionTest, ParsesProjectWithOr) {
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
-              "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { orExpr: [ "
-              "{ orExpr: "
-              "[ \"<UserInt 8>\", \"<UserInt 7>\" ] }, \"<UserInt 4>\" ] }, b: { orExpr: [ "
-              "\"<UserInt -3>\", \"<UserInt 2>\" ] } } }");
+              "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type "
+              "double 9.100000>\", <ProjectionPath a>: { <KeyFieldname orExpr>: [ "
+              "{ <KeyFieldname orExpr>: [ \"<UserInt 8>\", \"<UserInt 7>\" ] }, \"<UserInt 4>\" ] "
+              "}, <ProjectionPath b>: { "
+              "<KeyFieldname orExpr>: [ \"<UserInt -3>\", \"<UserInt 2>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesProjectWithNot) {
@@ -89,10 +91,13 @@ TEST(CstExpressionTest, ParsesProjectWithNot) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(stages[0].toBson().toString(),
-              "{ projectInclusion: { id: \"<NonZeroKey of type double 9.100000>\", a: { notExpr: [ "
-              "\"<UserInt 4>\" ] }, b: { andExpr: [ { notExpr: [ \"<UserBoolean 1>\" ] }, "
-              "\"<UserDouble 1.000000>\" ] } } }");
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type "
+        "double 9.100000>\", <ProjectionPath a>: { <KeyFieldname notExpr>: [ "
+        "\"<UserInt 4>\" ] }, <ProjectionPath b>: { <KeyFieldname andExpr>: [ { <KeyFieldname "
+        "notExpr>: [ \"<UserBoolean 1>\" ] }, "
+        "\"<UserDouble 1.000000>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesComparisonExpressions) {
@@ -106,8 +111,8 @@ TEST(CstExpressionTest, ParsesComparisonExpressions) {
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(stages[0].toBson().toString(),
-                  "{ projectInclusion: { id: { " + expr +
-                      ": [ \"<UserInt 1>\", \"<UserDouble 2.500000>\" ] } } }");
+                  "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: { <KeyFieldname " +
+                      expr + ">: [ \"<UserInt 1>\", \"<UserDouble 2.500000>\" ] } } }");
     };
 
     for (auto&& expr : {"cmp"_sd, "eq"_sd, "gt"_sd, "gte"_sd, "lt"_sd, "lte"_sd, "ne"_sd}) {
@@ -175,10 +180,14 @@ TEST(CstExpressionTest, ParsesConvertExpressions) {
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
-              "{ projectInclusion: { a: { toBool: \"<UserInt 1>\" }, b: { toDate: \"<UserLong "
-              "1100000000000>\" }, c: { toDecimal: \"<UserInt 5>\" }, d: { toDouble: \"<UserInt "
-              "-2>\" }, e: { toInt: \"<UserDouble 1.999999>\" }, f: { toLong: \"<UserDouble "
-              "1.999999>\" }, g: { toObjectId: \"<UserFieldPath $_id>\" }, h: { toString: "
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname toBool>: "
+              "\"<UserInt 1>\" }, <ProjectionPath b>: { <KeyFieldname toDate>: \"<UserLong "
+              "1100000000000>\" }, <ProjectionPath c>: { <KeyFieldname toDecimal>: \"<UserInt 5>\" "
+              "}, <ProjectionPath d>: { <KeyFieldname toDouble>: \"<UserInt "
+              "-2>\" }, <ProjectionPath e>: { <KeyFieldname toInt>: \"<UserDouble 1.999999>\" }, "
+              "<ProjectionPath f>: { <KeyFieldname toLong>: \"<UserDouble "
+              "1.999999>\" }, <ProjectionPath g>: { <KeyFieldname toObjectId>: \"<AggregationPath "
+              "_id>\" }, <ProjectionPath h>: { <KeyFieldname toString>: "
               "\"<UserBoolean 0>\" } } }");
 }
 
@@ -195,10 +204,14 @@ TEST(CstExpressionTest, ParsesConvertExpressionsNoOptArgs) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ projectInclusion: { a: { convert: { inputArg: \"<UserInt 1>\", toArg: \"<UserString "
-        "string>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: \"<KeyValue "
-        "absentKey>\" } }, b: { convert: { inputArg: \"<UserString true>\", toArg: "
-        "\"<UserString bool>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
+        "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname convert>: { "
+        "<KeyFieldname inputArg>: \"<UserInt 1>\", <KeyFieldname toArg>: \"<UserString "
+        "string>\", <KeyFieldname onErrorArg>: \"<KeyValue absentKey>\", <KeyFieldname "
+        "onNullArg>: \"<KeyValue "
+        "absentKey>\" } }, <ProjectionPath b>: { <KeyFieldname convert>: { <KeyFieldname "
+        "inputArg>: \"<UserString true>\", <KeyFieldname toArg>: "
+        "\"<UserString bool>\", <KeyFieldname onErrorArg>: \"<KeyValue absentKey>\", "
+        "<KeyFieldname onNullArg>: "
         "\"<KeyValue absentKey>\" } } } }");
 }
 
@@ -216,10 +229,14 @@ TEST(CstExpressionTest, ParsesConvertExpressionsWithOptArgs) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ projectInclusion: { a: { convert: { inputArg: \"<UserInt 1>\", toArg: \"<UserString "
-        "string>\", onErrorArg: \"<UserString Could not convert>\", onNullArg: \"<KeyValue "
-        "absentKey>\" } }, b: { convert: { inputArg: \"<UserBoolean 1>\", toArg: "
-        "\"<UserString double>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
+        "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname convert>: { "
+        "<KeyFieldname inputArg>: \"<UserInt 1>\", <KeyFieldname toArg>: \"<UserString "
+        "string>\", <KeyFieldname onErrorArg>: \"<UserString Could not convert>\", "
+        "<KeyFieldname onNullArg>: \"<KeyValue "
+        "absentKey>\" } }, <ProjectionPath b>: { <KeyFieldname convert>: { <KeyFieldname "
+        "inputArg>: \"<UserBoolean 1>\", <KeyFieldname toArg>: "
+        "\"<UserString double>\", <KeyFieldname onErrorArg>: \"<KeyValue absentKey>\", "
+        "<KeyFieldname onNullArg>: "
         "\"<UserInt 0>\" } } } }");
 }
 
@@ -237,10 +254,13 @@ TEST(CstExpressionTest, ParsesIndexOf) {
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
-              "{ projectInclusion: { b: { indexOfBytes: [ \"<UserString ABC>\", \"<UserString B>\" "
-              "] }, c: "
-              "{ indexOfCP: [ \"<UserString cafeteria>\", \"<UserString e>\" ] }, d: { "
-              "indexOfBytes: [ \"<UserString foo.bar.fi>\", \"<UserString .>\", \"<UserInt 5>\", "
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath b>: { <KeyFieldname "
+              "indexOfBytes>: [ \"<UserString ABC>\", \"<UserString B>\" "
+              "] }, <ProjectionPath c>: "
+              "{ <KeyFieldname indexOfCP>: [ \"<UserString cafeteria>\", \"<UserString e>\" ] }, "
+              "<ProjectionPath d>: { "
+              "<KeyFieldname indexOfBytes>: [ \"<UserString foo.bar.fi>\", \"<UserString .>\", "
+              "\"<UserInt 5>\", "
               "\"<UserInt 7>\" ] } } }");
 }
 
@@ -256,9 +276,12 @@ TEST(CstExpressionTest, ParsesDateFromString) {
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
-              "{ projectInclusion: { m: { dateFromString: { dateStringArg: \"<UserString "
-              "2017-02-08T12:10:40.787>\", formatArg: \"<KeyValue absentKey>\", timezoneArg: "
-              "\"<UserString America/New_York>\", onErrorArg: \"<KeyValue absentKey>\", onNullArg: "
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath m>: { <KeyFieldname "
+              "dateFromString>: { <KeyFieldname dateStringArg>: \"<UserString "
+              "2017-02-08T12:10:40.787>\", <KeyFieldname formatArg>: \"<KeyValue absentKey>\", "
+              "<KeyFieldname timezoneArg>: "
+              "\"<UserString America/New_York>\", <KeyFieldname onErrorArg>: \"<KeyValue "
+              "absentKey>\", <KeyFieldname onNullArg>: "
               "\"<KeyValue absentKey>\" } } } }");
 }
 
@@ -275,8 +298,10 @@ TEST(CstExpressionTest, ParsesDateToString) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ projectInclusion: { m: { dateToString: { dateArg: \"<UserFieldPath $date>\", formatArg: "
-        "\"<UserString %Y-%m-%d>\", timezoneArg: \"<KeyValue absentKey>\", onNullArg: "
+        "{ <KeyFieldname projectInclusion>: { <ProjectionPath m>: { <KeyFieldname dateToString>: { "
+        "<KeyFieldname dateArg>: \"<AggregationPath date>\", <KeyFieldname formatArg>: "
+        "\"<UserString %Y-%m-%d>\", <KeyFieldname timezoneArg>: \"<KeyValue absentKey>\", "
+        "<KeyFieldname onNullArg>: "
         "\"<KeyValue absentKey>\" } } } }");
 }
 
@@ -294,10 +319,13 @@ TEST(CstExpressionTest, ParsesReplaceStringExpressions) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ projectInclusion: { h: { replaceOne: { inputArg: \"<UserFieldPath $name>\", findArg: "
-        "\"<UserString Cafe>\", replacementArg: \"<UserString CAFE>\" } }, i: { replaceAll: "
-        "{ inputArg: \"<UserString cafeSeattle>\", findArg: \"<UserString cafe>\", "
-        "replacementArg: \"<UserString CAFE>\" } } } }");
+        "{ <KeyFieldname projectInclusion>: { <ProjectionPath h>: { <KeyFieldname replaceOne>: { "
+        "<KeyFieldname inputArg>: \"<AggregationPath name>\", <KeyFieldname findArg>: "
+        "\"<UserString Cafe>\", <KeyFieldname replacementArg>: \"<UserString CAFE>\" } }, "
+        "<ProjectionPath i>: { <KeyFieldname replaceAll>: "
+        "{ <KeyFieldname inputArg>: \"<UserString cafeSeattle>\", <KeyFieldname findArg>: "
+        "\"<UserString cafe>\", "
+        "<KeyFieldname replacementArg>: \"<UserString CAFE>\" } } } }");
 }
 
 TEST(CstExpressionTest, ParsesTrim) {
@@ -313,12 +341,14 @@ TEST(CstExpressionTest, ParsesTrim) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(
-        stages[0].toBson().toString(),
-        "{ projectInclusion: { d: { ltrim: { inputArg: \"<UserString  ggggoodbyeeeee>\", charsArg: "
-        "\"<KeyValue absentKey>\" } }, e: { rtrim: { inputArg: \"<UserString ggggoodbyeeeee  "
-        " >\", charsArg: \"<KeyValue absentKey>\" } }, f: { trim: { inputArg: \"<UserString  "
-        "   ggggoodbyeeeee>\", charsArg: \"<UserString  ge>\" } } } }");
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath d>: { <KeyFieldname ltrim>: { "
+              "<KeyFieldname inputArg>: \"<UserString  ggggoodbyeeeee>\", <KeyFieldname charsArg>: "
+              "\"<KeyValue absentKey>\" } }, <ProjectionPath e>: { <KeyFieldname rtrim>: { "
+              "<KeyFieldname inputArg>: \"<UserString ggggoodbyeeeee  "
+              " >\", <KeyFieldname charsArg>: \"<KeyValue absentKey>\" } }, <ProjectionPath f>: { "
+              "<KeyFieldname trim>: { <KeyFieldname inputArg>: \"<UserString  "
+              "   ggggoodbyeeeee>\", <KeyFieldname charsArg>: \"<UserString  ge>\" } } } }");
 }
 
 TEST(CstExpressionTest, ParsesToUpperAndLower) {
@@ -333,10 +363,10 @@ TEST(CstExpressionTest, ParsesToUpperAndLower) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(
-        stages[0].toBson().toString(),
-        "{ projectInclusion: { g: { toUpper: \"<UserString abc>\" }, v: { toLower: \"<UserString "
-        "ABC>\" } } }");
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath g>: { <KeyFieldname toUpper>: "
+              "\"<UserString abc>\" }, <ProjectionPath v>: { <KeyFieldname toLower>: \"<UserString "
+              "ABC>\" } } }");
 }
 
 TEST(CstExpressionTest, ParsesRegexExpressions) {
@@ -354,12 +384,15 @@ TEST(CstExpressionTest, ParsesRegexExpressions) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ projectInclusion: { j: { regexFind: { inputArg: \"<UserFieldPath $details>\", regexArg: "
-        "\"<UserRegex /^[a-z0-9_.+-]/>\", optionsArg: \"<UserString i>\" } }, k: { regexFindAll: { "
-        "inputArg: \"<UserFieldPath $fname>\", regexArg: \"<UserRegex /(C(ar)*)ol/>\", optionsArg: "
-        "\"<KeyValue absentKey>\" } }, l: { regexMatch: { inputArg: \"<UserFieldPath "
-        "$description>\", "
-        "regexArg: \"<UserRegex /lin(e|k)/>\", optionsArg: \"<KeyValue absentKey>\" } } } }");
+        "{ <KeyFieldname projectInclusion>: { <ProjectionPath j>: { <KeyFieldname regexFind>: "
+        "{ <KeyFieldname inputArg>: \"<AggregationPath details>\", <KeyFieldname regexArg>: "
+        "\"<UserRegex /^[a-z0-9_.+-]/>\", <KeyFieldname optionsArg>: \"<UserString i>\" } }, "
+        "<ProjectionPath k>: { <KeyFieldname regexFindAll>: { "
+        "<KeyFieldname inputArg>: \"<AggregationPath fname>\", <KeyFieldname regexArg>: "
+        "\"<UserRegex /(C(ar)*)ol/>\", <KeyFieldname optionsArg>: "
+        "\"<KeyValue absentKey>\" } }, <ProjectionPath l>: { <KeyFieldname regexMatch>: { "
+        "<KeyFieldname inputArg>: \"<AggregationPath description>\", <KeyFieldname regexArg>: "
+        "\"<UserRegex /lin(e|k)/>\", <KeyFieldname optionsArg>: \"<KeyValue absentKey>\" } } } }");
 }
 
 TEST(CstExpressionTest, ParsesSubstrExpressions) {
@@ -375,13 +408,13 @@ TEST(CstExpressionTest, ParsesSubstrExpressions) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(
-        stages[0].toBson().toString(),
-        "{ projectInclusion: { s: { substr: [ \"<UserFieldPath $quarter>\", \"<UserInt 2>\", "
-        "\"<UserInt -1>\" "
-        "] }, t: { substrBytes: [ \"<UserFieldPath $name>\", \"<UserInt 0>\", \"<UserInt 3>\" ] }, "
-        "u: "
-        "{ substrCP: [ \"<UserString Hello World!>\", \"<UserInt 6>\", \"<UserInt 5>\" ] } } }");
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath s>: { <KeyFieldname substr>: [ "
+              "\"<AggregationPath quarter>\", \"<UserInt 2>\", "
+              "\"<UserInt -1>\" ] }, <ProjectionPath t>: { <KeyFieldname substrBytes>: [ "
+              "\"<AggregationPath name>\", \"<UserInt 0>\", \"<UserInt 3>\" ] }, <ProjectionPath "
+              "u>: { <KeyFieldname substrCP>: [ \"<UserString Hello World!>\", \"<UserInt 6>\", "
+              "\"<UserInt 5>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesStringLengthExpressions) {
@@ -398,7 +431,8 @@ TEST(CstExpressionTest, ParsesStringLengthExpressions) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(
         stages[0].toBson().toString(),
-        "{ projectInclusion: { p: { strLenBytes: \"<UserString cafeteria>\" }, q: { strLenCP: "
+        "{ <KeyFieldname projectInclusion>: { <ProjectionPath p>: { <KeyFieldname strLenBytes>: "
+        "\"<UserString cafeteria>\" }, <ProjectionPath q>: { <KeyFieldname strLenCP>: "
         "\"<UserString Hello World!>\" } } }");
 }
 
@@ -413,9 +447,11 @@ TEST(CstExpressionTest, ParsesSplit) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(stages[0].toBson().toString(),
-              "{ projectInclusion: { o: { split: [ { toUpper: \"<UserString abc>\" }, "
-              "\"<UserString ->\" ] } } }");
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ <KeyFieldname projectInclusion>: { <ProjectionPath o>: { <KeyFieldname split>: [ { "
+        "<KeyFieldname toUpper>: \"<UserString abc>\" }, "
+        "\"<UserString ->\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesStrCaseCmp) {
@@ -429,10 +465,10 @@ TEST(CstExpressionTest, ParsesStrCaseCmp) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(
-        stages[0].toBson().toString(),
-        "{ projectInclusion: { r: { strcasecmp: [ \"<UserFieldPath $quarter>\", \"<UserString "
-        "13q4>\" ] } } }");
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath r>: { <KeyFieldname "
+              "strcasecmp>: [ \"<AggregationPath quarter>\", \"<UserString "
+              "13q4>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesConcat) {
@@ -447,7 +483,8 @@ TEST(CstExpressionTest, ParsesConcat) {
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
-              "{ projectInclusion: { a: { concat: [ \"<UserFieldPath $description>\", "
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname concat>: [ "
+              "\"<AggregationPath description>\", "
               "\"<UserString  - >\", "
               "\"<UserString item>\" ] } } }");
 }

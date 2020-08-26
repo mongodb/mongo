@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -59,7 +60,7 @@ auto makePipelineContainingProjectStageWithLiteral(CNode&& literal) {
     return CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
-             {UserFieldname{"a"},
+             {ProjectionPath{make_vector<std::string>("a")},
               CNode{CNode::ObjectChildren{{KeyFieldname::literal, std::move(literal)}}}}}}}}}}};
 }
 

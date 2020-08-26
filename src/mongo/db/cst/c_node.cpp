@@ -33,6 +33,7 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/visit_helper.h"
 
+#include <iterator>
 #include <numeric>
 #include <type_traits>
 
@@ -50,10 +51,24 @@ auto printFieldname(const CNode::Fieldname& fieldname) {
     return stdx::visit(
         visit_helper::Overloaded{
             [](const KeyFieldname& key) -> std::string {
-                return key_fieldname::toString[static_cast<std::underlying_type_t<KeyFieldname>>(
-                    key)];
+                return "<KeyFieldname "s +
+                    key_fieldname::toString[static_cast<std::underlying_type_t<KeyFieldname>>(
+                        key)] +
+                    ">";
             },
-            [](const UserFieldname& user) { return user; }},
+            [](const UserFieldname& user) { return "<UserFieldname "s + user + ">"; },
+            [](const FieldnamePath& path) {
+                return stdx::visit(
+                    visit_helper::Overloaded{[&](const ProjectionPath& projPath) {
+                                                 return "<ProjectionPath "s +
+                                                     path::vectorToString(projPath) + ">";
+                                             },
+                                             [&](const PositionalProjectionPath& posProjPath) {
+                                                 return "<PositionalionProjectionPath "s +
+                                                     path::vectorToString(posProjPath) + ">";
+                                             }},
+                    path);
+            }},
         fieldname);
 }
 
@@ -83,17 +98,22 @@ auto printValue(const T& payload) {
             [](const NonZeroKey& nonZeroKey) {
                 return "<NonZeroKey of type "s + printNonZeroKey(nonZeroKey) + ">";
             },
+            [](const ValuePath& valuePath) {
+                return stdx::visit(
+                    visit_helper::Overloaded{[&](const AggregationPath& aggPath) {
+                                                 return "<AggregationPath "s +
+                                                     path::vectorToString(aggPath) + ">";
+                                             },
+                                             [&](const AggregationVariablePath& aggVarPath) {
+                                                 return "<AggregationVariablePath "s +
+                                                     path::vectorToString(aggVarPath) + ">";
+                                             }},
+                    valuePath);
+            },
             [](const UserDouble& userDouble) {
                 return "<UserDouble "s + std::to_string(userDouble) + ">";
             },
             [](const UserString& userString) { return "<UserString "s + userString + ">"; },
-            [](const UserFieldPath& userPath) {
-                if (userPath.isVariable) {
-                    return "<UserFieldPath "s + "$$" + userPath.rawStr + ">";
-                } else {
-                    return "<UserFieldPath "s + "$" + userPath.rawStr + ">";
-                }
-            },
             [](const UserBinary& userBinary) {
                 return "<UserBinary "s + typeName(userBinary.type) + ", " +
                     hexblob::encode(userBinary.data, userBinary.length) + ">";
@@ -194,19 +214,17 @@ std::pair<BSONObj, bool> CNode::toBsonWithArrayIndicator() const {
             !childBson.isEmpty() && childBson.firstElementFieldNameStringData().empty())
             return bson.addField(
                 childBson
-                    .replaceFieldNames(
-                        BSON(printFieldname(std::forward<decltype(fieldname)>(fieldname)) << ""))
+                    .replaceFieldNames(BSON(std::forward<decltype(fieldname)>(fieldname) << ""))
                     .firstElement());
         // This field is an array. Reconstruct with BSONArray and add it.
         else if (isArray)
-            return bson.addField(BSON(printFieldname(std::forward<decltype(fieldname)>(fieldname))
-                                      << BSONArray{childBson})
-                                     .firstElement());
+            return bson.addField(
+                BSON(std::forward<decltype(fieldname)>(fieldname) << BSONArray{childBson})
+                    .firstElement());
         // This field is an object. Add it directly.
         else
             return bson.addField(
-                BSON(printFieldname(std::forward<decltype(fieldname)>(fieldname)) << childBson)
-                    .firstElement());
+                BSON(std::forward<decltype(fieldname)>(fieldname) << childBson).firstElement());
     };
 
     return stdx::visit(
@@ -232,25 +250,25 @@ std::pair<BSONObj, bool> CNode::toBsonWithArrayIndicator() const {
                                                  [&](auto&& bson, auto&& childPair) {
                                                      return addChild(
                                                          std::forward<decltype(bson)>(bson),
-                                                         childPair.first,
+                                                         printFieldname(childPair.first),
                                                          childPair.second);
                                                  }),
                                  false};
             },
             // Build a compound inclusion key wrapper in a BSONObj.
             [&](const CompoundInclusionKey& compoundKey) {
-                return std::pair{addChild(BSONObj{}, "<CompoundInclusionKey>", *compoundKey.obj),
+                return std::pair{addChild(BSONObj{}, "<CompoundInclusionKey>"s, *compoundKey.obj),
                                  false};
             },
             // Build a compound exclusion key wrapper in a BSONObj.
             [&](const CompoundExclusionKey& compoundKey) {
-                return std::pair{addChild(BSONObj{}, "<CompoundExclusionKey>", *compoundKey.obj),
+                return std::pair{addChild(BSONObj{}, "<CompoundExclusionKey>"s, *compoundKey.obj),
                                  false};
             },
             // Build a compound exclusion key wrapper in a BSONObj.
             [&](const CompoundInconsistentKey& compoundKey) {
-                return std::pair{addChild(BSONObj{}, "<CompoundInconsistentKey>", *compoundKey.obj),
-                                 false};
+                return std::pair{
+                    addChild(BSONObj{}, "<CompoundInconsistentKey>"s, *compoundKey.obj), false};
             },
             // Build a non-compound field in a BSONObj shell.
             [this](auto&&) {

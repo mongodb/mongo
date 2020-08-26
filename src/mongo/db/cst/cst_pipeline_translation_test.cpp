@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -122,7 +123,8 @@ TEST(CstPipelineTranslationTest, TranslatesEmptyProjects) {
 TEST(CstPipelineTranslationTest, TranslatesOneFieldInclusionProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectInclusion,
-         CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}}}}}}}}};
+         CNode{CNode::ObjectChildren{
+             {ProjectionPath{make_vector<std::string>("a")}, CNode{KeyValue::trueKey}}}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
@@ -137,9 +139,11 @@ TEST(CstPipelineTranslationTest, TranslatesOneFieldInclusionProjectionStage) {
 TEST(CstPipelineTranslationTest, TranslatesMultifieldInclusionProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectInclusion,
-         CNode{CNode::ObjectChildren{{KeyFieldname::id, CNode{KeyValue::trueKey}},
-                                     {UserFieldname{"a"}, CNode{NonZeroKey{7}}},
-                                     {UserFieldname{"b"}, CNode{NonZeroKey{-99999999999ll}}}}}}}}}};
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::id, CNode{KeyValue::trueKey}},
+             {ProjectionPath{make_vector<std::string>("a")}, CNode{NonZeroKey{7}}},
+             {ProjectionPath{make_vector<std::string>("b")},
+              CNode{NonZeroKey{-99999999999ll}}}}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
@@ -162,15 +166,17 @@ TEST(CstPipelineTranslationTest, TranslatesCompoundObjectInclusionProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
-             {UserFieldname{"a"},
+             {ProjectionPath{make_vector<std::string>("a")},
               CNode{CompoundInclusionKey{CNode{CNode::ObjectChildren{
-                  {{UserFieldname{"b"},
+                  {{ProjectionPath{make_vector<std::string>("b")},
                     CNode{CNode::ObjectChildren{
-                        {{UserFieldname{"c"}, CNode{KeyValue::trueKey}},
-                         {UserFieldname{"d"}, CNode{CNode{NonZeroKey{88}}}},
-                         {UserFieldname{"e"},
-                          CNode{CNode::ObjectChildren{
-                              {{UserFieldname{"f"}, CNode{NonZeroKey{-3ll}}}}}}}}}}}}}}}}}}}}}}}};
+                        {{ProjectionPath{make_vector<std::string>("c")}, CNode{KeyValue::trueKey}},
+                         {ProjectionPath{make_vector<std::string>("d")},
+                          CNode{CNode{NonZeroKey{88}}}},
+                         {ProjectionPath{make_vector<std::string>("e")},
+                          CNode{
+                              CNode::ObjectChildren{{{ProjectionPath{make_vector<std::string>("f")},
+                                                      CNode{NonZeroKey{-3ll}}}}}}}}}}}}}}}}}}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
@@ -183,10 +189,27 @@ TEST(CstPipelineTranslationTest, TranslatesCompoundObjectInclusionProjection) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
+TEST(CstPipelineTranslationTest, TranslatesMultiComponentPathInclusionProjectionStage) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::projectInclusion,
+         CNode{CNode::ObjectChildren{
+             {ProjectionPath{make_vector<std::string>("a.b.c.d")}, CNode{KeyValue::trueKey}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("_id" << true << "a" << BSON("b" << BSON("c" << BSON("d" << true)))) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
 TEST(CstPipelineTranslationTest, TranslatesOneFieldExclusionProjectionStage) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectExclusion,
-         CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::falseKey}}}}}}}}};
+         CNode{CNode::ObjectChildren{
+             {ProjectionPath{make_vector<std::string>("a")}, CNode{KeyValue::falseKey}}}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
@@ -201,9 +224,11 @@ TEST(CstPipelineTranslationTest, TranslatesOneFieldExclusionProjectionStage) {
 TEST(CstPipelineTranslationTest, TranslatesMultifieldExclusionProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectExclusion,
-         CNode{CNode::ObjectChildren{{KeyFieldname::id, CNode{KeyValue::falseKey}},
-                                     {UserFieldname{"a"}, CNode{KeyValue::doubleZeroKey}},
-                                     {UserFieldname{"b"}, CNode{KeyValue::decimalZeroKey}}}}}}}}};
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::id, CNode{KeyValue::falseKey}},
+             {ProjectionPath{make_vector<std::string>("a")}, CNode{KeyValue::doubleZeroKey}},
+             {ProjectionPath{make_vector<std::string>("b")},
+              CNode{KeyValue::decimalZeroKey}}}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
@@ -226,15 +251,17 @@ TEST(CstPipelineTranslationTest, TranslatesCompoundObjectExclusionProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectExclusion,
          CNode{CNode::ObjectChildren{
-             {UserFieldname{"a"},
+             {ProjectionPath{make_vector<std::string>("a")},
               CNode{CompoundExclusionKey{CNode{CNode::ObjectChildren{
-                  {{UserFieldname{"b"},
+                  {{ProjectionPath{make_vector<std::string>("b")},
                     CNode{CNode::ObjectChildren{
-                        {{UserFieldname{"c"}, CNode{KeyValue::falseKey}},
-                         {UserFieldname{"d"}, CNode{CNode{NonZeroKey{0}}}},
-                         {UserFieldname{"e"},
-                          CNode{CNode::ObjectChildren{
-                              {{UserFieldname{"f"}, CNode{NonZeroKey{0ll}}}}}}}}}}}}}}}}}}}}}}}};
+                        {{ProjectionPath{make_vector<std::string>("c")}, CNode{KeyValue::falseKey}},
+                         {ProjectionPath{make_vector<std::string>("d")},
+                          CNode{CNode{NonZeroKey{0}}}},
+                         {ProjectionPath{make_vector<std::string>("e")},
+                          CNode{
+                              CNode::ObjectChildren{{{ProjectionPath{make_vector<std::string>("f")},
+                                                      CNode{NonZeroKey{0ll}}}}}}}}}}}}}}}}}}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
@@ -246,15 +273,34 @@ TEST(CstPipelineTranslationTest, TranslatesCompoundObjectExclusionProjection) {
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
+TEST(CstPipelineTranslationTest, TranslatesMultiComponentPathExclusionProjectionStage) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::projectExclusion,
+         CNode{CNode::ObjectChildren{{ProjectionPath{make_vector<std::string>("a.b")},
+
+                                      CNode{CompoundExclusionKey{CNode{CNode::ObjectChildren{
+                                          {ProjectionPath{make_vector<std::string>("c.d")},
+                                           CNode{KeyValue::falseKey}}}}}}}}}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("a" << BSON("b" << BSON("c" << BSON("d" << false)))) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
 TEST(CstPipelineTranslationTest, TranslatesComputedProjection) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
-             {UserFieldname{"a"},
+             {ProjectionPath{make_vector<std::string>("a")},
               CNode{CNode::ObjectChildren{
                   {KeyFieldname::atan2,
                    CNode{CNode::ArrayChildren{CNode{UserInt{1}}, CNode{UserInt{0}}}}}}}},
-             {UserFieldname{"b"},
+             {ProjectionPath{make_vector<std::string>("b")},
               CNode{
                   CNode::ObjectChildren{{KeyFieldname::add,
                                          CNode{CNode::ArrayChildren{CNode{UserInt{1}},
@@ -281,11 +327,12 @@ TEST(CstPipelineTranslationTest, TranslatesComputedInclusionMixedProjectionStage
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
-             {UserFieldname{"a"},
+             {ProjectionPath{make_vector<std::string>("a")},
               CNode{CNode::ObjectChildren{
                   {KeyFieldname::add,
                    CNode{CNode::ArrayChildren{CNode{UserLong{0ll}}, CNode{UserInt{1}}}}}}}},
-             {UserFieldname{"b"}, CNode{NonZeroKey{Decimal128{590.095}}}}}}}}}}};
+             {ProjectionPath{make_vector<std::string>("b")},
+              CNode{NonZeroKey{Decimal128{590.095}}}}}}}}}}};
     auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
     auto& sources = pipeline->getSources();
     ASSERT_EQ(1u, sources.size());
@@ -296,6 +343,37 @@ TEST(CstPipelineTranslationTest, TranslatesComputedInclusionMixedProjectionStage
         BSON("_id" << true << "a"
                    << BSON("$add" << BSON_ARRAY(BSON("$const" << 0ll) << BSON("$const" << 1)))
                    << "b" << true) ==
+        singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
+}
+
+TEST(CstPipelineTranslationTest, TranslatesMultiComponentPathMixedProjectionStage) {
+    const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
+        {KeyFieldname::projectInclusion,
+         CNode{CNode::ObjectChildren{
+             {ProjectionPath{make_vector<std::string>("a.b")},
+              CNode{CompoundInclusionKey{CNode{CNode::ObjectChildren{
+                  {ProjectionPath{make_vector<std::string>("c.d")}, CNode{NonZeroKey{1}}},
+                  {ProjectionPath{make_vector<std::string>("e.f")},
+                   CNode{
+                       CNode::ObjectChildren{{KeyFieldname::atan2,
+                                              CNode{CNode::ArrayChildren{
+                                                  CNode{UserLong{0ll}}, CNode{UserInt{1}}}}}}}}}}}}}
+
+         }}}}}}};
+    auto pipeline = cst_pipeline_translation::translatePipeline(cst, getExpCtx());
+    auto& sources = pipeline->getSources();
+    ASSERT_EQ(1u, sources.size());
+    auto iter = sources.begin();
+    auto& singleDoc = dynamic_cast<DocumentSourceSingleDocumentTransformation&>(**iter);
+    using namespace std;
+
+    // DocumenSourceSingleDocumentTransformation reorders fields so we need to be insensitive.
+    ASSERT(UnorderedFieldsBSONObjComparator{}.evaluate(
+        BSON("_id" << true << "a"
+                   << BSON("b" << BSON("c" << BSON("d" << true) << "e"
+                                           << BSON("f" << BSON("$atan2" << BSON_ARRAY(
+                                                                   BSON("$const" << 0ll)
+                                                                   << BSON("$const" << 1))))))) ==
         singleDoc.getTransformer().serializeTransformation(boost::none).toBson()));
 }
 
@@ -311,14 +389,16 @@ TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStages) {
     const auto cst = CNode{CNode::ArrayChildren{
         CNode{CNode::ObjectChildren{
             {KeyFieldname::projectInclusion,
-             CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{KeyValue::trueKey}}}}}}},
+             CNode{CNode::ObjectChildren{
+                 {ProjectionPath{make_vector<std::string>("a")}, CNode{KeyValue::trueKey}}}}}}},
         CNode{CNode::ObjectChildren{
             {KeyFieldname::projectExclusion,
-             CNode{CNode::ObjectChildren{{UserFieldname{"b"}, CNode{KeyValue::falseKey}}}}}}},
+             CNode{CNode::ObjectChildren{
+                 {ProjectionPath{make_vector<std::string>("b")}, CNode{KeyValue::falseKey}}}}}}},
         CNode{
             CNode::ObjectChildren{{KeyFieldname::projectInclusion,
                                    CNode{CNode::ObjectChildren{
-                                       {UserFieldname{"c"},
+                                       {ProjectionPath{make_vector<std::string>("c")},
                                         CNode{CNode::ObjectChildren{
                                             {KeyFieldname::add,
                                              CNode{CNode::ArrayChildren{
@@ -374,14 +454,14 @@ TEST(CstPipelineTranslationTest, TranslatesMultipleProjectionStagesWithAndOrNot)
         CNode{CNode::ObjectChildren{
             {KeyFieldname::projectInclusion,
              CNode{CNode::ObjectChildren{
-                 {UserFieldname{"a"},
+                 {ProjectionPath{make_vector<std::string>("a")},
                   CNode{CNode::ObjectChildren{
                       {KeyFieldname::notExpr,
                        CNode{CNode::ArrayChildren{CNode{UserInt{0}}}}}}}}}}}}},
         CNode{
             CNode::ObjectChildren{{KeyFieldname::projectInclusion,
                                    CNode{CNode::ObjectChildren{
-                                       {UserFieldname{"c"},
+                                       {ProjectionPath{make_vector<std::string>("c")},
                                         CNode{CNode::ObjectChildren{
                                             {KeyFieldname::andExpr,
                                              CNode{CNode::ArrayChildren{
@@ -423,7 +503,7 @@ TEST(CstPipelineTranslationTest, TranslatesComputedProjectionWithAndOr) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
-             {UserFieldname{"a"},
+             {ProjectionPath{make_vector<std::string>("a")},
               CNode{CNode::ObjectChildren{
                   {KeyFieldname::andExpr,
                    CNode{CNode::ArrayChildren{
@@ -432,7 +512,7 @@ TEST(CstPipelineTranslationTest, TranslatesComputedProjectionWithAndOr) {
                            {KeyFieldname::add,
                             CNode{CNode::ArrayChildren{CNode{UserInt{1}},
                                                        CNode{UserInt{0}}}}}}}}}}}}},
-             {UserFieldname{"b"},
+             {ProjectionPath{make_vector<std::string>("b")},
               CNode{
                   CNode::ObjectChildren{{KeyFieldname::orExpr,
                                          CNode{CNode::ArrayChildren{CNode{UserInt{1}},
@@ -688,7 +768,7 @@ TEST(CstPipelineTranslationTest, TranslatesProjectionWithConvert) {
     const auto cst = CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
-             {UserFieldname{"a"},
+             {ProjectionPath{make_vector<std::string>("a")},
               CNode{CNode::ObjectChildren{
                   {KeyFieldname::convert,
                    CNode{CNode::ObjectChildren{
@@ -696,7 +776,7 @@ TEST(CstPipelineTranslationTest, TranslatesProjectionWithConvert) {
                        {KeyFieldname::toArg, CNode{UserString{"bool"}}},
                        {KeyFieldname::onErrorArg, CNode{KeyValue::absentKey}},
                        {KeyFieldname::onNullArg, CNode{KeyValue::absentKey}}}}}}}},
-             {UserFieldname{"b"},
+             {ProjectionPath{make_vector<std::string>("b")},
               CNode{CNode::ObjectChildren{
                   {KeyFieldname::convert,
                    CNode{CNode::ObjectChildren{
@@ -791,8 +871,8 @@ TEST(CstPipelineTranslationTest, TranslatesToLongExpression) {
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToObjectIdExpression) {
-    const auto cst = CNode{
-        CNode::ObjectChildren{{KeyFieldname::toObjectId, CNode{UserFieldPath{"_id", false}}}}};
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::toObjectId, CNode{AggregationPath{make_vector<std::string>("_id"s)}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: '$_id', to: {$const: 'objectId'}}}")) ==
@@ -827,8 +907,8 @@ TEST(CstPipelineTranslationTest, AbsConstantTranslation) {
 }
 
 TEST(CstPipelineTranslationTest, AbsVariableTransation) {
-    const auto cst =
-        CNode{CNode::ObjectChildren{{KeyFieldname::abs, CNode{UserFieldPath{"foo", false}}}}};
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::abs, CNode{AggregationPath{make_vector<std::string>("foo")}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$abs: [\"$foo\"]}")) ==
                                            expr->serialize(false)));
@@ -1037,7 +1117,7 @@ TEST(CstPipelineTranslationTest, TranslatesDateToStringExpression) {
     const auto cst = CNode{CNode::ObjectChildren{
         {KeyFieldname::dateToString,
          CNode{CNode::ObjectChildren{
-             {KeyFieldname::dateArg, CNode{UserFieldPath{"date", false}}},
+             {KeyFieldname::dateArg, CNode{AggregationPath{make_vector<std::string>("date")}}},
              {KeyFieldname::formatArg, CNode{UserString{"%Y-%m-%d"}}},
              {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
              {KeyFieldname::onNullArg, CNode{UserString{"8/10/20"}}},
@@ -1229,33 +1309,45 @@ TEST(CstPipelineTranslationTest, TranslatesRegexMatch) {
         << expr->serialize(false);
 }
 
+TEST(CstPipelineTranslationTest, TranslatesSlice) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::slice,
+         CNode{CNode::ArrayChildren{
+             CNode{CNode::ArrayChildren{CNode{UserInt{1}}, CNode{UserInt{2}}, CNode{UserInt{3}}}},
+             CNode{UserInt{-2}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$slice: [[{$const: 1}, {$const: 2}, {$const: 3}], {$const: -2}]}")) ==
+        expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesMeta) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::textScore}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$meta: \"textScore\"}")) ==
+                                           expr->serialize(false)))
+        << expr->serialize(false);
+}
+
 TEST(CstPipelineTranslationTest, RecognizesSingleDollarAsNonConst) {
     const auto cst = CNode{CNode::ObjectChildren{
         {KeyFieldname::trunc,
-         CNode{CNode::ArrayChildren{CNode{UserFieldPath{"val", false}},
-                                    CNode{UserFieldPath{"places", false}}}}}}};
+         CNode{CNode::ArrayChildren{CNode{AggregationPath{make_vector<std::string>("val")}},
+                                    CNode{AggregationPath{make_vector<std::string>("places")}}}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$trunc: [\"$val\", \"$places\"]}")) ==
                                            expr->serialize(false)));
 }
 
 TEST(CstPipelineTranslationTest, RecognizesDoubleDollarAsNonConst) {
-    const auto cst =
-        CNode{CNode::ObjectChildren{{KeyFieldname::toDate, CNode{UserFieldPath{"NOW", true}}}}};
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::toDate, CNode{AggregationVariablePath{make_vector<std::string>("NOW")}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: \"$$NOW\", to: {$const: 'date'}}}")) ==
         expr->serialize(false)));
-}
-
-TEST(CstPipelineTranslationTest, InvalidDollarPrefixStringFails) {
-    {
-        const auto cst = CNode{
-            CNode::ObjectChildren{{KeyFieldname::toDate, CNode{UserFieldPath{"NOWX", true}}}}};
-        ASSERT_THROWS_CODE(cst_pipeline_translation::translateExpression(cst, getExpCtx()),
-                           AssertionException,
-                           17276);
-    }
 }
 
 TEST(CstSortTranslationTest, BasicSortGeneratesCorrectSortPattern) {
@@ -1315,49 +1407,49 @@ TEST(CstSortTranslationTest, SortWithMetaGeneratesCorrectSortPattern) {
 }
 
 TEST(CstPipelineTranslationTest, AllElementsTrueTest) {
-    const auto cst = CNode{
-        CNode::ObjectChildren{{KeyFieldname::allElementsTrue,
-                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}}}}}}};
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::allElementsTrue,
+         CNode{CNode::ArrayChildren{CNode{AggregationPath{make_vector<std::string>("set"s)}}}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$allElementsTrue: [\"$set\"]}")) ==
                                            expr->serialize(false)));
 }
 
 TEST(CstPipelineTranslationTest, AnyElementsTrueTest) {
-    const auto cst = CNode{
-        CNode::ObjectChildren{{KeyFieldname::anyElementTrue,
-                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}}}}}}};
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::anyElementTrue,
+         CNode{CNode::ArrayChildren{CNode{AggregationPath{make_vector<std::string>("set"s)}}}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$anyElementTrue: [\"$set\"]}")) ==
                                            expr->serialize(false)));
 }
 
 TEST(CstPipelineTranslationTest, SetDifferenceTest) {
-    const auto cst = CNode{
-        CNode::ObjectChildren{{KeyFieldname::setDifference,
-                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}},
-                                                          CNode{UserFieldPath{"set2", false}}}}}}};
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::setDifference,
+         CNode{CNode::ArrayChildren{CNode{AggregationPath{make_vector<std::string>("set"s)}},
+                                    CNode{AggregationPath{make_vector<std::string>("set2"s)}}}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setDifference: [\"$set\", \"$set2\"]}")) == expr->serialize(false)));
 }
 
 TEST(CstPipelineTranslationTest, SetEqualsTest) {
-    const auto cst = CNode{
-        CNode::ObjectChildren{{KeyFieldname::setEquals,
-                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}},
-                                                          CNode{UserFieldPath{"set2", false}}}}}}};
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::setEquals,
+         CNode{CNode::ArrayChildren{CNode{AggregationPath{make_vector<std::string>("set"s)}},
+                                    CNode{AggregationPath{make_vector<std::string>("set2"s)}}}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$setEquals: [\"$set\", \"$set2\"]}")) ==
                                            expr->serialize(false)));
 }
 
 TEST(CstPipelineTranslationTest, SetIntersectionTest) {
-    const auto cst = CNode{
-        CNode::ObjectChildren{{KeyFieldname::setIntersection,
-                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}},
-                                                          CNode{UserFieldPath{"set2", false}},
-                                                          CNode{UserFieldPath{"set3", false}}}}}}};
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::setIntersection,
+         CNode{CNode::ArrayChildren{CNode{AggregationPath{make_vector<std::string>("set"s)}},
+                                    CNode{AggregationPath{make_vector<std::string>("set2"s)}},
+                                    CNode{AggregationPath{make_vector<std::string>("set3"s)}}}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setIntersection: [\"$set\", \"$set2\", \"$set3\"]}")) ==
@@ -1365,21 +1457,21 @@ TEST(CstPipelineTranslationTest, SetIntersectionTest) {
 }
 
 TEST(CstPipelineTranslationTest, SetIsSubsetTest) {
-    const auto cst = CNode{
-        CNode::ObjectChildren{{KeyFieldname::setIsSubset,
-                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}},
-                                                          CNode{UserFieldPath{"set2", false}}}}}}};
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::setIsSubset,
+         CNode{CNode::ArrayChildren{CNode{AggregationPath{make_vector<std::string>("set"s)}},
+                                    CNode{AggregationPath{make_vector<std::string>("set2"s)}}}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setIsSubset: [\"$set\", \"$set2\"]}")) == expr->serialize(false)));
 }
 
 TEST(CstPipelineTranslationTest, SetUnionTest) {
-    const auto cst = CNode{
-        CNode::ObjectChildren{{KeyFieldname::setUnion,
-                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}},
-                                                          CNode{UserFieldPath{"set2", false}},
-                                                          CNode{UserFieldPath{"set3", false}}}}}}};
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::setUnion,
+         CNode{CNode::ArrayChildren{CNode{AggregationPath{make_vector<std::string>("set"s)}},
+                                    CNode{AggregationPath{make_vector<std::string>("set2"s)}},
+                                    CNode{AggregationPath{make_vector<std::string>("set3"s)}}}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setUnion: [\"$set\", \"$set2\", \"$set3\"]}")) ==

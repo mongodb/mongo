@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include <algorithm>
 #include <boost/optional.hpp>
-#include <iterator>
 #include <memory>
-#include <utility>
+#include <numeric>
 
 #include "mongo/db/cst/c_node_disambiguation.h"
 #include "mongo/stdx/variant.h"
@@ -40,82 +38,50 @@
 namespace mongo::c_node_disambiguation {
 namespace {
 
-enum class ProjectionType : char { inclusion, exclusion, inconsistent };
-
-boost::optional<CNode> replaceCNode(const CNode& cst,
-                                    boost::optional<ProjectionType>& currentProjType) {
-    auto updateProjectionTypeCreateReplacement =
-        [&](auto&& isExclusion, auto&& makeExclusive, auto&& makeInclusive) {
-            auto seenProjType = isExclusion ? ProjectionType::exclusion : ProjectionType::inclusion;
-            if (!currentProjType)
-                currentProjType = seenProjType;
-            else if (*currentProjType != seenProjType)
-                currentProjType = ProjectionType::inconsistent;
-            return boost::make_optional(isExclusion ? makeExclusive() : makeInclusive());
-        };
-
-    // This is done without mutation so we can cancel the operation without side effects.
+auto disambiguateCNode(const CNode& cst) {
     return stdx::visit(
         visit_helper::Overloaded{
-            [&](const CNode::ObjectChildren& children) -> boost::optional<CNode> {
-                auto newChildren = CNode::ObjectChildren{};
-                for (auto&& [fieldname, fieldValue] : children)
-                    if (!stdx::holds_alternative<UserFieldname>(fieldname))
-                        return boost::none;
-                    else if (auto newNode = replaceCNode(fieldValue, currentProjType); !newNode)
-                        return boost::none;
-                    else
-                        newChildren.emplace_back(fieldname, *newNode);
-                return CNode{std::move(newChildren)};
+            [](const CNode::ObjectChildren& children) {
+                return *std::accumulate(
+                    children.begin(),
+                    children.end(),
+                    boost::optional<ProjectionType>{},
+                    [](auto&& currentProjType, auto&& child) {
+                        const auto seenProjType =
+                            stdx::holds_alternative<FieldnamePath>(child.first)
+                            // This is part of the compound key and must be explored.
+                            ? disambiguateCNode(child.second)
+                            // This is an arbitrary expression to produce a computed field.
+                            : ProjectionType::inclusion;
+                        if (!currentProjType)
+                            return seenProjType;
+                        else if (*currentProjType != seenProjType)
+                            return ProjectionType::inconsistent;
+                        else
+                            return *currentProjType;
+                    });
             },
-            [&](const UserInt& userInt) {
-                return updateProjectionTypeCreateReplacement(
-                    userInt == UserInt{0},
-                    [] { return CNode{KeyValue::intZeroKey}; },
-                    [&] { return CNode{NonZeroKey{userInt}}; });
-            },
-            [&](const UserLong& userLong) {
-                return updateProjectionTypeCreateReplacement(
-                    userLong == UserLong{0ll},
-                    [] { return CNode{KeyValue::longZeroKey}; },
-                    [&] { return CNode{NonZeroKey{userLong}}; });
-            },
-            [&](const UserDouble& userDouble) {
-                return updateProjectionTypeCreateReplacement(
-                    userDouble == UserDouble{0.0},
-                    [] { return CNode{KeyValue::doubleZeroKey}; },
-                    [&] { return CNode{NonZeroKey{userDouble}}; });
-            },
-            [&](const UserDecimal& userDecimal) {
-                return updateProjectionTypeCreateReplacement(
-                    userDecimal == UserDecimal{0.0},
-                    [] { return CNode{KeyValue::decimalZeroKey}; },
-                    [&] { return CNode{NonZeroKey{userDecimal}}; });
-            },
-            [&](const UserBoolean& userBoolean) {
-                return updateProjectionTypeCreateReplacement(
-                    userBoolean == UserBoolean{false},
-                    [] { return CNode{KeyValue::falseKey}; },
-                    [] { return CNode{KeyValue::trueKey}; });
-            },
-            [&](auto &&) -> boost::optional<CNode> { return boost::none; }},
+            [&](auto&&) {
+                if (auto type = cst.projectionType())
+                    // This is a key which indicates the projection type.
+                    return *type;
+                else
+                    // This is a value which will produce a computed field.
+                    return ProjectionType::inclusion;
+            }},
         cst.payload);
 }
 
 }  // namespace
 
 CNode disambiguateCompoundProjection(CNode project) {
-    auto projectionType = boost::optional<ProjectionType>{};
-    auto cNode = replaceCNode(project, projectionType);
-    if (!cNode)
-        return project;
-    switch (*projectionType) {
+    switch (disambiguateCNode(project)) {
         case ProjectionType::inclusion:
-            return CNode{CompoundInclusionKey{std::make_unique<CNode>(*std::move(cNode))}};
+            return CNode{CompoundInclusionKey{std::make_unique<CNode>(std::move(project))}};
         case ProjectionType::exclusion:
-            return CNode{CompoundExclusionKey{std::make_unique<CNode>(*std::move(cNode))}};
+            return CNode{CompoundExclusionKey{std::make_unique<CNode>(std::move(project))}};
         case ProjectionType::inconsistent:
-            return CNode{CompoundInconsistentKey{std::make_unique<CNode>(*std::move(cNode))}};
+            return CNode{CompoundInconsistentKey{std::make_unique<CNode>(std::move(project))}};
     }
     MONGO_UNREACHABLE;
 }

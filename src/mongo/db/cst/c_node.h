@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,6 +43,7 @@
 #include "mongo/db/cst/compound_key.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
+#include "mongo/db/cst/path.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/time_support.h"
@@ -72,10 +74,7 @@ using UserDecimal = Decimal128;
 struct UserMinKey {};
 struct UserMaxKey {};
 
-struct UserFieldPath {
-    std::string rawStr;
-    bool isVariable;
-};
+enum class ProjectionType : char { inclusion, exclusion, inconsistent };
 
 struct CNode {
     static auto noopLeaf() {
@@ -163,21 +162,41 @@ struct CNode {
     }
 
     /*
-     * Returns whether the payload indicates inclusion through a key. Note that this does not return
-     * true for ObjectChildren payloads indicating a computed projection.
+     * Returns whether the payload indicates inclusion/exclusion or inconsistency through a key.
+     * Note that this returns none for ObjectChildren payloads even if they indicate a computed
+     * projection which can be treated as inclusion in projection type determination contexts.
      */
-    auto isInclusionKeyValue() const {
-        return stdx::holds_alternative<NonZeroKey>(payload) ||
+    auto projectionType() const {
+        if (stdx::holds_alternative<NonZeroKey>(payload) ||
             stdx::holds_alternative<CompoundInclusionKey>(payload) ||
             (stdx::holds_alternative<KeyValue>(payload) &&
-             stdx::get<KeyValue>(payload) == KeyValue::trueKey);
+             stdx::get<KeyValue>(payload) == KeyValue::trueKey))
+            return boost::optional<ProjectionType>{ProjectionType::inclusion};
+        else if (stdx::holds_alternative<CompoundExclusionKey>(payload) ||
+                 (stdx::holds_alternative<KeyValue>(payload) && [&] {
+                     switch (stdx::get<KeyValue>(payload)) {
+                         case KeyValue::intZeroKey:
+                         case KeyValue::longZeroKey:
+                         case KeyValue::doubleZeroKey:
+                         case KeyValue::decimalZeroKey:
+                         case KeyValue::falseKey:
+                             return true;
+                         default:
+                             return false;
+                     }
+                 }()))
+            return boost::optional<ProjectionType>{ProjectionType::exclusion};
+        else if (stdx::holds_alternative<CompoundInconsistentKey>(payload))
+            return boost::optional<ProjectionType>{ProjectionType::inconsistent};
+        else
+            return boost::optional<ProjectionType>{};
     }
 
 private:
     std::string toStringHelper(int numTabs) const;
 
 public:
-    using Fieldname = stdx::variant<KeyFieldname, UserFieldname>;
+    using Fieldname = stdx::variant<KeyFieldname, UserFieldname, FieldnamePath>;
     using ArrayChildren = std::vector<CNode>;
     using ObjectChildren = std::vector<std::pair<Fieldname, CNode>>;
     stdx::variant<ArrayChildren,
@@ -187,9 +206,9 @@ public:
                   CompoundInconsistentKey,
                   KeyValue,
                   NonZeroKey,
+                  ValuePath,
                   UserDouble,
                   UserString,
-                  UserFieldPath,
                   UserBinary,
                   UserUndefined,
                   UserObjectId,

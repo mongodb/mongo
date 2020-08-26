@@ -104,6 +104,7 @@
     ENUMIFY(setUnion)            \
     ENUMIFY(sizeArg)             \
     ENUMIFY(skip)                \
+    ENUMIFY(slice)               \
     ENUMIFY(split)               \
     ENUMIFY(sqrt)                \
     ENUMIFY(strLenBytes)         \

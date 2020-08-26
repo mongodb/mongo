@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.7.1.
+// A Bison parser, made by GNU Bison 3.6.3.
 
 // Skeleton implementation for Bison LALR(1) parsers in C++
 
@@ -41,10 +41,15 @@
 // Unqualified %code blocks.
 #line 82 "grammar.yy"
 
+#include <boost/algorithm/string.hpp>
+#include <iterator>
+#include <utility>
+
 #include "mongo/db/cst/bson_lexer.h"
 #include "mongo/db/cst/c_node_disambiguation.h"
 #include "mongo/db/cst/c_node_validation.h"
 #include "mongo/db/cst/key_fieldname.h"
+#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/variant.h"
 
@@ -60,7 +65,7 @@ void ParserGen::error(const ParserGen::location_type& loc, const std::string& ms
 // mongo.
 #define YYLLOC_DEFAULT(newPos, rhsPositions, nRhs)
 
-#line 68 "parser_gen.cpp"
+#line 73 "parser_gen.cpp"
 
 
 #ifndef YY_
@@ -153,7 +158,7 @@ void ParserGen::error(const ParserGen::location_type& loc, const std::string& ms
 
 #line 57 "grammar.yy"
 namespace mongo {
-#line 161 "parser_gen.cpp"
+#line 166 "parser_gen.cpp"
 
 /// Build a parser object.
 ParserGen::ParserGen(BSONLexer& lexer_yyarg, CNode* cst_yyarg)
@@ -204,250 +209,266 @@ ParserGen::stack_symbol_type::stack_symbol_type() {}
 ParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_type) that)
     : super_type(YY_MOVE(that.state), YY_MOVE(that.location)) {
     switch (that.kind()) {
-        case symbol_kind::S_BINARY:  // "BinData"
+        case 134:  // "BinData"
             value.YY_MOVE_OR_COPY<BSONBinData>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_JAVASCRIPT:  // "Code"
+        case 141:  // "Code"
             value.YY_MOVE_OR_COPY<BSONCode>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_JAVASCRIPT_W_SCOPE:  // "CodeWScope"
+        case 143:  // "CodeWScope"
             value.YY_MOVE_OR_COPY<BSONCodeWScope>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_DB_POINTER:  // "dbPointer"
+        case 140:  // "dbPointer"
             value.YY_MOVE_OR_COPY<BSONDBRef>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_REGEX:  // "regex"
+        case 139:  // "regex"
             value.YY_MOVE_OR_COPY<BSONRegEx>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_SYMBOL:  // "Symbol"
+        case 142:  // "Symbol"
             value.YY_MOVE_OR_COPY<BSONSymbol>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_dbPointer:            // dbPointer
-        case symbol_kind::S_javascript:           // javascript
-        case symbol_kind::S_symbol:               // symbol
-        case symbol_kind::S_javascriptWScope:     // javascriptWScope
-        case symbol_kind::S_int:                  // int
-        case symbol_kind::S_timestamp:            // timestamp
-        case symbol_kind::S_long:                 // long
-        case symbol_kind::S_double:               // double
-        case symbol_kind::S_decimal:              // decimal
-        case symbol_kind::S_minKey:               // minKey
-        case symbol_kind::S_maxKey:               // maxKey
-        case symbol_kind::S_value:                // value
-        case symbol_kind::S_string:               // string
-        case symbol_kind::S_fieldPath:            // fieldPath
-        case symbol_kind::S_binary:               // binary
-        case symbol_kind::S_undefined:            // undefined
-        case symbol_kind::S_objectId:             // objectId
-        case symbol_kind::S_bool:                 // bool
-        case symbol_kind::S_date:                 // date
-        case symbol_kind::S_null:                 // null
-        case symbol_kind::S_regex:                // regex
-        case symbol_kind::S_simpleValue:          // simpleValue
-        case symbol_kind::S_compoundValue:        // compoundValue
-        case symbol_kind::S_valueArray:           // valueArray
-        case symbol_kind::S_valueObject:          // valueObject
-        case symbol_kind::S_valueFields:          // valueFields
-        case symbol_kind::S_variable:             // variable
-        case symbol_kind::S_pipeline:             // pipeline
-        case symbol_kind::S_stageList:            // stageList
-        case symbol_kind::S_stage:                // stage
-        case symbol_kind::S_inhibitOptimization:  // inhibitOptimization
-        case symbol_kind::S_unionWith:            // unionWith
-        case symbol_kind::S_skip:                 // skip
-        case symbol_kind::S_limit:                // limit
-        case symbol_kind::S_project:              // project
-        case symbol_kind::S_sample:               // sample
-        case symbol_kind::S_projectFields:        // projectFields
-        case symbol_kind::S_projection:           // projection
-        case symbol_kind::S_num:                  // num
-        case symbol_kind::S_expression:           // expression
-        case symbol_kind::S_compoundExpression:   // compoundExpression
-        case symbol_kind::S_exprFixedTwoArg:      // exprFixedTwoArg
-        case symbol_kind::S_expressionArray:      // expressionArray
-        case symbol_kind::S_expressionObject:     // expressionObject
-        case symbol_kind::S_expressionFields:     // expressionFields
-        case symbol_kind::S_maths:                // maths
-        case symbol_kind::S_add:                  // add
-        case symbol_kind::S_atan2:                // atan2
-        case symbol_kind::S_boolExps:             // boolExps
-        case symbol_kind::S_and:                  // and
-        case symbol_kind::S_or:                   // or
-        case symbol_kind::S_not:                  // not
-        case symbol_kind::S_literalEscapes:       // literalEscapes
-        case symbol_kind::S_const:                // const
-        case symbol_kind::S_literal:              // literal
-        case symbol_kind::S_stringExps:           // stringExps
-        case symbol_kind::S_concat:               // concat
-        case symbol_kind::S_dateFromString:       // dateFromString
-        case symbol_kind::S_dateToString:         // dateToString
-        case symbol_kind::S_indexOfBytes:         // indexOfBytes
-        case symbol_kind::S_indexOfCP:            // indexOfCP
-        case symbol_kind::S_ltrim:                // ltrim
-        case symbol_kind::S_regexFind:            // regexFind
-        case symbol_kind::S_regexFindAll:         // regexFindAll
-        case symbol_kind::S_regexMatch:           // regexMatch
-        case symbol_kind::S_regexArgs:            // regexArgs
-        case symbol_kind::S_replaceOne:           // replaceOne
-        case symbol_kind::S_replaceAll:           // replaceAll
-        case symbol_kind::S_rtrim:                // rtrim
-        case symbol_kind::S_split:                // split
-        case symbol_kind::S_strLenBytes:          // strLenBytes
-        case symbol_kind::S_strLenCP:             // strLenCP
-        case symbol_kind::S_strcasecmp:           // strcasecmp
-        case symbol_kind::S_substr:               // substr
-        case symbol_kind::S_substrBytes:          // substrBytes
-        case symbol_kind::S_substrCP:             // substrCP
-        case symbol_kind::S_toLower:              // toLower
-        case symbol_kind::S_toUpper:              // toUpper
-        case symbol_kind::S_trim:                 // trim
-        case symbol_kind::S_compExprs:            // compExprs
-        case symbol_kind::S_cmp:                  // cmp
-        case symbol_kind::S_eq:                   // eq
-        case symbol_kind::S_gt:                   // gt
-        case symbol_kind::S_gte:                  // gte
-        case symbol_kind::S_lt:                   // lt
-        case symbol_kind::S_lte:                  // lte
-        case symbol_kind::S_ne:                   // ne
-        case symbol_kind::S_typeExpression:       // typeExpression
-        case symbol_kind::S_convert:              // convert
-        case symbol_kind::S_toBool:               // toBool
-        case symbol_kind::S_toDate:               // toDate
-        case symbol_kind::S_toDecimal:            // toDecimal
-        case symbol_kind::S_toDouble:             // toDouble
-        case symbol_kind::S_toInt:                // toInt
-        case symbol_kind::S_toLong:               // toLong
-        case symbol_kind::S_toObjectId:           // toObjectId
-        case symbol_kind::S_toString:             // toString
-        case symbol_kind::S_type:                 // type
-        case symbol_kind::S_abs:                  // abs
-        case symbol_kind::S_ceil:                 // ceil
-        case symbol_kind::S_divide:               // divide
-        case symbol_kind::S_exponent:             // exponent
-        case symbol_kind::S_floor:                // floor
-        case symbol_kind::S_ln:                   // ln
-        case symbol_kind::S_log:                  // log
-        case symbol_kind::S_logten:               // logten
-        case symbol_kind::S_mod:                  // mod
-        case symbol_kind::S_multiply:             // multiply
-        case symbol_kind::S_pow:                  // pow
-        case symbol_kind::S_round:                // round
-        case symbol_kind::S_sqrt:                 // sqrt
-        case symbol_kind::S_subtract:             // subtract
-        case symbol_kind::S_trunc:                // trunc
-        case symbol_kind::S_setExpression:        // setExpression
-        case symbol_kind::S_allElementsTrue:      // allElementsTrue
-        case symbol_kind::S_anyElementTrue:       // anyElementTrue
-        case symbol_kind::S_setDifference:        // setDifference
-        case symbol_kind::S_setEquals:            // setEquals
-        case symbol_kind::S_setIntersection:      // setIntersection
-        case symbol_kind::S_setIsSubset:          // setIsSubset
-        case symbol_kind::S_setUnion:             // setUnion
-        case symbol_kind::S_match:                // match
-        case symbol_kind::S_predicates:           // predicates
-        case symbol_kind::S_compoundMatchExprs:   // compoundMatchExprs
-        case symbol_kind::S_predValue:            // predValue
-        case symbol_kind::S_additionalExprs:      // additionalExprs
-        case symbol_kind::S_sortSpecs:            // sortSpecs
-        case symbol_kind::S_specList:             // specList
-        case symbol_kind::S_metaSort:             // metaSort
-        case symbol_kind::S_oneOrNegOne:          // oneOrNegOne
-        case symbol_kind::S_metaSortKeyword:      // metaSortKeyword
+        case 172:  // dbPointer
+        case 173:  // javascript
+        case 174:  // symbol
+        case 175:  // javascriptWScope
+        case 176:  // int
+        case 177:  // timestamp
+        case 178:  // long
+        case 179:  // double
+        case 180:  // decimal
+        case 181:  // minKey
+        case 182:  // maxKey
+        case 183:  // value
+        case 184:  // string
+        case 185:  // aggregationFieldPath
+        case 186:  // binary
+        case 187:  // undefined
+        case 188:  // objectId
+        case 189:  // bool
+        case 190:  // date
+        case 191:  // null
+        case 192:  // regex
+        case 193:  // simpleValue
+        case 194:  // compoundValue
+        case 195:  // valueArray
+        case 196:  // valueObject
+        case 197:  // valueFields
+        case 198:  // variable
+        case 199:  // pipeline
+        case 200:  // stageList
+        case 201:  // stage
+        case 202:  // inhibitOptimization
+        case 203:  // unionWith
+        case 204:  // skip
+        case 205:  // limit
+        case 206:  // project
+        case 207:  // sample
+        case 208:  // projectFields
+        case 209:  // projectionObjectFields
+        case 210:  // topLevelProjection
+        case 211:  // projection
+        case 212:  // projectionObject
+        case 213:  // num
+        case 214:  // expression
+        case 215:  // compoundNonObjectExpression
+        case 216:  // exprFixedTwoArg
+        case 217:  // exprFixedThreeArg
+        case 218:  // arrayManipulation
+        case 219:  // slice
+        case 220:  // expressionArray
+        case 221:  // expressionObject
+        case 222:  // expressionFields
+        case 223:  // maths
+        case 224:  // meta
+        case 225:  // add
+        case 226:  // atan2
+        case 227:  // boolExprs
+        case 228:  // and
+        case 229:  // or
+        case 230:  // not
+        case 231:  // literalEscapes
+        case 232:  // const
+        case 233:  // literal
+        case 234:  // stringExps
+        case 235:  // concat
+        case 236:  // dateFromString
+        case 237:  // dateToString
+        case 238:  // indexOfBytes
+        case 239:  // indexOfCP
+        case 240:  // ltrim
+        case 241:  // regexFind
+        case 242:  // regexFindAll
+        case 243:  // regexMatch
+        case 244:  // regexArgs
+        case 245:  // replaceOne
+        case 246:  // replaceAll
+        case 247:  // rtrim
+        case 248:  // split
+        case 249:  // strLenBytes
+        case 250:  // strLenCP
+        case 251:  // strcasecmp
+        case 252:  // substr
+        case 253:  // substrBytes
+        case 254:  // substrCP
+        case 255:  // toLower
+        case 256:  // toUpper
+        case 257:  // trim
+        case 258:  // compExprs
+        case 259:  // cmp
+        case 260:  // eq
+        case 261:  // gt
+        case 262:  // gte
+        case 263:  // lt
+        case 264:  // lte
+        case 265:  // ne
+        case 266:  // typeExpression
+        case 267:  // convert
+        case 268:  // toBool
+        case 269:  // toDate
+        case 270:  // toDecimal
+        case 271:  // toDouble
+        case 272:  // toInt
+        case 273:  // toLong
+        case 274:  // toObjectId
+        case 275:  // toString
+        case 276:  // type
+        case 277:  // abs
+        case 278:  // ceil
+        case 279:  // divide
+        case 280:  // exponent
+        case 281:  // floor
+        case 282:  // ln
+        case 283:  // log
+        case 284:  // logten
+        case 285:  // mod
+        case 286:  // multiply
+        case 287:  // pow
+        case 288:  // round
+        case 289:  // sqrt
+        case 290:  // subtract
+        case 291:  // trunc
+        case 301:  // setExpression
+        case 302:  // allElementsTrue
+        case 303:  // anyElementTrue
+        case 304:  // setDifference
+        case 305:  // setEquals
+        case 306:  // setIntersection
+        case 307:  // setIsSubset
+        case 308:  // setUnion
+        case 309:  // match
+        case 310:  // predicates
+        case 311:  // compoundMatchExprs
+        case 312:  // predValue
+        case 313:  // additionalExprs
+        case 319:  // sortSpecs
+        case 320:  // specList
+        case 321:  // metaSort
+        case 322:  // oneOrNegOne
+        case 323:  // metaSortKeyword
             value.YY_MOVE_OR_COPY<CNode>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_projectionFieldname:      // projectionFieldname
-        case symbol_kind::S_expressionFieldname:      // expressionFieldname
-        case symbol_kind::S_stageAsUserFieldname:     // stageAsUserFieldname
-        case symbol_kind::S_predFieldname:            // predFieldname
-        case symbol_kind::S_argAsUserFieldname:       // argAsUserFieldname
-        case symbol_kind::S_aggExprAsUserFieldname:   // aggExprAsUserFieldname
-        case symbol_kind::S_invariableUserFieldname:  // invariableUserFieldname
-        case symbol_kind::S_idAsUserFieldname:        // idAsUserFieldname
-        case symbol_kind::S_valueFieldname:           // valueFieldname
-        case symbol_kind::S_logicalExprField:         // logicalExprField
+        case 155:  // aggregationProjectionFieldname
+        case 156:  // projectionFieldname
+        case 157:  // expressionFieldname
+        case 158:  // stageAsUserFieldname
+        case 159:  // argAsUserFieldname
+        case 160:  // argAsProjectionPath
+        case 161:  // aggExprAsUserFieldname
+        case 162:  // invariableUserFieldname
+        case 163:  // idAsUserFieldname
+        case 164:  // idAsProjectionPath
+        case 165:  // valueFieldname
+        case 166:  // predFieldname
+        case 318:  // logicalExprField
             value.YY_MOVE_OR_COPY<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_DATE_LITERAL:  // "Date"
+        case 137:  // "Date"
             value.YY_MOVE_OR_COPY<Date_t>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_DECIMAL_OTHER:  // "arbitrary decimal"
+        case 147:  // "arbitrary decimal"
             value.YY_MOVE_OR_COPY<Decimal128>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_OBJECT_ID:  // "ObjectID"
+        case 136:  // "ObjectID"
             value.YY_MOVE_OR_COPY<OID>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_TIMESTAMP:  // "Timestamp"
+        case 148:  // "Timestamp"
             value.YY_MOVE_OR_COPY<Timestamp>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_MAX_KEY:  // "maxKey"
+        case 150:  // "maxKey"
             value.YY_MOVE_OR_COPY<UserMaxKey>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_MIN_KEY:  // "minKey"
+        case 149:  // "minKey"
             value.YY_MOVE_OR_COPY<UserMinKey>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_JSNULL:  // "null"
+        case 138:  // "null"
             value.YY_MOVE_OR_COPY<UserNull>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_UNDEFINED:  // "undefined"
+        case 135:  // "undefined"
             value.YY_MOVE_OR_COPY<UserUndefined>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_DOUBLE_OTHER:  // "arbitrary double"
+        case 146:  // "arbitrary double"
             value.YY_MOVE_OR_COPY<double>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_INT_OTHER:  // "arbitrary integer"
+        case 144:  // "arbitrary integer"
             value.YY_MOVE_OR_COPY<int>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_LONG_OTHER:  // "arbitrary long"
+        case 145:  // "arbitrary long"
             value.YY_MOVE_OR_COPY<long long>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_projectField:        // projectField
-        case symbol_kind::S_expressionField:     // expressionField
-        case symbol_kind::S_valueField:          // valueField
-        case symbol_kind::S_onErrorArg:          // onErrorArg
-        case symbol_kind::S_onNullArg:           // onNullArg
-        case symbol_kind::S_formatArg:           // formatArg
-        case symbol_kind::S_timezoneArg:         // timezoneArg
-        case symbol_kind::S_charsArg:            // charsArg
-        case symbol_kind::S_optionsArg:          // optionsArg
-        case symbol_kind::S_predicate:           // predicate
-        case symbol_kind::S_logicalExpr:         // logicalExpr
-        case symbol_kind::S_operatorExpression:  // operatorExpression
-        case symbol_kind::S_notExpr:             // notExpr
-        case symbol_kind::S_sortSpec:            // sortSpec
+        case 167:  // projectField
+        case 168:  // projectionObjectField
+        case 169:  // expressionField
+        case 170:  // valueField
+        case 292:  // onErrorArg
+        case 293:  // onNullArg
+        case 294:  // formatArg
+        case 295:  // timezoneArg
+        case 296:  // charsArg
+        case 297:  // optionsArg
+        case 314:  // predicate
+        case 315:  // logicalExpr
+        case 316:  // operatorExpression
+        case 317:  // notExpr
+        case 324:  // sortSpec
             value.YY_MOVE_OR_COPY<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_FIELDNAME:              // "fieldname"
-        case symbol_kind::S_STRING:                 // "string"
-        case symbol_kind::S_DOLLAR_STRING:          // "$-prefixed string"
-        case symbol_kind::S_DOLLAR_DOLLAR_STRING:   // "$$-prefixed string"
-        case symbol_kind::S_DOLLAR_PREF_FIELDNAME:  // "$-prefixed fieldname"
+        case 128:  // "fieldname"
+        case 130:  // "$-prefixed fieldname"
+        case 131:  // "string"
+        case 132:  // "$-prefixed string"
+        case 133:  // "$$-prefixed string"
+        case 171:  // arg
             value.YY_MOVE_OR_COPY<std::string>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_expressions:    // expressions
-        case symbol_kind::S_values:         // values
-        case symbol_kind::S_exprZeroToTwo:  // exprZeroToTwo
+        case 298:  // expressions
+        case 299:  // values
+        case 300:  // exprZeroToTwo
             value.YY_MOVE_OR_COPY<std::vector<CNode>>(YY_MOVE(that.value));
+            break;
+
+        case 129:  // "fieldname containing dotted path"
+            value.YY_MOVE_OR_COPY<std::vector<std::string>>(YY_MOVE(that.value));
             break;
 
         default:
@@ -463,250 +484,266 @@ ParserGen::stack_symbol_type::stack_symbol_type(YY_RVREF(stack_symbol_type) that
 ParserGen::stack_symbol_type::stack_symbol_type(state_type s, YY_MOVE_REF(symbol_type) that)
     : super_type(s, YY_MOVE(that.location)) {
     switch (that.kind()) {
-        case symbol_kind::S_BINARY:  // "BinData"
+        case 134:  // "BinData"
             value.move<BSONBinData>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_JAVASCRIPT:  // "Code"
+        case 141:  // "Code"
             value.move<BSONCode>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_JAVASCRIPT_W_SCOPE:  // "CodeWScope"
+        case 143:  // "CodeWScope"
             value.move<BSONCodeWScope>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_DB_POINTER:  // "dbPointer"
+        case 140:  // "dbPointer"
             value.move<BSONDBRef>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_REGEX:  // "regex"
+        case 139:  // "regex"
             value.move<BSONRegEx>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_SYMBOL:  // "Symbol"
+        case 142:  // "Symbol"
             value.move<BSONSymbol>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_dbPointer:            // dbPointer
-        case symbol_kind::S_javascript:           // javascript
-        case symbol_kind::S_symbol:               // symbol
-        case symbol_kind::S_javascriptWScope:     // javascriptWScope
-        case symbol_kind::S_int:                  // int
-        case symbol_kind::S_timestamp:            // timestamp
-        case symbol_kind::S_long:                 // long
-        case symbol_kind::S_double:               // double
-        case symbol_kind::S_decimal:              // decimal
-        case symbol_kind::S_minKey:               // minKey
-        case symbol_kind::S_maxKey:               // maxKey
-        case symbol_kind::S_value:                // value
-        case symbol_kind::S_string:               // string
-        case symbol_kind::S_fieldPath:            // fieldPath
-        case symbol_kind::S_binary:               // binary
-        case symbol_kind::S_undefined:            // undefined
-        case symbol_kind::S_objectId:             // objectId
-        case symbol_kind::S_bool:                 // bool
-        case symbol_kind::S_date:                 // date
-        case symbol_kind::S_null:                 // null
-        case symbol_kind::S_regex:                // regex
-        case symbol_kind::S_simpleValue:          // simpleValue
-        case symbol_kind::S_compoundValue:        // compoundValue
-        case symbol_kind::S_valueArray:           // valueArray
-        case symbol_kind::S_valueObject:          // valueObject
-        case symbol_kind::S_valueFields:          // valueFields
-        case symbol_kind::S_variable:             // variable
-        case symbol_kind::S_pipeline:             // pipeline
-        case symbol_kind::S_stageList:            // stageList
-        case symbol_kind::S_stage:                // stage
-        case symbol_kind::S_inhibitOptimization:  // inhibitOptimization
-        case symbol_kind::S_unionWith:            // unionWith
-        case symbol_kind::S_skip:                 // skip
-        case symbol_kind::S_limit:                // limit
-        case symbol_kind::S_project:              // project
-        case symbol_kind::S_sample:               // sample
-        case symbol_kind::S_projectFields:        // projectFields
-        case symbol_kind::S_projection:           // projection
-        case symbol_kind::S_num:                  // num
-        case symbol_kind::S_expression:           // expression
-        case symbol_kind::S_compoundExpression:   // compoundExpression
-        case symbol_kind::S_exprFixedTwoArg:      // exprFixedTwoArg
-        case symbol_kind::S_expressionArray:      // expressionArray
-        case symbol_kind::S_expressionObject:     // expressionObject
-        case symbol_kind::S_expressionFields:     // expressionFields
-        case symbol_kind::S_maths:                // maths
-        case symbol_kind::S_add:                  // add
-        case symbol_kind::S_atan2:                // atan2
-        case symbol_kind::S_boolExps:             // boolExps
-        case symbol_kind::S_and:                  // and
-        case symbol_kind::S_or:                   // or
-        case symbol_kind::S_not:                  // not
-        case symbol_kind::S_literalEscapes:       // literalEscapes
-        case symbol_kind::S_const:                // const
-        case symbol_kind::S_literal:              // literal
-        case symbol_kind::S_stringExps:           // stringExps
-        case symbol_kind::S_concat:               // concat
-        case symbol_kind::S_dateFromString:       // dateFromString
-        case symbol_kind::S_dateToString:         // dateToString
-        case symbol_kind::S_indexOfBytes:         // indexOfBytes
-        case symbol_kind::S_indexOfCP:            // indexOfCP
-        case symbol_kind::S_ltrim:                // ltrim
-        case symbol_kind::S_regexFind:            // regexFind
-        case symbol_kind::S_regexFindAll:         // regexFindAll
-        case symbol_kind::S_regexMatch:           // regexMatch
-        case symbol_kind::S_regexArgs:            // regexArgs
-        case symbol_kind::S_replaceOne:           // replaceOne
-        case symbol_kind::S_replaceAll:           // replaceAll
-        case symbol_kind::S_rtrim:                // rtrim
-        case symbol_kind::S_split:                // split
-        case symbol_kind::S_strLenBytes:          // strLenBytes
-        case symbol_kind::S_strLenCP:             // strLenCP
-        case symbol_kind::S_strcasecmp:           // strcasecmp
-        case symbol_kind::S_substr:               // substr
-        case symbol_kind::S_substrBytes:          // substrBytes
-        case symbol_kind::S_substrCP:             // substrCP
-        case symbol_kind::S_toLower:              // toLower
-        case symbol_kind::S_toUpper:              // toUpper
-        case symbol_kind::S_trim:                 // trim
-        case symbol_kind::S_compExprs:            // compExprs
-        case symbol_kind::S_cmp:                  // cmp
-        case symbol_kind::S_eq:                   // eq
-        case symbol_kind::S_gt:                   // gt
-        case symbol_kind::S_gte:                  // gte
-        case symbol_kind::S_lt:                   // lt
-        case symbol_kind::S_lte:                  // lte
-        case symbol_kind::S_ne:                   // ne
-        case symbol_kind::S_typeExpression:       // typeExpression
-        case symbol_kind::S_convert:              // convert
-        case symbol_kind::S_toBool:               // toBool
-        case symbol_kind::S_toDate:               // toDate
-        case symbol_kind::S_toDecimal:            // toDecimal
-        case symbol_kind::S_toDouble:             // toDouble
-        case symbol_kind::S_toInt:                // toInt
-        case symbol_kind::S_toLong:               // toLong
-        case symbol_kind::S_toObjectId:           // toObjectId
-        case symbol_kind::S_toString:             // toString
-        case symbol_kind::S_type:                 // type
-        case symbol_kind::S_abs:                  // abs
-        case symbol_kind::S_ceil:                 // ceil
-        case symbol_kind::S_divide:               // divide
-        case symbol_kind::S_exponent:             // exponent
-        case symbol_kind::S_floor:                // floor
-        case symbol_kind::S_ln:                   // ln
-        case symbol_kind::S_log:                  // log
-        case symbol_kind::S_logten:               // logten
-        case symbol_kind::S_mod:                  // mod
-        case symbol_kind::S_multiply:             // multiply
-        case symbol_kind::S_pow:                  // pow
-        case symbol_kind::S_round:                // round
-        case symbol_kind::S_sqrt:                 // sqrt
-        case symbol_kind::S_subtract:             // subtract
-        case symbol_kind::S_trunc:                // trunc
-        case symbol_kind::S_setExpression:        // setExpression
-        case symbol_kind::S_allElementsTrue:      // allElementsTrue
-        case symbol_kind::S_anyElementTrue:       // anyElementTrue
-        case symbol_kind::S_setDifference:        // setDifference
-        case symbol_kind::S_setEquals:            // setEquals
-        case symbol_kind::S_setIntersection:      // setIntersection
-        case symbol_kind::S_setIsSubset:          // setIsSubset
-        case symbol_kind::S_setUnion:             // setUnion
-        case symbol_kind::S_match:                // match
-        case symbol_kind::S_predicates:           // predicates
-        case symbol_kind::S_compoundMatchExprs:   // compoundMatchExprs
-        case symbol_kind::S_predValue:            // predValue
-        case symbol_kind::S_additionalExprs:      // additionalExprs
-        case symbol_kind::S_sortSpecs:            // sortSpecs
-        case symbol_kind::S_specList:             // specList
-        case symbol_kind::S_metaSort:             // metaSort
-        case symbol_kind::S_oneOrNegOne:          // oneOrNegOne
-        case symbol_kind::S_metaSortKeyword:      // metaSortKeyword
+        case 172:  // dbPointer
+        case 173:  // javascript
+        case 174:  // symbol
+        case 175:  // javascriptWScope
+        case 176:  // int
+        case 177:  // timestamp
+        case 178:  // long
+        case 179:  // double
+        case 180:  // decimal
+        case 181:  // minKey
+        case 182:  // maxKey
+        case 183:  // value
+        case 184:  // string
+        case 185:  // aggregationFieldPath
+        case 186:  // binary
+        case 187:  // undefined
+        case 188:  // objectId
+        case 189:  // bool
+        case 190:  // date
+        case 191:  // null
+        case 192:  // regex
+        case 193:  // simpleValue
+        case 194:  // compoundValue
+        case 195:  // valueArray
+        case 196:  // valueObject
+        case 197:  // valueFields
+        case 198:  // variable
+        case 199:  // pipeline
+        case 200:  // stageList
+        case 201:  // stage
+        case 202:  // inhibitOptimization
+        case 203:  // unionWith
+        case 204:  // skip
+        case 205:  // limit
+        case 206:  // project
+        case 207:  // sample
+        case 208:  // projectFields
+        case 209:  // projectionObjectFields
+        case 210:  // topLevelProjection
+        case 211:  // projection
+        case 212:  // projectionObject
+        case 213:  // num
+        case 214:  // expression
+        case 215:  // compoundNonObjectExpression
+        case 216:  // exprFixedTwoArg
+        case 217:  // exprFixedThreeArg
+        case 218:  // arrayManipulation
+        case 219:  // slice
+        case 220:  // expressionArray
+        case 221:  // expressionObject
+        case 222:  // expressionFields
+        case 223:  // maths
+        case 224:  // meta
+        case 225:  // add
+        case 226:  // atan2
+        case 227:  // boolExprs
+        case 228:  // and
+        case 229:  // or
+        case 230:  // not
+        case 231:  // literalEscapes
+        case 232:  // const
+        case 233:  // literal
+        case 234:  // stringExps
+        case 235:  // concat
+        case 236:  // dateFromString
+        case 237:  // dateToString
+        case 238:  // indexOfBytes
+        case 239:  // indexOfCP
+        case 240:  // ltrim
+        case 241:  // regexFind
+        case 242:  // regexFindAll
+        case 243:  // regexMatch
+        case 244:  // regexArgs
+        case 245:  // replaceOne
+        case 246:  // replaceAll
+        case 247:  // rtrim
+        case 248:  // split
+        case 249:  // strLenBytes
+        case 250:  // strLenCP
+        case 251:  // strcasecmp
+        case 252:  // substr
+        case 253:  // substrBytes
+        case 254:  // substrCP
+        case 255:  // toLower
+        case 256:  // toUpper
+        case 257:  // trim
+        case 258:  // compExprs
+        case 259:  // cmp
+        case 260:  // eq
+        case 261:  // gt
+        case 262:  // gte
+        case 263:  // lt
+        case 264:  // lte
+        case 265:  // ne
+        case 266:  // typeExpression
+        case 267:  // convert
+        case 268:  // toBool
+        case 269:  // toDate
+        case 270:  // toDecimal
+        case 271:  // toDouble
+        case 272:  // toInt
+        case 273:  // toLong
+        case 274:  // toObjectId
+        case 275:  // toString
+        case 276:  // type
+        case 277:  // abs
+        case 278:  // ceil
+        case 279:  // divide
+        case 280:  // exponent
+        case 281:  // floor
+        case 282:  // ln
+        case 283:  // log
+        case 284:  // logten
+        case 285:  // mod
+        case 286:  // multiply
+        case 287:  // pow
+        case 288:  // round
+        case 289:  // sqrt
+        case 290:  // subtract
+        case 291:  // trunc
+        case 301:  // setExpression
+        case 302:  // allElementsTrue
+        case 303:  // anyElementTrue
+        case 304:  // setDifference
+        case 305:  // setEquals
+        case 306:  // setIntersection
+        case 307:  // setIsSubset
+        case 308:  // setUnion
+        case 309:  // match
+        case 310:  // predicates
+        case 311:  // compoundMatchExprs
+        case 312:  // predValue
+        case 313:  // additionalExprs
+        case 319:  // sortSpecs
+        case 320:  // specList
+        case 321:  // metaSort
+        case 322:  // oneOrNegOne
+        case 323:  // metaSortKeyword
             value.move<CNode>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_projectionFieldname:      // projectionFieldname
-        case symbol_kind::S_expressionFieldname:      // expressionFieldname
-        case symbol_kind::S_stageAsUserFieldname:     // stageAsUserFieldname
-        case symbol_kind::S_predFieldname:            // predFieldname
-        case symbol_kind::S_argAsUserFieldname:       // argAsUserFieldname
-        case symbol_kind::S_aggExprAsUserFieldname:   // aggExprAsUserFieldname
-        case symbol_kind::S_invariableUserFieldname:  // invariableUserFieldname
-        case symbol_kind::S_idAsUserFieldname:        // idAsUserFieldname
-        case symbol_kind::S_valueFieldname:           // valueFieldname
-        case symbol_kind::S_logicalExprField:         // logicalExprField
+        case 155:  // aggregationProjectionFieldname
+        case 156:  // projectionFieldname
+        case 157:  // expressionFieldname
+        case 158:  // stageAsUserFieldname
+        case 159:  // argAsUserFieldname
+        case 160:  // argAsProjectionPath
+        case 161:  // aggExprAsUserFieldname
+        case 162:  // invariableUserFieldname
+        case 163:  // idAsUserFieldname
+        case 164:  // idAsProjectionPath
+        case 165:  // valueFieldname
+        case 166:  // predFieldname
+        case 318:  // logicalExprField
             value.move<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_DATE_LITERAL:  // "Date"
+        case 137:  // "Date"
             value.move<Date_t>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_DECIMAL_OTHER:  // "arbitrary decimal"
+        case 147:  // "arbitrary decimal"
             value.move<Decimal128>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_OBJECT_ID:  // "ObjectID"
+        case 136:  // "ObjectID"
             value.move<OID>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_TIMESTAMP:  // "Timestamp"
+        case 148:  // "Timestamp"
             value.move<Timestamp>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_MAX_KEY:  // "maxKey"
+        case 150:  // "maxKey"
             value.move<UserMaxKey>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_MIN_KEY:  // "minKey"
+        case 149:  // "minKey"
             value.move<UserMinKey>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_JSNULL:  // "null"
+        case 138:  // "null"
             value.move<UserNull>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_UNDEFINED:  // "undefined"
+        case 135:  // "undefined"
             value.move<UserUndefined>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_DOUBLE_OTHER:  // "arbitrary double"
+        case 146:  // "arbitrary double"
             value.move<double>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_INT_OTHER:  // "arbitrary integer"
+        case 144:  // "arbitrary integer"
             value.move<int>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_LONG_OTHER:  // "arbitrary long"
+        case 145:  // "arbitrary long"
             value.move<long long>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_projectField:        // projectField
-        case symbol_kind::S_expressionField:     // expressionField
-        case symbol_kind::S_valueField:          // valueField
-        case symbol_kind::S_onErrorArg:          // onErrorArg
-        case symbol_kind::S_onNullArg:           // onNullArg
-        case symbol_kind::S_formatArg:           // formatArg
-        case symbol_kind::S_timezoneArg:         // timezoneArg
-        case symbol_kind::S_charsArg:            // charsArg
-        case symbol_kind::S_optionsArg:          // optionsArg
-        case symbol_kind::S_predicate:           // predicate
-        case symbol_kind::S_logicalExpr:         // logicalExpr
-        case symbol_kind::S_operatorExpression:  // operatorExpression
-        case symbol_kind::S_notExpr:             // notExpr
-        case symbol_kind::S_sortSpec:            // sortSpec
+        case 167:  // projectField
+        case 168:  // projectionObjectField
+        case 169:  // expressionField
+        case 170:  // valueField
+        case 292:  // onErrorArg
+        case 293:  // onNullArg
+        case 294:  // formatArg
+        case 295:  // timezoneArg
+        case 296:  // charsArg
+        case 297:  // optionsArg
+        case 314:  // predicate
+        case 315:  // logicalExpr
+        case 316:  // operatorExpression
+        case 317:  // notExpr
+        case 324:  // sortSpec
             value.move<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_FIELDNAME:              // "fieldname"
-        case symbol_kind::S_STRING:                 // "string"
-        case symbol_kind::S_DOLLAR_STRING:          // "$-prefixed string"
-        case symbol_kind::S_DOLLAR_DOLLAR_STRING:   // "$$-prefixed string"
-        case symbol_kind::S_DOLLAR_PREF_FIELDNAME:  // "$-prefixed fieldname"
+        case 128:  // "fieldname"
+        case 130:  // "$-prefixed fieldname"
+        case 131:  // "string"
+        case 132:  // "$-prefixed string"
+        case 133:  // "$$-prefixed string"
+        case 171:  // arg
             value.move<std::string>(YY_MOVE(that.value));
             break;
 
-        case symbol_kind::S_expressions:    // expressions
-        case symbol_kind::S_values:         // values
-        case symbol_kind::S_exprZeroToTwo:  // exprZeroToTwo
+        case 298:  // expressions
+        case 299:  // values
+        case 300:  // exprZeroToTwo
             value.move<std::vector<CNode>>(YY_MOVE(that.value));
+            break;
+
+        case 129:  // "fieldname containing dotted path"
+            value.move<std::vector<std::string>>(YY_MOVE(that.value));
             break;
 
         default:
@@ -722,250 +759,266 @@ ParserGen::stack_symbol_type& ParserGen::stack_symbol_type::operator=(
     const stack_symbol_type& that) {
     state = that.state;
     switch (that.kind()) {
-        case symbol_kind::S_BINARY:  // "BinData"
+        case 134:  // "BinData"
             value.copy<BSONBinData>(that.value);
             break;
 
-        case symbol_kind::S_JAVASCRIPT:  // "Code"
+        case 141:  // "Code"
             value.copy<BSONCode>(that.value);
             break;
 
-        case symbol_kind::S_JAVASCRIPT_W_SCOPE:  // "CodeWScope"
+        case 143:  // "CodeWScope"
             value.copy<BSONCodeWScope>(that.value);
             break;
 
-        case symbol_kind::S_DB_POINTER:  // "dbPointer"
+        case 140:  // "dbPointer"
             value.copy<BSONDBRef>(that.value);
             break;
 
-        case symbol_kind::S_REGEX:  // "regex"
+        case 139:  // "regex"
             value.copy<BSONRegEx>(that.value);
             break;
 
-        case symbol_kind::S_SYMBOL:  // "Symbol"
+        case 142:  // "Symbol"
             value.copy<BSONSymbol>(that.value);
             break;
 
-        case symbol_kind::S_dbPointer:            // dbPointer
-        case symbol_kind::S_javascript:           // javascript
-        case symbol_kind::S_symbol:               // symbol
-        case symbol_kind::S_javascriptWScope:     // javascriptWScope
-        case symbol_kind::S_int:                  // int
-        case symbol_kind::S_timestamp:            // timestamp
-        case symbol_kind::S_long:                 // long
-        case symbol_kind::S_double:               // double
-        case symbol_kind::S_decimal:              // decimal
-        case symbol_kind::S_minKey:               // minKey
-        case symbol_kind::S_maxKey:               // maxKey
-        case symbol_kind::S_value:                // value
-        case symbol_kind::S_string:               // string
-        case symbol_kind::S_fieldPath:            // fieldPath
-        case symbol_kind::S_binary:               // binary
-        case symbol_kind::S_undefined:            // undefined
-        case symbol_kind::S_objectId:             // objectId
-        case symbol_kind::S_bool:                 // bool
-        case symbol_kind::S_date:                 // date
-        case symbol_kind::S_null:                 // null
-        case symbol_kind::S_regex:                // regex
-        case symbol_kind::S_simpleValue:          // simpleValue
-        case symbol_kind::S_compoundValue:        // compoundValue
-        case symbol_kind::S_valueArray:           // valueArray
-        case symbol_kind::S_valueObject:          // valueObject
-        case symbol_kind::S_valueFields:          // valueFields
-        case symbol_kind::S_variable:             // variable
-        case symbol_kind::S_pipeline:             // pipeline
-        case symbol_kind::S_stageList:            // stageList
-        case symbol_kind::S_stage:                // stage
-        case symbol_kind::S_inhibitOptimization:  // inhibitOptimization
-        case symbol_kind::S_unionWith:            // unionWith
-        case symbol_kind::S_skip:                 // skip
-        case symbol_kind::S_limit:                // limit
-        case symbol_kind::S_project:              // project
-        case symbol_kind::S_sample:               // sample
-        case symbol_kind::S_projectFields:        // projectFields
-        case symbol_kind::S_projection:           // projection
-        case symbol_kind::S_num:                  // num
-        case symbol_kind::S_expression:           // expression
-        case symbol_kind::S_compoundExpression:   // compoundExpression
-        case symbol_kind::S_exprFixedTwoArg:      // exprFixedTwoArg
-        case symbol_kind::S_expressionArray:      // expressionArray
-        case symbol_kind::S_expressionObject:     // expressionObject
-        case symbol_kind::S_expressionFields:     // expressionFields
-        case symbol_kind::S_maths:                // maths
-        case symbol_kind::S_add:                  // add
-        case symbol_kind::S_atan2:                // atan2
-        case symbol_kind::S_boolExps:             // boolExps
-        case symbol_kind::S_and:                  // and
-        case symbol_kind::S_or:                   // or
-        case symbol_kind::S_not:                  // not
-        case symbol_kind::S_literalEscapes:       // literalEscapes
-        case symbol_kind::S_const:                // const
-        case symbol_kind::S_literal:              // literal
-        case symbol_kind::S_stringExps:           // stringExps
-        case symbol_kind::S_concat:               // concat
-        case symbol_kind::S_dateFromString:       // dateFromString
-        case symbol_kind::S_dateToString:         // dateToString
-        case symbol_kind::S_indexOfBytes:         // indexOfBytes
-        case symbol_kind::S_indexOfCP:            // indexOfCP
-        case symbol_kind::S_ltrim:                // ltrim
-        case symbol_kind::S_regexFind:            // regexFind
-        case symbol_kind::S_regexFindAll:         // regexFindAll
-        case symbol_kind::S_regexMatch:           // regexMatch
-        case symbol_kind::S_regexArgs:            // regexArgs
-        case symbol_kind::S_replaceOne:           // replaceOne
-        case symbol_kind::S_replaceAll:           // replaceAll
-        case symbol_kind::S_rtrim:                // rtrim
-        case symbol_kind::S_split:                // split
-        case symbol_kind::S_strLenBytes:          // strLenBytes
-        case symbol_kind::S_strLenCP:             // strLenCP
-        case symbol_kind::S_strcasecmp:           // strcasecmp
-        case symbol_kind::S_substr:               // substr
-        case symbol_kind::S_substrBytes:          // substrBytes
-        case symbol_kind::S_substrCP:             // substrCP
-        case symbol_kind::S_toLower:              // toLower
-        case symbol_kind::S_toUpper:              // toUpper
-        case symbol_kind::S_trim:                 // trim
-        case symbol_kind::S_compExprs:            // compExprs
-        case symbol_kind::S_cmp:                  // cmp
-        case symbol_kind::S_eq:                   // eq
-        case symbol_kind::S_gt:                   // gt
-        case symbol_kind::S_gte:                  // gte
-        case symbol_kind::S_lt:                   // lt
-        case symbol_kind::S_lte:                  // lte
-        case symbol_kind::S_ne:                   // ne
-        case symbol_kind::S_typeExpression:       // typeExpression
-        case symbol_kind::S_convert:              // convert
-        case symbol_kind::S_toBool:               // toBool
-        case symbol_kind::S_toDate:               // toDate
-        case symbol_kind::S_toDecimal:            // toDecimal
-        case symbol_kind::S_toDouble:             // toDouble
-        case symbol_kind::S_toInt:                // toInt
-        case symbol_kind::S_toLong:               // toLong
-        case symbol_kind::S_toObjectId:           // toObjectId
-        case symbol_kind::S_toString:             // toString
-        case symbol_kind::S_type:                 // type
-        case symbol_kind::S_abs:                  // abs
-        case symbol_kind::S_ceil:                 // ceil
-        case symbol_kind::S_divide:               // divide
-        case symbol_kind::S_exponent:             // exponent
-        case symbol_kind::S_floor:                // floor
-        case symbol_kind::S_ln:                   // ln
-        case symbol_kind::S_log:                  // log
-        case symbol_kind::S_logten:               // logten
-        case symbol_kind::S_mod:                  // mod
-        case symbol_kind::S_multiply:             // multiply
-        case symbol_kind::S_pow:                  // pow
-        case symbol_kind::S_round:                // round
-        case symbol_kind::S_sqrt:                 // sqrt
-        case symbol_kind::S_subtract:             // subtract
-        case symbol_kind::S_trunc:                // trunc
-        case symbol_kind::S_setExpression:        // setExpression
-        case symbol_kind::S_allElementsTrue:      // allElementsTrue
-        case symbol_kind::S_anyElementTrue:       // anyElementTrue
-        case symbol_kind::S_setDifference:        // setDifference
-        case symbol_kind::S_setEquals:            // setEquals
-        case symbol_kind::S_setIntersection:      // setIntersection
-        case symbol_kind::S_setIsSubset:          // setIsSubset
-        case symbol_kind::S_setUnion:             // setUnion
-        case symbol_kind::S_match:                // match
-        case symbol_kind::S_predicates:           // predicates
-        case symbol_kind::S_compoundMatchExprs:   // compoundMatchExprs
-        case symbol_kind::S_predValue:            // predValue
-        case symbol_kind::S_additionalExprs:      // additionalExprs
-        case symbol_kind::S_sortSpecs:            // sortSpecs
-        case symbol_kind::S_specList:             // specList
-        case symbol_kind::S_metaSort:             // metaSort
-        case symbol_kind::S_oneOrNegOne:          // oneOrNegOne
-        case symbol_kind::S_metaSortKeyword:      // metaSortKeyword
+        case 172:  // dbPointer
+        case 173:  // javascript
+        case 174:  // symbol
+        case 175:  // javascriptWScope
+        case 176:  // int
+        case 177:  // timestamp
+        case 178:  // long
+        case 179:  // double
+        case 180:  // decimal
+        case 181:  // minKey
+        case 182:  // maxKey
+        case 183:  // value
+        case 184:  // string
+        case 185:  // aggregationFieldPath
+        case 186:  // binary
+        case 187:  // undefined
+        case 188:  // objectId
+        case 189:  // bool
+        case 190:  // date
+        case 191:  // null
+        case 192:  // regex
+        case 193:  // simpleValue
+        case 194:  // compoundValue
+        case 195:  // valueArray
+        case 196:  // valueObject
+        case 197:  // valueFields
+        case 198:  // variable
+        case 199:  // pipeline
+        case 200:  // stageList
+        case 201:  // stage
+        case 202:  // inhibitOptimization
+        case 203:  // unionWith
+        case 204:  // skip
+        case 205:  // limit
+        case 206:  // project
+        case 207:  // sample
+        case 208:  // projectFields
+        case 209:  // projectionObjectFields
+        case 210:  // topLevelProjection
+        case 211:  // projection
+        case 212:  // projectionObject
+        case 213:  // num
+        case 214:  // expression
+        case 215:  // compoundNonObjectExpression
+        case 216:  // exprFixedTwoArg
+        case 217:  // exprFixedThreeArg
+        case 218:  // arrayManipulation
+        case 219:  // slice
+        case 220:  // expressionArray
+        case 221:  // expressionObject
+        case 222:  // expressionFields
+        case 223:  // maths
+        case 224:  // meta
+        case 225:  // add
+        case 226:  // atan2
+        case 227:  // boolExprs
+        case 228:  // and
+        case 229:  // or
+        case 230:  // not
+        case 231:  // literalEscapes
+        case 232:  // const
+        case 233:  // literal
+        case 234:  // stringExps
+        case 235:  // concat
+        case 236:  // dateFromString
+        case 237:  // dateToString
+        case 238:  // indexOfBytes
+        case 239:  // indexOfCP
+        case 240:  // ltrim
+        case 241:  // regexFind
+        case 242:  // regexFindAll
+        case 243:  // regexMatch
+        case 244:  // regexArgs
+        case 245:  // replaceOne
+        case 246:  // replaceAll
+        case 247:  // rtrim
+        case 248:  // split
+        case 249:  // strLenBytes
+        case 250:  // strLenCP
+        case 251:  // strcasecmp
+        case 252:  // substr
+        case 253:  // substrBytes
+        case 254:  // substrCP
+        case 255:  // toLower
+        case 256:  // toUpper
+        case 257:  // trim
+        case 258:  // compExprs
+        case 259:  // cmp
+        case 260:  // eq
+        case 261:  // gt
+        case 262:  // gte
+        case 263:  // lt
+        case 264:  // lte
+        case 265:  // ne
+        case 266:  // typeExpression
+        case 267:  // convert
+        case 268:  // toBool
+        case 269:  // toDate
+        case 270:  // toDecimal
+        case 271:  // toDouble
+        case 272:  // toInt
+        case 273:  // toLong
+        case 274:  // toObjectId
+        case 275:  // toString
+        case 276:  // type
+        case 277:  // abs
+        case 278:  // ceil
+        case 279:  // divide
+        case 280:  // exponent
+        case 281:  // floor
+        case 282:  // ln
+        case 283:  // log
+        case 284:  // logten
+        case 285:  // mod
+        case 286:  // multiply
+        case 287:  // pow
+        case 288:  // round
+        case 289:  // sqrt
+        case 290:  // subtract
+        case 291:  // trunc
+        case 301:  // setExpression
+        case 302:  // allElementsTrue
+        case 303:  // anyElementTrue
+        case 304:  // setDifference
+        case 305:  // setEquals
+        case 306:  // setIntersection
+        case 307:  // setIsSubset
+        case 308:  // setUnion
+        case 309:  // match
+        case 310:  // predicates
+        case 311:  // compoundMatchExprs
+        case 312:  // predValue
+        case 313:  // additionalExprs
+        case 319:  // sortSpecs
+        case 320:  // specList
+        case 321:  // metaSort
+        case 322:  // oneOrNegOne
+        case 323:  // metaSortKeyword
             value.copy<CNode>(that.value);
             break;
 
-        case symbol_kind::S_projectionFieldname:      // projectionFieldname
-        case symbol_kind::S_expressionFieldname:      // expressionFieldname
-        case symbol_kind::S_stageAsUserFieldname:     // stageAsUserFieldname
-        case symbol_kind::S_predFieldname:            // predFieldname
-        case symbol_kind::S_argAsUserFieldname:       // argAsUserFieldname
-        case symbol_kind::S_aggExprAsUserFieldname:   // aggExprAsUserFieldname
-        case symbol_kind::S_invariableUserFieldname:  // invariableUserFieldname
-        case symbol_kind::S_idAsUserFieldname:        // idAsUserFieldname
-        case symbol_kind::S_valueFieldname:           // valueFieldname
-        case symbol_kind::S_logicalExprField:         // logicalExprField
+        case 155:  // aggregationProjectionFieldname
+        case 156:  // projectionFieldname
+        case 157:  // expressionFieldname
+        case 158:  // stageAsUserFieldname
+        case 159:  // argAsUserFieldname
+        case 160:  // argAsProjectionPath
+        case 161:  // aggExprAsUserFieldname
+        case 162:  // invariableUserFieldname
+        case 163:  // idAsUserFieldname
+        case 164:  // idAsProjectionPath
+        case 165:  // valueFieldname
+        case 166:  // predFieldname
+        case 318:  // logicalExprField
             value.copy<CNode::Fieldname>(that.value);
             break;
 
-        case symbol_kind::S_DATE_LITERAL:  // "Date"
+        case 137:  // "Date"
             value.copy<Date_t>(that.value);
             break;
 
-        case symbol_kind::S_DECIMAL_OTHER:  // "arbitrary decimal"
+        case 147:  // "arbitrary decimal"
             value.copy<Decimal128>(that.value);
             break;
 
-        case symbol_kind::S_OBJECT_ID:  // "ObjectID"
+        case 136:  // "ObjectID"
             value.copy<OID>(that.value);
             break;
 
-        case symbol_kind::S_TIMESTAMP:  // "Timestamp"
+        case 148:  // "Timestamp"
             value.copy<Timestamp>(that.value);
             break;
 
-        case symbol_kind::S_MAX_KEY:  // "maxKey"
+        case 150:  // "maxKey"
             value.copy<UserMaxKey>(that.value);
             break;
 
-        case symbol_kind::S_MIN_KEY:  // "minKey"
+        case 149:  // "minKey"
             value.copy<UserMinKey>(that.value);
             break;
 
-        case symbol_kind::S_JSNULL:  // "null"
+        case 138:  // "null"
             value.copy<UserNull>(that.value);
             break;
 
-        case symbol_kind::S_UNDEFINED:  // "undefined"
+        case 135:  // "undefined"
             value.copy<UserUndefined>(that.value);
             break;
 
-        case symbol_kind::S_DOUBLE_OTHER:  // "arbitrary double"
+        case 146:  // "arbitrary double"
             value.copy<double>(that.value);
             break;
 
-        case symbol_kind::S_INT_OTHER:  // "arbitrary integer"
+        case 144:  // "arbitrary integer"
             value.copy<int>(that.value);
             break;
 
-        case symbol_kind::S_LONG_OTHER:  // "arbitrary long"
+        case 145:  // "arbitrary long"
             value.copy<long long>(that.value);
             break;
 
-        case symbol_kind::S_projectField:        // projectField
-        case symbol_kind::S_expressionField:     // expressionField
-        case symbol_kind::S_valueField:          // valueField
-        case symbol_kind::S_onErrorArg:          // onErrorArg
-        case symbol_kind::S_onNullArg:           // onNullArg
-        case symbol_kind::S_formatArg:           // formatArg
-        case symbol_kind::S_timezoneArg:         // timezoneArg
-        case symbol_kind::S_charsArg:            // charsArg
-        case symbol_kind::S_optionsArg:          // optionsArg
-        case symbol_kind::S_predicate:           // predicate
-        case symbol_kind::S_logicalExpr:         // logicalExpr
-        case symbol_kind::S_operatorExpression:  // operatorExpression
-        case symbol_kind::S_notExpr:             // notExpr
-        case symbol_kind::S_sortSpec:            // sortSpec
+        case 167:  // projectField
+        case 168:  // projectionObjectField
+        case 169:  // expressionField
+        case 170:  // valueField
+        case 292:  // onErrorArg
+        case 293:  // onNullArg
+        case 294:  // formatArg
+        case 295:  // timezoneArg
+        case 296:  // charsArg
+        case 297:  // optionsArg
+        case 314:  // predicate
+        case 315:  // logicalExpr
+        case 316:  // operatorExpression
+        case 317:  // notExpr
+        case 324:  // sortSpec
             value.copy<std::pair<CNode::Fieldname, CNode>>(that.value);
             break;
 
-        case symbol_kind::S_FIELDNAME:              // "fieldname"
-        case symbol_kind::S_STRING:                 // "string"
-        case symbol_kind::S_DOLLAR_STRING:          // "$-prefixed string"
-        case symbol_kind::S_DOLLAR_DOLLAR_STRING:   // "$$-prefixed string"
-        case symbol_kind::S_DOLLAR_PREF_FIELDNAME:  // "$-prefixed fieldname"
+        case 128:  // "fieldname"
+        case 130:  // "$-prefixed fieldname"
+        case 131:  // "string"
+        case 132:  // "$-prefixed string"
+        case 133:  // "$$-prefixed string"
+        case 171:  // arg
             value.copy<std::string>(that.value);
             break;
 
-        case symbol_kind::S_expressions:    // expressions
-        case symbol_kind::S_values:         // values
-        case symbol_kind::S_exprZeroToTwo:  // exprZeroToTwo
+        case 298:  // expressions
+        case 299:  // values
+        case 300:  // exprZeroToTwo
             value.copy<std::vector<CNode>>(that.value);
+            break;
+
+        case 129:  // "fieldname containing dotted path"
+            value.copy<std::vector<std::string>>(that.value);
             break;
 
         default:
@@ -979,250 +1032,266 @@ ParserGen::stack_symbol_type& ParserGen::stack_symbol_type::operator=(
 ParserGen::stack_symbol_type& ParserGen::stack_symbol_type::operator=(stack_symbol_type& that) {
     state = that.state;
     switch (that.kind()) {
-        case symbol_kind::S_BINARY:  // "BinData"
+        case 134:  // "BinData"
             value.move<BSONBinData>(that.value);
             break;
 
-        case symbol_kind::S_JAVASCRIPT:  // "Code"
+        case 141:  // "Code"
             value.move<BSONCode>(that.value);
             break;
 
-        case symbol_kind::S_JAVASCRIPT_W_SCOPE:  // "CodeWScope"
+        case 143:  // "CodeWScope"
             value.move<BSONCodeWScope>(that.value);
             break;
 
-        case symbol_kind::S_DB_POINTER:  // "dbPointer"
+        case 140:  // "dbPointer"
             value.move<BSONDBRef>(that.value);
             break;
 
-        case symbol_kind::S_REGEX:  // "regex"
+        case 139:  // "regex"
             value.move<BSONRegEx>(that.value);
             break;
 
-        case symbol_kind::S_SYMBOL:  // "Symbol"
+        case 142:  // "Symbol"
             value.move<BSONSymbol>(that.value);
             break;
 
-        case symbol_kind::S_dbPointer:            // dbPointer
-        case symbol_kind::S_javascript:           // javascript
-        case symbol_kind::S_symbol:               // symbol
-        case symbol_kind::S_javascriptWScope:     // javascriptWScope
-        case symbol_kind::S_int:                  // int
-        case symbol_kind::S_timestamp:            // timestamp
-        case symbol_kind::S_long:                 // long
-        case symbol_kind::S_double:               // double
-        case symbol_kind::S_decimal:              // decimal
-        case symbol_kind::S_minKey:               // minKey
-        case symbol_kind::S_maxKey:               // maxKey
-        case symbol_kind::S_value:                // value
-        case symbol_kind::S_string:               // string
-        case symbol_kind::S_fieldPath:            // fieldPath
-        case symbol_kind::S_binary:               // binary
-        case symbol_kind::S_undefined:            // undefined
-        case symbol_kind::S_objectId:             // objectId
-        case symbol_kind::S_bool:                 // bool
-        case symbol_kind::S_date:                 // date
-        case symbol_kind::S_null:                 // null
-        case symbol_kind::S_regex:                // regex
-        case symbol_kind::S_simpleValue:          // simpleValue
-        case symbol_kind::S_compoundValue:        // compoundValue
-        case symbol_kind::S_valueArray:           // valueArray
-        case symbol_kind::S_valueObject:          // valueObject
-        case symbol_kind::S_valueFields:          // valueFields
-        case symbol_kind::S_variable:             // variable
-        case symbol_kind::S_pipeline:             // pipeline
-        case symbol_kind::S_stageList:            // stageList
-        case symbol_kind::S_stage:                // stage
-        case symbol_kind::S_inhibitOptimization:  // inhibitOptimization
-        case symbol_kind::S_unionWith:            // unionWith
-        case symbol_kind::S_skip:                 // skip
-        case symbol_kind::S_limit:                // limit
-        case symbol_kind::S_project:              // project
-        case symbol_kind::S_sample:               // sample
-        case symbol_kind::S_projectFields:        // projectFields
-        case symbol_kind::S_projection:           // projection
-        case symbol_kind::S_num:                  // num
-        case symbol_kind::S_expression:           // expression
-        case symbol_kind::S_compoundExpression:   // compoundExpression
-        case symbol_kind::S_exprFixedTwoArg:      // exprFixedTwoArg
-        case symbol_kind::S_expressionArray:      // expressionArray
-        case symbol_kind::S_expressionObject:     // expressionObject
-        case symbol_kind::S_expressionFields:     // expressionFields
-        case symbol_kind::S_maths:                // maths
-        case symbol_kind::S_add:                  // add
-        case symbol_kind::S_atan2:                // atan2
-        case symbol_kind::S_boolExps:             // boolExps
-        case symbol_kind::S_and:                  // and
-        case symbol_kind::S_or:                   // or
-        case symbol_kind::S_not:                  // not
-        case symbol_kind::S_literalEscapes:       // literalEscapes
-        case symbol_kind::S_const:                // const
-        case symbol_kind::S_literal:              // literal
-        case symbol_kind::S_stringExps:           // stringExps
-        case symbol_kind::S_concat:               // concat
-        case symbol_kind::S_dateFromString:       // dateFromString
-        case symbol_kind::S_dateToString:         // dateToString
-        case symbol_kind::S_indexOfBytes:         // indexOfBytes
-        case symbol_kind::S_indexOfCP:            // indexOfCP
-        case symbol_kind::S_ltrim:                // ltrim
-        case symbol_kind::S_regexFind:            // regexFind
-        case symbol_kind::S_regexFindAll:         // regexFindAll
-        case symbol_kind::S_regexMatch:           // regexMatch
-        case symbol_kind::S_regexArgs:            // regexArgs
-        case symbol_kind::S_replaceOne:           // replaceOne
-        case symbol_kind::S_replaceAll:           // replaceAll
-        case symbol_kind::S_rtrim:                // rtrim
-        case symbol_kind::S_split:                // split
-        case symbol_kind::S_strLenBytes:          // strLenBytes
-        case symbol_kind::S_strLenCP:             // strLenCP
-        case symbol_kind::S_strcasecmp:           // strcasecmp
-        case symbol_kind::S_substr:               // substr
-        case symbol_kind::S_substrBytes:          // substrBytes
-        case symbol_kind::S_substrCP:             // substrCP
-        case symbol_kind::S_toLower:              // toLower
-        case symbol_kind::S_toUpper:              // toUpper
-        case symbol_kind::S_trim:                 // trim
-        case symbol_kind::S_compExprs:            // compExprs
-        case symbol_kind::S_cmp:                  // cmp
-        case symbol_kind::S_eq:                   // eq
-        case symbol_kind::S_gt:                   // gt
-        case symbol_kind::S_gte:                  // gte
-        case symbol_kind::S_lt:                   // lt
-        case symbol_kind::S_lte:                  // lte
-        case symbol_kind::S_ne:                   // ne
-        case symbol_kind::S_typeExpression:       // typeExpression
-        case symbol_kind::S_convert:              // convert
-        case symbol_kind::S_toBool:               // toBool
-        case symbol_kind::S_toDate:               // toDate
-        case symbol_kind::S_toDecimal:            // toDecimal
-        case symbol_kind::S_toDouble:             // toDouble
-        case symbol_kind::S_toInt:                // toInt
-        case symbol_kind::S_toLong:               // toLong
-        case symbol_kind::S_toObjectId:           // toObjectId
-        case symbol_kind::S_toString:             // toString
-        case symbol_kind::S_type:                 // type
-        case symbol_kind::S_abs:                  // abs
-        case symbol_kind::S_ceil:                 // ceil
-        case symbol_kind::S_divide:               // divide
-        case symbol_kind::S_exponent:             // exponent
-        case symbol_kind::S_floor:                // floor
-        case symbol_kind::S_ln:                   // ln
-        case symbol_kind::S_log:                  // log
-        case symbol_kind::S_logten:               // logten
-        case symbol_kind::S_mod:                  // mod
-        case symbol_kind::S_multiply:             // multiply
-        case symbol_kind::S_pow:                  // pow
-        case symbol_kind::S_round:                // round
-        case symbol_kind::S_sqrt:                 // sqrt
-        case symbol_kind::S_subtract:             // subtract
-        case symbol_kind::S_trunc:                // trunc
-        case symbol_kind::S_setExpression:        // setExpression
-        case symbol_kind::S_allElementsTrue:      // allElementsTrue
-        case symbol_kind::S_anyElementTrue:       // anyElementTrue
-        case symbol_kind::S_setDifference:        // setDifference
-        case symbol_kind::S_setEquals:            // setEquals
-        case symbol_kind::S_setIntersection:      // setIntersection
-        case symbol_kind::S_setIsSubset:          // setIsSubset
-        case symbol_kind::S_setUnion:             // setUnion
-        case symbol_kind::S_match:                // match
-        case symbol_kind::S_predicates:           // predicates
-        case symbol_kind::S_compoundMatchExprs:   // compoundMatchExprs
-        case symbol_kind::S_predValue:            // predValue
-        case symbol_kind::S_additionalExprs:      // additionalExprs
-        case symbol_kind::S_sortSpecs:            // sortSpecs
-        case symbol_kind::S_specList:             // specList
-        case symbol_kind::S_metaSort:             // metaSort
-        case symbol_kind::S_oneOrNegOne:          // oneOrNegOne
-        case symbol_kind::S_metaSortKeyword:      // metaSortKeyword
+        case 172:  // dbPointer
+        case 173:  // javascript
+        case 174:  // symbol
+        case 175:  // javascriptWScope
+        case 176:  // int
+        case 177:  // timestamp
+        case 178:  // long
+        case 179:  // double
+        case 180:  // decimal
+        case 181:  // minKey
+        case 182:  // maxKey
+        case 183:  // value
+        case 184:  // string
+        case 185:  // aggregationFieldPath
+        case 186:  // binary
+        case 187:  // undefined
+        case 188:  // objectId
+        case 189:  // bool
+        case 190:  // date
+        case 191:  // null
+        case 192:  // regex
+        case 193:  // simpleValue
+        case 194:  // compoundValue
+        case 195:  // valueArray
+        case 196:  // valueObject
+        case 197:  // valueFields
+        case 198:  // variable
+        case 199:  // pipeline
+        case 200:  // stageList
+        case 201:  // stage
+        case 202:  // inhibitOptimization
+        case 203:  // unionWith
+        case 204:  // skip
+        case 205:  // limit
+        case 206:  // project
+        case 207:  // sample
+        case 208:  // projectFields
+        case 209:  // projectionObjectFields
+        case 210:  // topLevelProjection
+        case 211:  // projection
+        case 212:  // projectionObject
+        case 213:  // num
+        case 214:  // expression
+        case 215:  // compoundNonObjectExpression
+        case 216:  // exprFixedTwoArg
+        case 217:  // exprFixedThreeArg
+        case 218:  // arrayManipulation
+        case 219:  // slice
+        case 220:  // expressionArray
+        case 221:  // expressionObject
+        case 222:  // expressionFields
+        case 223:  // maths
+        case 224:  // meta
+        case 225:  // add
+        case 226:  // atan2
+        case 227:  // boolExprs
+        case 228:  // and
+        case 229:  // or
+        case 230:  // not
+        case 231:  // literalEscapes
+        case 232:  // const
+        case 233:  // literal
+        case 234:  // stringExps
+        case 235:  // concat
+        case 236:  // dateFromString
+        case 237:  // dateToString
+        case 238:  // indexOfBytes
+        case 239:  // indexOfCP
+        case 240:  // ltrim
+        case 241:  // regexFind
+        case 242:  // regexFindAll
+        case 243:  // regexMatch
+        case 244:  // regexArgs
+        case 245:  // replaceOne
+        case 246:  // replaceAll
+        case 247:  // rtrim
+        case 248:  // split
+        case 249:  // strLenBytes
+        case 250:  // strLenCP
+        case 251:  // strcasecmp
+        case 252:  // substr
+        case 253:  // substrBytes
+        case 254:  // substrCP
+        case 255:  // toLower
+        case 256:  // toUpper
+        case 257:  // trim
+        case 258:  // compExprs
+        case 259:  // cmp
+        case 260:  // eq
+        case 261:  // gt
+        case 262:  // gte
+        case 263:  // lt
+        case 264:  // lte
+        case 265:  // ne
+        case 266:  // typeExpression
+        case 267:  // convert
+        case 268:  // toBool
+        case 269:  // toDate
+        case 270:  // toDecimal
+        case 271:  // toDouble
+        case 272:  // toInt
+        case 273:  // toLong
+        case 274:  // toObjectId
+        case 275:  // toString
+        case 276:  // type
+        case 277:  // abs
+        case 278:  // ceil
+        case 279:  // divide
+        case 280:  // exponent
+        case 281:  // floor
+        case 282:  // ln
+        case 283:  // log
+        case 284:  // logten
+        case 285:  // mod
+        case 286:  // multiply
+        case 287:  // pow
+        case 288:  // round
+        case 289:  // sqrt
+        case 290:  // subtract
+        case 291:  // trunc
+        case 301:  // setExpression
+        case 302:  // allElementsTrue
+        case 303:  // anyElementTrue
+        case 304:  // setDifference
+        case 305:  // setEquals
+        case 306:  // setIntersection
+        case 307:  // setIsSubset
+        case 308:  // setUnion
+        case 309:  // match
+        case 310:  // predicates
+        case 311:  // compoundMatchExprs
+        case 312:  // predValue
+        case 313:  // additionalExprs
+        case 319:  // sortSpecs
+        case 320:  // specList
+        case 321:  // metaSort
+        case 322:  // oneOrNegOne
+        case 323:  // metaSortKeyword
             value.move<CNode>(that.value);
             break;
 
-        case symbol_kind::S_projectionFieldname:      // projectionFieldname
-        case symbol_kind::S_expressionFieldname:      // expressionFieldname
-        case symbol_kind::S_stageAsUserFieldname:     // stageAsUserFieldname
-        case symbol_kind::S_predFieldname:            // predFieldname
-        case symbol_kind::S_argAsUserFieldname:       // argAsUserFieldname
-        case symbol_kind::S_aggExprAsUserFieldname:   // aggExprAsUserFieldname
-        case symbol_kind::S_invariableUserFieldname:  // invariableUserFieldname
-        case symbol_kind::S_idAsUserFieldname:        // idAsUserFieldname
-        case symbol_kind::S_valueFieldname:           // valueFieldname
-        case symbol_kind::S_logicalExprField:         // logicalExprField
+        case 155:  // aggregationProjectionFieldname
+        case 156:  // projectionFieldname
+        case 157:  // expressionFieldname
+        case 158:  // stageAsUserFieldname
+        case 159:  // argAsUserFieldname
+        case 160:  // argAsProjectionPath
+        case 161:  // aggExprAsUserFieldname
+        case 162:  // invariableUserFieldname
+        case 163:  // idAsUserFieldname
+        case 164:  // idAsProjectionPath
+        case 165:  // valueFieldname
+        case 166:  // predFieldname
+        case 318:  // logicalExprField
             value.move<CNode::Fieldname>(that.value);
             break;
 
-        case symbol_kind::S_DATE_LITERAL:  // "Date"
+        case 137:  // "Date"
             value.move<Date_t>(that.value);
             break;
 
-        case symbol_kind::S_DECIMAL_OTHER:  // "arbitrary decimal"
+        case 147:  // "arbitrary decimal"
             value.move<Decimal128>(that.value);
             break;
 
-        case symbol_kind::S_OBJECT_ID:  // "ObjectID"
+        case 136:  // "ObjectID"
             value.move<OID>(that.value);
             break;
 
-        case symbol_kind::S_TIMESTAMP:  // "Timestamp"
+        case 148:  // "Timestamp"
             value.move<Timestamp>(that.value);
             break;
 
-        case symbol_kind::S_MAX_KEY:  // "maxKey"
+        case 150:  // "maxKey"
             value.move<UserMaxKey>(that.value);
             break;
 
-        case symbol_kind::S_MIN_KEY:  // "minKey"
+        case 149:  // "minKey"
             value.move<UserMinKey>(that.value);
             break;
 
-        case symbol_kind::S_JSNULL:  // "null"
+        case 138:  // "null"
             value.move<UserNull>(that.value);
             break;
 
-        case symbol_kind::S_UNDEFINED:  // "undefined"
+        case 135:  // "undefined"
             value.move<UserUndefined>(that.value);
             break;
 
-        case symbol_kind::S_DOUBLE_OTHER:  // "arbitrary double"
+        case 146:  // "arbitrary double"
             value.move<double>(that.value);
             break;
 
-        case symbol_kind::S_INT_OTHER:  // "arbitrary integer"
+        case 144:  // "arbitrary integer"
             value.move<int>(that.value);
             break;
 
-        case symbol_kind::S_LONG_OTHER:  // "arbitrary long"
+        case 145:  // "arbitrary long"
             value.move<long long>(that.value);
             break;
 
-        case symbol_kind::S_projectField:        // projectField
-        case symbol_kind::S_expressionField:     // expressionField
-        case symbol_kind::S_valueField:          // valueField
-        case symbol_kind::S_onErrorArg:          // onErrorArg
-        case symbol_kind::S_onNullArg:           // onNullArg
-        case symbol_kind::S_formatArg:           // formatArg
-        case symbol_kind::S_timezoneArg:         // timezoneArg
-        case symbol_kind::S_charsArg:            // charsArg
-        case symbol_kind::S_optionsArg:          // optionsArg
-        case symbol_kind::S_predicate:           // predicate
-        case symbol_kind::S_logicalExpr:         // logicalExpr
-        case symbol_kind::S_operatorExpression:  // operatorExpression
-        case symbol_kind::S_notExpr:             // notExpr
-        case symbol_kind::S_sortSpec:            // sortSpec
+        case 167:  // projectField
+        case 168:  // projectionObjectField
+        case 169:  // expressionField
+        case 170:  // valueField
+        case 292:  // onErrorArg
+        case 293:  // onNullArg
+        case 294:  // formatArg
+        case 295:  // timezoneArg
+        case 296:  // charsArg
+        case 297:  // optionsArg
+        case 314:  // predicate
+        case 315:  // logicalExpr
+        case 316:  // operatorExpression
+        case 317:  // notExpr
+        case 324:  // sortSpec
             value.move<std::pair<CNode::Fieldname, CNode>>(that.value);
             break;
 
-        case symbol_kind::S_FIELDNAME:              // "fieldname"
-        case symbol_kind::S_STRING:                 // "string"
-        case symbol_kind::S_DOLLAR_STRING:          // "$-prefixed string"
-        case symbol_kind::S_DOLLAR_DOLLAR_STRING:   // "$$-prefixed string"
-        case symbol_kind::S_DOLLAR_PREF_FIELDNAME:  // "$-prefixed fieldname"
+        case 128:  // "fieldname"
+        case 130:  // "$-prefixed fieldname"
+        case 131:  // "string"
+        case 132:  // "$-prefixed string"
+        case 133:  // "$$-prefixed string"
+        case 171:  // arg
             value.move<std::string>(that.value);
             break;
 
-        case symbol_kind::S_expressions:    // expressions
-        case symbol_kind::S_values:         // values
-        case symbol_kind::S_exprZeroToTwo:  // exprZeroToTwo
+        case 298:  // expressions
+        case 299:  // values
+        case 300:  // exprZeroToTwo
             value.move<std::vector<CNode>>(that.value);
+            break;
+
+        case 129:  // "fieldname containing dotted path"
+            value.move<std::vector<std::string>>(that.value);
             break;
 
         default:
@@ -1448,250 +1517,266 @@ int ParserGen::parse() {
                correct type. The default '$$ = $1' action is NOT applied
                when using variants.  */
             switch (yyr1_[yyn]) {
-                case symbol_kind::S_BINARY:  // "BinData"
+                case 134:  // "BinData"
                     yylhs.value.emplace<BSONBinData>();
                     break;
 
-                case symbol_kind::S_JAVASCRIPT:  // "Code"
+                case 141:  // "Code"
                     yylhs.value.emplace<BSONCode>();
                     break;
 
-                case symbol_kind::S_JAVASCRIPT_W_SCOPE:  // "CodeWScope"
+                case 143:  // "CodeWScope"
                     yylhs.value.emplace<BSONCodeWScope>();
                     break;
 
-                case symbol_kind::S_DB_POINTER:  // "dbPointer"
+                case 140:  // "dbPointer"
                     yylhs.value.emplace<BSONDBRef>();
                     break;
 
-                case symbol_kind::S_REGEX:  // "regex"
+                case 139:  // "regex"
                     yylhs.value.emplace<BSONRegEx>();
                     break;
 
-                case symbol_kind::S_SYMBOL:  // "Symbol"
+                case 142:  // "Symbol"
                     yylhs.value.emplace<BSONSymbol>();
                     break;
 
-                case symbol_kind::S_dbPointer:            // dbPointer
-                case symbol_kind::S_javascript:           // javascript
-                case symbol_kind::S_symbol:               // symbol
-                case symbol_kind::S_javascriptWScope:     // javascriptWScope
-                case symbol_kind::S_int:                  // int
-                case symbol_kind::S_timestamp:            // timestamp
-                case symbol_kind::S_long:                 // long
-                case symbol_kind::S_double:               // double
-                case symbol_kind::S_decimal:              // decimal
-                case symbol_kind::S_minKey:               // minKey
-                case symbol_kind::S_maxKey:               // maxKey
-                case symbol_kind::S_value:                // value
-                case symbol_kind::S_string:               // string
-                case symbol_kind::S_fieldPath:            // fieldPath
-                case symbol_kind::S_binary:               // binary
-                case symbol_kind::S_undefined:            // undefined
-                case symbol_kind::S_objectId:             // objectId
-                case symbol_kind::S_bool:                 // bool
-                case symbol_kind::S_date:                 // date
-                case symbol_kind::S_null:                 // null
-                case symbol_kind::S_regex:                // regex
-                case symbol_kind::S_simpleValue:          // simpleValue
-                case symbol_kind::S_compoundValue:        // compoundValue
-                case symbol_kind::S_valueArray:           // valueArray
-                case symbol_kind::S_valueObject:          // valueObject
-                case symbol_kind::S_valueFields:          // valueFields
-                case symbol_kind::S_variable:             // variable
-                case symbol_kind::S_pipeline:             // pipeline
-                case symbol_kind::S_stageList:            // stageList
-                case symbol_kind::S_stage:                // stage
-                case symbol_kind::S_inhibitOptimization:  // inhibitOptimization
-                case symbol_kind::S_unionWith:            // unionWith
-                case symbol_kind::S_skip:                 // skip
-                case symbol_kind::S_limit:                // limit
-                case symbol_kind::S_project:              // project
-                case symbol_kind::S_sample:               // sample
-                case symbol_kind::S_projectFields:        // projectFields
-                case symbol_kind::S_projection:           // projection
-                case symbol_kind::S_num:                  // num
-                case symbol_kind::S_expression:           // expression
-                case symbol_kind::S_compoundExpression:   // compoundExpression
-                case symbol_kind::S_exprFixedTwoArg:      // exprFixedTwoArg
-                case symbol_kind::S_expressionArray:      // expressionArray
-                case symbol_kind::S_expressionObject:     // expressionObject
-                case symbol_kind::S_expressionFields:     // expressionFields
-                case symbol_kind::S_maths:                // maths
-                case symbol_kind::S_add:                  // add
-                case symbol_kind::S_atan2:                // atan2
-                case symbol_kind::S_boolExps:             // boolExps
-                case symbol_kind::S_and:                  // and
-                case symbol_kind::S_or:                   // or
-                case symbol_kind::S_not:                  // not
-                case symbol_kind::S_literalEscapes:       // literalEscapes
-                case symbol_kind::S_const:                // const
-                case symbol_kind::S_literal:              // literal
-                case symbol_kind::S_stringExps:           // stringExps
-                case symbol_kind::S_concat:               // concat
-                case symbol_kind::S_dateFromString:       // dateFromString
-                case symbol_kind::S_dateToString:         // dateToString
-                case symbol_kind::S_indexOfBytes:         // indexOfBytes
-                case symbol_kind::S_indexOfCP:            // indexOfCP
-                case symbol_kind::S_ltrim:                // ltrim
-                case symbol_kind::S_regexFind:            // regexFind
-                case symbol_kind::S_regexFindAll:         // regexFindAll
-                case symbol_kind::S_regexMatch:           // regexMatch
-                case symbol_kind::S_regexArgs:            // regexArgs
-                case symbol_kind::S_replaceOne:           // replaceOne
-                case symbol_kind::S_replaceAll:           // replaceAll
-                case symbol_kind::S_rtrim:                // rtrim
-                case symbol_kind::S_split:                // split
-                case symbol_kind::S_strLenBytes:          // strLenBytes
-                case symbol_kind::S_strLenCP:             // strLenCP
-                case symbol_kind::S_strcasecmp:           // strcasecmp
-                case symbol_kind::S_substr:               // substr
-                case symbol_kind::S_substrBytes:          // substrBytes
-                case symbol_kind::S_substrCP:             // substrCP
-                case symbol_kind::S_toLower:              // toLower
-                case symbol_kind::S_toUpper:              // toUpper
-                case symbol_kind::S_trim:                 // trim
-                case symbol_kind::S_compExprs:            // compExprs
-                case symbol_kind::S_cmp:                  // cmp
-                case symbol_kind::S_eq:                   // eq
-                case symbol_kind::S_gt:                   // gt
-                case symbol_kind::S_gte:                  // gte
-                case symbol_kind::S_lt:                   // lt
-                case symbol_kind::S_lte:                  // lte
-                case symbol_kind::S_ne:                   // ne
-                case symbol_kind::S_typeExpression:       // typeExpression
-                case symbol_kind::S_convert:              // convert
-                case symbol_kind::S_toBool:               // toBool
-                case symbol_kind::S_toDate:               // toDate
-                case symbol_kind::S_toDecimal:            // toDecimal
-                case symbol_kind::S_toDouble:             // toDouble
-                case symbol_kind::S_toInt:                // toInt
-                case symbol_kind::S_toLong:               // toLong
-                case symbol_kind::S_toObjectId:           // toObjectId
-                case symbol_kind::S_toString:             // toString
-                case symbol_kind::S_type:                 // type
-                case symbol_kind::S_abs:                  // abs
-                case symbol_kind::S_ceil:                 // ceil
-                case symbol_kind::S_divide:               // divide
-                case symbol_kind::S_exponent:             // exponent
-                case symbol_kind::S_floor:                // floor
-                case symbol_kind::S_ln:                   // ln
-                case symbol_kind::S_log:                  // log
-                case symbol_kind::S_logten:               // logten
-                case symbol_kind::S_mod:                  // mod
-                case symbol_kind::S_multiply:             // multiply
-                case symbol_kind::S_pow:                  // pow
-                case symbol_kind::S_round:                // round
-                case symbol_kind::S_sqrt:                 // sqrt
-                case symbol_kind::S_subtract:             // subtract
-                case symbol_kind::S_trunc:                // trunc
-                case symbol_kind::S_setExpression:        // setExpression
-                case symbol_kind::S_allElementsTrue:      // allElementsTrue
-                case symbol_kind::S_anyElementTrue:       // anyElementTrue
-                case symbol_kind::S_setDifference:        // setDifference
-                case symbol_kind::S_setEquals:            // setEquals
-                case symbol_kind::S_setIntersection:      // setIntersection
-                case symbol_kind::S_setIsSubset:          // setIsSubset
-                case symbol_kind::S_setUnion:             // setUnion
-                case symbol_kind::S_match:                // match
-                case symbol_kind::S_predicates:           // predicates
-                case symbol_kind::S_compoundMatchExprs:   // compoundMatchExprs
-                case symbol_kind::S_predValue:            // predValue
-                case symbol_kind::S_additionalExprs:      // additionalExprs
-                case symbol_kind::S_sortSpecs:            // sortSpecs
-                case symbol_kind::S_specList:             // specList
-                case symbol_kind::S_metaSort:             // metaSort
-                case symbol_kind::S_oneOrNegOne:          // oneOrNegOne
-                case symbol_kind::S_metaSortKeyword:      // metaSortKeyword
+                case 172:  // dbPointer
+                case 173:  // javascript
+                case 174:  // symbol
+                case 175:  // javascriptWScope
+                case 176:  // int
+                case 177:  // timestamp
+                case 178:  // long
+                case 179:  // double
+                case 180:  // decimal
+                case 181:  // minKey
+                case 182:  // maxKey
+                case 183:  // value
+                case 184:  // string
+                case 185:  // aggregationFieldPath
+                case 186:  // binary
+                case 187:  // undefined
+                case 188:  // objectId
+                case 189:  // bool
+                case 190:  // date
+                case 191:  // null
+                case 192:  // regex
+                case 193:  // simpleValue
+                case 194:  // compoundValue
+                case 195:  // valueArray
+                case 196:  // valueObject
+                case 197:  // valueFields
+                case 198:  // variable
+                case 199:  // pipeline
+                case 200:  // stageList
+                case 201:  // stage
+                case 202:  // inhibitOptimization
+                case 203:  // unionWith
+                case 204:  // skip
+                case 205:  // limit
+                case 206:  // project
+                case 207:  // sample
+                case 208:  // projectFields
+                case 209:  // projectionObjectFields
+                case 210:  // topLevelProjection
+                case 211:  // projection
+                case 212:  // projectionObject
+                case 213:  // num
+                case 214:  // expression
+                case 215:  // compoundNonObjectExpression
+                case 216:  // exprFixedTwoArg
+                case 217:  // exprFixedThreeArg
+                case 218:  // arrayManipulation
+                case 219:  // slice
+                case 220:  // expressionArray
+                case 221:  // expressionObject
+                case 222:  // expressionFields
+                case 223:  // maths
+                case 224:  // meta
+                case 225:  // add
+                case 226:  // atan2
+                case 227:  // boolExprs
+                case 228:  // and
+                case 229:  // or
+                case 230:  // not
+                case 231:  // literalEscapes
+                case 232:  // const
+                case 233:  // literal
+                case 234:  // stringExps
+                case 235:  // concat
+                case 236:  // dateFromString
+                case 237:  // dateToString
+                case 238:  // indexOfBytes
+                case 239:  // indexOfCP
+                case 240:  // ltrim
+                case 241:  // regexFind
+                case 242:  // regexFindAll
+                case 243:  // regexMatch
+                case 244:  // regexArgs
+                case 245:  // replaceOne
+                case 246:  // replaceAll
+                case 247:  // rtrim
+                case 248:  // split
+                case 249:  // strLenBytes
+                case 250:  // strLenCP
+                case 251:  // strcasecmp
+                case 252:  // substr
+                case 253:  // substrBytes
+                case 254:  // substrCP
+                case 255:  // toLower
+                case 256:  // toUpper
+                case 257:  // trim
+                case 258:  // compExprs
+                case 259:  // cmp
+                case 260:  // eq
+                case 261:  // gt
+                case 262:  // gte
+                case 263:  // lt
+                case 264:  // lte
+                case 265:  // ne
+                case 266:  // typeExpression
+                case 267:  // convert
+                case 268:  // toBool
+                case 269:  // toDate
+                case 270:  // toDecimal
+                case 271:  // toDouble
+                case 272:  // toInt
+                case 273:  // toLong
+                case 274:  // toObjectId
+                case 275:  // toString
+                case 276:  // type
+                case 277:  // abs
+                case 278:  // ceil
+                case 279:  // divide
+                case 280:  // exponent
+                case 281:  // floor
+                case 282:  // ln
+                case 283:  // log
+                case 284:  // logten
+                case 285:  // mod
+                case 286:  // multiply
+                case 287:  // pow
+                case 288:  // round
+                case 289:  // sqrt
+                case 290:  // subtract
+                case 291:  // trunc
+                case 301:  // setExpression
+                case 302:  // allElementsTrue
+                case 303:  // anyElementTrue
+                case 304:  // setDifference
+                case 305:  // setEquals
+                case 306:  // setIntersection
+                case 307:  // setIsSubset
+                case 308:  // setUnion
+                case 309:  // match
+                case 310:  // predicates
+                case 311:  // compoundMatchExprs
+                case 312:  // predValue
+                case 313:  // additionalExprs
+                case 319:  // sortSpecs
+                case 320:  // specList
+                case 321:  // metaSort
+                case 322:  // oneOrNegOne
+                case 323:  // metaSortKeyword
                     yylhs.value.emplace<CNode>();
                     break;
 
-                case symbol_kind::S_projectionFieldname:      // projectionFieldname
-                case symbol_kind::S_expressionFieldname:      // expressionFieldname
-                case symbol_kind::S_stageAsUserFieldname:     // stageAsUserFieldname
-                case symbol_kind::S_predFieldname:            // predFieldname
-                case symbol_kind::S_argAsUserFieldname:       // argAsUserFieldname
-                case symbol_kind::S_aggExprAsUserFieldname:   // aggExprAsUserFieldname
-                case symbol_kind::S_invariableUserFieldname:  // invariableUserFieldname
-                case symbol_kind::S_idAsUserFieldname:        // idAsUserFieldname
-                case symbol_kind::S_valueFieldname:           // valueFieldname
-                case symbol_kind::S_logicalExprField:         // logicalExprField
+                case 155:  // aggregationProjectionFieldname
+                case 156:  // projectionFieldname
+                case 157:  // expressionFieldname
+                case 158:  // stageAsUserFieldname
+                case 159:  // argAsUserFieldname
+                case 160:  // argAsProjectionPath
+                case 161:  // aggExprAsUserFieldname
+                case 162:  // invariableUserFieldname
+                case 163:  // idAsUserFieldname
+                case 164:  // idAsProjectionPath
+                case 165:  // valueFieldname
+                case 166:  // predFieldname
+                case 318:  // logicalExprField
                     yylhs.value.emplace<CNode::Fieldname>();
                     break;
 
-                case symbol_kind::S_DATE_LITERAL:  // "Date"
+                case 137:  // "Date"
                     yylhs.value.emplace<Date_t>();
                     break;
 
-                case symbol_kind::S_DECIMAL_OTHER:  // "arbitrary decimal"
+                case 147:  // "arbitrary decimal"
                     yylhs.value.emplace<Decimal128>();
                     break;
 
-                case symbol_kind::S_OBJECT_ID:  // "ObjectID"
+                case 136:  // "ObjectID"
                     yylhs.value.emplace<OID>();
                     break;
 
-                case symbol_kind::S_TIMESTAMP:  // "Timestamp"
+                case 148:  // "Timestamp"
                     yylhs.value.emplace<Timestamp>();
                     break;
 
-                case symbol_kind::S_MAX_KEY:  // "maxKey"
+                case 150:  // "maxKey"
                     yylhs.value.emplace<UserMaxKey>();
                     break;
 
-                case symbol_kind::S_MIN_KEY:  // "minKey"
+                case 149:  // "minKey"
                     yylhs.value.emplace<UserMinKey>();
                     break;
 
-                case symbol_kind::S_JSNULL:  // "null"
+                case 138:  // "null"
                     yylhs.value.emplace<UserNull>();
                     break;
 
-                case symbol_kind::S_UNDEFINED:  // "undefined"
+                case 135:  // "undefined"
                     yylhs.value.emplace<UserUndefined>();
                     break;
 
-                case symbol_kind::S_DOUBLE_OTHER:  // "arbitrary double"
+                case 146:  // "arbitrary double"
                     yylhs.value.emplace<double>();
                     break;
 
-                case symbol_kind::S_INT_OTHER:  // "arbitrary integer"
+                case 144:  // "arbitrary integer"
                     yylhs.value.emplace<int>();
                     break;
 
-                case symbol_kind::S_LONG_OTHER:  // "arbitrary long"
+                case 145:  // "arbitrary long"
                     yylhs.value.emplace<long long>();
                     break;
 
-                case symbol_kind::S_projectField:        // projectField
-                case symbol_kind::S_expressionField:     // expressionField
-                case symbol_kind::S_valueField:          // valueField
-                case symbol_kind::S_onErrorArg:          // onErrorArg
-                case symbol_kind::S_onNullArg:           // onNullArg
-                case symbol_kind::S_formatArg:           // formatArg
-                case symbol_kind::S_timezoneArg:         // timezoneArg
-                case symbol_kind::S_charsArg:            // charsArg
-                case symbol_kind::S_optionsArg:          // optionsArg
-                case symbol_kind::S_predicate:           // predicate
-                case symbol_kind::S_logicalExpr:         // logicalExpr
-                case symbol_kind::S_operatorExpression:  // operatorExpression
-                case symbol_kind::S_notExpr:             // notExpr
-                case symbol_kind::S_sortSpec:            // sortSpec
+                case 167:  // projectField
+                case 168:  // projectionObjectField
+                case 169:  // expressionField
+                case 170:  // valueField
+                case 292:  // onErrorArg
+                case 293:  // onNullArg
+                case 294:  // formatArg
+                case 295:  // timezoneArg
+                case 296:  // charsArg
+                case 297:  // optionsArg
+                case 314:  // predicate
+                case 315:  // logicalExpr
+                case 316:  // operatorExpression
+                case 317:  // notExpr
+                case 324:  // sortSpec
                     yylhs.value.emplace<std::pair<CNode::Fieldname, CNode>>();
                     break;
 
-                case symbol_kind::S_FIELDNAME:              // "fieldname"
-                case symbol_kind::S_STRING:                 // "string"
-                case symbol_kind::S_DOLLAR_STRING:          // "$-prefixed string"
-                case symbol_kind::S_DOLLAR_DOLLAR_STRING:   // "$$-prefixed string"
-                case symbol_kind::S_DOLLAR_PREF_FIELDNAME:  // "$-prefixed fieldname"
+                case 128:  // "fieldname"
+                case 130:  // "$-prefixed fieldname"
+                case 131:  // "string"
+                case 132:  // "$-prefixed string"
+                case 133:  // "$$-prefixed string"
+                case 171:  // arg
                     yylhs.value.emplace<std::string>();
                     break;
 
-                case symbol_kind::S_expressions:    // expressions
-                case symbol_kind::S_values:         // values
-                case symbol_kind::S_exprZeroToTwo:  // exprZeroToTwo
+                case 298:  // expressions
+                case 299:  // values
+                case 300:  // exprZeroToTwo
                     yylhs.value.emplace<std::vector<CNode>>();
+                    break;
+
+                case 129:  // "fieldname containing dotted path"
+                    yylhs.value.emplace<std::vector<std::string>>();
                     break;
 
                 default:
@@ -1713,128 +1798,128 @@ int ParserGen::parse() {
 #endif  // YY_EXCEPTIONS
             {
                 switch (yyn) {
-                    case 2:  // start: "pipeline argument" pipeline
-#line 313 "grammar.yy"
+                    case 2:
+#line 333 "grammar.yy"
                     {
                         *cst = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1788 "parser_gen.cpp"
+#line 1873 "parser_gen.cpp"
                     break;
 
-                    case 3:  // start: "filter" match
-#line 316 "grammar.yy"
+                    case 3:
+#line 336 "grammar.yy"
                     {
                         *cst = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1796 "parser_gen.cpp"
+#line 1881 "parser_gen.cpp"
                     break;
 
-                    case 4:  // start: "query" match
-#line 319 "grammar.yy"
+                    case 4:
+#line 339 "grammar.yy"
                     {
                         *cst = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1804 "parser_gen.cpp"
+#line 1889 "parser_gen.cpp"
                     break;
 
-                    case 5:  // start: "q" match
-#line 322 "grammar.yy"
+                    case 5:
+#line 342 "grammar.yy"
                     {
                         *cst = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1812 "parser_gen.cpp"
+#line 1897 "parser_gen.cpp"
                     break;
 
-                    case 6:  // start: "sort argument" sortSpecs
-#line 325 "grammar.yy"
+                    case 6:
+#line 345 "grammar.yy"
                     {
                         *cst = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1820 "parser_gen.cpp"
+#line 1905 "parser_gen.cpp"
                     break;
 
-                    case 7:  // pipeline: "array" stageList "end of array"
-#line 332 "grammar.yy"
+                    case 7:
+#line 352 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 1828 "parser_gen.cpp"
+#line 1913 "parser_gen.cpp"
                     break;
 
-                    case 8:  // stageList: %empty
-#line 338 "grammar.yy"
+                    case 8:
+#line 358 "grammar.yy"
                     {
                     }
-#line 1834 "parser_gen.cpp"
+#line 1919 "parser_gen.cpp"
                     break;
 
-                    case 9:  // stageList: "object" stage "end of object" stageList
-#line 339 "grammar.yy"
+                    case 9:
+#line 359 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}};
                     }
-#line 1842 "parser_gen.cpp"
+#line 1927 "parser_gen.cpp"
                     break;
 
-                    case 10:  // $@1: %empty
-#line 347 "grammar.yy"
+                    case 10:
+#line 367 "grammar.yy"
                     {
                         lexer.sortObjTokens();
                     }
-#line 1848 "parser_gen.cpp"
+#line 1933 "parser_gen.cpp"
                     break;
 
-                    case 12:  // stage: inhibitOptimization
-#line 350 "grammar.yy"
+                    case 12:
+#line 370 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1854 "parser_gen.cpp"
+#line 1939 "parser_gen.cpp"
                     break;
 
-                    case 13:  // stage: unionWith
-#line 350 "grammar.yy"
+                    case 13:
+#line 370 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1860 "parser_gen.cpp"
+#line 1945 "parser_gen.cpp"
                     break;
 
-                    case 14:  // stage: skip
-#line 350 "grammar.yy"
+                    case 14:
+#line 370 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1866 "parser_gen.cpp"
+#line 1951 "parser_gen.cpp"
                     break;
 
-                    case 15:  // stage: limit
-#line 350 "grammar.yy"
+                    case 15:
+#line 370 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1872 "parser_gen.cpp"
+#line 1957 "parser_gen.cpp"
                     break;
 
-                    case 16:  // stage: project
-#line 350 "grammar.yy"
+                    case 16:
+#line 370 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1878 "parser_gen.cpp"
+#line 1963 "parser_gen.cpp"
                     break;
 
-                    case 17:  // stage: sample
-#line 350 "grammar.yy"
+                    case 17:
+#line 370 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1884 "parser_gen.cpp"
+#line 1969 "parser_gen.cpp"
                     break;
 
-                    case 18:  // sample: STAGE_SAMPLE "object" "size argument" num "end of object"
-#line 353 "grammar.yy"
+                    case 18:
+#line 373 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{std::pair{
                             KeyFieldname::sample,
@@ -1842,22 +1927,20 @@ int ParserGen::parse() {
                                 {KeyFieldname::sizeArg, YY_MOVE(yystack_[1].value.as<CNode>())},
                             }}}}};
                     }
-#line 1896 "parser_gen.cpp"
+#line 1981 "parser_gen.cpp"
                     break;
 
-                    case 19:  // inhibitOptimization: STAGE_INHIBIT_OPTIMIZATION "object" "end of
-                              // object"
-#line 363 "grammar.yy"
+                    case 19:
+#line 383 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()}}};
                     }
-#line 1904 "parser_gen.cpp"
+#line 1989 "parser_gen.cpp"
                     break;
 
-                    case 20:  // unionWith: STAGE_UNION_WITH START_ORDERED_OBJECT "coll argument"
-                              // string "pipeline argument" double "end of object"
-#line 369 "grammar.yy"
+                    case 20:
+#line 389 "grammar.yy"
                     {
                         auto pipeline = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{std::pair{
@@ -1866,63 +1949,68 @@ int ParserGen::parse() {
                                 {KeyFieldname::collArg, YY_MOVE(yystack_[3].value.as<CNode>())},
                                 {KeyFieldname::pipelineArg, std::move(pipeline)}}}}}};
                     }
-#line 1917 "parser_gen.cpp"
+#line 2002 "parser_gen.cpp"
                     break;
 
-                    case 21:  // num: int
-#line 379 "grammar.yy"
+                    case 21:
+#line 399 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1923 "parser_gen.cpp"
+#line 2008 "parser_gen.cpp"
                     break;
 
-                    case 22:  // num: long
-#line 379 "grammar.yy"
+                    case 22:
+#line 399 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1929 "parser_gen.cpp"
+#line 2014 "parser_gen.cpp"
                     break;
 
-                    case 23:  // num: double
-#line 379 "grammar.yy"
+                    case 23:
+#line 399 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1935 "parser_gen.cpp"
+#line 2020 "parser_gen.cpp"
                     break;
 
-                    case 24:  // num: decimal
-#line 379 "grammar.yy"
+                    case 24:
+#line 399 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1941 "parser_gen.cpp"
+#line 2026 "parser_gen.cpp"
                     break;
 
-                    case 25:  // skip: STAGE_SKIP num
-#line 383 "grammar.yy"
+                    case 25:
+#line 403 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             std::pair{KeyFieldname::skip, YY_MOVE(yystack_[0].value.as<CNode>())}}};
                     }
-#line 1949 "parser_gen.cpp"
+#line 2034 "parser_gen.cpp"
                     break;
 
-                    case 26:  // limit: STAGE_LIMIT num
-#line 388 "grammar.yy"
+                    case 26:
+#line 408 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{std::pair{
                             KeyFieldname::limit, YY_MOVE(yystack_[0].value.as<CNode>())}}};
                     }
-#line 1957 "parser_gen.cpp"
+#line 2042 "parser_gen.cpp"
                     break;
 
-                    case 27:  // project: STAGE_PROJECT "object" projectFields "end of object"
-#line 393 "grammar.yy"
+                    case 27:
+#line 413 "grammar.yy"
                     {
                         auto&& fields = YY_MOVE(yystack_[1].value.as<CNode>());
+                        if (auto status =
+                                c_node_validation::validateNoConflictingPathsInProjectFields(
+                                    fields);
+                            !status.isOK())
+                            error(yystack_[3].location, status.reason());
                         if (auto inclusion =
                                 c_node_validation::validateProjectionAsInclusionOrExclusion(fields);
                             inclusion.isOK())
@@ -1936,458 +2024,556 @@ int ParserGen::parse() {
                             // function.
                             error(yystack_[3].location, inclusion.getStatus().reason());
                     }
-#line 1975 "parser_gen.cpp"
+#line 2063 "parser_gen.cpp"
                     break;
 
-                    case 28:  // projectFields: %empty
-#line 409 "grammar.yy"
+                    case 28:
+#line 432 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 1983 "parser_gen.cpp"
+#line 2071 "parser_gen.cpp"
                     break;
 
-                    case 29:  // projectFields: projectFields projectField
-#line 412 "grammar.yy"
+                    case 29:
+#line 435 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 1992 "parser_gen.cpp"
+#line 2080 "parser_gen.cpp"
                     break;
 
-                    case 30:  // projectField: ID projection
-#line 419 "grammar.yy"
+                    case 30:
+#line 442 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             KeyFieldname::id, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2000 "parser_gen.cpp"
+#line 2088 "parser_gen.cpp"
                     break;
 
-                    case 31:  // projectField: projectionFieldname projection
-#line 422 "grammar.yy"
+                    case 31:
+#line 445 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2008 "parser_gen.cpp"
+#line 2096 "parser_gen.cpp"
                     break;
 
-                    case 32:  // projection: string
-#line 428 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2014 "parser_gen.cpp"
-                    break;
-
-                    case 33:  // projection: binary
-#line 429 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2020 "parser_gen.cpp"
-                    break;
-
-                    case 34:  // projection: undefined
-#line 430 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2026 "parser_gen.cpp"
-                    break;
-
-                    case 35:  // projection: objectId
-#line 431 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2032 "parser_gen.cpp"
-                    break;
-
-                    case 36:  // projection: date
-#line 432 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2038 "parser_gen.cpp"
-                    break;
-
-                    case 37:  // projection: null
-#line 433 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2044 "parser_gen.cpp"
-                    break;
-
-                    case 38:  // projection: regex
-#line 434 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2050 "parser_gen.cpp"
-                    break;
-
-                    case 39:  // projection: dbPointer
-#line 435 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2056 "parser_gen.cpp"
-                    break;
-
-                    case 40:  // projection: javascript
-#line 436 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2062 "parser_gen.cpp"
-                    break;
-
-                    case 41:  // projection: symbol
-#line 437 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2068 "parser_gen.cpp"
-                    break;
-
-                    case 42:  // projection: javascriptWScope
-#line 438 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2074 "parser_gen.cpp"
-                    break;
-
-                    case 43:  // projection: "1 (int)"
-#line 439 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{NonZeroKey{1}};
-                    }
-#line 2082 "parser_gen.cpp"
-                    break;
-
-                    case 44:  // projection: "-1 (int)"
-#line 442 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{NonZeroKey{-1}};
-                    }
-#line 2090 "parser_gen.cpp"
-                    break;
-
-                    case 45:  // projection: "arbitrary integer"
-#line 445 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() =
-                            CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<int>())}};
-                    }
-#line 2098 "parser_gen.cpp"
-                    break;
-
-                    case 46:  // projection: "zero (int)"
-#line 448 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{KeyValue::intZeroKey};
-                    }
-#line 2106 "parser_gen.cpp"
-                    break;
-
-                    case 47:  // projection: "1 (long)"
+                    case 32:
 #line 451 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{NonZeroKey{1ll}};
-                    }
-#line 2114 "parser_gen.cpp"
-                    break;
-
-                    case 48:  // projection: "-1 (long)"
-#line 454 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{NonZeroKey{-1ll}};
-                    }
-#line 2122 "parser_gen.cpp"
-                    break;
-
-                    case 49:  // projection: "arbitrary long"
-#line 457 "grammar.yy"
-                    {
+                        auto projection = YY_MOVE(yystack_[0].value.as<CNode>());
                         yylhs.value.as<CNode>() =
-                            CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<long long>())}};
-                    }
-#line 2130 "parser_gen.cpp"
-                    break;
-
-                    case 50:  // projection: "zero (long)"
-#line 460 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{KeyValue::longZeroKey};
-                    }
-#line 2138 "parser_gen.cpp"
-                    break;
-
-                    case 51:  // projection: "1 (double)"
-#line 463 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{NonZeroKey{1.0}};
-                    }
-#line 2146 "parser_gen.cpp"
-                    break;
-
-                    case 52:  // projection: "-1 (double)"
-#line 466 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{NonZeroKey{-1.0}};
-                    }
-#line 2154 "parser_gen.cpp"
-                    break;
-
-                    case 53:  // projection: "arbitrary double"
-#line 469 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() =
-                            CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<double>())}};
-                    }
-#line 2162 "parser_gen.cpp"
-                    break;
-
-                    case 54:  // projection: "zero (double)"
-#line 472 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{KeyValue::doubleZeroKey};
-                    }
-#line 2170 "parser_gen.cpp"
-                    break;
-
-                    case 55:  // projection: "1 (decimal)"
-#line 475 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{NonZeroKey{1.0}};
-                    }
-#line 2178 "parser_gen.cpp"
-                    break;
-
-                    case 56:  // projection: "-1 (decimal)"
-#line 478 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{NonZeroKey{-1.0}};
-                    }
-#line 2186 "parser_gen.cpp"
-                    break;
-
-                    case 57:  // projection: "arbitrary decimal"
-#line 481 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() =
-                            CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<Decimal128>())}};
-                    }
-#line 2194 "parser_gen.cpp"
-                    break;
-
-                    case 58:  // projection: "zero (decimal)"
-#line 484 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{KeyValue::decimalZeroKey};
-                    }
-#line 2202 "parser_gen.cpp"
-                    break;
-
-                    case 59:  // projection: "true"
-#line 487 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{KeyValue::trueKey};
-                    }
-#line 2210 "parser_gen.cpp"
-                    break;
-
-                    case 60:  // projection: "false"
-#line 490 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{KeyValue::falseKey};
-                    }
-#line 2218 "parser_gen.cpp"
-                    break;
-
-                    case 61:  // projection: timestamp
-#line 493 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2224 "parser_gen.cpp"
-                    break;
-
-                    case 62:  // projection: minKey
-#line 494 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2230 "parser_gen.cpp"
-                    break;
-
-                    case 63:  // projection: maxKey
-#line 495 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2236 "parser_gen.cpp"
-                    break;
-
-                    case 64:  // projection: compoundExpression
-#line 496 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() =
-                            c_node_disambiguation::disambiguateCompoundProjection(
-                                YY_MOVE(yystack_[0].value.as<CNode>()));
+                            stdx::holds_alternative<CNode::ObjectChildren>(projection.payload) &&
+                                stdx::holds_alternative<FieldnamePath>(
+                                    projection.objectChildren()[0].first)
+                            ? c_node_disambiguation::disambiguateCompoundProjection(
+                                  std::move(projection))
+                            : std::move(projection);
                         if (stdx::holds_alternative<CompoundInconsistentKey>(
                                 yylhs.value.as<CNode>().payload))
                             // TODO SERVER-50498: error() instead of uasserting
                             uasserted(ErrorCodes::FailedToParse,
-                                      "object project field cannot contain both inclusion and "
-                                      "exclusion indicators");
+                                      "object project field cannot contain both "
+                                      "inclusion and exclusion indicators");
                     }
-#line 2247 "parser_gen.cpp"
+#line 2112 "parser_gen.cpp"
                     break;
 
-                    case 65:  // projectionFieldname: invariableUserFieldname
-#line 505 "grammar.yy"
+                    case 33:
+#line 465 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2253 "parser_gen.cpp"
+#line 2118 "parser_gen.cpp"
                     break;
 
-                    case 66:  // projectionFieldname: stageAsUserFieldname
-#line 505 "grammar.yy"
+                    case 34:
+#line 466 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2259 "parser_gen.cpp"
+#line 2124 "parser_gen.cpp"
                     break;
 
-                    case 67:  // projectionFieldname: argAsUserFieldname
-#line 505 "grammar.yy"
+                    case 35:
+#line 467 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2265 "parser_gen.cpp"
+#line 2130 "parser_gen.cpp"
                     break;
 
-                    case 68:  // projectionFieldname: aggExprAsUserFieldname
-#line 505 "grammar.yy"
+                    case 36:
+#line 468 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() =
-                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2271 "parser_gen.cpp"
+#line 2136 "parser_gen.cpp"
                     break;
 
-                    case 69:  // match: "object" predicates "end of object"
+                    case 37:
+#line 469 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2142 "parser_gen.cpp"
+                    break;
+
+                    case 38:
+#line 470 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2148 "parser_gen.cpp"
+                    break;
+
+                    case 39:
+#line 471 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2154 "parser_gen.cpp"
+                    break;
+
+                    case 40:
+#line 472 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2160 "parser_gen.cpp"
+                    break;
+
+                    case 41:
+#line 473 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2166 "parser_gen.cpp"
+                    break;
+
+                    case 42:
+#line 474 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2172 "parser_gen.cpp"
+                    break;
+
+                    case 43:
+#line 475 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2178 "parser_gen.cpp"
+                    break;
+
+                    case 44:
+#line 476 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{NonZeroKey{1}};
+                    }
+#line 2186 "parser_gen.cpp"
+                    break;
+
+                    case 45:
+#line 479 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{NonZeroKey{-1}};
+                    }
+#line 2194 "parser_gen.cpp"
+                    break;
+
+                    case 46:
+#line 482 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<int>())}};
+                    }
+#line 2202 "parser_gen.cpp"
+                    break;
+
+                    case 47:
+#line 485 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{KeyValue::intZeroKey};
+                    }
+#line 2210 "parser_gen.cpp"
+                    break;
+
+                    case 48:
+#line 488 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{NonZeroKey{1ll}};
+                    }
+#line 2218 "parser_gen.cpp"
+                    break;
+
+                    case 49:
+#line 491 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{NonZeroKey{-1ll}};
+                    }
+#line 2226 "parser_gen.cpp"
+                    break;
+
+                    case 50:
+#line 494 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<long long>())}};
+                    }
+#line 2234 "parser_gen.cpp"
+                    break;
+
+                    case 51:
+#line 497 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{KeyValue::longZeroKey};
+                    }
+#line 2242 "parser_gen.cpp"
+                    break;
+
+                    case 52:
+#line 500 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{NonZeroKey{1.0}};
+                    }
+#line 2250 "parser_gen.cpp"
+                    break;
+
+                    case 53:
+#line 503 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{NonZeroKey{-1.0}};
+                    }
+#line 2258 "parser_gen.cpp"
+                    break;
+
+                    case 54:
+#line 506 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<double>())}};
+                    }
+#line 2266 "parser_gen.cpp"
+                    break;
+
+                    case 55:
 #line 509 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{KeyValue::doubleZeroKey};
+                    }
+#line 2274 "parser_gen.cpp"
+                    break;
+
+                    case 56:
+#line 512 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{NonZeroKey{Decimal128{1.0}}};
+                    }
+#line 2282 "parser_gen.cpp"
+                    break;
+
+                    case 57:
+#line 515 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{NonZeroKey{Decimal128{-1.0}}};
+                    }
+#line 2290 "parser_gen.cpp"
+                    break;
+
+                    case 58:
+#line 518 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<Decimal128>())}};
+                    }
+#line 2298 "parser_gen.cpp"
+                    break;
+
+                    case 59:
+#line 521 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{KeyValue::decimalZeroKey};
+                    }
+#line 2306 "parser_gen.cpp"
+                    break;
+
+                    case 60:
+#line 524 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{KeyValue::trueKey};
+                    }
+#line 2314 "parser_gen.cpp"
+                    break;
+
+                    case 61:
+#line 527 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{KeyValue::falseKey};
+                    }
+#line 2322 "parser_gen.cpp"
+                    break;
+
+                    case 62:
+#line 530 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2328 "parser_gen.cpp"
+                    break;
+
+                    case 63:
+#line 531 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2334 "parser_gen.cpp"
+                    break;
+
+                    case 64:
+#line 532 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2340 "parser_gen.cpp"
+                    break;
+
+                    case 65:
+#line 533 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2346 "parser_gen.cpp"
+                    break;
+
+                    case 66:
+#line 534 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2352 "parser_gen.cpp"
+                    break;
+
+                    case 67:
+#line 539 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode::Fieldname>() =
+                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                        if (stdx::holds_alternative<PositionalProjectionPath>(
+                                stdx::get<FieldnamePath>(yylhs.value.as<CNode::Fieldname>())))
+                            error(yystack_[0].location,
+                                  "positional projection forbidden in $project aggregation "
+                                  "pipeline stage");
+                    }
+#line 2362 "parser_gen.cpp"
+                    break;
+
+                    case 68:
+#line 547 "grammar.yy"
+                    {
+                        auto components =
+                            make_vector<std::string>(YY_MOVE(yystack_[0].value.as<std::string>()));
+                        if (auto positional =
+                                c_node_validation::validateProjectionPathAsNormalOrPositional(
+                                    components);
+                            positional.isOK()) {
+                            if (positional.getValue() == c_node_validation::IsPositional::yes)
+                                yylhs.value.as<CNode::Fieldname>() =
+                                    PositionalProjectionPath{std::move(components)};
+                            else
+                                yylhs.value.as<CNode::Fieldname>() =
+                                    ProjectionPath{std::move(components)};
+                        } else {
+                            error(yystack_[0].location, positional.getStatus().reason());
+                        }
+                    }
+#line 2380 "parser_gen.cpp"
+                    break;
+
+                    case 69:
+#line 560 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode::Fieldname>() =
+                            YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
+                    }
+#line 2386 "parser_gen.cpp"
+                    break;
+
+                    case 70:
+#line 561 "grammar.yy"
+                    {
+                        auto components = YY_MOVE(yystack_[0].value.as<std::vector<std::string>>());
+                        if (auto positional =
+                                c_node_validation::validateProjectionPathAsNormalOrPositional(
+                                    components);
+                            positional.isOK()) {
+                            if (positional.getValue() == c_node_validation::IsPositional::yes)
+                                yylhs.value.as<CNode::Fieldname>() =
+                                    PositionalProjectionPath{std::move(components)};
+                            else
+                                yylhs.value.as<CNode::Fieldname>() =
+                                    ProjectionPath{std::move(components)};
+                        } else {
+                            error(yystack_[0].location, positional.getStatus().reason());
+                        }
+                    }
+#line 2404 "parser_gen.cpp"
+                    break;
+
+                    case 71:
+#line 578 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 2279 "parser_gen.cpp"
+#line 2412 "parser_gen.cpp"
                     break;
 
-                    case 70:  // predicates: %empty
-#line 515 "grammar.yy"
+                    case 72:
+#line 585 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
+                        yylhs.value.as<CNode>().objectChildren().emplace_back(
+                            YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 2287 "parser_gen.cpp"
+#line 2421 "parser_gen.cpp"
                     break;
 
-                    case 71:  // predicates: predicates predicate
-#line 518 "grammar.yy"
+                    case 73:
+#line 589 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 2296 "parser_gen.cpp"
+#line 2430 "parser_gen.cpp"
                     break;
 
-                    case 72:  // predicate: predFieldname predValue
-#line 524 "grammar.yy"
+                    case 74:
+#line 597 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2304 "parser_gen.cpp"
+#line 2438 "parser_gen.cpp"
                     break;
 
-                    case 73:  // predicate: logicalExpr
-#line 527 "grammar.yy"
+                    case 75:
+#line 600 "grammar.yy"
                     {
-                        yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
-                            YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>());
+                        yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
+                            YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
+                            YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2312 "parser_gen.cpp"
+#line 2446 "parser_gen.cpp"
                     break;
 
-                    case 74:  // predValue: simpleValue
-#line 536 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 2318 "parser_gen.cpp"
-                    break;
-
-                    case 75:  // predValue: "object" compoundMatchExprs "end of object"
-#line 537 "grammar.yy"
+                    case 76:
+#line 606 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 2326 "parser_gen.cpp"
+#line 2454 "parser_gen.cpp"
                     break;
 
-                    case 76:  // compoundMatchExprs: %empty
-#line 543 "grammar.yy"
+                    case 77:
+#line 612 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 2334 "parser_gen.cpp"
+#line 2462 "parser_gen.cpp"
                     break;
 
-                    case 77:  // compoundMatchExprs: compoundMatchExprs operatorExpression
-#line 546 "grammar.yy"
+                    case 78:
+#line 615 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 2343 "parser_gen.cpp"
+#line 2471 "parser_gen.cpp"
                     break;
 
-                    case 78:  // operatorExpression: notExpr
-#line 553 "grammar.yy"
+                    case 79:
+#line 621 "grammar.yy"
+                    {
+                        yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
+                            YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
+                            YY_MOVE(yystack_[0].value.as<CNode>())};
+                    }
+#line 2479 "parser_gen.cpp"
+                    break;
+
+                    case 80:
+#line 624 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>());
                     }
-#line 2349 "parser_gen.cpp"
+#line 2487 "parser_gen.cpp"
                     break;
 
-                    case 79:  // notExpr: NOT regex
-#line 556 "grammar.yy"
+                    case 81:
+#line 633 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 2493 "parser_gen.cpp"
+                    break;
+
+                    case 82:
+#line 634 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
+                    }
+#line 2501 "parser_gen.cpp"
+                    break;
+
+                    case 83:
+#line 640 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode::noopLeaf();
+                    }
+#line 2509 "parser_gen.cpp"
+                    break;
+
+                    case 84:
+#line 643 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
+                        yylhs.value.as<CNode>().objectChildren().emplace_back(
+                            YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
+                    }
+#line 2518 "parser_gen.cpp"
+                    break;
+
+                    case 85:
+#line 650 "grammar.yy"
+                    {
+                        yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
+                            YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>());
+                    }
+#line 2524 "parser_gen.cpp"
+                    break;
+
+                    case 86:
+#line 653 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::notExpr, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2357 "parser_gen.cpp"
+#line 2532 "parser_gen.cpp"
                     break;
 
-                    case 80:  // notExpr: NOT "object" operatorExpression compoundMatchExprs "end of
-                              // object"
-#line 560 "grammar.yy"
+                    case 87:
+#line 657 "grammar.yy"
                     {
                         auto&& exprs = YY_MOVE(yystack_[1].value.as<CNode>());
                         exprs.objectChildren().emplace_back(
@@ -2396,12 +2582,11 @@ int ParserGen::parse() {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::notExpr, std::move(exprs)};
                     }
-#line 2368 "parser_gen.cpp"
+#line 2543 "parser_gen.cpp"
                     break;
 
-                    case 81:  // logicalExpr: logicalExprField "array" match additionalExprs "end of
-                              // array"
-#line 569 "grammar.yy"
+                    case 88:
+#line 666 "grammar.yy"
                     {
                         auto&& children = YY_MOVE(yystack_[1].value.as<CNode>());
                         children.arrayChildren().emplace_back(
@@ -2409,1764 +2594,2006 @@ int ParserGen::parse() {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[4].value.as<CNode::Fieldname>()), std::move(children)};
                     }
-#line 2378 "parser_gen.cpp"
+#line 2553 "parser_gen.cpp"
                     break;
 
-                    case 82:  // logicalExprField: AND
-#line 577 "grammar.yy"
+                    case 89:
+#line 674 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = KeyFieldname::andExpr;
                     }
-#line 2384 "parser_gen.cpp"
+#line 2559 "parser_gen.cpp"
                     break;
 
-                    case 83:  // logicalExprField: OR
-#line 578 "grammar.yy"
+                    case 90:
+#line 675 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = KeyFieldname::orExpr;
                     }
-#line 2390 "parser_gen.cpp"
+#line 2565 "parser_gen.cpp"
                     break;
 
-                    case 84:  // logicalExprField: NOR
-#line 579 "grammar.yy"
+                    case 91:
+#line 676 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = KeyFieldname::norExpr;
                     }
-#line 2396 "parser_gen.cpp"
+#line 2571 "parser_gen.cpp"
                     break;
 
-                    case 85:  // additionalExprs: %empty
-#line 582 "grammar.yy"
+                    case 92:
+#line 679 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ArrayChildren{}};
                     }
-#line 2404 "parser_gen.cpp"
+#line 2579 "parser_gen.cpp"
                     break;
 
-                    case 86:  // additionalExprs: additionalExprs match
-#line 585 "grammar.yy"
+                    case 93:
+#line 682 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().arrayChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<CNode>()));
                     }
-#line 2413 "parser_gen.cpp"
+#line 2588 "parser_gen.cpp"
                     break;
 
-                    case 87:  // predFieldname: idAsUserFieldname
-#line 592 "grammar.yy"
+                    case 94:
+#line 689 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2419 "parser_gen.cpp"
+#line 2594 "parser_gen.cpp"
                     break;
 
-                    case 88:  // predFieldname: argAsUserFieldname
-#line 592 "grammar.yy"
+                    case 95:
+#line 689 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2425 "parser_gen.cpp"
+#line 2600 "parser_gen.cpp"
                     break;
 
-                    case 89:  // predFieldname: invariableUserFieldname
-#line 592 "grammar.yy"
+                    case 96:
+#line 689 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2431 "parser_gen.cpp"
+#line 2606 "parser_gen.cpp"
                     break;
 
-                    case 90:  // invariableUserFieldname: "fieldname"
-#line 595 "grammar.yy"
+                    case 97:
+#line 692 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             UserFieldname{YY_MOVE(yystack_[0].value.as<std::string>())};
                     }
-#line 2439 "parser_gen.cpp"
+#line 2614 "parser_gen.cpp"
                     break;
 
-                    case 91:  // stageAsUserFieldname: STAGE_INHIBIT_OPTIMIZATION
-#line 603 "grammar.yy"
+                    case 98:
+#line 700 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             UserFieldname{"$_internalInhibitOptimization"};
                     }
-#line 2447 "parser_gen.cpp"
+#line 2622 "parser_gen.cpp"
                     break;
 
-                    case 92:  // stageAsUserFieldname: STAGE_UNION_WITH
-#line 606 "grammar.yy"
+                    case 99:
+#line 703 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$unionWith"};
                     }
-#line 2455 "parser_gen.cpp"
+#line 2630 "parser_gen.cpp"
                     break;
 
-                    case 93:  // stageAsUserFieldname: STAGE_SKIP
-#line 609 "grammar.yy"
+                    case 100:
+#line 706 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$skip"};
                     }
-#line 2463 "parser_gen.cpp"
+#line 2638 "parser_gen.cpp"
                     break;
 
-                    case 94:  // stageAsUserFieldname: STAGE_LIMIT
-#line 612 "grammar.yy"
+                    case 101:
+#line 709 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$limit"};
                     }
-#line 2471 "parser_gen.cpp"
+#line 2646 "parser_gen.cpp"
                     break;
 
-                    case 95:  // stageAsUserFieldname: STAGE_PROJECT
-#line 615 "grammar.yy"
+                    case 102:
+#line 712 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$project"};
                     }
-#line 2479 "parser_gen.cpp"
+#line 2654 "parser_gen.cpp"
                     break;
 
-                    case 96:  // stageAsUserFieldname: STAGE_SAMPLE
-#line 618 "grammar.yy"
+                    case 103:
+#line 715 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$sample"};
                     }
-#line 2487 "parser_gen.cpp"
+#line 2662 "parser_gen.cpp"
                     break;
 
-                    case 97:  // argAsUserFieldname: "coll argument"
-#line 627 "grammar.yy"
+                    case 104:
+#line 721 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"coll"};
+                        yylhs.value.as<CNode::Fieldname>() =
+                            UserFieldname{YY_MOVE(yystack_[0].value.as<std::string>())};
                     }
-#line 2495 "parser_gen.cpp"
+#line 2670 "parser_gen.cpp"
                     break;
 
-                    case 98:  // argAsUserFieldname: "pipeline argument"
-#line 630 "grammar.yy"
+                    case 105:
+#line 727 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"pipeline"};
+                        auto components =
+                            make_vector<std::string>(YY_MOVE(yystack_[0].value.as<std::string>()));
+                        if (auto positional =
+                                c_node_validation::validateProjectionPathAsNormalOrPositional(
+                                    components);
+                            positional.isOK()) {
+                            if (positional.getValue() == c_node_validation::IsPositional::yes)
+                                yylhs.value.as<CNode::Fieldname>() =
+                                    PositionalProjectionPath{std::move(components)};
+                            else
+                                yylhs.value.as<CNode::Fieldname>() =
+                                    ProjectionPath{std::move(components)};
+                        } else {
+                            error(yystack_[0].location, positional.getStatus().reason());
+                        }
                     }
-#line 2503 "parser_gen.cpp"
+#line 2688 "parser_gen.cpp"
                     break;
 
-                    case 99:  // argAsUserFieldname: "size argument"
-#line 633 "grammar.yy"
+                    case 106:
+#line 746 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"size"};
+                        yylhs.value.as<std::string>() = "coll";
                     }
-#line 2511 "parser_gen.cpp"
+#line 2696 "parser_gen.cpp"
                     break;
 
-                    case 100:  // argAsUserFieldname: "input argument"
-#line 636 "grammar.yy"
+                    case 107:
+#line 749 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"input"};
+                        yylhs.value.as<std::string>() = "pipeline";
                     }
-#line 2519 "parser_gen.cpp"
+#line 2704 "parser_gen.cpp"
                     break;
 
-                    case 101:  // argAsUserFieldname: "to argument"
-#line 639 "grammar.yy"
+                    case 108:
+#line 752 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"to"};
+                        yylhs.value.as<std::string>() = "size";
                     }
-#line 2527 "parser_gen.cpp"
+#line 2712 "parser_gen.cpp"
                     break;
 
-                    case 102:  // argAsUserFieldname: "onError argument"
-#line 642 "grammar.yy"
+                    case 109:
+#line 755 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"onError"};
+                        yylhs.value.as<std::string>() = "input";
                     }
-#line 2535 "parser_gen.cpp"
+#line 2720 "parser_gen.cpp"
                     break;
 
-                    case 103:  // argAsUserFieldname: "onNull argument"
-#line 645 "grammar.yy"
+                    case 110:
+#line 758 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"onNull"};
+                        yylhs.value.as<std::string>() = "to";
                     }
-#line 2543 "parser_gen.cpp"
+#line 2728 "parser_gen.cpp"
                     break;
 
-                    case 104:  // argAsUserFieldname: "dateString argument"
-#line 648 "grammar.yy"
+                    case 111:
+#line 761 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"dateString"};
+                        yylhs.value.as<std::string>() = "onError";
                     }
-#line 2551 "parser_gen.cpp"
+#line 2736 "parser_gen.cpp"
                     break;
 
-                    case 105:  // argAsUserFieldname: "format argument"
-#line 651 "grammar.yy"
+                    case 112:
+#line 764 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"format"};
+                        yylhs.value.as<std::string>() = "onNull";
                     }
-#line 2559 "parser_gen.cpp"
+#line 2744 "parser_gen.cpp"
                     break;
 
-                    case 106:  // argAsUserFieldname: "timezone argument"
-#line 654 "grammar.yy"
+                    case 113:
+#line 767 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"timezone"};
+                        yylhs.value.as<std::string>() = "dateString";
                     }
-#line 2567 "parser_gen.cpp"
+#line 2752 "parser_gen.cpp"
                     break;
 
-                    case 107:  // argAsUserFieldname: "date argument"
-#line 657 "grammar.yy"
+                    case 114:
+#line 770 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"date"};
+                        yylhs.value.as<std::string>() = "format";
                     }
-#line 2575 "parser_gen.cpp"
+#line 2760 "parser_gen.cpp"
                     break;
 
-                    case 108:  // argAsUserFieldname: "chars argument"
-#line 660 "grammar.yy"
+                    case 115:
+#line 773 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"chars"};
+                        yylhs.value.as<std::string>() = "timezone";
                     }
-#line 2583 "parser_gen.cpp"
+#line 2768 "parser_gen.cpp"
                     break;
 
-                    case 109:  // argAsUserFieldname: "regex argument"
-#line 663 "grammar.yy"
+                    case 116:
+#line 776 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"regex"};
+                        yylhs.value.as<std::string>() = "date";
                     }
-#line 2591 "parser_gen.cpp"
+#line 2776 "parser_gen.cpp"
                     break;
 
-                    case 110:  // argAsUserFieldname: "options argument"
-#line 666 "grammar.yy"
+                    case 117:
+#line 779 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"options"};
+                        yylhs.value.as<std::string>() = "chars";
                     }
-#line 2599 "parser_gen.cpp"
+#line 2784 "parser_gen.cpp"
                     break;
 
-                    case 111:  // argAsUserFieldname: "find argument"
-#line 669 "grammar.yy"
+                    case 118:
+#line 782 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"find"};
+                        yylhs.value.as<std::string>() = "regex";
                     }
-#line 2607 "parser_gen.cpp"
+#line 2792 "parser_gen.cpp"
                     break;
 
-                    case 112:  // argAsUserFieldname: "replacement argument"
-#line 672 "grammar.yy"
+                    case 119:
+#line 785 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"replacement"};
+                        yylhs.value.as<std::string>() = "options";
                     }
-#line 2615 "parser_gen.cpp"
+#line 2800 "parser_gen.cpp"
                     break;
 
-                    case 113:  // argAsUserFieldname: "filter"
-#line 675 "grammar.yy"
+                    case 120:
+#line 788 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"filter"};
+                        yylhs.value.as<std::string>() = "find";
                     }
-#line 2623 "parser_gen.cpp"
+#line 2808 "parser_gen.cpp"
                     break;
 
-                    case 114:  // argAsUserFieldname: "q"
-#line 678 "grammar.yy"
+                    case 121:
+#line 791 "grammar.yy"
                     {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"q"};
+                        yylhs.value.as<std::string>() = "replacement";
                     }
-#line 2631 "parser_gen.cpp"
+#line 2816 "parser_gen.cpp"
                     break;
 
-                    case 115:  // aggExprAsUserFieldname: ADD
-#line 686 "grammar.yy"
+                    case 122:
+#line 794 "grammar.yy"
+                    {
+                        yylhs.value.as<std::string>() = UserFieldname{"filter"};
+                    }
+#line 2824 "parser_gen.cpp"
+                    break;
+
+                    case 123:
+#line 797 "grammar.yy"
+                    {
+                        yylhs.value.as<std::string>() = UserFieldname{"q"};
+                    }
+#line 2832 "parser_gen.cpp"
+                    break;
+
+                    case 124:
+#line 805 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$add"};
                     }
-#line 2639 "parser_gen.cpp"
+#line 2840 "parser_gen.cpp"
                     break;
 
-                    case 116:  // aggExprAsUserFieldname: ATAN2
-#line 689 "grammar.yy"
+                    case 125:
+#line 808 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$atan2"};
                     }
-#line 2647 "parser_gen.cpp"
+#line 2848 "parser_gen.cpp"
                     break;
 
-                    case 117:  // aggExprAsUserFieldname: AND
-#line 692 "grammar.yy"
+                    case 126:
+#line 811 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$and"};
                     }
-#line 2655 "parser_gen.cpp"
+#line 2856 "parser_gen.cpp"
                     break;
 
-                    case 118:  // aggExprAsUserFieldname: CONST_EXPR
-#line 695 "grammar.yy"
+                    case 127:
+#line 814 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$const"};
                     }
-#line 2663 "parser_gen.cpp"
+#line 2864 "parser_gen.cpp"
                     break;
 
-                    case 119:  // aggExprAsUserFieldname: LITERAL
-#line 698 "grammar.yy"
+                    case 128:
+#line 817 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$literal"};
                     }
-#line 2671 "parser_gen.cpp"
+#line 2872 "parser_gen.cpp"
                     break;
 
-                    case 120:  // aggExprAsUserFieldname: OR
-#line 701 "grammar.yy"
+                    case 129:
+#line 820 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$or"};
                     }
-#line 2679 "parser_gen.cpp"
+#line 2880 "parser_gen.cpp"
                     break;
 
-                    case 121:  // aggExprAsUserFieldname: NOT
-#line 704 "grammar.yy"
+                    case 130:
+#line 823 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$not"};
                     }
-#line 2687 "parser_gen.cpp"
+#line 2888 "parser_gen.cpp"
                     break;
 
-                    case 122:  // aggExprAsUserFieldname: CMP
-#line 707 "grammar.yy"
+                    case 131:
+#line 826 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$cmp"};
                     }
-#line 2695 "parser_gen.cpp"
+#line 2896 "parser_gen.cpp"
                     break;
 
-                    case 123:  // aggExprAsUserFieldname: EQ
-#line 710 "grammar.yy"
+                    case 132:
+#line 829 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$eq"};
                     }
-#line 2703 "parser_gen.cpp"
+#line 2904 "parser_gen.cpp"
                     break;
 
-                    case 124:  // aggExprAsUserFieldname: GT
-#line 713 "grammar.yy"
+                    case 133:
+#line 832 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$gt"};
                     }
-#line 2711 "parser_gen.cpp"
+#line 2912 "parser_gen.cpp"
                     break;
 
-                    case 125:  // aggExprAsUserFieldname: GTE
-#line 716 "grammar.yy"
+                    case 134:
+#line 835 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$gte"};
                     }
-#line 2719 "parser_gen.cpp"
+#line 2920 "parser_gen.cpp"
                     break;
 
-                    case 126:  // aggExprAsUserFieldname: LT
-#line 719 "grammar.yy"
+                    case 135:
+#line 838 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$lt"};
                     }
-#line 2727 "parser_gen.cpp"
+#line 2928 "parser_gen.cpp"
                     break;
 
-                    case 127:  // aggExprAsUserFieldname: LTE
-#line 722 "grammar.yy"
+                    case 136:
+#line 841 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$lte"};
                     }
-#line 2735 "parser_gen.cpp"
+#line 2936 "parser_gen.cpp"
                     break;
 
-                    case 128:  // aggExprAsUserFieldname: NE
-#line 725 "grammar.yy"
+                    case 137:
+#line 844 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ne"};
                     }
-#line 2743 "parser_gen.cpp"
+#line 2944 "parser_gen.cpp"
                     break;
 
-                    case 129:  // aggExprAsUserFieldname: CONVERT
-#line 728 "grammar.yy"
+                    case 138:
+#line 847 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$convert"};
                     }
-#line 2751 "parser_gen.cpp"
+#line 2952 "parser_gen.cpp"
                     break;
 
-                    case 130:  // aggExprAsUserFieldname: TO_BOOL
-#line 731 "grammar.yy"
+                    case 139:
+#line 850 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toBool"};
                     }
-#line 2759 "parser_gen.cpp"
+#line 2960 "parser_gen.cpp"
                     break;
 
-                    case 131:  // aggExprAsUserFieldname: TO_DATE
-#line 734 "grammar.yy"
+                    case 140:
+#line 853 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toDate"};
                     }
-#line 2767 "parser_gen.cpp"
+#line 2968 "parser_gen.cpp"
                     break;
 
-                    case 132:  // aggExprAsUserFieldname: TO_DECIMAL
-#line 737 "grammar.yy"
+                    case 141:
+#line 856 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toDecimal"};
                     }
-#line 2775 "parser_gen.cpp"
+#line 2976 "parser_gen.cpp"
                     break;
 
-                    case 133:  // aggExprAsUserFieldname: TO_DOUBLE
-#line 740 "grammar.yy"
+                    case 142:
+#line 859 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toDouble"};
                     }
-#line 2783 "parser_gen.cpp"
+#line 2984 "parser_gen.cpp"
                     break;
 
-                    case 134:  // aggExprAsUserFieldname: TO_INT
-#line 743 "grammar.yy"
+                    case 143:
+#line 862 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toInt"};
                     }
-#line 2791 "parser_gen.cpp"
+#line 2992 "parser_gen.cpp"
                     break;
 
-                    case 135:  // aggExprAsUserFieldname: TO_LONG
-#line 746 "grammar.yy"
+                    case 144:
+#line 865 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toLong"};
                     }
-#line 2799 "parser_gen.cpp"
+#line 3000 "parser_gen.cpp"
                     break;
 
-                    case 136:  // aggExprAsUserFieldname: TO_OBJECT_ID
-#line 749 "grammar.yy"
+                    case 145:
+#line 868 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toObjectId"};
                     }
-#line 2807 "parser_gen.cpp"
+#line 3008 "parser_gen.cpp"
                     break;
 
-                    case 137:  // aggExprAsUserFieldname: TO_STRING
-#line 752 "grammar.yy"
+                    case 146:
+#line 871 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toString"};
                     }
-#line 2815 "parser_gen.cpp"
+#line 3016 "parser_gen.cpp"
                     break;
 
-                    case 138:  // aggExprAsUserFieldname: TYPE
-#line 755 "grammar.yy"
+                    case 147:
+#line 874 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$type"};
                     }
-#line 2823 "parser_gen.cpp"
+#line 3024 "parser_gen.cpp"
                     break;
 
-                    case 139:  // aggExprAsUserFieldname: ABS
-#line 758 "grammar.yy"
+                    case 148:
+#line 877 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$abs"};
                     }
-#line 2831 "parser_gen.cpp"
+#line 3032 "parser_gen.cpp"
                     break;
 
-                    case 140:  // aggExprAsUserFieldname: CEIL
-#line 761 "grammar.yy"
+                    case 149:
+#line 880 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ceil"};
                     }
-#line 2839 "parser_gen.cpp"
+#line 3040 "parser_gen.cpp"
                     break;
 
-                    case 141:  // aggExprAsUserFieldname: DIVIDE
-#line 764 "grammar.yy"
+                    case 150:
+#line 883 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$divide"};
                     }
-#line 2847 "parser_gen.cpp"
+#line 3048 "parser_gen.cpp"
                     break;
 
-                    case 142:  // aggExprAsUserFieldname: EXPONENT
-#line 767 "grammar.yy"
+                    case 151:
+#line 886 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$exp"};
                     }
-#line 2855 "parser_gen.cpp"
+#line 3056 "parser_gen.cpp"
                     break;
 
-                    case 143:  // aggExprAsUserFieldname: FLOOR
-#line 770 "grammar.yy"
+                    case 152:
+#line 889 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$floor"};
                     }
-#line 2863 "parser_gen.cpp"
+#line 3064 "parser_gen.cpp"
                     break;
 
-                    case 144:  // aggExprAsUserFieldname: LN
-#line 773 "grammar.yy"
+                    case 153:
+#line 892 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ln"};
                     }
-#line 2871 "parser_gen.cpp"
+#line 3072 "parser_gen.cpp"
                     break;
 
-                    case 145:  // aggExprAsUserFieldname: LOG
-#line 776 "grammar.yy"
+                    case 154:
+#line 895 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$log"};
                     }
-#line 2879 "parser_gen.cpp"
+#line 3080 "parser_gen.cpp"
                     break;
 
-                    case 146:  // aggExprAsUserFieldname: LOGTEN
-#line 779 "grammar.yy"
+                    case 155:
+#line 898 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$log10"};
                     }
-#line 2887 "parser_gen.cpp"
+#line 3088 "parser_gen.cpp"
                     break;
 
-                    case 147:  // aggExprAsUserFieldname: MOD
-#line 782 "grammar.yy"
+                    case 156:
+#line 901 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$mod"};
                     }
-#line 2895 "parser_gen.cpp"
+#line 3096 "parser_gen.cpp"
                     break;
 
-                    case 148:  // aggExprAsUserFieldname: MULTIPLY
-#line 785 "grammar.yy"
+                    case 157:
+#line 904 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$multiply"};
                     }
-#line 2903 "parser_gen.cpp"
+#line 3104 "parser_gen.cpp"
                     break;
 
-                    case 149:  // aggExprAsUserFieldname: POW
-#line 788 "grammar.yy"
+                    case 158:
+#line 907 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$pow"};
                     }
-#line 2911 "parser_gen.cpp"
+#line 3112 "parser_gen.cpp"
                     break;
 
-                    case 150:  // aggExprAsUserFieldname: ROUND
-#line 791 "grammar.yy"
+                    case 159:
+#line 910 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$round"};
                     }
-#line 2919 "parser_gen.cpp"
+#line 3120 "parser_gen.cpp"
                     break;
 
-                    case 151:  // aggExprAsUserFieldname: SQRT
-#line 794 "grammar.yy"
+                    case 160:
+#line 913 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$slice"};
+                    }
+#line 3128 "parser_gen.cpp"
+                    break;
+
+                    case 161:
+#line 916 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$sqrt"};
                     }
-#line 2927 "parser_gen.cpp"
+#line 3136 "parser_gen.cpp"
                     break;
 
-                    case 152:  // aggExprAsUserFieldname: SUBTRACT
-#line 797 "grammar.yy"
+                    case 162:
+#line 919 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$subtract"};
                     }
-#line 2935 "parser_gen.cpp"
+#line 3144 "parser_gen.cpp"
                     break;
 
-                    case 153:  // aggExprAsUserFieldname: TRUNC
-#line 800 "grammar.yy"
+                    case 163:
+#line 922 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$trunc"};
                     }
-#line 2943 "parser_gen.cpp"
+#line 3152 "parser_gen.cpp"
                     break;
 
-                    case 154:  // aggExprAsUserFieldname: CONCAT
-#line 803 "grammar.yy"
+                    case 164:
+#line 925 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$concat"};
                     }
-#line 2951 "parser_gen.cpp"
+#line 3160 "parser_gen.cpp"
                     break;
 
-                    case 155:  // aggExprAsUserFieldname: DATE_FROM_STRING
-#line 806 "grammar.yy"
+                    case 165:
+#line 928 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$dateFromString"};
                     }
-#line 2959 "parser_gen.cpp"
+#line 3168 "parser_gen.cpp"
                     break;
 
-                    case 156:  // aggExprAsUserFieldname: DATE_TO_STRING
-#line 809 "grammar.yy"
+                    case 166:
+#line 931 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$dateToString"};
                     }
-#line 2967 "parser_gen.cpp"
+#line 3176 "parser_gen.cpp"
                     break;
 
-                    case 157:  // aggExprAsUserFieldname: INDEX_OF_BYTES
-#line 812 "grammar.yy"
+                    case 167:
+#line 934 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$indexOfBytes"};
                     }
-#line 2975 "parser_gen.cpp"
+#line 3184 "parser_gen.cpp"
                     break;
 
-                    case 158:  // aggExprAsUserFieldname: INDEX_OF_CP
-#line 815 "grammar.yy"
+                    case 168:
+#line 937 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$indexOfCP"};
                     }
-#line 2983 "parser_gen.cpp"
+#line 3192 "parser_gen.cpp"
                     break;
 
-                    case 159:  // aggExprAsUserFieldname: LTRIM
-#line 818 "grammar.yy"
+                    case 169:
+#line 940 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ltrim"};
                     }
-#line 2991 "parser_gen.cpp"
+#line 3200 "parser_gen.cpp"
                     break;
 
-                    case 160:  // aggExprAsUserFieldname: META
-#line 821 "grammar.yy"
+                    case 170:
+#line 943 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$meta"};
                     }
-#line 2999 "parser_gen.cpp"
+#line 3208 "parser_gen.cpp"
                     break;
 
-                    case 161:  // aggExprAsUserFieldname: REGEX_FIND
-#line 824 "grammar.yy"
+                    case 171:
+#line 946 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$regexFind"};
                     }
-#line 3007 "parser_gen.cpp"
+#line 3216 "parser_gen.cpp"
                     break;
 
-                    case 162:  // aggExprAsUserFieldname: REGEX_FIND_ALL
-#line 827 "grammar.yy"
+                    case 172:
+#line 949 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$regexFindAll"};
                     }
-#line 3015 "parser_gen.cpp"
+#line 3224 "parser_gen.cpp"
                     break;
 
-                    case 163:  // aggExprAsUserFieldname: REGEX_MATCH
-#line 830 "grammar.yy"
+                    case 173:
+#line 952 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$regexMatch"};
-                    }
-#line 3023 "parser_gen.cpp"
-                    break;
-
-                    case 164:  // aggExprAsUserFieldname: REPLACE_ONE
-#line 833 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$replaceOne"};
-                    }
-#line 3031 "parser_gen.cpp"
-                    break;
-
-                    case 165:  // aggExprAsUserFieldname: REPLACE_ALL
-#line 836 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$replaceAll"};
-                    }
-#line 3039 "parser_gen.cpp"
-                    break;
-
-                    case 166:  // aggExprAsUserFieldname: RTRIM
-#line 839 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$rtrim"};
-                    }
-#line 3047 "parser_gen.cpp"
-                    break;
-
-                    case 167:  // aggExprAsUserFieldname: SPLIT
-#line 842 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$split"};
-                    }
-#line 3055 "parser_gen.cpp"
-                    break;
-
-                    case 168:  // aggExprAsUserFieldname: STR_LEN_BYTES
-#line 845 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strLenBytes"};
-                    }
-#line 3063 "parser_gen.cpp"
-                    break;
-
-                    case 169:  // aggExprAsUserFieldname: STR_LEN_CP
-#line 848 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strLenCP"};
-                    }
-#line 3071 "parser_gen.cpp"
-                    break;
-
-                    case 170:  // aggExprAsUserFieldname: STR_CASE_CMP
-#line 851 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strcasecmp"};
-                    }
-#line 3079 "parser_gen.cpp"
-                    break;
-
-                    case 171:  // aggExprAsUserFieldname: SUBSTR
-#line 854 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substr"};
-                    }
-#line 3087 "parser_gen.cpp"
-                    break;
-
-                    case 172:  // aggExprAsUserFieldname: SUBSTR_BYTES
-#line 857 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substrBytes"};
-                    }
-#line 3095 "parser_gen.cpp"
-                    break;
-
-                    case 173:  // aggExprAsUserFieldname: SUBSTR_CP
-#line 860 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substrCP"};
-                    }
-#line 3103 "parser_gen.cpp"
-                    break;
-
-                    case 174:  // aggExprAsUserFieldname: TO_LOWER
-#line 863 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toLower"};
-                    }
-#line 3111 "parser_gen.cpp"
-                    break;
-
-                    case 175:  // aggExprAsUserFieldname: TRIM
-#line 866 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$trim"};
-                    }
-#line 3119 "parser_gen.cpp"
-                    break;
-
-                    case 176:  // aggExprAsUserFieldname: TO_UPPER
-#line 869 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toUpper"};
-                    }
-#line 3127 "parser_gen.cpp"
-                    break;
-
-                    case 177:  // aggExprAsUserFieldname: "allElementsTrue"
-#line 872 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$allElementsTrue"};
-                    }
-#line 3135 "parser_gen.cpp"
-                    break;
-
-                    case 178:  // aggExprAsUserFieldname: "anyElementTrue"
-#line 875 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$anyElementTrue"};
-                    }
-#line 3143 "parser_gen.cpp"
-                    break;
-
-                    case 179:  // aggExprAsUserFieldname: "setDifference"
-#line 878 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setDifference"};
-                    }
-#line 3151 "parser_gen.cpp"
-                    break;
-
-                    case 180:  // aggExprAsUserFieldname: "setEquals"
-#line 881 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setEquals"};
-                    }
-#line 3159 "parser_gen.cpp"
-                    break;
-
-                    case 181:  // aggExprAsUserFieldname: "setIntersection"
-#line 884 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setIntersection"};
-                    }
-#line 3167 "parser_gen.cpp"
-                    break;
-
-                    case 182:  // aggExprAsUserFieldname: "setIsSubset"
-#line 887 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setIsSubset"};
-                    }
-#line 3175 "parser_gen.cpp"
-                    break;
-
-                    case 183:  // aggExprAsUserFieldname: "setUnion"
-#line 890 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setUnion"};
-                    }
-#line 3183 "parser_gen.cpp"
-                    break;
-
-                    case 184:  // string: "string"
-#line 897 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserString{YY_MOVE(yystack_[0].value.as<std::string>())}};
-                    }
-#line 3191 "parser_gen.cpp"
-                    break;
-
-                    case 185:  // string: "randVal"
-#line 902 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{UserString{"randVal"}};
-                    }
-#line 3199 "parser_gen.cpp"
-                    break;
-
-                    case 186:  // string: "textScore"
-#line 905 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = CNode{UserString{"textScore"}};
-                    }
-#line 3207 "parser_gen.cpp"
-                    break;
-
-                    case 187:  // fieldPath: "$-prefixed string"
-#line 911 "grammar.yy"
-                    {
-                        std::string str = YY_MOVE(yystack_[0].value.as<std::string>());
-                        if (str.size() == 1) {
-                            error(yystack_[0].location, "'$' by iteslf is not a valid FieldPath");
-                        }
-                        yylhs.value.as<CNode>() = CNode{UserFieldPath{str.substr(1), false}};
-                    }
-#line 3219 "parser_gen.cpp"
-                    break;
-
-                    case 188:  // variable: "$$-prefixed string"
-#line 919 "grammar.yy"
-                    {
-                        std::string str = YY_MOVE(yystack_[0].value.as<std::string>()).substr(2);
-                        auto status = c_node_validation::validateVariableName(str);
-                        if (!status.isOK()) {
-                            error(yystack_[0].location, status.reason());
-                        }
-                        yylhs.value.as<CNode>() = CNode{UserFieldPath{str, true}};
                     }
 #line 3232 "parser_gen.cpp"
                     break;
 
-                    case 189:  // binary: "BinData"
-#line 928 "grammar.yy"
+                    case 174:
+#line 955 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserBinary{YY_MOVE(yystack_[0].value.as<BSONBinData>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$replaceOne"};
                     }
 #line 3240 "parser_gen.cpp"
                     break;
 
-                    case 190:  // undefined: "undefined"
-#line 934 "grammar.yy"
+                    case 175:
+#line 958 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserUndefined{}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$replaceAll"};
                     }
 #line 3248 "parser_gen.cpp"
                     break;
 
-                    case 191:  // objectId: "ObjectID"
-#line 940 "grammar.yy"
+                    case 176:
+#line 961 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserObjectId{}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$rtrim"};
                     }
 #line 3256 "parser_gen.cpp"
                     break;
 
-                    case 192:  // date: "Date"
-#line 946 "grammar.yy"
+                    case 177:
+#line 964 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserDate{YY_MOVE(yystack_[0].value.as<Date_t>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$split"};
                     }
 #line 3264 "parser_gen.cpp"
                     break;
 
-                    case 193:  // null: "null"
-#line 952 "grammar.yy"
+                    case 178:
+#line 967 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserNull{}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strLenBytes"};
                     }
 #line 3272 "parser_gen.cpp"
                     break;
 
-                    case 194:  // regex: "regex"
-#line 958 "grammar.yy"
+                    case 179:
+#line 970 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserRegex{YY_MOVE(yystack_[0].value.as<BSONRegEx>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strLenCP"};
                     }
 #line 3280 "parser_gen.cpp"
                     break;
 
-                    case 195:  // dbPointer: "dbPointer"
-#line 964 "grammar.yy"
+                    case 180:
+#line 973 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserDBPointer{YY_MOVE(yystack_[0].value.as<BSONDBRef>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strcasecmp"};
                     }
 #line 3288 "parser_gen.cpp"
                     break;
 
-                    case 196:  // javascript: "Code"
-#line 970 "grammar.yy"
+                    case 181:
+#line 976 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserJavascript{YY_MOVE(yystack_[0].value.as<BSONCode>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substr"};
                     }
 #line 3296 "parser_gen.cpp"
                     break;
 
-                    case 197:  // symbol: "Symbol"
-#line 976 "grammar.yy"
+                    case 182:
+#line 979 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserSymbol{YY_MOVE(yystack_[0].value.as<BSONSymbol>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substrBytes"};
                     }
 #line 3304 "parser_gen.cpp"
                     break;
 
-                    case 198:  // javascriptWScope: "CodeWScope"
+                    case 183:
 #line 982 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserJavascriptWithScope{
-                            YY_MOVE(yystack_[0].value.as<BSONCodeWScope>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substrCP"};
                     }
 #line 3312 "parser_gen.cpp"
                     break;
 
-                    case 199:  // timestamp: "Timestamp"
-#line 988 "grammar.yy"
+                    case 184:
+#line 985 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserTimestamp{YY_MOVE(yystack_[0].value.as<Timestamp>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toLower"};
                     }
 #line 3320 "parser_gen.cpp"
                     break;
 
-                    case 200:  // minKey: "minKey"
-#line 994 "grammar.yy"
+                    case 185:
+#line 988 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserMinKey{YY_MOVE(yystack_[0].value.as<UserMinKey>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$trim"};
                     }
 #line 3328 "parser_gen.cpp"
                     break;
 
-                    case 201:  // maxKey: "maxKey"
-#line 1000 "grammar.yy"
+                    case 186:
+#line 991 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserMaxKey{YY_MOVE(yystack_[0].value.as<UserMaxKey>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toUpper"};
                     }
 #line 3336 "parser_gen.cpp"
                     break;
 
-                    case 202:  // int: "arbitrary integer"
-#line 1006 "grammar.yy"
+                    case 187:
+#line 994 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserInt{YY_MOVE(yystack_[0].value.as<int>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$allElementsTrue"};
                     }
 #line 3344 "parser_gen.cpp"
                     break;
 
-                    case 203:  // int: "zero (int)"
-#line 1009 "grammar.yy"
+                    case 188:
+#line 997 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserInt{0}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$anyElementTrue"};
                     }
 #line 3352 "parser_gen.cpp"
                     break;
 
-                    case 204:  // int: "1 (int)"
-#line 1012 "grammar.yy"
+                    case 189:
+#line 1000 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserInt{1}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setDifference"};
                     }
 #line 3360 "parser_gen.cpp"
                     break;
 
-                    case 205:  // int: "-1 (int)"
-#line 1015 "grammar.yy"
+                    case 190:
+#line 1003 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserInt{-1}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setEquals"};
                     }
 #line 3368 "parser_gen.cpp"
                     break;
 
-                    case 206:  // long: "arbitrary long"
-#line 1021 "grammar.yy"
+                    case 191:
+#line 1006 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserLong{YY_MOVE(yystack_[0].value.as<long long>())}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setIntersection"};
                     }
 #line 3376 "parser_gen.cpp"
                     break;
 
-                    case 207:  // long: "zero (long)"
-#line 1024 "grammar.yy"
+                    case 192:
+#line 1009 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserLong{0ll}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setIsSubset"};
                     }
 #line 3384 "parser_gen.cpp"
                     break;
 
-                    case 208:  // long: "1 (long)"
-#line 1027 "grammar.yy"
+                    case 193:
+#line 1012 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserLong{1ll}};
+                        yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setUnion"};
                     }
 #line 3392 "parser_gen.cpp"
                     break;
 
-                    case 209:  // long: "-1 (long)"
-#line 1030 "grammar.yy"
+                    case 194:
+#line 1019 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserLong{-1ll}};
+                        yylhs.value.as<CNode>() =
+                            CNode{UserString{YY_MOVE(yystack_[0].value.as<std::string>())}};
                     }
 #line 3400 "parser_gen.cpp"
                     break;
 
-                    case 210:  // double: "arbitrary double"
-#line 1036 "grammar.yy"
+                    case 195:
+#line 1024 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserDouble{YY_MOVE(yystack_[0].value.as<double>())}};
+                        yylhs.value.as<CNode>() = CNode{UserString{"geoNearDistance"}};
                     }
 #line 3408 "parser_gen.cpp"
                     break;
 
-                    case 211:  // double: "zero (double)"
-#line 1039 "grammar.yy"
+                    case 196:
+#line 1027 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserDouble{0.0}};
+                        yylhs.value.as<CNode>() = CNode{UserString{"geoNearPoint"}};
                     }
 #line 3416 "parser_gen.cpp"
                     break;
 
-                    case 212:  // double: "1 (double)"
-#line 1042 "grammar.yy"
+                    case 197:
+#line 1030 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserDouble{1.0}};
+                        yylhs.value.as<CNode>() = CNode{UserString{"indexKey"}};
                     }
 #line 3424 "parser_gen.cpp"
                     break;
 
-                    case 213:  // double: "-1 (double)"
-#line 1045 "grammar.yy"
+                    case 198:
+#line 1033 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserDouble{-1.0}};
+                        yylhs.value.as<CNode>() = CNode{UserString{"randVal"}};
                     }
 #line 3432 "parser_gen.cpp"
                     break;
 
-                    case 214:  // decimal: "arbitrary decimal"
-#line 1051 "grammar.yy"
+                    case 199:
+#line 1036 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() =
-                            CNode{UserDecimal{YY_MOVE(yystack_[0].value.as<Decimal128>())}};
+                        yylhs.value.as<CNode>() = CNode{UserString{"recordId"}};
                     }
 #line 3440 "parser_gen.cpp"
                     break;
 
-                    case 215:  // decimal: "zero (decimal)"
-#line 1054 "grammar.yy"
+                    case 200:
+#line 1039 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserDecimal{0.0}};
+                        yylhs.value.as<CNode>() = CNode{UserString{"searchHighlights"}};
                     }
 #line 3448 "parser_gen.cpp"
                     break;
 
-                    case 216:  // decimal: "1 (decimal)"
-#line 1057 "grammar.yy"
+                    case 201:
+#line 1042 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserDecimal{1.0}};
+                        yylhs.value.as<CNode>() = CNode{UserString{"searchScore"}};
                     }
 #line 3456 "parser_gen.cpp"
                     break;
 
-                    case 217:  // decimal: "-1 (decimal)"
-#line 1060 "grammar.yy"
+                    case 202:
+#line 1045 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserDecimal{-1.0}};
+                        yylhs.value.as<CNode>() = CNode{UserString{"sortKey"}};
                     }
 #line 3464 "parser_gen.cpp"
                     break;
 
-                    case 218:  // bool: "true"
-#line 1066 "grammar.yy"
+                    case 203:
+#line 1048 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserBoolean{true}};
+                        yylhs.value.as<CNode>() = CNode{UserString{"textScore"}};
                     }
 #line 3472 "parser_gen.cpp"
                     break;
 
-                    case 219:  // bool: "false"
-#line 1069 "grammar.yy"
+                    case 204:
+#line 1054 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = CNode{UserBoolean{false}};
+                        auto str = YY_MOVE(yystack_[0].value.as<std::string>());
+                        auto components = std::vector<std::string>{};
+                        auto withoutDollar = std::pair{std::next(str.begin()), str.end()};
+                        boost::split(components, withoutDollar, [](auto&& c) { return c == '.'; });
+                        if (auto status = c_node_validation::validateAggregationPath(components);
+                            !status.isOK())
+                            error(yystack_[0].location, status.reason());
+                        yylhs.value.as<CNode>() = CNode{AggregationPath{std::move(components)}};
                     }
-#line 3480 "parser_gen.cpp"
+#line 3488 "parser_gen.cpp"
                     break;
 
-                    case 220:  // simpleValue: string
-#line 1075 "grammar.yy"
+                    case 205:
+#line 1068 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3486 "parser_gen.cpp"
-                    break;
-
-                    case 221:  // simpleValue: fieldPath
-#line 1076 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3492 "parser_gen.cpp"
-                    break;
-
-                    case 222:  // simpleValue: variable
-#line 1077 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3498 "parser_gen.cpp"
-                    break;
-
-                    case 223:  // simpleValue: binary
-#line 1078 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        auto str = YY_MOVE(yystack_[0].value.as<std::string>());
+                        auto components = std::vector<std::string>{};
+                        auto withoutDollars =
+                            std::pair{std::next(std::next(str.begin())), str.end()};
+                        boost::split(components, withoutDollars, [](auto&& c) { return c == '.'; });
+                        if (auto status =
+                                c_node_validation::validateVariableNameAndPathSuffix(components);
+                            !status.isOK())
+                            error(yystack_[0].location, status.reason());
+                        yylhs.value.as<CNode>() =
+                            CNode{AggregationVariablePath{std::move(components)}};
                     }
 #line 3504 "parser_gen.cpp"
                     break;
 
-                    case 224:  // simpleValue: undefined
-#line 1079 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3510 "parser_gen.cpp"
-                    break;
-
-                    case 225:  // simpleValue: objectId
-#line 1080 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3516 "parser_gen.cpp"
-                    break;
-
-                    case 226:  // simpleValue: date
-#line 1081 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3522 "parser_gen.cpp"
-                    break;
-
-                    case 227:  // simpleValue: null
+                    case 206:
 #line 1082 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        yylhs.value.as<CNode>() =
+                            CNode{UserBinary{YY_MOVE(yystack_[0].value.as<BSONBinData>())}};
+                    }
+#line 3512 "parser_gen.cpp"
+                    break;
+
+                    case 207:
+#line 1088 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserUndefined{}};
+                    }
+#line 3520 "parser_gen.cpp"
+                    break;
+
+                    case 208:
+#line 1094 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserObjectId{}};
                     }
 #line 3528 "parser_gen.cpp"
                     break;
 
-                    case 228:  // simpleValue: regex
-#line 1083 "grammar.yy"
+                    case 209:
+#line 1100 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        yylhs.value.as<CNode>() =
+                            CNode{UserDate{YY_MOVE(yystack_[0].value.as<Date_t>())}};
                     }
-#line 3534 "parser_gen.cpp"
+#line 3536 "parser_gen.cpp"
                     break;
 
-                    case 229:  // simpleValue: dbPointer
-#line 1084 "grammar.yy"
+                    case 210:
+#line 1106 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        yylhs.value.as<CNode>() = CNode{UserNull{}};
                     }
-#line 3540 "parser_gen.cpp"
+#line 3544 "parser_gen.cpp"
                     break;
 
-                    case 230:  // simpleValue: javascript
-#line 1085 "grammar.yy"
+                    case 211:
+#line 1112 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3546 "parser_gen.cpp"
-                    break;
-
-                    case 231:  // simpleValue: symbol
-#line 1086 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        yylhs.value.as<CNode>() =
+                            CNode{UserRegex{YY_MOVE(yystack_[0].value.as<BSONRegEx>())}};
                     }
 #line 3552 "parser_gen.cpp"
                     break;
 
-                    case 232:  // simpleValue: javascriptWScope
-#line 1087 "grammar.yy"
+                    case 212:
+#line 1118 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        yylhs.value.as<CNode>() =
+                            CNode{UserDBPointer{YY_MOVE(yystack_[0].value.as<BSONDBRef>())}};
                     }
-#line 3558 "parser_gen.cpp"
+#line 3560 "parser_gen.cpp"
                     break;
 
-                    case 233:  // simpleValue: int
-#line 1088 "grammar.yy"
+                    case 213:
+#line 1124 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        yylhs.value.as<CNode>() =
+                            CNode{UserJavascript{YY_MOVE(yystack_[0].value.as<BSONCode>())}};
                     }
-#line 3564 "parser_gen.cpp"
+#line 3568 "parser_gen.cpp"
                     break;
 
-                    case 234:  // simpleValue: long
-#line 1089 "grammar.yy"
+                    case 214:
+#line 1130 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3570 "parser_gen.cpp"
-                    break;
-
-                    case 235:  // simpleValue: double
-#line 1090 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        yylhs.value.as<CNode>() =
+                            CNode{UserSymbol{YY_MOVE(yystack_[0].value.as<BSONSymbol>())}};
                     }
 #line 3576 "parser_gen.cpp"
                     break;
 
-                    case 236:  // simpleValue: decimal
-#line 1091 "grammar.yy"
+                    case 215:
+#line 1136 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        yylhs.value.as<CNode>() = CNode{UserJavascriptWithScope{
+                            YY_MOVE(yystack_[0].value.as<BSONCodeWScope>())}};
                     }
-#line 3582 "parser_gen.cpp"
+#line 3584 "parser_gen.cpp"
                     break;
 
-                    case 237:  // simpleValue: bool
-#line 1092 "grammar.yy"
+                    case 216:
+#line 1142 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        yylhs.value.as<CNode>() =
+                            CNode{UserTimestamp{YY_MOVE(yystack_[0].value.as<Timestamp>())}};
                     }
-#line 3588 "parser_gen.cpp"
+#line 3592 "parser_gen.cpp"
                     break;
 
-                    case 238:  // simpleValue: timestamp
-#line 1093 "grammar.yy"
+                    case 217:
+#line 1148 "grammar.yy"
                     {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
-                    }
-#line 3594 "parser_gen.cpp"
-                    break;
-
-                    case 239:  // simpleValue: minKey
-#line 1094 "grammar.yy"
-                    {
-                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                        yylhs.value.as<CNode>() =
+                            CNode{UserMinKey{YY_MOVE(yystack_[0].value.as<UserMinKey>())}};
                     }
 #line 3600 "parser_gen.cpp"
                     break;
 
-                    case 240:  // simpleValue: maxKey
-#line 1095 "grammar.yy"
+                    case 218:
+#line 1154 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{UserMaxKey{YY_MOVE(yystack_[0].value.as<UserMaxKey>())}};
+                    }
+#line 3608 "parser_gen.cpp"
+                    break;
+
+                    case 219:
+#line 1160 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{UserInt{YY_MOVE(yystack_[0].value.as<int>())}};
+                    }
+#line 3616 "parser_gen.cpp"
+                    break;
+
+                    case 220:
+#line 1163 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserInt{0}};
+                    }
+#line 3624 "parser_gen.cpp"
+                    break;
+
+                    case 221:
+#line 1166 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserInt{1}};
+                    }
+#line 3632 "parser_gen.cpp"
+                    break;
+
+                    case 222:
+#line 1169 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserInt{-1}};
+                    }
+#line 3640 "parser_gen.cpp"
+                    break;
+
+                    case 223:
+#line 1175 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{UserLong{YY_MOVE(yystack_[0].value.as<long long>())}};
+                    }
+#line 3648 "parser_gen.cpp"
+                    break;
+
+                    case 224:
+#line 1178 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserLong{0ll}};
+                    }
+#line 3656 "parser_gen.cpp"
+                    break;
+
+                    case 225:
+#line 1181 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserLong{1ll}};
+                    }
+#line 3664 "parser_gen.cpp"
+                    break;
+
+                    case 226:
+#line 1184 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserLong{-1ll}};
+                    }
+#line 3672 "parser_gen.cpp"
+                    break;
+
+                    case 227:
+#line 1190 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{UserDouble{YY_MOVE(yystack_[0].value.as<double>())}};
+                    }
+#line 3680 "parser_gen.cpp"
+                    break;
+
+                    case 228:
+#line 1193 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserDouble{0.0}};
+                    }
+#line 3688 "parser_gen.cpp"
+                    break;
+
+                    case 229:
+#line 1196 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserDouble{1.0}};
+                    }
+#line 3696 "parser_gen.cpp"
+                    break;
+
+                    case 230:
+#line 1199 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserDouble{-1.0}};
+                    }
+#line 3704 "parser_gen.cpp"
+                    break;
+
+                    case 231:
+#line 1205 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{UserDecimal{YY_MOVE(yystack_[0].value.as<Decimal128>())}};
+                    }
+#line 3712 "parser_gen.cpp"
+                    break;
+
+                    case 232:
+#line 1208 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserDecimal{0.0}};
+                    }
+#line 3720 "parser_gen.cpp"
+                    break;
+
+                    case 233:
+#line 1211 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserDecimal{1.0}};
+                    }
+#line 3728 "parser_gen.cpp"
+                    break;
+
+                    case 234:
+#line 1214 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserDecimal{-1.0}};
+                    }
+#line 3736 "parser_gen.cpp"
+                    break;
+
+                    case 235:
+#line 1220 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserBoolean{true}};
+                    }
+#line 3744 "parser_gen.cpp"
+                    break;
+
+                    case 236:
+#line 1223 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{UserBoolean{false}};
+                    }
+#line 3752 "parser_gen.cpp"
+                    break;
+
+                    case 237:
+#line 1229 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3606 "parser_gen.cpp"
+#line 3758 "parser_gen.cpp"
                     break;
 
-                    case 241:  // expressions: %empty
-#line 1102 "grammar.yy"
+                    case 238:
+#line 1230 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3764 "parser_gen.cpp"
+                    break;
+
+                    case 239:
+#line 1231 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3770 "parser_gen.cpp"
+                    break;
+
+                    case 240:
+#line 1232 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3776 "parser_gen.cpp"
+                    break;
+
+                    case 241:
+#line 1233 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3782 "parser_gen.cpp"
+                    break;
+
+                    case 242:
+#line 1234 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3788 "parser_gen.cpp"
+                    break;
+
+                    case 243:
+#line 1235 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3794 "parser_gen.cpp"
+                    break;
+
+                    case 244:
+#line 1236 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3800 "parser_gen.cpp"
+                    break;
+
+                    case 245:
+#line 1237 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3806 "parser_gen.cpp"
+                    break;
+
+                    case 246:
+#line 1238 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3812 "parser_gen.cpp"
+                    break;
+
+                    case 247:
+#line 1239 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3818 "parser_gen.cpp"
+                    break;
+
+                    case 248:
+#line 1240 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3824 "parser_gen.cpp"
+                    break;
+
+                    case 249:
+#line 1241 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3830 "parser_gen.cpp"
+                    break;
+
+                    case 250:
+#line 1242 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3836 "parser_gen.cpp"
+                    break;
+
+                    case 251:
+#line 1243 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3842 "parser_gen.cpp"
+                    break;
+
+                    case 252:
+#line 1244 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3848 "parser_gen.cpp"
+                    break;
+
+                    case 253:
+#line 1245 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3854 "parser_gen.cpp"
+                    break;
+
+                    case 254:
+#line 1246 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3860 "parser_gen.cpp"
+                    break;
+
+                    case 255:
+#line 1247 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3866 "parser_gen.cpp"
+                    break;
+
+                    case 256:
+#line 1248 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3872 "parser_gen.cpp"
+                    break;
+
+                    case 257:
+#line 1249 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3878 "parser_gen.cpp"
+                    break;
+
+                    case 258:
+#line 1256 "grammar.yy"
                     {
                     }
-#line 3612 "parser_gen.cpp"
+#line 3884 "parser_gen.cpp"
                     break;
 
-                    case 242:  // expressions: expression expressions
-#line 1103 "grammar.yy"
+                    case 259:
+#line 1257 "grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             YY_MOVE(yystack_[0].value.as<std::vector<CNode>>());
                         yylhs.value.as<std::vector<CNode>>().emplace_back(
                             YY_MOVE(yystack_[1].value.as<CNode>()));
                     }
-#line 3621 "parser_gen.cpp"
+#line 3893 "parser_gen.cpp"
                     break;
 
-                    case 243:  // expression: simpleValue
-#line 1110 "grammar.yy"
+                    case 260:
+#line 1264 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3627 "parser_gen.cpp"
+#line 3899 "parser_gen.cpp"
                     break;
 
-                    case 244:  // expression: compoundExpression
-#line 1110 "grammar.yy"
+                    case 261:
+#line 1264 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3633 "parser_gen.cpp"
+#line 3905 "parser_gen.cpp"
                     break;
 
-                    case 245:  // exprFixedTwoArg: "array" expression expression "end of array"
-#line 1114 "grammar.yy"
+                    case 262:
+#line 1264 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3911 "parser_gen.cpp"
+                    break;
+
+                    case 263:
+#line 1269 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>()),
                                                        YY_MOVE(yystack_[1].value.as<CNode>())}};
                     }
-#line 3641 "parser_gen.cpp"
+#line 3919 "parser_gen.cpp"
                     break;
 
-                    case 246:  // compoundExpression: expressionArray
-#line 1119 "grammar.yy"
+                    case 264:
+#line 1276 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() =
+                            CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
+                                                       YY_MOVE(yystack_[2].value.as<CNode>()),
+                                                       YY_MOVE(yystack_[1].value.as<CNode>())}};
+                    }
+#line 3927 "parser_gen.cpp"
+                    break;
+
+                    case 265:
+#line 1282 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3647 "parser_gen.cpp"
+#line 3933 "parser_gen.cpp"
                     break;
 
-                    case 247:  // compoundExpression: expressionObject
-#line 1119 "grammar.yy"
+                    case 266:
+#line 1282 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3653 "parser_gen.cpp"
+#line 3939 "parser_gen.cpp"
                     break;
 
-                    case 248:  // compoundExpression: maths
-#line 1119 "grammar.yy"
+                    case 267:
+#line 1282 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3659 "parser_gen.cpp"
+#line 3945 "parser_gen.cpp"
                     break;
 
-                    case 249:  // compoundExpression: boolExps
-#line 1119 "grammar.yy"
+                    case 268:
+#line 1282 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3665 "parser_gen.cpp"
+#line 3951 "parser_gen.cpp"
                     break;
 
-                    case 250:  // compoundExpression: literalEscapes
-#line 1119 "grammar.yy"
+                    case 269:
+#line 1282 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3671 "parser_gen.cpp"
+#line 3957 "parser_gen.cpp"
                     break;
 
-                    case 251:  // compoundExpression: compExprs
-#line 1119 "grammar.yy"
+                    case 270:
+#line 1283 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3677 "parser_gen.cpp"
+#line 3963 "parser_gen.cpp"
                     break;
 
-                    case 252:  // compoundExpression: typeExpression
-#line 1120 "grammar.yy"
+                    case 271:
+#line 1283 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3683 "parser_gen.cpp"
+#line 3969 "parser_gen.cpp"
                     break;
 
-                    case 253:  // compoundExpression: stringExps
-#line 1120 "grammar.yy"
+                    case 272:
+#line 1283 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3689 "parser_gen.cpp"
+#line 3975 "parser_gen.cpp"
                     break;
 
-                    case 254:  // compoundExpression: setExpression
-#line 1120 "grammar.yy"
+                    case 273:
+#line 1283 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3695 "parser_gen.cpp"
+#line 3981 "parser_gen.cpp"
                     break;
 
-                    case 255:  // expressionArray: "array" expressions "end of array"
-#line 1126 "grammar.yy"
+                    case 274:
+#line 1283 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3987 "parser_gen.cpp"
+                    break;
+
+                    case 275:
+#line 1287 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
+                    }
+#line 3993 "parser_gen.cpp"
+                    break;
+
+                    case 276:
+#line 1291 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
+                            {KeyFieldname::slice, YY_MOVE(yystack_[1].value.as<CNode>())}}};
+                    }
+#line 4002 "parser_gen.cpp"
+                    break;
+
+                    case 277:
+#line 1295 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
+                            {KeyFieldname::slice, YY_MOVE(yystack_[1].value.as<CNode>())}}};
+                    }
+#line 4011 "parser_gen.cpp"
+                    break;
+
+                    case 278:
+#line 1304 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{YY_MOVE(yystack_[1].value.as<std::vector<CNode>>())};
                     }
-#line 3703 "parser_gen.cpp"
+#line 4019 "parser_gen.cpp"
                     break;
 
-                    case 256:  // expressionObject: "object" expressionFields "end of object"
-#line 1134 "grammar.yy"
+                    case 279:
+#line 1312 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 3711 "parser_gen.cpp"
+#line 4027 "parser_gen.cpp"
                     break;
 
-                    case 257:  // expressionFields: %empty
-#line 1140 "grammar.yy"
+                    case 280:
+#line 1318 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 3719 "parser_gen.cpp"
+#line 4035 "parser_gen.cpp"
                     break;
 
-                    case 258:  // expressionFields: expressionFields expressionField
-#line 1143 "grammar.yy"
+                    case 281:
+#line 1321 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 3728 "parser_gen.cpp"
+#line 4044 "parser_gen.cpp"
                     break;
 
-                    case 259:  // expressionField: expressionFieldname expression
-#line 1150 "grammar.yy"
+                    case 282:
+#line 1328 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 3736 "parser_gen.cpp"
+#line 4052 "parser_gen.cpp"
                     break;
 
-                    case 260:  // expressionFieldname: invariableUserFieldname
-#line 1157 "grammar.yy"
+                    case 283:
+#line 1335 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 3742 "parser_gen.cpp"
+#line 4058 "parser_gen.cpp"
                     break;
 
-                    case 261:  // expressionFieldname: stageAsUserFieldname
-#line 1157 "grammar.yy"
+                    case 284:
+#line 1335 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 3748 "parser_gen.cpp"
+#line 4064 "parser_gen.cpp"
                     break;
 
-                    case 262:  // expressionFieldname: argAsUserFieldname
-#line 1157 "grammar.yy"
+                    case 285:
+#line 1335 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 3754 "parser_gen.cpp"
+#line 4070 "parser_gen.cpp"
                     break;
 
-                    case 263:  // expressionFieldname: idAsUserFieldname
-#line 1157 "grammar.yy"
+                    case 286:
+#line 1335 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 3760 "parser_gen.cpp"
+#line 4076 "parser_gen.cpp"
                     break;
 
-                    case 264:  // idAsUserFieldname: ID
-#line 1161 "grammar.yy"
+                    case 287:
+#line 1339 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"_id"};
                     }
-#line 3768 "parser_gen.cpp"
+#line 4084 "parser_gen.cpp"
                     break;
 
-                    case 265:  // maths: add
-#line 1167 "grammar.yy"
+                    case 288:
+#line 1345 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode::Fieldname>() =
+                            ProjectionPath{make_vector<std::string>("_id")};
+                    }
+#line 4092 "parser_gen.cpp"
+                    break;
+
+                    case 289:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3774 "parser_gen.cpp"
+#line 4098 "parser_gen.cpp"
                     break;
 
-                    case 266:  // maths: atan2
-#line 1167 "grammar.yy"
+                    case 290:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3780 "parser_gen.cpp"
+#line 4104 "parser_gen.cpp"
                     break;
 
-                    case 267:  // maths: abs
-#line 1167 "grammar.yy"
+                    case 291:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3786 "parser_gen.cpp"
+#line 4110 "parser_gen.cpp"
                     break;
 
-                    case 268:  // maths: ceil
-#line 1167 "grammar.yy"
+                    case 292:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3792 "parser_gen.cpp"
+#line 4116 "parser_gen.cpp"
                     break;
 
-                    case 269:  // maths: divide
-#line 1167 "grammar.yy"
+                    case 293:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3798 "parser_gen.cpp"
+#line 4122 "parser_gen.cpp"
                     break;
 
-                    case 270:  // maths: exponent
-#line 1167 "grammar.yy"
+                    case 294:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3804 "parser_gen.cpp"
+#line 4128 "parser_gen.cpp"
                     break;
 
-                    case 271:  // maths: floor
-#line 1167 "grammar.yy"
+                    case 295:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3810 "parser_gen.cpp"
+#line 4134 "parser_gen.cpp"
                     break;
 
-                    case 272:  // maths: ln
-#line 1167 "grammar.yy"
+                    case 296:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3816 "parser_gen.cpp"
+#line 4140 "parser_gen.cpp"
                     break;
 
-                    case 273:  // maths: log
-#line 1167 "grammar.yy"
+                    case 297:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3822 "parser_gen.cpp"
+#line 4146 "parser_gen.cpp"
                     break;
 
-                    case 274:  // maths: logten
-#line 1167 "grammar.yy"
+                    case 298:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3828 "parser_gen.cpp"
+#line 4152 "parser_gen.cpp"
                     break;
 
-                    case 275:  // maths: mod
-#line 1167 "grammar.yy"
+                    case 299:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3834 "parser_gen.cpp"
+#line 4158 "parser_gen.cpp"
                     break;
 
-                    case 276:  // maths: multiply
-#line 1167 "grammar.yy"
+                    case 300:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3840 "parser_gen.cpp"
+#line 4164 "parser_gen.cpp"
                     break;
 
-                    case 277:  // maths: pow
-#line 1167 "grammar.yy"
+                    case 301:
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3846 "parser_gen.cpp"
+#line 4170 "parser_gen.cpp"
                     break;
 
-                    case 278:  // maths: round
-#line 1168 "grammar.yy"
+                    case 302:
+#line 1352 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3852 "parser_gen.cpp"
+#line 4176 "parser_gen.cpp"
                     break;
 
-                    case 279:  // maths: sqrt
-#line 1168 "grammar.yy"
+                    case 303:
+#line 1352 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3858 "parser_gen.cpp"
+#line 4182 "parser_gen.cpp"
                     break;
 
-                    case 280:  // maths: subtract
-#line 1168 "grammar.yy"
+                    case 304:
+#line 1352 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3864 "parser_gen.cpp"
+#line 4188 "parser_gen.cpp"
                     break;
 
-                    case 281:  // maths: trunc
-#line 1168 "grammar.yy"
+                    case 305:
+#line 1352 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3870 "parser_gen.cpp"
+#line 4194 "parser_gen.cpp"
                     break;
 
-                    case 282:  // add: "object" ADD expressionArray "end of object"
-#line 1172 "grammar.yy"
+                    case 306:
+#line 1356 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
+                            {KeyFieldname::meta, CNode{KeyValue::geoNearDistance}}}};
+                    }
+#line 4202 "parser_gen.cpp"
+                    break;
+
+                    case 307:
+#line 1359 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
+                            {KeyFieldname::meta, CNode{KeyValue::geoNearPoint}}}};
+                    }
+#line 4210 "parser_gen.cpp"
+                    break;
+
+                    case 308:
+#line 1362 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{
+                            CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::indexKey}}}};
+                    }
+#line 4218 "parser_gen.cpp"
+                    break;
+
+                    case 309:
+#line 1365 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{
+                            CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::randVal}}}};
+                    }
+#line 4226 "parser_gen.cpp"
+                    break;
+
+                    case 310:
+#line 1368 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{
+                            CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::recordId}}}};
+                    }
+#line 4234 "parser_gen.cpp"
+                    break;
+
+                    case 311:
+#line 1371 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
+                            {KeyFieldname::meta, CNode{KeyValue::searchHighlights}}}};
+                    }
+#line 4242 "parser_gen.cpp"
+                    break;
+
+                    case 312:
+#line 1374 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
+                            {KeyFieldname::meta, CNode{KeyValue::searchScore}}}};
+                    }
+#line 4250 "parser_gen.cpp"
+                    break;
+
+                    case 313:
+#line 1377 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{
+                            CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::sortKey}}}};
+                    }
+#line 4258 "parser_gen.cpp"
+                    break;
+
+                    case 314:
+#line 1380 "grammar.yy"
+                    {
+                        yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
+                            {KeyFieldname::meta, CNode{KeyValue::textScore}}}};
+                    }
+#line 4266 "parser_gen.cpp"
+                    break;
+
+                    case 315:
+#line 1386 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::add, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3879 "parser_gen.cpp"
+#line 4275 "parser_gen.cpp"
                     break;
 
-                    case 283:  // atan2: "object" ATAN2 exprFixedTwoArg "end of object"
-#line 1179 "grammar.yy"
+                    case 316:
+#line 1393 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::atan2, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3888 "parser_gen.cpp"
+#line 4284 "parser_gen.cpp"
                     break;
 
-                    case 284:  // abs: "object" ABS expression "end of object"
-#line 1185 "grammar.yy"
+                    case 317:
+#line 1399 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::abs, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3896 "parser_gen.cpp"
+#line 4292 "parser_gen.cpp"
                     break;
 
-                    case 285:  // ceil: "object" CEIL expression "end of object"
-#line 1190 "grammar.yy"
+                    case 318:
+#line 1404 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ceil, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3904 "parser_gen.cpp"
+#line 4300 "parser_gen.cpp"
                     break;
 
-                    case 286:  // divide: "object" DIVIDE "array" expression expression "end of
-                               // array" "end of object"
-#line 1195 "grammar.yy"
+                    case 319:
+#line 1409 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::divide,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3913 "parser_gen.cpp"
+#line 4309 "parser_gen.cpp"
                     break;
 
-                    case 287:  // exponent: "object" EXPONENT expression "end of object"
-#line 1201 "grammar.yy"
+                    case 320:
+#line 1415 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::exponent, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3921 "parser_gen.cpp"
+#line 4317 "parser_gen.cpp"
                     break;
 
-                    case 288:  // floor: "object" FLOOR expression "end of object"
-#line 1206 "grammar.yy"
+                    case 321:
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::floor, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3929 "parser_gen.cpp"
+#line 4325 "parser_gen.cpp"
                     break;
 
-                    case 289:  // ln: "object" LN expression "end of object"
-#line 1211 "grammar.yy"
+                    case 322:
+#line 1425 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ln, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3937 "parser_gen.cpp"
+#line 4333 "parser_gen.cpp"
                     break;
 
-                    case 290:  // log: "object" LOG "array" expression expression "end of array"
-                               // "end of object"
-#line 1216 "grammar.yy"
+                    case 323:
+#line 1430 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::log,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3946 "parser_gen.cpp"
+#line 4342 "parser_gen.cpp"
                     break;
 
-                    case 291:  // logten: "object" LOGTEN expression "end of object"
-#line 1222 "grammar.yy"
+                    case 324:
+#line 1436 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::logten, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 3954 "parser_gen.cpp"
+#line 4350 "parser_gen.cpp"
                     break;
 
-                    case 292:  // mod: "object" MOD "array" expression expression "end of array"
-                               // "end of object"
-#line 1227 "grammar.yy"
+                    case 325:
+#line 1441 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::mod,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3963 "parser_gen.cpp"
+#line 4359 "parser_gen.cpp"
                     break;
 
-                    case 293:  // multiply: "object" MULTIPLY "array" expression expression
-                               // expressions "end of array" "end of object"
-#line 1233 "grammar.yy"
+                    case 326:
+#line 1447 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::multiply,
@@ -4177,298 +4604,292 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 3975 "parser_gen.cpp"
+#line 4371 "parser_gen.cpp"
                     break;
 
-                    case 294:  // pow: "object" POW "array" expression expression "end of array"
-                               // "end of object"
-#line 1242 "grammar.yy"
+                    case 327:
+#line 1456 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::pow,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3984 "parser_gen.cpp"
+#line 4380 "parser_gen.cpp"
                     break;
 
-                    case 295:  // round: "object" ROUND "array" expression expression "end of array"
-                               // "end of object"
-#line 1248 "grammar.yy"
+                    case 328:
+#line 1462 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::round,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 3993 "parser_gen.cpp"
+#line 4389 "parser_gen.cpp"
                     break;
 
-                    case 296:  // sqrt: "object" SQRT expression "end of object"
-#line 1254 "grammar.yy"
+                    case 329:
+#line 1468 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::sqrt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4001 "parser_gen.cpp"
+#line 4397 "parser_gen.cpp"
                     break;
 
-                    case 297:  // subtract: "object" SUBTRACT "array" expression expression "end of
-                               // array" "end of object"
-#line 1259 "grammar.yy"
+                    case 330:
+#line 1473 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::subtract,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4010 "parser_gen.cpp"
+#line 4406 "parser_gen.cpp"
                     break;
 
-                    case 298:  // trunc: "object" TRUNC "array" expression expression "end of array"
-                               // "end of object"
-#line 1265 "grammar.yy"
+                    case 331:
+#line 1479 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::trunc,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4019 "parser_gen.cpp"
+#line 4415 "parser_gen.cpp"
                     break;
 
-                    case 299:  // boolExps: and
-#line 1271 "grammar.yy"
+                    case 332:
+#line 1485 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4025 "parser_gen.cpp"
+#line 4421 "parser_gen.cpp"
                     break;
 
-                    case 300:  // boolExps: or
-#line 1271 "grammar.yy"
+                    case 333:
+#line 1485 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4031 "parser_gen.cpp"
+#line 4427 "parser_gen.cpp"
                     break;
 
-                    case 301:  // boolExps: not
-#line 1271 "grammar.yy"
+                    case 334:
+#line 1485 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4037 "parser_gen.cpp"
+#line 4433 "parser_gen.cpp"
                     break;
 
-                    case 302:  // and: "object" AND expressionArray "end of object"
-#line 1275 "grammar.yy"
+                    case 335:
+#line 1489 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::andExpr, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4046 "parser_gen.cpp"
+#line 4442 "parser_gen.cpp"
                     break;
 
-                    case 303:  // or: "object" OR expressionArray "end of object"
-#line 1282 "grammar.yy"
+                    case 336:
+#line 1496 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::orExpr, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4055 "parser_gen.cpp"
+#line 4451 "parser_gen.cpp"
                     break;
 
-                    case 304:  // not: "object" NOT "array" expression "end of array" "end of
-                               // object"
-#line 1289 "grammar.yy"
+                    case 337:
+#line 1503 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::notExpr,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4064 "parser_gen.cpp"
+#line 4460 "parser_gen.cpp"
                     break;
 
-                    case 305:  // stringExps: concat
-#line 1296 "grammar.yy"
+                    case 338:
+#line 1510 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4070 "parser_gen.cpp"
+#line 4466 "parser_gen.cpp"
                     break;
 
-                    case 306:  // stringExps: dateFromString
-#line 1296 "grammar.yy"
+                    case 339:
+#line 1510 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4076 "parser_gen.cpp"
+#line 4472 "parser_gen.cpp"
                     break;
 
-                    case 307:  // stringExps: dateToString
-#line 1296 "grammar.yy"
+                    case 340:
+#line 1510 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4082 "parser_gen.cpp"
+#line 4478 "parser_gen.cpp"
                     break;
 
-                    case 308:  // stringExps: indexOfBytes
-#line 1296 "grammar.yy"
+                    case 341:
+#line 1510 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4088 "parser_gen.cpp"
+#line 4484 "parser_gen.cpp"
                     break;
 
-                    case 309:  // stringExps: indexOfCP
-#line 1296 "grammar.yy"
+                    case 342:
+#line 1510 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4094 "parser_gen.cpp"
+#line 4490 "parser_gen.cpp"
                     break;
 
-                    case 310:  // stringExps: ltrim
-#line 1296 "grammar.yy"
+                    case 343:
+#line 1510 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4100 "parser_gen.cpp"
+#line 4496 "parser_gen.cpp"
                     break;
 
-                    case 311:  // stringExps: regexFind
-#line 1296 "grammar.yy"
+                    case 344:
+#line 1510 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4106 "parser_gen.cpp"
+#line 4502 "parser_gen.cpp"
                     break;
 
-                    case 312:  // stringExps: regexFindAll
-#line 1297 "grammar.yy"
+                    case 345:
+#line 1511 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4112 "parser_gen.cpp"
+#line 4508 "parser_gen.cpp"
                     break;
 
-                    case 313:  // stringExps: regexMatch
-#line 1297 "grammar.yy"
+                    case 346:
+#line 1511 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4118 "parser_gen.cpp"
+#line 4514 "parser_gen.cpp"
                     break;
 
-                    case 314:  // stringExps: replaceOne
-#line 1297 "grammar.yy"
+                    case 347:
+#line 1511 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4124 "parser_gen.cpp"
+#line 4520 "parser_gen.cpp"
                     break;
 
-                    case 315:  // stringExps: replaceAll
-#line 1297 "grammar.yy"
+                    case 348:
+#line 1511 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4130 "parser_gen.cpp"
+#line 4526 "parser_gen.cpp"
                     break;
 
-                    case 316:  // stringExps: rtrim
-#line 1297 "grammar.yy"
+                    case 349:
+#line 1511 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4136 "parser_gen.cpp"
+#line 4532 "parser_gen.cpp"
                     break;
 
-                    case 317:  // stringExps: split
-#line 1297 "grammar.yy"
+                    case 350:
+#line 1511 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4142 "parser_gen.cpp"
+#line 4538 "parser_gen.cpp"
                     break;
 
-                    case 318:  // stringExps: strLenBytes
-#line 1297 "grammar.yy"
+                    case 351:
+#line 1511 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4148 "parser_gen.cpp"
+#line 4544 "parser_gen.cpp"
                     break;
 
-                    case 319:  // stringExps: strLenCP
-#line 1297 "grammar.yy"
+                    case 352:
+#line 1511 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4154 "parser_gen.cpp"
+#line 4550 "parser_gen.cpp"
                     break;
 
-                    case 320:  // stringExps: strcasecmp
-#line 1298 "grammar.yy"
+                    case 353:
+#line 1512 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4160 "parser_gen.cpp"
+#line 4556 "parser_gen.cpp"
                     break;
 
-                    case 321:  // stringExps: substr
-#line 1298 "grammar.yy"
+                    case 354:
+#line 1512 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4166 "parser_gen.cpp"
+#line 4562 "parser_gen.cpp"
                     break;
 
-                    case 322:  // stringExps: substrBytes
-#line 1298 "grammar.yy"
+                    case 355:
+#line 1512 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4172 "parser_gen.cpp"
+#line 4568 "parser_gen.cpp"
                     break;
 
-                    case 323:  // stringExps: substrCP
-#line 1298 "grammar.yy"
+                    case 356:
+#line 1512 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4178 "parser_gen.cpp"
+#line 4574 "parser_gen.cpp"
                     break;
 
-                    case 324:  // stringExps: toLower
-#line 1298 "grammar.yy"
+                    case 357:
+#line 1512 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4184 "parser_gen.cpp"
+#line 4580 "parser_gen.cpp"
                     break;
 
-                    case 325:  // stringExps: trim
-#line 1298 "grammar.yy"
+                    case 358:
+#line 1512 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4190 "parser_gen.cpp"
+#line 4586 "parser_gen.cpp"
                     break;
 
-                    case 326:  // stringExps: toUpper
-#line 1298 "grammar.yy"
+                    case 359:
+#line 1512 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4196 "parser_gen.cpp"
+#line 4592 "parser_gen.cpp"
                     break;
 
-                    case 327:  // concat: "object" CONCAT "array" expressions "end of array" "end of
-                               // object"
-#line 1302 "grammar.yy"
+                    case 360:
+#line 1516 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::concat, CNode{CNode::ArrayChildren{}}}}};
@@ -4477,49 +4898,47 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 4208 "parser_gen.cpp"
+#line 4604 "parser_gen.cpp"
                     break;
 
-                    case 328:  // formatArg: %empty
-#line 1312 "grammar.yy"
+                    case 361:
+#line 1526 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::formatArg, CNode{KeyValue::absentKey}};
                     }
-#line 4216 "parser_gen.cpp"
+#line 4612 "parser_gen.cpp"
                     break;
 
-                    case 329:  // formatArg: "format argument" expression
-#line 1315 "grammar.yy"
+                    case 362:
+#line 1529 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::formatArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4224 "parser_gen.cpp"
+#line 4620 "parser_gen.cpp"
                     break;
 
-                    case 330:  // timezoneArg: %empty
-#line 1321 "grammar.yy"
+                    case 363:
+#line 1535 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::timezoneArg, CNode{KeyValue::absentKey}};
                     }
-#line 4232 "parser_gen.cpp"
+#line 4628 "parser_gen.cpp"
                     break;
 
-                    case 331:  // timezoneArg: "timezone argument" expression
-#line 1324 "grammar.yy"
+                    case 364:
+#line 1538 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::timezoneArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4240 "parser_gen.cpp"
+#line 4636 "parser_gen.cpp"
                     break;
 
-                    case 332:  // dateFromString: "object" DATE_FROM_STRING START_ORDERED_OBJECT
-                               // "dateString argument" expression formatArg timezoneArg onErrorArg
-                               // onNullArg "end of object" "end of object"
-#line 1331 "grammar.yy"
+                    case 365:
+#line 1545 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::dateFromString,
@@ -4535,13 +4954,11 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[2]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 4250 "parser_gen.cpp"
+#line 4646 "parser_gen.cpp"
                     break;
 
-                    case 333:  // dateToString: "object" DATE_TO_STRING START_ORDERED_OBJECT "date
-                               // argument" expression formatArg timezoneArg onNullArg "end of
-                               // object" "end of object"
-#line 1340 "grammar.yy"
+                    case 366:
+#line 1554 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::dateToString,
@@ -4554,39 +4971,38 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[2]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 4260 "parser_gen.cpp"
+#line 4656 "parser_gen.cpp"
                     break;
 
-                    case 334:  // exprZeroToTwo: %empty
-#line 1348 "grammar.yy"
+                    case 367:
+#line 1562 "grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() = CNode::ArrayChildren{};
                     }
-#line 4268 "parser_gen.cpp"
+#line 4664 "parser_gen.cpp"
                     break;
 
-                    case 335:  // exprZeroToTwo: expression
-#line 1351 "grammar.yy"
+                    case 368:
+#line 1565 "grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             CNode::ArrayChildren{YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4276 "parser_gen.cpp"
+#line 4672 "parser_gen.cpp"
                     break;
 
-                    case 336:  // exprZeroToTwo: expression expression
-#line 1354 "grammar.yy"
+                    case 369:
+#line 1568 "grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             CNode::ArrayChildren{YY_MOVE(yystack_[1].value.as<CNode>()),
                                                  YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4284 "parser_gen.cpp"
+#line 4680 "parser_gen.cpp"
                     break;
 
-                    case 337:  // indexOfBytes: "object" INDEX_OF_BYTES "array" expression
-                               // expression exprZeroToTwo "end of array" "end of object"
-#line 1361 "grammar.yy"
+                    case 370:
+#line 1575 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::indexOfBytes,
@@ -4597,12 +5013,11 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 4296 "parser_gen.cpp"
+#line 4692 "parser_gen.cpp"
                     break;
 
-                    case 338:  // indexOfCP: "object" INDEX_OF_CP "array" expression expression
-                               // exprZeroToTwo "end of array" "end of object"
-#line 1372 "grammar.yy"
+                    case 371:
+#line 1586 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::indexOfCP,
@@ -4613,30 +5028,29 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 4308 "parser_gen.cpp"
+#line 4704 "parser_gen.cpp"
                     break;
 
-                    case 339:  // charsArg: %empty
-#line 1382 "grammar.yy"
+                    case 372:
+#line 1596 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::charsArg, CNode{KeyValue::absentKey}};
                     }
-#line 4316 "parser_gen.cpp"
+#line 4712 "parser_gen.cpp"
                     break;
 
-                    case 340:  // charsArg: "chars argument" expression
-#line 1385 "grammar.yy"
+                    case 373:
+#line 1599 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::charsArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4324 "parser_gen.cpp"
+#line 4720 "parser_gen.cpp"
                     break;
 
-                    case 341:  // ltrim: "object" LTRIM START_ORDERED_OBJECT charsArg "input
-                               // argument" expression "end of object" "end of object"
-#line 1391 "grammar.yy"
+                    case 374:
+#line 1605 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ltrim,
@@ -4645,12 +5059,11 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 4334 "parser_gen.cpp"
+#line 4730 "parser_gen.cpp"
                     break;
 
-                    case 342:  // rtrim: "object" RTRIM START_ORDERED_OBJECT charsArg "input
-                               // argument" expression "end of object" "end of object"
-#line 1399 "grammar.yy"
+                    case 375:
+#line 1613 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::rtrim,
@@ -4659,12 +5072,11 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 4344 "parser_gen.cpp"
+#line 4740 "parser_gen.cpp"
                     break;
 
-                    case 343:  // trim: "object" TRIM START_ORDERED_OBJECT charsArg "input argument"
-                               // expression "end of object" "end of object"
-#line 1407 "grammar.yy"
+                    case 376:
+#line 1621 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::trim,
@@ -4673,30 +5085,29 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 4354 "parser_gen.cpp"
+#line 4750 "parser_gen.cpp"
                     break;
 
-                    case 344:  // optionsArg: %empty
-#line 1415 "grammar.yy"
+                    case 377:
+#line 1629 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::optionsArg, CNode{KeyValue::absentKey}};
                     }
-#line 4362 "parser_gen.cpp"
+#line 4758 "parser_gen.cpp"
                     break;
 
-                    case 345:  // optionsArg: "options argument" expression
-#line 1418 "grammar.yy"
+                    case 378:
+#line 1632 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::optionsArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4370 "parser_gen.cpp"
+#line 4766 "parser_gen.cpp"
                     break;
 
-                    case 346:  // regexArgs: START_ORDERED_OBJECT "input argument" expression
-                               // optionsArg "regex argument" expression "end of object"
-#line 1423 "grammar.yy"
+                    case 379:
+#line 1637 "grammar.yy"
                     {
                         // Note that the order of these arguments must match the constructor for the
                         // regex expression.
@@ -4705,40 +5116,38 @@ int ParserGen::parse() {
                             {KeyFieldname::regexArg, YY_MOVE(yystack_[1].value.as<CNode>())},
                             YY_MOVE(yystack_[3].value.as<std::pair<CNode::Fieldname, CNode>>())}};
                     }
-#line 4382 "parser_gen.cpp"
+#line 4778 "parser_gen.cpp"
                     break;
 
-                    case 347:  // regexFind: "object" REGEX_FIND regexArgs "end of object"
-#line 1432 "grammar.yy"
+                    case 380:
+#line 1646 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::regexFind, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4390 "parser_gen.cpp"
+#line 4786 "parser_gen.cpp"
                     break;
 
-                    case 348:  // regexFindAll: "object" REGEX_FIND_ALL regexArgs "end of object"
-#line 1438 "grammar.yy"
+                    case 381:
+#line 1652 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::regexFindAll, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4398 "parser_gen.cpp"
+#line 4794 "parser_gen.cpp"
                     break;
 
-                    case 349:  // regexMatch: "object" REGEX_MATCH regexArgs "end of object"
-#line 1444 "grammar.yy"
+                    case 382:
+#line 1658 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::regexMatch, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4406 "parser_gen.cpp"
+#line 4802 "parser_gen.cpp"
                     break;
 
-                    case 350:  // replaceOne: "object" REPLACE_ONE START_ORDERED_OBJECT "find
-                               // argument" expression "input argument" expression "replacement
-                               // argument" expression "end of object" "end of object"
-#line 1451 "grammar.yy"
+                    case 383:
+#line 1665 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::replaceOne,
@@ -4748,13 +5157,11 @@ int ParserGen::parse() {
                                  {KeyFieldname::replacementArg,
                                   YY_MOVE(yystack_[2].value.as<CNode>())}}}}}};
                     }
-#line 4417 "parser_gen.cpp"
+#line 4813 "parser_gen.cpp"
                     break;
 
-                    case 351:  // replaceAll: "object" REPLACE_ALL START_ORDERED_OBJECT "find
-                               // argument" expression "input argument" expression "replacement
-                               // argument" expression "end of object" "end of object"
-#line 1461 "grammar.yy"
+                    case 384:
+#line 1675 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::replaceAll,
@@ -4764,54 +5171,51 @@ int ParserGen::parse() {
                                  {KeyFieldname::replacementArg,
                                   YY_MOVE(yystack_[2].value.as<CNode>())}}}}}};
                     }
-#line 4428 "parser_gen.cpp"
+#line 4824 "parser_gen.cpp"
                     break;
 
-                    case 352:  // split: "object" SPLIT "array" expression expression "end of array"
-                               // "end of object"
-#line 1470 "grammar.yy"
+                    case 385:
+#line 1684 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::split,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4437 "parser_gen.cpp"
+#line 4833 "parser_gen.cpp"
                     break;
 
-                    case 353:  // strLenBytes: "object" STR_LEN_BYTES expression "end of object"
-#line 1477 "grammar.yy"
+                    case 386:
+#line 1691 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::strLenBytes, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4446 "parser_gen.cpp"
+#line 4842 "parser_gen.cpp"
                     break;
 
-                    case 354:  // strLenCP: "object" STR_LEN_CP expression "end of object"
-#line 1484 "grammar.yy"
+                    case 387:
+#line 1698 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::strLenCP, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4455 "parser_gen.cpp"
+#line 4851 "parser_gen.cpp"
                     break;
 
-                    case 355:  // strcasecmp: "object" STR_CASE_CMP "array" expression expression
-                               // "end of array" "end of object"
-#line 1492 "grammar.yy"
+                    case 388:
+#line 1706 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::strcasecmp,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4464 "parser_gen.cpp"
+#line 4860 "parser_gen.cpp"
                     break;
 
-                    case 356:  // substr: "object" SUBSTR "array" expression expression expression
-                               // "end of array" "end of object"
-#line 1500 "grammar.yy"
+                    case 389:
+#line 1714 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::substr,
@@ -4819,12 +5223,11 @@ int ParserGen::parse() {
                                                         YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4473 "parser_gen.cpp"
+#line 4869 "parser_gen.cpp"
                     break;
 
-                    case 357:  // substrBytes: "object" SUBSTR_BYTES "array" expression expression
-                               // expression "end of array" "end of object"
-#line 1508 "grammar.yy"
+                    case 390:
+#line 1722 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::substrBytes,
@@ -4832,12 +5235,11 @@ int ParserGen::parse() {
                                                         YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4482 "parser_gen.cpp"
+#line 4878 "parser_gen.cpp"
                     break;
 
-                    case 358:  // substrCP: "object" SUBSTR_CP "array" expression expression
-                               // expression "end of array" "end of object"
-#line 1516 "grammar.yy"
+                    case 391:
+#line 1730 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::substrCP,
@@ -4845,253 +5247,249 @@ int ParserGen::parse() {
                                                         YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4491 "parser_gen.cpp"
+#line 4887 "parser_gen.cpp"
                     break;
 
-                    case 359:  // toLower: "object" TO_LOWER expression "end of object"
-#line 1523 "grammar.yy"
+                    case 392:
+#line 1737 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toLower, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4499 "parser_gen.cpp"
+#line 4895 "parser_gen.cpp"
                     break;
 
-                    case 360:  // toUpper: "object" TO_UPPER expression "end of object"
-#line 1529 "grammar.yy"
+                    case 393:
+#line 1743 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toUpper, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4507 "parser_gen.cpp"
+#line 4903 "parser_gen.cpp"
                     break;
 
-                    case 361:  // metaSortKeyword: "randVal"
-#line 1535 "grammar.yy"
+                    case 394:
+#line 1749 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::randVal};
                     }
-#line 4515 "parser_gen.cpp"
+#line 4911 "parser_gen.cpp"
                     break;
 
-                    case 362:  // metaSortKeyword: "textScore"
-#line 1538 "grammar.yy"
+                    case 395:
+#line 1752 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::textScore};
                     }
-#line 4523 "parser_gen.cpp"
+#line 4919 "parser_gen.cpp"
                     break;
 
-                    case 363:  // metaSort: "object" META metaSortKeyword "end of object"
-#line 1544 "grammar.yy"
+                    case 396:
+#line 1758 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::meta, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4531 "parser_gen.cpp"
+#line 4927 "parser_gen.cpp"
                     break;
 
-                    case 364:  // sortSpecs: "object" specList "end of object"
-#line 1550 "grammar.yy"
+                    case 397:
+#line 1764 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 4539 "parser_gen.cpp"
+#line 4935 "parser_gen.cpp"
                     break;
 
-                    case 365:  // specList: %empty
-#line 1555 "grammar.yy"
+                    case 398:
+#line 1769 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 4547 "parser_gen.cpp"
+#line 4943 "parser_gen.cpp"
                     break;
 
-                    case 366:  // specList: specList sortSpec
-#line 1558 "grammar.yy"
+                    case 399:
+#line 1772 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 4556 "parser_gen.cpp"
+#line 4952 "parser_gen.cpp"
                     break;
 
-                    case 367:  // oneOrNegOne: "1 (int)"
-#line 1565 "grammar.yy"
+                    case 400:
+#line 1779 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::intOneKey};
                     }
-#line 4564 "parser_gen.cpp"
+#line 4960 "parser_gen.cpp"
                     break;
 
-                    case 368:  // oneOrNegOne: "-1 (int)"
-#line 1568 "grammar.yy"
+                    case 401:
+#line 1782 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::intNegOneKey};
                     }
-#line 4572 "parser_gen.cpp"
+#line 4968 "parser_gen.cpp"
                     break;
 
-                    case 369:  // oneOrNegOne: "1 (long)"
-#line 1571 "grammar.yy"
+                    case 402:
+#line 1785 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::longOneKey};
                     }
-#line 4580 "parser_gen.cpp"
+#line 4976 "parser_gen.cpp"
                     break;
 
-                    case 370:  // oneOrNegOne: "-1 (long)"
-#line 1574 "grammar.yy"
+                    case 403:
+#line 1788 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::longNegOneKey};
                     }
-#line 4588 "parser_gen.cpp"
+#line 4984 "parser_gen.cpp"
                     break;
 
-                    case 371:  // oneOrNegOne: "1 (double)"
-#line 1577 "grammar.yy"
+                    case 404:
+#line 1791 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::doubleOneKey};
                     }
-#line 4596 "parser_gen.cpp"
+#line 4992 "parser_gen.cpp"
                     break;
 
-                    case 372:  // oneOrNegOne: "-1 (double)"
-#line 1580 "grammar.yy"
+                    case 405:
+#line 1794 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::doubleNegOneKey};
                     }
-#line 4604 "parser_gen.cpp"
+#line 5000 "parser_gen.cpp"
                     break;
 
-                    case 373:  // oneOrNegOne: "1 (decimal)"
-#line 1583 "grammar.yy"
+                    case 406:
+#line 1797 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::decimalOneKey};
                     }
-#line 4612 "parser_gen.cpp"
+#line 5008 "parser_gen.cpp"
                     break;
 
-                    case 374:  // oneOrNegOne: "-1 (decimal)"
-#line 1586 "grammar.yy"
+                    case 407:
+#line 1800 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::decimalNegOneKey};
                     }
-#line 4620 "parser_gen.cpp"
+#line 5016 "parser_gen.cpp"
                     break;
 
-                    case 375:  // sortSpec: valueFieldname metaSort
-#line 1591 "grammar.yy"
+                    case 408:
+#line 1805 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4628 "parser_gen.cpp"
+#line 5024 "parser_gen.cpp"
                     break;
 
-                    case 376:  // sortSpec: valueFieldname oneOrNegOne
-#line 1593 "grammar.yy"
+                    case 409:
+#line 1807 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4636 "parser_gen.cpp"
+#line 5032 "parser_gen.cpp"
                     break;
 
-                    case 377:  // setExpression: allElementsTrue
-#line 1599 "grammar.yy"
+                    case 410:
+#line 1813 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4642 "parser_gen.cpp"
+#line 5038 "parser_gen.cpp"
                     break;
 
-                    case 378:  // setExpression: anyElementTrue
-#line 1599 "grammar.yy"
+                    case 411:
+#line 1813 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4648 "parser_gen.cpp"
+#line 5044 "parser_gen.cpp"
                     break;
 
-                    case 379:  // setExpression: setDifference
-#line 1599 "grammar.yy"
+                    case 412:
+#line 1813 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4654 "parser_gen.cpp"
+#line 5050 "parser_gen.cpp"
                     break;
 
-                    case 380:  // setExpression: setEquals
-#line 1599 "grammar.yy"
+                    case 413:
+#line 1813 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4660 "parser_gen.cpp"
+#line 5056 "parser_gen.cpp"
                     break;
 
-                    case 381:  // setExpression: setIntersection
-#line 1599 "grammar.yy"
+                    case 414:
+#line 1813 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4666 "parser_gen.cpp"
+#line 5062 "parser_gen.cpp"
                     break;
 
-                    case 382:  // setExpression: setIsSubset
-#line 1599 "grammar.yy"
+                    case 415:
+#line 1813 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4672 "parser_gen.cpp"
+#line 5068 "parser_gen.cpp"
                     break;
 
-                    case 383:  // setExpression: setUnion
-#line 1600 "grammar.yy"
+                    case 416:
+#line 1814 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4678 "parser_gen.cpp"
+#line 5074 "parser_gen.cpp"
                     break;
 
-                    case 384:  // allElementsTrue: "object" "allElementsTrue" "array" expression
-                               // "end of array" "end of object"
-#line 1604 "grammar.yy"
+                    case 417:
+#line 1818 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{
                             CNode::ObjectChildren{{KeyFieldname::allElementsTrue,
                                                    CNode{YY_MOVE(yystack_[2].value.as<CNode>())}}}};
                     }
-#line 4686 "parser_gen.cpp"
+#line 5082 "parser_gen.cpp"
                     break;
 
-                    case 385:  // anyElementTrue: "object" "anyElementTrue" "array" expression "end
-                               // of array" "end of object"
-#line 1610 "grammar.yy"
+                    case 418:
+#line 1824 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{
                             CNode::ObjectChildren{{KeyFieldname::anyElementTrue,
                                                    CNode{YY_MOVE(yystack_[2].value.as<CNode>())}}}};
                     }
-#line 4694 "parser_gen.cpp"
+#line 5090 "parser_gen.cpp"
                     break;
 
-                    case 386:  // setDifference: "object" "setDifference" exprFixedTwoArg "end of
-                               // object"
-#line 1616 "grammar.yy"
+                    case 419:
+#line 1830 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::setDifference, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4703 "parser_gen.cpp"
+#line 5099 "parser_gen.cpp"
                     break;
 
-                    case 387:  // setEquals: "object" "setEquals" "array" expression expression
-                               // expressions "end of array" "end of object"
-#line 1624 "grammar.yy"
+                    case 420:
+#line 1838 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::setEquals,
@@ -5102,12 +5500,11 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 4715 "parser_gen.cpp"
+#line 5111 "parser_gen.cpp"
                     break;
 
-                    case 388:  // setIntersection: "object" "setIntersection" "array" expression
-                               // expression expressions "end of array" "end of object"
-#line 1635 "grammar.yy"
+                    case 421:
+#line 1849 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::setIntersection,
@@ -5118,22 +5515,20 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 4727 "parser_gen.cpp"
+#line 5123 "parser_gen.cpp"
                     break;
 
-                    case 389:  // setIsSubset: "object" "setIsSubset" exprFixedTwoArg "end of
-                               // object"
-#line 1645 "grammar.yy"
+                    case 422:
+#line 1859 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::setIsSubset, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4736 "parser_gen.cpp"
+#line 5132 "parser_gen.cpp"
                     break;
 
-                    case 390:  // setUnion: "object" "setUnion" "array" expression expression
-                               // expressions "end of array" "end of object"
-#line 1653 "grammar.yy"
+                    case 423:
+#line 1867 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::setUnion,
@@ -5144,426 +5539,422 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 4748 "parser_gen.cpp"
+#line 5144 "parser_gen.cpp"
                     break;
 
-                    case 391:  // literalEscapes: const
-#line 1663 "grammar.yy"
+                    case 424:
+#line 1877 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4754 "parser_gen.cpp"
+#line 5150 "parser_gen.cpp"
                     break;
 
-                    case 392:  // literalEscapes: literal
-#line 1663 "grammar.yy"
+                    case 425:
+#line 1877 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4760 "parser_gen.cpp"
+#line 5156 "parser_gen.cpp"
                     break;
 
-                    case 393:  // const: "object" CONST_EXPR "array" value "end of array" "end of
-                               // object"
-#line 1667 "grammar.yy"
+                    case 426:
+#line 1881 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::constExpr,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4769 "parser_gen.cpp"
+#line 5165 "parser_gen.cpp"
                     break;
 
-                    case 394:  // literal: "object" LITERAL "array" value "end of array" "end of
-                               // object"
-#line 1674 "grammar.yy"
+                    case 427:
+#line 1888 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::literal,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4778 "parser_gen.cpp"
+#line 5174 "parser_gen.cpp"
                     break;
 
-                    case 395:  // value: simpleValue
-#line 1681 "grammar.yy"
+                    case 428:
+#line 1895 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4784 "parser_gen.cpp"
+#line 5180 "parser_gen.cpp"
                     break;
 
-                    case 396:  // value: compoundValue
-#line 1681 "grammar.yy"
+                    case 429:
+#line 1895 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4790 "parser_gen.cpp"
+#line 5186 "parser_gen.cpp"
                     break;
 
-                    case 397:  // compoundValue: valueArray
-#line 1685 "grammar.yy"
+                    case 430:
+#line 1899 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4796 "parser_gen.cpp"
+#line 5192 "parser_gen.cpp"
                     break;
 
-                    case 398:  // compoundValue: valueObject
-#line 1685 "grammar.yy"
+                    case 431:
+#line 1899 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4802 "parser_gen.cpp"
+#line 5198 "parser_gen.cpp"
                     break;
 
-                    case 399:  // valueArray: "array" values "end of array"
-#line 1689 "grammar.yy"
+                    case 432:
+#line 1903 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{YY_MOVE(yystack_[1].value.as<std::vector<CNode>>())};
                     }
-#line 4810 "parser_gen.cpp"
+#line 5206 "parser_gen.cpp"
                     break;
 
-                    case 400:  // values: %empty
-#line 1695 "grammar.yy"
+                    case 433:
+#line 1909 "grammar.yy"
                     {
                     }
-#line 4816 "parser_gen.cpp"
+#line 5212 "parser_gen.cpp"
                     break;
 
-                    case 401:  // values: value values
-#line 1696 "grammar.yy"
+                    case 434:
+#line 1910 "grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             YY_MOVE(yystack_[0].value.as<std::vector<CNode>>());
                         yylhs.value.as<std::vector<CNode>>().emplace_back(
                             YY_MOVE(yystack_[1].value.as<CNode>()));
                     }
-#line 4825 "parser_gen.cpp"
+#line 5221 "parser_gen.cpp"
                     break;
 
-                    case 402:  // valueObject: "object" valueFields "end of object"
-#line 1703 "grammar.yy"
+                    case 435:
+#line 1917 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 4833 "parser_gen.cpp"
+#line 5229 "parser_gen.cpp"
                     break;
 
-                    case 403:  // valueFields: %empty
-#line 1709 "grammar.yy"
+                    case 436:
+#line 1923 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 4841 "parser_gen.cpp"
+#line 5237 "parser_gen.cpp"
                     break;
 
-                    case 404:  // valueFields: valueFields valueField
-#line 1712 "grammar.yy"
+                    case 437:
+#line 1926 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 4850 "parser_gen.cpp"
+#line 5246 "parser_gen.cpp"
                     break;
 
-                    case 405:  // valueField: valueFieldname value
-#line 1719 "grammar.yy"
+                    case 438:
+#line 1933 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4858 "parser_gen.cpp"
+#line 5254 "parser_gen.cpp"
                     break;
 
-                    case 406:  // valueFieldname: invariableUserFieldname
-#line 1726 "grammar.yy"
+                    case 439:
+#line 1940 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4864 "parser_gen.cpp"
+#line 5260 "parser_gen.cpp"
                     break;
 
-                    case 407:  // valueFieldname: stageAsUserFieldname
-#line 1727 "grammar.yy"
+                    case 440:
+#line 1941 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4870 "parser_gen.cpp"
+#line 5266 "parser_gen.cpp"
                     break;
 
-                    case 408:  // valueFieldname: argAsUserFieldname
-#line 1728 "grammar.yy"
+                    case 441:
+#line 1942 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4876 "parser_gen.cpp"
+#line 5272 "parser_gen.cpp"
                     break;
 
-                    case 409:  // valueFieldname: aggExprAsUserFieldname
-#line 1729 "grammar.yy"
+                    case 442:
+#line 1943 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4882 "parser_gen.cpp"
+#line 5278 "parser_gen.cpp"
                     break;
 
-                    case 410:  // valueFieldname: idAsUserFieldname
-#line 1730 "grammar.yy"
+                    case 443:
+#line 1944 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4888 "parser_gen.cpp"
+#line 5284 "parser_gen.cpp"
                     break;
 
-                    case 411:  // compExprs: cmp
-#line 1733 "grammar.yy"
+                    case 444:
+#line 1947 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4894 "parser_gen.cpp"
+#line 5290 "parser_gen.cpp"
                     break;
 
-                    case 412:  // compExprs: eq
-#line 1733 "grammar.yy"
+                    case 445:
+#line 1947 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4900 "parser_gen.cpp"
+#line 5296 "parser_gen.cpp"
                     break;
 
-                    case 413:  // compExprs: gt
-#line 1733 "grammar.yy"
+                    case 446:
+#line 1947 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4906 "parser_gen.cpp"
+#line 5302 "parser_gen.cpp"
                     break;
 
-                    case 414:  // compExprs: gte
-#line 1733 "grammar.yy"
+                    case 447:
+#line 1947 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4912 "parser_gen.cpp"
+#line 5308 "parser_gen.cpp"
                     break;
 
-                    case 415:  // compExprs: lt
-#line 1733 "grammar.yy"
+                    case 448:
+#line 1947 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4918 "parser_gen.cpp"
+#line 5314 "parser_gen.cpp"
                     break;
 
-                    case 416:  // compExprs: lte
-#line 1733 "grammar.yy"
+                    case 449:
+#line 1947 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4924 "parser_gen.cpp"
+#line 5320 "parser_gen.cpp"
                     break;
 
-                    case 417:  // compExprs: ne
-#line 1733 "grammar.yy"
+                    case 450:
+#line 1947 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4930 "parser_gen.cpp"
+#line 5326 "parser_gen.cpp"
                     break;
 
-                    case 418:  // cmp: "object" CMP exprFixedTwoArg "end of object"
-#line 1735 "grammar.yy"
+                    case 451:
+#line 1949 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::cmp, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4939 "parser_gen.cpp"
+#line 5335 "parser_gen.cpp"
                     break;
 
-                    case 419:  // eq: "object" EQ exprFixedTwoArg "end of object"
-#line 1740 "grammar.yy"
+                    case 452:
+#line 1954 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::eq, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4948 "parser_gen.cpp"
+#line 5344 "parser_gen.cpp"
                     break;
 
-                    case 420:  // gt: "object" GT exprFixedTwoArg "end of object"
-#line 1745 "grammar.yy"
+                    case 453:
+#line 1959 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::gt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4957 "parser_gen.cpp"
+#line 5353 "parser_gen.cpp"
                     break;
 
-                    case 421:  // gte: "object" GTE exprFixedTwoArg "end of object"
-#line 1750 "grammar.yy"
+                    case 454:
+#line 1964 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::gte, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4966 "parser_gen.cpp"
+#line 5362 "parser_gen.cpp"
                     break;
 
-                    case 422:  // lt: "object" LT exprFixedTwoArg "end of object"
-#line 1755 "grammar.yy"
+                    case 455:
+#line 1969 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::lt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4975 "parser_gen.cpp"
+#line 5371 "parser_gen.cpp"
                     break;
 
-                    case 423:  // lte: "object" LTE exprFixedTwoArg "end of object"
-#line 1760 "grammar.yy"
+                    case 456:
+#line 1974 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::lte, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4984 "parser_gen.cpp"
+#line 5380 "parser_gen.cpp"
                     break;
 
-                    case 424:  // ne: "object" NE exprFixedTwoArg "end of object"
-#line 1765 "grammar.yy"
+                    case 457:
+#line 1979 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ne, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4993 "parser_gen.cpp"
+#line 5389 "parser_gen.cpp"
                     break;
 
-                    case 425:  // typeExpression: convert
-#line 1771 "grammar.yy"
+                    case 458:
+#line 1985 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4999 "parser_gen.cpp"
+#line 5395 "parser_gen.cpp"
                     break;
 
-                    case 426:  // typeExpression: toBool
-#line 1772 "grammar.yy"
+                    case 459:
+#line 1986 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5005 "parser_gen.cpp"
+#line 5401 "parser_gen.cpp"
                     break;
 
-                    case 427:  // typeExpression: toDate
-#line 1773 "grammar.yy"
+                    case 460:
+#line 1987 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5011 "parser_gen.cpp"
+#line 5407 "parser_gen.cpp"
                     break;
 
-                    case 428:  // typeExpression: toDecimal
-#line 1774 "grammar.yy"
+                    case 461:
+#line 1988 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5017 "parser_gen.cpp"
+#line 5413 "parser_gen.cpp"
                     break;
 
-                    case 429:  // typeExpression: toDouble
-#line 1775 "grammar.yy"
+                    case 462:
+#line 1989 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5023 "parser_gen.cpp"
+#line 5419 "parser_gen.cpp"
                     break;
 
-                    case 430:  // typeExpression: toInt
-#line 1776 "grammar.yy"
+                    case 463:
+#line 1990 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5029 "parser_gen.cpp"
+#line 5425 "parser_gen.cpp"
                     break;
 
-                    case 431:  // typeExpression: toLong
-#line 1777 "grammar.yy"
+                    case 464:
+#line 1991 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5035 "parser_gen.cpp"
+#line 5431 "parser_gen.cpp"
                     break;
 
-                    case 432:  // typeExpression: toObjectId
-#line 1778 "grammar.yy"
+                    case 465:
+#line 1992 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5041 "parser_gen.cpp"
+#line 5437 "parser_gen.cpp"
                     break;
 
-                    case 433:  // typeExpression: toString
-#line 1779 "grammar.yy"
+                    case 466:
+#line 1993 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5047 "parser_gen.cpp"
+#line 5443 "parser_gen.cpp"
                     break;
 
-                    case 434:  // typeExpression: type
-#line 1780 "grammar.yy"
+                    case 467:
+#line 1994 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5053 "parser_gen.cpp"
+#line 5449 "parser_gen.cpp"
                     break;
 
-                    case 435:  // onErrorArg: %empty
-#line 1785 "grammar.yy"
+                    case 468:
+#line 1999 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::onErrorArg, CNode{KeyValue::absentKey}};
                     }
-#line 5061 "parser_gen.cpp"
+#line 5457 "parser_gen.cpp"
                     break;
 
-                    case 436:  // onErrorArg: "onError argument" expression
-#line 1788 "grammar.yy"
+                    case 469:
+#line 2002 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::onErrorArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5069 "parser_gen.cpp"
+#line 5465 "parser_gen.cpp"
                     break;
 
-                    case 437:  // onNullArg: %empty
-#line 1795 "grammar.yy"
+                    case 470:
+#line 2009 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::onNullArg, CNode{KeyValue::absentKey}};
                     }
-#line 5077 "parser_gen.cpp"
+#line 5473 "parser_gen.cpp"
                     break;
 
-                    case 438:  // onNullArg: "onNull argument" expression
-#line 1798 "grammar.yy"
+                    case 471:
+#line 2012 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::onNullArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5085 "parser_gen.cpp"
+#line 5481 "parser_gen.cpp"
                     break;
 
-                    case 439:  // convert: "object" CONVERT START_ORDERED_OBJECT "input argument"
-                               // expression onErrorArg onNullArg "to argument" expression "end of
-                               // object" "end of object"
-#line 1805 "grammar.yy"
+                    case 472:
+#line 2019 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::convert,
@@ -5575,92 +5966,92 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 5096 "parser_gen.cpp"
+#line 5492 "parser_gen.cpp"
                     break;
 
-                    case 440:  // toBool: "object" TO_BOOL expression "end of object"
-#line 1814 "grammar.yy"
+                    case 473:
+#line 2028 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toBool, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5104 "parser_gen.cpp"
+#line 5500 "parser_gen.cpp"
                     break;
 
-                    case 441:  // toDate: "object" TO_DATE expression "end of object"
-#line 1819 "grammar.yy"
+                    case 474:
+#line 2033 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toDate, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5112 "parser_gen.cpp"
+#line 5508 "parser_gen.cpp"
                     break;
 
-                    case 442:  // toDecimal: "object" TO_DECIMAL expression "end of object"
-#line 1824 "grammar.yy"
+                    case 475:
+#line 2038 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toDecimal, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5120 "parser_gen.cpp"
+#line 5516 "parser_gen.cpp"
                     break;
 
-                    case 443:  // toDouble: "object" TO_DOUBLE expression "end of object"
-#line 1829 "grammar.yy"
+                    case 476:
+#line 2043 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toDouble, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5128 "parser_gen.cpp"
+#line 5524 "parser_gen.cpp"
                     break;
 
-                    case 444:  // toInt: "object" TO_INT expression "end of object"
-#line 1834 "grammar.yy"
+                    case 477:
+#line 2048 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toInt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5136 "parser_gen.cpp"
+#line 5532 "parser_gen.cpp"
                     break;
 
-                    case 445:  // toLong: "object" TO_LONG expression "end of object"
-#line 1839 "grammar.yy"
+                    case 478:
+#line 2053 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toLong, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5144 "parser_gen.cpp"
+#line 5540 "parser_gen.cpp"
                     break;
 
-                    case 446:  // toObjectId: "object" TO_OBJECT_ID expression "end of object"
-#line 1844 "grammar.yy"
+                    case 479:
+#line 2058 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toObjectId, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5152 "parser_gen.cpp"
+#line 5548 "parser_gen.cpp"
                     break;
 
-                    case 447:  // toString: "object" TO_STRING expression "end of object"
-#line 1849 "grammar.yy"
+                    case 480:
+#line 2063 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toString, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5160 "parser_gen.cpp"
+#line 5556 "parser_gen.cpp"
                     break;
 
-                    case 448:  // type: "object" TYPE expression "end of object"
-#line 1854 "grammar.yy"
+                    case 481:
+#line 2068 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::type, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5168 "parser_gen.cpp"
+#line 5564 "parser_gen.cpp"
                     break;
 
 
-#line 5172 "parser_gen.cpp"
+#line 5568 "parser_gen.cpp"
 
                     default:
                         break;
@@ -5975,356 +6366,421 @@ std::string ParserGen::yysyntax_error_(const context& yyctx) const {
 }
 
 
-const short ParserGen::yypact_ninf_ = -680;
+const short ParserGen::yypact_ninf_ = -733;
 
 const signed char ParserGen::yytable_ninf_ = -1;
 
 const short ParserGen::yypact_[] = {
-    23,   -58,  -47,  -58,  -58,  -40,  61,   -680, -680, -35,  -680, -680, -680, -680, -680, -680,
-    923,  27,   33,   439,  -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, 1061, -680, -680, -680,
-    -680, -680, -11,  -2,   106,  4,    16,   106,  -680, 38,   -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, 188,  -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -58,  70,   -680, -680, -680, -680, -680, -680, 108,  -680, 138,  54,   -35,  -680, -680, -680,
-    -680, -680, -680, -680, -680, 85,   -680, -680, -18,  -680, -680, 573,  106,  -57,  -680, -680,
-    -61,  -680, -91,  -680, -680, -23,  -680, 1173, 1173, -680, -680, -680, -680, -680, 109,  137,
-    -680, -680, 111,  86,   -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, 253,  809,  -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -5,   -680, -680, -680, 253,  -680,
-    113,  253,  63,   67,   63,   68,   69,   253,  69,   74,   75,   -680, -680, -680, 76,   69,
-    253,  253,  69,   69,   77,   78,   79,   253,  80,   253,  69,   69,   -680, 81,   87,   69,
-    88,   63,   89,   -680, -680, -680, -680, -680, 90,   -680, 69,   94,   97,   69,   98,   103,
-    253,  104,  253,  253,  110,  115,  118,  131,  253,  253,  253,  253,  253,  253,  253,  253,
-    253,  253,  -680, 135,  253,  944,  160,  -17,  -680, -680, 187,  189,  253,  190,  253,  253,
-    196,  199,  200,  253,  949,  168,  223,  237,  253,  202,  203,  208,  210,  212,  253,  253,
-    949,  213,  253,  215,  216,  217,  256,  253,  253,  219,  253,  221,  253,  225,  260,  231,
-    232,  266,  267,  253,  256,  235,  253,  253,  238,  253,  253,  239,  253,  241,  243,  253,
-    253,  253,  253,  252,  254,  255,  257,  259,  265,  268,  272,  273,  274,  256,  253,  275,
-    -680, 253,  -680, -680, -680, -680, -680, -680, -680, -680, -680, 277,  -680, 279,  253,  -680,
-    -680, -680, 280,  949,  -680, 282,  -680, -680, -680, -680, 253,  253,  253,  253,  -680, -680,
-    -680, -680, -680, 253,  253,  283,  -680, 253,  -680, -680, -680, 253,  284,  253,  253,  -680,
-    286,  -680, 253,  -680, 253,  -680, -680, 253,  253,  253,  287,  -680, 253,  253,  -680, 253,
-    253,  -680, 253,  -680, -680, 253,  253,  253,  253,  -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, 297,  253,  -680, -680, 288,  289,  291,  292,  949,  301,  691,  296,  317,
-    299,  299,  302,  253,  253,  306,  309,  -680, 253,  310,  253,  311,  313,  343,  347,  348,
-    323,  253,  253,  253,  253,  324,  327,  253,  253,  253,  349,  253,  350,  -680, -680, -680,
-    -680, -680, -680, -680, 949,  -680, -680, 253,  379,  253,  371,  371,  353,  253,  355,  356,
-    -680, 357,  358,  359,  361,  -680, 362,  253,  380,  253,  253,  363,  364,  366,  367,  368,
-    369,  370,  372,  373,  374,  375,  376,  377,  -680, -680, 253,  387,  -680, 253,  317,  379,
-    -680, -680, 381,  382,  -680, 383,  -680, 384,  -680, -680, 253,  397,  402,  -680, 385,  386,
-    388,  389,  -680, -680, 391,  395,  414,  -680, 418,  -680, -680, 253,  -680, 379,  422,  -680,
-    -680, -680, -680, 423,  253,  253,  -680, -680, -680, -680, -680, -680, -680, -680, 431,  432,
-    433,  -680, 435,  436,  437,  438,  -680, 448,  449,  -680, -680, -680, -680};
+    97,   -73,  -45,  -73,  -73,  -40,  85,   -733, -733, -17,  -733, -733, -733, -733, -733, -733,
+    972,  36,   52,   598,  -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, 1337,
+    -733, -733, -733, -6,   -4,   290,  -2,   8,    290,  -733, 54,   -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, 131,  -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -73,  73,   -733, -733, -733, -733, -733,
+    -733, 96,   -733, 112,  17,   -17,  -733, -733, -733, -733, -733, -733, -733, -733, 53,   -733,
+    -733, -9,   -733, -733, 1602, 290,  104,  -733, -733, -23,  -733, -92,  -733, -733, -22,  -733,
+    1459, -733, -733, 1459, -733, -733, -733, -733, 80,   108,  -733, -733, 82,   55,   -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, 1093,
+    464,  -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -3,   -733, -733, 850,  -733, 1093, -733, -733,
+    88,   1093, 37,   41,   37,   44,   45,   1093, 45,   47,   57,   -733, -733, -733, 58,   45,
+    1093, 1093, 45,   45,   -733, 59,   60,   61,   1093, 62,   1093, 45,   45,   -733, 312,  63,
+    67,   45,   70,   37,   71,   -733, -733, -733, -733, -733, 72,   -733, 45,   74,   76,   45,
+    77,   81,   83,   1093, 89,   1093, 1093, 90,   93,   102,  105,  1093, 1093, 1093, 1093, 1093,
+    1093, 1093, 1093, 1093, 1093, -733, 106,  1093, 1459, 1459, -733, 1623, 114,  12,   1670, -733,
+    -733, 132,  139,  1093, 141,  1093, 1093, 155,  163,  169,  1093, 1215, 202,  211,  213,  1093,
+    178,  179,  180,  181,  187,  1093, 1093, 1215, 188,  1093, 194,  208,  222,  240,  223,  226,
+    228,  231,  232,  233,  234,  237,  238,  1093, 1093, 239,  1093, 241,  1093, 244,  242,  245,
+    246,  273,  281,  1093, 240,  251,  1093, 1093, 252,  1093, 1093, 255,  259,  1093, 261,  1093,
+    266,  275,  1093, 1093, 1093, 1093, 276,  280,  289,  291,  292,  293,  294,  296,  299,  301,
+    240,  1093, 305,  -733, -733, -733, -733, -733, -733, -733, 1093, -733, -733, -733, -733, -733,
+    -733, -733, 307,  -733, 308,  1093, -733, -733, -733, 309,  1215, -733, 320,  -733, -733, -733,
+    -733, 1093, 1093, 1093, 1093, -733, -733, -733, -733, -733, 1093, 1093, 321,  -733, 1093, -733,
+    -733, -733, 1093, 352,  -733, -733, -733, -733, -733, -733, -733, -733, -733, 1093, 1093, -733,
+    323,  -733, 1093, -733, 1093, -733, -733, 1093, 1093, 1093, 355,  -733, 1093, 1093, -733, 1093,
+    1093, -733, -733, 1093, -733, 1093, -733, -733, 1093, 1093, 1093, 1093, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, 356,  1093, -733, -733, 326,  327,  330,  332,  1215, 334,
+    724,  336,  364,  322,  322,  338,  1093, 1093, 340,  344,  -733, 1093, 351,  1093, 357,  353,
+    379,  387,  391,  362,  1093, 1093, 1093, 1093, 971,  366,  367,  1093, 1093, 1093, 369,  1093,
+    372,  -733, -733, -733, -733, -733, -733, -733, 1215, -733, -733, 1093, 392,  1093, 393,  393,
+    374,  1093, 373,  376,  -733, 377,  378,  381,  380,  -733, 382,  1093, 400,  1093, 1093, 383,
+    384,  386,  388,  394,  395,  396,  397,  401,  402,  403,  399,  404,  405,  -733, -733, 1093,
+    411,  -733, 1093, 364,  392,  -733, -733, 406,  407,  -733, 408,  -733, 409,  -733, -733, 1093,
+    418,  426,  -733, 412,  413,  414,  415,  -733, -733, -733, 416,  420,  439,  -733, 443,  -733,
+    -733, 1093, -733, 392,  447,  -733, -733, -733, -733, 448,  1093, 1093, -733, -733, -733, -733,
+    -733, -733, -733, -733, 456,  457,  458,  -733, 460,  461,  462,  463,  -733, 468,  469,  -733,
+    -733, -733, -733};
 
 const short ParserGen::yydefact_[] = {
-    0,   0,   0,   0,   0,   0,   0,   70,  3,   8,   2,   5,   4,   365, 6,   1,   0,   0,   0,
-    0,   82,  108, 97,  107, 104, 113, 111, 105, 100, 102, 103, 110, 98,  114, 109, 112, 99,  106,
-    101, 69,  264, 84,  83,  90,  0,   88,  89,  87,  71,  73,  0,   0,   0,   0,   0,   0,   10,
-    0,   12,  13,  14,  15,  16,  17,  7,   139, 115, 177, 117, 178, 116, 140, 122, 154, 118, 129,
-    155, 156, 141, 364, 123, 142, 143, 124, 125, 157, 158, 119, 144, 145, 146, 126, 127, 159, 160,
-    147, 148, 128, 121, 120, 149, 161, 162, 163, 165, 164, 150, 166, 179, 180, 181, 182, 183, 167,
-    151, 91,  94,  95,  96,  93,  92,  170, 168, 169, 171, 172, 173, 152, 130, 131, 132, 133, 134,
-    135, 174, 136, 137, 176, 175, 153, 138, 407, 408, 409, 406, 410, 0,   366, 219, 218, 217, 216,
-    215, 213, 212, 211, 205, 204, 203, 209, 208, 207, 185, 76,  186, 184, 189, 190, 191, 192, 193,
-    194, 195, 196, 197, 198, 202, 206, 210, 214, 199, 200, 201, 187, 188, 229, 230, 231, 232, 233,
-    238, 234, 235, 236, 239, 240, 220, 221, 223, 224, 225, 237, 226, 227, 228, 74,  222, 72,  0,
-    0,   21,  22,  23,  24,  26,  28,  0,   25,  0,   0,   8,   374, 373, 372, 371, 368, 367, 370,
-    369, 0,   375, 376, 0,   85,  19,  0,   0,   0,   11,  9,   0,   75,  0,   77,  78,  0,   27,
-    0,   0,   66,  67,  68,  65,  29,  0,   0,   361, 362, 0,   0,   79,  81,  86,  60,  59,  56,
-    55,  58,  52,  51,  54,  44,  43,  46,  48,  47,  50,  241, 257, 45,  49,  53,  57,  39,  40,
-    41,  42,  61,  62,  63,  32,  33,  34,  35,  36,  37,  38,  30,  64,  246, 247, 248, 265, 266,
-    249, 299, 300, 301, 250, 391, 392, 253, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315,
-    316, 317, 318, 319, 320, 321, 322, 323, 324, 326, 325, 251, 411, 412, 413, 414, 415, 416, 417,
-    252, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 267, 268, 269, 270, 271, 272, 273, 274,
-    275, 276, 277, 278, 279, 280, 281, 254, 377, 378, 379, 380, 381, 382, 383, 31,  18,  0,   363,
-    76,  243, 241, 244, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   10,  10,  10,  0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   10,  0,   0,   0,   0,   0,
-    0,   10,  10,  10,  10,  10,  0,   10,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   10,  0,   0,   0,   0,   0,
-    242, 255, 0,   0,   0,   0,   0,   0,   0,   0,   0,   241, 0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   339, 0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   339, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   339, 0,   0,   256, 0,   261, 262,
-    260, 263, 258, 20,  80,  284, 282, 0,   302, 0,   0,   283, 285, 418, 0,   400, 403, 0,   395,
-    396, 397, 398, 0,   0,   0,   0,   419, 287, 288, 420, 421, 0,   0,   0,   289, 0,   291, 422,
-    423, 0,   0,   0,   0,   424, 0,   303, 0,   347, 0,   348, 349, 0,   0,   0,   0,   386, 0,
-    0,   389, 0,   0,   296, 0,   353, 354, 0,   0,   0,   0,   440, 441, 442, 443, 444, 445, 359,
-    446, 447, 360, 0,   0,   448, 259, 0,   0,   0,   0,   400, 0,   0,   0,   435, 328, 328, 0,
-    334, 334, 0,   0,   340, 0,   0,   241, 0,   0,   344, 0,   0,   0,   0,   241, 241, 241, 0,
-    0,   0,   0,   0,   0,   0,   0,   384, 385, 245, 327, 401, 399, 402, 0,   404, 393, 0,   437,
-    0,   330, 330, 0,   335, 0,   0,   394, 0,   0,   0,   0,   304, 0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   405, 436, 0,   0,   329, 0,   435,
-    437, 286, 336, 0,   0,   290, 0,   292, 0,   294, 345, 0,   0,   0,   295, 0,   0,   0,   0,
-    352, 355, 0,   0,   0,   297, 0,   298, 438, 0,   331, 437, 0,   337, 338, 341, 293, 0,   0,
-    0,   342, 387, 388, 390, 356, 357, 358, 343, 0,   0,   0,   346, 0,   0,   0,   0,   333, 0,
-    0,   439, 332, 351, 350};
+    0,   0,   0,   0,   0,   0,   0,   77,  3,   8,   2,   5,   4,   398, 6,   1,   0,   0,   0,
+    0,   89,  117, 106, 116, 113, 122, 120, 114, 109, 111, 112, 119, 107, 123, 118, 121, 108, 115,
+    110, 76,  287, 91,  90,  97,  95,  96,  94,  0,   104, 78,  80,  0,   0,   0,   0,   0,   0,
+    10,  0,   12,  13,  14,  15,  16,  17,  7,   148, 124, 187, 126, 188, 125, 149, 131, 164, 127,
+    138, 165, 166, 150, 397, 132, 151, 152, 133, 134, 167, 168, 128, 153, 154, 155, 135, 136, 169,
+    170, 156, 157, 137, 130, 129, 158, 171, 172, 173, 175, 174, 159, 176, 189, 190, 191, 192, 193,
+    160, 177, 161, 98,  101, 102, 103, 100, 99,  180, 178, 179, 181, 182, 183, 162, 139, 140, 141,
+    142, 143, 144, 184, 145, 146, 186, 185, 163, 147, 440, 441, 442, 439, 443, 0,   399, 236, 235,
+    234, 233, 232, 230, 229, 228, 195, 196, 197, 222, 221, 220, 226, 225, 224, 198, 199, 200, 201,
+    202, 83,  203, 194, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 219, 223, 227,
+    231, 216, 217, 218, 246, 247, 248, 249, 250, 255, 251, 252, 253, 256, 257, 237, 238, 240, 241,
+    242, 254, 243, 244, 245, 81,  239, 79,  0,   0,   21,  22,  23,  24,  26,  28,  0,   25,  0,
+    0,   8,   407, 406, 405, 404, 401, 400, 403, 402, 0,   408, 409, 0,   92,  19,  0,   0,   0,
+    11,  9,   0,   82,  0,   84,  85,  0,   27,  0,   68,  70,  0,   67,  69,  29,  105, 0,   0,
+    394, 395, 0,   0,   86,  88,  93,  61,  60,  57,  56,  59,  53,  52,  55,  45,  44,  47,  49,
+    48,  51,  258, 0,   46,  50,  54,  58,  40,  41,  42,  43,  62,  63,  64,  33,  34,  35,  36,
+    37,  38,  39,  30,  32,  65,  66,  265, 275, 266, 267, 268, 289, 290, 269, 332, 333, 334, 270,
+    424, 425, 273, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353,
+    354, 355, 356, 357, 359, 358, 271, 444, 445, 446, 447, 448, 449, 450, 272, 458, 459, 460, 461,
+    462, 463, 464, 465, 466, 467, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303,
+    304, 305, 274, 410, 411, 412, 413, 414, 415, 416, 31,  18,  0,   396, 83,  280, 260, 258, 262,
+    261, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   10,  10,  10,  0,   0,   0,   0,
+    0,   0,   288, 0,   0,   0,   0,   0,   0,   0,   0,   10,  0,   0,   0,   0,   0,   0,   0,
+    10,  10,  10,  10,  10,  0,   10,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   10,  0,   0,   0,   0,   72,
+    0,   0,   0,   0,   259, 278, 0,   0,   0,   0,   0,   0,   0,   0,   0,   258, 0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   372, 0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    372, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   372, 0,   0,   75,  74,  71,  73,  20,  87,  279,
+    0,   284, 285, 283, 286, 281, 317, 315, 0,   335, 0,   0,   316, 318, 451, 0,   433, 436, 0,
+    428, 429, 430, 431, 0,   0,   0,   0,   452, 320, 321, 453, 454, 0,   0,   0,   322, 0,   324,
+    455, 456, 0,   0,   306, 307, 308, 309, 310, 311, 312, 313, 314, 0,   0,   457, 0,   336, 0,
+    380, 0,   381, 382, 0,   0,   0,   0,   419, 0,   0,   422, 0,   0,   276, 277, 0,   329, 0,
+    386, 387, 0,   0,   0,   0,   473, 474, 475, 476, 477, 478, 392, 479, 480, 393, 0,   0,   481,
+    282, 0,   0,   0,   0,   433, 0,   0,   0,   468, 361, 361, 0,   367, 367, 0,   0,   373, 0,
+    0,   258, 0,   0,   377, 0,   0,   0,   0,   258, 258, 258, 0,   0,   0,   0,   0,   0,   0,
+    0,   0,   417, 418, 263, 360, 434, 432, 435, 0,   437, 426, 0,   470, 0,   363, 363, 0,   368,
+    0,   0,   427, 0,   0,   0,   0,   337, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   438, 469, 0,   0,   362, 0,   468, 470, 319, 369, 0,
+    0,   323, 0,   325, 0,   327, 378, 0,   0,   0,   328, 0,   0,   0,   0,   264, 385, 388, 0,
+    0,   0,   330, 0,   331, 471, 0,   364, 470, 0,   370, 371, 374, 326, 0,   0,   0,   375, 420,
+    421, 423, 389, 390, 391, 376, 0,   0,   0,   379, 0,   0,   0,   0,   366, 0,   0,   472, 365,
+    384, 383};
 
 const short ParserGen::yypgoto_[] = {
-    -680, -680, -680, -224, -680, -15,  172,  -14,  -13,  -188, -680, -680, -680, -195, -167,
-    -165, -156, -34,  -153, -32,  -46,  -25,  -149, -147, -463, -158, -680, -142, -139, -137,
-    -680, -122, -113, -201, -44,  -680, -680, -680, -680, -680, -680, 206,  -680, -680, -680,
-    -680, -680, -680, -680, -680, 248,  -43,  -375, -107, -62,  -355, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -278, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680, -680,
-    -680, -680, -680, -680, -680, -680, -200, -679, -124, -152, -449, -680, -374, -108, -92,
-    -680, -680, -680, -680, -680, -680, -680, -680, 10,   -680, 157,  -680, -680, -680, -680,
-    303,  -680, -680, -680, -680, -680, -680, -680, -680, -680, -52,  -680};
+    -733, 277,  -733, -733, -21,  -15,  -733, -733, -14,  -13,  -733, -240, -733, -733, 35,   -733,
+    -733, -236, -244, -210, -208, -206, -37,  -202, -31,  -46,  -24,  -197, -191, -482, -228, -733,
+    -177, -173, -169, -733, -158, -153, -221, -47,  -733, -733, -733, -733, -733, -733, 295,  -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, 263,  -430, -733, -43,  -390, -149, -34,  -733,
+    -733, -733, -310, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -394, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -733,
+    -733, -733, -733, -733, -733, -733, -733, -733, -733, -733, -232, -732, -147, -189, -452, -733,
+    -377, -139, -136, -733, -733, -733, -733, -733, -733, -733, -733, 2,    -733, 150,  -733, -733,
+    -733, -733, 283,  -733, -733, -733, -733, -733, -733, -733, -733, -733, -53,  -733};
 
 const short ParserGen::yydefgoto_[] = {
-    -1,  248, 529, 141, 44,  142, 143, 144, 145, 146, 253, 534, 661, 185, 186, 187, 188, 189,
-    190, 191, 192, 193, 194, 195, 619, 196, 197, 198, 199, 200, 201, 202, 203, 204, 381, 551,
-    552, 553, 621, 206, 10,  18,  57,  58,  59,  60,  61,  62,  63,  235, 297, 214, 382, 383,
-    464, 299, 300, 453, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314,
-    315, 316, 317, 318, 319, 320, 493, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331,
-    332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349,
-    350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 365, 366, 367,
-    664, 699, 666, 702, 572, 680, 384, 620, 670, 368, 369, 370, 371, 372, 373, 374, 375, 8,
-    16,  232, 207, 245, 48,  49,  243, 244, 50,  14,  19,  230, 231, 258, 147, 6,   494, 219};
+    -1,  472, 260, 570, 143, 144, 261, 145, 146, 147, 473, 148, 47,  262, 474, 575, 713, 48,
+    194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 670, 205, 206, 207, 208, 209, 210,
+    211, 212, 213, 396, 590, 591, 592, 672, 215, 10,  18,  58,  59,  60,  61,  62,  63,  64,
+    244, 475, 307, 308, 309, 223, 397, 398, 487, 540, 311, 312, 313, 399, 478, 314, 315, 316,
+    317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334,
+    525, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351,
+    352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 365, 366, 367, 368, 369,
+    370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 716, 752, 718, 755, 611, 732,
+    400, 671, 722, 382, 383, 384, 385, 386, 387, 388, 389, 8,   16,  241, 216, 254, 49,  50,
+    252, 253, 51,  14,  19,  239, 240, 268, 149, 6,   526, 228};
 
 const short ParserGen::yytable_[] = {
-    205, 45,  46,  47,  218, 549, 212, 259, 456, 212, 458, 249, 217, 11,  12,  256, 465, 565, 210,
-    162, 211, 210, 261, 211, 734, 474, 475, 213, 241, 536, 213, 459, 481, 461, 483, 1,   171, 153,
-    154, 155, 7,   260, 2,   3,   4,   257, 296, 296, 5,   164, 9,   586, 283, 283, 751, 242, 242,
-    507, 13,  509, 510, 15,  491, 17,  165, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 7,
-    611, 527, 64,  255, 284, 284, 285, 285, 220, 539, 208, 541, 542, 290, 290, 286, 286, 546, 287,
-    287, 209, 557, 288, 288, 289, 289, 215, 563, 564, 291, 291, 567, 292, 292, 293, 293, 573, 574,
-    216, 576, 234, 578, 51,  52,  53,  54,  55,  56,  585, 294, 294, 588, 589, 178, 591, 592, 236,
-    594, 295, 295, 597, 598, 599, 600, 298, 298, 495, 496, 150, 151, 152, 237, 153, 154, 155, 612,
-    238, 240, 614, 377, 378, 379, 457, 242, 277, 156, 157, 158, 460, 462, 463, 617, 159, 160, 161,
-    467, 468, 472, 478, 479, 480, 482, 487, 623, 624, 625, 626, 554, 488, 490, 492, 499, 627, 628,
-    212, 502, 630, 254, 503, 505, 631, 696, 633, 634, 506, 508, 210, 636, 211, 637, 535, 511, 638,
-    639, 640, 213, 512, 642, 643, 513, 644, 645, 233, 646, 250, 252, 647, 648, 649, 650, 221, 222,
-    514, 530, 223, 224, 526, 537, 555, 538, 540, 652, 176, 177, 178, 179, 543, 225, 226, 544, 545,
-    556, 558, 559, 227, 228, 669, 669, 560, 262, 561, 674, 562, 566, 676, 568, 569, 570, 571, 575,
-    684, 577, 685, 686, 687, 579, 690, 691, 692, 580, 694, 581, 582, 583, 584, 587, 148, 149, 590,
-    593, 229, 595, 697, 596, 700, 150, 151, 152, 705, 153, 154, 155, 601, 632, 602, 603, 641, 604,
-    713, 605, 715, 716, 156, 157, 158, 606, 651, 665, 607, 159, 160, 161, 608, 609, 610, 613, 615,
-    730, 616, 618, 732, 622, 629, 162, 466, 635, 454, 663, 653, 654, 655, 473, 656, 739, 476, 477,
-    662, 469, 470, 471, 658, 668, 484, 485, 277, 278, 672, 489, 673, 675, 750, 677, 678, 164, 486,
-    679, 681, 682, 501, 754, 755, 504, 683, 688, 497, 498, 689, 500, 165, 166, 167, 168, 169, 170,
-    171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 693, 695, 698, 701, 525,
-    704, 706, 707, 714, 708, 709, 710, 711, 251, 712, 717, 718, 719, 720, 721, 731, 722, 723, 724,
-    725, 726, 740, 727, 728, 729, 550, 741, 239, 735, 736, 737, 738, 742, 743, 660, 744, 745, 550,
-    746, 531, 532, 533, 747, 65,  66,  67,  68,  69,  21,  22,  23,  24,  25,  26,  27,  28,  29,
-    30,  31,  32,  33,  748, 34,  35,  36,  749, 37,  38,  70,  752, 753, 71,  72,  73,  74,  75,
-    76,  77,  756, 757, 758, 78,  759, 760, 761, 762, 79,  80,  81,  82,  83,  84,  40,  85,  86,
-    763, 764, 376, 87,  88,  89,  90,  667, 733, 550, 91,  92,  93,  94,  95,  96,  97,  657, 98,
-    99,  100, 703, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
-    117, 118, 119, 120, 671, 455, 121, 122, 123, 124, 125, 126, 127, 0,   128, 129, 130, 131, 132,
-    133, 134, 135, 136, 137, 138, 139, 140, 43,  0,   0,   380, 0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   550, 65,  66,  67,  68,  69,  21,  22,  23,  24,  25,  26,  27,  28,
-    29,  30,  31,  32,  33,  0,   34,  35,  36,  0,   37,  38,  70,  0,   0,   71,  72,  73,  74,
-    75,  76,  77,  0,   0,   0,   78,  0,   550, 0,   0,   246, 80,  81,  82,  83,  84,  247, 85,
-    86,  0,   0,   0,   87,  88,  89,  90,  0,   0,   0,   91,  92,  93,  94,  95,  96,  97,  0,
-    98,  99,  100, 0,   101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
-    116, 117, 118, 119, 120, 0,   0,   121, 122, 123, 124, 125, 126, 127, 0,   128, 129, 130, 131,
-    132, 133, 134, 135, 136, 137, 138, 139, 140, 43,  65,  66,  67,  68,  69,  21,  22,  23,  24,
-    25,  26,  27,  28,  29,  30,  31,  32,  33,  0,   34,  35,  36,  0,   37,  38,  70,  0,   0,
-    71,  72,  73,  74,  75,  76,  77,  0,   0,   0,   78,  0,   0,   0,   0,   659, 80,  81,  82,
-    83,  84,  40,  85,  86,  0,   0,   0,   87,  88,  89,  90,  0,   0,   0,   91,  92,  93,  94,
-    95,  96,  97,  0,   98,  99,  100, 0,   101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111,
-    112, 113, 114, 115, 116, 117, 118, 119, 120, 0,   0,   121, 122, 123, 124, 125, 126, 127, 0,
-    128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 43,  385, 386, 387, 388, 389,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   390, 0,   0,   391, 392, 393, 394, 395, 396, 397, 0,   0,   0,   398, 0,   0,   0,   0,
-    0,   399, 400, 401, 402, 403, 0,   404, 405, 0,   0,   0,   406, 407, 408, 409, 0,   0,   0,
-    410, 411, 412, 0,   413, 414, 415, 0,   416, 417, 418, 0,   419, 420, 421, 422, 423, 424, 425,
-    426, 427, 428, 429, 430, 431, 432, 0,   0,   0,   0,   0,   0,   0,   0,   433, 434, 435, 436,
-    437, 438, 439, 0,   440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 20,  0,
-    21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  0,   34,  35,  36,  0,   37,
-    38,  0,   21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  0,   34,  35,  36,
-    39,  37,  38,  0,   0,   0,   40,  0,   0,   148, 149, 0,   0,   0,   0,   0,   0,   0,   150,
-    151, 152, 528, 153, 154, 155, 0,   41,  40,  42,  0,   0,   0,   0,   0,   0,   156, 157, 158,
-    0,   0,   0,   0,   159, 160, 161, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   162,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   115, 116, 117, 118, 119, 120, 0,   0,   43,  0,
-    0,   547, 548, 0,   0,   0,   0,   0,   0,   0,   164, 0,   0,   0,   0,   0,   0,   0,   0,
-    43,  0,   0,   0,   0,   0,   165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177,
-    178, 179, 180, 181, 182, 183, 184, 148, 149, 0,   0,   0,   0,   0,   0,   0,   150, 151, 152,
-    0,   153, 154, 155, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   156, 157, 158, 0,   0,
-    0,   0,   159, 160, 161, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   162, 0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    163, 0,   0,   0,   0,   0,   0,   0,   164, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179,
-    180, 181, 182, 183, 184, 263, 264, 0,   0,   0,   0,   0,   0,   0,   265, 266, 267, 0,   268,
-    269, 270, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   271, 272, 273, 0,   0,   0,   0,
-    274, 275, 276, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   162, 0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   277, 278, 0,
-    0,   0,   0,   0,   0,   0,   164, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 279, 280, 281, 282, 180, 181,
-    182};
+    214, 44,  45,  46,  227, 11,  12,  221, 263, 588, 221, 481, 293, 226, 269, 293, 219, 488, 265,
+    219, 479, 604, 220, 271, 788, 220, 497, 498, 300, 222, 270, 300, 222, 7,   504, 306, 506, 250,
+    306, 155, 156, 157, 563, 564, 527, 528, 294, 182, 295, 294, 296, 295, 263, 296, 297, 805, 266,
+    297, 568, 298, 9,   542, 298, 544, 545, 299, 13,  251, 299, 550, 551, 552, 553, 554, 555, 556,
+    557, 558, 559, 301, 634, 562, 301, 302, 7,   15,  302, 303, 251, 17,  303, 267, 482, 578, 484,
+    580, 581, 65,  304, 217, 229, 304, 218, 305, 224, 596, 305, 310, 662, 1,   310, 602, 603, 585,
+    225, 606, 2,   3,   4,   243, 245, 246, 5,   247, 249, 523, 391, 392, 393, 621, 622, 251, 624,
+    480, 626, 52,  53,  54,  55,  56,  57,  633, 287, 189, 636, 637, 483, 639, 640, 485, 486, 643,
+    490, 645, 158, 159, 648, 649, 650, 651, 567, 160, 491, 495, 501, 502, 503, 505, 519, 230, 231,
+    663, 520, 232, 233, 522, 524, 531, 576, 534, 665, 535, 537, 167, 168, 577, 538, 579, 541, 234,
+    235, 668, 169, 170, 543, 546, 236, 237, 547, 221, 171, 582, 264, 674, 675, 676, 677, 548, 219,
+    583, 549, 561, 678, 679, 220, 584, 681, 593, 173, 242, 682, 222, 594, 595, 597, 598, 599, 600,
+    293, 293, 749, 684, 685, 601, 605, 174, 687, 238, 688, 263, 607, 689, 690, 691, 300, 300, 693,
+    694, 610, 695, 696, 306, 306, 697, 608, 698, 272, 628, 699, 700, 701, 702, 294, 294, 295, 295,
+    296, 296, 609, 612, 297, 297, 613, 704, 614, 298, 298, 615, 616, 617, 618, 299, 299, 619, 620,
+    623, 631, 625, 721, 721, 627, 629, 630, 726, 632, 301, 301, 635, 638, 302, 302, 641, 736, 303,
+    303, 642, 740, 644, 728, 743, 744, 745, 646, 747, 304, 304, 737, 738, 739, 305, 305, 647, 652,
+    310, 310, 750, 653, 753, 152, 153, 154, 758, 155, 156, 157, 654, 717, 655, 656, 657, 658, 766,
+    659, 768, 769, 660, 476, 661, 161, 162, 163, 664, 666, 667, 669, 164, 165, 166, 492, 493, 494,
+    784, 510, 511, 786, 673, 680, 683, 686, 512, 692, 703, 705, 706, 489, 707, 509, 793, 708, 710,
+    715, 496, 714, 720, 499, 500, 724, 529, 530, 725, 532, 513, 514, 507, 508, 804, 727, 731, 730,
+    521, 515, 516, 733, 729, 808, 809, 734, 735, 517, 751, 533, 741, 742, 536, 746, 539, 560, 748,
+    759, 754, 757, 760, 767, 761, 762, 764, 518, 763, 765, 770, 771, 772, 712, 773, 187, 188, 189,
+    190, 785, 774, 775, 794, 776, 777, 589, 781, 778, 779, 780, 795, 782, 783, 789, 790, 791, 792,
+    589, 571, 796, 797, 798, 799, 800, 572, 573, 574, 801, 401, 402, 403, 404, 405, 21,  22,  23,
+    24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  802, 34,  35,  36,  803, 37,  38,  406, 806,
+    807, 407, 408, 409, 410, 411, 412, 413, 810, 811, 812, 414, 813, 814, 815, 816, 566, 415, 416,
+    417, 817, 818, 418, 419, 420, 421, 422, 259, 390, 787, 248, 423, 424, 425, 426, 719, 756, 709,
+    427, 428, 429, 430, 431, 432, 433, 589, 434, 435, 436, 723, 477, 437, 438, 439, 440, 441, 442,
+    443, 394, 0,   444, 445, 446, 447, 448, 449, 0,   450, 451, 0,   0,   0,   0,   0,   0,   0,
+    0,   452, 453, 454, 455, 456, 457, 458, 0,   459, 460, 461, 462, 463, 464, 465, 466, 467, 468,
+    469, 470, 471, 257, 258, 0,   0,   0,   0,   0,   0,   0,   66,  67,  68,  69,  70,  21,  22,
+    23,  24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  0,   34,  35,  36,  589, 37,  38,  71,
+    0,   0,   72,  73,  74,  75,  76,  77,  78,  0,   0,   0,   79,  0,   0,   0,   0,   80,  81,
+    82,  83,  0,   0,   84,  85,  40,  86,  87,  0,   0,   0,   0,   88,  89,  90,  91,  0,   0,
+    589, 92,  93,  94,  95,  96,  97,  98,  0,   99,  100, 101, 0,   0,   102, 103, 104, 105, 106,
+    107, 108, 0,   0,   109, 110, 111, 112, 113, 114, 0,   115, 116, 117, 118, 119, 120, 121, 122,
+    0,   0,   123, 124, 125, 126, 127, 128, 129, 0,   130, 131, 132, 133, 134, 135, 136, 137, 138,
+    139, 140, 141, 142, 43,  66,  67,  68,  69,  70,  21,  22,  23,  24,  25,  26,  27,  28,  29,
+    30,  31,  32,  33,  0,   34,  35,  36,  0,   37,  38,  71,  0,   0,   72,  73,  74,  75,  76,
+    77,  78,  0,   0,   0,   79,  0,   0,   0,   0,   711, 81,  82,  83,  0,   0,   84,  85,  40,
+    86,  87,  0,   0,   0,   0,   88,  89,  90,  91,  0,   0,   0,   92,  93,  94,  95,  96,  97,
+    98,  0,   99,  100, 101, 0,   0,   102, 103, 104, 105, 106, 107, 108, 0,   0,   109, 110, 111,
+    112, 113, 114, 0,   115, 116, 117, 118, 119, 120, 121, 122, 0,   0,   123, 124, 125, 126, 127,
+    128, 129, 0,   130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 43,  401, 402,
+    403, 404, 405, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   406, 0,   0,   407, 408, 409, 410, 411, 412, 413, 0,   0,   0,   414, 0,
+    0,   0,   0,   0,   415, 416, 417, 0,   0,   418, 419, 0,   421, 422, 0,   0,   0,   0,   423,
+    424, 425, 426, 0,   0,   0,   427, 428, 429, 430, 431, 432, 433, 0,   434, 435, 436, 0,   0,
+    437, 438, 439, 440, 441, 442, 443, 0,   0,   444, 445, 446, 447, 448, 449, 0,   450, 451, 0,
+    0,   0,   0,   0,   0,   0,   0,   452, 453, 454, 455, 456, 457, 458, 0,   459, 460, 461, 462,
+    463, 464, 465, 466, 467, 468, 469, 470, 471, 20,  0,   21,  22,  23,  24,  25,  26,  27,  28,
+    29,  30,  31,  32,  33,  0,   34,  35,  36,  0,   37,  38,  150, 151, 0,   0,   0,   0,   0,
+    0,   0,   152, 153, 154, 0,   155, 156, 157, 707, 0,   39,  0,   0,   158, 159, 0,   0,   0,
+    40,  0,   160, 161, 162, 163, 0,   0,   0,   0,   164, 165, 166, 0,   0,   0,   0,   0,   0,
+    0,   0,   41,  0,   42,  167, 168, 0,   0,   0,   0,   0,   0,   0,   169, 170, 0,   0,   0,
+    0,   0,   0,   171, 0,   0,   0,   0,   0,   0,   0,   0,   287, 395, 0,   0,   0,   0,   0,
+    0,   0,   173, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   43,  0,
+    174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192,
+    193, 150, 151, 0,   0,   0,   0,   0,   0,   0,   152, 153, 154, 0,   155, 156, 157, 0,   0,
+    0,   0,   0,   158, 159, 0,   0,   0,   0,   0,   160, 161, 162, 163, 0,   0,   0,   0,   164,
+    165, 166, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   167, 168, 0,   0,   0,   0,
+    0,   0,   0,   169, 170, 0,   0,   0,   0,   0,   0,   171, 0,   0,   0,   0,   0,   0,   0,
+    0,   287, 395, 0,   0,   0,   0,   0,   0,   0,   173, 0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184,
+    185, 186, 187, 188, 189, 190, 191, 192, 193, 150, 151, 0,   0,   0,   0,   0,   0,   0,   152,
+    153, 154, 0,   155, 156, 157, 0,   0,   0,   0,   0,   158, 159, 0,   0,   0,   0,   0,   160,
+    161, 162, 163, 0,   0,   0,   0,   164, 165, 166, 0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   167, 168, 0,   0,   0,   0,   0,   0,   0,   169, 170, 0,   0,   0,   0,   0,   0,
+    171, 0,   0,   0,   0,   0,   0,   0,   0,   586, 587, 0,   0,   0,   0,   0,   0,   0,   173,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   174, 175, 176,
+    177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 150, 151,
+    0,   0,   0,   0,   0,   0,   0,   152, 153, 154, 0,   155, 156, 157, 0,   0,   0,   0,   0,
+    158, 159, 0,   0,   0,   0,   0,   160, 161, 162, 163, 0,   0,   0,   0,   164, 165, 166, 0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   167, 168, 0,   0,   0,   0,   0,   0,   0,
+    169, 170, 0,   0,   0,   0,   0,   0,   171, 0,   0,   0,   0,   0,   0,   0,   0,   0,   172,
+    0,   0,   0,   0,   0,   0,   0,   173, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187,
+    188, 189, 190, 191, 192, 193, 273, 274, 0,   0,   0,   0,   0,   0,   0,   275, 276, 277, 0,
+    278, 279, 280, 0,   0,   0,   0,   0,   158, 159, 0,   0,   0,   0,   0,   160, 281, 282, 283,
+    0,   0,   0,   0,   284, 285, 286, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   167,
+    168, 0,   0,   0,   0,   0,   0,   0,   169, 170, 0,   0,   0,   0,   0,   0,   171, 0,   0,
+    0,   0,   0,   0,   0,   0,   287, 288, 0,   0,   0,   0,   0,   0,   0,   173, 0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   174, 0,   0,   177, 178, 179,
+    180, 181, 182, 183, 184, 185, 186, 289, 290, 291, 292, 191, 192, 193, 21,  22,  23,  24,  25,
+    26,  27,  28,  29,  30,  31,  32,  33,  0,   34,  35,  36,  0,   37,  38,  0,   21,  22,  23,
+    24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  0,   34,  35,  36,  255, 37,  38,  0,   0,
+    0,   0,   0,   256, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   565, 0,   0,
+    0,   0,   0,   0,   0,   420, 21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32,  33,
+    0,   34,  35,  36,  0,   37,  38,  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   569, 0,   0,   0,   0,   0,   0,   0,   40,  0,   0,   0,   0,
+    0,   257, 258, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   257, 258, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   117, 118, 119, 120, 121, 122, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   43};
 
 const short ParserGen::yycheck_[] = {
-    44,  16,  16,  16,  56,  468, 52,  98,  382, 55,  385, 235, 55,  3,   4,   76,  391, 480, 52,
-    76,  52,  55,  45,  55,  703, 400, 401, 52,  46,  46,  55,  386, 407, 388, 409, 12,  127, 42,
-    43,  44,  98,  242, 19,  20,  21,  106, 247, 248, 25,  106, 97,  500, 247, 248, 733, 73,  73,
-    432, 98,  434, 435, 0,   417, 98,  121, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 98,
-    525, 452, 45,  237, 247, 248, 247, 248, 46,  460, 97,  462, 463, 247, 248, 247, 248, 467, 247,
-    248, 98,  472, 247, 248, 247, 248, 98,  478, 479, 247, 248, 482, 247, 248, 247, 248, 487, 488,
-    98,  490, 46,  492, 91,  92,  93,  94,  95,  96,  499, 247, 248, 502, 503, 134, 505, 506, 24,
-    508, 247, 248, 511, 512, 513, 514, 247, 248, 420, 421, 38,  39,  40,  9,   42,  43,  44,  526,
-    98,  68,  529, 46,  19,  46,  45,  73,  97,  55,  56,  57,  97,  97,  97,  542, 62,  63,  64,
-    97,  97,  97,  97,  97,  97,  97,  97,  554, 555, 556, 557, 15,  97,  97,  97,  97,  563, 564,
-    236, 97,  567, 236, 97,  97,  571, 660, 573, 574, 97,  97,  236, 578, 236, 580, 46,  97,  583,
-    584, 585, 236, 97,  588, 589, 97,  591, 592, 208, 594, 235, 235, 597, 598, 599, 600, 38,  39,
-    97,  453, 42,  43,  97,  46,  11,  46,  46,  612, 132, 133, 134, 135, 46,  55,  56,  46,  46,
-    10,  46,  46,  62,  63,  627, 628, 46,  245, 46,  632, 46,  46,  634, 46,  46,  46,  8,   46,
-    641, 46,  642, 643, 644, 46,  647, 648, 649, 15,  651, 46,  46,  13,  13,  46,  29,  30,  46,
-    46,  98,  46,  663, 46,  665, 38,  39,  40,  669, 42,  43,  44,  46,  15,  46,  46,  15,  46,
-    679, 46,  681, 682, 55,  56,  57,  46,  15,  14,  46,  62,  63,  64,  46,  46,  46,  46,  45,
-    698, 45,  45,  701, 45,  45,  76,  392, 45,  378, 16,  46,  46,  45,  399, 46,  714, 402, 403,
-    46,  395, 396, 397, 45,  45,  410, 411, 97,  98,  46,  415, 45,  45,  731, 46,  45,  106, 412,
-    18,  15,  15,  426, 740, 741, 429, 45,  45,  422, 423, 45,  425, 121, 122, 123, 124, 125, 126,
-    127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 45,  45,  17,  26,  450,
-    46,  45,  45,  22,  46,  46,  46,  45,  235, 46,  46,  46,  45,  45,  45,  27,  46,  46,  45,
-    45,  45,  23,  46,  46,  46,  468, 23,  220, 46,  46,  46,  46,  46,  46,  621, 46,  46,  480,
-    46,  453, 453, 453, 46,  3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,
-    17,  18,  19,  20,  46,  22,  23,  24,  46,  26,  27,  28,  46,  46,  31,  32,  33,  34,  35,
-    36,  37,  46,  46,  46,  41,  46,  46,  46,  46,  46,  47,  48,  49,  50,  51,  52,  53,  54,
-    46,  46,  248, 58,  59,  60,  61,  625, 702, 547, 65,  66,  67,  68,  69,  70,  71,  619, 73,
-    74,  75,  667, 77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,
-    93,  94,  95,  96,  628, 380, 99,  100, 101, 102, 103, 104, 105, -1,  107, 108, 109, 110, 111,
-    112, 113, 114, 115, 116, 117, 118, 119, 120, -1,  -1,  259, -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    -1,  -1,  -1,  -1,  -1,  619, 3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,
-    16,  17,  18,  19,  20,  -1,  22,  23,  24,  -1,  26,  27,  28,  -1,  -1,  31,  32,  33,  34,
-    35,  36,  37,  -1,  -1,  -1,  41,  -1,  660, -1,  -1,  46,  47,  48,  49,  50,  51,  52,  53,
-    54,  -1,  -1,  -1,  58,  59,  60,  61,  -1,  -1,  -1,  65,  66,  67,  68,  69,  70,  71,  -1,
-    73,  74,  75,  -1,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,
-    92,  93,  94,  95,  96,  -1,  -1,  99,  100, 101, 102, 103, 104, 105, -1,  107, 108, 109, 110,
-    111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 3,   4,   5,   6,   7,   8,   9,   10,  11,
-    12,  13,  14,  15,  16,  17,  18,  19,  20,  -1,  22,  23,  24,  -1,  26,  27,  28,  -1,  -1,
-    31,  32,  33,  34,  35,  36,  37,  -1,  -1,  -1,  41,  -1,  -1,  -1,  -1,  46,  47,  48,  49,
-    50,  51,  52,  53,  54,  -1,  -1,  -1,  58,  59,  60,  61,  -1,  -1,  -1,  65,  66,  67,  68,
-    69,  70,  71,  -1,  73,  74,  75,  -1,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,
-    88,  89,  90,  91,  92,  93,  94,  95,  96,  -1,  -1,  99,  100, 101, 102, 103, 104, 105, -1,
-    107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 3,   4,   5,   6,   7,
-    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    -1,  28,  -1,  -1,  31,  32,  33,  34,  35,  36,  37,  -1,  -1,  -1,  41,  -1,  -1,  -1,  -1,
-    -1,  47,  48,  49,  50,  51,  -1,  53,  54,  -1,  -1,  -1,  58,  59,  60,  61,  -1,  -1,  -1,
-    65,  66,  67,  -1,  69,  70,  71,  -1,  73,  74,  75,  -1,  77,  78,  79,  80,  81,  82,  83,
-    84,  85,  86,  87,  88,  89,  90,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  99,  100, 101, 102,
-    103, 104, 105, -1,  107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 6,   -1,
-    8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  -1,  22,  23,  24,  -1,  26,
-    27,  -1,  8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  -1,  22,  23,  24,
-    46,  26,  27,  -1,  -1,  -1,  52,  -1,  -1,  29,  30,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  38,
-    39,  40,  46,  42,  43,  44,  -1,  72,  52,  74,  -1,  -1,  -1,  -1,  -1,  -1,  55,  56,  57,
-    -1,  -1,  -1,  -1,  62,  63,  64,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  76,
-    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  91,  92,  93,  94,  95,  96,  -1,  -1,  120, -1,
-    -1,  97,  98,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  106, -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    120, -1,  -1,  -1,  -1,  -1,  121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133,
-    134, 135, 136, 137, 138, 139, 140, 29,  30,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  38,  39,  40,
-    -1,  42,  43,  44,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  55,  56,  57,  -1,  -1,
-    -1,  -1,  62,  63,  64,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  76,  -1,  -1,
-    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    98,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  106, -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    -1,  -1,  -1,  -1,  121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135,
-    136, 137, 138, 139, 140, 29,  30,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  38,  39,  40,  -1,  42,
-    43,  44,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  55,  56,  57,  -1,  -1,  -1,  -1,
-    62,  63,  64,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  76,  -1,  -1,  -1,  -1,
-    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  97,  98,  -1,
-    -1,  -1,  -1,  -1,  -1,  -1,  106, -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    -1,  -1,  121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137,
-    138};
+    47,  16,  16,  16,  57,  3,   4,   53,  244, 491, 56,  401, 256, 56,  106, 259, 53,  407, 246,
+    56,  397, 503, 53,  45,  756, 56,  416, 417, 256, 53,  251, 259, 56,  106, 424, 256, 426, 46,
+    259, 42,  43,  44,  472, 473, 438, 439, 256, 139, 256, 259, 256, 259, 288, 259, 256, 787, 79,
+    259, 46,  256, 105, 451, 259, 453, 454, 256, 106, 76,  259, 459, 460, 461, 462, 463, 464, 465,
+    466, 467, 468, 256, 532, 471, 259, 256, 106, 0,   259, 256, 76,  106, 259, 114, 402, 483, 404,
+    485, 486, 45,  256, 105, 46,  259, 106, 256, 106, 495, 259, 256, 560, 12,  259, 501, 502, 490,
+    106, 505, 19,  20,  21,  46,  24,  9,   25,  106, 71,  435, 46,  19,  46,  519, 520, 76,  522,
+    45,  524, 99,  100, 101, 102, 103, 104, 531, 105, 146, 534, 535, 105, 537, 538, 105, 105, 541,
+    105, 543, 50,  51,  546, 547, 548, 549, 46,  57,  105, 105, 105, 105, 105, 105, 105, 38,  39,
+    561, 105, 42,  43,  105, 105, 105, 46,  105, 570, 105, 105, 79,  80,  46,  105, 46,  105, 58,
+    59,  581, 88,  89,  105, 105, 65,  66,  105, 245, 96,  46,  245, 593, 594, 595, 596, 105, 245,
+    46,  105, 105, 602, 603, 245, 46,  606, 15,  114, 217, 610, 245, 11,  10,  46,  46,  46,  46,
+    472, 473, 712, 621, 622, 46,  46,  131, 626, 106, 628, 475, 46,  631, 632, 633, 472, 473, 636,
+    637, 8,   639, 640, 472, 473, 643, 46,  645, 254, 15,  648, 649, 650, 651, 472, 473, 472, 473,
+    472, 473, 46,  46,  472, 473, 46,  663, 46,  472, 473, 46,  46,  46,  46,  472, 473, 46,  46,
+    46,  13,  46,  678, 679, 46,  46,  46,  683, 13,  472, 473, 46,  46,  472, 473, 46,  692, 472,
+    473, 46,  696, 46,  685, 699, 700, 701, 46,  703, 472, 473, 693, 694, 695, 472, 473, 46,  46,
+    472, 473, 715, 46,  717, 38,  39,  40,  721, 42,  43,  44,  46,  14,  46,  46,  46,  46,  731,
+    46,  733, 734, 46,  392, 46,  58,  59,  60,  46,  45,  45,  45,  65,  66,  67,  411, 412, 413,
+    751, 50,  51,  754, 45,  45,  15,  45,  57,  15,  15,  46,  46,  408, 45,  429, 767, 46,  45,
+    16,  415, 46,  45,  418, 419, 46,  440, 441, 45,  443, 79,  80,  427, 428, 785, 45,  18,  45,
+    433, 88,  89,  15,  46,  794, 795, 15,  45,  96,  17,  444, 45,  45,  447, 45,  449, 469, 45,
+    45,  26,  46,  45,  22,  46,  46,  45,  114, 46,  46,  46,  46,  45,  672, 45,  144, 145, 146,
+    147, 27,  45,  45,  23,  46,  46,  491, 46,  45,  45,  45,  23,  46,  46,  46,  46,  46,  46,
+    503, 478, 46,  46,  46,  46,  46,  478, 478, 478, 46,  3,   4,   5,   6,   7,   8,   9,   10,
+    11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  46,  22,  23,  24,  46,  26,  27,  28,  46,
+    46,  31,  32,  33,  34,  35,  36,  37,  46,  46,  46,  41,  46,  46,  46,  46,  475, 47,  48,
+    49,  46,  46,  52,  53,  54,  55,  56,  244, 259, 755, 229, 61,  62,  63,  64,  676, 719, 670,
+    68,  69,  70,  71,  72,  73,  74,  586, 76,  77,  78,  679, 394, 81,  82,  83,  84,  85,  86,
+    87,  269, -1,  90,  91,  92,  93,  94,  95,  -1,  97,  98,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  107, 108, 109, 110, 111, 112, 113, -1,  115, 116, 117, 118, 119, 120, 121, 122, 123, 124,
+    125, 126, 127, 128, 129, -1,  -1,  -1,  -1,  -1,  -1,  -1,  3,   4,   5,   6,   7,   8,   9,
+    10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  -1,  22,  23,  24,  670, 26,  27,  28,
+    -1,  -1,  31,  32,  33,  34,  35,  36,  37,  -1,  -1,  -1,  41,  -1,  -1,  -1,  -1,  46,  47,
+    48,  49,  -1,  -1,  52,  53,  54,  55,  56,  -1,  -1,  -1,  -1,  61,  62,  63,  64,  -1,  -1,
+    712, 68,  69,  70,  71,  72,  73,  74,  -1,  76,  77,  78,  -1,  -1,  81,  82,  83,  84,  85,
+    86,  87,  -1,  -1,  90,  91,  92,  93,  94,  95,  -1,  97,  98,  99,  100, 101, 102, 103, 104,
+    -1,  -1,  107, 108, 109, 110, 111, 112, 113, -1,  115, 116, 117, 118, 119, 120, 121, 122, 123,
+    124, 125, 126, 127, 128, 3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,  16,
+    17,  18,  19,  20,  -1,  22,  23,  24,  -1,  26,  27,  28,  -1,  -1,  31,  32,  33,  34,  35,
+    36,  37,  -1,  -1,  -1,  41,  -1,  -1,  -1,  -1,  46,  47,  48,  49,  -1,  -1,  52,  53,  54,
+    55,  56,  -1,  -1,  -1,  -1,  61,  62,  63,  64,  -1,  -1,  -1,  68,  69,  70,  71,  72,  73,
+    74,  -1,  76,  77,  78,  -1,  -1,  81,  82,  83,  84,  85,  86,  87,  -1,  -1,  90,  91,  92,
+    93,  94,  95,  -1,  97,  98,  99,  100, 101, 102, 103, 104, -1,  -1,  107, 108, 109, 110, 111,
+    112, 113, -1,  115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 3,   4,
+    5,   6,   7,   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  -1,  28,  -1,  -1,  31,  32,  33,  34,  35,  36,  37,  -1,  -1,  -1,  41,  -1,
+    -1,  -1,  -1,  -1,  47,  48,  49,  -1,  -1,  52,  53,  -1,  55,  56,  -1,  -1,  -1,  -1,  61,
+    62,  63,  64,  -1,  -1,  -1,  68,  69,  70,  71,  72,  73,  74,  -1,  76,  77,  78,  -1,  -1,
+    81,  82,  83,  84,  85,  86,  87,  -1,  -1,  90,  91,  92,  93,  94,  95,  -1,  97,  98,  -1,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  107, 108, 109, 110, 111, 112, 113, -1,  115, 116, 117, 118,
+    119, 120, 121, 122, 123, 124, 125, 126, 127, 6,   -1,  8,   9,   10,  11,  12,  13,  14,  15,
+    16,  17,  18,  19,  20,  -1,  22,  23,  24,  -1,  26,  27,  29,  30,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  38,  39,  40,  -1,  42,  43,  44,  45,  -1,  46,  -1,  -1,  50,  51,  -1,  -1,  -1,
+    54,  -1,  57,  58,  59,  60,  -1,  -1,  -1,  -1,  65,  66,  67,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  75,  -1,  77,  79,  80,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  88,  89,  -1,  -1,  -1,
+    -1,  -1,  -1,  96,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  105, 106, -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  114, -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  128, -1,
+    131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149,
+    150, 29,  30,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  38,  39,  40,  -1,  42,  43,  44,  -1,  -1,
+    -1,  -1,  -1,  50,  51,  -1,  -1,  -1,  -1,  -1,  57,  58,  59,  60,  -1,  -1,  -1,  -1,  65,
+    66,  67,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  79,  80,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  88,  89,  -1,  -1,  -1,  -1,  -1,  -1,  96,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  105, 106, -1,  -1,  -1,  -1,  -1,  -1,  -1,  114, -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141,
+    142, 143, 144, 145, 146, 147, 148, 149, 150, 29,  30,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  38,
+    39,  40,  -1,  42,  43,  44,  -1,  -1,  -1,  -1,  -1,  50,  51,  -1,  -1,  -1,  -1,  -1,  57,
+    58,  59,  60,  -1,  -1,  -1,  -1,  65,  66,  67,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  79,  80,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  88,  89,  -1,  -1,  -1,  -1,  -1,  -1,
+    96,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  105, 106, -1,  -1,  -1,  -1,  -1,  -1,  -1,  114,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  131, 132, 133,
+    134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 29,  30,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  38,  39,  40,  -1,  42,  43,  44,  -1,  -1,  -1,  -1,  -1,
+    50,  51,  -1,  -1,  -1,  -1,  -1,  57,  58,  59,  60,  -1,  -1,  -1,  -1,  65,  66,  67,  -1,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  79,  80,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    88,  89,  -1,  -1,  -1,  -1,  -1,  -1,  96,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  106,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  114, -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144,
+    145, 146, 147, 148, 149, 150, 29,  30,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  38,  39,  40,  -1,
+    42,  43,  44,  -1,  -1,  -1,  -1,  -1,  50,  51,  -1,  -1,  -1,  -1,  -1,  57,  58,  59,  60,
+    -1,  -1,  -1,  -1,  65,  66,  67,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  79,
+    80,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  88,  89,  -1,  -1,  -1,  -1,  -1,  -1,  96,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  -1,  105, 106, -1,  -1,  -1,  -1,  -1,  -1,  -1,  114, -1,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  131, -1,  -1,  134, 135, 136,
+    137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 8,   9,   10,  11,  12,
+    13,  14,  15,  16,  17,  18,  19,  20,  -1,  22,  23,  24,  -1,  26,  27,  -1,  8,   9,   10,
+    11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  -1,  22,  23,  24,  46,  26,  27,  -1,  -1,
+    -1,  -1,  -1,  54,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  46,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  54,  8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,
+    -1,  22,  23,  24,  -1,  26,  27,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  -1,  46,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  54,  -1,  -1,  -1,  -1,
+    -1,  128, 129, -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  128, 129, -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  99,  100, 101, 102, 103, 104, -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+    -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  128};
 
 const short ParserGen::yystos_[] = {
-    0,   12,  19,  20,  21,  25,  301, 98,  285, 97,  182, 285, 285, 98,  295, 0,   286, 98,  183,
-    296, 6,   8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  22,  23,  24,  26,
-    27,  46,  52,  72,  74,  120, 146, 147, 149, 150, 290, 291, 294, 91,  92,  93,  94,  95,  96,
-    184, 185, 186, 187, 188, 189, 190, 45,  3,   4,   5,   6,   7,   28,  31,  32,  33,  34,  35,
-    36,  37,  41,  46,  47,  48,  49,  50,  51,  53,  54,  58,  59,  60,  61,  65,  66,  67,  68,
-    69,  70,  71,  73,  74,  75,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,
-    90,  91,  92,  93,  94,  95,  96,  99,  100, 101, 102, 103, 104, 105, 107, 108, 109, 110, 111,
-    112, 113, 114, 115, 116, 117, 118, 119, 145, 147, 148, 149, 150, 151, 300, 29,  30,  38,  39,
-    40,  42,  43,  44,  55,  56,  57,  62,  63,  64,  76,  98,  106, 121, 122, 123, 124, 125, 126,
-    127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 155, 156, 157, 158, 159,
-    160, 161, 162, 163, 164, 165, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 181, 288, 97,
-    98,  159, 161, 162, 163, 193, 98,  98,  193, 302, 303, 46,  38,  39,  42,  43,  55,  56,  62,
-    63,  98,  297, 298, 287, 285, 46,  191, 24,  9,   98,  183, 68,  46,  73,  292, 293, 289, 46,
-    52,  143, 145, 147, 148, 149, 152, 193, 167, 76,  106, 299, 98,  175, 45,  285, 29,  30,  38,
-    39,  40,  42,  43,  44,  55,  56,  57,  62,  63,  64,  97,  98,  132, 133, 134, 135, 155, 156,
-    157, 158, 160, 164, 165, 167, 169, 170, 171, 173, 174, 175, 192, 195, 197, 198, 200, 201, 202,
-    203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 221, 222,
-    223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241,
-    242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260,
-    261, 262, 263, 264, 265, 266, 267, 277, 278, 279, 280, 281, 282, 283, 284, 192, 46,  19,  46,
-    292, 176, 194, 195, 274, 3,   4,   5,   6,   7,   28,  31,  32,  33,  34,  35,  36,  37,  41,
-    47,  48,  49,  50,  51,  53,  54,  58,  59,  60,  61,  65,  66,  67,  69,  70,  71,  73,  74,
-    75,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  99,  100, 101, 102,
-    103, 104, 105, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 199, 162, 287,
-    274, 45,  194, 197, 97,  197, 97,  97,  196, 194, 196, 97,  97,  302, 302, 302, 97,  196, 194,
-    194, 196, 196, 97,  97,  97,  194, 97,  194, 196, 196, 302, 97,  97,  196, 97,  197, 97,  220,
-    302, 220, 220, 302, 302, 97,  302, 196, 97,  97,  196, 97,  97,  194, 97,  194, 194, 97,  97,
-    97,  97,  194, 194, 194, 194, 194, 194, 194, 194, 194, 194, 302, 97,  194, 46,  144, 145, 147,
-    149, 150, 153, 46,  46,  46,  46,  194, 46,  194, 194, 46,  46,  46,  274, 97,  98,  166, 176,
-    177, 178, 179, 15,  11,  10,  194, 46,  46,  46,  46,  46,  194, 194, 166, 46,  194, 46,  46,
-    46,  8,   272, 194, 194, 46,  194, 46,  194, 46,  15,  46,  46,  13,  13,  194, 272, 46,  194,
-    194, 46,  194, 194, 46,  194, 46,  46,  194, 194, 194, 194, 46,  46,  46,  46,  46,  46,  46,
-    46,  46,  46,  272, 194, 46,  194, 45,  45,  194, 45,  166, 275, 180, 45,  194, 194, 194, 194,
-    194, 194, 45,  194, 194, 15,  194, 194, 45,  194, 194, 194, 194, 194, 15,  194, 194, 194, 194,
-    194, 194, 194, 194, 194, 15,  194, 46,  46,  45,  46,  275, 45,  46,  151, 154, 46,  16,  268,
-    14,  270, 270, 45,  194, 276, 276, 46,  45,  194, 45,  274, 46,  45,  18,  273, 15,  15,  45,
-    194, 274, 274, 274, 45,  45,  194, 194, 194, 45,  194, 45,  166, 194, 17,  269, 194, 26,  271,
-    271, 46,  194, 45,  45,  46,  46,  46,  45,  46,  194, 22,  194, 194, 46,  46,  45,  45,  45,
-    46,  46,  45,  45,  45,  46,  46,  46,  194, 27,  194, 268, 269, 46,  46,  46,  46,  194, 23,
-    23,  46,  46,  46,  46,  46,  46,  46,  46,  194, 269, 46,  46,  194, 194, 46,  46,  46,  46,
-    46,  46,  46,  46,  46};
+    0,   12,  19,  20,  21,  25,  325, 106, 309, 105, 199, 309, 309, 106, 319, 0,   310, 106, 200,
+    320, 6,   8,   9,   10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  22,  23,  24,  26,
+    27,  46,  54,  75,  77,  128, 159, 162, 163, 166, 171, 314, 315, 318, 99,  100, 101, 102, 103,
+    104, 201, 202, 203, 204, 205, 206, 207, 45,  3,   4,   5,   6,   7,   28,  31,  32,  33,  34,
+    35,  36,  37,  41,  46,  47,  48,  49,  52,  53,  55,  56,  61,  62,  63,  64,  68,  69,  70,
+    71,  72,  73,  74,  76,  77,  78,  81,  82,  83,  84,  85,  86,  87,  90,  91,  92,  93,  94,
+    95,  97,  98,  99,  100, 101, 102, 103, 104, 107, 108, 109, 110, 111, 112, 113, 115, 116, 117,
+    118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 158, 159, 161, 162, 163, 165, 324, 29,  30,
+    38,  39,  40,  42,  43,  44,  50,  51,  57,  58,  59,  60,  65,  66,  67,  79,  80,  88,  89,
+    96,  106, 114, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146,
+    147, 148, 149, 150, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 184, 185, 186, 187,
+    188, 189, 190, 191, 192, 193, 198, 312, 105, 106, 176, 178, 179, 180, 213, 106, 106, 213, 326,
+    327, 46,  38,  39,  42,  43,  58,  59,  65,  66,  106, 321, 322, 311, 309, 46,  208, 24,  9,
+    106, 200, 71,  46,  76,  316, 317, 313, 46,  54,  128, 129, 155, 156, 160, 167, 171, 213, 184,
+    79,  114, 323, 106, 192, 45,  309, 29,  30,  38,  39,  40,  42,  43,  44,  58,  59,  60,  65,
+    66,  67,  105, 106, 144, 145, 146, 147, 172, 173, 174, 175, 177, 181, 182, 184, 186, 187, 188,
+    190, 191, 192, 210, 211, 212, 215, 218, 219, 220, 223, 224, 225, 226, 227, 228, 229, 230, 231,
+    232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 245, 246, 247, 248, 249, 250, 251,
+    252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270,
+    271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289,
+    290, 291, 301, 302, 303, 304, 305, 306, 307, 308, 210, 46,  19,  46,  316, 106, 193, 214, 215,
+    221, 298, 3,   4,   5,   6,   7,   28,  31,  32,  33,  34,  35,  36,  37,  41,  47,  48,  49,
+    52,  53,  54,  55,  56,  61,  62,  63,  64,  68,  69,  70,  71,  72,  73,  74,  76,  77,  78,
+    81,  82,  83,  84,  85,  86,  87,  90,  91,  92,  93,  94,  95,  97,  98,  107, 108, 109, 110,
+    111, 112, 113, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 155, 164, 168,
+    209, 179, 311, 222, 298, 45,  214, 220, 105, 220, 105, 105, 216, 214, 216, 105, 105, 326, 326,
+    326, 105, 216, 214, 214, 216, 216, 105, 105, 105, 214, 105, 214, 216, 216, 326, 50,  51,  57,
+    79,  80,  88,  89,  96,  114, 105, 105, 216, 105, 220, 105, 244, 326, 244, 244, 326, 326, 105,
+    326, 216, 105, 105, 216, 105, 105, 216, 217, 105, 214, 105, 214, 214, 105, 105, 105, 105, 214,
+    214, 214, 214, 214, 214, 214, 214, 214, 214, 326, 105, 214, 211, 211, 46,  168, 46,  46,  46,
+    157, 158, 159, 162, 163, 169, 46,  46,  214, 46,  214, 214, 46,  46,  46,  298, 105, 106, 183,
+    193, 194, 195, 196, 15,  11,  10,  214, 46,  46,  46,  46,  46,  214, 214, 183, 46,  214, 46,
+    46,  46,  8,   296, 46,  46,  46,  46,  46,  46,  46,  46,  46,  214, 214, 46,  214, 46,  214,
+    46,  15,  46,  46,  13,  13,  214, 296, 46,  214, 214, 46,  214, 214, 46,  46,  214, 46,  214,
+    46,  46,  214, 214, 214, 214, 46,  46,  46,  46,  46,  46,  46,  46,  46,  46,  296, 214, 46,
+    214, 45,  45,  214, 45,  183, 299, 197, 45,  214, 214, 214, 214, 214, 214, 45,  214, 214, 15,
+    214, 214, 45,  214, 214, 214, 214, 214, 15,  214, 214, 214, 214, 214, 214, 214, 214, 214, 214,
+    15,  214, 46,  46,  45,  46,  299, 45,  46,  165, 170, 46,  16,  292, 14,  294, 294, 45,  214,
+    300, 300, 46,  45,  214, 45,  298, 46,  45,  18,  297, 15,  15,  45,  214, 298, 298, 298, 214,
+    45,  45,  214, 214, 214, 45,  214, 45,  183, 214, 17,  293, 214, 26,  295, 295, 46,  214, 45,
+    45,  46,  46,  46,  45,  46,  214, 22,  214, 214, 46,  46,  45,  45,  45,  45,  46,  46,  45,
+    45,  45,  46,  46,  46,  214, 27,  214, 292, 293, 46,  46,  46,  46,  214, 23,  23,  46,  46,
+    46,  46,  46,  46,  46,  46,  214, 293, 46,  46,  214, 214, 46,  46,  46,  46,  46,  46,  46,
+    46,  46};
 
 const short ParserGen::yyr1_[] = {
-    0,   142, 301, 301, 301, 301, 301, 182, 183, 183, 303, 302, 184, 184, 184, 184, 184, 184, 190,
-    185, 186, 193, 193, 193, 193, 187, 188, 189, 191, 191, 152, 152, 192, 192, 192, 192, 192, 192,
-    192, 192, 192, 192, 192, 192, 192, 192, 192, 192, 192, 192, 192, 192, 192, 192, 192, 192, 192,
-    192, 192, 192, 192, 192, 192, 192, 192, 143, 143, 143, 143, 285, 286, 286, 290, 290, 288, 288,
-    287, 287, 292, 293, 293, 291, 294, 294, 294, 289, 289, 146, 146, 146, 149, 145, 145, 145, 145,
-    145, 145, 147, 147, 147, 147, 147, 147, 147, 147, 147, 147, 147, 147, 147, 147, 147, 147, 147,
-    147, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148,
-    148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148,
-    148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148,
-    148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 148, 167, 167, 167, 168, 181, 169,
-    170, 171, 173, 174, 175, 155, 156, 157, 158, 160, 164, 165, 159, 159, 159, 159, 161, 161, 161,
-    161, 162, 162, 162, 162, 163, 163, 163, 163, 172, 172, 176, 176, 176, 176, 176, 176, 176, 176,
-    176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 274, 274, 194, 194, 196, 195,
-    195, 195, 195, 195, 195, 195, 195, 195, 197, 198, 199, 199, 153, 144, 144, 144, 144, 150, 200,
-    200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 201, 202, 253,
-    254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 203, 203, 203, 204, 205,
-    206, 210, 210, 210, 210, 210, 210, 210, 210, 210, 210, 210, 210, 210, 210, 210, 210, 210, 210,
-    210, 210, 210, 210, 211, 270, 270, 271, 271, 212, 213, 276, 276, 276, 214, 215, 272, 272, 216,
-    223, 233, 273, 273, 220, 217, 218, 219, 221, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232,
-    299, 299, 297, 295, 296, 296, 298, 298, 298, 298, 298, 298, 298, 298, 300, 300, 277, 277, 277,
-    277, 277, 277, 277, 278, 279, 280, 281, 282, 283, 284, 207, 207, 208, 209, 166, 166, 177, 177,
-    178, 275, 275, 179, 180, 180, 154, 151, 151, 151, 151, 151, 234, 234, 234, 234, 234, 234, 234,
-    235, 236, 237, 238, 239, 240, 241, 242, 242, 242, 242, 242, 242, 242, 242, 242, 242, 268, 268,
-    269, 269, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252};
+    0,   154, 325, 325, 325, 325, 325, 199, 200, 200, 327, 326, 201, 201, 201, 201, 201, 201, 207,
+    202, 203, 213, 213, 213, 213, 204, 205, 206, 208, 208, 167, 167, 210, 211, 211, 211, 211, 211,
+    211, 211, 211, 211, 211, 211, 211, 211, 211, 211, 211, 211, 211, 211, 211, 211, 211, 211, 211,
+    211, 211, 211, 211, 211, 211, 211, 211, 211, 211, 155, 156, 156, 156, 212, 209, 209, 168, 168,
+    309, 310, 310, 314, 314, 312, 312, 311, 311, 316, 317, 317, 315, 318, 318, 318, 313, 313, 166,
+    166, 166, 162, 158, 158, 158, 158, 158, 158, 159, 160, 171, 171, 171, 171, 171, 171, 171, 171,
+    171, 171, 171, 171, 171, 171, 171, 171, 171, 171, 161, 161, 161, 161, 161, 161, 161, 161, 161,
+    161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161,
+    161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161,
+    161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161,
+    161, 161, 161, 161, 184, 184, 184, 184, 184, 184, 184, 184, 184, 184, 185, 198, 186, 187, 188,
+    190, 191, 192, 172, 173, 174, 175, 177, 181, 182, 176, 176, 176, 176, 178, 178, 178, 178, 179,
+    179, 179, 179, 180, 180, 180, 180, 189, 189, 193, 193, 193, 193, 193, 193, 193, 193, 193, 193,
+    193, 193, 193, 193, 193, 193, 193, 193, 193, 193, 193, 298, 298, 214, 214, 214, 216, 217, 215,
+    215, 215, 215, 215, 215, 215, 215, 215, 215, 218, 219, 219, 220, 221, 222, 222, 169, 157, 157,
+    157, 157, 163, 164, 223, 223, 223, 223, 223, 223, 223, 223, 223, 223, 223, 223, 223, 223, 223,
+    223, 223, 224, 224, 224, 224, 224, 224, 224, 224, 224, 225, 226, 277, 278, 279, 280, 281, 282,
+    283, 284, 285, 286, 287, 288, 289, 290, 291, 227, 227, 227, 228, 229, 230, 234, 234, 234, 234,
+    234, 234, 234, 234, 234, 234, 234, 234, 234, 234, 234, 234, 234, 234, 234, 234, 234, 234, 235,
+    294, 294, 295, 295, 236, 237, 300, 300, 300, 238, 239, 296, 296, 240, 247, 257, 297, 297, 244,
+    241, 242, 243, 245, 246, 248, 249, 250, 251, 252, 253, 254, 255, 256, 323, 323, 321, 319, 320,
+    320, 322, 322, 322, 322, 322, 322, 322, 322, 324, 324, 301, 301, 301, 301, 301, 301, 301, 302,
+    303, 304, 305, 306, 307, 308, 231, 231, 232, 233, 183, 183, 194, 194, 195, 299, 299, 196, 197,
+    197, 170, 165, 165, 165, 165, 165, 258, 258, 258, 258, 258, 258, 258, 259, 260, 261, 262, 263,
+    264, 265, 266, 266, 266, 266, 266, 266, 266, 266, 266, 266, 292, 292, 293, 293, 267, 268, 269,
+    270, 271, 272, 273, 274, 275, 276};
 
 const signed char ParserGen::yyr2_[] = {
-    0, 2, 2,  2,  2, 2, 2, 3, 0, 4, 0, 2, 1, 1, 1, 1, 1, 1, 5, 3,  7,  1,  1, 1, 1, 2, 2, 4, 0, 2,
-    2, 2, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1,  1,  1, 1, 1, 1, 1, 3, 0, 2, 2, 1, 1, 3, 0, 2, 1, 2,  5,  5,  1, 1, 1, 0, 2, 1, 1, 1,
-    1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 2,  1,  1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 0, 2, 2,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 7, 4, 4, 4,  7,  4,  7, 8, 7, 7, 4, 7, 7, 1,
-    1, 1, 4,  4,  6, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 6, 0, 2,
-    0, 2, 11, 10, 0, 1, 2, 8, 8, 0, 2, 8, 8, 8, 0, 2, 7, 4, 4, 4,  11, 11, 7, 4, 4, 7, 8, 8, 8, 4,
-    4, 1, 1,  4,  3, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1,  1,  1,  1, 1, 6, 6, 4, 8, 8, 4,
-    8, 1, 1,  6,  6, 1, 1, 1, 1, 3, 0, 2, 3, 0, 2, 2, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 4, 4,
-    4, 4, 4,  4,  4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 0, 2, 11, 4,  4,  4, 4, 4, 4, 4, 4, 4};
+    0, 2, 2, 2, 2, 2, 2,  3,  0,  4, 0, 2, 1, 1, 1, 1, 1, 1,  5,  3, 7, 1, 1, 1, 1, 2, 2, 4, 0,
+    2, 2, 2, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 3, 1, 2, 2, 2,  3,  0, 2, 2, 1, 1, 3, 0, 2, 1, 2,
+    5, 5, 1, 1, 1, 0, 2,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 1, 1, 1, 1, 1, 1, 0, 2, 1,
+    1, 1, 4, 5, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 4, 4, 3,  3,  0, 2, 2, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 4, 4,  4,  4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+    7, 4, 4, 4, 7, 4, 7,  8,  7,  7, 4, 7, 7, 1, 1, 1, 4, 4,  6,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,  1,  1,  1, 1, 1, 6, 0, 2, 0, 2, 11, 10, 0, 1, 2, 8, 8, 0, 2, 8, 8, 8,
+    0, 2, 7, 4, 4, 4, 11, 11, 7,  4, 4, 7, 8, 8, 8, 4, 4, 1,  1,  4, 3, 0, 2, 1, 1, 1, 1, 1, 1,
+    1, 1, 2, 2, 1, 1, 1,  1,  1,  1, 1, 6, 6, 4, 8, 8, 4, 8,  1,  1, 6, 6, 1, 1, 1, 1, 3, 0, 2,
+    3, 0, 2, 2, 1, 1, 1,  1,  1,  1, 1, 1, 1, 1, 1, 1, 4, 4,  4,  4, 4, 4, 4, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 0, 2, 0,  2,  11, 4, 4, 4, 4, 4, 4, 4, 4, 4};
 
 
 #if YYDEBUG || 1
@@ -6380,11 +6836,14 @@ const char* const ParserGen::yytname_[] = {"\"EOF\"",
                                            "EQ",
                                            "EXPONENT",
                                            "FLOOR",
+                                           "\"geoNearDistance\"",
+                                           "\"geoNearPoint\"",
                                            "GT",
                                            "GTE",
                                            "ID",
                                            "INDEX_OF_BYTES",
                                            "INDEX_OF_CP",
+                                           "\"indexKey\"",
                                            "\"-1 (int)\"",
                                            "\"1 (int)\"",
                                            "\"zero (int)\"",
@@ -6407,6 +6866,7 @@ const char* const ParserGen::yytname_[] = {"\"EOF\"",
                                            "OR",
                                            "POW",
                                            "\"randVal\"",
+                                           "\"recordId\"",
                                            "REGEX_FIND",
                                            "REGEX_FIND_ALL",
                                            "REGEX_MATCH",
@@ -6414,11 +6874,15 @@ const char* const ParserGen::yytname_[] = {"\"EOF\"",
                                            "REPLACE_ONE",
                                            "ROUND",
                                            "RTRIM",
+                                           "\"searchHighlights\"",
+                                           "\"searchScore\"",
                                            "\"setDifference\"",
                                            "\"setEquals\"",
                                            "\"setIntersection\"",
                                            "\"setIsSubset\"",
                                            "\"setUnion\"",
+                                           "\"slice\"",
+                                           "\"sortKey\"",
                                            "SPLIT",
                                            "SQRT",
                                            "STAGE_INHIBIT_OPTIMIZATION",
@@ -6451,7 +6915,11 @@ const char* const ParserGen::yytname_[] = {"\"EOF\"",
                                            "TRUNC",
                                            "TYPE",
                                            "\"fieldname\"",
+                                           "\"fieldname containing dotted path\"",
+                                           "\"$-prefixed fieldname\"",
                                            "\"string\"",
+                                           "\"$-prefixed string\"",
+                                           "\"$$-prefixed string\"",
                                            "\"BinData\"",
                                            "\"undefined\"",
                                            "\"ObjectID\"",
@@ -6469,22 +6937,27 @@ const char* const ParserGen::yytname_[] = {"\"EOF\"",
                                            "\"Timestamp\"",
                                            "\"minKey\"",
                                            "\"maxKey\"",
-                                           "\"$-prefixed string\"",
-                                           "\"$$-prefixed string\"",
-                                           "\"$-prefixed fieldname\"",
+                                           "START_PIPELINE",
+                                           "START_MATCH",
+                                           "START_SORT",
                                            "$accept",
+                                           "aggregationProjectionFieldname",
                                            "projectionFieldname",
                                            "expressionFieldname",
                                            "stageAsUserFieldname",
-                                           "predFieldname",
                                            "argAsUserFieldname",
+                                           "argAsProjectionPath",
                                            "aggExprAsUserFieldname",
                                            "invariableUserFieldname",
                                            "idAsUserFieldname",
+                                           "idAsProjectionPath",
                                            "valueFieldname",
+                                           "predFieldname",
                                            "projectField",
+                                           "projectionObjectField",
                                            "expressionField",
                                            "valueField",
+                                           "arg",
                                            "dbPointer",
                                            "javascript",
                                            "symbol",
@@ -6498,7 +6971,7 @@ const char* const ParserGen::yytname_[] = {"\"EOF\"",
                                            "maxKey",
                                            "value",
                                            "string",
-                                           "fieldPath",
+                                           "aggregationFieldPath",
                                            "binary",
                                            "undefined",
                                            "objectId",
@@ -6522,18 +6995,25 @@ const char* const ParserGen::yytname_[] = {"\"EOF\"",
                                            "project",
                                            "sample",
                                            "projectFields",
+                                           "projectionObjectFields",
+                                           "topLevelProjection",
                                            "projection",
+                                           "projectionObject",
                                            "num",
                                            "expression",
-                                           "compoundExpression",
+                                           "compoundNonObjectExpression",
                                            "exprFixedTwoArg",
+                                           "exprFixedThreeArg",
+                                           "arrayManipulation",
+                                           "slice",
                                            "expressionArray",
                                            "expressionObject",
                                            "expressionFields",
                                            "maths",
+                                           "meta",
                                            "add",
                                            "atan2",
-                                           "boolExps",
+                                           "boolExprs",
                                            "and",
                                            "or",
                                            "not",
@@ -6640,35 +7120,37 @@ const char* const ParserGen::yytname_[] = {"\"EOF\"",
 
 #if YYDEBUG
 const short ParserGen::yyrline_[] = {
-    0,    313,  313,  316,  319,  322,  325,  332,  338,  339,  347,  347,  350,  350,  350,  350,
-    350,  350,  353,  363,  369,  379,  379,  379,  379,  383,  388,  393,  409,  412,  419,  422,
-    428,  429,  430,  431,  432,  433,  434,  435,  436,  437,  438,  439,  442,  445,  448,  451,
-    454,  457,  460,  463,  466,  469,  472,  475,  478,  481,  484,  487,  490,  493,  494,  495,
-    496,  505,  505,  505,  505,  509,  515,  518,  524,  527,  536,  537,  543,  546,  553,  556,
-    560,  569,  577,  578,  579,  582,  585,  592,  592,  592,  595,  603,  606,  609,  612,  615,
-    618,  627,  630,  633,  636,  639,  642,  645,  648,  651,  654,  657,  660,  663,  666,  669,
-    672,  675,  678,  686,  689,  692,  695,  698,  701,  704,  707,  710,  713,  716,  719,  722,
-    725,  728,  731,  734,  737,  740,  743,  746,  749,  752,  755,  758,  761,  764,  767,  770,
-    773,  776,  779,  782,  785,  788,  791,  794,  797,  800,  803,  806,  809,  812,  815,  818,
-    821,  824,  827,  830,  833,  836,  839,  842,  845,  848,  851,  854,  857,  860,  863,  866,
-    869,  872,  875,  878,  881,  884,  887,  890,  897,  902,  905,  911,  919,  928,  934,  940,
-    946,  952,  958,  964,  970,  976,  982,  988,  994,  1000, 1006, 1009, 1012, 1015, 1021, 1024,
-    1027, 1030, 1036, 1039, 1042, 1045, 1051, 1054, 1057, 1060, 1066, 1069, 1075, 1076, 1077, 1078,
-    1079, 1080, 1081, 1082, 1083, 1084, 1085, 1086, 1087, 1088, 1089, 1090, 1091, 1092, 1093, 1094,
-    1095, 1102, 1103, 1110, 1110, 1114, 1119, 1119, 1119, 1119, 1119, 1119, 1120, 1120, 1120, 1126,
-    1134, 1140, 1143, 1150, 1157, 1157, 1157, 1157, 1161, 1167, 1167, 1167, 1167, 1167, 1167, 1167,
-    1167, 1167, 1167, 1167, 1167, 1167, 1168, 1168, 1168, 1168, 1172, 1179, 1185, 1190, 1195, 1201,
-    1206, 1211, 1216, 1222, 1227, 1233, 1242, 1248, 1254, 1259, 1265, 1271, 1271, 1271, 1275, 1282,
-    1289, 1296, 1296, 1296, 1296, 1296, 1296, 1296, 1297, 1297, 1297, 1297, 1297, 1297, 1297, 1297,
-    1298, 1298, 1298, 1298, 1298, 1298, 1298, 1302, 1312, 1315, 1321, 1324, 1330, 1339, 1348, 1351,
-    1354, 1360, 1371, 1382, 1385, 1391, 1399, 1407, 1415, 1418, 1423, 1432, 1438, 1444, 1450, 1460,
-    1470, 1477, 1484, 1491, 1499, 1507, 1515, 1523, 1529, 1535, 1538, 1544, 1550, 1555, 1558, 1565,
-    1568, 1571, 1574, 1577, 1580, 1583, 1586, 1591, 1593, 1599, 1599, 1599, 1599, 1599, 1599, 1600,
-    1604, 1610, 1616, 1623, 1634, 1645, 1652, 1663, 1663, 1667, 1674, 1681, 1681, 1685, 1685, 1689,
-    1695, 1696, 1703, 1709, 1712, 1719, 1726, 1727, 1728, 1729, 1730, 1733, 1733, 1733, 1733, 1733,
-    1733, 1733, 1735, 1740, 1745, 1750, 1755, 1760, 1765, 1771, 1772, 1773, 1774, 1775, 1776, 1777,
-    1778, 1779, 1780, 1785, 1788, 1795, 1798, 1804, 1814, 1819, 1824, 1829, 1834, 1839, 1844, 1849,
-    1854};
+    0,    333,  333,  336,  339,  342,  345,  352,  358,  359,  367,  367,  370,  370,  370,  370,
+    370,  370,  373,  383,  389,  399,  399,  399,  399,  403,  408,  413,  432,  435,  442,  445,
+    451,  465,  466,  467,  468,  469,  470,  471,  472,  473,  474,  475,  476,  479,  482,  485,
+    488,  491,  494,  497,  500,  503,  506,  509,  512,  515,  518,  521,  524,  527,  530,  531,
+    532,  533,  534,  539,  547,  560,  561,  578,  585,  589,  597,  600,  606,  612,  615,  621,
+    624,  633,  634,  640,  643,  650,  653,  657,  666,  674,  675,  676,  679,  682,  689,  689,
+    689,  692,  700,  703,  706,  709,  712,  715,  721,  727,  746,  749,  752,  755,  758,  761,
+    764,  767,  770,  773,  776,  779,  782,  785,  788,  791,  794,  797,  805,  808,  811,  814,
+    817,  820,  823,  826,  829,  832,  835,  838,  841,  844,  847,  850,  853,  856,  859,  862,
+    865,  868,  871,  874,  877,  880,  883,  886,  889,  892,  895,  898,  901,  904,  907,  910,
+    913,  916,  919,  922,  925,  928,  931,  934,  937,  940,  943,  946,  949,  952,  955,  958,
+    961,  964,  967,  970,  973,  976,  979,  982,  985,  988,  991,  994,  997,  1000, 1003, 1006,
+    1009, 1012, 1019, 1024, 1027, 1030, 1033, 1036, 1039, 1042, 1045, 1048, 1054, 1068, 1082, 1088,
+    1094, 1100, 1106, 1112, 1118, 1124, 1130, 1136, 1142, 1148, 1154, 1160, 1163, 1166, 1169, 1175,
+    1178, 1181, 1184, 1190, 1193, 1196, 1199, 1205, 1208, 1211, 1214, 1220, 1223, 1229, 1230, 1231,
+    1232, 1233, 1234, 1235, 1236, 1237, 1238, 1239, 1240, 1241, 1242, 1243, 1244, 1245, 1246, 1247,
+    1248, 1249, 1256, 1257, 1264, 1264, 1264, 1269, 1276, 1282, 1282, 1282, 1282, 1282, 1283, 1283,
+    1283, 1283, 1283, 1287, 1291, 1295, 1304, 1312, 1318, 1321, 1328, 1335, 1335, 1335, 1335, 1339,
+    1345, 1351, 1351, 1351, 1351, 1351, 1351, 1351, 1351, 1351, 1351, 1351, 1351, 1351, 1352, 1352,
+    1352, 1352, 1356, 1359, 1362, 1365, 1368, 1371, 1374, 1377, 1380, 1386, 1393, 1399, 1404, 1409,
+    1415, 1420, 1425, 1430, 1436, 1441, 1447, 1456, 1462, 1468, 1473, 1479, 1485, 1485, 1485, 1489,
+    1496, 1503, 1510, 1510, 1510, 1510, 1510, 1510, 1510, 1511, 1511, 1511, 1511, 1511, 1511, 1511,
+    1511, 1512, 1512, 1512, 1512, 1512, 1512, 1512, 1516, 1526, 1529, 1535, 1538, 1544, 1553, 1562,
+    1565, 1568, 1574, 1585, 1596, 1599, 1605, 1613, 1621, 1629, 1632, 1637, 1646, 1652, 1658, 1664,
+    1674, 1684, 1691, 1698, 1705, 1713, 1721, 1729, 1737, 1743, 1749, 1752, 1758, 1764, 1769, 1772,
+    1779, 1782, 1785, 1788, 1791, 1794, 1797, 1800, 1805, 1807, 1813, 1813, 1813, 1813, 1813, 1813,
+    1814, 1818, 1824, 1830, 1837, 1848, 1859, 1866, 1877, 1877, 1881, 1888, 1895, 1895, 1899, 1899,
+    1903, 1909, 1910, 1917, 1923, 1926, 1933, 1940, 1941, 1942, 1943, 1944, 1947, 1947, 1947, 1947,
+    1947, 1947, 1947, 1949, 1954, 1959, 1964, 1969, 1974, 1979, 1985, 1986, 1987, 1988, 1989, 1990,
+    1991, 1992, 1993, 1994, 1999, 2002, 2009, 2012, 2018, 2028, 2033, 2038, 2043, 2048, 2053, 2058,
+    2063, 2068};
 
 void ParserGen::yy_stack_print_() const {
     *yycdebug_ << "Stack now";
@@ -6691,6 +7173,6 @@ void ParserGen::yy_reduce_print_(int yyrule) const {
 
 #line 57 "grammar.yy"
 }  // namespace mongo
-#line 6344 "parser_gen.cpp"
+#line 6872 "parser_gen.cpp"
 
-#line 1858 "grammar.yy"
+#line 2072 "grammar.yy"

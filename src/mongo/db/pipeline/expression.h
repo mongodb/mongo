@@ -2271,6 +2271,8 @@ class ExpressionSlice final : public ExpressionRangedArity<ExpressionSlice, 2, 3
 public:
     explicit ExpressionSlice(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx) {}
+    ExpressionSlice(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;

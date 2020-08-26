@@ -43,7 +43,7 @@ struct CompoundInclusionKey final {
     CompoundInclusionKey() = default;
     explicit CompoundInclusionKey(CNode cNode);
     CompoundInclusionKey(std::unique_ptr<CNode> obj) : obj{std::move(obj)} {}
-    CompoundInclusionKey(CompoundInclusionKey&&) = default;
+    CompoundInclusionKey(CompoundInclusionKey&&) noexcept = default;
     CompoundInclusionKey(const CompoundInclusionKey& other)
         : obj(std::make_unique<CNode>(*other.obj)) {}
     CompoundInclusionKey& operator=(CompoundInclusionKey&&) = default;
@@ -59,7 +59,7 @@ struct CompoundExclusionKey final {
     CompoundExclusionKey() = default;
     explicit CompoundExclusionKey(CNode cNode);
     CompoundExclusionKey(std::unique_ptr<CNode> obj) : obj{std::move(obj)} {}
-    CompoundExclusionKey(CompoundExclusionKey&&) = default;
+    CompoundExclusionKey(CompoundExclusionKey&&) noexcept = default;
     CompoundExclusionKey(const CompoundExclusionKey& other)
         : obj(std::make_unique<CNode>(*other.obj)) {}
     CompoundExclusionKey& operator=(CompoundExclusionKey&&) = default;
@@ -75,7 +75,7 @@ struct CompoundInconsistentKey final {
     CompoundInconsistentKey() = default;
     explicit CompoundInconsistentKey(CNode cNode);
     CompoundInconsistentKey(std::unique_ptr<CNode> obj) : obj{std::move(obj)} {}
-    CompoundInconsistentKey(CompoundInconsistentKey&&) = default;
+    CompoundInconsistentKey(CompoundInconsistentKey&&) noexcept = default;
     CompoundInconsistentKey(const CompoundInconsistentKey& other)
         : obj(std::make_unique<CNode>(*other.obj)) {}
     CompoundInconsistentKey& operator=(CompoundInconsistentKey&&) = default;

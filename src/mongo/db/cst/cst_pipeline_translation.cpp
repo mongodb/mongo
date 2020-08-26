@@ -32,8 +32,8 @@
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
 #include <iterator>
-#include <numeric>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -44,6 +44,7 @@
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
@@ -57,6 +58,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_trigonometric.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/visit_helper.h"
 
@@ -177,6 +179,36 @@ bool verifyFieldnames(const std::vector<CNode::Fieldname>& expected,
     return true;
 }
 
+auto translateMeta(const CNode::ObjectChildren& object,
+                   const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    switch (stdx::get<KeyValue>(object[0].second.payload)) {
+        case KeyValue::geoNearDistance:
+            return make_intrusive<ExpressionMeta>(expCtx.get(),
+                                                  DocumentMetadataFields::kGeoNearDist);
+        case KeyValue::geoNearPoint:
+            return make_intrusive<ExpressionMeta>(expCtx.get(),
+                                                  DocumentMetadataFields::kGeoNearPoint);
+        case KeyValue::indexKey:
+            return make_intrusive<ExpressionMeta>(expCtx.get(), DocumentMetadataFields::kIndexKey);
+        case KeyValue::randVal:
+            return make_intrusive<ExpressionMeta>(expCtx.get(), DocumentMetadataFields::kRandVal);
+        case KeyValue::recordId:
+            return make_intrusive<ExpressionMeta>(expCtx.get(), DocumentMetadataFields::kRecordId);
+        case KeyValue::searchHighlights:
+            return make_intrusive<ExpressionMeta>(expCtx.get(),
+                                                  DocumentMetadataFields::kSearchHighlights);
+        case KeyValue::searchScore:
+            return make_intrusive<ExpressionMeta>(expCtx.get(),
+                                                  DocumentMetadataFields::kSearchScore);
+        case KeyValue::sortKey:
+            return make_intrusive<ExpressionMeta>(expCtx.get(), DocumentMetadataFields::kSortKey);
+        case KeyValue::textScore:
+            return make_intrusive<ExpressionMeta>(expCtx.get(), DocumentMetadataFields::kTextScore);
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 /**
  * Walk an agg function/operator object payload and produce an Expression.
  */
@@ -187,6 +219,10 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
         stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::literal)
         return make_intrusive<ExpressionConstant>(expCtx.get(),
                                                   translateLiteralToValue(object[0].second));
+    // Meta is an exception since it has no Expression children but rather an enum member.
+    if (stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::meta)
+        return translateMeta(object, expCtx);
+
     auto expressions = transformInputExpression(object, expCtx);
     switch (stdx::get<KeyFieldname>(object[0].first)) {
         case KeyFieldname::add:
@@ -352,6 +388,8 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
                                                   "$trim",
                                                   std::move(expressions[0]),
                                                   std::move(expressions[1]));
+        case KeyFieldname::slice:
+            return make_intrusive<ExpressionSlice>(expCtx.get(), std::move(expressions));
         case KeyFieldname::split:
             return make_intrusive<ExpressionSplit>(expCtx.get(), std::move(expressions));
         case KeyFieldname::strcasecmp:
@@ -420,51 +458,39 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
     }
 }
 
-enum class ProjectionType : char { inclusion, exclusion, computed };
-
-/**
- * Walk a projection CNode and produce true if inclusion, false if exclusion or none if computed.
- */
-auto determineProjectionKeyType(const CNode& cst) {
-    if (cst.isInclusionKeyValue())
-        // This is an inclusion Key.
-        return ProjectionType::inclusion;
-    else if (stdx::holds_alternative<KeyValue>(cst.payload) ||
-             stdx::holds_alternative<CompoundExclusionKey>(cst.payload))
-        // This is an exclusion Key.
-        return ProjectionType::exclusion;
-    else
-        // This is an arbitrary expression to produce a computed field.
-        return ProjectionType::computed;
-}
-
 /**
  * Walk a compound projection CNode payload (CompoundInclusionKey or CompoundExclusionKey) and
- * produce a sequence of paths.
+ * produce a sequence of paths and optional expressions.
  */
 template <typename CompoundPayload>
-auto translateCompoundProjection(const CompoundPayload& payload, StringData prefix) {
-    auto path = std::vector<StringData>{};
-    auto resultPaths = std::vector<FieldPath>{};
-    auto translateProjectionObject = [&](auto&& recurse, auto&& children) -> void {
+auto translateCompoundProjection(const CompoundPayload& payload,
+                                 const std::vector<StringData>& path,
+                                 const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto resultPaths =
+        std::vector<std::pair<FieldPath, boost::optional<boost::intrusive_ptr<Expression>>>>{};
+    auto translateProjectionObject =
+        [&](auto&& recurse, auto&& children, auto&& previousPath) -> void {
         for (auto&& child : children) {
-            path.push_back(stdx::get<UserFieldname>(child.first));
-            // In this context we have an object.
-            if (auto recursiveChildren = stdx::get_if<CNode::ObjectChildren>(&child.second.payload))
-                recurse(recurse, *recursiveChildren);
-            // Alternatively we have a key indicating inclusion/exclusion, no other cases need to be
-            // considered.
+            auto&& components =
+                stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(child.first)).components;
+            auto currentPath = previousPath;
+            for (auto&& component : components)
+                currentPath.emplace_back(component);
+            // In this context we have a project path object to recurse over.
+            if (auto recursiveChildren = stdx::get_if<CNode::ObjectChildren>(&child.second.payload);
+                recursiveChildren &&
+                stdx::holds_alternative<FieldnamePath>((*recursiveChildren)[0].first))
+                recurse(recurse, *recursiveChildren, std::as_const(currentPath));
+            // Alternatively we have a key indicating inclusion/exclusion.
+            else if (child.second.projectionType())
+                resultPaths.emplace_back(path::vectorToString(currentPath), boost::none);
+            // Everything else is an agg expression to translate.
             else
-                resultPaths.emplace_back(std::accumulate(
-                    std::next(path.cbegin()),
-                    path.cend(),
-                    std::string{path[0]},
-                    [](auto&& pathString, auto&& element) { return pathString + "." + element; }));
-            path.pop_back();
+                resultPaths.emplace_back(path::vectorToString(currentPath),
+                                         translateExpression(child.second, expCtx));
         }
     };
-    path.push_back(prefix);
-    translateProjectionObject(translateProjectionObject, payload.obj->objectChildren());
+    translateProjectionObject(translateProjectionObject, payload.obj->objectChildren(), path);
     return resultPaths;
 }
 
@@ -482,26 +508,39 @@ auto translateProjectInclusion(const CNode& cst,
     for (auto&& [name, child] : cst.objectChildren()) {
         sawId = sawId || CNode::fieldnameIsId(name);
         // If we see a key fieldname, make sure it's _id.
-        const auto path =
-            CNode::fieldnameIsId(name) ? "_id"_sd : StringData{stdx::get<UserFieldname>(name)};
-        switch (determineProjectionKeyType(child)) {
-            case ProjectionType::inclusion:
-                if (auto payload = stdx::get_if<CompoundInclusionKey>(&child.payload))
-                    for (auto&& compoundPath : translateCompoundProjection(*payload, path))
-                        executor->getRoot()->addProjectionForPath(std::move(compoundPath));
-                else
-                    executor->getRoot()->addProjectionForPath(FieldPath{path});
-                break;
-            case ProjectionType::exclusion:
-                // InclusionProjectionExecutors must contain no exclusion besides _id so we do
-                // nothing here and translate the presence of an _id exclusion node by the absence
-                // of the implicit _id inclusion below.
-                invariant(CNode::fieldnameIsId(name));
-                break;
-            case ProjectionType::computed:
-                executor->getRoot()->addExpressionForPath(FieldPath{path},
-                                                          translateExpression(child, expCtx));
-        }
+        const auto path = CNode::fieldnameIsId(name)
+            ? make_vector<StringData>("_id"_sd)
+            : std::vector<StringData>{
+                  stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.begin(),
+                  stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.end()};
+        if (auto type = child.projectionType())
+            switch (*type) {
+                case ProjectionType::inclusion:
+                    if (auto payload = stdx::get_if<CompoundInclusionKey>(&child.payload))
+                        for (auto&& [compoundPath, expr] :
+                             translateCompoundProjection(*payload, path, expCtx))
+                            if (expr)
+                                executor->getRoot()->addExpressionForPath(std::move(compoundPath),
+                                                                          std::move(*expr));
+                            else
+                                executor->getRoot()->addProjectionForPath(std::move(compoundPath));
+                    else
+                        executor->getRoot()->addProjectionForPath(
+                            FieldPath{path::vectorToString(path)});
+                    break;
+                case ProjectionType::exclusion:
+                    // InclusionProjectionExecutors must contain no exclusion besides _id so we do
+                    // nothing here and translate the presence of an _id exclusion node by the
+                    // absence of the implicit _id inclusion below.
+                    invariant(CNode::fieldnameIsId(name));
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        else
+            // This is a computed projection.
+            executor->getRoot()->addExpressionForPath(FieldPath{path::vectorToString(path)},
+                                                      translateExpression(child, expCtx));
     }
 
     // If we didn't see _id we need to add it in manually for inclusion.
@@ -523,24 +562,33 @@ auto translateProjectExclusion(const CNode& cst,
 
     for (auto&& [name, child] : cst.objectChildren()) {
         // If we see a key fieldname, make sure it's _id.
-        const auto path =
-            CNode::fieldnameIsId(name) ? "_id"_sd : StringData{stdx::get<UserFieldname>(name)};
-        switch (determineProjectionKeyType(child)) {
-            case ProjectionType::inclusion:
-                // ExclusionProjectionExecutors must contain no inclusion besides _id so we do
-                // nothing here since including _id is the default.
-                break;
-            case ProjectionType::exclusion:
-                if (auto payload = stdx::get_if<CompoundExclusionKey>(&child.payload))
-                    for (auto&& compoundPath : translateCompoundProjection(*payload, path))
-                        executor->getRoot()->addProjectionForPath(std::move(compoundPath));
-                else
-                    executor->getRoot()->addProjectionForPath(FieldPath{path});
-                break;
-            case ProjectionType::computed:
-                // Computed fields are disallowed in exclusion projection.
-                MONGO_UNREACHABLE;
-        }
+        const auto path = CNode::fieldnameIsId(name)
+            ? make_vector<StringData>("_id"_sd)
+            : std::vector<StringData>{
+                  stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.begin(),
+                  stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.end()};
+        if (auto type = child.projectionType())
+            switch (*type) {
+                case ProjectionType::inclusion:
+                    // ExclusionProjectionExecutors must contain no inclusion besides _id so we do
+                    // nothing here since including _id is the default.
+                    break;
+                case ProjectionType::exclusion:
+                    if (auto payload = stdx::get_if<CompoundExclusionKey>(&child.payload))
+                        for (auto&& [compoundPath, unused] :
+                             translateCompoundProjection(*payload, path, expCtx))
+                            executor->getRoot()->addProjectionForPath(std::move(compoundPath));
+                    else
+                        executor->getRoot()->addProjectionForPath(
+                            FieldPath{path::vectorToString(path)});
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        else
+            // This is a computed projection.
+            // Computed fields are disallowed in exclusion projection.
+            MONGO_UNREACHABLE;
     }
 
     return make_intrusive<DocumentSourceSingleDocumentTransformation>(
@@ -649,16 +697,21 @@ boost::intrusive_ptr<Expression> translateExpression(
                 }
             },
             [](const NonZeroKey&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
-            [&](const UserFieldPath& ufp) -> boost::intrusive_ptr<Expression> {
-                if (ufp.isVariable) {
-                    // Remove two '$' characters.
-                    return ExpressionFieldPath::createVarFromString(
-                        expCtx.get(), ufp.rawStr, expCtx->variablesParseState);
-                } else {
-                    // Remove one '$' character.
-                    return ExpressionFieldPath::createPathFromString(
-                        expCtx.get(), ufp.rawStr, expCtx->variablesParseState);
-                }
+            [&](const ValuePath& vp) -> boost::intrusive_ptr<Expression> {
+                return stdx::visit(
+                    visit_helper::Overloaded{[&](const AggregationPath& ap) {
+                                                 return ExpressionFieldPath::createPathFromString(
+                                                     expCtx.get(),
+                                                     path::vectorToString(ap.components),
+                                                     expCtx->variablesParseState);
+                                             },
+                                             [&](const AggregationVariablePath& avp) {
+                                                 return ExpressionFieldPath::createVarFromString(
+                                                     expCtx.get(),
+                                                     path::vectorToString(avp.components),
+                                                     expCtx->variablesParseState);
+                                             }},
+                    vp);
             },
             // Everything else is a literal leaf.
             [&](auto &&) -> boost::intrusive_ptr<Expression> {
@@ -695,12 +748,12 @@ Value translateLiteralLeaf(const CNode& cst) {
             // These are illegal since they're non-literal.
             [](const KeyValue&) -> Value { MONGO_UNREACHABLE; },
             [](const NonZeroKey&) -> Value { MONGO_UNREACHABLE; },
+            [](const ValuePath&) -> Value { MONGO_UNREACHABLE; },
             // These payloads require a special translation to DocumentValue parlance.
             [](const UserUndefined&) { return Value{BSONUndefined}; },
             [](const UserNull&) { return Value{BSONNULL}; },
             [](const UserMinKey&) { return Value{MINKEY}; },
             [](const UserMaxKey&) { return Value{MAXKEY}; },
-            [](const UserFieldPath& ufp) { return Value{ufp.rawStr}; },
             // The rest convert directly.
             [](auto&& payload) { return Value{payload}; }},
         cst.payload);

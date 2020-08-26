@@ -59,7 +59,8 @@ TEST(CstMatchTest, ParsesEqualityPredicates) {
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     ASSERT_EQ(output.toBson().toString(),
-              "{ a: \"<UserDouble 5.000000>\", b: \"<UserInt 10>\", _id: \"<UserLong 15>\" }");
+              "{ <UserFieldname a>: \"<UserDouble 5.000000>\", <UserFieldname b>: \"<UserInt "
+              "10>\", <UserFieldname _id>: \"<UserLong 15>\" }");
 }
 
 TEST(CstMatchTest, ParsesLogicalOperatorsWithOneChild) {
@@ -69,7 +70,8 @@ TEST(CstMatchTest, ParsesLogicalOperatorsWithOneChild) {
         BSONLexer lexer(input["filter"]);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        ASSERT_EQ(output.toBson().toString(), "{ andExpr: [ { a: \"<UserInt 1>\" } ] }");
+        ASSERT_EQ(output.toBson().toString(),
+                  "{ <KeyFieldname andExpr>: [ { <UserFieldname a>: \"<UserInt 1>\" } ] }");
     }
     {
         CNode output;
@@ -77,7 +79,8 @@ TEST(CstMatchTest, ParsesLogicalOperatorsWithOneChild) {
         BSONLexer lexer(input["filter"]);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        ASSERT_EQ(output.toBson().toString(), "{ orExpr: [ { a: \"<UserInt 1>\" } ] }");
+        ASSERT_EQ(output.toBson().toString(),
+                  "{ <KeyFieldname orExpr>: [ { <UserFieldname a>: \"<UserInt 1>\" } ] }");
     }
     {
         CNode output;
@@ -85,7 +88,8 @@ TEST(CstMatchTest, ParsesLogicalOperatorsWithOneChild) {
         BSONLexer lexer(input["filter"]);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
-        ASSERT_EQ(output.toBson().toString(), "{ norExpr: [ { a: \"<UserInt 1>\" } ] }");
+        ASSERT_EQ(output.toBson().toString(),
+                  "{ <KeyFieldname norExpr>: [ { <UserFieldname a>: \"<UserInt 1>\" } ] }");
     }
 }
 
@@ -97,7 +101,8 @@ TEST(CstMatchTest, ParsesLogicalOperatorsWithMultipleChildren) {
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
         ASSERT_EQ(output.toBson().toString(),
-                  "{ andExpr: [ { b: \"<UserString bee>\" }, { a: \"<UserInt 1>\" } ] }");
+                  "{ <KeyFieldname andExpr>: [ { <UserFieldname b>: \"<UserString bee>\" }, { "
+                  "<UserFieldname a>: \"<UserInt 1>\" } ] }");
     }
     {
         CNode output;
@@ -106,7 +111,8 @@ TEST(CstMatchTest, ParsesLogicalOperatorsWithMultipleChildren) {
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
         ASSERT_EQ(output.toBson().toString(),
-                  "{ orExpr: [ { b: \"<UserString bee>\" }, { a: \"<UserInt 1>\" } ] }");
+                  "{ <KeyFieldname orExpr>: [ { <UserFieldname b>: \"<UserString bee>\" }, { "
+                  "<UserFieldname a>: \"<UserInt 1>\" } ] }");
     }
     {
         CNode output;
@@ -115,7 +121,8 @@ TEST(CstMatchTest, ParsesLogicalOperatorsWithMultipleChildren) {
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
         ASSERT_EQ(output.toBson().toString(),
-                  "{ norExpr: [ { b: \"<UserString bee>\" }, { a: \"<UserInt 1>\" } ] }");
+                  "{ <KeyFieldname norExpr>: [ { <UserFieldname b>: \"<UserString bee>\" }, { "
+                  "<UserFieldname a>: \"<UserInt 1>\" } ] }");
     }
 }
 
@@ -125,7 +132,8 @@ TEST(CstMatchTest, ParsesNotWithRegex) {
     BSONLexer lexer(input["filter"]);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    ASSERT_EQ(output.toBson().toString(), "{ a: { notExpr: \"<UserRegex /^a/>\" } }");
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <UserFieldname a>: { <KeyFieldname notExpr>: \"<UserRegex /^a/>\" } }");
 }
 
 TEST(CstMatchTest, ParsesNotWithChildExpression) {
@@ -134,7 +142,9 @@ TEST(CstMatchTest, ParsesNotWithChildExpression) {
     BSONLexer lexer(input["filter"]);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
-    ASSERT_EQ(output.toBson().toString(), "{ a: { notExpr: { notExpr: \"<UserRegex /^a/>\" } } }");
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <UserFieldname a>: { <KeyFieldname notExpr>: { <KeyFieldname notExpr>: "
+              "\"<UserRegex /^a/>\" } } }");
 }
 
 TEST(CstMatchTest, FailsToParseNotWithNonObject) {

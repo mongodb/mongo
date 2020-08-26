@@ -34,23 +34,30 @@
 #include "mongo/util/printable_enum.h"
 
 #define KEYVALUES(ENUMIFY)    \
-    ENUMIFY(intOneKey)        \
-    ENUMIFY(intNegOneKey)     \
-    ENUMIFY(intZeroKey)       \
-    ENUMIFY(longOneKey)       \
-    ENUMIFY(longNegOneKey)    \
-    ENUMIFY(longZeroKey)      \
-    ENUMIFY(doubleOneKey)     \
-    ENUMIFY(doubleNegOneKey)  \
-    ENUMIFY(doubleZeroKey)    \
-    ENUMIFY(decimalOneKey)    \
-    ENUMIFY(decimalNegOneKey) \
-    ENUMIFY(decimalZeroKey)   \
-    ENUMIFY(trueKey)          \
-    ENUMIFY(falseKey)         \
     ENUMIFY(absentKey)        \
+    ENUMIFY(decimalNegOneKey) \
+    ENUMIFY(decimalOneKey)    \
+    ENUMIFY(decimalZeroKey)   \
+    ENUMIFY(doubleNegOneKey)  \
+    ENUMIFY(doubleOneKey)     \
+    ENUMIFY(doubleZeroKey)    \
+    ENUMIFY(falseKey)         \
+    ENUMIFY(geoNearDistance)  \
+    ENUMIFY(geoNearPoint)     \
+    ENUMIFY(indexKey)         \
+    ENUMIFY(intNegOneKey)     \
+    ENUMIFY(intOneKey)        \
+    ENUMIFY(intZeroKey)       \
+    ENUMIFY(longNegOneKey)    \
+    ENUMIFY(longOneKey)       \
+    ENUMIFY(longZeroKey)      \
+    ENUMIFY(randVal)          \
+    ENUMIFY(recordId)         \
+    ENUMIFY(searchHighlights) \
+    ENUMIFY(searchScore)      \
+    ENUMIFY(sortKey)          \
     ENUMIFY(textScore)        \
-    ENUMIFY(randVal)
+    ENUMIFY(trueKey)
 
 MAKE_PRINTABLE_ENUM(KeyValue, KEYVALUES);
 MAKE_PRINTABLE_ENUM_STRING_ARRAY(key_value, KeyValue, KEYVALUES);
