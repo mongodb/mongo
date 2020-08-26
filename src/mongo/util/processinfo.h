@@ -98,10 +98,17 @@ public:
     }
 
     /**
-     * Get the number of CPUs
+     * Get the number of (logical) CPUs
      */
     static unsigned getNumCores() {
         return sysInfo().numCores;
+    }
+
+    /**
+     * Get the number of physical CPUs
+     */
+    static unsigned getNumPhysicalCores() {
+        return sysInfo().numPhysicalCores;
     }
 
     /**
@@ -198,6 +205,7 @@ private:
         unsigned long long memSize;
         unsigned long long memLimit;
         unsigned numCores;
+        unsigned numPhysicalCores;
         unsigned long long pageSize;
         std::string cpuArch;
         bool hasNuma;
@@ -215,6 +223,7 @@ private:
               memSize(0),
               memLimit(0),
               numCores(0),
+              numPhysicalCores(0),
               pageSize(0),
               hasNuma(false),
               preferMsyncOverFSync(true) {
