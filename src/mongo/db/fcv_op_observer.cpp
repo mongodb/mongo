@@ -52,7 +52,7 @@ using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
 
 void FcvOpObserver::_setVersion(OperationContext* opCtx,
                                 ServerGlobalParams::FeatureCompatibility::Version newVersion) {
-    serverGlobalParams.featureCompatibility.setVersion(newVersion);
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(newVersion);
     FeatureCompatibilityVersion::updateMinWireVersion();
 
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.

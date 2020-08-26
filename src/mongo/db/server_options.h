@@ -232,15 +232,7 @@ struct ServerGlobalParams {
             return _version.load();
         }
 
-        void reset() {
-            _version.store(Version::kUnsetDefault44Behavior);
-        }
-
-        void setVersion(Version version) {
-            return _version.store(version);
-        }
-
-        bool isLessThanOrEqualTo(Version version, Version* versionReturn = nullptr) {
+        bool isLessThanOrEqualTo(Version version, Version* versionReturn = nullptr) const {
             Version currentVersion = getVersion();
             if (versionReturn != nullptr) {
                 *versionReturn = currentVersion;
@@ -248,7 +240,7 @@ struct ServerGlobalParams {
             return currentVersion <= version;
         }
 
-        bool isGreaterThanOrEqualTo(Version version, Version* versionReturn = nullptr) {
+        bool isGreaterThanOrEqualTo(Version version, Version* versionReturn = nullptr) const {
             Version currentVersion = getVersion();
             if (versionReturn != nullptr) {
                 *versionReturn = currentVersion;
@@ -256,7 +248,7 @@ struct ServerGlobalParams {
             return currentVersion >= version;
         }
 
-        bool isLessThan(Version version, Version* versionReturn = nullptr) {
+        bool isLessThan(Version version, Version* versionReturn = nullptr) const {
             Version currentVersion = getVersion();
             if (versionReturn != nullptr) {
                 *versionReturn = currentVersion;
@@ -264,7 +256,7 @@ struct ServerGlobalParams {
             return currentVersion < version;
         }
 
-        bool isGreaterThan(Version version, Version* versionReturn = nullptr) {
+        bool isGreaterThan(Version version, Version* versionReturn = nullptr) const {
             Version currentVersion = getVersion();
             if (versionReturn != nullptr) {
                 *versionReturn = currentVersion;
@@ -273,17 +265,28 @@ struct ServerGlobalParams {
         }
 
         // This function is to be used for generic FCV references only, and not for FCV-gating.
-        bool isUpgradingOrDowngrading(boost::optional<Version> version = boost::none) {
+        bool isUpgradingOrDowngrading(boost::optional<Version> version = boost::none) const {
             if (version == boost::none) {
                 version = getVersion();
             }
             return version != kLatest && version != kLastContinuous && version != kLastLTS;
         }
 
+        void reset() {
+            _version.store(Version::kUnsetDefault44Behavior);
+        }
+
+        void setVersion(Version version) {
+            return _version.store(version);
+        }
+
     private:
         AtomicWord<Version> _version{Version::kUnsetDefault44Behavior};
 
-    } featureCompatibility;
+    } mutableFeatureCompatibility;
+
+    // Const reference for featureCompatibilityVersion checks.
+    const FeatureCompatibility& featureCompatibility = mutableFeatureCompatibility;
 
     // Feature validation differs depending on the role of a mongod in a replica set. Replica set
     // primaries can accept user-initiated writes and validate based on the feature compatibility

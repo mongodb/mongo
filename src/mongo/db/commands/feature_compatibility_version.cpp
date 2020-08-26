@@ -266,7 +266,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     }
 
     auto version = swVersion.getValue();
-    serverGlobalParams.featureCompatibility.setVersion(version);
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(version);
     FeatureCompatibilityVersion::updateMinWireVersion();
 
     // On startup, if the version is in an upgrading or downgrading state, print a warning.

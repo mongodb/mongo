@@ -43,10 +43,10 @@ public:
     using Version = ServerGlobalParams::FeatureCompatibility::Version;
     EnsureFCV(Version version)
         : _origVersion(serverGlobalParams.featureCompatibility.getVersion()) {
-        serverGlobalParams.featureCompatibility.setVersion(version);
+        serverGlobalParams.mutableFeatureCompatibility.setVersion(version);
     }
     ~EnsureFCV() {
-        serverGlobalParams.featureCompatibility.setVersion(_origVersion);
+        serverGlobalParams.mutableFeatureCompatibility.setVersion(_origVersion);
     }
 
 private:

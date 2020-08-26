@@ -4042,7 +4042,7 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch() {
 
 void InitialSyncerTest::doSuccessfulInitialSyncWithOneBatch() {
     auto lastOp = doInitialSyncWithOneBatch();
-    serverGlobalParams.featureCompatibility.reset();
+    serverGlobalParams.mutableFeatureCompatibility.reset();
     ASSERT_OK(_lastApplied.getStatus());
     ASSERT_EQUALS(lastOp.getOpTime(), _lastApplied.getValue().opTime);
     ASSERT_EQUALS(lastOp.getWallClockTime(), _lastApplied.getValue().wallTime);

@@ -128,7 +128,7 @@ void OplogApplierImplTest::setUp() {
     // test fixture does not create a featureCompatibilityVersion document from which to initialize
     // the server parameter.
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-    serverGlobalParams.featureCompatibility.setVersion(
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::kLatest);
 
     // This is necessary to generate ghost timestamps for index builds that are not 0, since 0 is an
