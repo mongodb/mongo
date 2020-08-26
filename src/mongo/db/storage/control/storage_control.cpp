@@ -76,9 +76,9 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
     areControlsStarted = true;
 }
 
-void stopStorageControls(ServiceContext* serviceContext) {
+void stopStorageControls(ServiceContext* serviceContext, const Status& reason) {
     if (areControlsStarted) {
-        JournalFlusher::get(serviceContext)->shutdown();
+        JournalFlusher::get(serviceContext)->shutdown(reason);
     }
 }
 
