@@ -1786,8 +1786,8 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     }
 
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
-    // this op should be sampled for profiling.
-    const bool shouldSample = currentOp.completeAndLogOperation(
+    // this op should be written to the profiler.
+    const bool shouldProfile = currentOp.completeAndLogOperation(
         opCtx, MONGO_LOGV2_DEFAULT_COMPONENT, dbresponse.response.size(), slowMsOverride, forceLog);
 
     Top::get(opCtx->getServiceContext())
@@ -1796,7 +1796,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
             durationCount<Microseconds>(currentOp.elapsedTimeExcludingPauses()),
             currentOp.getReadWriteType());
 
-    if (currentOp.shouldDBProfile(shouldSample)) {
+    if (shouldProfile) {
         // Performance profiling is on
         if (opCtx->lockState()->isReadLocked()) {
             LOGV2_DEBUG(21970, 1, "Note: not profiling because of recursive read lock");

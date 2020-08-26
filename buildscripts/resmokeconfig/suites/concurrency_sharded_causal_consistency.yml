@@ -105,6 +105,8 @@ selector:
   # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results
   # from.
   - uses_curop_agg_stage
+  # mongos has no system.profile collection.
+  - requires_profiling
 
 executor:
   archive:

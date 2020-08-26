@@ -75,6 +75,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
@@ -106,22 +107,22 @@ MONGO_FAIL_POINT_DEFINE(waitInFilemd5DuringManualYield);
 
 namespace {
 
-Status _setProfilingLevel(OperationContext* opCtx, Database* db, StringData dbName, int newLevel) {
+Status _setProfileSettings(OperationContext* opCtx,
+                           Database* db,
+                           StringData dbName,
+                           mongo::CollectionCatalog::ProfileSettings newSettings) {
     invariant(db);
 
-    auto currLevel = CollectionCatalog::get(opCtx).getDatabaseProfileLevel(dbName);
+    auto currSettings = CollectionCatalog::get(opCtx).getDatabaseProfileSettings(dbName);
 
-    if (currLevel == newLevel) {
+    if (currSettings == newSettings) {
         return Status::OK();
     }
 
-    if (newLevel == 0) {
-        CollectionCatalog::get(opCtx).setDatabaseProfileLevel(dbName, newLevel);
+    if (newSettings.level == 0) {
+        // No need to create the profile collection.
+        CollectionCatalog::get(opCtx).setDatabaseProfileSettings(dbName, newSettings);
         return Status::OK();
-    }
-
-    if (newLevel < 0 || newLevel > 2) {
-        return Status(ErrorCodes::BadValue, "profiling level has to be >=0 and <= 2");
     }
 
     // Can't support profiling without supporting capped collections.
@@ -135,7 +136,7 @@ Status _setProfilingLevel(OperationContext* opCtx, Database* db, StringData dbNa
         return status;
     }
 
-    CollectionCatalog::get(opCtx).setDatabaseProfileLevel(dbName, newLevel);
+    CollectionCatalog::get(opCtx).setDatabaseProfileSettings(dbName, newSettings);
 
     return Status::OK();
 }
@@ -150,15 +151,21 @@ public:
     CmdProfile() = default;
 
 protected:
-    int _applyProfilingLevel(OperationContext* opCtx,
-                             const std::string& dbName,
-                             int profilingLevel) const final {
+    CollectionCatalog::ProfileSettings _applyProfilingLevel(
+        OperationContext* opCtx,
+        const std::string& dbName,
+        const ProfileCmdRequest& request) const final {
+        const auto profilingLevel = request.getCommandParameter();
 
         // The system.profile collection is non-replicated, so writes to it do not cause
         // replication lag. As such, they should be excluded from Flow Control.
         opCtx->setShouldParticipateInFlowControl(false);
 
-        const bool readOnly = (profilingLevel < 0 || profilingLevel > 2);
+        // An invalid profiling level (outside the range [0, 2]) represents a request to read the
+        // current profiling level. Similarly, if the request does not include a filter, we only
+        // need to read the current filter, if any. If we're not changing either value, then we can
+        // acquire a shared lock instead of exclusive.
+        const bool readOnly = (profilingLevel < 0 || profilingLevel > 2) && !request.getFilter();
         const LockMode dbMode = readOnly ? MODE_S : MODE_X;
 
         // Accessing system.profile collection should not conflict with oplog application.
@@ -167,8 +174,9 @@ protected:
         AutoGetDb ctx(opCtx, dbName, dbMode);
         Database* db = ctx.getDb();
 
-        // Fetches the database profiling level or the server default if the db does not exist.
-        auto oldLevel = CollectionCatalog::get(opCtx).getDatabaseProfileLevel(dbName);
+        // Fetches the database profiling level + filter or the server default if the db does not
+        // exist.
+        auto oldSettings = CollectionCatalog::get(opCtx).getDatabaseProfileSettings(dbName);
 
         if (!readOnly) {
             if (!db) {
@@ -178,10 +186,23 @@ protected:
                 db = databaseHolder->openDb(opCtx, dbName);
             }
 
-            uassertStatusOK(_setProfilingLevel(opCtx, db, dbName, profilingLevel));
+            auto newSettings = oldSettings;
+            if (profilingLevel >= 0 && profilingLevel <= 2) {
+                newSettings.level = profilingLevel;
+            }
+            if (auto filterOrUnset = request.getFilter()) {
+                if (auto filter = filterOrUnset->obj) {
+                    // filter: <match expression>
+                    newSettings.filter = std::make_shared<ProfileFilterImpl>(*filter);
+                } else {
+                    // filter: "unset"
+                    newSettings.filter = nullptr;
+                }
+            }
+            uassertStatusOK(_setProfileSettings(opCtx, db, dbName, newSettings));
         }
 
-        return oldLevel;
+        return oldSettings;
     }
 
 } cmdProfile;

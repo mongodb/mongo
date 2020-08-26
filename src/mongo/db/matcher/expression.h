@@ -299,6 +299,15 @@ public:
     virtual void serialize(BSONObjBuilder* out, bool includePath = true) const = 0;
 
     /**
+     * Convenience method which serializes this MatchExpression to a BSONObj.
+     */
+    BSONObj serialize(bool includePath = true) const {
+        BSONObjBuilder bob;
+        serialize(&bob, includePath);
+        return bob.obj();
+    }
+
+    /**
      * Returns true if this expression will always evaluate to false, such as an $or with no
      * children.
      */

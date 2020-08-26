@@ -417,7 +417,7 @@ public:
                 // Fill out OpDebug with the number of deleted docs.
                 opDebug->additiveMetrics.ndeleted = DeleteStage::getNumDeleted(*exec);
 
-                if (curOp->shouldDBProfile()) {
+                if (curOp->shouldDBProfile(opCtx)) {
                     BSONObjBuilder execStatsBob;
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();
@@ -518,7 +518,7 @@ public:
                                                         opDebug);
                 opDebug->setPlanSummaryMetrics(summaryStats);
 
-                if (curOp->shouldDBProfile()) {
+                if (curOp->shouldDBProfile(opCtx)) {
                     BSONObjBuilder execStatsBob;
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();

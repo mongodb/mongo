@@ -424,24 +424,26 @@ std::vector<std::string> CollectionCatalog::getAllDbNames() const {
     return ret;
 }
 
-void CollectionCatalog::setDatabaseProfileLevel(StringData dbName, int newProfileLevel) {
-    stdx::lock_guard<Latch> lock(_profileLevelsLock);
-    _databaseProfileLevels[dbName] = newProfileLevel;
+void CollectionCatalog::setDatabaseProfileSettings(
+    StringData dbName, CollectionCatalog::ProfileSettings newProfileSettings) {
+    stdx::lock_guard<Latch> lock(_profileSettingsLock);
+    _databaseProfileSettings[dbName] = newProfileSettings;
 }
 
-int CollectionCatalog::getDatabaseProfileLevel(StringData dbName) const {
-    stdx::lock_guard<Latch> lock(_profileLevelsLock);
-    auto it = _databaseProfileLevels.find(dbName);
-    if (it != _databaseProfileLevels.end()) {
+CollectionCatalog::ProfileSettings CollectionCatalog::getDatabaseProfileSettings(
+    StringData dbName) const {
+    stdx::lock_guard<Latch> lock(_profileSettingsLock);
+    auto it = _databaseProfileSettings.find(dbName);
+    if (it != _databaseProfileSettings.end()) {
         return it->second;
     }
 
-    return serverGlobalParams.defaultProfile;
+    return {serverGlobalParams.defaultProfile, ProfileFilter::getDefault()};
 }
 
-void CollectionCatalog::clearDatabaseProfileLevel(StringData dbName) {
-    stdx::lock_guard<Latch> lock(_profileLevelsLock);
-    _databaseProfileLevels.erase(dbName);
+void CollectionCatalog::clearDatabaseProfileSettings(StringData dbName) {
+    stdx::lock_guard<Latch> lock(_profileSettingsLock);
+    _databaseProfileSettings.erase(dbName);
 }
 
 void CollectionCatalog::registerCollection(CollectionUUID uuid, std::unique_ptr<Collection>* coll) {

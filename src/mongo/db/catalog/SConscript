@@ -272,6 +272,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/profile_filter',
         '$BUILD_DIR/mongo/db/service_context',
         'collection',
     ],

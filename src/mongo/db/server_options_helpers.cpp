@@ -43,6 +43,7 @@
 #include <iostream>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
@@ -451,6 +452,18 @@ Status storeBaseOptions(const moe::Environment& params) {
 
     if (params.count("operationProfiling.slowOpSampleRate")) {
         serverGlobalParams.sampleRate = params["operationProfiling.slowOpSampleRate"].as<double>();
+    }
+
+    if (params.count("operationProfiling.filter")) {
+        try {
+            serverGlobalParams.defaultProfileFilter =
+                fromjson(params["operationProfiling.filter"].as<std::string>()).getOwned();
+        } catch (AssertionException& e) {
+            // Add more context to the error
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream()
+                          << "Failed to parse option operationProfiling.filter: " << e.reason());
+        }
     }
 
     return Status::OK();

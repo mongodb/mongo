@@ -1583,7 +1583,7 @@ bool runMapReduce(OperationContext* opCtx,
             curOp->debug().setPlanSummaryMetrics(stats);
             CollectionQueryInfo::get(scopedAutoColl->getCollection()).notifyOfQuery(opCtx, stats);
 
-            if (curOp->shouldDBProfile()) {
+            if (curOp->shouldDBProfile(opCtx)) {
                 BSONObjBuilder execStatsBob;
                 Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                 curOp->debug().execStats = execStatsBob.obj();

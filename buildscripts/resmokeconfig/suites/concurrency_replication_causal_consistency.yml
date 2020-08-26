@@ -25,6 +25,9 @@ selector:
   # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results
   # from.
   - uses_curop_agg_stage
+  # The system.profile collection is not replicated, so these tests are incompatible with
+  # readPreference secondary.
+  - requires_profiling
 
 executor:
   archive:

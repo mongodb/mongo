@@ -54,36 +54,6 @@ using std::endl;
 using std::string;
 using std::unique_ptr;
 
-namespace {
-
-void _appendUserInfo(const CurOp& c, BSONObjBuilder& builder, AuthorizationSession* authSession) {
-    UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
-
-    UserName bestUser;
-    if (nameIter.more())
-        bestUser = *nameIter;
-
-    std::string opdb(nsToDatabase(c.getNS()));
-
-    BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
-    for (; nameIter.more(); nameIter.next()) {
-        BSONObjBuilder nextUser(allUsers.subobjStart());
-        nextUser.append(AuthorizationManager::USER_NAME_FIELD_NAME, nameIter->getUser());
-        nextUser.append(AuthorizationManager::USER_DB_FIELD_NAME, nameIter->getDB());
-        nextUser.doneFast();
-
-        if (nameIter->getDB() == opdb) {
-            bestUser = *nameIter;
-        }
-    }
-    allUsers.doneFast();
-
-    builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getFullName());
-}
-
-}  // namespace
-
-
 void profile(OperationContext* opCtx, NetworkOp op) {
     // Initialize with 1kb at start in order to avoid realloc later
     BufBuilder profileBufBuilder(1024);
@@ -110,7 +80,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     }
 
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-    _appendUserInfo(*CurOp::get(opCtx), b, authSession);
+    OpDebug::appendUserInfo(*CurOp::get(opCtx), b, authSession);
 
     const BSONObj p = b.done();
 

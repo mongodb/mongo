@@ -34,6 +34,7 @@
 #include <set>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/uuid.h"
@@ -93,6 +94,26 @@ public:
         std::map<std::pair<std::string, CollectionUUID>, Collection*>::const_iterator _mapIter;
         const CollectionCatalog* _catalog;
         static constexpr Collection* _nullCollection = nullptr;
+    };
+
+    struct ProfileSettings {
+        int level;
+        std::shared_ptr<ProfileFilter> filter;  // nullable
+
+        ProfileSettings(int level, std::shared_ptr<ProfileFilter> filter)
+            : level(level), filter(filter) {
+            // ProfileSettings represents a state, not a request to change the state.
+            // -1 is not a valid profiling level: it is only used in requests, to represent
+            // leaving the state unchanged.
+            invariant(0 <= level && level <= 2,
+                      str::stream() << "Invalid profiling level: " << level);
+        }
+
+        ProfileSettings() = default;
+
+        bool operator==(const ProfileSettings& other) {
+            return level == other.level && filter == other.filter;
+        }
     };
 
     static CollectionCatalog& get(ServiceContext* svcCtx);
@@ -219,21 +240,33 @@ public:
     std::vector<std::string> getAllDbNames() const;
 
     /**
-     * Sets 'newProfileLevel' as the profiling level for the database 'dbName'.
+     * Sets 'newProfileSettings' as the profiling settings for the database 'dbName'.
      */
-    void setDatabaseProfileLevel(StringData dbName, int newProfileLevel);
+    void setDatabaseProfileSettings(StringData dbName, ProfileSettings newProfileSettings);
+
+    /**
+     * Fetches the profiling settings for database 'dbName'.
+     *
+     * Returns the server's default database profile settings if the database does not exist.
+     */
+    ProfileSettings getDatabaseProfileSettings(StringData dbName) const;
 
     /**
      * Fetches the profiling level for database 'dbName'.
      *
-     * Returns the server's default database profile level if the database does not exist.
+     * Returns the server's default database profile settings if the database does not exist.
+     *
+     * There is no corresponding setDatabaseProfileLevel; use setDatabaseProfileSettings instead.
+     * This method only exists as a convenience.
      */
-    int getDatabaseProfileLevel(StringData dbName) const;
+    int getDatabaseProfileLevel(StringData dbName) const {
+        return getDatabaseProfileSettings(dbName).level;
+    }
 
     /**
-     * Clears the database profile level entry for 'dbName'.
+     * Clears the database profile settings entry for 'dbName'.
      */
-    void clearDatabaseProfileLevel(StringData dbName);
+    void clearDatabaseProfileSettings(StringData dbName);
 
     /**
      * Puts the catalog in closed state. In this state, the lookupNSSByUUID method will fall back
@@ -293,7 +326,7 @@ private:
         stdx::unordered_map<CollectionUUID, std::unique_ptr<Collection>, CollectionUUID::Hash>;
     using OrderedCollectionMap = std::map<std::pair<std::string, CollectionUUID>, Collection*>;
     using NamespaceCollectionMap = stdx::unordered_map<NamespaceString, Collection*>;
-    using DatabaseProfileLevelMap = StringMap<int>;
+    using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
 
     CollectionCatalogMap _catalog;
     OrderedCollectionMap _orderedCollections;  // Ordered by <dbName, collUUID> pair
@@ -310,14 +343,16 @@ private:
     // Mapping from ResourceId to a set of strings that contains collection and database namespaces.
     std::map<ResourceId, std::set<std::string>> _resourceInformation;
 
-    // Protects _databaseProfileLevels.
-    mutable Mutex _profileLevelsLock = MONGO_MAKE_LATCH("CollectionCatalog::_profileLevelsLock");
+    // Protects _databaseProfileSettings.
+    mutable Mutex _profileSettingsLock =
+        MONGO_MAKE_LATCH("CollectionCatalog::_profileSettingsLock");
 
     /**
-     * Contains non-default database profile levels. New collections, current collections and views
-     * must all be able to access the correct profile level for the database in which they reside.
-     * Simple database name to integer profile level map. Access protected by the _catalogLock.
+     * Contains non-default database profile settings. New collections, current collections and
+     * views must all be able to access the correct profile settings for the database in which they
+     * reside. Simple database name to struct ProfileSettings map. Access protected by
+     * _profileSettingsLock.
      */
-    DatabaseProfileLevelMap _databaseProfileLevels;
+    DatabaseProfileSettingsMap _databaseProfileSettings;
 };
 }  // namespace mongo

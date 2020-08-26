@@ -111,9 +111,20 @@ env.Library(
 )
 
 env.Library(
+    target='profile_filter',
+    source=[
+        'profile_filter.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='curop',
     source=[
         'curop.cpp',
+
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -127,6 +138,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/progress_meter',
+        'profile_filter',
         'server_options',
         'generic_cursor',
     ],

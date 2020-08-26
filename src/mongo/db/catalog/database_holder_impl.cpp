@@ -205,7 +205,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
     }
 
     // Clean up the in-memory database state.
-    CollectionCatalog::get(opCtx).clearDatabaseProfileLevel(name);
+    CollectionCatalog::get(opCtx).clearDatabaseProfileSettings(name);
     close(opCtx, name);
 
     auto const storageEngine = serviceContext->getStorageEngine();

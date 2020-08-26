@@ -39,7 +39,7 @@
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/config.h"
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -47,6 +47,7 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/json.h"
 #include "mongo/db/prepare_conflict_tracker.h"
+#include "mongo/db/profile_filter.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/logv2/log.h"
@@ -422,6 +423,8 @@ void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
     _dbprofile = std::max(dbProfileLevel, _dbprofile);
 }
 
+static constexpr size_t appendMaxElementSize = 50 * 1024;
+
 bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                                     logv2::LogComponent component,
                                     boost::optional<size_t> responseLength,
@@ -444,11 +447,24 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         oplogGetMoreStats.recordMillis(executionTimeMillis);
     }
 
-    bool shouldLogSlowOp, shouldSample;
+    bool shouldLogSlowOp, shouldProfileAtLevel1;
 
-    // Log the operation if it is eligible according to the current slowMS and sampleRate settings.
-    std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-        opCtx, component, Milliseconds(executionTimeMillis), Milliseconds(slowMs));
+    if (auto filter =
+            CollectionCatalog::get(opCtx).getDatabaseProfileSettings(getNSS().db()).filter) {
+        bool passesFilter = filter->matches(opCtx, _debug, *this);
+
+        shouldLogSlowOp = passesFilter;
+        shouldProfileAtLevel1 = passesFilter;
+
+    } else {
+        // Log the operation if it is eligible according to the current slowMS and sampleRate
+        // settings.
+        bool shouldSample;
+        std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
+            opCtx, component, Milliseconds(executionTimeMillis), Milliseconds(slowMs));
+
+        shouldProfileAtLevel1 = shouldLogSlowOp && shouldSample;
+    }
 
     if (forceLog || shouldLogSlowOp) {
         auto lockerInfo = opCtx->lockState()->getLockerInfo(_lockStatsBase);
@@ -503,7 +519,11 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     }
 
     // Return 'true' if this operation should also be added to the profiler.
-    return shouldDBProfile(shouldSample);
+    if (_dbprofile >= 2)
+        return true;
+    if (_dbprofile <= 0)
+        return false;
+    return shouldProfileAtLevel1;
 }
 
 Command::ReadWriteType CurOp::getReadWriteType() const {
@@ -1009,26 +1029,28 @@ void OpDebug::report(OperationContext* opCtx,
     pAttrs->add("durationMillis", (executionTimeMicros / 1000));
 }
 
+#define OPDEBUG_APPEND_NUMBER2(b, x, y) \
+    if (y != -1)                        \
+    (b).appendNumber(x, (y))
+#define OPDEBUG_APPEND_NUMBER(b, x) OPDEBUG_APPEND_NUMBER2(b, #x, x)
 
-#define OPDEBUG_APPEND_NUMBER(x) \
-    if (x != -1)                 \
-    b.appendNumber(#x, (x))
-#define OPDEBUG_APPEND_BOOL(x) \
-    if (x)                     \
-    b.appendBool(#x, (x))
-#define OPDEBUG_APPEND_ATOMIC(x, y)   \
-    if (auto __y = y.load(); __y > 0) \
-    b.appendNumber(x, __y)
-#define OPDEBUG_APPEND_OPTIONAL(x, y) \
+#define OPDEBUG_APPEND_BOOL2(b, x, y) \
     if (y)                            \
-    b.appendNumber(x, (*y))
+    (b).appendBool(x, (y))
+#define OPDEBUG_APPEND_BOOL(b, x) OPDEBUG_APPEND_BOOL2(b, #x, x)
+
+#define OPDEBUG_APPEND_ATOMIC(b, x, y) \
+    if (auto __y = y.load(); __y > 0)  \
+    (b).appendNumber(x, __y)
+#define OPDEBUG_APPEND_OPTIONAL(b, x, y) \
+    if (y)                               \
+    (b).appendNumber(x, (*y))
 
 void OpDebug::append(OperationContext* opCtx,
                      const SingleThreadedLockStats& lockStats,
                      FlowControlTicketholder::CurOp flowControlStats,
                      BSONObjBuilder& b) const {
     auto& curop = *CurOp::get(opCtx);
-    const size_t maxElementSize = 50 * 1024;
 
     b.append("op", logicalOpToString(logicalOp));
 
@@ -1036,47 +1058,47 @@ void OpDebug::append(OperationContext* opCtx,
     b.append("ns", nss.ns());
 
     appendAsObjOrString(
-        "command", appendCommentField(opCtx, curop.opDescription()), maxElementSize, &b);
+        "command", appendCommentField(opCtx, curop.opDescription()), appendMaxElementSize, &b);
 
     auto originatingCommand = curop.originatingCommand();
     if (!originatingCommand.isEmpty()) {
-        appendAsObjOrString("originatingCommand", originatingCommand, maxElementSize, &b);
+        appendAsObjOrString("originatingCommand", originatingCommand, appendMaxElementSize, &b);
     }
 
-    OPDEBUG_APPEND_NUMBER(nShards);
-    OPDEBUG_APPEND_NUMBER(cursorid);
+    OPDEBUG_APPEND_NUMBER(b, nShards);
+    OPDEBUG_APPEND_NUMBER(b, cursorid);
     if (mongotCursorId) {
         b.append("mongot", makeMongotDebugStatsObject());
     }
-    OPDEBUG_APPEND_BOOL(exhaust);
+    OPDEBUG_APPEND_BOOL(b, exhaust);
 
-    OPDEBUG_APPEND_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
-    OPDEBUG_APPEND_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
-    OPDEBUG_APPEND_BOOL(hasSortStage);
-    OPDEBUG_APPEND_BOOL(usedDisk);
-    OPDEBUG_APPEND_BOOL(fromMultiPlanner);
+    OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", additiveMetrics.keysExamined);
+    OPDEBUG_APPEND_OPTIONAL(b, "docsExamined", additiveMetrics.docsExamined);
+    OPDEBUG_APPEND_BOOL(b, hasSortStage);
+    OPDEBUG_APPEND_BOOL(b, usedDisk);
+    OPDEBUG_APPEND_BOOL(b, fromMultiPlanner);
     if (replanReason) {
         bool replanned = true;
-        OPDEBUG_APPEND_BOOL(replanned);
+        OPDEBUG_APPEND_BOOL(b, replanned);
         b.append("replanReason", *replanReason);
     }
-    OPDEBUG_APPEND_OPTIONAL("nMatched", additiveMetrics.nMatched);
-    OPDEBUG_APPEND_OPTIONAL("nModified", additiveMetrics.nModified);
-    OPDEBUG_APPEND_OPTIONAL("ninserted", additiveMetrics.ninserted);
-    OPDEBUG_APPEND_OPTIONAL("ndeleted", additiveMetrics.ndeleted);
-    OPDEBUG_APPEND_BOOL(upsert);
-    OPDEBUG_APPEND_BOOL(cursorExhausted);
+    OPDEBUG_APPEND_OPTIONAL(b, "nMatched", additiveMetrics.nMatched);
+    OPDEBUG_APPEND_OPTIONAL(b, "nModified", additiveMetrics.nModified);
+    OPDEBUG_APPEND_OPTIONAL(b, "ninserted", additiveMetrics.ninserted);
+    OPDEBUG_APPEND_OPTIONAL(b, "ndeleted", additiveMetrics.ndeleted);
+    OPDEBUG_APPEND_BOOL(b, upsert);
+    OPDEBUG_APPEND_BOOL(b, cursorExhausted);
 
-    OPDEBUG_APPEND_OPTIONAL("keysInserted", additiveMetrics.keysInserted);
-    OPDEBUG_APPEND_OPTIONAL("keysDeleted", additiveMetrics.keysDeleted);
-    OPDEBUG_APPEND_ATOMIC("prepareReadConflicts", additiveMetrics.prepareReadConflicts);
-    OPDEBUG_APPEND_ATOMIC("writeConflicts", additiveMetrics.writeConflicts);
+    OPDEBUG_APPEND_OPTIONAL(b, "keysInserted", additiveMetrics.keysInserted);
+    OPDEBUG_APPEND_OPTIONAL(b, "keysDeleted", additiveMetrics.keysDeleted);
+    OPDEBUG_APPEND_ATOMIC(b, "prepareReadConflicts", additiveMetrics.prepareReadConflicts);
+    OPDEBUG_APPEND_ATOMIC(b, "writeConflicts", additiveMetrics.writeConflicts);
 
-    OPDEBUG_APPEND_OPTIONAL("dataThroughputLastSecond", dataThroughputLastSecond);
-    OPDEBUG_APPEND_OPTIONAL("dataThroughputAverage", dataThroughputAverage);
+    OPDEBUG_APPEND_OPTIONAL(b, "dataThroughputLastSecond", dataThroughputLastSecond);
+    OPDEBUG_APPEND_OPTIONAL(b, "dataThroughputAverage", dataThroughputAverage);
 
     b.appendNumber("numYield", curop.numYields());
-    OPDEBUG_APPEND_NUMBER(nreturned);
+    OPDEBUG_APPEND_NUMBER(b, nreturned);
 
     if (queryHash) {
         b.append("queryHash", unsignedIntToFixedLengthHex(*queryHash));
@@ -1119,7 +1141,7 @@ void OpDebug::append(OperationContext* opCtx,
         b.append("errCode", errInfo.code());
     }
 
-    OPDEBUG_APPEND_NUMBER(responseLength);
+    OPDEBUG_APPEND_NUMBER(b, responseLength);
     if (iscommand) {
         b.append("protocol", getProtoString(networkOp));
     }
@@ -1135,8 +1157,314 @@ void OpDebug::append(OperationContext* opCtx,
     }
 
     if (!execStats.isEmpty()) {
-        b.append("execStats", execStats);
+        b.append("execStats", std::move(execStats));
     }
+}
+
+void OpDebug::appendUserInfo(const CurOp& c,
+                             BSONObjBuilder& builder,
+                             AuthorizationSession* authSession) {
+    UserNameIterator nameIter = authSession->getAuthenticatedUserNames();
+
+    UserName bestUser;
+    if (nameIter.more())
+        bestUser = *nameIter;
+
+    std::string opdb(nsToDatabase(c.getNS()));
+
+    BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
+    for (; nameIter.more(); nameIter.next()) {
+        BSONObjBuilder nextUser(allUsers.subobjStart());
+        nextUser.append(AuthorizationManager::USER_NAME_FIELD_NAME, nameIter->getUser());
+        nextUser.append(AuthorizationManager::USER_DB_FIELD_NAME, nameIter->getDB());
+        nextUser.doneFast();
+
+        if (nameIter->getDB() == opdb) {
+            bestUser = *nameIter;
+        }
+    }
+    allUsers.doneFast();
+
+    builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getFullName());
+}
+
+std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requestedFields,
+                                                                  bool needWholeDocument) {
+    // This function is analogous to OpDebug::append. The main difference is that append() does
+    // the work of building BSON right away, while appendStaged() stages the work to be done later.
+    // It returns a std::function that builds BSON when called.
+
+    // The other difference is that appendStaged can avoid building BSON for unneeded fields.
+    // requestedFields is a set of top-level field names; any fields beyond this list may be
+    // omitted. This also lets us uassert if the caller asks for an unsupported field.
+
+    // Each piece of the result is a function that appends to a BSONObjBuilder.
+    // Before returning, we encapsulate the result in a simpler function that returns a BSONObj.
+    using Piece = std::function<void(ProfileFilter::Args, BSONObjBuilder&)>;
+    std::vector<Piece> pieces;
+
+    // For convenience, the callback that handles each field gets the fieldName as an extra arg.
+    using Callback = std::function<void(const char*, ProfileFilter::Args, BSONObjBuilder&)>;
+
+    // Helper to check for the presence of a field in the StringSet, and remove it.
+    // At the end of this method, anything left in the StringSet is a field we don't know
+    // how to handle.
+    auto needs = [&](const char* fieldName) {
+        bool val = needWholeDocument || requestedFields.count(fieldName) > 0;
+        requestedFields.erase(fieldName);
+        return val;
+    };
+    auto addIfNeeded = [&](const char* fieldName, Callback cb) {
+        if (needs(fieldName)) {
+            pieces.push_back([fieldName = fieldName, cb = std::move(cb)](auto args, auto& b) {
+                cb(fieldName, args, b);
+            });
+        }
+    };
+
+    addIfNeeded("ts", [](auto field, auto args, auto& b) { b.append(field, jsTime()); });
+    addIfNeeded("client", [](auto field, auto args, auto& b) {
+        b.append(field, args.opCtx->getClient()->clientAddress());
+    });
+    addIfNeeded("appName", [](auto field, auto args, auto& b) {
+        const auto& clientMetadata =
+            ClientMetadataIsMasterState::get(args.opCtx->getClient()).getClientMetadata();
+        if (clientMetadata) {
+            auto appName = clientMetadata.get().getApplicationName();
+            if (!appName.empty()) {
+                b.append(field, appName);
+            }
+        }
+    });
+    bool needsAllUsers = needs("allUsers");
+    bool needsUser = needs("user");
+    if (needsAllUsers || needsUser) {
+        pieces.push_back([](auto args, auto& b) {
+            AuthorizationSession* authSession = AuthorizationSession::get(args.opCtx->getClient());
+            appendUserInfo(args.curop, b, authSession);
+        });
+    }
+
+    addIfNeeded("op", [](auto field, auto args, auto& b) {
+        b.append(field, logicalOpToString(args.op.logicalOp));
+    });
+    addIfNeeded("ns", [](auto field, auto args, auto& b) {
+        b.append(field, NamespaceString(args.curop.getNS()).ns());
+    });
+
+    addIfNeeded("command", [](auto field, auto args, auto& b) {
+        appendAsObjOrString(field,
+                            appendCommentField(args.opCtx, args.curop.opDescription()),
+                            appendMaxElementSize,
+                            &b);
+    });
+
+    addIfNeeded("originatingCommand", [](auto field, auto args, auto& b) {
+        auto originatingCommand = args.curop.originatingCommand();
+        if (!originatingCommand.isEmpty()) {
+            appendAsObjOrString(field, originatingCommand, appendMaxElementSize, &b);
+        }
+    });
+
+    addIfNeeded("nShards", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_NUMBER2(b, field, args.op.nShards);
+    });
+    addIfNeeded("cursorid", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_NUMBER2(b, field, args.op.cursorid);
+    });
+    addIfNeeded("mongot", [](auto field, auto args, auto& b) {
+        if (args.op.mongotCursorId) {
+            b.append(field, args.op.makeMongotDebugStatsObject());
+        }
+    });
+    addIfNeeded("exhaust", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.exhaust);
+    });
+
+    addIfNeeded("keysExamined", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.keysExamined);
+    });
+    addIfNeeded("docsExamined", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.docsExamined);
+    });
+    addIfNeeded("hasSortStage", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.hasSortStage);
+    });
+    addIfNeeded("usedDisk", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.usedDisk);
+    });
+    addIfNeeded("fromMultiPlanner", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.fromMultiPlanner);
+    });
+    addIfNeeded("replanned", [](auto field, auto args, auto& b) {
+        if (args.op.replanReason) {
+            OPDEBUG_APPEND_BOOL2(b, field, true);
+        }
+    });
+    addIfNeeded("replanReason", [](auto field, auto args, auto& b) {
+        if (args.op.replanReason) {
+            b.append(field, *args.op.replanReason);
+        }
+    });
+    addIfNeeded("nMatched", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nMatched);
+    });
+    addIfNeeded("nModified", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.nModified);
+    });
+    addIfNeeded("ninserted", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.ninserted);
+    });
+    addIfNeeded("ndeleted", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.ndeleted);
+    });
+    addIfNeeded("upsert", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.upsert);
+    });
+    addIfNeeded("cursorExhausted", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_BOOL2(b, field, args.op.cursorExhausted);
+    });
+
+    addIfNeeded("keysInserted", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.keysInserted);
+    });
+    addIfNeeded("keysDeleted", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.additiveMetrics.keysDeleted);
+    });
+    addIfNeeded("prepareReadConflicts", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_ATOMIC(b, field, args.op.additiveMetrics.prepareReadConflicts);
+    });
+    addIfNeeded("writeConflicts", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_ATOMIC(b, field, args.op.additiveMetrics.writeConflicts);
+    });
+
+    addIfNeeded("dataThroughputLastSecond", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.dataThroughputLastSecond);
+    });
+    addIfNeeded("dataThroughputAverage", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_OPTIONAL(b, field, args.op.dataThroughputAverage);
+    });
+
+    addIfNeeded("numYield", [](auto field, auto args, auto& b) {
+        b.appendNumber(field, args.curop.numYields());
+    });
+    addIfNeeded("nreturned", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_NUMBER2(b, field, args.op.nreturned);
+    });
+
+    addIfNeeded("queryHash", [](auto field, auto args, auto& b) {
+        if (args.op.queryHash) {
+            b.append(field, unsignedIntToFixedLengthHex(*args.op.queryHash));
+        }
+    });
+    addIfNeeded("planCacheKey", [](auto field, auto args, auto& b) {
+        if (args.op.planCacheKey) {
+            b.append(field, unsignedIntToFixedLengthHex(*args.op.planCacheKey));
+        }
+    });
+
+    addIfNeeded("locks", [](auto field, auto args, auto& b) {
+        if (auto lockerInfo =
+                args.opCtx->lockState()->getLockerInfo(args.curop.getLockStatsBase())) {
+            BSONObjBuilder locks(b.subobjStart(field));
+            lockerInfo->stats.report(&locks);
+        }
+    });
+
+    addIfNeeded("flowControl", [](auto field, auto args, auto& b) {
+        BSONObj flowControlMetrics =
+            makeFlowControlObject(args.opCtx->lockState()->getFlowControlStats());
+        BSONObjBuilder flowControlBuilder(b.subobjStart(field));
+        flowControlBuilder.appendElements(flowControlMetrics);
+    });
+
+    addIfNeeded("writeConcern", [](auto field, auto args, auto& b) {
+        if (args.op.writeConcern && !args.op.writeConcern->usedDefault) {
+            b.append(field, args.op.writeConcern->toBSON());
+        }
+    });
+
+    addIfNeeded("storage", [](auto field, auto args, auto& b) {
+        if (args.op.storageStats) {
+            b.append(field, args.op.storageStats->toBSON());
+        }
+    });
+
+    // Don't short-circuit: call needs() for every supported field, so that at the end we can
+    // uassert that no unsupported fields were requested.
+    bool needsOk = needs("ok");
+    bool needsErrMsg = needs("errMsg");
+    bool needsErrName = needs("errName");
+    bool needsErrCode = needs("errCode");
+    if (needsOk || needsErrMsg || needsErrName || needsErrCode) {
+        pieces.push_back([](auto args, auto& b) {
+            if (!args.op.errInfo.isOK()) {
+                b.appendNumber("ok", 0.0);
+                if (!args.op.errInfo.reason().empty()) {
+                    b.append("errMsg", args.op.errInfo.reason());
+                }
+                b.append("errName", ErrorCodes::errorString(args.op.errInfo.code()));
+                b.append("errCode", args.op.errInfo.code());
+            }
+        });
+    }
+
+    addIfNeeded("responseLength", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_NUMBER2(b, field, args.op.responseLength);
+    });
+
+    addIfNeeded("protocol", [](auto field, auto args, auto& b) {
+        if (args.op.iscommand) {
+            b.append(field, getProtoString(args.op.networkOp));
+        }
+    });
+
+    addIfNeeded("remoteOpWaitMillis", [](auto field, auto args, auto& b) {
+        if (args.op.remoteOpWaitTime) {
+            b.append(field, durationCount<Milliseconds>(*args.op.remoteOpWaitTime));
+        }
+    });
+
+    // millis and durationMillis are the same thing. This is one of the few inconsistencies between
+    // the profiler (OpDebug::append) and the log file (OpDebug::report), so for the profile filter
+    // we support both names.
+    addIfNeeded("millis", [](auto field, auto args, auto& b) {
+        b.appendIntOrLL(field, args.op.executionTimeMicros / 1000);
+    });
+    addIfNeeded("durationMillis", [](auto field, auto args, auto& b) {
+        b.appendIntOrLL(field, args.op.executionTimeMicros / 1000);
+    });
+
+    addIfNeeded("planSummary", [](auto field, auto args, auto& b) {
+        if (!args.curop.getPlanSummary().empty()) {
+            b.append(field, args.curop.getPlanSummary());
+        }
+    });
+
+    addIfNeeded("execStats", [](auto field, auto args, auto& b) {
+        if (!args.op.execStats.isEmpty()) {
+            b.append(field, args.op.execStats);
+        }
+    });
+
+    if (!requestedFields.empty()) {
+        std::stringstream ss;
+        ss << "No such field (or fields) available for profile filter";
+        auto sep = ": ";
+        for (auto&& s : requestedFields) {
+            ss << sep << s;
+            sep = ", ";
+        }
+        uasserted(4910200, ss.str());
+    }
+
+    return [pieces = std::move(pieces)](ProfileFilter::Args args) {
+        BSONObjBuilder bob;
+        for (auto piece : pieces) {
+            piece(args, bob);
+        }
+        return bob.obj();
+    };
 }
 
 void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
@@ -1148,7 +1476,7 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     replanReason = planSummaryStats.replanReason;
 }
 
-BSONObj OpDebug::makeFlowControlObject(FlowControlTicketholder::CurOp stats) const {
+BSONObj OpDebug::makeFlowControlObject(FlowControlTicketholder::CurOp stats) {
     BSONObjBuilder builder;
     if (stats.ticketsAcquired > 0) {
         builder.append("acquireCount", stats.ticketsAcquired);
@@ -1288,16 +1616,16 @@ void OpDebug::AdditiveMetrics::report(logv2::DynamicAttributes* pAttrs) const {
 
 BSONObj OpDebug::AdditiveMetrics::reportBSON() const {
     BSONObjBuilder b;
-    OPDEBUG_APPEND_OPTIONAL("keysExamined", keysExamined);
-    OPDEBUG_APPEND_OPTIONAL("docsExamined", docsExamined);
-    OPDEBUG_APPEND_OPTIONAL("nMatched", nMatched);
-    OPDEBUG_APPEND_OPTIONAL("nModified", nModified);
-    OPDEBUG_APPEND_OPTIONAL("ninserted", ninserted);
-    OPDEBUG_APPEND_OPTIONAL("ndeleted", ndeleted);
-    OPDEBUG_APPEND_OPTIONAL("keysInserted", keysInserted);
-    OPDEBUG_APPEND_OPTIONAL("keysDeleted", keysDeleted);
-    OPDEBUG_APPEND_ATOMIC("prepareReadConflicts", prepareReadConflicts);
-    OPDEBUG_APPEND_ATOMIC("writeConflicts", writeConflicts);
+    OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", keysExamined);
+    OPDEBUG_APPEND_OPTIONAL(b, "docsExamined", docsExamined);
+    OPDEBUG_APPEND_OPTIONAL(b, "nMatched", nMatched);
+    OPDEBUG_APPEND_OPTIONAL(b, "nModified", nModified);
+    OPDEBUG_APPEND_OPTIONAL(b, "ninserted", ninserted);
+    OPDEBUG_APPEND_OPTIONAL(b, "ndeleted", ndeleted);
+    OPDEBUG_APPEND_OPTIONAL(b, "keysInserted", keysInserted);
+    OPDEBUG_APPEND_OPTIONAL(b, "keysDeleted", keysDeleted);
+    OPDEBUG_APPEND_ATOMIC(b, "prepareReadConflicts", prepareReadConflicts);
+    OPDEBUG_APPEND_ATOMIC(b, "writeConflicts", writeConflicts);
     return b.obj();
 }
 

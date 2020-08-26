@@ -31,9 +31,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/profile_filter_impl.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 
@@ -69,42 +72,64 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
     auto request = ProfileCmdRequest::parse(IDLParserErrorContext("profile"), cmdObj);
     const auto profilingLevel = request.getCommandParameter();
 
+    // Validate arguments before making changes.
+    if (auto sampleRate = request.getSampleRate()) {
+        uassert(ErrorCodes::BadValue,
+                "'sampleRate' must be between 0.0 and 1.0 inclusive",
+                *sampleRate >= 0.0 && *sampleRate <= 1.0);
+    }
+
     // Delegate to _applyProfilingLevel to set the profiling level appropriately whether we are on
     // mongoD or mongoS.
-    int oldLevel = _applyProfilingLevel(opCtx, dbName, profilingLevel);
+    auto oldSettings = _applyProfilingLevel(opCtx, dbName, request);
     auto oldSlowMS = serverGlobalParams.slowMS;
     auto oldSampleRate = serverGlobalParams.sampleRate;
 
-    result.append("was", oldLevel);
+    result.append("was", oldSettings.level);
     result.append("slowms", oldSlowMS);
     result.append("sampleRate", oldSampleRate);
+    if (oldSettings.filter) {
+        result.append("filter", oldSettings.filter->serialize());
+    }
+    if (oldSettings.filter || request.getFilter()) {
+        result.append("note",
+                      "When a filter expression is set, slowms and sampleRate are not used for "
+                      "profiling and slow-query log lines.");
+    }
 
     if (auto slowms = request.getSlowms()) {
         serverGlobalParams.slowMS = *slowms;
     }
     if (auto sampleRate = request.getSampleRate()) {
-        uassert(ErrorCodes::BadValue,
-                "'sampleRate' must be between 0.0 and 1.0 inclusive",
-                *sampleRate >= 0.0 && *sampleRate <= 1.0);
         serverGlobalParams.sampleRate = *sampleRate;
     }
 
-    // Log the change made to server's profiling settings, unless the request was to get the current
-    // value.
-    if (profilingLevel != -1) {
+    // Log the change made to server's profiling settings, if the request asks to change anything.
+    if (profilingLevel != -1 || request.getSlowms() || request.getSampleRate() ||
+        request.getFilter()) {
         logv2::DynamicAttributes attrs;
 
         BSONObjBuilder oldState;
         BSONObjBuilder newState;
 
-        oldState.append("level"_sd, oldLevel);
+        oldState.append("level"_sd, oldSettings.level);
         oldState.append("slowms"_sd, oldSlowMS);
         oldState.append("sampleRate"_sd, oldSampleRate);
+        if (oldSettings.filter) {
+            oldState.append("filter"_sd, oldSettings.filter->serialize());
+        }
         attrs.add("from", oldState.obj());
 
-        newState.append("level"_sd, profilingLevel);
+        // newSettings.level may differ from profilingLevel: profilingLevel is part of the request,
+        // and if the request specifies {profile: -1, ...} then we want to show the unchanged value
+        // (0, 1, or 2).
+        auto newSettings = CollectionCatalog::get(opCtx).getDatabaseProfileSettings(dbName);
+        newState.append("level"_sd, newSettings.level);
         newState.append("slowms"_sd, serverGlobalParams.slowMS);
         newState.append("sampleRate"_sd, serverGlobalParams.sampleRate);
+        if (newSettings.filter) {
+            newState.append("filter"_sd, newSettings.filter->serialize());
+        }
         attrs.add("to", newState.obj());
 
         LOGV2(48742, "Profiler settings changed", attrs);
@@ -112,4 +137,25 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
 
     return true;
 }
+
+ObjectOrUnset parseObjectOrUnset(const BSONElement& element) {
+    if (element.type() == BSONType::Object) {
+        return {{element.Obj()}};
+    } else if (element.type() == BSONType::String && element.String() == "unset"_sd) {
+        return {{}};
+    } else {
+        uasserted(ErrorCodes::BadValue, "Expected an object, or the string 'unset'.");
+    }
+}
+
+void serializeObjectOrUnset(const ObjectOrUnset& obj,
+                            StringData fieldName,
+                            BSONObjBuilder* builder) {
+    if (obj.obj) {
+        builder->append(fieldName, *obj.obj);
+    } else {
+        builder->append(fieldName, "unset"_sd);
+    }
+}
+
 }  // namespace mongo

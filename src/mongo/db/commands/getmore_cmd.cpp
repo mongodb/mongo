@@ -635,7 +635,7 @@ public:
             // could be destroyed before we know if we need 'execStats' and we do not want to
             // generate the stats eagerly for all operations due to cost.
             if (cursorPin->lockPolicy() != ClientCursorParams::LockPolicy::kLocksInternally &&
-                curOp->shouldDBProfile()) {
+                curOp->shouldDBProfile(opCtx)) {
                 BSONObjBuilder execStatsBob;
                 Explain::getWinningPlanStats(exec, &execStatsBob);
                 curOp->debug().execStats = execStatsBob.obj();

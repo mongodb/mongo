@@ -77,3 +77,7 @@ configs:
         short_name: slowOpSampleRate
         arg_vartype: Double
         default: 1.0
+    'operationProfiling.filter':
+        description: 'Query predicate to control which operations are logged and profiled'
+        short_name: profileFilter
+        arg_vartype: String

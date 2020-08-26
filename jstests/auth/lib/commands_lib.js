@@ -4843,7 +4843,7 @@ var authCommandsLib = {
               },
               {
                 runOnDb: firstDbName,
-                roles: {},
+                roles: roles_dbAdmin,
               }
           ]
         },
@@ -4869,7 +4869,20 @@ var authCommandsLib = {
               },
               {
                 runOnDb: firstDbName,
-                roles: {},
+                roles: {
+                    backup: 1,
+                    dbAdmin: 1,
+                    dbAdminAnyDatabase: 1,
+                    dbOwner: 1,
+                    clusterMonitor: 1,
+                    clusterAdmin: 1,
+                    root: 1,
+                    __system: 1
+                },
+                privileges: [{
+                    resource: {db: firstDbName, collection: "system.profile"},
+                    actions: ["find"]
+                }]
               }
           ]
         },
