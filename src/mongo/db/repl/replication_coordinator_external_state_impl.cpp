@@ -962,9 +962,9 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
     }
 }
 
-void ReplicationCoordinatorExternalStateImpl::dropAllSnapshots() {
+void ReplicationCoordinatorExternalStateImpl::clearCommittedSnapshot() {
     if (auto manager = _service->getStorageEngine()->getSnapshotManager())
-        manager->dropAllSnapshots();
+        manager->clearCommittedSnapshot();
 }
 
 void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(

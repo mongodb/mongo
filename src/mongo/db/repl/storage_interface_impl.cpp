@@ -408,7 +408,7 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
           "dropReplicatedDatabases - dropping databases",
           "numDatabases"_attr = dbNames.size());
 
-    ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
+    ReplicationCoordinator::get(opCtx)->clearCommittedSnapshot();
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto hasLocalDatabase = false;

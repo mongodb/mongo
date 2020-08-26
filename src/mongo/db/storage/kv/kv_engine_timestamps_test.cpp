@@ -246,7 +246,7 @@ TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {
     ASSERT_OK(ru->obtainMajorityCommittedSnapshot());
 
     // Not anymore!
-    snapshotManager->dropAllSnapshots();
+    snapshotManager->clearCommittedSnapshot();
     ASSERT_EQ(ru->obtainMajorityCommittedSnapshot(),
               ErrorCodes::ReadConcernMajorityNotAvailableYet);
 }
@@ -265,7 +265,7 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
     ASSERT_EQ(itCountOn(op), 0);  // acquires a snapshot.
 
     // Everything still works until we abandon our snapshot.
-    snapshotManager->dropAllSnapshots();
+    snapshotManager->clearCommittedSnapshot();
     ASSERT_EQ(itCountOn(op), 0);
 
     // Now it doesn't.

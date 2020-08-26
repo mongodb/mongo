@@ -449,7 +449,7 @@ void ReplicationCoordinatorNoOp::createWMajorityWriteAvailabilityDateWaiter(OpTi
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::dropAllSnapshots() {
+void ReplicationCoordinatorNoOp::clearCommittedSnapshot() {
     MONGO_UNREACHABLE;
 }
 

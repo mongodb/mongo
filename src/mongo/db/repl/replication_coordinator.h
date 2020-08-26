@@ -843,9 +843,9 @@ public:
                                             const Timestamp& untilSnapshot) = 0;
 
     /**
-     * Resets all information related to snapshotting.
+     * Clears the current committed snapshot.
      */
-    virtual void dropAllSnapshots() = 0;
+    virtual void clearCommittedSnapshot() = 0;
 
     /**
      * Gets the latest OpTime of the currentCommittedSnapshot.

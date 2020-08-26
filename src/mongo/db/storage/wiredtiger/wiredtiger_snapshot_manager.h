@@ -53,7 +53,7 @@ public:
     void setCommittedSnapshot(const Timestamp& timestamp) final;
     void setLastApplied(const Timestamp& timestamp) final;
     boost::optional<Timestamp> getLastApplied() final;
-    void dropAllSnapshots() final;
+    void clearCommittedSnapshot() final;
 
     //
     // WT-specific methods

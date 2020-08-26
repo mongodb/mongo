@@ -129,7 +129,7 @@ assert.soonNoExcept(function() {
     return null == nodes[0].getDB(dbName).getCollection(collName).findOne({a: 2});
 }, "Original primary never rolled back its write");
 
-rst.awaitReplication();
+rst.awaitLastOpCommitted();
 
 // Ensure that the old primary got the write that the new primary did and sees it as committed.
 assert.neq(

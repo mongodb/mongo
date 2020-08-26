@@ -69,9 +69,9 @@ public:
     virtual boost::optional<Timestamp> getLastApplied() = 0;
 
     /**
-     * Drops all snapshots and clears the "committed" snapshot.
+     * Clears the "committed" snapshot.
      */
-    virtual void dropAllSnapshots() = 0;
+    virtual void clearCommittedSnapshot() = 0;
 
 protected:
     /**

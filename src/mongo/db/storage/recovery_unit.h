@@ -237,8 +237,8 @@ public:
      * If no snapshot has yet been marked as Majority Committed, returns a status with error code
      * ReadConcernMajorityNotAvailableYet. After this returns successfully, at any point where
      * implementations attempt to acquire committed snapshot, if there are none available due to a
-     * call to SnapshotManager::dropAllSnapshots(), a AssertionException with the same code should
-     * be thrown.
+     * call to SnapshotManager::clearCommittedSnapshot(), a AssertionException with the same code
+     * should be thrown.
      *
      * StorageEngines that don't support a SnapshotManager should use the default
      * implementation.

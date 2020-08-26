@@ -6795,7 +6795,7 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutLogging) {
     ASSERT_EQ(2, countTextFormatLogLinesContaining("Canceling election timeout callback"));
 }
 
-TEST_F(ReplCoordTest, ZeroCommittedSnapshotWhenAllSnapshotsAreDropped) {
+TEST_F(ReplCoordTest, ZeroCommittedSnapshotAfterClearingCommittedSnapshot) {
     init("mySet");
 
     assertStartSuccess(BSON("_id"
@@ -6820,8 +6820,7 @@ TEST_F(ReplCoordTest, ZeroCommittedSnapshotWhenAllSnapshotsAreDropped) {
     replCoordSetMyLastAppliedOpTime(time5, Date_t() + Seconds(100));
     replCoordSetMyLastDurableOpTime(time5, Date_t() + Seconds(100));
 
-    // ensure dropping all snapshots should reset the current committed snapshot
-    getReplCoord()->dropAllSnapshots();
+    getReplCoord()->clearCommittedSnapshot();
     ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshotOpTime());
 }
 

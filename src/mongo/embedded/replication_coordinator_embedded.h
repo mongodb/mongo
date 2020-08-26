@@ -240,7 +240,7 @@ public:
 
     bool getWriteConcernMajorityShouldJournal() override;
 
-    void dropAllSnapshots() override;
+    void clearCommittedSnapshot() override;
 
     long long getTerm() const override;
 

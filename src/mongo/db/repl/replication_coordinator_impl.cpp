@@ -3582,7 +3582,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
     auto contentChanged =
         SimpleBSONObjComparator::kInstance.evaluate(oldConfig.toBSON() != newConfigCopy.toBSON());
     if (defaultDurableChanged || (isForceReconfig && contentChanged)) {
-        _dropAllSnapshots_inlock();
+        _clearCommittedSnapshot_inlock();
     }
 
     lk.unlock();
@@ -4067,31 +4067,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         // When transitioning from other follower states to SECONDARY, run for election on a
         // single-node replica set.
         result = kActionStartSingleNodeElection;
-    }
-
-    if (newState.rollback()) {
-        // When we start rollback, we need to drop all snapshots since we may need to create
-        // out-of-order snapshots. This would be necessary even if the SnapshotName was completely
-        // monotonically increasing because we don't necessarily have a snapshot of every write.
-        // If we didn't drop all snapshots on rollback it could lead to the following situation:
-        //
-        //  |--------|-------------|-------------|
-        //  | OpTime | HasSnapshot | Committed   |
-        //  |--------|-------------|-------------|
-        //  | (0, 1) | *           | *           |
-        //  | (0, 2) | *           | ROLLED BACK |
-        //  | (1, 2) |             | *           |
-        //  |--------|-------------|-------------|
-        //
-        // When we try to make (1,2) the commit point, we'd find (0,2) as the newest snapshot
-        // before the commit point, but it would be invalid to mark it as the committed snapshot
-        // since it was never committed.
-        _dropAllSnapshots_inlock();
-    }
-
-    if (_memberState.rollback()) {
-        // Ensure that no snapshots were created while we were in rollback.
-        invariant(!_currentCommittedSnapshot);
     }
 
     // If we are transitioning from secondary, cancel any scheduled takeovers.
@@ -5418,14 +5393,14 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(WithLock lk,
     return true;
 }
 
-void ReplicationCoordinatorImpl::dropAllSnapshots() {
+void ReplicationCoordinatorImpl::clearCommittedSnapshot() {
     stdx::lock_guard<Latch> lock(_mutex);
-    _dropAllSnapshots_inlock();
+    _clearCommittedSnapshot_inlock();
 }
 
-void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
+void ReplicationCoordinatorImpl::_clearCommittedSnapshot_inlock() {
     _currentCommittedSnapshot = boost::none;
-    _externalState->dropAllSnapshots();
+    _externalState->clearCommittedSnapshot();
 }
 
 void ReplicationCoordinatorImpl::waitForElectionFinish_forTest() {

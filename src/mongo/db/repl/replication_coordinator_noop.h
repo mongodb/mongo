@@ -232,7 +232,7 @@ public:
 
     bool getWriteConcernMajorityShouldJournal() final;
 
-    void dropAllSnapshots() final;
+    void clearCommittedSnapshot() final;
 
     long long getTerm() const final;
 

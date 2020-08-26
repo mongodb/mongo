@@ -248,9 +248,9 @@ public:
     virtual bool tooStale() = 0;
 
     /**
-     * Drops all snapshots and clears the "committed" snapshot.
+     * Clears the "committed" snapshot.
      */
-    virtual void dropAllSnapshots() = 0;
+    virtual void clearCommittedSnapshot() = 0;
 
     /**
      * Updates the committed snapshot to the newCommitPoint, and deletes older snapshots.

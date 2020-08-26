@@ -245,7 +245,7 @@ bool ReplicationCoordinatorExternalStateMock::tooStale() {
     return false;
 }
 
-void ReplicationCoordinatorExternalStateMock::dropAllSnapshots() {}
+void ReplicationCoordinatorExternalStateMock::clearCommittedSnapshot() {}
 
 void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(
     const OpTime& newCommitPoint) {}

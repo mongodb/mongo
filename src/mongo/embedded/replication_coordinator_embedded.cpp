@@ -475,7 +475,7 @@ void ReplicationCoordinatorEmbedded::createWMajorityWriteAvailabilityDateWaiter(
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::dropAllSnapshots() {
+void ReplicationCoordinatorEmbedded::clearCommittedSnapshot() {
     UASSERT_NOT_IMPLEMENTED;
 }
 

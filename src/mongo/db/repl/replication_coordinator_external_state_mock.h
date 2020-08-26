@@ -91,7 +91,7 @@ public:
     virtual void stopProducer();
     virtual void startProducerIfStopped();
     virtual bool tooStale();
-    virtual void dropAllSnapshots();
+    virtual void clearCommittedSnapshot();
     virtual void updateCommittedSnapshot(const OpTime& newCommitPoint);
     virtual void updateLastAppliedSnapshot(const OpTime& optime);
     virtual bool snapshotsEnabled() const;

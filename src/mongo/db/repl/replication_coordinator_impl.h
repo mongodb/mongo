@@ -304,7 +304,7 @@ public:
 
     virtual bool getWriteConcernMajorityShouldJournal() override;
 
-    virtual void dropAllSnapshots() override;
+    virtual void clearCommittedSnapshot() override;
     /**
      * Get current term from topology coordinator
      */
@@ -1343,9 +1343,9 @@ private:
     void _setStableTimestampForStorage(WithLock lk);
 
     /**
-     * Drops all snapshots and clears the "committed" snapshot.
+     * Clears the current committed snapshot.
      */
-    void _dropAllSnapshots_inlock();
+    void _clearCommittedSnapshot_inlock();
 
     /**
      * Bottom half of _scheduleNextLivenessUpdate.

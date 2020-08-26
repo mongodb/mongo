@@ -277,7 +277,7 @@ public:
 
     virtual Status updateTerm(OperationContext* opCtx, long long term);
 
-    virtual void dropAllSnapshots() override;
+    virtual void clearCommittedSnapshot() override;
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 

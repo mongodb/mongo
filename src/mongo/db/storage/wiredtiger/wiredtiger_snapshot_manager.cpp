@@ -61,7 +61,7 @@ boost::optional<Timestamp> WiredTigerSnapshotManager::getLastApplied() {
     return _lastApplied;
 }
 
-void WiredTigerSnapshotManager::dropAllSnapshots() {
+void WiredTigerSnapshotManager::clearCommittedSnapshot() {
     stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
     _committedSnapshot = boost::none;
 }
