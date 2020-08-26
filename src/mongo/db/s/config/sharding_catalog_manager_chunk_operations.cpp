@@ -640,9 +640,8 @@ BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
             BSON(ChunkType::lastmod << -1),  // Sort by version.
             1));                             // Limit 1.
 
-    uassert(4914700,
-            str::stream() << "Couldn't retrieve collection version from config server",
-            swCollectionVersion.isOK());
+    uassertStatusOKWithContext(swCollectionVersion,
+                               "Couldn't retrieve collection version from config server");
 
     auto swDonorShardVersion = getMaxChunkVersionFromQueryResponse(
         nss,
