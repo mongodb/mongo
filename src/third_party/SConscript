@@ -190,11 +190,11 @@ if not use_system_version_of_library('kms-message'):
 
 if use_system_libunwind:
     thirdPartyEnvironmentModifications['unwind'] = {
-        'SYSLIBDEPS' : [env['LIBDEPS_UNWIND_SYSLIBDEP'], 'lzma'],
+        'SYSLIBDEPS_PRIVATE' : [env['LIBDEPS_UNWIND_SYSLIBDEP'], 'lzma'],
     }
 elif use_vendored_libunwind:
     thirdPartyEnvironmentModifications['unwind'] = {
-        'SYSLIBDEPS' : ['lzma'],
+        'SYSLIBDEPS_PRIVATE' : ['lzma'],
     }
 
 def injectThirdParty(thisEnv, libraries=[], parts=[]):

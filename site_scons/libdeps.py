@@ -51,6 +51,7 @@ automatically added when missing.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from collections import OrderedDict
 import copy
 import os
 import textwrap
@@ -62,16 +63,17 @@ import SCons.Util
 
 class Constants:
     Libdeps = "LIBDEPS"
-    LibdepsPrivate = "LIBDEPS_PRIVATE"
-    LibdepsInterface ="LIBDEPS_INTERFACE"
-    LibdepsDependents = "LIBDEPS_DEPENDENTS"
-    ProgdepsDependents = "PROGDEPS_DEPENDENTS"
-    SysLibdeps = "SYSLIBDEPS"
     LibdepsCached = "LIBDEPS_cached"
-    SysLibdepsCached = "SYSLIBDEPS_cached"
-    MissingLibdep = "MISSING_LIBDEP_"
+    LibdepsDependents = "LIBDEPS_DEPENDENTS"
+    LibdepsInterface ="LIBDEPS_INTERFACE"
+    LibdepsPrivate = "LIBDEPS_PRIVATE"
     LibdepsTags = "LIBDEPS_TAGS"
     LibdepsTagExpansion = "LIBDEPS_TAG_EXPANSIONS"
+    MissingLibdep = "MISSING_LIBDEP_"
+    ProgdepsDependents = "PROGDEPS_DEPENDENTS"
+    SysLibdeps = "SYSLIBDEPS"
+    SysLibdepsCached = "SYSLIBDEPS_cached"
+    SysLibdepsPrivate = "SYSLIBDEPS_PRIVATE"
 
 class dependency:
     Public, Private, Interface = list(range(3))
@@ -511,6 +513,8 @@ class DependencyCycleError(SCons.Errors.UserError):
 class LibdepLinterError(SCons.Errors.UserError):
     """Exception representing a discongruent usages of libdeps"""
 
+class MissingSyslibdepError(SCons.Errors.UserError):
+    """Exception representing a discongruent usages of libdeps"""
 
 def __get_sorted_direct_libdeps(node):
     direct_sorted = getattr(node.attributes, "libdeps_direct_sorted", False)
@@ -568,35 +572,6 @@ def __get_libdeps(node):
     return tsorted
 
 
-def __get_syslibdeps(node):
-    """ Given a SCons Node, return its system library dependencies.
-
-    These are the dependencies listed with SYSLIBDEPS, and are linked using -l.
-    """
-    result = getattr(node.attributes, Constants.SysLibdepsCached, None)
-    if result is not None:
-        return result
-
-    result = node.get_env().Flatten(node.get_env().get(Constants.SysLibdeps, []))
-    for lib in __get_libdeps(node):
-        for syslib in lib.get_env().get(Constants.SysLibdeps, []):
-            if not syslib:
-                continue
-
-            if type(syslib) is str and syslib.startswith(Constants.MissingLibdep):
-                print(
-                    "Target '{}' depends on the availability of a "
-                    "system provided library for '{}', "
-                    "but no suitable library was found during configuration.".format(str(node), syslib[len(Constants.MissingLibdep) :])
-                )
-                node.get_env().Exit(1)
-
-            result.append(syslib)
-
-    setattr(node.attributes, Constants.SysLibdepsCached, result)
-    return result
-
-
 def __missing_syslib(name):
     return Constants.MissingLibdep + name
 
@@ -642,24 +617,60 @@ def get_libdeps_objs(source, target, env, for_signature):
         objs.extend(lib.sources)
     return objs
 
+def make_get_syslibdeps_callable(shared):
 
-def get_syslibdeps(source, target, env, for_signature):
-    deps = __get_syslibdeps(target[0])
-    lib_link_prefix = env.subst("$LIBLINKPREFIX")
-    lib_link_suffix = env.subst("$LIBLINKSUFFIX")
-    result = []
-    for d in deps:
+    def get_syslibdeps(source, target, env, for_signature):
+        """ Given a SCons Node, return its system library dependencies.
+
+        These are the dependencies listed with SYSLIBDEPS, and are linked using -l.
+        """
+
+        deps = getattr(target[0].attributes, Constants.SysLibdepsCached, None)
+        if deps is None:
+
+            # Get the sys libdeps for the current node
+            deps = target[0].get_env().Flatten(target[0].get_env().get(Constants.SysLibdepsPrivate) or [])
+            deps += target[0].get_env().Flatten(target[0].get_env().get(Constants.SysLibdeps) or [])
+
+            for lib in __get_libdeps(target[0]):
+
+                # For each libdep get its syslibdeps, and then check to see if we can
+                # add it to the deps list. For static build we will also include private
+                # syslibdeps to be transitive. For a dynamic build we will only make
+                # public libdeps transitive.
+                syslibs = []
+                if not shared:
+                    syslibs += lib.get_env().get(Constants.SysLibdepsPrivate) or []
+                syslibs += lib.get_env().get(Constants.SysLibdeps) or []
+
+                # Validate the libdeps, a configure check has already checked what
+                # syslibdeps are available so we can hard fail here if a syslibdep
+                # is being attempted to be linked with.
+                for syslib in syslibs:
+                    if not syslib:
+                        continue
+
+                    if isinstance(syslib, str) and syslib.startswith(Constants.MissingLibdep):
+                        MissingSyslibdepError(textwrap.dedent(f"""\
+                            Target '{str(target[0])}' depends on the availability of a
+                            system provided library for '{syslib[len(Constants.MissingLibdep):]}',
+                            but no suitable library was found during configuration."""
+                        ))
+
+                    deps.append(syslib)
+
+            setattr(target[0].attributes, Constants.SysLibdepsCached, deps)
+
+        lib_link_prefix = env.subst("$LIBLINKPREFIX")
+        lib_link_suffix = env.subst("$LIBLINKSUFFIX")
         # Elements of syslibdeps are either strings (str or unicode), or they're File objects.
         # If they're File objects, they can be passed straight through.  If they're strings,
         # they're believed to represent library short names, that should be prefixed with -l
         # or the compiler-specific equivalent.  I.e., 'm' becomes '-lm', but 'File("m.a") is passed
         # through whole cloth.
-        if type(d) is str:
-            result.append("%s%s%s" % (lib_link_prefix, d, lib_link_suffix))
-        else:
-            result.append(d)
-    return result
+        return [f"{lib_link_prefix}{d}{lib_link_suffix}" if isinstance(d, str) else d for d in deps]
 
+    return get_syslibdeps
 
 def __append_direct_libdeps(node, prereq_nodes):
     # We do not bother to decorate nodes that are not actual Objects
@@ -695,8 +706,8 @@ def __get_node_with_ixes(env, node, node_builder_type):
     node_builder = env["BUILDERS"][node_builder_type]
     node_factory = node_builder.target_factory or env.File
 
-    # Cache the ixes in a function scope global so we don't need
-    # to run scons performance intensive 'subst' each time
+    # Cache the 'ixes' in a function scope global so we don't need
+    # to run SCons performance intensive 'subst' each time
     cache_key = (id(env), node_builder_type)
     try:
         prefix, suffix = __get_node_with_ixes.node_type_ixes[cache_key]
@@ -879,7 +890,7 @@ def setup_environment(env, emitting_shared=False, linting='on'):
     env["_LIBDEPS_TAGS"] = expand_libdeps_tags
     env["_LIBDEPS_GET_LIBS"] = get_libdeps
     env["_LIBDEPS_OBJS"] = get_libdeps_objs
-    env["_SYSLIBDEPS"] = get_syslibdeps
+    env["_SYSLIBDEPS"] = make_get_syslibdeps_callable(emitting_shared)
 
     env[Constants.Libdeps] = SCons.Util.CLVar()
     env[Constants.SysLibdeps] = SCons.Util.CLVar()

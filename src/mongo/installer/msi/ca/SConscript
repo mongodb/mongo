@@ -19,8 +19,8 @@ else:
     env['CCFLAGS'].append("/MT")
 
 env.Append(LIBS=[
-    'msi.lib',
-    'user32.lib'
+    'msi',
+    'user32'
     ]
 )
 

@@ -37,7 +37,7 @@ def build_benchmark(env, target, source, **kwargs):
     bmEnv.InjectThirdParty(libraries=["benchmark"])
 
     if bmEnv.TargetOSIs("windows"):
-        bmEnv.Append(LIBS=["ShLwApi.lib"])
+        bmEnv.Append(LIBS=["ShLwApi"])
 
     libdeps = kwargs.get("LIBDEPS", bmEnv.get("LIBDEPS", [])).copy()
     insort_wrapper(libdeps, "$BUILD_DIR/mongo/unittest/benchmark_main")

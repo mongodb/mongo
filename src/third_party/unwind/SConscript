@@ -110,10 +110,10 @@ env.Append(
 # propagates to consumers that Inject (depend on) unwind.
 env.RegisterConsumerModifications(
     CPPPATH=[unwind_platform.Dir("install/include")],
-    LIBS=['lzma'])
+    SYSLIBDEPS_PRIVATE=['lzma'])
 
 env.Append(
-    LIBS=['lzma'])
+    SYSLIBDEPS_PRIVATE=['lzma'])
 
 env.Append(
     CPPDEFINES=[

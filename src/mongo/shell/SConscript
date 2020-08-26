@@ -295,7 +295,7 @@ if not has_option('noshell') and usemozjs:
 
     shellEnv = env.Clone()
     if env.TargetOSIs('windows'):
-        shellEnv.Append(LIBS=["winmm.lib"])
+        shellEnv.Append(LIBS=["winmm"])
 
         generatedMongoManifest = shellEnv.Substfile(
                 'mongo.manifest.in',

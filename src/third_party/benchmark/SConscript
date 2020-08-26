@@ -10,7 +10,7 @@ if env.TargetOSIs('windows'):
         '/wd4722',
     ])
 
-    env.Append(LIBS=["ShLwApi.lib"])
+    env.Append(LIBS=["ShLwApi"])
 
 env.Append(CPPDEFINES=["HAVE_STD_REGEX"])
 
