@@ -38,6 +38,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -296,7 +297,7 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
 
 void WiredTigerIndex::fullValidate(OperationContext* opCtx,
                                    long long* numKeysOut,
-                                   ValidateResults* fullResults) const {
+                                   IndexValidateResults* fullResults) const {
     dassert(opCtx->lockState()->isReadLocked());
     if (fullResults && !WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->isEphemeral()) {
         int err = WiredTigerUtil::verifyTable(opCtx, _uri, &(fullResults->errors));

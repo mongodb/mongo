@@ -43,8 +43,6 @@ class OperationContext;
  * collection validation operation.
  */
 class ValidateAdaptor {
-    using ValidateResultsMap = std::map<std::string, ValidateResults>;
-
 public:
     ValidateAdaptor(IndexConsistency* indexConsistency,
                     CollectionValidation::ValidateState* validateState)
@@ -59,8 +57,7 @@ public:
                                   const RecordId& recordId,
                                   const RecordData& record,
                                   size_t* dataSize,
-                                  ValidateResults* results,
-                                  ValidateResultsMap* indexNsResultsMap);
+                                  ValidateResults* results);
 
     /**
      * Traverses the index getting index entries to validate them and keep track of the index keys
@@ -77,14 +74,13 @@ public:
      */
     void traverseRecordStore(OperationContext* opCtx,
                              ValidateResults* results,
-                             BSONObjBuilder* output,
-                             ValidateResultsMap* indexNsResultsMap);
+                             BSONObjBuilder* output);
 
     /**
      * Validates that the number of document keys matches the number of index keys previously
      * traversed in traverseIndex().
      */
-    void validateIndexKeyCount(const IndexCatalogEntry* index, ValidateResults& results);
+    void validateIndexKeyCount(const IndexCatalogEntry* index, IndexValidateResults& results);
 
 private:
     IndexConsistency* _indexConsistency;

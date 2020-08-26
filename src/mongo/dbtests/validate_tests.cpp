@@ -1568,6 +1568,7 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll->ns());
             });
 
+
             ASSERT_EQ(true, results.valid);
             ASSERT_EQ(true, results.repaired);
             ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
@@ -1576,6 +1577,9 @@ public:
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(3, results.numRemovedExtraIndexEntries);
             ASSERT_EQ(3, results.numInsertedMissingIndexEntries);
+
+            ASSERT_EQ(3, results.indexResultsMap[indexNameA].keysTraversed);
+            ASSERT_EQ(3, results.indexResultsMap[indexNameB].keysTraversed);
 
             dumpOnErrorGuard.dismiss();
         }

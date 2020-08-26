@@ -281,7 +281,7 @@ RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
 
 void AbstractIndexAccessMethod::validate(OperationContext* opCtx,
                                          int64_t* numKeys,
-                                         ValidateResults* fullResults) const {
+                                         IndexValidateResults* fullResults) const {
     long long keys = 0;
     _newInterface->fullValidate(opCtx, &keys, fullResults);
     *numKeys = keys;

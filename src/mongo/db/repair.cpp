@@ -250,7 +250,14 @@ Status repairCollection(OperationContext* opCtx,
         return status;
     }
 
-    LOGV2(21028, "Collection validation", "results"_attr = output.done());
+    BSONObjBuilder detailedResults;
+    const bool debug = false;
+    validateResults.appendToResultObj(detailedResults, debug);
+
+    LOGV2(21028,
+          "Collection validation",
+          "results"_attr = output.done(),
+          "detailedResults"_attr = detailedResults.done());
 
     if (validateResults.repaired) {
         if (validateResults.valid) {

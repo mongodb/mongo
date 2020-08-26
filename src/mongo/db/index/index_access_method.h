@@ -167,7 +167,7 @@ public:
      */
     virtual void validate(OperationContext* opCtx,
                           int64_t* numKeys,
-                          ValidateResults* fullResults) const = 0;
+                          IndexValidateResults* fullResults) const = 0;
 
     /**
      * Add custom statistics about this index to BSON object builder, for display.
@@ -486,7 +486,7 @@ public:
 
     void validate(OperationContext* opCtx,
                   int64_t* numKeys,
-                  ValidateResults* fullResults) const final;
+                  IndexValidateResults* fullResults) const final;
 
     bool appendCustomStats(OperationContext* opCtx,
                            BSONObjBuilder* result,

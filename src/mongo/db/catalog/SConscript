@@ -373,11 +373,22 @@ env.Library(
     ],
     LIBDEPS=[
         'catalog_impl',
+        'validate_results',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/multi_key_path_tracker',
         'throttle_cursor',
         'validate_state',
+    ]
+)
+
+env.Library(
+    target='validate_results',
+    source=[
+        'validate_results.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ]
 )
 

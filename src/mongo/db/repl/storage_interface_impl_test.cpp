@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -160,7 +161,7 @@ int64_t getIndexKeyCount(OperationContext* opCtx,
                          const IndexDescriptor* desc) {
     auto idx = cat->getEntry(desc)->accessMethod();
     int64_t numKeys;
-    ValidateResults fullRes;
+    IndexValidateResults fullRes;
     idx->validate(opCtx, &numKeys, &fullRes);
     return numKeys;
 }

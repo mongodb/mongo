@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
 class OperationContext;
 class Collection;
-struct ValidateResults;
 class BSONObjBuilder;
 class Status;
 

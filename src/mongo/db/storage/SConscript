@@ -286,6 +286,7 @@ env.Library(
         'storage_debug_util.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/validate_results',
         '$BUILD_DIR/mongo/db/db_raii',
     ],
 )

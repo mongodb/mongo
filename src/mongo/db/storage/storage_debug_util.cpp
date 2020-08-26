@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/storage_debug_util.h"
 
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/storage/key_string.h"

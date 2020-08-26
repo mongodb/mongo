@@ -117,7 +117,7 @@ public:
     Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) override;
     void fullValidate(OperationContext* opCtx,
                       long long* numKeysOut,
-                      ValidateResults* fullResults) const override;
+                      IndexValidateResults* fullResults) const override;
     std::unique_ptr<mongo::SortedDataInterface::Cursor> newCursor(
         OperationContext* opCtx, bool isForward = true) const override;
 };
@@ -144,7 +144,7 @@ public:
     Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) override;
     void fullValidate(OperationContext* opCtx,
                       long long* numKeysOut,
-                      ValidateResults* fullResults) const override;
+                      IndexValidateResults* fullResults) const override;
     std::unique_ptr<mongo::SortedDataInterface::Cursor> newCursor(
         OperationContext* opCtx, bool isForward = true) const override;
 };

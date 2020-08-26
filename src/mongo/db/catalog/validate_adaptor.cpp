@@ -70,8 +70,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        const RecordId& recordId,
                                        const RecordData& record,
                                        size_t* dataSize,
-                                       ValidateResults* results,
-                                       ValidateResultsMap* indexNsResultsMap) {
+                                       ValidateResults* results) {
     const Status status = validateBSON(record.data(), record.size());
     if (!status.isOK())
         return status;
@@ -132,7 +131,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                                           << " set to multikey.");
                 results->repaired = true;
             } else {
-                ValidateResults& curRecordResults = (*indexNsResultsMap)[descriptor->indexName()];
+                auto& curRecordResults = (results->indexResultsMap)[descriptor->indexName()];
                 std::string msg = str::stream() << "Index " << descriptor->indexName()
                                                 << " is not multikey but has more than one"
                                                 << " key in document " << recordId;
@@ -166,8 +165,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                     std::string msg = str::stream()
                         << "Index " << descriptor->indexName()
                         << " multikey paths do not cover a document. RecordId: " << recordId;
-                    ValidateResults& curRecordResults =
-                        (*indexNsResultsMap)[descriptor->indexName()];
+                    auto& curRecordResults = (results->indexResultsMap)[descriptor->indexName()];
                     curRecordResults.errors.push_back(msg);
                     curRecordResults.valid = false;
                 }
@@ -201,7 +199,7 @@ void _validateKeyOrder(OperationContext* opCtx,
                        const IndexCatalogEntry* index,
                        const KeyString::Value& currKey,
                        const KeyString::Value& prevKey,
-                       ValidateResults* results) {
+                       IndexValidateResults* results) {
     auto descriptor = index->descriptor();
     bool unique = descriptor->unique();
 
@@ -250,6 +248,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
                                     ValidateResults* results) {
     const IndexDescriptor* descriptor = index->descriptor();
     auto indexName = descriptor->indexName();
+    auto& indexResults = results->indexResultsMap[indexName];
     IndexInfo& indexInfo = _indexConsistency->getIndexInfo(indexName);
     int64_t numKeys = 0;
 
@@ -286,7 +285,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
 
         if (!isFirstEntry) {
             _validateKeyOrder(
-                opCtx, index, indexEntry->keyString, prevIndexKeyStringValue, results);
+                opCtx, index, indexEntry->keyString, prevIndexKeyStringValue, &indexResults);
         }
 
         const RecordId kWildcardMultikeyMetadataRecordId{
@@ -327,8 +326,7 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
 
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           ValidateResults* results,
-                                          BSONObjBuilder* output,
-                                          ValidateResultsMap* indexNsResultsMap) {
+                                          BSONObjBuilder* output) {
     _numRecords = 0;  // need to reset it because this function can be called more than once.
     long long dataSizeTotal = 0;
     long long interruptIntervalNumBytes = 0;
@@ -366,8 +364,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         interruptIntervalNumBytes += dataSize;
         dataSizeTotal += dataSize;
         size_t validatedSize = 0;
-        Status status = validateRecord(
-            opCtx, record->id, record->data, &validatedSize, results, indexNsResultsMap);
+        Status status = validateRecord(opCtx, record->id, record->data, &validatedSize, results);
 
         // Checks to ensure isInRecordIdOrder() is being used properly.
         if (prevRecordId.isValid()) {
@@ -463,7 +460,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 }
 
 void ValidateAdaptor::validateIndexKeyCount(const IndexCatalogEntry* index,
-                                            ValidateResults& results) {
+                                            IndexValidateResults& results) {
     // Fetch the total number of index entries we previously found traversing the index.
     const IndexDescriptor* desc = index->descriptor();
     const std::string indexName = desc->indexName();

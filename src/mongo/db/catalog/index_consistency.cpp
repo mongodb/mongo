@@ -167,6 +167,8 @@ void IndexConsistency::repairMissingIndexEntries(OperationContext* opCtx,
         // InsertKeys may fail in the scenario where there are missing index entries for duplicate
         // documents.
         if (numInserted > 0) {
+            auto& indexResults = results->indexResultsMap[indexName];
+            indexResults.keysTraversed += numInserted;
             results->numInsertedMissingIndexEntries += numInserted;
             results->repaired = true;
             getIndexInfo(indexName).numKeys += numInserted;
@@ -183,8 +185,7 @@ void IndexConsistency::repairMissingIndexEntries(OperationContext* opCtx,
     }
 }
 
-void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap,
-                                           ValidateResults* results) {
+void IndexConsistency::addIndexEntryErrors(ValidateResults* results) {
     invariant(!_firstPhase);
 
     // We'll report up to 1MB for extra index entry errors and missing index entry errors.
@@ -224,7 +225,7 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
         }
 
         std::string indexName = entry["indexName"].String();
-        if (!indexNsResultsMap->at(indexName).valid) {
+        if (!results->indexResultsMap.at(indexName).valid) {
             continue;
         }
 
@@ -232,7 +233,7 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
         ss << "Index with name '" << indexName << "' has inconsistencies.";
         results->errors.push_back(ss.str());
 
-        indexNsResultsMap->at(indexName).valid = false;
+        results->indexResultsMap.at(indexName).valid = false;
     }
 
     bool extraIndexEntrySizeLimitWarning = false;
@@ -252,7 +253,7 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
             }
 
             std::string indexName = entry["indexName"].String();
-            if (!indexNsResultsMap->at(indexName).valid) {
+            if (!results->indexResultsMap.at(indexName).valid) {
                 continue;
             }
 
@@ -260,7 +261,7 @@ void IndexConsistency::addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap
             ss << "Index with name '" << indexName << "' has inconsistencies.";
             results->errors.push_back(ss.str());
 
-            indexNsResultsMap->at(indexName).valid = false;
+            results->indexResultsMap.at(indexName).valid = false;
         }
     }
 
@@ -368,6 +369,8 @@ void IndexConsistency::addIndexKey(OperationContext* opCtx,
                             opCtx, {ks}, recordId, options, &numDeleted);
                         wunit.commit();
                     });
+                auto& indexResults = results->indexResultsMap[indexInfo->indexName];
+                indexResults.keysTraversed -= numDeleted;
                 results->numRemovedExtraIndexEntries += numDeleted;
                 results->repaired = true;
                 indexInfo->numKeys--;

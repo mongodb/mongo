@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
@@ -1374,7 +1375,7 @@ Status SortedDataInterfaceUnique::dupKeyCheck(OperationContext* opCtx,
 
 void SortedDataInterfaceUnique::fullValidate(OperationContext* opCtx,
                                              long long* numKeysOut,
-                                             ValidateResults* fullResults) const {
+                                             IndexValidateResults* fullResults) const {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     long long numKeys = 0;
     auto it = workingCopy->lower_bound(_KSForIdentStart);
@@ -1512,7 +1513,7 @@ Status SortedDataInterfaceStandard::dupKeyCheck(OperationContext* opCtx,
 
 void SortedDataInterfaceStandard::fullValidate(OperationContext* opCtx,
                                                long long* numKeysOut,
-                                               ValidateResults* fullResults) const {
+                                               IndexValidateResults* fullResults) const {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     long long numKeys = 0;
     auto it = workingCopy->lower_bound(_KSForIdentStart);

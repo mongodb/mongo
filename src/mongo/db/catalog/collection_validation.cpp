@@ -58,8 +58,6 @@ namespace CollectionValidation {
 
 namespace {
 
-using ValidateResultsMap = std::map<string, ValidateResults>;
-
 // Indicates whether the failpoint turned on by testing has been reached.
 AtomicWord<bool> _validationIsPausedForTest{false};
 
@@ -68,15 +66,10 @@ AtomicWord<bool> _validationIsPausedForTest{false};
  * the index files have not been corrupted or compromised.
  *
  * May close or invalidate open cursors.
- *
- * Returns a map from indexName -> number of keys validated.
  */
-std::map<std::string, int64_t> _validateIndexesInternalStructure(
-    OperationContext* opCtx,
-    ValidateState* validateState,
-    ValidateResultsMap* indexNsResultsMap,
-    ValidateResults* results) {
-    std::map<std::string, int64_t> numIndexKeysPerIndex;
+void _validateIndexesInternalStructure(OperationContext* opCtx,
+                                       ValidateState* validateState,
+                                       ValidateResults* results) {
     // Need to use the IndexCatalog here because the 'validateState->indexes' object hasn't been
     // constructed yet. It must be initialized to ensure we're validating all indexes.
     const IndexCatalog* indexCatalog = validateState->getCollection()->getIndexCatalog();
@@ -98,7 +91,7 @@ std::map<std::string, int64_t> _validateIndexesInternalStructure(
                       "index"_attr = descriptor->indexName(),
                       "namespace"_attr = validateState->nss());
 
-        ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
+        auto& curIndexResults = (results->indexResultsMap)[descriptor->indexName()];
 
         int64_t numValidated;
         iam->validate(opCtx, &numValidated, &curIndexResults);
@@ -107,9 +100,8 @@ std::map<std::string, int64_t> _validateIndexesInternalStructure(
             results->valid = false;
         }
 
-        numIndexKeysPerIndex[descriptor->indexName()] = numValidated;
+        curIndexResults.keysTraversedFromFullValidate = numValidated;
     }
-    return numIndexKeysPerIndex;
 }
 
 /**
@@ -120,10 +112,7 @@ std::map<std::string, int64_t> _validateIndexesInternalStructure(
  */
 void _validateIndexes(OperationContext* opCtx,
                       ValidateState* validateState,
-                      BSONObjBuilder* keysPerIndex,
                       ValidateAdaptor* indexValidator,
-                      const std::map<std::string, int64_t>& numIndexKeysPerIndex,
-                      ValidateResultsMap* indexNsResultsMap,
                       ValidateResults* results) {
     // Validate Indexes, checking for mismatch between index entries and collection records.
     for (const auto& index : validateState->getIndexes()) {
@@ -137,9 +126,11 @@ void _validateIndexes(OperationContext* opCtx,
                       "index"_attr = descriptor->indexName(),
                       "namespace"_attr = validateState->nss());
 
-        ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
         int64_t numTraversedKeys;
-        indexValidator->traverseIndex(opCtx, index.get(), &numTraversedKeys, &curIndexResults);
+        indexValidator->traverseIndex(opCtx, index.get(), &numTraversedKeys, results);
+
+        auto& curIndexResults = (results->indexResultsMap)[descriptor->indexName()];
+        curIndexResults.keysTraversed = numTraversedKeys;
 
         // If we are performing a full index validation, we have information on the number of index
         // keys validated in _validateIndexesInternalStructure (when we validated the internal
@@ -148,13 +139,9 @@ void _validateIndexes(OperationContext* opCtx,
         if (validateState->isFullIndexValidation()) {
             invariant(opCtx->lockState()->isCollectionLockedForMode(validateState->nss(), MODE_X));
 
-            // Ensure that this index was validated in _validateIndexesInternalStructure.
-            const auto numIndexKeysIt = numIndexKeysPerIndex.find(descriptor->indexName());
-            invariant(numIndexKeysIt != numIndexKeysPerIndex.end());
-
             // The number of keys counted in _validateIndexesInternalStructure, when checking the
             // internal structure of the index.
-            const int64_t numIndexKeys = numIndexKeysIt->second;
+            const int64_t numIndexKeys = curIndexResults.keysTraversedFromFullValidate;
 
             // Check if currIndexResults is valid to ensure that this index is not corrupted or
             // comprised (which was set in _validateIndexesInternalStructure). If the index is
@@ -172,8 +159,6 @@ void _validateIndexes(OperationContext* opCtx,
             }
         }
 
-        keysPerIndex->appendNumber(descriptor->indexName(),
-                                   static_cast<long long>(numTraversedKeys));
         if (!curIndexResults.valid) {
             results->valid = false;
         }
@@ -188,7 +173,6 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
                              ValidateState* validateState,
                              IndexConsistency* indexConsistency,
                              ValidateAdaptor* indexValidator,
-                             ValidateResultsMap* indexNsResultsMap,
                              ValidateResults* result) {
     indexConsistency->setSecondPhase();
     if (!indexConsistency->limitMemoryUsageForSecondPhase(result)) {
@@ -203,10 +187,8 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
     {
         ValidateResults tempValidateResults;
         BSONObjBuilder tempBuilder;
-        ValidateResultsMap tempIndexResultsMap;
 
-        indexValidator->traverseRecordStore(
-            opCtx, &tempValidateResults, &tempBuilder, &tempIndexResultsMap);
+        indexValidator->traverseRecordStore(opCtx, &tempValidateResults, &tempBuilder);
     }
 
     LOGV2_OPTIONS(
@@ -243,7 +225,7 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
 
     LOGV2_OPTIONS(20301, {LogComponent::kIndex}, "Finished traversing through all the indexes");
 
-    indexConsistency->addIndexEntryErrors(indexNsResultsMap, result);
+    indexConsistency->addIndexEntryErrors(result);
 }
 
 void _validateIndexKeyCount(OperationContext* opCtx,
@@ -252,7 +234,7 @@ void _validateIndexKeyCount(OperationContext* opCtx,
                             ValidateResultsMap* indexNsResultsMap) {
     for (const auto& index : validateState->getIndexes()) {
         const IndexDescriptor* descriptor = index->descriptor();
-        ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
+        auto& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
         if (curIndexResults.valid) {
             indexValidator->validateIndexKeyCount(index.get(), curIndexResults);
@@ -262,8 +244,6 @@ void _validateIndexKeyCount(OperationContext* opCtx,
 
 void _reportValidationResults(OperationContext* opCtx,
                               ValidateState* validateState,
-                              ValidateResultsMap* indexNsResultsMap,
-                              BSONObjBuilder* keysPerIndex,
                               ValidateResults* results,
                               BSONObjBuilder* output) {
     std::unique_ptr<BSONObjBuilder> indexDetails;
@@ -275,15 +255,18 @@ void _reportValidationResults(OperationContext* opCtx,
         indexDetails = std::make_unique<BSONObjBuilder>();
     }
 
+    BSONObjBuilder keysPerIndex;
+
     // Report detailed index validation results gathered when using {full: true} for validated
     // indexes.
     for (const auto& index : validateState->getIndexes()) {
         const std::string indexName = index->descriptor()->indexName();
-        if (indexNsResultsMap->find(indexName) == indexNsResultsMap->end()) {
+        auto& indexResultsMap = results->indexResultsMap;
+        if (indexResultsMap.find(indexName) == indexResultsMap.end()) {
             continue;
         }
 
-        const ValidateResults& vr = indexNsResultsMap->at(indexName);
+        auto& vr = indexResultsMap.at(indexName);
 
         if (!vr.valid) {
             results->valid = false;
@@ -302,12 +285,14 @@ void _reportValidationResults(OperationContext* opCtx,
             }
         }
 
+        keysPerIndex.appendNumber(indexName, static_cast<long long>(vr.keysTraversed));
+
         results->warnings.insert(results->warnings.end(), vr.warnings.begin(), vr.warnings.end());
         results->errors.insert(results->errors.end(), vr.errors.begin(), vr.errors.end());
     }
 
     output->append("nIndexes", static_cast<int>(validateState->getIndexes().size()));
-    output->append("keysPerIndex", keysPerIndex->done());
+    output->append("keysPerIndex", keysPerIndex.done());
     if (indexDetails) {
         output->append("indexDetails", indexDetails->done());
     }
@@ -315,13 +300,10 @@ void _reportValidationResults(OperationContext* opCtx,
 
 void _reportInvalidResults(OperationContext* opCtx,
                            ValidateState* validateState,
-                           ValidateResultsMap* indexNsResultsMap,
-                           BSONObjBuilder* keysPerIndex,
                            ValidateResults* results,
                            BSONObjBuilder* output,
                            const string uuidString) {
-    _reportValidationResults(
-        opCtx, validateState, indexNsResultsMap, keysPerIndex, results, output);
+    _reportValidationResults(opCtx, validateState, results, output);
     LOGV2_OPTIONS(20302,
                   {LogComponent::kIndex},
                   "Validation complete -- Corruption found",
@@ -453,10 +435,6 @@ Status validate(OperationContext* opCtx,
         opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
     try {
-        std::map<std::string, int64_t> numIndexKeysPerIndex;
-        ValidateResultsMap indexNsResultsMap;
-        BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe.
-
         // Full record store validation code is executed before we open cursors because it may close
         // and/or invalidate all open cursors.
         if (validateState.isFullValidation()) {
@@ -471,20 +449,13 @@ Status validate(OperationContext* opCtx,
             // For full index validation, we validate the internal structure of each index and save
             // the number of keys in the index to compare against _validateIndexes()'s count
             // results.
-            numIndexKeysPerIndex = _validateIndexesInternalStructure(
-                opCtx, &validateState, &indexNsResultsMap, results);
+            _validateIndexesInternalStructure(opCtx, &validateState, results);
         }
 
         const string uuidString = str::stream() << " (UUID: " << validateState.uuid() << ")";
 
         if (!results->valid) {
-            _reportInvalidResults(opCtx,
-                                  &validateState,
-                                  &indexNsResultsMap,
-                                  &keysPerIndex,
-                                  results,
-                                  output,
-                                  uuidString);
+            _reportInvalidResults(opCtx, &validateState, results, output, uuidString);
             return Status::OK();
         }
 
@@ -508,7 +479,7 @@ Status validate(OperationContext* opCtx,
         // In traverseRecordStore(), the index validator keeps track the records in the record
         // store so that _validateIndexes() can confirm that the index entries match the records in
         // the collection.
-        indexValidator.traverseRecordStore(opCtx, results, output, &indexNsResultsMap);
+        indexValidator.traverseRecordStore(opCtx, results, output);
 
         // Pause collection validation while a lock is held and between collection and index data
         // validation.
@@ -529,24 +500,12 @@ Status validate(OperationContext* opCtx,
         }
 
         if (!results->valid) {
-            _reportInvalidResults(opCtx,
-                                  &validateState,
-                                  &indexNsResultsMap,
-                                  &keysPerIndex,
-                                  results,
-                                  output,
-                                  uuidString);
+            _reportInvalidResults(opCtx, &validateState, results, output, uuidString);
             return Status::OK();
         }
 
         // Validate indexes and check for mismatches.
-        _validateIndexes(opCtx,
-                         &validateState,
-                         &keysPerIndex,
-                         &indexValidator,
-                         numIndexKeysPerIndex,
-                         &indexNsResultsMap,
-                         results);
+        _validateIndexes(opCtx, &validateState, &indexValidator, results);
 
         if (indexConsistency.haveEntryMismatch()) {
             LOGV2_OPTIONS(20305,
@@ -554,43 +513,26 @@ Status validate(OperationContext* opCtx,
                           "Index inconsistencies were detected. "
                           "Starting the second phase of index validation to gather concise errors",
                           "namespace"_attr = validateState.nss());
-            _gatherIndexEntryErrors(opCtx,
-                                    &validateState,
-                                    &indexConsistency,
-                                    &indexValidator,
-                                    &indexNsResultsMap,
-                                    results);
+            _gatherIndexEntryErrors(
+                opCtx, &validateState, &indexConsistency, &indexValidator, results);
         }
 
         if (!results->valid) {
-            _reportInvalidResults(opCtx,
-                                  &validateState,
-                                  &indexNsResultsMap,
-                                  &keysPerIndex,
-                                  results,
-                                  output,
-                                  uuidString);
+            _reportInvalidResults(opCtx, &validateState, results, output, uuidString);
             return Status::OK();
         }
 
         // Validate index key count.
-        _validateIndexKeyCount(opCtx, &validateState, &indexValidator, &indexNsResultsMap);
+        _validateIndexKeyCount(opCtx, &validateState, &indexValidator, &results->indexResultsMap);
 
         if (!results->valid) {
-            _reportInvalidResults(opCtx,
-                                  &validateState,
-                                  &indexNsResultsMap,
-                                  &keysPerIndex,
-                                  results,
-                                  output,
-                                  uuidString);
+            _reportInvalidResults(opCtx, &validateState, results, output, uuidString);
             return Status::OK();
         }
 
         // At this point, validation is complete and successful.
         // Report the validation results for the user to see.
-        _reportValidationResults(
-            opCtx, &validateState, &indexNsResultsMap, &keysPerIndex, results, output);
+        _reportValidationResults(opCtx, &validateState, results, output);
 
         LOGV2_OPTIONS(20306,
                       {LogComponent::kIndex},

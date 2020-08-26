@@ -45,7 +45,7 @@ namespace mongo {
 class BSONObjBuilder;
 class BucketDeletionNotification;
 class SortedDataBuilderInterface;
-struct ValidateResults;
+struct IndexValidateResults;
 
 /**
  * This is the uniform interface for storing indexes and supporting point queries as well as range
@@ -133,7 +133,7 @@ public:
      */
     virtual void fullValidate(OperationContext* opCtx,
                               long long* numKeysOut,
-                              ValidateResults* fullResults) const = 0;
+                              IndexValidateResults* fullResults) const = 0;
 
     virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,

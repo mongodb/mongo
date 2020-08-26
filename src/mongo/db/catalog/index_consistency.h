@@ -89,7 +89,6 @@ struct IndexEntryInfo {
  */
 class IndexConsistency final {
     using IndexInfoMap = std::map<std::string, IndexInfo>;
-    using ValidateResultsMap = std::map<std::string, ValidateResults>;
     using IndexKey = std::pair<std::string, std::string>;
 
 public:
@@ -159,7 +158,7 @@ public:
      * Records the errors gathered from the second phase of index validation into the provided
      * ValidateResultsMap and ValidateResults.
      */
-    void addIndexEntryErrors(ValidateResultsMap* indexNsResultsMap, ValidateResults* results);
+    void addIndexEntryErrors(ValidateResults* results);
 
     /**
      * Sets up this IndexConsistency object to limit memory usage in the second phase of index
