@@ -1,7 +1,6 @@
 /**
- * Checks all the easily testable fields in the response object returned by the hello() command and
- * its aliases, isMaster() and ismaster(). This test also checks that fields that should not be in
- * the document are absent.
+ * check all the easily testable fields in the document returned by the isMaster() command
+ * also checks that fields that should not be in the document are absent
  */
 
 // Skip db hash check because node 2 is slave delayed and may time out on awaitReplication.
@@ -29,36 +28,10 @@ var generateErrorString = function(badFields, missingFields, badValues, result) 
     return str;
 };
 
-// This function calls checkResponseFields with the isMaster and hello commands.
-var runHelloCmdAndAliases = function(memberInfo) {
-    checkResponseFields(memberInfo, "ismaster");
-    checkResponseFields(memberInfo, "isMaster");
-    checkResponseFields(memberInfo, "hello");
-};
-
-// This function runs either the isMaster or hello command, and validates that the response is what
-// we expect.
-var checkResponseFields = function(memberInfo, cmd) {
-    // run the passed in command on the connection
-    var result = memberInfo.conn.getDB("admin").runCommand(cmd);
-    // If we are running the hello command, we must modify the expected fields. We expect
-    // "isWritablePrimary" and "secondaryDelaySecs" instead of "ismaster" and "slaveDelay" in the
-    // hello command response.
-    if (cmd === "hello") {
-        memberInfo.goodValues.isWritablePrimary = memberInfo.goodValues.ismaster;
-        delete memberInfo.goodValues.ismaster;
-        memberInfo.unwantedFields.push("ismaster");
-        memberInfo.unwantedFields =
-            memberInfo.unwantedFields.filter(f => f !== "isWritablePrimary");
-
-        if (memberInfo.goodValues.hasOwnProperty("slaveDelay")) {
-            memberInfo.goodValues.secondaryDelaySecs = memberInfo.goodValues.slaveDelay;
-            delete memberInfo.goodValues.slaveDelay;
-            memberInfo.unwantedFields.push("slaveDelay");
-            memberInfo.unwantedFields =
-                memberInfo.unwantedFields.filter(f => f !== "secondaryDelaySecs");
-        }
-    }
+// function to check a single result
+var checkMember = function(memberInfo) {
+    // run isMaster on the connection
+    result = memberInfo.conn.getDB("admin").runCommand({isMaster: 1});
 
     // make sure result doesn't contain anything it shouldn't
     var badFields = [];
@@ -105,7 +78,7 @@ var checkResponseFields = function(memberInfo, cmd) {
 };
 
 // start of test code
-var name = "hello_and_aliases";
+var name = "ismaster";
 var replTest = new ReplSetTest({name: name, nodes: 4});
 var nodes = replTest.startSet();
 
@@ -122,68 +95,54 @@ var agreeOnPrimaryAndSetVersion = function(setVersion) {
     print("Waiting for primary and replica set version " + setVersion);
 
     var nodes = replTest.nodes;
-    var currPrimary = undefined;
+    var primary = undefined;
     var lastSetVersion = setVersion;
     for (var i = 0; i < nodes.length; i++) {
         try {
-            var helloResult = nodes[i].getDB("admin").runCommand({hello: 1});
+            var isMasterResult = nodes[i].getDB("admin").runCommand({isMaster: 1});
         } catch (e) {
             // handle reconnect errors due to step downs
-            print("Error while calling hello on " + nodes[i] + ": " + e);
+            print("Error while calling isMaster on " + nodes[i] + ": " + e);
             return false;
         }
 
-        printjson(helloResult);
-        if (!currPrimary)
-            currPrimary = helloResult.primary;
+        printjson(isMasterResult);
+        if (!primary)
+            primary = isMasterResult.primary;
         if (!lastSetVersion)
-            lastSetVersion = helloResult.setVersion;
-        if (helloResult.primary != currPrimary || !currPrimary)
+            lastSetVersion = isMasterResult.setVersion;
+        if (isMasterResult.primary != primary || !primary)
             return false;
-        if (helloResult.setVersion != lastSetVersion)
+        if (isMasterResult.setVersion != lastSetVersion)
             return false;
     }
 
     return true;
 };
 
-var primary = replTest.getPrimary();
+var master = replTest.getPrimary();
 var expectedVersion = replTest.getReplSetConfigFromNode().version;
 assert.soon(function() {
     return agreeOnPrimaryAndSetVersion(expectedVersion);
 }, "Nodes did not initiate in less than a minute", 60000);
 
-// Check to see if the information from hello() and its aliases are correct at each node.
-// The checker only checks that the field exists when its value is "has".
-runHelloCmdAndAliases({
-    conn: primary,
-    name: "primary",
-    goodValues: {
-        setName: "hello_and_aliases",
-        setVersion: expectedVersion,
-        ismaster: true,
-        secondary: false,
-        ok: 1
-    },
+// check to see if the information from isMaster() is correct at each node
+// the checker only checks that the field exists when its value is "has"
+checkMember({
+    conn: master,
+    name: "master",
+    goodValues:
+        {setName: "ismaster", setVersion: expectedVersion, ismaster: true, secondary: false, ok: 1},
     wantedFields:
         ["hosts", "passives", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
-    unwantedFields: [
-        "isWritablePrimary",
-        "arbiterOnly",
-        "passive",
-        "slaveDelay",
-        "secondaryDelaySecs",
-        "hidden",
-        "tags",
-        "buildIndexes"
-    ]
+    unwantedFields: ["arbiterOnly", "passive", "slaveDelay", "hidden", "tags", "buildIndexes"]
 });
 
-runHelloCmdAndAliases({
+checkMember({
     conn: replTest._slaves[0],
-    name: "secondary",
+    name: "slave",
     goodValues: {
-        setName: "hello_and_aliases",
+        setName: "ismaster",
         setVersion: expectedVersion,
         ismaster: false,
         secondary: true,
@@ -192,22 +151,14 @@ runHelloCmdAndAliases({
     },
     wantedFields:
         ["hosts", "passives", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
-    unwantedFields: [
-        "isWritablePrimary",
-        "arbiterOnly",
-        "slaveDelay",
-        "secondaryDelaySecs",
-        "hidden",
-        "tags",
-        "buildIndexes"
-    ]
+    unwantedFields: ["arbiterOnly", "slaveDelay", "hidden", "tags", "buildIndexes"]
 });
 
-runHelloCmdAndAliases({
+checkMember({
     conn: replTest._slaves[1],
-    name: "delayed_secondary",
+    name: "delayed_slave",
     goodValues: {
-        setName: "hello_and_aliases",
+        setName: "ismaster",
         setVersion: expectedVersion,
         ismaster: false,
         secondary: true,
@@ -218,14 +169,14 @@ runHelloCmdAndAliases({
     },
     wantedFields:
         ["hosts", "passives", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
-    unwantedFields: ["isWritablePrimary", "arbiterOnly", "tags", "secondaryDelaySecs"]
+    unwantedFields: ["arbiterOnly", "tags"]
 });
 
-runHelloCmdAndAliases({
+checkMember({
     conn: replTest._slaves[2],
     name: "arbiter",
     goodValues: {
-        setName: "hello_and_aliases",
+        setName: "ismaster",
         setVersion: expectedVersion,
         ismaster: false,
         secondary: false,
@@ -234,19 +185,11 @@ runHelloCmdAndAliases({
     },
     wantedFields:
         ["hosts", "passives", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
-    unwantedFields: [
-        "isWritablePrimary",
-        "slaveDelay",
-        "secondaryDelaySecs",
-        "hidden",
-        "tags",
-        "buildIndexes",
-        "passive"
-    ]
+    unwantedFields: ["slaveDelay", "hidden", "tags", "buildIndexes", "passive"]
 });
 
-// Reconfigure the replset and make sure the changes are present on all members.
-config = primary.getDB("local").system.replset.findOne();
+// reconfigure and make sure the changes show up in ismaster on all members
+config = master.getDB("local").system.replset.findOne();
 config.version = config.version + 1;
 config.members[0].tags = {
     disk: "ssd"
@@ -260,23 +203,23 @@ config.members[2].tags = {
     disk: "hdd"
 };
 try {
-    result = primary.getDB("admin").runCommand({replSetReconfig: config});
+    result = master.getDB("admin").runCommand({replSetReconfig: config});
 } catch (e) {
     print(e);
 }
 
-primary = replTest.getPrimary();
+master = replTest.getPrimary();
 expectedVersion = config.version;
 assert.soon(function() {
     return agreeOnPrimaryAndSetVersion(expectedVersion);
 }, "Nodes did not sync in less than a minute", 60000);
 
 // check nodes for their new settings
-runHelloCmdAndAliases({
-    conn: primary,
-    name: "primary2",
+checkMember({
+    conn: master,
+    name: "master2",
     goodValues: {
-        setName: "hello_and_aliases",
+        setName: "ismaster",
         setVersion: expectedVersion,
         ismaster: true,
         secondary: false,
@@ -284,23 +227,14 @@ runHelloCmdAndAliases({
         ok: 1
     },
     wantedFields: ["hosts", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
-    unwantedFields: [
-        "isWritablePrimary",
-        "arbiterOnly",
-        "passives",
-        "passive",
-        "slaveDelay",
-        "secondaryDelaySecs",
-        "hidden",
-        "buildIndexes"
-    ]
+    unwantedFields: ["arbiterOnly", "passives", "passive", "slaveDelay", "hidden", "buildIndexes"]
 });
 
-runHelloCmdAndAliases({
+checkMember({
     conn: replTest._slaves[0],
-    name: "first_secondary",
+    name: "first_slave",
     goodValues: {
-        setName: "hello_and_aliases",
+        setName: "ismaster",
         setVersion: expectedVersion,
         ismaster: false,
         secondary: true,
@@ -310,21 +244,14 @@ runHelloCmdAndAliases({
         ok: 1
     },
     wantedFields: ["hosts", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
-    unwantedFields: [
-        "isWritablePrimary",
-        "arbiterOnly",
-        "passives",
-        "slaveDelay",
-        "secondaryDelaySecs",
-        "buildIndexes"
-    ]
+    unwantedFields: ["arbiterOnly", "passives", "slaveDelayed", "buildIndexes"]
 });
 
-runHelloCmdAndAliases({
+checkMember({
     conn: replTest._slaves[1],
-    name: "very_delayed_secondary",
+    name: "very_delayed_slave",
     goodValues: {
-        setName: "hello_and_aliases",
+        setName: "ismaster",
         setVersion: expectedVersion,
         ismaster: false,
         secondary: true,
@@ -336,14 +263,14 @@ runHelloCmdAndAliases({
         ok: 1
     },
     wantedFields: ["hosts", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
-    unwantedFields: ["isWritablePrimary", "arbiterOnly", "passives", "secondaryDelaySecs"]
+    unwantedFields: ["arbiterOnly", "passives"]
 });
 
-runHelloCmdAndAliases({
+checkMember({
     conn: replTest._slaves[2],
     name: "arbiter",
     goodValues: {
-        setName: "hello_and_aliases",
+        setName: "ismaster",
         setVersion: expectedVersion,
         ismaster: false,
         secondary: false,
@@ -351,20 +278,12 @@ runHelloCmdAndAliases({
         ok: 1
     },
     wantedFields: ["hosts", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
-    unwantedFields: [
-        "isWritablePrimary",
-        "slaveDelay",
-        "secondaryDelaySecs",
-        "hidden",
-        "tags",
-        "buildIndexes",
-        "passive"
-    ]
+    unwantedFields: ["slaveDelay", "hidden", "tags", "buildIndexes", "passive"]
 });
 
 // force reconfig and ensure all have the same setVersion afterwards
-config = primary.getDB("local").system.replset.findOne();
-primary.getDB("admin").runCommand({replSetReconfig: config, force: true});
+config = master.getDB("local").system.replset.findOne();
+master.getDB("admin").runCommand({replSetReconfig: config, force: true});
 
 assert.soon(function() {
     return agreeOnPrimaryAndSetVersion();

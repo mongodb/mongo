@@ -62,21 +62,19 @@ public:
     Status initialize(const BSONObj& doc);
 
     /**
-     * Appends all non-default values to "builder". When true, "useLegacyResponseFields" indicates
-     * that we are responding to an isMaster command and not a hello command. Attach the legacy
-     * "ismaster" field if true, and the "isWritablePrimary" field otherwise. There are two values
-     * that are handled specially: if _inShutdown is true or _configSet is false, we will add a
-     * standard response to "builder" indicating either that we are in the middle of shutting down
-     * or we do not have a valid replica set config, ignoring the values of all other member
-     * variables.
+     * Appends all non-default values to "builder".
+     * There are two values that are handled specially: if _inShutdown is true or _configSet
+     * is false, we will add a standard response to "builder" indicating either that we are
+     * in the middle of shutting down or we do not have a valid replica set config, ignoring
+     * the values of all other member variables.
      */
-    void addToBSON(BSONObjBuilder* builder, bool useLegacyResponseFields) const;
+    void addToBSON(BSONObjBuilder* builder) const;
 
     /**
      * Returns a BSONObj consisting the results of calling addToBSON on an otherwise empty
      * BSONObjBuilder.
      */
-    BSONObj toBSON(bool useLegacyResponseFields = true) const;
+    BSONObj toBSON() const;
 
 
     // ===================== Accessors for member variables ================================= //

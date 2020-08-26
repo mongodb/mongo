@@ -65,8 +65,6 @@ const std::string kLastWriteDateFieldName = "lastWriteDate";
 const std::string kLastMajorityWriteOpTimeFieldName = "majorityOpTime";
 const std::string kLastMajorityWriteDateFieldName = "majorityWriteDate";
 const std::string kLastWriteFieldName = "lastWrite";
-const std::string kIsWritablePrimaryFieldName = "isWritablePrimary";
-const std::string kSecondaryDelaySecsFieldName = "secondaryDelaySecs";
 
 // field name constants that don't directly correspond to member variables
 const std::string kInfoFieldName = "info";
@@ -104,7 +102,7 @@ IsMasterResponse::IsMasterResponse()
       _configSet(true),
       _shutdownInProgress(false) {}
 
-void IsMasterResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponseFields) const {
+void IsMasterResponse::addToBSON(BSONObjBuilder* builder) const {
     if (_topologyVersion) {
         BSONObjBuilder topologyVersionBuilder(builder->subobjStart(kTopologyVersionFieldName));
         _topologyVersion->serialize(&topologyVersionBuilder);
@@ -143,11 +141,7 @@ void IsMasterResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponse
     }
 
     if (!_configSet) {
-        if (useLegacyResponseFields) {
-            builder->append(kIsMasterFieldName, false);
-        } else {
-            builder->append(kIsWritablePrimaryFieldName, false);
-        }
+        builder->append(kIsMasterFieldName, false);
         builder->append(kSecondaryFieldName, false);
         builder->append(kInfoFieldName, "Does not have a valid replica set config");
         builder->append(kIsReplicaSetFieldName, true);
@@ -157,11 +151,7 @@ void IsMasterResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponse
     invariant(_setVersionSet);
     builder->append(kSetVersionFieldName, static_cast<int>(_setVersion));
     invariant(_isMasterSet);
-    if (useLegacyResponseFields) {
-        builder->append(kIsMasterFieldName, _isMaster);
-    } else {
-        builder->append(kIsWritablePrimaryFieldName, _isMaster);
-    }
+    builder->append(kIsMasterFieldName, _isMaster);
     invariant(_isSecondarySet);
     builder->append(kSecondaryFieldName, _secondary);
 
@@ -175,14 +165,8 @@ void IsMasterResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponse
         builder->append(kHiddenFieldName, _hidden);
     if (_buildIndexesSet)
         builder->append(kBuildIndexesFieldName, _buildIndexes);
-    if (_slaveDelaySet) {
-        if (useLegacyResponseFields) {
-            builder->appendIntOrLL(kSlaveDelayFieldName, durationCount<Seconds>(_slaveDelay));
-        } else {
-            builder->appendIntOrLL(kSecondaryDelaySecsFieldName,
-                                   durationCount<Seconds>(_slaveDelay));
-        }
-    }
+    if (_slaveDelaySet)
+        builder->appendIntOrLL(kSlaveDelayFieldName, durationCount<Seconds>(_slaveDelay));
     if (_tagsSet) {
         BSONObjBuilder tags(builder->subobjStart(kTagsFieldName));
         for (stdx::unordered_map<std::string, std::string>::const_iterator it = _tags.begin();
@@ -209,9 +193,9 @@ void IsMasterResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponse
     }
 }
 
-BSONObj IsMasterResponse::toBSON(bool useLegacyResponseFields) const {
+BSONObj IsMasterResponse::toBSON() const {
     BSONObjBuilder builder;
-    addToBSON(&builder, useLegacyResponseFields);
+    addToBSON(&builder);
     return builder.obj();
 }
 
