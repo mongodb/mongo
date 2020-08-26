@@ -94,7 +94,9 @@ try {
     assert.eq(size, secondDB.getCollection(collectionName).find({}).itcount());
 
     // Verify that only the _id index is ready.
-    if (ResumableIndexBuildTest.resumableIndexBuildsEnabled(second)) {
+    const supportsCommittedReads =
+        assert.commandWorked(secondDB.serverStatus()).storageEngine.supportsCommittedReads;
+    if (ResumableIndexBuildTest.resumableIndexBuildsEnabled(second) && supportsCommittedReads) {
         checkLog.containsJson(second, 4841704);
     } else {
         checkLog.containsJson(second, 4585201);
