@@ -71,6 +71,64 @@ struct PsApiInit {
 
 static PsApiInit* psapiGlobal = NULL;
 
+namespace {
+
+using Slpi = SYSTEM_LOGICAL_PROCESSOR_INFORMATION;
+using SlpiBuf = std::aligned_storage_t<sizeof(Slpi)>;
+
+struct LpiRecords {
+    const Slpi* begin() const {
+        return reinterpret_cast<const Slpi*>(slpiRecords.get());
+    }
+
+    const Slpi* end() const {
+        return begin() + count;
+    }
+
+    std::unique_ptr<SlpiBuf[]> slpiRecords;
+    size_t count;
+};
+
+// Both the body of this getLogicalProcessorInformationRecords and the callers of
+// getLogicalProcessorInformationRecords are largely modeled off of the example code at
+// https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getlogicalprocessorinformation
+LpiRecords getLogicalProcessorInformationRecords() {
+
+    DWORD returnLength = 0;
+    LpiRecords lpiRecords{};
+
+    DWORD returnCode = 0;
+    do {
+        returnCode = GetLogicalProcessorInformation(
+            reinterpret_cast<Slpi*>(lpiRecords.slpiRecords.get()), &returnLength);
+        if (returnCode == FALSE) {
+            if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+                lpiRecords.slpiRecords = std::unique_ptr<SlpiBuf[]>(
+                    new SlpiBuf[((returnLength - 1) / sizeof(Slpi)) + 1]);
+            } else {
+                DWORD gle = GetLastError();
+                warning() << "GetLogicalProcessorInformation failed" << errnoWithDescription(gle);
+                return LpiRecords{};
+            }
+        }
+    } while (returnCode == FALSE);
+
+
+    lpiRecords.count = returnLength / sizeof(Slpi);
+    return lpiRecords;
+}
+
+int getPhysicalCores() {
+    int processorCoreCount = 0;
+    for (auto&& lpi : getLogicalProcessorInformationRecords()) {
+        if (lpi.Relationship == RelationProcessorCore)
+            processorCoreCount++;
+    }
+    return processorCoreCount;
+}
+
+}  // namespace
+
 int _wconvertmtos(SIZE_T s) {
     return (int)(s / (1024 * 1024));
 }
@@ -282,8 +340,10 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     GetNativeSystemInfo(&ntsysinfo);
     addrSize = (ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? 64 : 32);
     numCores = ntsysinfo.dwNumberOfProcessors;
+    numPhysicalCores = getPhysicalCores();
     pageSize = static_cast<unsigned long long>(ntsysinfo.dwPageSize);
     bExtra.append("pageSize", static_cast<long long>(pageSize));
+    bExtra.append("physicalCores", static_cast<int>(numPhysicalCores));
 
     // get memory info
     mse.dwLength = sizeof(mse);
@@ -387,47 +447,13 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     }
 }
 
+
 bool ProcessInfo::checkNumaEnabled() {
-    typedef BOOL(WINAPI * LPFN_GLPI)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
-
-    DWORD returnLength = 0;
     DWORD numaNodeCount = 0;
-    unique_ptr<SYSTEM_LOGICAL_PROCESSOR_INFORMATION[]> buffer;
-
-    LPFN_GLPI glpi(reinterpret_cast<LPFN_GLPI>(
-        GetProcAddress(GetModuleHandleW(L"kernel32"), "GetLogicalProcessorInformation")));
-    if (glpi == NULL) {
-        return false;
-    }
-
-    DWORD returnCode = 0;
-    do {
-        returnCode = glpi(buffer.get(), &returnLength);
-
-        if (returnCode == FALSE) {
-            if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-                buffer.reset(reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION>(
-                    new BYTE[returnLength]));
-            } else {
-                DWORD gle = GetLastError();
-                warning() << "GetLogicalProcessorInformation failed with "
-                          << errnoWithDescription(gle);
-                return false;
-            }
-        }
-    } while (returnCode == FALSE);
-
-    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = buffer.get();
-
-    unsigned int byteOffset = 0;
-    while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
-        if (ptr->Relationship == RelationNumaNode) {
+    for (auto&& lpi : getLogicalProcessorInformationRecords()) {
+        if (lpi.Relationship == RelationNumaNode)
             // Non-NUMA systems report a single record of this type.
-            numaNodeCount++;
-        }
-
-        byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
-        ptr++;
+            ++numaNodeCount;
     }
 
     // For non-NUMA machines, the count is 1

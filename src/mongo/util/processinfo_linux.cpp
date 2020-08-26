@@ -38,6 +38,7 @@
 
 #include <iostream>
 #include <malloc.h>
+#include <pcrecpp.h>
 #include <sched.h>
 #include <stdio.h>
 #include <sys/mman.h>
@@ -56,6 +57,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <pcrecpp.h>
 
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
@@ -72,7 +74,6 @@ public:
     LinuxProc(ProcessId pid) {
         char name[128];
         sprintf(name, "/proc/%d/stat", pid.asUInt32());
-
         FILE* f = fopen(name, "r");
         if (!f) {
             stringstream ss;
@@ -139,7 +140,7 @@ public:
                            */
                            );
         if (found == 0) {
-            cout << "system error: reading proc info" << endl;
+            log() << "system error: reading proc info";
         }
         fclose(f);
     }
@@ -249,6 +250,112 @@ public:
     // The current EIP (instruction pointer).
 };
 
+namespace {
+
+// As described in the /proc/[pid]/mountinfo section of `man 5 proc`:
+//
+// 36 35 98:0 /mnt1 /mnt2 rw,noatime master:1 - ext3 /dev/root rw,errors=continue
+// |  |  |    |     |     |          |          |      |     |
+// (1)(2)(3:4)(5)   (6)   (7)        (8)        (9)   (10)   (11)
+struct MountRecord {
+    bool parseLine(const std::string& line) {
+        static const pcrecpp::RE kRe{
+            //   (1)   (2)   (3)   (4)   (5)   (6)   (7)   (8)                (9)   (10)  (11)
+            R"re((\d+) (\d+) (\d+):(\d+) (\S+) (\S+) (\S+) ((?:\S+:\S+ ?)*) - (\S+) (\S+) (\S+))re"};
+        return kRe.FullMatch(line,
+                             &mountId,
+                             &parentId,
+                             &major,
+                             &minor,
+                             &root,
+                             &mountPoint,
+                             &options,
+                             &fields,
+                             &type,
+                             &source,
+                             &superOpt);
+    }
+
+    void appendBSON(BSONObjBuilder& bob) const {
+        bob.append("mountId", mountId)
+            .append("parentId", parentId)
+            .append("major", major)
+            .append("minor", minor)
+            .append("root", root)
+            .append("mountPoint", mountPoint)
+            .append("options", options)
+            .append("fields", fields)
+            .append("type", type)
+            .append("source", source)
+            .append("superOpt", superOpt);
+    }
+
+    int mountId;             //  (1) unique ID for the mount
+    int parentId;            //  (2) the ID of the parent mount (self for the root mount)
+    int major;               //  (3) major block device number (see stat(2))
+    int minor;               //  (4) minor block device number
+    std::string root;        //  (5) path in filesystem forming the root
+    std::string mountPoint;  //  (6) the mount point relative to the process's root
+    std::string options;     //  (7) per-mount options (see mount(2)).
+    std::string fields;      //  (8) zero or more: "tag[:value]" fields
+    std::string type;        //  (9) filesystem type: "type[.subtype]"
+    std::string source;      //  (10) fs-specific information or "none"
+    std::string superOpt;    //  (11) per-superblock options (see mount(2))
+};
+
+void appendMountInfo(BSONObjBuilder& bob) {
+    std::ifstream ifs("/proc/self/mountinfo");
+    if (!ifs)
+        return;
+    BSONArrayBuilder arr = bob.subarrayStart("mountInfo");
+    std::string line;
+    MountRecord rec;
+    while (ifs && getline(ifs, line)) {
+        if (rec.parseLine(line)) {
+            auto bob = BSONObjBuilder(arr.subobjStart());
+            rec.appendBSON(bob);
+        }
+    }
+}
+
+class CpuInfoParser {
+public:
+    struct LineProcessor {
+        pcrecpp::RE regex;
+        std::function<void(const std::string&)> f;
+    };
+    std::vector<LineProcessor> lineProcessors;
+    std::function<void()> recordProcessor;
+    void run() {
+        std::ifstream f("/proc/cpuinfo");
+        if (!f)
+            return;
+
+        bool readSuccess;
+        bool unprocessed = false;
+        static const pcrecpp::RE lineRegex(R"re((.*?)\s*:\s*(.*))re");
+        do {
+            std::string fstr;
+            readSuccess = f && std::getline(f, fstr);
+            if (readSuccess && !fstr.empty()) {
+                std::string key;
+                std::string value;
+                if (!lineRegex.FullMatch(fstr, &key, &value))
+                    continue;
+                for (auto&& lp : lineProcessors) {
+                    if (lp.regex.FullMatch(key))
+                        lp.f(value);
+                }
+                unprocessed = true;
+            } else if (unprocessed) {
+                recordProcessor();
+                unprocessed = false;
+            }
+        } while (readSuccess);
+    }
+};
+
+}  // namespace
 
 class LinuxSysHelper {
 public:
@@ -268,30 +375,63 @@ public:
         return fstr;
     }
 
+
+    /**
+     * count the number of physical cores
+     */
+    static void getNumPhysicalCores(int& physicalCores) {
+
+        /* In /proc/cpuinfo core ids are only unique within a particular physical unit, AKA a cpu
+         * package, so to count the total cores we need to count the unique pairs of core id and
+         * physical id*/
+        struct CpuId {
+            std::string core;
+            std::string physical;
+        };
+
+        CpuId parsedCpuId;
+
+        auto cmp = [](auto&& a, auto&& b) {
+            auto tupLens = [](auto&& o) { return std::tie(o.core, o.physical); };
+            return tupLens(a) < tupLens(b);
+        };
+        std::set<CpuId, decltype(cmp)> cpuIds(cmp);
+
+        CpuInfoParser cpuInfoParser{
+            {
+                {"physical id", [&](const std::string& value) { parsedCpuId.physical = value; }},
+                {"core id", [&](const std::string& value) { parsedCpuId.core = value; }},
+            },
+            [&]() {
+                cpuIds.insert(parsedCpuId);
+                parsedCpuId = CpuId{};
+            }};
+        cpuInfoParser.run();
+
+        physicalCores = cpuIds.size();
+    }
+
     /**
     * Get some details about the CPU
     */
-    static void getCpuInfo(int& procCount, string& freq, string& features) {
-        FILE* f;
-        char fstr[1024] = {0};
+    static void getCpuInfo(int& procCount, std::string& freq, std::string& features) {
+
         procCount = 0;
 
-        f = fopen("/proc/cpuinfo", "r");
-        if (f == NULL)
-            return;
-
-        while (fgets(fstr, 1023, f) != NULL && !feof(f)) {
-            // until the end of the file
-            fstr[strlen(fstr) < 1 ? 0 : strlen(fstr) - 1] = '\0';
-            if (strncmp(fstr, "processor ", 10) == 0 || strncmp(fstr, "processor\t:", 11) == 0)
-                ++procCount;
-            if (strncmp(fstr, "cpu MHz\t\t:", 10) == 0)
-                freq = fstr + 11;
-            if (strncmp(fstr, "flags\t\t:", 8) == 0)
-                features = fstr + 9;
-        }
-
-        fclose(f);
+        CpuInfoParser cpuInfoParser{
+            {
+#ifdef __s390x__
+                {R"re(processor\s+\d+)re", [&](const std::string& value) { procCount++; }},
+                {"cpu MHz static", [&](const std::string& value) { freq = value; }},
+                {"features", [&](const std::string& value) { features = value; }},
+#else
+                {"processor", [&](const std::string& value) { procCount++; }},
+                {"cpu MHz", [&](const std::string& value) { freq = value; }},
+                {"flags", [&](const std::string& value) { features = value; }},
+#endif
+            },
+            []() {}};
+        cpuInfoParser.run();
     }
 
     /**
@@ -494,9 +634,11 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     string distroName, distroVersion;
     string cpuFreq, cpuFeatures;
     int cpuCount;
+    int physicalCores;
 
     string verSig = LinuxSysHelper::readLineFromFile("/proc/version_signature");
     LinuxSysHelper::getCpuInfo(cpuCount, cpuFreq, cpuFeatures);
+    LinuxSysHelper::getNumPhysicalCores(physicalCores);
     LinuxSysHelper::getLinuxDistro(distroName, distroVersion);
 
     if (uname(&unameData) == -1) {
@@ -537,6 +679,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     bExtra.append("pageSize", static_cast<long long>(pageSize));
     bExtra.append("numPages", static_cast<int>(sysconf(_SC_PHYS_PAGES)));
     bExtra.append("maxOpenFiles", static_cast<int>(sysconf(_SC_OPEN_MAX)));
+    bExtra.append("physicalCores", physicalCores);
 
     _extraStats = bExtra.obj();
 }
