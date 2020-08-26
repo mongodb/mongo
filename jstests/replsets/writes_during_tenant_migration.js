@@ -1,7 +1,6 @@
 /**
  * Tests that the donor blocks writes that are executed while the migration in the blocking state,
- * then rejects the writes if the migration commits and and internally retries the writes if the
- * migration aborts.
+ * then rejects the writes when the migration completes.
  *
  * Tenant migrations are not expected to be run on servers with ephemeralForTest, and in particular
  * this test fails on ephemeralForTest because the donor has to wait for the write to set the
@@ -321,10 +320,10 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
 }
 
 /**
- * Tests that the donor blocks writes that are executed in the blocking state and internally retries
- * them after the migration aborts.
+ * Tests that the donor blocks writes that are executed in the blocking state and rejects them after
+ * the migration aborts.
  */
-function testBlockedReadGetsUnblockedAndRetriedIfMigrationAborts(testCase, testOpts) {
+function testBlockedReadGetsUnblockedAndRejectedIfMigrationAborts(testCase, testOpts) {
     let blockingFp =
         configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
     let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
@@ -346,8 +345,8 @@ function testBlockedReadGetsUnblockedAndRetriedIfMigrationAborts(testCase, testO
     blockingFp.wait();
 
     // The migration should unpause and abort after the write is blocked. Verify that the write is
-    // retried and succeeds.
-    runCommand(testOpts);
+    // rejected.
+    runCommand(testOpts, ErrorCodes.TenantMigrationAborted);
 
     // Verify that the migration aborted due to the simulated error.
     resumeMigrationThread.join();
@@ -355,7 +354,7 @@ function testBlockedReadGetsUnblockedAndRetriedIfMigrationAborts(testCase, testO
     abortFp.off();
     assert.commandFailedWithCode(migrationThread.returnData(), ErrorCodes.TenantMigrationAborted);
 
-    testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
+    testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }
 
 const isNotWriteCommand = "not a write command";
@@ -841,7 +840,7 @@ const testFuncs = {
     inAborted: testWriteIsAcceptedIfSentAfterMigrationHasAborted,
     inBlocking: testWriteBlocksIfMigrationIsInBlocking,
     inBlockingThenCommitted: testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits,
-    inBlockingThenAborted: testBlockedReadGetsUnblockedAndRetriedIfMigrationAborts
+    inBlockingThenAborted: testBlockedReadGetsUnblockedAndRejectedIfMigrationAborts
 };
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {

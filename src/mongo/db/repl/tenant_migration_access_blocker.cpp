@@ -84,9 +84,13 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrBlock(OperationContext* opCt
     opCtx->waitForConditionOrInterrupt(
         _transitionOutOfBlockingCV, ul, [&]() { return canWrite() || _access == Access::kReject; });
 
-    uassert(ErrorCodes::TenantMigrationCommitted,
-            "Write must be re-routed to the new owner of this database",
-            _access == Access::kAllow);
+    auto status = onCompletion().getNoThrow();
+    if (status.isOK()) {
+        invariant(_access == Access::kReject);
+        uasserted(ErrorCodes::TenantMigrationCommitted,
+                  "Write must be re-routed to the new owner of this database");
+    }
+    uassertStatusOK(status);
 }
 
 void TenantMigrationAccessBlocker::checkIfCanDoClusterTimeReadOrBlock(

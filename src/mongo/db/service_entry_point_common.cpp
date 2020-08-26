@@ -520,9 +520,9 @@ void invokeWithNoSession(OperationContext* opCtx,
                          const OpMsgRequest& request,
                          CommandInvocation* invocation,
                          rpc::ReplyBuilderInterface* replyBuilder) {
-    tenant_migration_donor::checkIfCanReadOrBlock(opCtx, request.getDatabase());
-    tenant_migration_donor::migrationConflictRetry(
+    tenant_migration_donor::migrationConflictHandler(
         opCtx,
+        request.getDatabase(),
         [&] { CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder); },
         replyBuilder);
 }
@@ -628,14 +628,13 @@ void invokeWithSessionCheckedOut(OperationContext* opCtx,
         }
     }
 
-    tenant_migration_donor::checkIfCanReadOrBlock(opCtx, request.getDatabase());
-
     // Use the API parameters that were stored when the transaction was initiated.
     APIParameters::get(opCtx) = txnParticipant.getAPIParameters(opCtx);
 
     try {
-        tenant_migration_donor::migrationConflictRetry(
+        tenant_migration_donor::migrationConflictHandler(
             opCtx,
+            request.getDatabase(),
             [&] { CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder); },
             replyBuilder);
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {

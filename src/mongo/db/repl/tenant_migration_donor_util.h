@@ -74,42 +74,43 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
 void onWriteToDatabase(OperationContext* opCtx, StringData dbName);
 
 /**
- * Runs the argument function 'callable' as many times as needed for it to complete or throw an
- * exception or return a non-OK status (as indicated in 'replyBuilder') other than
- * TenantMigrationConflict. Clears 'replyBuilder' before each retry.
+ * Runs the argument function 'callable'. If it throws a TenantMigrationConflict error (as indicated
+ * in 'replyBuilder'), clears 'replyBuilder' and blocks until the migration commits or aborts, then
+ * throws TenantMigrationCommitted or TenantMigrationAborted.
  */
 template <typename Callable>
-void migrationConflictRetry(OperationContext* opCtx,
-                            Callable&& callable,
-                            rpc::ReplyBuilderInterface* replyBuilder) {
+void migrationConflictHandler(OperationContext* opCtx,
+                              StringData dbName,
+                              Callable&& callable,
+                              rpc::ReplyBuilderInterface* replyBuilder) {
+    checkIfCanReadOrBlock(opCtx, dbName);
+
     auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
 
-    while (true) {
-        try {
-            // callable will modify replyBuilder.
-            callable();
-            auto replyBodyBuilder = replyBuilder->getBodyBuilder();
+    try {
+        // callable will modify replyBuilder.
+        callable();
+        auto replyBodyBuilder = replyBuilder->getBodyBuilder();
 
-            // getStatusFromWriteCommandReply expects an 'ok' field.
-            CommandHelpers::extractOrAppendOk(replyBodyBuilder);
+        // getStatusFromWriteCommandReply expects an 'ok' field.
+        CommandHelpers::extractOrAppendOk(replyBodyBuilder);
 
-            // Commands such as insert, update, delete, and applyOps return the result as a status
-            // rather than throwing.
-            const auto status = getStatusFromWriteCommandReply(replyBodyBuilder.asTempObj());
+        // Commands such as insert, update, delete, and applyOps return the result as a status
+        // rather than throwing.
+        const auto status = getStatusFromWriteCommandReply(replyBodyBuilder.asTempObj());
 
-            if (status == ErrorCodes::TenantMigrationConflict) {
-                uassertStatusOK(status);
-            }
-            break;
-        } catch (const TenantMigrationConflictException& ex) {
-            auto migrationConflictInfo = ex.extraInfo<TenantMigrationConflictInfo>();
-            invariant(migrationConflictInfo);
+        if (status == ErrorCodes::TenantMigrationConflict) {
+            uassertStatusOK(status);
+        }
+        return;
+    } catch (const TenantMigrationConflictException& ex) {
+        auto migrationConflictInfo = ex.extraInfo<TenantMigrationConflictInfo>();
+        invariant(migrationConflictInfo);
 
-            if (auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(
-                    migrationConflictInfo->getDatabasePrefix())) {
-                mtab->checkIfCanWriteOrBlock(opCtx);
-            }
+        if (auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(
+                migrationConflictInfo->getDatabasePrefix())) {
             replyBuilder->getBodyBuilder().resetToEmpty();
+            mtab->checkIfCanWriteOrBlock(opCtx);
         }
     }
 }
