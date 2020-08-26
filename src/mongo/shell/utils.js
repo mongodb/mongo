@@ -96,7 +96,7 @@ function isRetryableError(error) {
         "NetworkTimeout",
         "SocketException",
         "NotWritablePrimary",
-        "NotMasterNoSlaveOk",
+        "NotPrimaryNoSecondaryOk",
         "NotMasterOrSecondary",
         "PrimarySteppedDown",
         "WriteConcernFailed",

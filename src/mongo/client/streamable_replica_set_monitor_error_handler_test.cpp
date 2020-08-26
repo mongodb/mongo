@@ -112,7 +112,7 @@ public:
         ErrorCodes::PrimarySteppedDown,
         ErrorCodes::ShutdownInProgress,
         ErrorCodes::NotWritablePrimary,
-        ErrorCodes::NotMasterNoSlaveOk};
+        ErrorCodes::NotPrimaryNoSecondaryOk};
 
     inline static const std::string kSetName = "setName";
     inline static const HostAndPort kHost = HostAndPort("foobar:123");

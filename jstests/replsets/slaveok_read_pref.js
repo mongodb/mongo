@@ -37,9 +37,9 @@ for (let readMode of ["commands", "legacy"]) {
             const cursor = (readPref ? secDB.test.find().readPref(readPref) : secDB.test.find());
 
             if (readPref === "primary" || (!readPref && !slaveOk)) {
-                // Attempting to run the query throws an error of type NotMasterNoSlaveOk.
+                // Attempting to run the query throws an error of type NotPrimaryNoSecondaryOk.
                 const slaveOkErr = assert.throws(() => cursor.itcount(), [], tojson(testType));
-                assert.commandFailedWithCode(slaveOkErr, ErrorCodes.NotMasterNoSlaveOk);
+                assert.commandFailedWithCode(slaveOkErr, ErrorCodes.NotPrimaryNoSecondaryOk);
             } else {
                 // Succeeds for all non-primary readPrefs, and for no readPref iff slaveOk.
                 const docCount = assert.doesNotThrow(() => cursor.itcount(), [], tojson(testType));
@@ -49,26 +49,26 @@ for (let readMode of ["commands", "legacy"]) {
     }
 }
 
-function assertNotMasterNoSlaveOk(func) {
+function assertNotPrimaryNoSecondaryOk(func) {
     secDB.getMongo().forceReadMode("commands");
     secDB.getMongo().setSlaveOk(false);
     secDB.getMongo().setReadPref("primary");
     const res = assert.throws(func);
-    assert.commandFailedWithCode(res, ErrorCodes.NotMasterNoSlaveOk);
+    assert.commandFailedWithCode(res, ErrorCodes.NotPrimaryNoSecondaryOk);
 }
 
-// Test that agg with $out/$merge and non-inline mapReduce fail with 'NotMasterNoSlaveOk' when
+// Test that agg with $out/$merge and non-inline mapReduce fail with 'NotPrimaryNoSecondaryOk' when
 // directed at a secondary with "primary" read preference.
 const secondaryColl = secDB.slaveok_read_pref;
-assertNotMasterNoSlaveOk(() => secondaryColl.aggregate([{$out: "target"}]).itcount());
-assertNotMasterNoSlaveOk(
+assertNotPrimaryNoSecondaryOk(() => secondaryColl.aggregate([{$out: "target"}]).itcount());
+assertNotPrimaryNoSecondaryOk(
     () =>
         secondaryColl
             .aggregate([{$merge: {into: "target", whenMatched: "fail", whenNotMatched: "insert"}}])
             .itcount());
-assertNotMasterNoSlaveOk(() => secondaryColl.mapReduce(() => emit(this.a),
-                                                       (k, v) => Array.sum(b),
-                                                       {out: {replace: "target"}}));
+assertNotPrimaryNoSecondaryOk(() => secondaryColl.mapReduce(() => emit(this.a),
+                                                            (k, v) => Array.sum(b),
+                                                            {out: {replace: "target"}}));
 
 rst.stopSet();
 })();

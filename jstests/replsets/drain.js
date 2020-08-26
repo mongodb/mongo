@@ -65,15 +65,15 @@ jsTestLog('New primary should not be writable yet');
 assert.writeError(secondary.getDB("foo").flag.insert({sentinel: 2}));
 assert(!secondary.getDB("admin").runCommand({"isMaster": 1}).ismaster);
 
-// Ensure new primary is not yet readable without slaveOk bit.
+// Ensure new primary is not yet readable without secondaryOk bit.
 secondary.setSecondaryOk(false);
-jsTestLog('New primary should not be readable yet, without slaveOk bit');
+jsTestLog('New primary should not be readable yet, without secondaryOk bit');
 var res = secondary.getDB("foo").runCommand({find: "foo"});
 assert.commandFailed(res);
-assert.eq(ErrorCodes.NotMasterNoSlaveOk,
+assert.eq(ErrorCodes.NotPrimaryNoSecondaryOk,
           res.code,
           "find failed with unexpected error code: " + tojson(res));
-// Nor should it be readable with the slaveOk bit.
+// Nor should it be readable with the secondaryOk bit.
 secondary.setSecondaryOk();
 assert.commandWorked(secondary.getDB("foo").runCommand({find: "foo"}));
 

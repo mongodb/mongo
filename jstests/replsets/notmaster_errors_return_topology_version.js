@@ -19,7 +19,7 @@ const primaryDB = primary.getDB(dbName);
 const notPrimaryErrorCodes = [
     ErrorCodes.InterruptedDueToReplStateChange,
     ErrorCodes.NotWritablePrimary,
-    ErrorCodes.NotMasterNoSlaveOk,
+    ErrorCodes.NotPrimaryNoSecondaryOk,
     ErrorCodes.NotMasterOrSecondary,
     ErrorCodes.PrimarySteppedDown
 ];

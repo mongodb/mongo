@@ -1006,7 +1006,7 @@ void DBClientReplicaSet::checkResponse(const std::vector<BSONObj>& batch,
 
         if (networkError ||
             (hasErrField(dataObj) && !dataObj["code"].eoo() &&
-             dataObj["code"].Int() == ErrorCodes::NotMasterNoSlaveOk)) {
+             dataObj["code"].Int() == ErrorCodes::NotPrimaryNoSecondaryOk)) {
             if (_lazyState._lastClient == _master.get()) {
                 isntMaster();
             }

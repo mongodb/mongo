@@ -419,7 +419,7 @@ error_codes:
     - {code: 13388,name: StaleConfig,
                     extra: StaleConfigInfo,
                     categories: [StaleShardVersionError,NeedRetargettingError]}
-    - {code: 13435,name: NotMasterNoSlaveOk,categories: [NotMasterError,RetriableError]}
+    - {code: 13435,name: NotPrimaryNoSecondaryOk,categories: [NotMasterError,RetriableError]}
     - {code: 13436,name: NotMasterOrSecondary,categories: [NotMasterError,RetriableError]}
     - {code: 14031,name: OutOfDiskSpace}
     - {code: 17280,name: OBSOLETE_KeyTooLong}

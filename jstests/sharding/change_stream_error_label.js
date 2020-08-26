@@ -35,7 +35,7 @@ const expectedStopShardErrors = [
     ErrorCodes.NotWritablePrimary,
     ErrorCodes.InterruptedAtShutdown,
     ErrorCodes.InterruptedDueToReplStateChange,
-    ErrorCodes.NotMasterNoSlaveOk,
+    ErrorCodes.NotPrimaryNoSecondaryOk,
     ErrorCodes.NotMasterOrSecondary
 ];
 
