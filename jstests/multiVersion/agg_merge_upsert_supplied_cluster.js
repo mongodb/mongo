@@ -9,7 +9,7 @@ load("jstests/multiVersion/libs/causal_consistency_helpers.js");  // supportsMaj
 load("jstests/multiVersion/libs/multi_cluster.js");               // upgradeCluster
 load("jstests/multiVersion/libs/multi_rs.js");                    // upgradeSet
 
-// The UUID consistency check can hit NotMasterNoSlaveOk when it attempts to obtain a list of
+// The UUID consistency check can hit NotPrimaryNoSecondaryOk when it attempts to obtain a list of
 // collections from the shard Primaries through mongoS at the end of this test.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 

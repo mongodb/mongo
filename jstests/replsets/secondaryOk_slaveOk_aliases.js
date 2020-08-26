@@ -25,7 +25,7 @@ assert.commandWorked(secondary.getDB(dbName).runCommand({find: collName}),
 secondary.getDB(dbName).getMongo().setSecondaryOk(false);
 assert.eq(secondary.getDB(dbName).getMongo().getSecondaryOk(), false);
 assert.commandFailedWithCode(secondary.getDB(dbName).runCommand({find: collName}),
-                             ErrorCodes.NotMasterNoSlaveOk,
+                             ErrorCodes.NotPrimaryNoSecondaryOk,
                              "find did not fail with the correct error code");
 
 // setSlaveOk() is deprecated and aliased to setSecondaryOk(), but ensure
@@ -40,7 +40,7 @@ assert.commandWorked(secondary.getDB(dbName).runCommand({find: collName}),
 secondary.getDB(dbName).getMongo().setSlaveOk(false);
 assert.eq(secondary.getDB(dbName).getMongo().getSlaveOk(), false);
 assert.commandFailedWithCode(secondary.getDB(dbName).runCommand({find: collName}),
-                             ErrorCodes.NotMasterNoSlaveOk,
+                             ErrorCodes.NotPrimaryNoSecondaryOk,
                              "find did not fail with the correct error code");
 rst.stopSet();
 })();

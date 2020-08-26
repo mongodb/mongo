@@ -314,7 +314,7 @@ error_code("KeyTooLong", 17280);
 error_code("BackgroundOperationInProgressForDatabase", 12586);
 error_code("BackgroundOperationInProgressForNamespace", 12587);
 error_code("NotMasterOrSecondary", 13436);
-error_code("NotMasterNoSlaveOk", 13435);
+error_code("NotPrimaryNoSecondaryOk", 13435);
 error_code("ShardKeyTooBig", 13334);
 error_code("StaleConfig", 13388, extra="StaleConfigInfo");
 error_code("DatabaseDifferCase", 13297);
@@ -339,7 +339,7 @@ error_class("Interruption", ["Interrupted",
 # happened. If you care about whether a write could have happened, check for individual codes.
 error_class("NotMasterError", [
     "NotWritablePrimary",
-    "NotMasterNoSlaveOk",
+    "NotPrimaryNoSecondaryOk",
     "NotMasterOrSecondary",
     "InterruptedDueToReplStateChange",
     "PrimarySteppedDown",
@@ -375,7 +375,7 @@ error_class("VoteAbortError", ["NoSuchTransaction", "ReadConcernMajorityNotEnabl
 error_class("NonResumableChangeStreamError", ["ChangeStreamFatalError", "ChangeStreamHistoryLost"])
 error_class("RetriableError", [
     "NotWritablePrimary",
-    "NotMasterNoSlaveOk",
+    "NotPrimaryNoSecondaryOk",
     "NotMasterOrSecondary",
     "InterruptedDueToReplStateChange",
     "PrimarySteppedDown",
