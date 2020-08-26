@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/matcher/match_expression_util.h"
 
 namespace mongo {
 /**
@@ -46,21 +47,32 @@ public:
     static constexpr StringData kName = "$_internalSchemaAllElemMatchFromIndex"_sd;
 
     InternalSchemaAllElemMatchFromIndexMatchExpression(
-        StringData path, long long index, std::unique_ptr<ExpressionWithPlaceholder> expression);
+        StringData path,
+        long long index,
+        std::unique_ptr<ExpressionWithPlaceholder> expression,
+        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
     bool matchesArray(const BSONObj& array, MatchDetails* details) const final {
+        return !findFirstMismatchInArray(array, details);
+    }
+
+    /**
+     * Finds the first element in the sub-array of array 'array' that the expression applies to that
+     * does not match the sub-expression. If such element does not exist, then returns empty (i.e.
+     * EOO) value.
+     */
+    BSONElement findFirstMismatchInArray(const BSONObj& array, MatchDetails* details) const {
         auto iter = BSONObjIterator(array);
-        for (int i = 0; iter.more() && i < _index; i++) {
-            iter.next();
-        }
+        match_expression_util::advanceBy(_index, iter);
         while (iter.more()) {
-            if (!_expression->matchesBSONElement(iter.next(), details)) {
-                return false;
+            auto element = iter.next();
+            if (!_expression->matchesBSONElement(element, details)) {
+                return element;
             }
         }
-        return true;
+        return {};
     }
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
@@ -68,6 +80,13 @@ public:
     BSONObj getSerializedRightHandSide() const final;
 
     bool equivalent(const MatchExpression* other) const final;
+
+    /**
+     * Returns an index of the first element of the array this match expression applies to.
+     */
+    long long startIndex() const {
+        return _index;
+    }
 
     boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
         return boost::none;

@@ -39,16 +39,19 @@ constexpr StringData InternalSchemaAllElemMatchFromIndexMatchExpression::kName;
 
 InternalSchemaAllElemMatchFromIndexMatchExpression::
     InternalSchemaAllElemMatchFromIndexMatchExpression(
-        StringData path, long long index, std::unique_ptr<ExpressionWithPlaceholder> expression)
-    : ArrayMatchingMatchExpression(MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX,
-                                   path),
+        StringData path,
+        long long index,
+        std::unique_ptr<ExpressionWithPlaceholder> expression,
+        clonable_ptr<ErrorAnnotation> annotation)
+    : ArrayMatchingMatchExpression(
+          MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX, path, std::move(annotation)),
       _index(index),
       _expression(std::move(expression)) {}
 
 std::unique_ptr<MatchExpression> InternalSchemaAllElemMatchFromIndexMatchExpression::shallowClone()
     const {
     auto clone = std::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>(
-        path(), _index, _expression->shallowClone());
+        path(), _index, _expression->shallowClone(), _errorAnnotation);
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }

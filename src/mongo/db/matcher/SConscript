@@ -19,6 +19,7 @@ env.Library(
 env.Library(
     target='expressions',
     source=[
+        'match_expression_util.cpp',
         'doc_validation_error.cpp',
         'doc_validation_util.cpp',
         'expression.cpp',
@@ -98,6 +99,7 @@ env.Library(
 env.CppUnitTest(
     target='db_matcher_test',
     source=[
+        'match_expression_util_test.cpp',
         'doc_validation_error_json_schema_test.cpp',
         'doc_validation_error_test.cpp',
         'expression_algo_test.cpp',

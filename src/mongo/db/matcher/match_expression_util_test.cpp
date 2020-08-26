@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,48 +29,26 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
+#include "mongo/db/matcher/match_expression_util.h"
 
-namespace mongo {
-constexpr StringData InternalSchemaUniqueItemsMatchExpression::kName;
+#include "mongo/unittest/unittest.h"
 
-void InternalSchemaUniqueItemsMatchExpression::debugString(StringBuilder& debug,
-                                                           int indentationLevel) const {
-    _debugAddSpace(debug, indentationLevel);
-
-    BSONObjBuilder builder;
-    serialize(&builder, true);
-    debug << builder.obj().toString() << "\n";
-
-    const auto* tag = getTag();
-    if (tag) {
-        debug << " ";
-        tag->debugString(&debug);
-    }
-    debug << "\n";
+namespace mongo::match_expression_util {
+namespace {
+TEST(BSONObjIteratorUtils, AdvanceBy) {
+    auto obj = BSON("a" << 1 << "b" << 2 << "c" << 3);
+    BSONObjIterator iter = BSONObjIterator(obj);
+    advanceBy(0, iter);
+    ASSERT_TRUE(iter.more());
+    ASSERT_EQUALS(iter.next().fieldNameStringData(), "a");
+    advanceBy(1, iter);
+    ASSERT_TRUE(iter.more());
+    ASSERT_EQUALS(iter.next().fieldNameStringData(), "c");
+    ASSERT_FALSE(iter.more());
+    advanceBy(0, iter);
+    ASSERT_FALSE(iter.more());
+    advanceBy(1, iter);
+    ASSERT_FALSE(iter.more());
 }
-
-bool InternalSchemaUniqueItemsMatchExpression::equivalent(const MatchExpression* expr) const {
-    if (matchType() != expr->matchType()) {
-        return false;
-    }
-
-    const auto* other = static_cast<const InternalSchemaUniqueItemsMatchExpression*>(expr);
-    return path() == other->path();
-}
-
-BSONObj InternalSchemaUniqueItemsMatchExpression::getSerializedRightHandSide() const {
-    BSONObjBuilder bob;
-    bob.append(kName, true);
-    return bob.obj();
-}
-
-std::unique_ptr<MatchExpression> InternalSchemaUniqueItemsMatchExpression::shallowClone() const {
-    auto clone =
-        std::make_unique<InternalSchemaUniqueItemsMatchExpression>(path(), _errorAnnotation);
-    if (getTag()) {
-        clone->setTag(getTag()->clone());
-    }
-    return clone;
-}
-}  // namespace mongo
+}  // namespace
+}  // namespace mongo::match_expression_util

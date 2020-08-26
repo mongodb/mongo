@@ -43,13 +43,20 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/matcher/match_expression_util.h"
 #include "mongo/db/matcher/match_expression_walker.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_str_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+#include "mongo/db/matcher/schema/json_schema_parser.h"
 
 namespace mongo::doc_validation_error {
 namespace {
@@ -58,6 +65,7 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(DocumentValidationFailureInfo);
 using ErrorAnnotation = MatchExpression::ErrorAnnotation;
 using AnnotationMode = ErrorAnnotation::Mode;
 using LeafArrayBehavior = ElementPath::LeafArrayBehavior;
+using NonLeafArrayBehavior = ElementPath::NonLeafArrayBehavior;
 
 /**
  * Enumerated type which describes whether an error should be described normally or in an
@@ -196,6 +204,10 @@ struct ValidationErrorContext {
         }
         return rootDoc;
     }
+    void setCurrentDocument(const BSONObj& document) {
+        invariant(!frames.empty());
+        frames.top().currentDoc = document;
+    }
     InvertError getCurrentInversion() const {
         invariant(!frames.empty());
         return frames.top().inversion;
@@ -313,6 +325,39 @@ void finishLogicalOperatorChildError(const ListOfMatchExpression* expr,
 }
 
 /**
+ * Enumerated type to encode JSON Schema array keyword "items" and "additionalItems", and their
+ * variants.
+ */
+enum class ItemsKeywordType {
+    kItems,                  // 'items': {schema}
+    kAdditionalItemsFalse,   // 'additionalItems': false
+    kAdditionalItemsSchema,  // 'additionalItems': {schema}
+};
+
+/**
+ * Decodes the JSON Schema "items"/"additionalItems" keyword type from an error annotation of
+ * expression 'expr'.
+ */
+ItemsKeywordType toItemsKeywordType(
+    const InternalSchemaAllElemMatchFromIndexMatchExpression& expr) {
+    auto* errorAnnotation = expr.getErrorAnnotation();
+    if ("items" == errorAnnotation->operatorName) {
+        return ItemsKeywordType::kItems;
+    }
+    if ("additionalItems" == errorAnnotation->operatorName) {
+        switch (errorAnnotation->annotation.firstElementType()) {
+            case BSONType::Bool:
+                return ItemsKeywordType::kAdditionalItemsFalse;
+            case BSONType::Object:
+                return ItemsKeywordType::kAdditionalItemsSchema;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+    MONGO_UNREACHABLE;
+}
+
+/**
  * Visitor which is primarily responsible for error generation.
  */
 class ValidationErrorPreVisitor final : public MatchExpressionConstVisitor {
@@ -325,12 +370,16 @@ public:
         generateAlwaysBooleanError(*expr);
     }
     void visit(const AndMatchExpression* expr) final {
+        auto&& operatorName = expr->getErrorAnnotation()->operatorName;
         // $all is treated as a leaf operator.
-        auto operatorName = expr->getErrorAnnotation()->operatorName;
         if (operatorName == "$all") {
             static constexpr auto kNormalReason = "array did not contain all specified values";
             static constexpr auto kInvertedReason = "array did contain all specified values";
             generateLogicalLeafError(*expr, kNormalReason, kInvertedReason);
+        } else if (operatorName == "items") {
+            // $and only gets annotated as an "items" only for JSON Schema keyword "items" set to an
+            // array of subschemas.
+            generateJSONSchemaItemsSchemaArrayError(*expr);
         } else {
             preVisitTreeOperator(expr);
             // An AND needs its children to call 'matches' in a normal context to discern which
@@ -429,7 +478,25 @@ public:
         generatePathError(*expr, kNormalReason, kInvertedReason);
     }
     void visit(const InternalExprEqMatchExpression* expr) final {}
-    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
+    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
+        switch (toItemsKeywordType(*expr)) {
+            case ItemsKeywordType::kItems: {
+                static constexpr auto kNormalReason =
+                    "At least one item did not match the sub-schema";
+                generateJSONSchemaArraySingleSchemaError(expr, kNormalReason, "");
+            } break;
+            case ItemsKeywordType::kAdditionalItemsSchema: {
+                static constexpr auto kNormalReason =
+                    "At least one additional item did not match the sub-schema";
+                generateJSONSchemaArraySingleSchemaError(expr, kNormalReason, "");
+            } break;
+            case ItemsKeywordType::kAdditionalItemsFalse:
+                generateJSONSchemaAdditionalItemsFalseError(expr);
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
         static constexpr auto kNormalReason = "encrypted value has wrong type";
@@ -447,8 +514,7 @@ public:
             // appropriate error.
             if (elem.type() == BSONType::BinData && elem.binDataType() == BinDataType::Encrypt &&
                 _context->getCurrentInversion() == InvertError::kNormal) {
-                auto& builder = _context->getCurrentObjBuilder();
-                appendOperatorName(*expr->getErrorAnnotation(), &builder);
+                appendOperatorName(*expr);
                 appendErrorReason(kNormalReason, kInvertedReason);
             } else {
                 _context->setCurrentRuntimeState(RuntimeState::kNoError);
@@ -460,8 +526,7 @@ public:
         static constexpr auto kInvertedReason = "value was encrypted";
         _context->pushNewFrame(*expr, _context->getCurrentDocument());
         if (_context->shouldGenerateError(*expr)) {
-            auto& builder = _context->getCurrentObjBuilder();
-            appendOperatorName(*expr->getErrorAnnotation(), &builder);
+            appendOperatorName(*expr);
             appendErrorReason(kNormalReason, kInvertedReason);
         }
     }
@@ -482,13 +547,43 @@ public:
                           &kExpectedTypes,
                           LeafArrayBehavior::kNoTraversal);
     }
-    void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {}
-    void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
+        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        if (_context->shouldGenerateError(*expr)) {
+            // Get an element of an array.
+            ElementPath path(
+                expr->path(), LeafArrayBehavior::kNoTraversal, NonLeafArrayBehavior::kNoTraversal);
+            auto attributeValue = getValueAt(path);
+
+            // Attribute should be present and be an array, since it has been ensured by handling of
+            // AndMatchExpression with error annotation "items".
+            invariant(attributeValue.type() == BSONType::Array);
+            auto valueAsArray = BSONArray(attributeValue.embeddedObject());
+
+            // If array is shorter than the index the match expression applies to, then document
+            // validation should not fail.
+            invariant(expr->arrayIndex() < valueAsArray.nFields());
+
+            // Append information about array element to the error.
+            BSONElement arrayElement = valueAsArray[expr->arrayIndex()];
+            BSONObjBuilder& bob = _context->getCurrentObjBuilder();
+            bob.append("itemIndex"_sd, expr->arrayIndex());
+
+            // Build a document corresponding to the array element for the child expression to
+            // operate on.
+            _context->setCurrentDocument(toObjectWithPlaceholder(arrayElement));
+        }
+    }
+    void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {
+        generateJSONSchemaMinItemsMaxItemsError(expr);
+    }
     void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
         generateStringLengthError(*expr);
     }
     void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {}
-    void visit(const InternalSchemaMinItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinItemsMatchExpression* expr) final {
+        generateJSONSchemaMinItemsMaxItemsError(expr);
+    }
     void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
         generateStringLengthError(*expr);
     }
@@ -528,7 +623,21 @@ public:
     void visit(const InternalSchemaTypeExpression* expr) final {
         generateTypeError(expr, LeafArrayBehavior::kNoTraversal);
     }
-    void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
+        static constexpr auto normalReason = "found a duplicate item";
+        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
+            appendErrorDetails(*expr);
+            appendErrorReason(normalReason, "");
+            auto attributeValueAsArray = BSONArray(attributeValue.embeddedObject());
+            appendConsideredValue(attributeValueAsArray);
+            auto duplicateValue = expr->findFirstDuplicateValue(attributeValueAsArray);
+            invariant(duplicateValue);
+            _context->getCurrentObjBuilder().appendAs(duplicateValue, "duplicatedValue"_sd);
+        } else {
+            _context->setCurrentRuntimeState(RuntimeState::kNoError);
+        }
+    }
     void visit(const InternalSchemaXorMatchExpression* expr) final {
         preVisitTreeOperator(expr);
         _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
@@ -639,11 +748,11 @@ public:
 
 private:
     // Set of utilities responsible for appending various fields to build a descriptive error.
-    void appendOperatorName(const ErrorAnnotation& annotation, BSONObjBuilder* bob) {
-        auto operatorName = annotation.operatorName;
+    void appendOperatorName(const MatchExpression& expr) {
+        auto operatorName = expr.getErrorAnnotation()->operatorName;
         // Only append the operator name if 'annotation' has one.
         if (!operatorName.empty()) {
-            bob->append("operatorName", operatorName);
+            _context->getCurrentObjBuilder().append("operatorName", operatorName);
         }
     }
     void appendSpecifiedAs(const ErrorAnnotation& annotation, BSONObjBuilder* bob) {
@@ -652,7 +761,7 @@ private:
     void appendErrorDetails(const MatchExpression& expr) {
         auto annotation = expr.getErrorAnnotation();
         BSONObjBuilder& bob = _context->getCurrentObjBuilder();
-        appendOperatorName(*annotation, &bob);
+        appendOperatorName(expr);
         appendSpecifiedAs(*annotation, &bob);
     }
 
@@ -672,6 +781,23 @@ private:
             }
         }
         return bab.arr();
+    }
+
+    /**
+     * Returns a value at path 'path' in the current document, or an empty (End-Of-Object type)
+     * element if the value is not present. Illegal to call if, due to implicit array traversal,
+     * 'path' would result in multiple elements.
+     */
+    BSONElement getValueAt(const ElementPath& path) {
+        BSONMatchableDocument doc(_context->getCurrentDocument());
+        MatchableDocument::IteratorHolder cursor(&doc, &path);
+        if (cursor->more()) {
+            auto element = cursor->next().element();
+            invariant(!cursor->more());  // We expect only 1 item.
+            return element;
+        } else {
+            return {};
+        }
     }
 
     /**
@@ -732,6 +858,9 @@ private:
         } else {
             bob.append("reason", invertedReason);
         }
+    }
+    void appendConsideredValue(const BSONArray& array) {
+        _context->getCurrentObjBuilder().append("consideredValue"_sd, array);
     }
     void appendConsideredValues(const BSONArray& arr) {
         int size = arr.nFields();
@@ -851,7 +980,7 @@ private:
             // Only append the operator name if it will produce an object error corresponding to
             // a user-facing operator.
             if (!_context->producesArray(*expr))
-                appendOperatorName(*annotation, &_context->getCurrentObjBuilder());
+                appendOperatorName(*expr);
             _context->getCurrentObjBuilder().appendElements(annotation->annotation);
         }
     }
@@ -906,6 +1035,176 @@ private:
         static const std::set<BSONType> expectedTypes{BSONType::String};
         generatePathError(
             expr, kNormalReason, kInvertedReason, &expectedTypes, LeafArrayBehavior::kNoTraversal);
+    }
+
+    /**
+     * Determines if a validation error should be generated for a JSON Schema array keyword match
+     * expression 'expr' given the current document validation context and returns the array 'expr'
+     * expression applies over. If a validation error should not be generated, then the
+     * End-Of-Object (EOO) value is returned. If a validation error should be generated, then the
+     * type of the value of the returned BSONElement is always an array.
+     */
+    BSONElement getValueForArrayKeywordExpressionIfShouldGenerateError(
+        const MatchExpression& expr) {
+        if (!_context->shouldGenerateError(expr)) {
+            return {};
+        }
+        if (InvertError::kInverted == _context->getCurrentInversion()) {
+            // Inverted errors are not supported.
+            return {};
+        }
+
+        // Determine what value does 'expr' expression apply over.
+        ElementPath path(
+            expr.path(), LeafArrayBehavior::kNoTraversal, NonLeafArrayBehavior::kNoTraversal);
+        auto attributeValue = getValueAt(path);
+
+        // If attribute value is either not present or is not an array, do not generate an error,
+        // since related match expressions do that instead. There are 4 cases of how an array
+        // keyword can be defined in combination with 'required' and 'type' keywords (in the
+        // explanation below parameter 'expr' corresponds to '(array keyword match expression)'):
+        //
+        // 1) 'required' is not present, {type: 'array'} is not present. In this case the expression
+        // tree corresponds to ((array keyword match expression) OR NOT (is array)) OR (NOT
+        // (attribute exists)). This tree can fail to match only if the attribute is present and is
+        // an array.
+        //
+        // 2) 'required' is not present, {type: 'array'} is present. In this case the expression
+        // tree corresponds to ((array keyword match expression) AND (is array)) OR (NOT (attribute
+        // exists)). If the input is an attribute of a non-array type, then both (array keyword
+        // match expression) and (is array) expressions fail to match and are asked to contribute to
+        // the validation error. We expect only (is array) expression, not an (array keyword match
+        // expression), to report a type mismatch, since otherwise the error would contain redundant
+        // elements.
+        //
+        // 3) 'required' is present, {type: 'array'} is not present. In this case the expression
+        // tree corresponds to ((array keyword match expression) OR NOT (is array)) AND (attribute
+        // exists). This tree can fail to match if the attribute is present and is an array, and
+        // fails to match when the attribute is not present. In the latter case expression part
+        // ((array keyword match expression) OR NOT (is array)) matches and (array keyword match
+        // expression) is not asked to contribute to the error.
+        //
+        // 4) 'required' is present, {type: 'array'} is present. In this case the expression tree
+        // corresponds to ((array keyword match expression) AND (is array)) AND (attribute exists).
+        // This tree can fail to match if the attribute is present and is an array, and fails to
+        // match when the attribute is not present or is not an array. In the case when the
+        // attribute is not present all parts of the expression fail to match and are asked to
+        // contribute to the error, but we expect only (attribute exists) expression to contribute,
+        // since otherwise the error would contain redundant elements.
+        return (attributeValue.type() == BSONType::Array) ? attributeValue : BSONElement{};
+    }
+
+    /**
+     * Generates an error for JSON Schema "minItems"/"maxItems" keyword match expression 'expr'.
+     */
+    void generateJSONSchemaMinItemsMaxItemsError(
+        const InternalSchemaNumArrayItemsMatchExpression* expr) {
+        static constexpr auto normalReason = "array did not match specified length";
+        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
+            appendErrorDetails(*expr);
+            appendErrorReason(normalReason, "");
+            auto attributeValueAsArray = BSONArray(attributeValue.embeddedObject());
+            appendConsideredValue(attributeValueAsArray);
+        } else {
+            _context->setCurrentRuntimeState(RuntimeState::kNoError);
+        }
+    }
+
+    /**
+     * Generates an error for JSON Schema "additionalItems" keyword set to 'false'.
+     */
+    void generateJSONSchemaAdditionalItemsFalseError(
+        const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) {
+        static constexpr auto normalReason = "found additional items";
+        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
+            appendErrorDetails(*expr);
+            appendErrorReason(normalReason, "");
+            appendAdditionalItems(BSONArray(attributeValue.embeddedObject()), expr->startIndex());
+        } else {
+            _context->setCurrentRuntimeState(RuntimeState::kNoError);
+        }
+    }
+
+    /**
+     * Generates an error for JSON Schema "items" keyword set to an array of subschemas that is used
+     * to validate elements of the array.
+     */
+    void generateJSONSchemaItemsSchemaArrayError(const AndMatchExpression& expr) {
+        _context->pushNewFrame(expr, _context->getCurrentDocument());
+
+        // Determine if we need to generate an error using a child of the "$and" expression, which
+        // must be of InternalSchemaMatchArrayIndexMatchExpression type, since "$and" does not have
+        // a path associated with it.
+
+        // If 'expr' does not have any children then we have 'items':[] case and we don't need to
+        // generate an error.
+        if (expr.numChildren() == 0) {
+            return;
+        }
+        invariant(expr.getChild(0)->matchType() ==
+                  MatchExpression::MatchType::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX);
+        if (getValueForArrayKeywordExpressionIfShouldGenerateError(*expr.getChild(0))) {
+            appendOperatorName(expr);
+
+            // Since the "items" keyword set to an array of subschemas logically behaves as "$and",
+            // it needs its children to call 'matches' to discern which clauses failed.
+            _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
+        } else {
+            // Force children match expressions to not generate any errors.
+            _context->setCurrentRuntimeState(RuntimeState::kNoError);
+        }
+    }
+
+    /**
+     * Builds a BSON object from a BSON element 'element' using the same name placeholder as the
+     * JSON Schema match expressions.
+     */
+    BSONObj toObjectWithPlaceholder(BSONElement element) {
+        return BSON(JSONSchemaParser::kNamePlaceholder << element);
+    }
+
+    /**
+     * Adds elements starting from index 'startIndex' from array 'array' to the current object as
+     * "additionalItems" attribute.
+     */
+    void appendAdditionalItems(const mongo::BSONArray& array, size_t startIndex) {
+        auto it = BSONObjIterator(array);
+
+        // Skip first 'startIndex' elements.
+        match_expression_util::advanceBy(startIndex, it);
+
+        // Add remaining array elements as "additionalItems" attribute.
+        auto& detailsArrayBuilder = _context->getCurrentArrayBuilder();
+        while (it.more()) {
+            detailsArrayBuilder.append(it.next());
+        }
+        _context->getCurrentObjBuilder().append("additionalItems"_sd, detailsArrayBuilder.arr());
+    }
+
+    /**
+     * Generates an error for JSON Schema array keyword set to a single schema value that is used
+     * to validate elements of the array.
+     */
+    void generateJSONSchemaArraySingleSchemaError(
+        const InternalSchemaAllElemMatchFromIndexMatchExpression* expr,
+        const std::string& normalReason,
+        const std::string& invertedReason) {
+        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
+            appendOperatorName(*expr);
+            appendErrorReason(normalReason, invertedReason);
+            auto failingElement =
+                expr->findFirstMismatchInArray(attributeValue.embeddedObject(), nullptr);
+            invariant(failingElement);
+            _context->getCurrentObjBuilder().appendNumber(
+                "itemIndex"_sd, std::stoll(failingElement.fieldNameStringData().toString()));
+            _context->setCurrentDocument(toObjectWithPlaceholder(failingElement));
+        } else {
+            // Disable error generation by the child expression of 'expr'.
+            _context->setCurrentRuntimeState(RuntimeState::kNoError);
+        }
     }
 
     ValidationErrorContext* _context;
@@ -1031,6 +1330,7 @@ public:
             {"properties", {"propertiesNotSatisfied", ""}},
             {"$jsonSchema", {"schemaRulesNotSatisfied", ""}},
             {"_internalSubschema", {"", ""}},
+            {"items", {"details", ""}},
             {"", {"details", ""}}};
         auto detailsStringPair = detailsStringMap.find(operatorName);
         invariant(detailsStringPair != detailsStringMap.end());
@@ -1084,7 +1384,21 @@ public:
         _context->finishCurrentError(expr);
     }
     void visit(const InternalExprEqMatchExpression* expr) final {}
-    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
+    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
+        switch (toItemsKeywordType(*expr)) {
+            case ItemsKeywordType::kItems:
+            case ItemsKeywordType::kAdditionalItemsSchema:
+                if (_context->shouldGenerateError(*expr)) {
+                    _context->appendLatestCompleteError(&_context->getCurrentObjBuilder());
+                }
+                break;
+            case ItemsKeywordType::kAdditionalItemsFalse:
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
         _context->finishCurrentError(expr);
@@ -1097,13 +1411,23 @@ public:
     void visit(const InternalSchemaFmodMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
-    void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {}
-    void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
+        // If generating an error, append the error details.
+        if (_context->shouldGenerateError(*expr)) {
+            _context->appendLatestCompleteError(&_context->getCurrentObjBuilder());
+        }
+        _context->finishCurrentError(expr);
+    }
+    void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
     void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {}
-    void visit(const InternalSchemaMinItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinItemsMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
@@ -1115,7 +1439,9 @@ public:
     void visit(const InternalSchemaTypeExpression* expr) final {
         _context->finishCurrentError(expr);
     }
-    void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaXorMatchExpression* expr) final {
         static constexpr auto normalDetailString = "schemasNotSatisfied";
         if (_context->getCurrentInversion() == InvertError::kNormal) {
@@ -1230,6 +1556,33 @@ bool hasErrorAnnotations(const MatchExpression& validatorExpr) {
     return true;
 }
 
+/**
+ * Generates a document validation error using match expression 'validatorExpr' for document
+ * 'doc'.
+ */
+BSONObj generateDocumentValidationError(const MatchExpression& validatorExpr, const BSONObj& doc) {
+    ValidationErrorContext context(doc);
+    ValidationErrorPreVisitor preVisitor{&context};
+    ValidationErrorInVisitor inVisitor{&context};
+    ValidationErrorPostVisitor postVisitor{&context};
+
+    // TODO SERVER-49446: Once all nodes have ErrorAnnotations, this check should be converted to an
+    // invariant check that all nodes have an annotation. Also add an invariant to the
+    // DocumentValidationFailureInfo constructor to check that it is initialized with a non-empty
+    // object.
+    if (!hasErrorAnnotations(validatorExpr)) {
+        return BSONObj();
+    }
+    MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
+    tree_walker::walk<true, MatchExpression>(&validatorExpr, &walker);
+
+    // There should be no frames when error generation is complete as the finished error will be
+    // stored in 'context'.
+    invariant(context.frames.empty());
+    auto error = context.getLatestCompleteErrorObject();
+    invariant(!error.isEmpty());
+    return error;
+}
 }  // namespace
 
 std::shared_ptr<const ErrorExtraInfo> DocumentValidationFailureInfo::parse(const BSONObj& obj) {
@@ -1250,24 +1603,9 @@ void DocumentValidationFailureInfo::serialize(BSONObjBuilder* bob) const {
 const BSONObj& DocumentValidationFailureInfo::getDetails() const {
     return _details;
 }
-BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc) {
-    ValidationErrorContext context(doc);
-    ValidationErrorPreVisitor preVisitor{&context};
-    ValidationErrorInVisitor inVisitor{&context};
-    ValidationErrorPostVisitor postVisitor{&context};
-    // TODO SERVER-49446: Once all nodes have ErrorAnnotations, this check should be converted to an
-    // invariant check that all nodes have an annotation. Also add an invariant to the
-    // DocumentValidationFailureInfo constructor to check that it is initialized with a non-empty
-    // object.
-    if (!hasErrorAnnotations(validatorExpr)) {
-        return BSONObj();
-    }
-    MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
-    tree_walker::walk<true, MatchExpression>(&validatorExpr, &walker);
 
-    // There should be no frames when error generation is complete as the finished error will be
-    // stored in 'context'.
-    invariant(context.frames.empty());
+BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc) {
+    auto error = generateDocumentValidationError(validatorExpr, doc);
     BSONObjBuilder objBuilder;
 
     // Add document id to the error object.
@@ -1276,10 +1614,7 @@ BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc) 
     objBuilder.appendAs(objectIdElement, "failingDocumentId"_sd);
 
     // Add errors from match expressions.
-    auto error = context.getLatestCompleteErrorObject();
-    invariant(!error.isEmpty());
     objBuilder.append("details"_sd, std::move(error));
     return objBuilder.obj();
 }
-
 }  // namespace mongo::doc_validation_error

@@ -55,7 +55,8 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<InternalSchemaMaxItemsMatchExpression> maxItems =
-            std::make_unique<InternalSchemaMaxItemsMatchExpression>(path(), numItems());
+            std::make_unique<InternalSchemaMaxItemsMatchExpression>(
+                path(), numItems(), _errorAnnotation);
         if (getTag()) {
             maxItems->setTag(getTag()->clone());
         }

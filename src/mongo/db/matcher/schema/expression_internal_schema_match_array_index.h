@@ -45,7 +45,10 @@ public:
     static constexpr StringData kName = "$_internalSchemaMatchArrayIndex"_sd;
 
     InternalSchemaMatchArrayIndexMatchExpression(
-        StringData path, long long index, std::unique_ptr<ExpressionWithPlaceholder> expression);
+        StringData path,
+        long long index,
+        std::unique_ptr<ExpressionWithPlaceholder> expression,
+        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
@@ -92,6 +95,13 @@ public:
     }
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
+    }
+
+    /**
+     * Returns an index of an array element this expression applies to.
+     */
+    long long arrayIndex() const {
+        return _index;
     }
 
 private:

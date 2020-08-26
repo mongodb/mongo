@@ -47,8 +47,10 @@ class InternalSchemaUniqueItemsMatchExpression final : public ArrayMatchingMatch
 public:
     static constexpr StringData kName = "$_internalSchemaUniqueItems"_sd;
 
-    explicit InternalSchemaUniqueItemsMatchExpression(StringData path)
-        : ArrayMatchingMatchExpression(MatchExpression::INTERNAL_SCHEMA_UNIQUE_ITEMS, path) {}
+    explicit InternalSchemaUniqueItemsMatchExpression(
+        StringData path, clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ArrayMatchingMatchExpression(
+              MatchExpression::INTERNAL_SCHEMA_UNIQUE_ITEMS, path, std::move(annotation)) {}
 
     size_t numChildren() const final {
         return 0;
@@ -63,13 +65,17 @@ public:
     }
 
     bool matchesArray(const BSONObj& array, MatchDetails*) const final {
+        return !findFirstDuplicateValue(array);
+    }
+
+    BSONElement findFirstDuplicateValue(const BSONObj& array) const {
         auto set = _comparator.makeBSONEltSet();
         for (auto&& elem : array) {
             if (!std::get<bool>(set.insert(elem))) {
-                return false;
+                return elem;
             }
         }
-        return true;
+        return {};
     }
 
     void debugString(StringBuilder& builder, int indentationLevel) const final;

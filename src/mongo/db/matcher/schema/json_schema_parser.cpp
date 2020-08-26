@@ -86,7 +86,7 @@ const std::set<StringData> unsupportedKeywords{
     "id"_sd,
 };
 
-constexpr StringData kNamePlaceholder = "i"_sd;
+constexpr StringData kNamePlaceholder = JSONSchemaParser::kNamePlaceholder;
 
 /**
  * Parses 'schema' to the semantically equivalent match expression. If the schema has an associated
@@ -898,19 +898,22 @@ StatusWithMatchExpression parseUniqueItems(const boost::intrusive_ptr<Expression
                                            BSONElement uniqueItemsElt,
                                            StringData path,
                                            InternalSchemaTypeExpression* typeExpr) {
+    auto errorAnnotation = doc_validation_error::createAnnotation(
+        expCtx, uniqueItemsElt.fieldNameStringData().toString(), uniqueItemsElt.wrap());
     if (!uniqueItemsElt.isBoolean()) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '"
                               << JSONSchemaParser::kSchemaUniqueItemsKeyword
                               << "' must be a boolean"};
     } else if (path.empty()) {
-        return {std::make_unique<AlwaysTrueMatchExpression>()};
+        return {std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation))};
     } else if (uniqueItemsElt.boolean()) {
-        auto uniqueItemsExpr = std::make_unique<InternalSchemaUniqueItemsMatchExpression>(path);
+        auto uniqueItemsExpr = std::make_unique<InternalSchemaUniqueItemsMatchExpression>(
+            path, std::move(errorAnnotation));
         return makeRestriction(expCtx, BSONType::Array, path, std::move(uniqueItemsExpr), typeExpr);
     }
 
-    return {std::make_unique<AlwaysTrueMatchExpression>()};
+    return {std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation))};
 }
 
 /**
@@ -928,8 +931,12 @@ StatusWith<boost::optional<long long>> parseItems(
     boost::optional<long long> startIndexForAdditionalItems;
     if (itemsElt.type() == BSONType::Array) {
         // When "items" is an array, generate match expressions for each subschema for each position
-        // in the array, which are bundled together in an AndMatchExpression.
-        auto andExprForSubschemas = std::make_unique<AndMatchExpression>();
+        // in the array, which are bundled together in an AndMatchExpression. Annotate the
+        // AndMatchExpression with the 'items' operator name, since it logically corresponds to the
+        // user visible JSON Schema "items" keyword.
+        auto andExprForSubschemas =
+            std::make_unique<AndMatchExpression>(doc_validation_error::createAnnotation(
+                expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap()));
         auto index = 0LL;
         for (auto subschema : itemsElt.embeddedObject()) {
             if (subschema.type() != BSONType::Object) {
@@ -954,14 +961,24 @@ StatusWith<boost::optional<long long>> parseItems(
             auto exprWithPlaceholder = std::make_unique<ExpressionWithPlaceholder>(
                 kNamePlaceholder.toString(), std::move(parsedSubschema.getValue()));
             auto matchArrayIndex = std::make_unique<InternalSchemaMatchArrayIndexMatchExpression>(
-                path, index, std::move(exprWithPlaceholder));
+                path,
+                index,
+                std::move(exprWithPlaceholder),
+                doc_validation_error::createAnnotation(
+                    expCtx,
+                    "" /* 'andExprForSubschemas' carries the operator name, not this expression */,
+                    BSONObj()));
             andExprForSubschemas->add(matchArrayIndex.release());
             ++index;
         }
         startIndexForAdditionalItems = index;
 
         if (path.empty()) {
-            andExpr->add(std::make_unique<AlwaysTrueMatchExpression>().release());
+            andExpr->add(
+                std::make_unique<AlwaysTrueMatchExpression>(
+                    doc_validation_error::createAnnotation(
+                        expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap()))
+                    .release());
         } else {
             andExpr->add(
                 makeRestriction(
@@ -983,13 +1000,19 @@ StatusWith<boost::optional<long long>> parseItems(
         auto exprWithPlaceholder = std::make_unique<ExpressionWithPlaceholder>(
             kNamePlaceholder.toString(), std::move(nestedItemsSchema.getValue()));
 
+        auto errorAnnotation = doc_validation_error::createAnnotation(
+            expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap());
         if (path.empty()) {
-            andExpr->add(std::make_unique<AlwaysTrueMatchExpression>().release());
+            andExpr->add(
+                std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation)).release());
         } else {
             constexpr auto startIndexForItems = 0LL;
             auto allElemMatch =
                 std::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>(
-                    path, startIndexForItems, std::move(exprWithPlaceholder));
+                    path,
+                    startIndexForItems,
+                    std::move(exprWithPlaceholder),
+                    std::move(errorAnnotation));
             andExpr->add(
                 makeRestriction(expCtx, BSONType::Array, path, std::move(allElemMatch), typeExpr)
                     .release());
@@ -1014,12 +1037,18 @@ Status parseAdditionalItems(const boost::intrusive_ptr<ExpressionContext>& expCt
     std::unique_ptr<ExpressionWithPlaceholder> otherwiseExpr;
     if (additionalItemsElt.type() == BSONType::Bool) {
         const auto emptyPlaceholder = boost::none;
+        // Ignore the expression, since InternalSchemaAllElemMatchFromIndexMatchExpression reports
+        // the details in this case.
+        auto errorAnnotation =
+            doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore);
         if (additionalItemsElt.boolean()) {
             otherwiseExpr = std::make_unique<ExpressionWithPlaceholder>(
-                emptyPlaceholder, std::make_unique<AlwaysTrueMatchExpression>());
+                emptyPlaceholder,
+                std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation)));
         } else {
             otherwiseExpr = std::make_unique<ExpressionWithPlaceholder>(
-                emptyPlaceholder, std::make_unique<AlwaysFalseMatchExpression>());
+                emptyPlaceholder,
+                std::make_unique<AlwaysFalseMatchExpression>(std::move(errorAnnotation)));
         }
     } else if (additionalItemsElt.type() == BSONType::Object) {
         auto parsedOtherwiseExpr = _parse(expCtx,
@@ -1042,12 +1071,18 @@ Status parseAdditionalItems(const boost::intrusive_ptr<ExpressionContext>& expCt
 
     // Only generate a match expression if needed.
     if (startIndexForAdditionalItems) {
+        auto errorAnnotation = doc_validation_error::createAnnotation(
+            expCtx, additionalItemsElt.fieldNameStringData().toString(), additionalItemsElt.wrap());
         if (path.empty()) {
-            andExpr->add(std::make_unique<AlwaysTrueMatchExpression>().release());
+            andExpr->add(
+                std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation)).release());
         } else {
             auto allElemMatch =
                 std::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>(
-                    path, *startIndexForAdditionalItems, std::move(otherwiseExpr));
+                    path,
+                    *startIndexForAdditionalItems,
+                    std::move(otherwiseExpr),
+                    std::move(errorAnnotation));
             andExpr->add(
                 makeRestriction(expCtx, BSONType::Array, path, std::move(allElemMatch), typeExpr)
                     .release());

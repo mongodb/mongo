@@ -1442,5 +1442,603 @@ TEST(JSONSchemaLogicalKeywordValidation, CombineLogicalKeywords) {
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
+TEST(JSONSchemaValidation, ArrayType) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'type': 'array'}}}}");
+    BSONObj document = fromjson("{'a': {'b': 1}}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'type',"
+        "            'specifiedAs': {'type': 'array'},"
+        "            'reason': 'type did not match',"
+        "            'consideredValue': {'b': 1},"
+        "            'consideredType': 'object'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayMinItemsTypeArray) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'type': 'array', 'minItems': 2}}}}");
+    BSONObj document = fromjson("{'a': [1]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'minItems',"
+        "            'specifiedAs': {'minItems': 2},"
+        "            'reason': 'array did not match specified length',"
+        "            'consideredValue': [1]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayMinItems) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'minItems': 2}}}}");
+    BSONObj document = fromjson("{'a': [1]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'minItems',"
+        "            'specifiedAs': {'minItems': 2},"
+        "            'reason': 'array did not match specified length',"
+        "            'consideredValue': [1]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayMinItemsAlwaysTrue) {
+    BSONObj query = fromjson("{$nor: [{'$jsonSchema': {'minItems': 2}}]}");
+    BSONObj document = fromjson("{}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$nor', 'clausesSatisfied': ["
+        "  {'index': 0, 'details': "
+        "    {'operatorName': '$jsonSchema', 'reason': 'schema matched'}}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayMinItemsTypeArrayOnNonArrayAttribute) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'type': 'array', 'minItems': 2}}}}");
+    BSONObj document = fromjson("{'a': 1}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'type',"
+        "            'specifiedAs': {'type': 'array'},"
+        "            'reason': 'type did not match',"
+        "            'consideredValue': 1,"
+        "            'consideredType': 'int'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayMaxItems) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'maxItems': 2}}}}");
+    BSONObj document = fromjson("{'a': [1, 2, 3]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'maxItems',"
+        "            'specifiedAs': {'maxItems': 2},"
+        "            'reason': 'array did not match specified length',"
+        "            'consideredValue': [1, 2, 3]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayMaxItemsAlwaysTrue) {
+    BSONObj query = fromjson("{$nor: [{'$jsonSchema': {'maxItems': 2}}]}");
+    BSONObj document = fromjson("{}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$nor', 'clausesSatisfied': ["
+        "  {'index': 0, 'details': "
+        "    {'operatorName': '$jsonSchema', 'reason': 'schema matched'}}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayUniqueItems) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'uniqueItems': true}}}}");
+    BSONObj document = fromjson("{'a': [1, 2, 3, 3, 4, 4]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'uniqueItems',"
+        "            'specifiedAs': {'uniqueItems': true},"
+        "            'reason': 'found a duplicate item',"
+        "            'consideredValue': [1, 2, 3, 3, 4, 4],"
+        "            'duplicatedValue': 3}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayUniqueItemTypeArray) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'type': 'array', 'uniqueItems': true}}}}");
+    BSONObj document = fromjson("{'a': [1, 2, 3, 3, 4, 4]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'uniqueItems',"
+        "            'specifiedAs': {'uniqueItems': true},"
+        "            'reason': 'found a duplicate item',"
+        "            'consideredValue': [1, 2, 3, 3, 4, 4],"
+        "            'duplicatedValue': 3}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayUniqueItemsTypeArrayOnNonArrayAttribute) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'type': 'array', 'uniqueItems': true}}}}");
+    BSONObj document = fromjson("{'a': 1}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'type',"
+        "            'specifiedAs': {'type': 'array'},"
+        "            'reason': 'type did not match',"
+        "            'consideredValue': 1,"
+        "            'consideredType': 'int'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayUniqueItemsAlwaysTrue) {
+    BSONObj query = fromjson("{$nor: [{'$jsonSchema': {'uniqueItems': true}}]}");
+    BSONObj document = fromjson("{}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$nor', 'clausesSatisfied': ["
+        "  {'index': 0, 'details': "
+        "    {'operatorName': '$jsonSchema', 'reason': 'schema matched'}}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayItemsSingleSchema) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'items': {'type': 'string'}}}}}");
+    BSONObj document = fromjson("{'a': [1, 'A', {}]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "  {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "    {'propertyName': 'a', 'details': ["
+        "      {'operatorName': 'items', 'reason': 'At least one item did not match the "
+        "sub-schema', 'itemIndex': 0, 'details': ["
+        "          {'operatorName': 'type', 'specifiedAs': {'type': 'string'}, "
+        "'reason': 'type did not match', 'consideredValue': 1, 'consideredType': 'int'}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayItemsSingleSchemaTypeArrayOnNonArrayAttribute) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'items': {'type': 'string'}, 'type': 'array'}}}}");
+    BSONObj document = fromjson("{'a': 1}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'type',"
+        "            'specifiedAs': {'type': 'array'},"
+        "            'reason': 'type did not match',"
+        "            'consideredValue': 1,"
+        "            'consideredType': 'int'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// Verifies that "items" with a single schema does not produce any unwanted artifacts when it does
+// not fail. We use "minItems" that fails validation to check that.
+TEST(JSONSchemaValidation, ArrayItemsSingleSchemaCombinedWithMinItems) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'items': {'type': 'string'}, 'minItems': 5}}}}");
+    BSONObj document = fromjson("{'a': ['A', 'B']}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'minItems',"
+        "            'specifiedAs': {'minItems': 5},"
+        "            'reason': 'array did not match specified length',"
+        "            'consideredValue': ['A', 'B']}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayItemsSingleSchemaAlwaysTrue) {
+    BSONObj query = fromjson("{$nor: [{'$jsonSchema': {'items': {'type': 'string'}}}]}");
+    BSONObj document = fromjson("{}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$nor', 'clausesSatisfied': ["
+        "  {'index': 0, 'details': "
+        "    {'operatorName': '$jsonSchema', 'reason': 'schema matched'}}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayItemsSingleSchemaNested) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'properties': "
+        "  {'a': {'items': {'properties': {'b': {'minItems': 2}}}}}}}");
+    BSONObj document = fromjson("{'a': [{'b': [1]}]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "  {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "    {'propertyName': 'a', 'details': ["
+        "      {'operatorName': 'items', 'reason': 'At least one item did not match the "
+        "sub-schema', 'itemIndex': 0, 'details': ["
+        "        {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "          {'propertyName': 'b', 'details': [ "
+        "            {'operatorName': 'minItems', 'specifiedAs': { 'minItems': 2 }, 'reason': "
+        "'array did not match specified length', 'consideredValue': [1]}]}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayItemsSingleSchema2DArray) {
+    BSONObj query =
+        fromjson("{'$jsonSchema': {'properties': {'a': {'items': {'items': {'minimum': 0}}}}}}");
+    BSONObj document = fromjson("{'a': [[1],[],[2, 4], [-1]]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "  {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "    {'propertyName': 'a', 'details': ["
+        "      {'operatorName': 'items', 'reason': 'At least one item did not match the "
+        "sub-schema', 'itemIndex': 3, 'details': ["
+        "        {'operatorName': 'items', 'reason': 'At least one item did not match the "
+        "sub-schema', 'itemIndex': 0, 'details': ["
+        "          {'operatorName': 'minimum', 'specifiedAs': {'minimum': 0}, 'reason': "
+        "'comparison failed', 'consideredValue': -1}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayItemsSingleSchemaNestedWithMinimum) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'properties': "
+        "  {'a': {'items': {'properties': {'b': {'minimum': 2}}}}}}}");
+    BSONObj document = fromjson("{'a': [{'b': 2}, {'b': 1}]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "{'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "  {'propertyName': 'a', 'details': ["
+        "    {'operatorName': 'items', 'reason': 'At least one item did not match the sub-schema', "
+        "'itemIndex': 1, 'details': ["
+        "      {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "        {'propertyName': 'b', 'details': ["
+        "          {'operatorName': 'minimum', 'specifiedAs': {'minimum': 2}, 'reason': "
+        "'comparison failed', 'consideredValue': 1}]}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayItemsSchemaArray) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'items': [{'type': 'number'}, {'type': 'string'}]}}}}");
+    BSONObj document = fromjson("{'a': [1, 2]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "  {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "    {'propertyName': 'a', 'details': ["
+        "      {'operatorName': 'items', 'details': ["
+        "        {'itemIndex': 1, 'details': ["
+        "          {'operatorName': 'type', 'specifiedAs': {'type': 'string'}, 'reason': 'type did "
+        "not match', 'consideredValue': 2, 'consideredType': 'int'}]}"
+        "]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// Verifies that "items" with an array of schemas does not produce any unwanted artifacts when it
+// does not fail. We use "minItems" that fails validation to check that.
+TEST(JSONSchemaValidation, ArrayItemsSchemaArrayCombinedWithMinItems) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'items': [{'type': 'number'}, {'type': 'string'}], 'minItems': 5}}}}");
+    BSONObj document = fromjson("{'a': [1, 'A']}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'minItems',"
+        "            'specifiedAs': {'minItems': 5},"
+        "            'reason': 'array did not match specified length',"
+        "            'consideredValue': [1, 'A']}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// Verifies that "items" with an array of schemas does not produce any unwanted artifacts when it
+// does not fail on array elements that do not exist. We use "minItems" that fails validation to
+// check that.
+TEST(JSONSchemaValidation, ArrayItemsSchemaArrayCombinedWithMinItemsOnShortArray) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'items': [{'type': 'number'}, {'type': 'string'}], 'minItems': 5}}}}");
+    BSONObj document = fromjson("{'a': [1]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'minItems',"
+        "            'specifiedAs': {'minItems': 5},"
+        "            'reason': 'array did not match specified length',"
+        "            'consideredValue': [1]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayItemsSchemaArrayTypeArrayOnNonArrayAttribute) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'items': [{'type': 'number'}, {'type': 'string'}], 'type': 'array'}}}}");
+    BSONObj document = fromjson("{'a': 1}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'type',"
+        "            'specifiedAs': {'type': 'array'},"
+        "            'reason': 'type did not match',"
+        "            'consideredValue': 1,"
+        "            'consideredType': 'int'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// Verifies that "items" with an empty array of schemas does not produce any unwanted artifacts. We
+// use "minItems" that fails validation to check that.
+TEST(JSONSchemaValidation, ArrayItemsEmptySchemaArrayCombinedWithMinItems) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'items': [], 'minItems': 5}}}}");
+    BSONObj document = fromjson("{'a': [1, 'A']}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'minItems',"
+        "            'specifiedAs': {'minItems': 5},"
+        "            'reason': 'array did not match specified length',"
+        "            'consideredValue': [1, 'A']}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayItemsSchemaArrayAlwaysTrue) {
+    BSONObj query = fromjson("{$nor: [{'$jsonSchema': {'items': [{'type': 'string'}]}}]}");
+    BSONObj document = fromjson("{}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$nor', 'clausesSatisfied': ["
+        "  {'index': 0, 'details': "
+        "    {'operatorName': '$jsonSchema', 'reason': 'schema matched'}}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayItemsSchemaArrayOneEmptyObject) {
+    BSONObj query = fromjson("{$nor: [{'$jsonSchema': {'items': [{}]}}]}");
+    BSONObj document = fromjson("{}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$nor', 'clausesSatisfied': ["
+        "  {'index': 0, 'details': "
+        "    {'operatorName': '$jsonSchema', 'reason': 'schema matched'}}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayAdditionalItemsSchema) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'type': 'array', 'items': [{'type': 'number'}, {'type': 'string'}], "
+        "'additionalItems': {'type': 'object'}}}}}");
+    BSONObj document = fromjson("{'a': [1, 'First', {}, 'Extra element']}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "  {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "    {'propertyName': 'a', 'details': ["
+        "      {'operatorName': 'additionalItems', 'reason': 'At least one additional item did not "
+        "match the sub-schema', 'itemIndex': 3, 'details': ["
+        "          {'operatorName': 'type', 'specifiedAs': {'type': 'object'}, 'reason': 'type did "
+        "not match', 'consideredValue': 'Extra element', 'consideredType': 'string'}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayAdditionalItemsSchemaItemsAndItemsSchemaFail) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'type': 'array', 'items': [{'type': 'number'}, {'type': 'string'}], "
+        "'additionalItems': {'type': 'object'}}}}}");
+    BSONObj document = fromjson("{'a': ['1', 2, {}, {'b': 1}, 'Fail']}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "  {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "    {'propertyName': 'a', 'details': ["
+        "      {'operatorName': 'items', 'details': ["
+        "        {'itemIndex': 0, 'details': ["
+        "          {'operatorName': 'type', 'specifiedAs': {'type': 'number'}, 'reason': 'type did "
+        "not match', 'consideredValue': '1', 'consideredType': 'string'}]},"
+        "        {'itemIndex': 1, 'details': ["
+        "          {'operatorName': 'type', 'specifiedAs': {'type': 'string'}, 'reason': 'type did "
+        "not match', 'consideredValue': 2, 'consideredType': 'int'}]}"
+        "]},"
+        "      {'operatorName': 'additionalItems', 'reason': 'At least one additional item did not "
+        "match the sub-schema', 'itemIndex': 4, 'details': ["
+        "          {'operatorName': 'type', 'specifiedAs': {'type': 'object'}, 'reason': 'type did "
+        "not match', 'consideredValue': 'Fail', 'consideredType': 'string'}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayAdditionalItemsSchemaNested) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'type': 'array', 'items': [{'type': 'string'}], 'additionalItems': "
+        "         {'properties': {'b': {'items': {'type': 'object'}}}}}}}}");
+    BSONObj document = fromjson("{'a': ['A', {'b': [{}, 'A']}]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "  {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "    {'propertyName': 'a', 'details': ["
+        "      {'operatorName': 'additionalItems', 'reason': 'At least one additional item did not "
+        "match the sub-schema', 'itemIndex': 1, 'details': ["
+        "        {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "          {'propertyName': 'b', 'details': ["
+        "            {'operatorName': 'items', 'reason': 'At least one item did not match the "
+        "sub-schema', 'itemIndex': 1, 'details': ["
+        "              {'operatorName': 'type', 'specifiedAs': {'type': 'object'}, 'reason': "
+        "'type did not match', 'consideredValue': 'A', 'consideredType': 'string'}]}]}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayAdditionalItemsSchemaTypeArrayOnNonArrayAttribute) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'type': 'array', 'items': [{'type': 'number'}, {'type': 'string'}], "
+        "'additionalItems': {'type': 'object'}}}}}");
+    BSONObj document = fromjson("{'a': 1}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'type',"
+        "            'specifiedAs': {'type': 'array'},"
+        "            'reason': 'type did not match',"
+        "            'consideredValue': 1,"
+        "            'consideredType': 'int'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// Verifies that "additionalItems" with a single schema does not produce any unwanted artifacts when
+// it does not fail. We use "minItems" that fails validation to check that.
+TEST(JSONSchemaValidation, ArrayAdditionalItemsSchemaCombinedWithMinItems) {
+    BSONObj query = fromjson(
+        "  {'$jsonSchema':"
+        "   {'properties': "
+        "       {'a': {'type': 'array', 'items': [{'type': 'number'}, {'type': 'string'}], "
+        "'additionalItems': {'type': 'object'}, 'minItems': 5}}}}");
+    BSONObj document = fromjson("{'a': [1, 'First', {}]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'minItems',"
+        "            'specifiedAs': {'minItems': 5},"
+        "            'reason': 'array did not match specified length',"
+        "            'consideredValue': [1, 'First', {}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayAdditionalItemsSchemaAlwaysTrue) {
+    BSONObj query = fromjson(
+        "{$nor: [{'$jsonSchema': "
+        "{'items': [{'type': 'object'}], 'additionalItems': {'type': 'object'}}}]}");
+    BSONObj document = fromjson("{}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$nor', 'clausesSatisfied': ["
+        "  {'index': 0, 'details': "
+        "    {'operatorName': '$jsonSchema', 'reason': 'schema matched'}}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayAdditionalItemsFalse) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "  {'properties': {'a': "
+        "    {'items': [{'type': 'number'}, {'type': 'string'}], "
+        "'additionalItems': false}}}}");
+    BSONObj document = fromjson("{'a': [1, 'First', 'Extra element']}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "  {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "    {'propertyName': 'a', 'details': ["
+        "      {'operatorName': 'additionalItems', 'specifiedAs': {'additionalItems': false}, "
+        "'reason': 'found additional items', 'additionalItems': ['Extra element']}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayAdditionalItemsFalseTypeArrayOnNonArrayAttribute) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "  {'properties': {'a': "
+        "    {'items': [{'type': 'number'}], 'additionalItems': false, 'type': 'array'}}}}");
+    BSONObj document = fromjson("{'a': 1}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'type',"
+        "            'specifiedAs': {'type': 'array'},"
+        "            'reason': 'type did not match',"
+        "            'consideredValue': 1,"
+        "            'consideredType': 'int'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayAdditionalItemsFalseCombinedWithMinItems) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "  {'properties': {'a': "
+        "    {'items': [{'type': 'number'}], 'additionalItems': false, 'minItems': 5}}}}");
+    BSONObj document = fromjson("{'a': [1]}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'minItems',"
+        "            'specifiedAs': {'minItems': 5},"
+        "            'reason': 'array did not match specified length',"
+        "            'consideredValue': [1]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, ArrayAdditionalItemsFalseAlwaysTrue) {
+    BSONObj query = fromjson(
+        "{$nor: [{'$jsonSchema': {'items': [{'type': 'number'}], 'additionalItems': false}}]}");
+    BSONObj document = fromjson("{}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$nor', 'clausesSatisfied': ["
+        "  {'index': 0, 'details': "
+        "    {'operatorName': '$jsonSchema', 'reason': 'schema matched'}}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
 }  // namespace
 }  // namespace mongo

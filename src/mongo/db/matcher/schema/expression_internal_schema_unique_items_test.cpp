@@ -105,5 +105,15 @@ TEST(InternalSchemaUniqueItemsMatchExpression, AlwaysUsesBinaryComparisonRegardl
     ASSERT_TRUE(uniqueItems.matchesBSON(fromjson("{foo: [{x: 'two'}, {y: 'two'}]}")));
     ASSERT_TRUE(uniqueItems.matchesBSON(fromjson("{foo: [{a: 'three'}, {a: 'THREE'}]}")));
 }
+
+TEST(InternalSchemaUniqueItemsMatchExpression, FindsFirstDuplicateValue) {
+    InternalSchemaUniqueItemsMatchExpression uniqueItems("");
+    auto inputArray = fromjson("[1, 2, 2, 1]}");
+    auto result = uniqueItems.findFirstDuplicateValue(inputArray);
+    ASSERT_TRUE(result);
+    ASSERT_EQUALS(result.Int(), 2);
+    ASSERT_FALSE(uniqueItems.findFirstDuplicateValue(fromjson("[1, 2]}")));
+    ASSERT_FALSE(uniqueItems.findFirstDuplicateValue(fromjson("[]}")));
+}
 }  // namespace
 }  // namespace mongo
