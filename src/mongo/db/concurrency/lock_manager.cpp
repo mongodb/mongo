@@ -845,7 +845,11 @@ LockManager::Partition* LockManager::_getPartition(LockRequest* request) const {
 void LockManager::dump() const {
     BSONArrayBuilder locks;
     _buildLocksArray(getLockToClientMap(getGlobalServiceContext()), true, nullptr, &locks);
-    LOGV2(20521, "lock manager dump", "addr"_attr = formatPtr(this), "locks"_attr = locks.arr());
+    LOGV2_OPTIONS(20521,
+                  logv2::LogTruncation::Disabled,
+                  "lock manager dump",
+                  "addr"_attr = formatPtr(this),
+                  "locks"_attr = locks.arr());
 }
 
 void LockManager::getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClientMap,
