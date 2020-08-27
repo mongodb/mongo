@@ -59,7 +59,7 @@ public:
     /**
      * run() catches all database exceptions and stores them in _status, to simplify error
      * handling in the caller above.  It returns its own _status if that is not OK, otherwise
-     * the shared initial sync status.
+     * the shared sync status.
      */
     Status run();
 
@@ -97,7 +97,7 @@ protected:
     // isTransientError() method determines whether the exception is retryable or not; usually
     // network errors will be retryable and other errors will not.  If the error is retryable,
     // the BaseCloner framework will attempt to reconnect the client and run the stage again.  If
-    // it is not, the exception will be propagated up and fail the initial sync attempt entirely.
+    // it is not, the exception will be propagated up and fail the sync attempt entirely.
     class BaseClonerStage {
     public:
         BaseClonerStage(std::string name) : _name(name){};
@@ -201,7 +201,7 @@ protected:
     void setSyncFailedStatus(Status status);
 
     /**
-     * Takes the initial sync status lock and checks the initial sync status.
+     * Takes the sync status lock and checks the sync status.
      * Used to make sure failpoints exit on process shutdown.
      */
     bool mustExit();
@@ -210,8 +210,38 @@ protected:
      * A stage may, but is not required, to call this when we should clear the retrying state
      * because the operation has at least partially succeeded.  If the stage does not call this,
      * the retrying state is cleared upon successful completion of the entire stage.
+     *
+     * Left blank here but may be overriden.
      */
-    void clearRetryingState();
+    virtual void clearRetryingState() {}
+
+    /**
+     * Called every time the base cloner receives an error from a stage. Use this to
+     * execute any cloner-specific logic such as evaluating retry eligibility, running
+     * checks on the sync source, etc.
+     *
+     * Left blank here but may be overriden.
+     */
+    virtual void handleStageAttemptFailed(BaseClonerStage* stage, Status lastError) {}
+
+    /**
+     * Supports pausing at certain stages for a fuzzer test framework.
+     *
+     * Left blank but may be overriden.
+     */
+    virtual void pauseForFuzzer(BaseClonerStage* stage) {}
+
+    /**
+     * Provides part of a log message for the sync process describing the namespace the
+     * cloner is operating on.  It must start with the database name, followed by the
+     * string ' db: { ', followed by the stage name, followed by ': ' and the collection UUID
+     * if known.
+     *
+     * Left blank but may be overriden.
+     */
+    virtual std::string describeForFuzzer(BaseClonerStage*) const {
+        return "";
+    }
 
 private:
     virtual ClonerStages getStages() = 0;
@@ -226,38 +256,6 @@ private:
     AfterStageBehavior runStage(BaseClonerStage* stage);
 
     AfterStageBehavior runStageWithRetries(BaseClonerStage* stage);
-
-    /**
-     * Make sure the initial sync ID on the sync source has not changed.  Throws an exception
-     * if it has.  Returns a not-OK status if a network error occurs.
-     */
-    Status checkInitialSyncIdIsUnchanged();
-
-    /**
-     * Make sure the rollback ID has not changed.  Throws an exception if it has.  Returns
-     * a not-OK status if a network error occurs.
-     */
-    Status checkRollBackIdIsUnchanged();
-
-    /**
-     * Does validity checks on the sync source.  If the sync source is now no longer usable,
-     * throws an exception. Returns a not-OK status if a network error occurs or if the sync
-     * source is temporarily unusable (e.g. restarting).
-     */
-    Status checkSyncSourceIsStillValid();
-
-    /**
-     * Supports pausing at certain stages for the initial sync fuzzer test framework.
-     */
-    void pauseForFuzzer(BaseClonerStage* stage);
-
-    /**
-     * Provides part of a log message for the initial sync describing the namespace the
-     * cloner is operating on.  It must start with the database name, followed by the
-     * string ' db: { ', followed by the stage name, followed by ': ' and the collection UUID
-     * if known.
-     */
-    virtual std::string describeForFuzzer(BaseClonerStage*) const = 0;
 
     AfterStageBehavior runStages();
 
@@ -287,9 +285,6 @@ private:
     // _stopAfterStage is used for unit testing and causes the cloner to exit after a given
     // stage.
     std::string _stopAfterStage;  // (X)
-
-    // Operation that may currently be retrying.
-    ReplSyncSharedData::RetryableOperation _retryableOp;  // (X)
 };
 
 }  // namespace repl

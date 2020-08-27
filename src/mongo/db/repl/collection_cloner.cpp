@@ -61,7 +61,8 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
                                    DBClientConnection* client,
                                    StorageInterface* storageInterface,
                                    ThreadPool* dbPool)
-    : BaseCloner("CollectionCloner"_sd, sharedData, source, client, storageInterface, dbPool),
+    : InitialSyncBaseCloner(
+          "CollectionCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _sourceNss(sourceNss),
       _collectionOptions(collectionOptions),
       _sourceDbAndUuid(NamespaceString("UNINITIALIZED")),

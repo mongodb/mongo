@@ -31,15 +31,15 @@
 
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/tenant_database_cloner.h"
+#include "mongo/db/repl/tenant_migration_base_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 
 namespace mongo {
 namespace repl {
 
-class TenantAllDatabaseCloner final : public BaseCloner {
+class TenantAllDatabaseCloner final : public TenantMigrationBaseCloner {
 public:
     struct Stats {
         size_t databasesCloned{0};
@@ -68,10 +68,6 @@ public:
 protected:
     ClonerStages getStages() final;
 
-    TenantMigrationSharedData* getSharedData() const override {
-        return checked_cast<TenantMigrationSharedData*>(BaseCloner::getSharedData());
-    }
-
 private:
     friend class TenantAllDatabaseClonerTest;
 
@@ -99,10 +95,6 @@ private:
      * the sync source.
      */
     void postStage() final;
-
-    std::string describeForFuzzer(BaseClonerStage* stage) const final {
-        return "admin db: { " + stage->getName() + ": 1 }";
-    }
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

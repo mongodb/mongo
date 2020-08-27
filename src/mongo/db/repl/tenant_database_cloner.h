@@ -31,15 +31,15 @@
 
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/tenant_collection_cloner.h"
+#include "mongo/db/repl/tenant_migration_base_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 
 namespace mongo {
 namespace repl {
 
-class TenantDatabaseCloner final : public BaseCloner {
+class TenantDatabaseCloner final : public TenantMigrationBaseCloner {
 public:
     struct Stats {
         std::string dbname;
@@ -75,10 +75,6 @@ protected:
 
     bool isMyFailPoint(const BSONObj& data) const final;
 
-    TenantMigrationSharedData* getSharedData() const override {
-        return checked_cast<TenantMigrationSharedData*>(BaseCloner::getSharedData());
-    }
-
 private:
     friend class TenantDatabaseClonerTest;
 
@@ -110,10 +106,6 @@ private:
      * on the sync source, and sets the end time in _stats when done.
      */
     void postStage() final;
-
-    std::string describeForFuzzer(BaseClonerStage* stage) const final {
-        return _dbName + " db: { " + stage->getName() + ": 1 } ";
-    }
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

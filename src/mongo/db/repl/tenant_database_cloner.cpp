@@ -55,7 +55,8 @@ TenantDatabaseCloner::TenantDatabaseCloner(const std::string& dbName,
                                            StorageInterface* storageInterface,
                                            ThreadPool* dbPool,
                                            StringData tenantId)
-    : BaseCloner("TenantDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
+    : TenantMigrationBaseCloner(
+          "TenantDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
       _listCollectionsStage("listCollections", this, &TenantDatabaseCloner::listCollectionsStage),
       _tenantId(tenantId) {

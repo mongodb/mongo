@@ -71,7 +71,8 @@ TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
                                                StorageInterface* storageInterface,
                                                ThreadPool* dbPool,
                                                StringData tenantId)
-    : BaseCloner("TenantCollectionCloner"_sd, sharedData, source, client, storageInterface, dbPool),
+    : TenantMigrationBaseCloner(
+          "TenantCollectionCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _sourceNss(sourceNss),
       _collectionOptions(collectionOptions),
       _sourceDbAndUuid(NamespaceString("UNINITIALIZED")),

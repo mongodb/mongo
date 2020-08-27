@@ -47,7 +47,8 @@ AllDatabaseCloner::AllDatabaseCloner(InitialSyncSharedData* sharedData,
                                      DBClientConnection* client,
                                      StorageInterface* storageInterface,
                                      ThreadPool* dbPool)
-    : BaseCloner("AllDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
+    : InitialSyncBaseCloner(
+          "AllDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _connectStage("connect", this, &AllDatabaseCloner::connectStage),
       _getInitialSyncIdStage("getInitialSyncId", this, &AllDatabaseCloner::getInitialSyncIdStage),
       _listDatabasesStage("listDatabases", this, &AllDatabaseCloner::listDatabasesStage) {}

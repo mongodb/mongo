@@ -982,6 +982,7 @@ env.Library(
         'all_database_cloner.cpp',
         'collection_cloner.cpp',
         'database_cloner.cpp',
+        'initial_sync_base_cloner.cpp',
     ],
     LIBDEPS = [
         '$BUILD_DIR/mongo/base',
@@ -1011,6 +1012,7 @@ env.Library(
         'tenant_all_database_cloner.cpp',
         'tenant_collection_cloner.cpp',
         'tenant_database_cloner.cpp',
+        'tenant_migration_base_cloner.cpp',
     ],
     LIBDEPS = [
         '$BUILD_DIR/mongo/base',

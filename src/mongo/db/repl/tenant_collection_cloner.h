@@ -32,16 +32,16 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/task_runner.h"
+#include "mongo/db/repl/tenant_migration_base_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
 namespace repl {
 
-class TenantCollectionCloner : public BaseCloner {
+class TenantCollectionCloner : public TenantMigrationBaseCloner {
 public:
     struct Stats {
         static constexpr StringData kDocumentsToCopyFieldName = "documentsToCopy"_sd;
@@ -117,10 +117,6 @@ protected:
 
     bool isMyFailPoint(const BSONObj& data) const final;
 
-    TenantMigrationSharedData* getSharedData() const override {
-        return checked_cast<TenantMigrationSharedData*>(BaseCloner::getSharedData());
-    }
-
 private:
     friend class TenantCollectionClonerTest;
     friend class TenantCollectionClonerStage;
@@ -138,11 +134,6 @@ private:
             return false;
         }
     };
-
-    std::string describeForFuzzer(BaseClonerStage* stage) const final {
-        return _sourceNss.db() + " db: { " + stage->getName() + ": UUID(\"" +
-            _sourceDbAndUuid.uuid()->toString() + "\") coll: " + _sourceNss.coll() + " }";
-    }
 
     /**
      * The preStage sets the start time in _stats.

@@ -161,8 +161,8 @@ runRenameTest({
 });
 
 const expectedLogFor5and7 = isJsonLogNoConn()
-    ? '`Initial Sync retrying cloner stage due to error","attr":{"cloner":"CollectionCloner","stage":"query","error":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${rnss}\'. UUID ${uuid}"}}}`'
-    : "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${rnss}'. UUID ${uuid}`";
+    ? '`Sync process retrying cloner stage due to error","attr":{"cloner":"CollectionCloner","stage":"query","error":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${rnss}\'. UUID ${uuid}"}}}`'
+    : "`Sync process retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${rnss}'. UUID ${uuid}`";
 
 jsTestLog("[5] Testing rename between getMores.");
 runRenameTest({
@@ -188,10 +188,10 @@ if (isJsonLogNoConn()) {
 if (TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replTest)) {
     if (isJsonLogNoConn()) {
         expectedLogFor6and8 =
-            '`Initial Sync retrying cloner stage due to error","attr":{"cloner":"CollectionCloner","stage":"query","error":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${dropPendingNss}\'. UUID ${uuid}`';
+            '`Sync process retrying cloner stage due to error","attr":{"cloner":"CollectionCloner","stage":"query","error":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${dropPendingNss}\'. UUID ${uuid}`';
     } else {
         expectedLogFor6and8 =
-            "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${dropPendingNss}'. UUID ${uuid}`";
+            "`Sync process retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${dropPendingNss}'. UUID ${uuid}`";
     }
 }
 

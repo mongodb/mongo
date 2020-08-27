@@ -48,7 +48,8 @@ DatabaseCloner::DatabaseCloner(const std::string& dbName,
                                DBClientConnection* client,
                                StorageInterface* storageInterface,
                                ThreadPool* dbPool)
-    : BaseCloner("DatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
+    : InitialSyncBaseCloner(
+          "DatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _dbName(dbName),
       _listCollectionsStage("listCollections", this, &DatabaseCloner::listCollectionsStage) {
     invariant(!dbName.empty());
