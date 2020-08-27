@@ -1769,6 +1769,116 @@ for each collection in the relevant database. Once all collection drops are repl
 of nodes, the node will drop the now empty database and a `dropDatabase` command oplog entry is
 written to the oplog.
 
+# Feature Compatibility Version
+
+Feature compatibility version (FCV) is the versioning mechanism for a MongoDB cluster that provides
+safety guarantees when upgrading and downgrading between versions. The FCV determines the version of
+the feature set exposed by the cluster.
+
+FCV is used to disable features that may be problematic when active in a mixed version cluster.
+For example, incompatibility issues can arise if a newer version node accepts an instance of a new
+feature *f* while there are still older version nodes in the cluster that are unable to handle
+*f*.
+
+FCV is persisted as a document in the `admin.system.version` collection. It will look something like
+the following if a node were to be in FCV 4.4:
+<pre><code>
+   { "_id" : "featureCompatibilityVersion", "version" : "4.4" }</code></pre>
+
+This document is present in every mongod in the cluster and is replicated to other members of the
+replica set whenever it is updated via writes to the `admin.system.version` collection. The FCV
+document is also present on standalone nodes.
+
+On a clean startup (the server currently has no non-local databases), the server will create the FCV
+document for the first time. If it is running as a shard server (with the `--shardsvr option`), the 
+server will set the FCV to be the last LTS version. This is to ensure compatibility when adding the
+shard to a downgraded version cluster. The config server will run `setFeatureCompatibilityVersion`
+on the shard to match the clusters FCV as part of `addShard`. If the server is not running as a
+shard server, then the server will set its FCV to the latest version by default.
+
+As part of a startup with an existing FCV document, the server caches an in-memory value of the FCV
+from disk. The `FcvOpObserver` keeps this in-memory value in sync with the on-disk FCV document
+whenever an update to the document is made. In the period of time during startup where the in-memory
+value has yet to be loaded from disk, the FCV is set to `kUnsetDefault{Last-LTS}Behavior`. This 
+indicates that the server will be using the last-LTS feature set as to ensure compatibility with
+other nodes in the replica set.
+
+As part of initial sync, the in-memory FCV value is always initially set to be 
+`kUnsetDefault{Last-LTS}Behavior`. This is to ensure compatibility between the sync source and sync
+target. If the sync source is actually in a different feature compatibility version, we will find
+out when we clone the `admin.system.version` collection.
+
+A node that starts with `--replSet` will also have an FCV value of `kUnsetDefault{Last-LTS}Behavior`
+if it has not yet received the `replSetInitiate` command.
+
+## setFeatureCompatibilityVersion
+
+The FCV can be set using the `setFeatureCompatibilityVersion` admin command to one of the following:
+* The version of the last-LTS (Long Term Support) 
+  * Indicates to the server to use the feature set compatible with the last LTS release version.
+* The version of the last-continuous release
+  * Indicates to the server to use the feature set compatible with the last continuous release
+version.
+* The version of the latest(current) release
+  * Indicates to the server to use the feature set compatible with the latest release version.
+In a replica set configuration, this command should be run against the primary node. In a sharded
+configuration this should be run against the mongos. The mongos will forward the command
+to the config servers which then forward request again to shard primaries. As mongos nodes are
+non-data bearing, they do not have an FCV.
+
+Each `mongod` release will support the following upgrade/downgrade paths:
+* Last-Continuous ←→ Latest
+* Last-LTS ←→ Latest
+
+As part of an upgrade/downgrade, the FCV will transition through three states:
+<pre><code>
+Upgrade:
+   kVersionX → kUpgradingFromXToY → kVersionY
+
+Downgrade:
+   kVersionX → kDowngradingFromXToY → kVersionY
+</code></pre>
+In above, X will be the source version that we are upgrading/downgrading from while Y is the target
+version that we are upgrading/downgrading to.
+
+Transitioning to one of the `kUpgradingFromXToY`/`kDowngradingFromXToY` states updates
+the FCV document in `admin.system.version` with a new `targetVersion` field. Transitioning to a
+`kDowngradingFromXtoY` state in particular will also add a `previousVersion` field along with the
+`targetVersion` field. These updates are done with `writeConcern: majority`.
+
+Some examples of on-disk representations of the upgrading and downgrading states:
+<pre><code>
+kUpgradingFrom44To47:
+{
+    version: 4.4,
+    targetVersion: 4.7
+}
+
+kDowngradingFrom47To44:
+{ 
+    version: 4.4, 
+    targetVersion: 4.4,
+    previousVersion: 4.7
+}
+</code></pre>
+
+Once this transition is complete, the global lock is acquired in shared
+mode and then released immediately. This creates a barrier and guarantees safety for operations
+that acquire the global lock either in exclusive or intent exclusive mode. If these operations begin
+and acquire the global lock prior to the FCV change, they will proceed in the context of the old
+FCV, and will guarantee to finish before the FCV change takes place. For the operations that begin
+after the FCV change, they will see the updated FCV and behave accordingly.
+
+Transitioning to one of the `kUpgradingFromXToY`/`kDowngradingFromXtoY`/`kVersionY`(on upgrade)
+states sets the `minWireVersion` to `WireVersion::LATEST_WIRE_VERSION` and also closes all incoming
+connections from internal clients with lower binary versions.
+
+Finally, as part of transitioning to the `kVersionY` state, the `targetVersion` and the
+`previousVersion` (if applicable) fields of the FCV document are deleted while the `version` field
+is updated to reflect the new upgraded or downgraded state. This update is also done using
+`writeConcern: majority`. The new in-memory FCV value will be updated to reflect the on-disk
+changes.
+
 # Replication Timestamp Glossary
 
 In this section, when we refer to the word "transaction" without any other qualifier, we are talking
