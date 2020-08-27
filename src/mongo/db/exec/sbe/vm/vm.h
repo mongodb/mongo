@@ -185,6 +185,7 @@ enum class Builtin : uint8_t {
     bitTestZero,      // test bitwise mask & value is zero
     bitTestMask,      // test bitwise mask & value is mask
     bitTestPosition,  // test BinData with a bit position list
+    bsonSize,         // implements $bsonSize
 };
 
 class CodeFragment {
@@ -422,6 +423,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestZero(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestMask(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestPosition(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinBsonSize(uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 

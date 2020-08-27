@@ -94,6 +94,7 @@ env.CppUnitTest(
         'sbe_plan_stage_test.cpp',
         'sbe_sort_test.cpp',
         'sbe_test.cpp',
+        'expressions/sbe_bson_size_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',

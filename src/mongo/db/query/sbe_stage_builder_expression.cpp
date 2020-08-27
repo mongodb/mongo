@@ -918,7 +918,27 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionBsonSize* expr) final {
-        unsupportedExpression(expr->getOpName());
+        // Build an expression which evaluates the size of a BSON document and validates the input
+        // argument.
+        // 1. If the argument is null or empty, return null.
+        // 2. Else, if the argument is a BSON document, return its size.
+        // 3. Else, raise an error.
+
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
+
+        auto bsonSizeExpr = sbe::makeE<sbe::EIf>(
+            generateNullOrMissing(frameId, 0),
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+            sbe::makeE<sbe::EIf>(
+                sbe::makeE<sbe::EFunction>("isObject", sbe::makeEs(inputRef.clone())),
+                sbe::makeE<sbe::EFunction>("bsonSize", sbe::makeEs(inputRef.clone())),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5043001},
+                                       "$bsonSize requires a document input")));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(bsonSizeExpr)));
     }
     void visit(ExpressionCeil* expr) final {
         unsupportedExpression(expr->getOpName());

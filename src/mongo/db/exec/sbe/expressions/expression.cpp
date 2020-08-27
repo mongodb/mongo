@@ -364,6 +364,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"bitTestMask", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::bitTestMask, false}},
     {"bitTestPosition",
      BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::bitTestPosition, false}},
+    {"bsonSize", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::bsonSize, false}},
 };
 
 /**

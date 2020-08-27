@@ -1196,6 +1196,22 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestMask(uin
     return {false, value::TypeTags::Boolean, result};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBsonSize(uint8_t arity) {
+    auto [_, tagOperand, valOperand] = getFromStack(0);
+
+    if (tagOperand == value::TypeTags::Object) {
+        BSONObjBuilder objBuilder;
+        bson::convertToBsonObj(objBuilder, value::getObjectView(valOperand));
+        auto sz = objBuilder.done().objsize();
+        return {false, value::TypeTags::NumberInt32, value::bitcastFrom(sz)};
+    } else if (tagOperand == value::TypeTags::bsonObject) {
+        auto beginObj = value::getRawPointerView(valOperand);
+        auto sz = ConstDataView(beginObj).read<LittleEndian<uint32_t>>();
+        return {false, value::TypeTags::NumberInt32, value::bitcastFrom(sz)};
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
@@ -1229,6 +1245,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinBitTestMask(arity);
         case Builtin::bitTestPosition:
             return builtinBitTestPosition(arity);
+        case Builtin::bsonSize:
+            return builtinBsonSize(arity);
     }
 
     MONGO_UNREACHABLE;
