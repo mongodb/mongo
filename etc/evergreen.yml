@@ -3734,6 +3734,31 @@ tasks:
           --separate-debug
         compiling_for_test: true
 
+- name: compile_visibility_test
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: archive-visibility-test-meta
+        task_compile_flags: >-
+          --ssl
+          --dbg=on
+          --opt=on
+          --separate-debug
+          --link-model=dynamic
+          --experimental-visibility-support=on
+
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/visibility-test-meta.${ext|tgz}
+        remote_file: ${project}/${build_variant}/${revision}/visibility-test-meta-${build_id}-${task_name}-${execution}.${ext|tgz}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        display_name: Binaries
+
 ## embedded_sdk_build_and_test_* - build the embedded-dev and embedded-test targets only ##
 
 - name: embedded_sdk_build_cdriver
@@ -8449,6 +8474,29 @@ task_groups:
   tasks:
   - clang_tidy
 
+- name: visibility_test_TG
+  setup_group_can_fail_task: true
+  max_hosts: 1
+  setup_group:
+    - command: manifest.load
+    - func: "git get project"
+    - func: "get buildnumber"
+    - func: "set up credentials"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
+    - func: "upload pip requirements"
+    - func: "set up win mount script"
+    - func: "generate compile expansions"
+  teardown_group:
+    - func: "umount shared scons directory"
+  setup_task:
+    - func: "set task expansion macros"
+    - func: "apply compile expansions"
+  teardown_task:
+      - func: "attach scons logs"
+  tasks:
+  - compile_visibility_test
+
 - name: embedded_sdk_build_and_test
   setup_group_can_fail_task: true
   max_hosts: 1
@@ -9887,12 +9935,13 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: macos-debug
+- &macos-debug-template
+  name: macos-debug
   display_name: "* Shared Library macOS DEBUG"
   batchtime: 60 # 1 hour
   run_on:
   - macos-1014
-  expansions:
+  expansions: &macos-debug-expansions
     resmoke_jobs_max: 6
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic
@@ -10105,14 +10154,15 @@ buildvariants:
     - ubuntu1604-packer
   - name: .publish
 
-- name: enterprise-rhel-62-64-bit-dynamic-required
+- &enterprise-rhel-62-64-bit-dynamic-required-template
+  name: enterprise-rhel-62-64-bit-dynamic-required
   display_name: "! Shared Library Enterprise RHEL 6.2"
   batchtime: 60 # 1 hour
   modules:
   - enterprise
   run_on:
   - rhel62-small
-  expansions:
+  expansions: &enterprise-rhel-62-64-bit-dynamic-required-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     multiversion_platform: rhel62
@@ -12695,3 +12745,31 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
+
+- <<: *enterprise-rhel-62-64-bit-dynamic-required-template
+  name: rhel-62-64-bit-dynamic-visibility-test
+  display_name: "~ Shared Library RHEL 6.2 (visibility test)"
+  expansions:
+    <<: *enterprise-rhel-62-64-bit-dynamic-required-expansions
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --experimental-visibility-support=on
+
+- name: windows-dynamic-visibility-test
+  display_name: "~ Shared Library Windows (visibility test)"
+  expansions:
+    compile_flags: CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    python: '/cygdrive/c/python/python37/python.exe'
+    ext: zip
+    has_packages: false
+    scons_cache_scope: shared
+    scons_cache_mode: all
+  tasks:
+  - name: visibility_test_TG
+    distros:
+    - windows-64-vs2019-large
+
+- <<: *macos-debug-template
+  name: macos-dynamic-visibility-test
+  display_name: "~ Shared Library macOS DEBUG (visibility test)"
+  expansions:
+    <<: *macos-debug-expansions
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic --experimental-visibility-support=on
