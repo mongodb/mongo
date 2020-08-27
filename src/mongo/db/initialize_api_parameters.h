@@ -86,7 +86,7 @@ public:
         _apiDeprecationErrors = apiDeprecationErrors;
     }
 
-    const bool getParamsPassed() const {
+    bool getParamsPassed() const {
         return _apiVersion || _apiStrict || _apiDeprecationErrors;
     }
 
