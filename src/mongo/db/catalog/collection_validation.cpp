@@ -434,6 +434,8 @@ Status validate(OperationContext* opCtx,
     uassertStatusOK(replCoord->checkCanServeReadsFor(
         opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
+    output->append("ns", validateState.nss().ns());
+
     try {
         // Full record store validation code is executed before we open cursors because it may close
         // and/or invalidate all open cursors.
@@ -540,8 +542,6 @@ Status validate(OperationContext* opCtx,
                       "corruption found",
                       "namespace"_attr = validateState.nss(),
                       "uuid"_attr = uuidString);
-
-        output->append("ns", validateState.nss().ns());
     } catch (ExceptionFor<ErrorCodes::CursorNotFound>&) {
         invariant(validateState.isBackground());
         string warning = str::stream()
