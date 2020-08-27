@@ -1,5 +1,7 @@
 """Class to support running various linters in a common framework."""
 
+from typing import Dict, List, Optional
+
 import difflib
 import logging
 import os
@@ -8,7 +10,7 @@ import site
 import subprocess
 import sys
 import threading
-from typing import Dict, List, Optional
+import pkg_resources
 
 from . import base
 
@@ -22,22 +24,28 @@ def _check_version(linter, cmd_path, args):
         logging.info(str(cmd))
         process_handle = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, stderr = process_handle.communicate()
-        output = output.decode('utf-8')
+        decoded_output = output.decode('utf-8')
 
         if process_handle.returncode:
             logging.info(
                 "Version check failed for [%s], return code '%d'."
-                "Standard Output:\n%s\nStandard Error:\n%s", cmd, process_handle.returncode, output,
-                stderr)
+                "Standard Output:\n%s\nStandard Error:\n%s", cmd, process_handle.returncode,
+                decoded_output, stderr)
 
-        required_version = re.escape(linter.required_version)
+        pattern = r"\b(?:(%s) )?(?P<version>\S+)\b" % (linter.cmd_name)
+        required_version = pkg_resources.parse_version(linter.required_version)
 
-        pattern = r"\b%s\b" % (required_version)
-        if not re.search(pattern, output):
+        match = re.search(pattern, decoded_output)
+        if match:
+            found_version = match.group('version')
+        else:
+            found_version = '0.0'
+
+        if pkg_resources.parse_version(found_version) < required_version:
             logging.info(
-                "Linter %s has wrong version for '%s'. Expected '%s',"
+                "Linter %s has wrong version for '%s'. Expected >= '%s',"
                 "Standard Output:\n'%s'\nStandard Error:\n%s", linter.cmd_name, cmd,
-                required_version, output, stderr)
+                required_version, decoded_output, stderr)
             return False
 
     except OSError as os_error:

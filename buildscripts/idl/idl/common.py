@@ -84,6 +84,7 @@ def template_format(template, template_params=None):
     # str.
     # See https://docs.python.org/2/library/string.html#template-strings
     template = _escape_template_string(template)
+    # pylint: disable=too-many-function-args
     return string.Template(template).substitute(template_params)  # type: ignore
 
 
@@ -94,6 +95,7 @@ def template_args(template, **kwargs):
     # str.
     # See https://docs.python.org/2/library/string.html#template-strings
     template = _escape_template_string(template)
+    # pylint: disable=too-many-function-args
     return string.Template(template).substitute(kwargs)  # type: ignore
 
 

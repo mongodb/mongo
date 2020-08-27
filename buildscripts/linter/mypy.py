@@ -16,7 +16,7 @@ class MypyLinter(base.LinterBase):
         """Create a mypy linter."""
         # User can override the location of mypy from an environment variable.
 
-        super(MypyLinter, self).__init__("mypy", "mypy 0.580", os.getenv("MYPY"))
+        super(MypyLinter, self).__init__("mypy", "0.580", os.getenv("MYPY"))
 
     def get_lint_version_cmd_args(self):
         # type: () -> List[str]

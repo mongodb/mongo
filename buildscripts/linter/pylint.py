@@ -13,7 +13,7 @@ class PyLintLinter(base.LinterBase):
     def __init__(self):
         # type: () -> None
         """Create a pylint linter."""
-        super(PyLintLinter, self).__init__("pylint", "pylint 2.3.1")
+        super(PyLintLinter, self).__init__("pylint", "2.3.1")
 
     def get_lint_version_cmd_args(self):
         # type: () -> List[str]
