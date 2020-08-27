@@ -952,8 +952,6 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
                 indexBuildInterceptor->getSkippedRecordTracker()->getTableIdent())
             indexInfo.append("skippedRecordTrackerTable", *skippedRecordTrackerTableIdent);
 
-        // TODO SERVER-49450: Consider only writing out the index name or key and getting the rest
-        // of the spec from the durable catalog on startup.
         indexInfo.append("spec", index.block->getSpec());
 
         indexInfo.done();
