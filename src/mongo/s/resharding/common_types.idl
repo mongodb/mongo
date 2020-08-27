@@ -56,7 +56,8 @@ enums:
         description: "The current state of a donor shard for a resharding operation."
         type: string
         values:
-            kInitializing: "initialized"
+            kUnused: "unused"
+            kInitializing: "initializing"
             kDonatingInitialData: "donating-initial-data"
             kDonatingOplogEntries: "donating-oplog-entries"
             kMirroring: "mirroring"
@@ -67,6 +68,8 @@ enums:
         description: "The current state of a recipient shard for a resharding operation."
         type: string
         values:
+            kUnused: "unused"
+            kInitializing: "initializing"
             kCloning: "cloning"
             kApplying: "applying"
             kSteadyState: "steady-state"
