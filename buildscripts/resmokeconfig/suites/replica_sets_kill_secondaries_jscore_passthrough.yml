@@ -43,6 +43,7 @@ executor:
     class: ReplicaSetFixture
     mongod_options:
       syncdelay: 5
+      wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:
