@@ -75,6 +75,14 @@ protected:
 
     using LogicalTimeArray = ComponentArray<LogicalTime>;
 
+    struct component_comparator {
+        bool operator()(const Component& c0, const Component& c1) const {
+            return static_cast<uint8_t>(c0) < static_cast<uint8_t>(c1);
+        }
+    };
+
+    using ComponentSet = std::set<Component, component_comparator>;
+
 public:
     class VectorTime {
     public:
@@ -221,72 +229,37 @@ protected:
     static bool _lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks);
 
     /**
-     * Adds the necessary fields to outMessage to gossip the given time to a node internal to the
-     * cluster.  Returns true if the ClusterTime was output into outMessage, or false otherwise.
+     * Returns the set of components that need to be gossiped to a node internal to the cluster.
      */
-    virtual bool _gossipOutInternal(OperationContext* opCtx,
-                                    BSONObjBuilder* out,
-                                    const LogicalTimeArray& time) const = 0;
+    virtual ComponentSet _gossipOutInternal() const = 0;
 
     /**
-     * As for _gossipOutInternal, except for an outMessage to be sent to a client external to the
-     * cluster, eg. a driver or user client.
+     * As for _gossipOutInternal, except for the components to be sent to a client external to the
+     * cluster, eg. a driver or user client. By default, just the ClusterTime is gossiped.
      */
-    virtual bool _gossipOutExternal(OperationContext* opCtx,
-                                    BSONObjBuilder* out,
-                                    const LogicalTimeArray& time) const = 0;
+    virtual ComponentSet _gossipOutExternal() const {
+        return ComponentSet{Component::ClusterTime};
+    }
 
     /**
-     * Reads the necessary fields from the BSONObj, which has come from a node internal to the
-     * cluster, and returns an array of LogicalTimes for each component present in the BSONObj.
-     *
-     * This array is suitable for passing to _advanceTime(), in order to monotonically increase
-     * any Component times that are larger than the current time.  Since the times in
-     * LogicalTimeArray are default constructed (ie. to Timestamp(0, 0)), any fields not present
-     * in the input BSONObj won't be advanced.
-     *
-     * The couldBeUnauthenticated parameter is used to indicate if the source of the input BSONObj
-     * is an incoming request for a command that can be run by an unauthenticated client.
+     * Returns the set of components that should be processed during gossiping in of messages from
+     * internal clients.
      */
-    virtual LogicalTimeArray _gossipInInternal(OperationContext* opCtx,
-                                               const BSONObj& in,
-                                               bool couldBeUnauthenticated) = 0;
+    virtual ComponentSet _gossipInInternal() const = 0;
 
     /**
-     * As for _gossipInInternal, except for an input BSONObj from a client external to the cluster,
-     * eg. a driver or user client.
+     * As for _gossipInInternal, except from a client external to the cluster, eg. a driver or user
+     * client. By default, just the ClusterTime is gossiped.
      */
-    virtual LogicalTimeArray _gossipInExternal(OperationContext* opCtx,
-                                               const BSONObj& in,
-                                               bool couldBeUnauthenticated) = 0;
+    virtual ComponentSet _gossipInExternal() const {
+        return ComponentSet{Component::ClusterTime};
+    }
 
     /**
      * Whether or not it's permissable to refresh external state (eg. updating gossip signing keys)
      * during gossip out.
      */
     virtual bool _permitRefreshDuringGossipOut() const = 0;
-
-    /**
-     * Called by sub-classes in order to actually output a Component time to the output
-     * BSONObjBuilder, using the appropriate field name and representation for that Component.
-     *
-     * Returns true if the component is ClusterTime and it was output, or false otherwise.
-     */
-    bool _gossipOutComponent(OperationContext* opCtx,
-                             BSONObjBuilder* out,
-                             const LogicalTimeArray& time,
-                             Component component) const;
-
-    /**
-     * Called by sub-classes in order to actually input a Component time into the given
-     * LogicalTimeArray from the given BSONObj, using the appropriate field name and representation
-     * for that Component.
-     */
-    void _gossipInComponent(OperationContext* opCtx,
-                            const BSONObj& in,
-                            bool couldBeUnauthenticated,
-                            LogicalTimeArray* newTime,
-                            Component component);
 
     /**
      * For each component in the LogicalTimeArray, sets the current time to newTime if the newTime >
@@ -321,6 +294,27 @@ private:
     class SignedComponentFormat;
     template <class ActualFormat>
     class OnlyOutOnNewFCVComponentFormat;
+
+    /**
+     * Called in order to output a Component time to the passed BSONObjBuilder, using the
+     * appropriate field name and representation for that Component.
+     *
+     * Returns true if the component is ClusterTime and it was output, or false otherwise.
+     */
+    bool _gossipOutComponent(OperationContext* opCtx,
+                             BSONObjBuilder* out,
+                             const LogicalTimeArray& time,
+                             Component component) const;
+
+    /**
+     * Called in order to input a Component time into the given LogicalTimeArray from the given
+     * BSONObj, using the appropriate field name and representation for that Component.
+     */
+    void _gossipInComponent(OperationContext* opCtx,
+                            const BSONObj& in,
+                            bool couldBeUnauthenticated,
+                            LogicalTimeArray* newTime,
+                            Component component);
 
     static const ComponentArray<std::unique_ptr<ComponentFormat>> _gossipFormatters;
 };

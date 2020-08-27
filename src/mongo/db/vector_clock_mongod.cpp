@@ -59,18 +59,9 @@ public:
 private:
     // VectorClock methods implementation
 
-    bool _gossipOutInternal(OperationContext* opCtx,
-                            BSONObjBuilder* out,
-                            const LogicalTimeArray& time) const override;
-    bool _gossipOutExternal(OperationContext* opCtx,
-                            BSONObjBuilder* out,
-                            const LogicalTimeArray& time) const override;
-    LogicalTimeArray _gossipInInternal(OperationContext* opCtx,
-                                       const BSONObj& in,
-                                       bool couldBeUnauthenticated) override;
-    LogicalTimeArray _gossipInExternal(OperationContext* opCtx,
-                                       const BSONObj& in,
-                                       bool couldBeUnauthenticated) override;
+    ComponentSet _gossipOutInternal() const override;
+    ComponentSet _gossipInInternal() const override;
+
     bool _permitRefreshDuringGossipOut() const override {
         return false;
     }
@@ -395,42 +386,23 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
     return future;
 }
 
-bool VectorClockMongoD::_gossipOutInternal(OperationContext* opCtx,
-                                           BSONObjBuilder* out,
-                                           const LogicalTimeArray& time) const {
-    bool wasClusterTimeOutput = _gossipOutComponent(opCtx, out, time, Component::ClusterTime);
+VectorClock::ComponentSet VectorClockMongoD::_gossipOutInternal() const {
+    VectorClock::ComponentSet toGossip{Component::ClusterTime};
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
         serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        _gossipOutComponent(opCtx, out, time, Component::ConfigTime);
-        _gossipOutComponent(opCtx, out, time, Component::TopologyTime);
+        toGossip.insert(Component::ConfigTime);
+        toGossip.insert(Component::TopologyTime);
     }
-    return wasClusterTimeOutput;
+    return toGossip;
 }
 
-bool VectorClockMongoD::_gossipOutExternal(OperationContext* opCtx,
-                                           BSONObjBuilder* out,
-                                           const LogicalTimeArray& time) const {
-    return _gossipOutComponent(opCtx, out, time, Component::ClusterTime);
-}
-
-VectorClock::LogicalTimeArray VectorClockMongoD::_gossipInInternal(OperationContext* opCtx,
-                                                                   const BSONObj& in,
-                                                                   bool couldBeUnauthenticated) {
-    LogicalTimeArray newTime;
-    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
+VectorClock::ComponentSet VectorClockMongoD::_gossipInInternal() const {
+    VectorClock::ComponentSet toGossip{Component::ClusterTime};
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ConfigTime);
-        _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::TopologyTime);
+        toGossip.insert(Component::ConfigTime);
+        toGossip.insert(Component::TopologyTime);
     }
-    return newTime;
-}
-
-VectorClock::LogicalTimeArray VectorClockMongoD::_gossipInExternal(OperationContext* opCtx,
-                                                                   const BSONObj& in,
-                                                                   bool couldBeUnauthenticated) {
-    LogicalTimeArray newTime;
-    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
-    return newTime;
+    return toGossip;
 }
 
 LogicalTime VectorClockMongoD::_tick(Component component, uint64_t nTicks) {

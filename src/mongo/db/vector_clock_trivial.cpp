@@ -48,18 +48,12 @@ public:
 private:
     // VectorClock methods implementation
 
-    bool _gossipOutInternal(OperationContext* opCtx,
-                            BSONObjBuilder* out,
-                            const LogicalTimeArray& time) const override;
-    bool _gossipOutExternal(OperationContext* opCtx,
-                            BSONObjBuilder* out,
-                            const LogicalTimeArray& time) const override;
-    LogicalTimeArray _gossipInInternal(OperationContext* opCtx,
-                                       const BSONObj& in,
-                                       bool couldBeUnauthenticated) override;
-    LogicalTimeArray _gossipInExternal(OperationContext* opCtx,
-                                       const BSONObj& in,
-                                       bool couldBeUnauthenticated) override;
+    ComponentSet _gossipOutInternal() const override;
+    ComponentSet _gossipOutExternal() const override;
+
+    ComponentSet _gossipInInternal() const override;
+    ComponentSet _gossipInExternal() const override;
+
     bool _permitRefreshDuringGossipOut() const override {
         return false;
     }
@@ -105,32 +99,24 @@ VectorClockTrivial::VectorClockTrivial() = default;
 
 VectorClockTrivial::~VectorClockTrivial() = default;
 
-bool VectorClockTrivial::_gossipOutInternal(OperationContext* opCtx,
-                                            BSONObjBuilder* out,
-                                            const LogicalTimeArray& time) const {
+VectorClock::ComponentSet VectorClockTrivial::_gossipOutInternal() const {
     // Clocks are not gossipped in trivial (non-distributed) environments.
-    return false;
+    return ComponentSet{};
 }
 
-bool VectorClockTrivial::_gossipOutExternal(OperationContext* opCtx,
-                                            BSONObjBuilder* out,
-                                            const LogicalTimeArray& time) const {
+VectorClock::ComponentSet VectorClockTrivial::_gossipOutExternal() const {
     // Clocks are not gossipped in trivial (non-distributed) environments.
-    return false;
+    return ComponentSet{};
 }
 
-VectorClock::LogicalTimeArray VectorClockTrivial::_gossipInInternal(OperationContext* opCtx,
-                                                                    const BSONObj& in,
-                                                                    bool couldBeUnauthenticated) {
+VectorClock::ComponentSet VectorClockTrivial::_gossipInInternal() const {
     // Clocks are not gossipped in trivial (non-distributed) environments.
-    return {};
+    return ComponentSet{};
 }
 
-VectorClock::LogicalTimeArray VectorClockTrivial::_gossipInExternal(OperationContext* opCtx,
-                                                                    const BSONObj& in,
-                                                                    bool couldBeUnauthenticated) {
+VectorClock::ComponentSet VectorClockTrivial::_gossipInExternal() const {
     // Clocks are not gossipped in trivial (non-distributed) environments.
-    return {};
+    return ComponentSet{};
 }
 
 LogicalTime VectorClockTrivial::_tick(Component component, uint64_t nTicks) {

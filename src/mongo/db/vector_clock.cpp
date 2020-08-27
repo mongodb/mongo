@@ -331,12 +331,17 @@ bool VectorClock::gossipOut(OperationContext* opCtx,
     if (opCtx && opCtx->getClient()) {
         clientSessionTags = opCtx->getClient()->getSessionTags();
     }
-    VectorTime now = getTime();
-    if (clientSessionTags & transport::Session::kInternalClient) {
-        return _gossipOutInternal(opCtx, outMessage, now._time);
-    } else {
-        return _gossipOutExternal(opCtx, outMessage, now._time);
+
+    ComponentSet toGossip = clientSessionTags & transport::Session::kInternalClient
+        ? _gossipOutInternal()
+        : _gossipOutExternal();
+
+    auto now = getTime();
+    bool clusterTimeWasOutput = false;
+    for (auto component : toGossip) {
+        clusterTimeWasOutput |= _gossipOutComponent(opCtx, outMessage, now._time, component);
     }
+    return clusterTimeWasOutput;
 }
 
 void VectorClock::gossipIn(OperationContext* opCtx,
@@ -350,11 +355,18 @@ void VectorClock::gossipIn(OperationContext* opCtx,
     if (opCtx && opCtx->getClient()) {
         clientSessionTags = opCtx->getClient()->getSessionTags();
     }
-    if (clientSessionTags & transport::Session::kInternalClient) {
-        _advanceTime(_gossipInInternal(opCtx, inMessage, couldBeUnauthenticated));
-    } else {
-        _advanceTime(_gossipInExternal(opCtx, inMessage, couldBeUnauthenticated));
+
+    ComponentSet toGossip = clientSessionTags & transport::Session::kInternalClient
+        ? _gossipInInternal()
+        : _gossipInExternal();
+
+    LogicalTimeArray newTime;
+    for (auto component : toGossip) {
+        _gossipInComponent(opCtx, inMessage, couldBeUnauthenticated, &newTime, component);
     }
+    // Since the times in LogicalTimeArray are default constructed (ie. to Timestamp(0, 0)), any
+    // component not present in the input BSONObj won't be advanced.
+    _advanceTime(std::move(newTime));
 }
 
 bool VectorClock::_gossipOutComponent(OperationContext* opCtx,

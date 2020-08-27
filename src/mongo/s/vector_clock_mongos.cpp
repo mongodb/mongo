@@ -45,18 +45,9 @@ public:
 private:
     // VectorClock methods implementation
 
-    bool _gossipOutInternal(OperationContext* opCtx,
-                            BSONObjBuilder* out,
-                            const LogicalTimeArray& time) const override;
-    bool _gossipOutExternal(OperationContext* opCtx,
-                            BSONObjBuilder* out,
-                            const LogicalTimeArray& time) const override;
-    LogicalTimeArray _gossipInInternal(OperationContext* opCtx,
-                                       const BSONObj& in,
-                                       bool couldBeUnauthenticated) override;
-    LogicalTimeArray _gossipInExternal(OperationContext* opCtx,
-                                       const BSONObj& in,
-                                       bool couldBeUnauthenticated) override;
+    ComponentSet _gossipInInternal() const override;
+    ComponentSet _gossipOutInternal() const override;
+
     bool _permitRefreshDuringGossipOut() const override {
         return true;
     }
@@ -77,36 +68,14 @@ VectorClockMongoS::VectorClockMongoS() = default;
 
 VectorClockMongoS::~VectorClockMongoS() = default;
 
-bool VectorClockMongoS::_gossipOutInternal(OperationContext* opCtx,
-                                           BSONObjBuilder* out,
-                                           const LogicalTimeArray& time) const {
-    bool wasClusterTimeOutput = _gossipOutComponent(opCtx, out, time, Component::ClusterTime);
-    _gossipOutComponent(opCtx, out, time, Component::ConfigTime);
-    return wasClusterTimeOutput;
+VectorClock::ComponentSet VectorClockMongoS::_gossipOutInternal() const {
+    return VectorClock::ComponentSet{
+        Component::ClusterTime, Component::ConfigTime, Component::TopologyTime};
 }
 
-bool VectorClockMongoS::_gossipOutExternal(OperationContext* opCtx,
-                                           BSONObjBuilder* out,
-                                           const LogicalTimeArray& time) const {
-    return _gossipOutComponent(opCtx, out, time, Component::ClusterTime);
-}
-
-VectorClock::LogicalTimeArray VectorClockMongoS::_gossipInInternal(OperationContext* opCtx,
-                                                                   const BSONObj& in,
-                                                                   bool couldBeUnauthenticated) {
-    LogicalTimeArray newTime;
-    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
-    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ConfigTime);
-    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::TopologyTime);
-    return newTime;
-}
-
-VectorClock::LogicalTimeArray VectorClockMongoS::_gossipInExternal(OperationContext* opCtx,
-                                                                   const BSONObj& in,
-                                                                   bool couldBeUnauthenticated) {
-    LogicalTimeArray newTime;
-    _gossipInComponent(opCtx, in, couldBeUnauthenticated, &newTime, Component::ClusterTime);
-    return newTime;
+VectorClock::ComponentSet VectorClockMongoS::_gossipInInternal() const {
+    return VectorClock::ComponentSet{
+        Component::ClusterTime, Component::ConfigTime, Component::TopologyTime};
 }
 
 }  // namespace
