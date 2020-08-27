@@ -29,7 +29,7 @@ doTest = function(signal) {
 
     var secondaries = replTest.getSecondaries();
     secondaries.forEach(function(secondary) {
-        secondary.setSlaveOk();
+        secondary.setSecondaryOk();
     });
 
     // Test write concern with multiple inserts.

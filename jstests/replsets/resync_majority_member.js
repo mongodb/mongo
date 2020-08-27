@@ -99,8 +99,8 @@ assert.soon(() => {
 });
 
 // Observe that the old write does not exist anywhere in the set.
-syncSource.setSlaveOk();
-resyncNode.setSlaveOk();
+syncSource.setSecondaryOk();
+resyncNode.setSecondaryOk();
 assert.eq(0, syncSource.getDB(dbName)[collName].find(disappearingDoc).itcount());
 assert.eq(0, resyncNode.getDB(dbName)[collName].find(disappearingDoc).itcount());
 

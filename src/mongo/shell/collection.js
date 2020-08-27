@@ -1322,9 +1322,7 @@ DBCollection.prototype.getSlaveOk = function() {
     return this.getSecondaryOk();
 };
 
-DBCollection.prototype.setSecondaryOk = function(value) {
-    if (value === undefined)
-        value = true;
+DBCollection.prototype.setSecondaryOk = function(value = true) {
     this._secondaryOk = value;
 };
 

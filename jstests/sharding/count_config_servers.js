@@ -13,7 +13,7 @@ TestData.skipCheckOrphans = true;
 "use strict";
 
 var st = new ShardingTest({name: 'sync_conn_cmd', shards: 0});
-st.s.setSlaveOk(true);
+st.s.setSecondaryOk();
 
 var configDB = st.config;
 var coll = configDB.test;

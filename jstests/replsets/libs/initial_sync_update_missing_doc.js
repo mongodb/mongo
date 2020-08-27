@@ -17,7 +17,7 @@ load("jstests/libs/fail_point_util.js");
 // must be called after reInitiateSetWithSecondary.
 var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
     const secondary = replSet.add(secondaryConfig);
-    secondary.setSlaveOk();
+    secondary.setSecondaryOk();
 
     // Make the secondary hang after retrieving the last op on the sync source but before
     // copying databases.

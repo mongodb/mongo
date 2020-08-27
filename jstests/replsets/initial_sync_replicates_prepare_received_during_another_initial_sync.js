@@ -47,7 +47,7 @@ function restartSecondaryAndForceSyncSource(replSet, secondary, syncSource, dbNa
     // Wait for the secondary to complete initial sync.
     waitForState(secondary, ReplSetTest.State.SECONDARY);
     // Allow for secondary reads.
-    secondary.setSlaveOk();
+    secondary.setSecondaryOk();
     const secondaryDB = secondary.getDB(dbName);
 
     // Confirm that we have a prepared transaction in progress on the secondary.

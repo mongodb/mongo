@@ -139,7 +139,7 @@ replTest.awaitReplication();
 jsTestLog("Initial sync completed");
 
 // Make sure the secondary fetched enough transaction oplog entries.
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 const secondaryOplog = secondary.getDB("local").getCollection("oplog.rs");
 assert.eq(secondaryOplog.find({"ts": beginFetchingTs}).itcount(), 1);
 

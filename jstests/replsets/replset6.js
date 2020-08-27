@@ -10,7 +10,7 @@ var p = rt.getPrimary();
 rt.awaitSecondaryNodes();
 var secondaries = rt.getSecondaries();
 s = secondaries[0];
-s.setSlaveOk();
+s.setSecondaryOk();
 admin = p.getDB("admin");
 
 debug = function(foo) {};  // print( foo ); }

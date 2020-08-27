@@ -4,11 +4,15 @@ shellHelper("show", "tables;");
 shellHelper("show", "tables");
 shellHelper("show", "tables ;");
 
-// test slaveOk levels
-assert(!db.getSlaveOk() && !db.test.getSlaveOk() && !db.getMongo().getSlaveOk(), "slaveOk 1");
-db.getMongo().setSlaveOk();
-assert(db.getSlaveOk() && db.test.getSlaveOk() && db.getMongo().getSlaveOk(), "slaveOk 2");
-db.setSlaveOk(false);
-assert(!db.getSlaveOk() && !db.test.getSlaveOk() && db.getMongo().getSlaveOk(), "slaveOk 3");
-db.test.setSlaveOk(true);
-assert(!db.getSlaveOk() && db.test.getSlaveOk() && db.getMongo().getSlaveOk(), "slaveOk 4");
+// test secondaryOk levels
+assert(!db.getSecondaryOk() && !db.test.getSecondaryOk() && !db.getMongo().getSecondaryOk(),
+       "secondaryOk 1");
+db.getMongo().setSecondaryOk();
+assert(db.getSecondaryOk() && db.test.getSecondaryOk() && db.getMongo().getSecondaryOk(),
+       "secondaryOk 2");
+db.setSecondaryOk(false);
+assert(!db.getSecondaryOk() && !db.test.getSecondaryOk() && db.getMongo().getSecondaryOk(),
+       "secondaryOk 3");
+db.test.setSecondaryOk();
+assert(!db.getSecondaryOk() && db.test.getSecondaryOk() && db.getMongo().getSecondaryOk(),
+       "secondaryOk 4");

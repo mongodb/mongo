@@ -88,7 +88,7 @@ function CollectionValidator() {
         try {
             print('Running validate() on ' + host);
             const conn = new Mongo(host);
-            conn.setSlaveOk();
+            conn.setSecondaryOk();
             jsTest.authenticate(conn);
 
             // Skip validating collections for arbiters.

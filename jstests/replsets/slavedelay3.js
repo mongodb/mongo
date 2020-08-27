@@ -17,7 +17,7 @@ var secondaryConns = replTest.getSecondaries();
 var secondaries = [];
 for (var i in secondaryConns) {
     var d = secondaryConns[i].getDB(name);
-    d.getMongo().setSlaveOk();
+    d.getMongo().setSecondaryOk();
     secondaries.push(d);
 }
 

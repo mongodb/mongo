@@ -31,7 +31,7 @@ assert.commandWorked(coll.insert({_id: 0, content: "hi"}));
 // but before copying databases.
 var secondary =
     replSet.add({setParameter: "numInitialSyncAttempts=2", rsConfig: {votes: 0, priority: 0}});
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 
 let failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
 replSet.reInitiate();

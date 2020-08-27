@@ -54,10 +54,10 @@ replTest.initiate({
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 var master = replTest.getPrimary();
 var a_conn = conns[0];
-a_conn.setSlaveOk();
+a_conn.setSecondaryOk();
 var A = a_conn.getDB("admin");
 var b_conn = conns[1];
-b_conn.setSlaveOk();
+b_conn.setSecondaryOk();
 var B = b_conn.getDB("admin");
 assert.eq(master, conns[0], "conns[0] assumed to be master");
 assert.eq(a_conn, master);

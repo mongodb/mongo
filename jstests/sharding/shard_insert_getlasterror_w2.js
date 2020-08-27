@@ -70,7 +70,7 @@ replSet1.stop(secondary2);
 replSet1.waitForState(primary, ReplSetTest.State.SECONDARY);
 
 testDB.getMongo().adminCommand({setParameter: 1, logLevel: 1});
-testDB.getMongo().setSlaveOk();
+testDB.getMongo().setSecondaryOk();
 print("trying some queries");
 assert.soon(function() {
     try {

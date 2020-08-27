@@ -36,8 +36,8 @@ replSet.initiate({
 // set up common points of access
 var master = replSet.getPrimary();
 var primary = master.getDB("foo");
-replSet.nodes[1].setSlaveOk();
-replSet.nodes[2].setSlaveOk();
+replSet.nodes[1].setSecondaryOk();
+replSet.nodes[2].setSecondaryOk();
 var member2 = replSet.nodes[1].getDB("admin");
 var member3 = replSet.nodes[2].getDB("admin");
 

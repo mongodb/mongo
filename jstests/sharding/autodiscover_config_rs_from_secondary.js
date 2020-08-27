@@ -53,7 +53,7 @@ var mongos = MongoRunner.runMongos({configdb: seedList});
 rst.stop(1);
 
 var admin = mongos.getDB('admin');
-mongos.setSlaveOk(true);
+mongos.setSecondaryOk();
 assert.eq(1, admin.foo.findOne().a);
 MongoRunner.stopMongos(mongos);
 rst.stopSet();

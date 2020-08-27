@@ -38,9 +38,9 @@ replTest.initiateWithAnyNodeAsPrimary(
 var primary = replTest.getPrimary();
 var secondaries = replTest.getSecondaries();
 var healthySecondary = secondaries[0];
-healthySecondary.setSlaveOk();
+healthySecondary.setSecondaryOk();
 var noSnapshotSecondary = secondaries[1];
-noSnapshotSecondary.setSlaveOk();
+noSnapshotSecondary.setSecondaryOk();
 
 // Do a write, wait for it to replicate, and ensure it is visible.
 var res = primary.getDB(name).runCommandWithMetadata(  //

@@ -72,7 +72,7 @@ var $config = (function() {
                         // Create a new connection to any node which isn't "me".
                         const conn = new Mongo(node);
                         assert(conn);
-                        conn.setSlaveOk();
+                        conn.setSecondaryOk();
                         RSnodes.push(conn);
                     });
 

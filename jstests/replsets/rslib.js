@@ -147,7 +147,7 @@ reconnect = function(conn) {
 };
 
 getLatestOp = function(server) {
-    server.getDB("admin").getMongo().setSlaveOk();
+    server.getDB("admin").getMongo().setSecondaryOk();
     var log = server.getDB("local")['oplog.rs'];
     var cursor = log.find({}).sort({'$natural': -1}).limit(1);
     if (cursor.hasNext()) {
@@ -157,7 +157,7 @@ getLatestOp = function(server) {
 };
 
 getLeastRecentOp = function({server, readConcern}) {
-    server.getDB("admin").getMongo().setSlaveOk();
+    server.getDB("admin").getMongo().setSecondaryOk();
     const oplog = server.getDB("local").oplog.rs;
     const cursor = oplog.find().sort({$natural: 1}).limit(1).readConcern(readConcern);
     if (cursor.hasNext()) {

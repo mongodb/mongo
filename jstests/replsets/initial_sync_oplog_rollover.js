@@ -38,7 +38,7 @@ var firstOplogEntry = getFirstOplogEntry(primary);
 
 // Add a secondary node but make it hang before copying databases.
 var secondary = replSet.add();
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 
 var failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
 replSet.reInitiate();

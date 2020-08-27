@@ -87,7 +87,7 @@ for (let nodeIdx = 0; nodeIdx < 2; ++nodeIdx) {
         jsTestLog("Starting as a replica set. Both indexes should exist. Node: " + nodeIdentity);
         let conn = rst.start(nodeIdx, {startClean: false}, true);
         rst.waitForState(conn, ReplSetTest.State.SECONDARY);
-        conn.setSlaveOk();
+        conn.setSecondaryOk();
         IndexBuildTest.assertIndexes(getColl(conn), 2, ['_id_', 'foo_1']);
         rst.stop(nodeIdx);
     }

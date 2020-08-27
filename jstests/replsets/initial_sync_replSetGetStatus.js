@@ -24,7 +24,7 @@ assert.commandWorked(coll.insert({a: 2}));
 
 // Add a secondary node but make it hang before copying databases.
 var secondary = replSet.add({rsConfig: {votes: 0, priority: 0}});
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 
 var failPointBeforeCopying = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
 var failPointBeforeFinish = configureFailPoint(secondary, 'initialSyncHangBeforeFinish');

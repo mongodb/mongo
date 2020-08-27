@@ -25,8 +25,8 @@ var collName = jsTest.name();
 
 function runTest(host, rst, waitForPrimary) {
     // We create a new connection to 'host' here instead of passing in the original connection.
-    // This to work around the fact that connections created by ReplSetTest already have slaveOk
-    // set on them, but we need a connection with slaveOk not set for this test.
+    // This to work around the fact that connections created by ReplSetTest already have secondaryOk
+    // set on them, but we need a connection with secondaryOk not set for this test.
     var conn = new Mongo(host);
     var coll = conn.getDB(dbName).getCollection(collName);
     assert(!coll.exists());
@@ -51,7 +51,7 @@ function runTest(host, rst, waitForPrimary) {
     } catch (e) {
     }
 
-    // Even though our connection doesn't have slaveOk set, we should still be able to iterate
+    // Even though our connection doesn't have secondaryOk set, we should still be able to iterate
     // our cursor and kill our cursor.
     assert(cursor.hasNext());
     assert.doesNotThrow(function() {

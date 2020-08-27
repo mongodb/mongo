@@ -1,5 +1,5 @@
 // Ensure that a call to createIndexes in a sharded cluster will route to the primary, even when
-// setSlaveOk() is set to true.
+// setSecondaryOk() is set to true.
 (function() {
 'use strict';
 
@@ -12,7 +12,7 @@ assert.commandWorked(testDB.adminCommand({enableSharding: testDBName}));
 assert.commandWorked(
     testDB.adminCommand({shardCollection: testDB[collName].getFullName(), key: {x: 1}}));
 
-st.s.setSlaveOk(true);
+st.s.setSecondaryOk();
 assert.commandWorked(
     testDB.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "index"}]}));
 

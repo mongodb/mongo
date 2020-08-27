@@ -14,7 +14,7 @@ function SecondaryReadsTest(name = "secondary_reads_test") {
     let primaryDB = primary.getDB(dbName);
     let secondary = rst.getSecondary();
     let secondaryDB = secondary.getDB(dbName);
-    secondaryDB.getMongo().setSlaveOk();
+    secondaryDB.getMongo().setSecondaryOk();
 
     let readers = [];
     let signalColl = "signalColl";
@@ -37,7 +37,7 @@ function SecondaryReadsTest(name = "secondary_reads_test") {
 
     this.startSecondaryReaders = function(nReaders, readFn) {
         let read = function() {
-            db.getMongo().setSlaveOk();
+            db.getMongo().setSecondaryOk();
             db = db.getSiblingDB(TestData.dbName);
             while (true) {
                 readFn();

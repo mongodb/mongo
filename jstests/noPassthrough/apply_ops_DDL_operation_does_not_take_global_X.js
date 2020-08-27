@@ -29,7 +29,7 @@ assert.commandWorked(secondary.getDB("admin").runCommand(
     {configureFailPoint: "waitInFindBeforeMakingBatch", mode: "alwaysOn"}));
 
 const findWait = startParallelShell(function() {
-    db.getMongo().setSlaveOk();
+    db.getMongo().setSecondaryOk();
     assert.eq(
         db.getSiblingDB('read').getCollection('readColl').find().comment('read hangs').itcount(),
         1);

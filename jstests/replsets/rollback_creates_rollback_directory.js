@@ -31,8 +31,8 @@ function runRollbackDirectoryTest(shouldCreateRollbackFiles) {
     var master = replTest.getPrimary();
     var a_conn = conns[0];
     var b_conn = conns[1];
-    a_conn.setSlaveOk();
-    b_conn.setSlaveOk();
+    a_conn.setSecondaryOk();
+    b_conn.setSecondaryOk();
     var A = a_conn.getDB("test");
     var B = b_conn.getDB("test");
     var Apath = replTest.getDbPath(a_conn) + '/';

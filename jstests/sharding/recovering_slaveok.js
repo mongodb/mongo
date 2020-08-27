@@ -1,6 +1,6 @@
 /**
- * This tests that slaveOk'd queries in sharded setups get correctly routed when a slave goes into
- * RECOVERING state, and don't break
+ * This tests that secondaryOk'd queries in sharded setups get correctly routed when a slave goes
+ * into RECOVERING state, and don't break
  */
 
 // Shard secondaries are restarted, which may cause that shard's primary to stepdown while it does
@@ -12,11 +12,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 load("jstests/replsets/rslib.js");
 
 var shardTest =
-    new ShardingTest({name: "recovering_slaveok", shards: 2, mongos: 2, other: {rs: true}});
+    new ShardingTest({name: "recovering_secondaryok", shards: 2, mongos: 2, other: {rs: true}});
 
 var mongos = shardTest.s0;
 var mongosSOK = shardTest.s1;
-mongosSOK.setSlaveOk();
+mongosSOK.setSecondaryOk();
 
 var admin = mongos.getDB("admin");
 var config = mongos.getDB("config");
@@ -50,7 +50,7 @@ shardTest.shardColl(coll,
                     /* dbname */ null,
                     /* waitForDelete */ true);
 
-print("3: test normal and slaveOk queries");
+print("3: test normal and secondaryOk queries");
 
 // Make shardA and rsA the same
 var shardA = shardTest.getShard(coll, {_id: -1});
@@ -87,7 +87,7 @@ print("6: stop non-RECOVERING secondary");
 
 rsA.stop(goodSec);
 
-print("7: check our regular and slaveOk query");
+print("7: check our regular and secondaryOk query");
 
 assert.eq(2, coll.find().itcount());
 assert.eq(2, collSOk.find().itcount());
@@ -100,7 +100,7 @@ print("9: wait for recovery");
 
 rsA.waitForState(rsA.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000);
 
-print("10: check our regular and slaveOk query");
+print("10: check our regular and secondaryOk query");
 
 // We need to make sure our nodes are considered accessible from mongos - otherwise we fail
 // See SERVER-7274
@@ -112,7 +112,7 @@ awaitRSClientHosts(coll.getMongo(), rsB.nodes, {ok: true});
 awaitRSClientHosts(collSOk.getMongo(), [rsA.getSecondaries()[0]], {secondary: true, ok: true});
 awaitRSClientHosts(collSOk.getMongo(), [rsB.getSecondaries()[0]], {secondary: true, ok: true});
 
-print("SlaveOK Query...");
+print("SecondaryOk Query...");
 var sOKCount = collSOk.find().itcount();
 
 var collCount = null;

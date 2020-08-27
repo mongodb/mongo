@@ -75,7 +75,7 @@ assert.eq(doDirtyRead(oldPrimaryColl), 'INVALID');
 assert.eq(doCommittedRead(oldPrimaryColl), 'old');
 
 // Change the partitioning so that oldPrimary is isolated, and newPrimary can be elected.
-oldPrimary.setSlaveOk();
+oldPrimary.setSecondaryOk();
 oldPrimary.disconnect(arbiters);
 newPrimary.reconnect(arbiters);
 assert.soon(() => newPrimary.adminCommand('isMaster').ismaster, '', 60 * 1000);

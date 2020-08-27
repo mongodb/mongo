@@ -12,9 +12,9 @@ rst.startSet();
 rst.initiate();
 rst.awaitSecondaryNodes();
 
-// Disable "slaveOk" on the connection so that we are not allowed to run on the Secondary.
+// Disable "secondaryOk" on the connection so that we are not allowed to run on the Secondary.
 const testDB = rst.getSecondary().getDB(jsTestName());
-testDB.getMongo().setSlaveOk(false);
+testDB.getMongo().setSecondaryOk(false);
 const coll = testDB.test;
 
 // Issue a change stream. We should fail with a NotPrimaryNoSecondaryOk error.
@@ -28,8 +28,8 @@ assert.contains("ResumableChangeStreamError", err.errorLabels, err);
 // Now verify that the 'failGetMoreAfterCursorCheckout' failpoint can effectively exercise the
 // error label generation logic for change stream getMores.
 function testFailGetMoreAfterCursorCheckoutFailpoint({errorCode, expectedLabel}) {
-    // Re-enable "slaveOk" on the test connection.
-    testDB.getMongo().setSlaveOk(true);
+    // Re-enable "secondaryOk" on the test connection.
+    testDB.getMongo().setSecondaryOk();
 
     // Activate the failpoint and set the exception that it will throw.
     assert.commandWorked(testDB.adminCommand({

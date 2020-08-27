@@ -41,7 +41,7 @@ assert.commandWorked(priConn.getDB('admin').system.version.update(
     shardIdentityQuery, shardIdentityUpdate, {upsert: true, writeConcern: {w: 2}}));
 
 var secConn = replTest.getSecondary();
-secConn.setSlaveOk(true);
+secConn.setSecondaryOk();
 
 var res = secConn.getDB('admin').runCommand({shardingState: 1});
 
@@ -55,7 +55,7 @@ replTest.waitForPrimary();
 replTest.awaitSecondaryNodes();
 
 secConn = replTest.getSecondary();
-secConn.setSlaveOk(true);
+secConn.setSecondaryOk();
 
 res = secConn.getDB('admin').runCommand({shardingState: 1});
 

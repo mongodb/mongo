@@ -52,7 +52,7 @@ assert.eq(shardIdentityDoc.clusterId, res.clusterId);
 
 // Ensure sharding state on the secondaries was *not* initialized
 secondaries.forEach(function(secondary) {
-    secondary.setSlaveOk(true);
+    secondary.setSecondaryOk();
     res = secondary.getDB('admin').runCommand({shardingState: 1});
     assert(!res.enabled, tojson(res));
 });
@@ -105,7 +105,7 @@ try {
 // specified. We do want to wait to be able to connect to the node here however, so we need to pass
 // {waitForConnect: true}.
 priConn = replTest.start(priConn.nodeId, {shardsvr: '', waitForConnect: true}, true);
-priConn.setSlaveOk();
+priConn.setSecondaryOk();
 
 // Wait for the old primary to replicate the document that was written to the new primary while
 // it was shut down.

@@ -82,7 +82,7 @@ PrepareHelpers.awaitMajorityCommitted(replTest, prepareTimestamp2);
 
 // Wait for the node to complete recovery before trying to read from it.
 replTest.awaitSecondaryNodes();
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 
 jsTestLog("Checking that the first transaction is properly prepared");
 

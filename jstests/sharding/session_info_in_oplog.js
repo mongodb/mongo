@@ -329,7 +329,7 @@ replTest.initiate();
 
 var priConn = replTest.getPrimary();
 var secConn = replTest.getSecondary();
-secConn.setSlaveOk(true);
+secConn.setSecondaryOk();
 
 runTests(priConn, priConn, secConn);
 
@@ -338,7 +338,7 @@ replTest.stopSet();
 var st = new ShardingTest({shards: {rs0: {nodes: kNodes}}});
 
 secConn = st.rs0.getSecondary();
-secConn.setSlaveOk(true);
+secConn.setSecondaryOk();
 runTests(st.s, st.rs0.getPrimary(), secConn);
 
 st.stop();

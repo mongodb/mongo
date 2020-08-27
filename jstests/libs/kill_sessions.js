@@ -120,7 +120,7 @@ var _kill_sessions_api_module = (function() {
         // hosts.  We identify particular ops by secs sleeping.
         this.visit(function(client) {
             let admin = client.getDB("admin");
-            admin.getMongo().setSlaveOk();
+            admin.getMongo().setSecondaryOk();
 
             assert.soon(function() {
                 let inProgressOps = admin.aggregate([{$currentOp: {'allUsers': true}}]);
@@ -183,7 +183,7 @@ var _kill_sessions_api_module = (function() {
     Fixture.prototype.assertNoSessionsInCursors = function() {
         this.visit(function(client) {
             var db = client.getDB("admin");
-            db.setSlaveOk();
+            db.setSecondaryOk();
             assert.soon(() => {
                 let cursors = db.aggregate([
                                     {"$currentOp": {"idleCursors": true, "allUsers": true}}
@@ -205,7 +205,7 @@ var _kill_sessions_api_module = (function() {
             });
 
             var db = client.getDB("admin");
-            db.setSlaveOk();
+            db.setSecondaryOk();
             var cursors = db.aggregate([
                                 {"$currentOp": {"idleCursors": true, "allUsers": true}},
                                 {"$match": {type: "idleCursor"}}

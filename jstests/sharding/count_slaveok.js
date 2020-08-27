@@ -1,5 +1,5 @@
 /**
- * Tests count and distinct using slaveOk. Also tests a scenario querying a set where only one
+ * Tests count and distinct using secondaryOk. Also tests a scenario querying a set where only one
  * secondary is up.
  */
 
@@ -20,7 +20,7 @@ var rst = st.rs0;
 // Insert data into replica set
 var conn = new Mongo(st.s.host);
 
-var coll = conn.getCollection('test.countSlaveOk');
+var coll = conn.getCollection('test.countSecondaryOk');
 coll.drop();
 
 var bulk = coll.initializeUnorderedBulkOp();
@@ -51,9 +51,9 @@ awaitRSClientHosts(conn, sec, {ok: true, secondary: true});
 // Make sure that mongos realizes that primary is already down
 awaitRSClientHosts(conn, primary, {ok: false});
 
-// Need to check slaveOk=true first, since slaveOk=false will destroy conn in pool when
+// Need to check secondaryOk=true first, since secondaryOk=false will destroy conn in pool when
 // master is down
-conn.setSlaveOk();
+conn.setSecondaryOk();
 
 // count using the command path
 assert.eq(30, coll.find({i: 0}).count());
@@ -62,14 +62,14 @@ assert.eq(30, coll.find({i: 0}).itcount());
 assert.eq(10, coll.distinct("i").length);
 
 try {
-    conn.setSlaveOk(false);
-    // Should throw exception, since not slaveOk'd
+    conn.setSecondaryOk(false);
+    // Should throw exception, since not secondaryOk'd
     coll.find({i: 0}).count();
 
     print("Should not reach here!");
     assert(false);
 } catch (e) {
-    print("Non-slaveOk'd connection failed.");
+    print("Non-secondaryOk'd connection failed.");
 }
 
 st.stop();

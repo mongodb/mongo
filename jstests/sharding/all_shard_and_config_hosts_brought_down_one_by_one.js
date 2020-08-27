@@ -39,7 +39,7 @@ jsTest.log('Config nodes up: 1 of 3, shard nodes up: 1 of 2: ' +
            'Only queries will work (no shard primary)');
 st.rs0.stop(0);
 st.restartMongos(0);
-st.s0.setSlaveOk(true);
+st.s0.setSecondaryOk();
 assert.eq([{_id: 0, count: 3}], st.s0.getDB('TestDB').TestColl.find().toArray());
 
 jsTest.log('Config nodes up: 1 of 3, shard nodes up: 0 of 2: ' +

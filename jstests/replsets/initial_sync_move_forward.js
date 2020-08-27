@@ -41,7 +41,7 @@ assert.commandWorked(masterColl.ensureIndex({x: 1}, {unique: true}));
 // Add a secondary.
 var secondary =
     rst.add({setParameter: "numInitialSyncAttempts=1", rsConfig: {votes: 0, priority: 0}});
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 var secondaryColl = secondary.getDB("test").coll;
 
 // Pause initial sync when the secondary has copied {_id: 0, x: 0} and {_id: 1, x: 1}.

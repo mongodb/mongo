@@ -63,7 +63,7 @@ assert.soon(function() {
 });
 
 var secConn = st.rs0.getSecondary();
-secConn.setSlaveOk(true);
+secConn.setSecondaryOk();
 assert.soon(function() {
     return checkConfigStrUpdated(secConn, expectedConfigStr);
 });
@@ -96,7 +96,7 @@ assert.soon(function() {
 });
 
 secConn = st.rs0.getSecondary();
-secConn.setSlaveOk(true);
+secConn.setSecondaryOk();
 assert.soon(function() {
     return checkConfigStrUpdated(secConn, origConfigConnStr);
 });

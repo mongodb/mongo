@@ -16,7 +16,7 @@ const runDBHashFn = (host, dbName, clusterTime, useSnapshot) => {
     const conn = new Mongo(host);
     const db = conn.getDB(dbName);
 
-    conn.setSlaveOk();
+    conn.setSecondaryOk();
     let cmd;
     if (useSnapshot) {
         cmd = {dbHash: 1, readConcern: {level: "snapshot", atClusterTime: eval(clusterTime)}};

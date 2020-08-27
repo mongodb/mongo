@@ -88,7 +88,7 @@ print("try some legal and illegal reads");
 var r = primary.getDB("test").foo.findOne();
 assert.eq(r.x, 1);
 
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 
 function doQueryOn(p) {
     var error = assert.throws(function() {
@@ -200,7 +200,7 @@ wait(function() {
 print("make sure it has the config, too");
 assert.soon(function() {
     for (var i in rs.nodes) {
-        rs.nodes[i].setSlaveOk();
+        rs.nodes[i].setSecondaryOk();
         rs.nodes[i].getDB("admin").auth("foo", "bar");
         config = rs.nodes[i].getDB("local").system.replset.findOne();
         // We expect the config version to be 3 due to the initial config and then the

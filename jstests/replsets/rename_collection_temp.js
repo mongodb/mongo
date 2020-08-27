@@ -54,7 +54,7 @@ replTest.awaitReplication();
 var secondary = replTest.getSecondary();
 var secondaryFoo = secondary.getDB("foo");
 
-secondaryFoo.permanentColl.setSlaveOk(true);
+secondaryFoo.permanentColl.setSecondaryOk();
 
 // Get the information on the secondary to ensure it was replicated correctly.
 checkCollectionTemp(secondaryFoo, "permanentColl", false);

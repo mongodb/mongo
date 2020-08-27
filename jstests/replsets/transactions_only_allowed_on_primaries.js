@@ -27,8 +27,8 @@ replTest.initiate(config);
 const primary = replTest.getPrimary();
 const secondary = replTest.getSecondary();
 
-// Set slaveOk=true so that normal read commands would be allowed on the secondary.
-secondary.setSlaveOk(true);
+// Set secondaryOk=true so that normal read commands would be allowed on the secondary.
+secondary.setSecondaryOk();
 
 // Create a test collection that we can run commands against.
 const primaryDB = primary.getDB(dbName);

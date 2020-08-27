@@ -23,7 +23,7 @@ rs.waitForState(nodes[2], ReplSetTest.State.SECONDARY);
 
 // Make sure you can still authenticate a replset connection with no primary
 var conn2 = new Mongo(rs.getURL());
-conn2.setSlaveOk(true);
+conn2.setSecondaryOk();
 assert(conn2.getDB('admin').auth({user: 'admin', pwd: 'pwd', mechanism: "SCRAM-SHA-1"}));
 assert.eq(1, conn2.getDB('admin').foo.findOne().a);
 

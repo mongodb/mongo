@@ -55,8 +55,8 @@ if (wcError != null) {
 }
 
 var secondaries = replTest.getSecondaries();
-secondaries[0].setSlaveOk();
-secondaries[1].setSlaveOk();
+secondaries[0].setSecondaryOk();
+secondaries[1].setSecondaryOk();
 
 var secondary0Count = secondaries[0].getDB(testDB).foo.find().itcount();
 assert(secondary0Count == docNum,

@@ -165,7 +165,7 @@ let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expect
 
     let testDB = conn.getDB(kDbName);
     let shardedColl = conn.getCollection(kShardedNs);
-    conn.setSlaveOk(false);  // purely rely on readPref
+    conn.setSecondaryOk(false);  // purely rely on readPref
     conn.setReadPref(readPref.mode, readPref.tagSets, readPref.hedge);
 
     /**
@@ -387,7 +387,7 @@ let testCursorReadPreference = function(conn, isMongos, rsNodes, {readPref, expe
         tojson(readPref.tagSets)}, hedge ${tojson(readPref.hedge)}`);
 
     let testColl = conn.getCollection(kShardedNs);
-    conn.setSlaveOk(false);  // purely rely on readPref
+    conn.setSecondaryOk(false);  // purely rely on readPref
 
     let bulk = testColl.initializeUnorderedBulkOp();
     for (let i = 0; i < kNumDocs; ++i) {

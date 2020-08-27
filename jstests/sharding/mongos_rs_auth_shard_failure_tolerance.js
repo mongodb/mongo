@@ -160,9 +160,9 @@ gc();  // Clean up new connections
 
 jsTest.log("Stopping primary of second shard...");
 
-mongosConnActive.setSlaveOk();
+mongosConnActive.setSecondaryOk();
 mongosConnIdle = authDBUsers(new Mongo(mongos.host));
-mongosConnIdle.setSlaveOk();
+mongosConnIdle.setSecondaryOk();
 
 // Need to save this node for later
 var rs1Secondary = st.rs1.getSecondary();
@@ -192,13 +192,13 @@ assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne(
 jsTest.log("Testing new connections with second primary down...");
 
 mongosConnNew = authDBUsers(new Mongo(mongos.host));
-mongosConnNew.setSlaveOk();
+mongosConnNew.setSecondaryOk();
 assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
 mongosConnNew = authDBUsers(new Mongo(mongos.host));
-mongosConnNew.setSlaveOk();
+mongosConnNew.setSecondaryOk();
 assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
 mongosConnNew = authDBUsers(new Mongo(mongos.host));
-mongosConnNew.setSlaveOk();
+mongosConnNew.setSecondaryOk();
 assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
 mongosConnNew = authDBUsers(new Mongo(mongos.host));
@@ -212,9 +212,9 @@ gc();  // Clean up new connections
 
 jsTest.log("Stopping primary of first shard...");
 
-mongosConnActive.setSlaveOk();
+mongosConnActive.setSecondaryOk();
 mongosConnIdle = authDBUsers(new Mongo(mongos.host));
-mongosConnIdle.setSlaveOk();
+mongosConnIdle.setSecondaryOk();
 
 st.rs0.stop(st.rs0.getPrimary());
 
@@ -241,13 +241,13 @@ assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne(
 jsTest.log("Testing new connections with first primary down...");
 
 mongosConnNew = authDBUsers(new Mongo(mongos.host));
-mongosConnNew.setSlaveOk();
+mongosConnNew.setSecondaryOk();
 assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
 mongosConnNew = authDBUsers(new Mongo(mongos.host));
-mongosConnNew.setSlaveOk();
+mongosConnNew.setSecondaryOk();
 assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: 1}));
 mongosConnNew = authDBUsers(new Mongo(mongos.host));
-mongosConnNew.setSlaveOk();
+mongosConnNew.setSecondaryOk();
 assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
 mongosConnNew = authDBUsers(new Mongo(mongos.host));
@@ -261,9 +261,9 @@ gc();  // Clean up new connections
 
 jsTest.log("Stopping second shard...");
 
-mongosConnActive.setSlaveOk();
+mongosConnActive.setSecondaryOk();
 mongosConnIdle = authDBUsers(new Mongo(mongos.host));
-mongosConnIdle.setSlaveOk();
+mongosConnIdle.setSecondaryOk();
 
 st.rs1.stop(rs1Secondary);
 
@@ -288,10 +288,10 @@ assert.neq(null, mongosConnIdle.getCollection(collUnsharded.toString()).findOne(
 jsTest.log("Testing new connections with second shard down...");
 
 mongosConnNew = authDBUsers(new Mongo(mongos.host));
-mongosConnNew.setSlaveOk();
+mongosConnNew.setSecondaryOk();
 assert.neq(null, mongosConnNew.getCollection(collSharded.toString()).findOne({_id: -1}));
 mongosConnNew = authDBUsers(new Mongo(mongos.host));
-mongosConnNew.setSlaveOk();
+mongosConnNew.setSecondaryOk();
 assert.neq(null, mongosConnNew.getCollection(collUnsharded.toString()).findOne({_id: 1}));
 
 mongosConnNew = authDBUsers(new Mongo(mongos.host));

@@ -40,7 +40,7 @@ secondaries.forEach(function(secondary) {
     assert.eq(stats.myState, 3, "Secondary should be in recovering state.");
 
     print("count should fail in recovering state...");
-    secondary.slaveOk = true;
+    secondary.setSecondaryOk();
     assert.commandFailed(secondary.getDB("foo").runCommand({count: "foo"}));
 
     // unset maintenance mode when done

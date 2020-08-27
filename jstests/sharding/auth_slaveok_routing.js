@@ -1,5 +1,5 @@
 /**
- * This tests whether slaveOk reads are properly routed through mongos in
+ * This tests whether secondaryOk reads are properly routed through mongos in
  * an authenticated environment. This test also includes restarting the
  * entire set, then querying afterwards.
  *
@@ -59,11 +59,11 @@ priAdminDB.createUser({user: 'user', pwd: 'password', roles: jsTest.adminUserRol
                       {w: 3, wtimeout: 30000});
 
 coll.drop();
-coll.setSlaveOk(true);
+coll.setSecondaryOk();
 
 /* Secondaries should be up here, but they can still be in RECOVERY
  * state, which will make the ReplicaSetMonitor mark them as
- * ok = false and not eligible for slaveOk queries.
+ * ok = false and not eligible for secondaryOk queries.
  */
 awaitRSClientHosts(mongos, replTest.getSecondaries(), {ok: true, secondary: true});
 
@@ -90,7 +90,7 @@ for (var n = 0; n < nodeCount; n++) {
 
 replTest.awaitSecondaryNodes();
 
-coll.setSlaveOk(true);
+coll.setSecondaryOk();
 
 /* replSetMonitor does not refresh the nodes information when getting secondaries.
  * A node that is previously labeled as secondary can now be a primary, so we

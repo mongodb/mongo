@@ -36,7 +36,7 @@ doTest = function(signal) {
     assert(secondaries.length == 2, "Expected 2 secondaries but length was " + secondaries.length);
     secondaries.forEach(function(secondary) {
         // try to read from secondary
-        secondary.slaveOk = true;
+        secondary.setSecondaryOk();
         var count = secondary.getDB("foo").foo.find().itcount();
         printjson(count);
         assert.eq(len, count, "secondary count wrong: " + secondary);
@@ -46,7 +46,7 @@ doTest = function(signal) {
         printjson(one);
 
         print("Calling inline mr() with slaveOk=true, must succeed");
-        secondary.slaveOk = true;
+        secondary.setSecondaryOk();
         map = function() {
             emit(this.a, 1);
         };

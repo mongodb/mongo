@@ -104,7 +104,7 @@ var doTest = function(signal) {
     var secondaries = replTest.getSecondaries();
     assert(secondaries.length == 2, "Expected 2 secondaries but length was " + secondaries.length);
     secondaries.forEach(function(secondary) {
-        secondary.setSlaveOk();
+        secondary.setSecondaryOk();
         var count = secondary.getDB("bar").runCommand({count: "bar"});
         printjson(count);
         assert.eq(1000, count.n, "secondary count wrong: " + secondary);
@@ -118,7 +118,7 @@ var doTest = function(signal) {
     var t = db.foo;
 
     var ts = secondaries.map(function(z) {
-        z.setSlaveOk();
+        z.setSecondaryOk();
         return z.getDB("foo").foo;
     });
 

@@ -39,9 +39,7 @@ Mongo.prototype.getSlaveOk = function() {
     return this.getSecondaryOk();
 };
 
-Mongo.prototype.setSecondaryOk = function(value) {
-    if (value == undefined)
-        value = true;
+Mongo.prototype.setSecondaryOk = function(value = true) {
     this.secondaryOk = value;
 };
 

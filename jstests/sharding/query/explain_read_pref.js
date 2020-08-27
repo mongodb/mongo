@@ -58,7 +58,7 @@ var testAllModes = function(conn, isMongos) {
         var mode = args[0], tagSets = args[1], secExpected = args[2];
 
         var testDB = conn.getDB('TestDB');
-        conn.setSlaveOk(false);  // purely rely on readPref
+        conn.setSecondaryOk(false);  // purely rely on readPref
         jsTest.log('Testing mode: ' + mode + ', tag sets: ' + tojson(tagSets));
 
         // .explain().find()

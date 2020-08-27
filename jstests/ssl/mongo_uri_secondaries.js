@@ -39,7 +39,7 @@ const subShellCommand = function(hosts) {
 
     for (var i = 0; i < 10; i++) {
         var db = Ms[i].getDB("test");
-        db.setSlaveOk(true);
+        db.setSecondaryOk();
         db.col.find().readPref("secondary").toArray();
     }
 };

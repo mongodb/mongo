@@ -49,7 +49,7 @@ jsTestLog("2. Start blocking getMore cmd before step up");
 const joinGetMoreThread = startParallelShell(() => {
     // Open another cursor on secondary before step up.
     secondaryDB = db.getSiblingDB(TestData.dbName);
-    secondaryDB.getMongo().setSlaveOk(true);
+    secondaryDB.getMongo().setSecondaryOk();
 
     const cursorIdToBeReadDuringStepUp =
         assert.commandWorked(secondaryDB.runCommand({"find": TestData.collName, batchSize: 0}))
@@ -71,7 +71,7 @@ waitForCurOpByFailPoint(
 jsTestLog("2. Start blocking find cmd before step up");
 const joinFindThread = startParallelShell(() => {
     secondaryDB = db.getSiblingDB(TestData.dbName);
-    secondaryDB.getMongo().setSlaveOk(true);
+    secondaryDB.getMongo().setSecondaryOk();
 
     // Enable the fail point for find cmd.
     assert.commandWorked(

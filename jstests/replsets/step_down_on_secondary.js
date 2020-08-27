@@ -93,7 +93,7 @@ jsTestLog("Do a read that hits a prepare conflict on the old primary");
 const wTPrintPrepareConflictLogFailPoint = configureFailPoint(primary, "WTPrintPrepareConflictLog");
 
 const joinReadThread = startParallelShell(() => {
-    db.getMongo().setSlaveOk(true);
+    db.getMongo().setSecondaryOk();
     oldPrimaryDB = db.getSiblingDB(TestData.dbName);
 
     assert.commandFailedWithCode(oldPrimaryDB.runCommand({

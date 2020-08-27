@@ -45,7 +45,7 @@
 
     jsTestLog("5. Wait for new node to start cloning");
 
-    s.setSlaveOk();
+    s.setSecondaryOk();
     var sc = s.getDB("d")["c"];
 
     wait(function() {

@@ -50,7 +50,7 @@ replTest.awaitReplication();
 
 // Calling getPrimary also populates '_secondaries'.
 var secondaries = replTest.getSecondaries();
-secondaries[0].setSlaveOk();
+secondaries[0].setSecondaryOk();
 
 assert.commandWorked(secondaries[0].getDB("admin").runCommand({fsync: 1, lock: 1}));
 var docNum = 1000;

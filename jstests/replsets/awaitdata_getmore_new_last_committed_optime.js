@@ -56,7 +56,7 @@ let waitForGetMoreToFinish = startParallelShell(() => {
     load('jstests/replsets/rslib.js');
 
     const secondary = db.getMongo();
-    secondary.setSlaveOk();
+    secondary.setSecondaryOk();
 
     const dbName = 'test';
     const collName = 'coll';

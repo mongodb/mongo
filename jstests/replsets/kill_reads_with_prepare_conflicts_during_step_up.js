@@ -74,7 +74,7 @@ TestData.clusterTime = clusterTimeAfterPrepare;
 
 const waitForSecondaryReadBlockedOnPrepareConflictThread = startParallelShell(() => {
     // Allow for secondary reads.
-    db.getMongo().setSlaveOk();
+    db.getMongo().setSecondaryOk();
     const parallelTestDB = db.getSiblingDB(TestData.dbName);
     const parallelTestCollName = TestData.collName;
 

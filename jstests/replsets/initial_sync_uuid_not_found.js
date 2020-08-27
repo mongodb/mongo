@@ -39,7 +39,7 @@ function ResyncWithFailpoint(failpointName, failpointData) {
     assert.eq(primary, rst.getPrimary(), 'Primary changed after reconfig');
 
     jsTestLog('Wait for new node to start cloning');
-    secondary.setSlaveOk();
+    secondary.setSecondaryOk();
     const secondaryDB = secondary.getDB(primaryDB.getName());
     const secondaryColl = secondaryDB[primaryColl.getName()];
 

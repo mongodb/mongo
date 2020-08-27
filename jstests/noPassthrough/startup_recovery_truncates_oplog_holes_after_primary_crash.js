@@ -87,7 +87,7 @@ assert.soonNoExcept(function() {
 });
 
 // Confirm that the write with the oplog hold behind it is now gone (truncated) as expected.
-primary.setSlaveOk();
+primary.setSecondaryOk();
 const find = primary.getDB(dbName).getCollection(collName).findOne({_id: "writeAfterHole"});
 assert.eq(find, null);
 

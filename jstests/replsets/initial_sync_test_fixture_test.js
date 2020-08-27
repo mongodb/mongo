@@ -108,7 +108,7 @@ let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 assert(!initialSyncTest.step());
 
 secondary = initialSyncTest.getSecondary();
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 
 // Make sure that we cannot read from this node yet.
 assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),

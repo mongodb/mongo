@@ -35,7 +35,7 @@ rst.awaitSecondaryNodes();
 
 // Get the new secondary connection.
 secondary = rst.getSecondary();
-secondary.setSlaveOk(true);
+secondary.setSecondaryOk();
 
 const secondaryAdminDb = secondary.getDB("admin");
 // Assert that the FCV document was cloned through initial sync on the secondary.

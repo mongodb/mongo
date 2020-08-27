@@ -106,7 +106,7 @@ replTest.awaitSecondaryNodes();
 
 jsTestLog("Initial sync completed");
 
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 const secondaryColl = secondary.getDB(dbName).getCollection(collName);
 
 // Make sure that while reading from the node that went through initial sync, we can't read

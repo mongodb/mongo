@@ -43,9 +43,9 @@ var testOps = function(mongos) {
     assert.throws(function() {
         mongos.getDB('config').shards.findOne();
     });
-    mongos.setSlaveOk(true);
+    mongos.setSecondaryOk();
     var shardDoc = mongos.getDB('config').shards.findOne();
-    mongos.setSlaveOk(false);
+    mongos.setSecondaryOk(false);
     assert.neq(null, shardDoc);
 
     jsTestLog("Doing ops that require metadata writes and thus should fail against: " + mongos);

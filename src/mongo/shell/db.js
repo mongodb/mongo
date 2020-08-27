@@ -1244,7 +1244,7 @@ DB.autocomplete = function(obj) {
     return ret;
 };
 
-DB.prototype.setSlaveOk = function(value) {
+DB.prototype.setSlaveOk = function(value = true) {
     print(
         "WARNING: setSlaveOk() is deprecated and may be removed in the next major release. Please use setSecondaryOk() instead.");
     this.setSecondaryOk(value);
@@ -1256,9 +1256,7 @@ DB.prototype.getSlaveOk = function() {
     return this.getSecondaryOk();
 };
 
-DB.prototype.setSecondaryOk = function(value) {
-    if (value == undefined)
-        value = true;
+DB.prototype.setSecondaryOk = function(value = true) {
     this._secondaryOk = value;
 };
 

@@ -44,7 +44,7 @@ const secondary = rst.add({
     rsConfig: {votes: 0, priority: 0},
     setParameter: {"numInitialSyncAttempts": 1, 'collectionClonerBatchSize': clonerBatchSize}
 });
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 const secondaryColl = secondary.getDB(dbName).getCollection(collectionName);
 
 // We set the collectionClonerBatchSize low above, so we will definitely hit

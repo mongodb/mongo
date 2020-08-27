@@ -1,5 +1,5 @@
 /**
- * Tests aggregate command against mongos with slaveOk. For more tests on read preference,
+ * Tests aggregate command against mongos with secondaryOk. For more tests on read preference,
  * please refer to jstests/sharding/read_pref_cmd.js.
  * @tags: [
  *   requires_replication,
@@ -21,12 +21,12 @@ var doTest = function(st, doSharded) {
     }
 
     testDB.user.insert({x: 10}, {writeConcern: {w: NODES}});
-    testDB.setSlaveOk(true);
+    testDB.setSecondaryOk();
 
     var secNode = st.rs0.getSecondary();
     secNode.getDB('test').setProfilingLevel(2);
 
-    // wait for mongos to recognize that the slave is up
+    // wait for mongos to recognize that the secondary is up
     awaitRSClientHosts(st.s, secNode, {ok: true});
 
     var res = testDB.runCommand({aggregate: 'user', pipeline: [{$project: {x: 1}}], cursor: {}});

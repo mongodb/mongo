@@ -29,8 +29,8 @@ MongoRunner.validateCollectionsCallback = function(port) {
         return;
     }
 
-    // Set slaveOk=true so that we can run commands against any secondaries.
-    conn.setSlaveOk();
+    // Set secondaryOk=true so that we can run commands against any secondaries.
+    conn.setSecondaryOk();
 
     let dbNames;
     let result =

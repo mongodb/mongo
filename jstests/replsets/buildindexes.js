@@ -21,7 +21,7 @@ var primary = replTest.getPrimary().getDB(name);
 var secondaryConns = replTest.getSecondaries();
 var secondaries = [];
 for (var i in secondaryConns) {
-    secondaryConns[i].setSlaveOk();
+    secondaryConns[i].setSecondaryOk();
     secondaries.push(secondaryConns[i].getDB(name));
 }
 replTest.awaitReplication();

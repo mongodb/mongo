@@ -21,7 +21,7 @@ const secondaryAdminDB = secondary.getDB("admin");
 
 function runAwaitableIsMasterBeforeFCVChange(
     topologyVersionField, targetFCV, isPrimary, prevMinWireVersion, serverMaxWireVersion) {
-    db.getMongo().setSlaveOk();
+    db.getMongo().setSecondaryOk();
     let response = assert.commandWorked(db.runCommand({
         isMaster: 1,
         topologyVersion: topologyVersionField,

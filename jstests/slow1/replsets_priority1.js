@@ -146,9 +146,9 @@ for (var i = 0; i < n; i++) {
     assert.soon(function() {
         var versions = [0, 0];
         var secondaries = rs.getSecondaries();
-        secondaries[0].setSlaveOk();
+        secondaries[0].setSecondaryOk();
         versions[0] = secondaries[0].getDB("local").system.replset.findOne().version;
-        secondaries[1].setSlaveOk();
+        secondaries[1].setSecondaryOk();
         versions[1] = secondaries[1].getDB("local").system.replset.findOne().version;
         return versions[0] == config.version && versions[1] == config.version;
     });

@@ -48,7 +48,7 @@ function runAwaitableIsMaster(topologyVersionField) {
 }
 
 function runFind() {
-    db.getMongo().setSlaveOk();
+    db.getMongo().setSecondaryOk();
     assert.eq(4, db.getSiblingDB("test").coll.find().itcount());
 }
 

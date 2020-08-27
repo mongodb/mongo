@@ -1,7 +1,7 @@
 // Verify that the plan cache and index filter commands can be run on secondaries, but only
-// if slave ok is explicitly set.
+// if secondaryOk is explicitly set.
 
-var name = "plan_cache_slaveok";
+var name = "plan_cache_secondaryok";
 
 function assertPlanCacheCommandsSucceed(db) {
     assert.commandWorked(db.runCommand({planCacheClear: name, query: {a: 1}}));
@@ -50,13 +50,13 @@ assert.eq(1, primary.getDB("test")[name].findOne({a: 1})["a"]);
 // Make sure the plan cache commands succeed on the primary.
 assertPlanCacheCommandsSucceed(primary.getDB("test"));
 
-// With slave ok false, the commands should fail on the secondary.
+// With secondaryOk false, the commands should fail on the secondary.
 var secondary = replTest.getSecondary();
-secondary.getDB("test").getMongo().setSlaveOk(false);
+secondary.getDB("test").getMongo().setSecondaryOk(false);
 assertPlanCacheCommandsFail(secondary.getDB("test"));
 
-// With slave ok true, the commands should succeed on the secondary.
-secondary.getDB("test").getMongo().setSlaveOk(true);
+// With secondaryOk true, the commands should succeed on the secondary.
+secondary.getDB("test").getMongo().setSecondaryOk();
 assertPlanCacheCommandsSucceed(secondary.getDB("test"));
 
 replTest.stopSet();

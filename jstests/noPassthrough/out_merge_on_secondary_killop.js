@@ -57,7 +57,7 @@ function testKillOp(pipeline, comment, failpointName) {
     // Run the aggregate and ensure that it is interrupted.
     const runAggregate = `
             const testDB = db.getSiblingDB("${kDBName}");
-            testDB.setSlaveOk(true);
+            testDB.setSecondaryOk();
             const res = testDB.runCommand({
                 aggregate: "inputColl",
                 pipeline: ${tojson(pipeline)},

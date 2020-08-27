@@ -107,7 +107,7 @@ PrepareHelpers.awaitMajorityCommitted(replTest, prepareTimestamp);
 
 jsTestLog("Initial sync completed");
 
-secondary.setSlaveOk();
+secondary.setSecondaryOk();
 const secondaryColl = secondary.getDB(dbName).getCollection(collName);
 
 jsTestLog("Checking that the transaction is properly prepared");

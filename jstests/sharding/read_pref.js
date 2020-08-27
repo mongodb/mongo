@@ -134,7 +134,7 @@ var doTest = function(useDollarQuerySyntax) {
     var explainServer = getExplainServer(explain);
     assert.neq(primaryNode.name, explainServer);
 
-    conn.setSlaveOk();
+    conn.setSecondaryOk();
 
     // It should also work with slaveOk
     explain = getExplain("secondary");

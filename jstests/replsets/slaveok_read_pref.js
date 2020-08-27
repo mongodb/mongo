@@ -1,5 +1,5 @@
-// Test that slaveOk is implicitly allowed for queries on a secondary with a read preference other
-// than 'primary', and that queries which do have 'primary' read preference fail.
+// Test that secondaryOk is implicitly allowed for queries on a secondary with a read preference
+// other than 'primary', and that queries which do have 'primary' read preference fail.
 (function() {
 "use strict";
 
@@ -28,18 +28,18 @@ const secDB = rst.getSecondary().getDB(jsTestName());
 
 for (let readMode of ["commands", "legacy"]) {
     for (let readPref of readPrefs) {
-        for (let slaveOk of [true, false]) {
-            const testType = {readMode: readMode, readPref: readPref, slaveOk: slaveOk};
+        for (let secondaryOk of [true, false]) {
+            const testType = {readMode: readMode, readPref: readPref, secondaryOk: secondaryOk};
 
             secDB.getMongo().forceReadMode(readMode);
-            secDB.getMongo().setSlaveOk(slaveOk);
+            secDB.getMongo().setSecondaryOk(secondaryOk);
 
             const cursor = (readPref ? secDB.test.find().readPref(readPref) : secDB.test.find());
 
-            if (readPref === "primary" || (!readPref && !slaveOk)) {
+            if (readPref === "primary" || (!readPref && !secondaryOk)) {
                 // Attempting to run the query throws an error of type NotPrimaryNoSecondaryOk.
-                const slaveOkErr = assert.throws(() => cursor.itcount(), [], tojson(testType));
-                assert.commandFailedWithCode(slaveOkErr, ErrorCodes.NotPrimaryNoSecondaryOk);
+                const secondaryOkErr = assert.throws(() => cursor.itcount(), [], tojson(testType));
+                assert.commandFailedWithCode(secondaryOkErr, ErrorCodes.NotPrimaryNoSecondaryOk);
             } else {
                 // Succeeds for all non-primary readPrefs, and for no readPref iff slaveOk.
                 const docCount = assert.doesNotThrow(() => cursor.itcount(), [], tojson(testType));
@@ -51,7 +51,7 @@ for (let readMode of ["commands", "legacy"]) {
 
 function assertNotPrimaryNoSecondaryOk(func) {
     secDB.getMongo().forceReadMode("commands");
-    secDB.getMongo().setSlaveOk(false);
+    secDB.getMongo().setSecondaryOk(false);
     secDB.getMongo().setReadPref("primary");
     const res = assert.throws(func);
     assert.commandFailedWithCode(res, ErrorCodes.NotPrimaryNoSecondaryOk);
@@ -59,7 +59,7 @@ function assertNotPrimaryNoSecondaryOk(func) {
 
 // Test that agg with $out/$merge and non-inline mapReduce fail with 'NotPrimaryNoSecondaryOk' when
 // directed at a secondary with "primary" read preference.
-const secondaryColl = secDB.slaveok_read_pref;
+const secondaryColl = secDB.secondaryok_read_pref;
 assertNotPrimaryNoSecondaryOk(() => secondaryColl.aggregate([{$out: "target"}]).itcount());
 assertNotPrimaryNoSecondaryOk(
     () =>
