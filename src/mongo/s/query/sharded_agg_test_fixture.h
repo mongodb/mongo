@@ -109,7 +109,8 @@ public:
             return response;
         }());
 
-        future.default_timed_get().get();
+        auto routingInfo = future.default_timed_get();
+        ASSERT(routingInfo->cm());
     }
 
 protected:
