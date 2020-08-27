@@ -463,6 +463,7 @@ executor:
     num_rs_nodes_per_shard: 3
     configsvr_options:
       mongod_options:
+        wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
         set_parameters:
           enableTestCommands: 1
     shard_options:

@@ -277,6 +277,7 @@ executor:
         settings:
           catchUpTimeoutMillis: 0
     mongod_options:
+      wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
       set_parameters:
         enableTestCommands: 1
         enableElectionHandoff: 0
