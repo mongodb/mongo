@@ -194,6 +194,8 @@ public:
      * true, unless the storage engine cannot guarantee durability, which should never happen when
      * isDurable() returned true. This cannot be called from inside a unit of work, and should
      * fail if it is. This method invariants if the caller holds any locks, except for repair.
+     *
+     * Can throw write interruption errors from the JournalListener.
      */
     virtual bool waitUntilDurable(OperationContext* opCtx) = 0;
 

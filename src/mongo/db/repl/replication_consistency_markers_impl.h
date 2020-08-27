@@ -120,12 +120,17 @@ private:
         OperationContext* opCtx) const;
 
     /**
+     * Updates the oplogTruncateAfterPoint with 'timestamp'. Callers should use this codepath when
+     * expecting write interruption errors.
+     */
+    Status _setOplogTruncateAfterPoint(OperationContext* opCtx, const Timestamp& timestamp);
+
+    /**
      * Upserts the OplogTruncateAfterPoint document according to the provided update spec. The
      * collection must already exist. See `createInternalCollections`.
-     *
-     * This fasserts on failure.
      */
-    void _upsertOplogTruncateAfterPointDocument(OperationContext* opCtx, const BSONObj& updateSpec);
+    Status _upsertOplogTruncateAfterPointDocument(OperationContext* opCtx,
+                                                  const BSONObj& updateSpec);
 
     StorageInterface* _storageInterface;
     const NamespaceString _minValidNss;

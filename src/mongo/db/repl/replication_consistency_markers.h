@@ -183,6 +183,8 @@ public:
      * null once the parallel oplog entry writes are complete.
      *
      * Concurrency control and serialization is the responsibility of the caller.
+     *
+     * This fasserts on write failure.
      */
     virtual void setOplogTruncateAfterPoint(OperationContext* opCtx,
                                             const Timestamp& timestamp) = 0;
@@ -228,6 +230,8 @@ public:
      * stopUsingOplogTruncateAfterPointForPrimary() will cause new calls to this function to do
      * nothing, but any already running callers of this function will need to be interrupted to
      * ensure the state change is in effect (that an update will not racily go ahead).
+     *
+     * Throws write interruption errors up to the caller.
      */
     virtual boost::optional<OpTimeAndWallTime> refreshOplogTruncateAfterPointIfPrimary(
         OperationContext* opCtx) = 0;
