@@ -135,15 +135,15 @@ env.Library(
         'oplog_cap_maintainer_thread.cpp',
     ],
     LIBDEPS=[
-    	'$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/db/namespace_string',
+    	'$BUILD_DIR/mongo/util/background_job',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context',
     ],
@@ -158,9 +158,9 @@ env.Library(
         '$BUILD_DIR/mongo/util/background_job',
     ],
     LIBDEPS_PRIVATE=[
-        'storage_options',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
+        'storage_options',
     ],
 )
 
@@ -234,8 +234,8 @@ env.Library(
         'sorted_data_interface_test_unindex.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
         'index_entry_comparison',
         'key_string',
@@ -311,13 +311,13 @@ env.Library(
     LIBDEPS=[
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/service_context',
         'storage_control',
         'storage_engine_lock_file',
-        'storage_repair_observer',
         'storage_engine_metadata',
         'storage_options',
+        'storage_repair_observer',
     ],
 )
 
@@ -356,8 +356,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/mongo/db/server_options_core',
     ],
 )
 
@@ -379,18 +379,20 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
+        '$BUILD_DIR/mongo/db/service_context',
         'storage_file_util',
     ],
 )
 
 env.Benchmark(
     target='storage_key_string_bm',
-    source='key_string_bm.cpp',
+    source=[
+        'key_string_bm.cpp'
+    ],
     LIBDEPS=[
-        'key_string',
         '$BUILD_DIR/mongo/base',
+        'key_string',
     ],
 )
 
@@ -400,9 +402,9 @@ env.Library(
         'remove_saver.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         'encryption_hooks',
         'storage_options',
-        '$BUILD_DIR/mongo/base',
     ]
 )
 
@@ -483,13 +485,13 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
         '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
@@ -523,7 +525,7 @@ env.Library(
     target='storage_engine_impl',
     source=[
         'storage_engine_impl.cpp',
-        'kv/temporary_kv_record_store.cpp', # TODO: SERVER-41892 Avoid source under kv sub-directory
+        'kv/temporary_kv_record_store.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -534,9 +536,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
         '$BUILD_DIR/mongo/db/resumable_index_builds_idl',
+        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/vector_clock',
         'storage_util',
         'two_phase_index_build_knobs_idl',

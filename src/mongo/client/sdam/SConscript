@@ -28,12 +28,12 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/util/clock_sources',
-		'$BUILD_DIR/mongo/client/read_preference',
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/db/wire_version',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/util/clock_sources',
         'sdam_configuration_parameters',
     ],
 )
@@ -45,12 +45,14 @@ sdam_json_test = env.Program(
         'sdam_json_test_runner.cpp'],
     AIB_COMPONENT="sdam-json-test",
     LIBDEPS=[
-        'sdam',
-        'sdam_test',
-        'json_test',
-        'sdam_configuration_parameters',
+        '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/util/clock_source_mock',
-        '$BUILD_DIR/mongo/client/connection_string'],
+        'json_test',
+        'sdam',
+        'sdam_configuration_parameters',
+        'sdam_test',
+    ],
+
 )[0]
 
 server_selection_json_test = env.Program(
@@ -59,12 +61,13 @@ server_selection_json_test = env.Program(
         'server_selection_json_test_runner.cpp'],
     AIB_COMPONENT="server-selection-json-test",
     LIBDEPS=[
-        'sdam',
-        'sdam_test',
-        'json_test',
-        'sdam_configuration_parameters',
+        '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/util/clock_source_mock',
-        '$BUILD_DIR/mongo/client/connection_string'],
+        'json_test',
+        'sdam',
+        'sdam_configuration_parameters',
+        'sdam_test',
+    ],
 )[0]
 
 env.Library(
@@ -74,9 +77,9 @@ env.Library(
         env.Idlc('json_test_runner_cli_options.idl')[0],
     ],
     LIBDEPS=[
-        'sdam',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'sdam',
     ],
 )
 
@@ -87,8 +90,8 @@ env.Library(
         'topology_listener_mock.cpp',
     ],
     LIBDEPS=[
-        'sdam',
         '$BUILD_DIR/mongo/base',
+        'sdam',
     ],
 )
 

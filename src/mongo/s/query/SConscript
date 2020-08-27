@@ -33,10 +33,10 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface',
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
         '$BUILD_DIR/mongo/db/views/views',
+        '$BUILD_DIR/mongo/s/query/cluster_client_cursor',
         'cluster_query',
     ]
 )
@@ -81,8 +81,8 @@ env.Library(
         "$BUILD_DIR/mongo/db/query/command_request_response",
         "$BUILD_DIR/mongo/db/query/query_common",
         "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/s/client/sharding_client",
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
+        "$BUILD_DIR/mongo/s/client/sharding_client",
         "$BUILD_DIR/mongo/s/sharding_router_api",
     ],
 )
@@ -169,8 +169,8 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "async_results_merger",
         "cluster_aggregate",
-        "cluster_client_cursor_mock",
         "cluster_client_cursor",
+        "cluster_client_cursor_mock",
         "cluster_cursor_manager",
         "router_exec_stage",
         "store_possible_cursor",

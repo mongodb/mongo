@@ -23,6 +23,7 @@
 """Pseudo-builders for building and registering unit tests."""
 from SCons.Script import Action
 
+from site_scons.mongo import insort_wrapper
 
 def exists(env):
     return True
@@ -31,7 +32,7 @@ def exists(env):
 def build_cpp_unit_test(env, target, source, **kwargs):
     if not kwargs.get("UNITTEST_HAS_CUSTOM_MAINLINE", False):
         libdeps = kwargs.get("LIBDEPS", env.get("LIBDEPS", [])).copy()
-        libdeps.append("$BUILD_DIR/mongo/unittest/unittest_main")
+        insort_wrapper(libdeps, "$BUILD_DIR/mongo/unittest/unittest_main")
         kwargs["LIBDEPS"] = libdeps
 
     unit_test_components = {"tests", "unittests"}

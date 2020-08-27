@@ -16,8 +16,8 @@ env.Library(
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/db/index_names',
-            '$BUILD_DIR/mongo/db/namespace_string',
             '$BUILD_DIR/mongo/db/matcher/expressions',
+            '$BUILD_DIR/mongo/db/namespace_string',
             '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         ],
 )
@@ -126,8 +126,8 @@ serveronlyEnv.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/index_catalog_entry',
-        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/execution_context',
@@ -138,10 +138,10 @@ serveronlyEnv.Library(
         'index_descriptor',
     ],
     LIBDEPS_PRIVATE=[
-        'skipped_record_tracker',
         '$BUILD_DIR/mongo/db/sorter/sorter_idl',
         '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/idl/server_parameter',
+        'skipped_record_tracker',
     ],
 )
 

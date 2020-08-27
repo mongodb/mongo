@@ -11,8 +11,8 @@ env.Library(
         'element.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/safe_num',
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/safe_num',
     ],
 )
 

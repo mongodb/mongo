@@ -45,7 +45,7 @@ env.CppUnitTest(
         'options_parser_test.cpp',
     ],
     LIBDEPS=[
-        'options_parser',
         '$BUILD_DIR/mongo/unittest/unittest',
+        'options_parser',
     ],
 )

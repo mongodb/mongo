@@ -14,11 +14,11 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/error_labels',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/s/common_s',

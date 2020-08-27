@@ -97,8 +97,8 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/unittest/unittest',
         'query_sbe_parser',
     ],
 )

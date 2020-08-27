@@ -76,9 +76,10 @@ class Constants:
 class dependency:
     Public, Private, Interface = list(range(3))
 
-    def __init__(self, value, deptype):
+    def __init__(self, value, deptype, listed_name):
         self.target_node = value
         self.dependency_type = deptype
+        self.listed_name = listed_name
 
     def __str__(self):
         return str(self.target_node)
@@ -215,6 +216,8 @@ class LibdepLinter:
         self.env = env
         self.target = target
         self.unique_libs = set()
+        self._libdeps_types_previous = dict()
+
 
         # If we are in print mode, we will record some linting metrics,
         # and print the results at the end of the build.
@@ -360,6 +363,26 @@ class LibdepLinter:
             )
 
         self.unique_libs.add(str(libdep))
+
+    @linter_rule
+    def linter_rule_alphabetic_deps(self, libdep):
+        """
+        LIBDEP RULE:
+            Libdeps shall be listed alphabetically by type in the SCons files.
+        """
+
+        if self._check_for_lint_tags('lint-allow-non-alphabetic'):
+            return
+
+        # Start checking order after the first item in the list is recorded to compare with.
+        if libdep.dependency_type in self._libdeps_types_previous:
+            if self._libdeps_types_previous[libdep.dependency_type] > libdep.listed_name:
+                target_type = self.target[0].builder.get_name(self.env)
+                self._raise_libdep_lint_exception(
+                    f"{target_type} '{self.target[0]}' has '{libdep.listed_name}' listed in {dep_type_to_env_var[libdep.dependency_type]} out of alphabetical order."
+                )
+
+        self._libdeps_types_previous[libdep.dependency_type] = libdep.listed_name
 
     @linter_rule
     def linter_rule_programs_link_private(self, libdep):
@@ -725,12 +748,13 @@ def make_libdeps_emitter(
                 if not lib:
                     continue
                 lib_with_ixes = __get_node_with_ixes(env, lib, dependency_builder)
-                libdeps.append(dependency(lib_with_ixes, dep_type))
+                libdeps.append(dependency(lib_with_ixes, dep_type, lib))
 
         # Lint the libdeps to make sure they are following the rules.
         # This will skip some or all of the checks depending on the options
         # and LIBDEPS_TAGS used.
-        LibdepLinter(env, target).lint_libdeps(libdeps)
+        if not any("conftest" in str(t) for t in target):
+            LibdepLinter(env, target).lint_libdeps(libdeps)
 
         # We ignored the dependency_map until now because we needed to use
         # original dependency value for linting. Now go back through and
@@ -757,7 +781,7 @@ def make_libdeps_emitter(
                 env, dependent, dependency_builder
             )
             __append_direct_libdeps(
-                dependentNode, [dependency(target[0], dependency_map[visibility])]
+                dependentNode, [dependency(target[0], dependency_map[visibility], dependent)]
             )
 
         if not ignore_progdeps:
@@ -775,7 +799,7 @@ def make_libdeps_emitter(
                     env, dependent, "Program"
                 )
                 __append_direct_libdeps(
-                    dependentNode, [dependency(target[0], dependency_map[visibility])]
+                    dependentNode, [dependency(target[0], dependency_map[visibility], dependent)]
                 )
 
         return target, source

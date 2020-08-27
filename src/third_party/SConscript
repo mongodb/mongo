@@ -2,6 +2,7 @@
 
 import SCons
 
+from site_scons.mongo import insort_wrapper
 import libdeps
 import json
 
@@ -237,7 +238,7 @@ for builder_name in ('Program', 'SharedLibrary', 'LoadableModule', 'StaticLibrar
             lds = env.get('LIBDEPS', [])
             shim_allocator = '$BUILD_DIR/third_party/shim_allocator'
             if shim_allocator not in lds:
-                lds.append(shim_allocator)
+                insort_wrapper(lds, shim_allocator)
                 env['LIBDEPS'] = lds
 
         return target, source
@@ -364,11 +365,11 @@ else:
     boostEnv.SConscript(boostDirectory + '/SConscript', exports={ 'env' : boostEnv })
     boostEnv = boostEnv.Clone(
         LIBDEPS_INTERFACE=[
-            boostDirectory + '/boost_program_options',
             boostDirectory + '/boost_filesystem',
-            boostDirectory + '/boost_system',
             boostDirectory + '/boost_iostreams',
             boostDirectory + '/boost_log',
+            boostDirectory + '/boost_program_options',
+            boostDirectory + '/boost_system',
         ])
 
 boostEnv.Library(

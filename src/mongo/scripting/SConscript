@@ -114,15 +114,15 @@ if usemozjs:
             env.Idlc('mozjs/scripting_util.idl')[0],
         ],
         LIBDEPS=[
+            '$BUILD_DIR/mongo/db/service_context',
+            '$BUILD_DIR/mongo/shell/mongojs',
             'bson_template_evaluator',
             'scripting_common',
-            '$BUILD_DIR/mongo/shell/mongojs',
-            '$BUILD_DIR/mongo/db/service_context',
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/client/clientdriver_network',
-            '$BUILD_DIR/third_party/shim_mozjs',
             '$BUILD_DIR/mongo/idl/server_parameter',
+            '$BUILD_DIR/third_party/shim_mozjs',
         ],
     )
 else:

@@ -25,6 +25,7 @@ Pseudo-builders for building and registering integration tests.
 """
 from SCons.Script import Action
 
+from site_scons.mongo import insort_wrapper
 
 def exists(env):
     return True
@@ -32,7 +33,7 @@ def exists(env):
 
 def build_cpp_integration_test(env, target, source, **kwargs):
     libdeps = kwargs.get("LIBDEPS", env.get("LIBDEPS", [])).copy()
-    libdeps.append("$BUILD_DIR/mongo/unittest/integration_test_main")
+    insort_wrapper(libdeps, "$BUILD_DIR/mongo/unittest/integration_test_main")
 
     kwargs["LIBDEPS"] = libdeps
     integration_test_components = {"tests", "integration-tests"}

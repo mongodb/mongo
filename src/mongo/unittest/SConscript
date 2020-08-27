@@ -48,15 +48,15 @@ env.Library(
         env.Idlc('integration_test_main.idl')[0],
     ],
     LIBDEPS=[
-        'unittest',
         '$BUILD_DIR/mongo/base',
+        'unittest',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/serverinit',
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/server_options_base',
+        '$BUILD_DIR/mongo/db/serverinit',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',

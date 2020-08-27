@@ -67,9 +67,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/fts/fts_query_noop',
         '$BUILD_DIR/mongo/db/geo/geometry',
         '$BUILD_DIR/mongo/db/geo/geoparser',
+        '$BUILD_DIR/mongo/db/pipeline/expression_context',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/mongo/db/query/query_knobs',
-        '$BUILD_DIR/mongo/db/pipeline/expression_context',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/regex_util',
         '$BUILD_DIR/third_party/shim_pcrecpp',
@@ -85,13 +85,13 @@ env.Library(
         'expression_where.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
+        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/scripting/scripting_server',
         'expressions',
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        '$BUILD_DIR/mongo/db/catalog_raii',
     ],
 )
 

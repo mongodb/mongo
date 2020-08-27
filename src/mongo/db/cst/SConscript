@@ -43,7 +43,7 @@ env.CppUnitTest(
         'cst_literals_test.cpp',
     ],
     LIBDEPS=[
-        'cst',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        'cst',
     ]
 )

@@ -161,11 +161,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/query/hint_parser',
         '$BUILD_DIR/mongo/db/repl/optime',
-        "$BUILD_DIR/mongo/idl/idl_parser",
+        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/db/query/hint_parser',
         'query_request',
     ]
 )
@@ -204,9 +204,9 @@ env.Library(
         "query_test_service_context.cpp",
     ],
     LIBDEPS=[
-        "collation/collator_factory_mock",
         "$BUILD_DIR/mongo/db/logical_session_id",
         "$BUILD_DIR/mongo/db/service_context",
+        "collation/collator_factory_mock",
     ],
     LIBDEPS_PRIVATE=[
     ],
@@ -218,8 +218,8 @@ env.Library(
         "query_planner_test_fixture.cpp",
     ],
     LIBDEPS=[
-        "query_planner_test_lib",
         "$BUILD_DIR/mongo/unittest/unittest",
+        "query_planner_test_lib",
     ],
 )
 

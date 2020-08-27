@@ -5,22 +5,36 @@ Import("env")
 env = env.Clone()
 
 # Core geometry shape libraries
-env.Library("geometry", [ "hash.cpp",
-                          "shapes.cpp",
-                          "big_polygon.cpp",
-                          "r2_region_coverer.cpp" ],
-            LIBDEPS = [ "$BUILD_DIR/mongo/base",
-                        "$BUILD_DIR/mongo/db/common",
-                        '$BUILD_DIR/mongo/db/storage/key_string',
-                        "$BUILD_DIR/third_party/s2/s2" ])
+env.Library(
+    target="geometry",
+    source=[
+        "hash.cpp",
+        "shapes.cpp",
+        "big_polygon.cpp",
+        "r2_region_coverer.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/common",
+        "$BUILD_DIR/mongo/db/storage/key_string",
+        "$BUILD_DIR/third_party/s2/s2"
+    ]
+)
 
 # Geometry / BSON parsing and wrapping
-env.Library("geoparser", [ "geoparser.cpp",
-                           "geometry_container.cpp" ],
-            LIBDEPS = [ "geometry",
-                        "$BUILD_DIR/mongo/base",
-                        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
-                        "$BUILD_DIR/third_party/s2/s2" ])
+env.Library(
+    target="geoparser",
+    source=[
+        "geoparser.cpp",
+        "geometry_container.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/third_party/s2/s2",
+        "geometry",
+    ]
+)
 
 env.CppUnitTest(
     target="db_geo_test",
@@ -31,8 +45,8 @@ env.CppUnitTest(
         "r2_region_coverer_test.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/common",
         "geometry",
         "geoparser",
-        "$BUILD_DIR/mongo/db/common"
     ]
 )

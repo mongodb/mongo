@@ -100,10 +100,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/pipeline/expression_context',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/op_observer_impl',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
+        '$BUILD_DIR/mongo/db/pipeline/expression_context',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
@@ -157,12 +157,12 @@ env.Library(
         env.Idlc('transaction_coordinators_stats.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/vector_clock_mongod',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/grid',
@@ -190,9 +190,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/s/common_s',
+        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
     ],
 )
 
@@ -323,8 +323,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
-        '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/s/sharding_initialization',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
         'balancer',
         'sharding_runtime_d',
     ],
@@ -351,8 +351,8 @@ env.Library(
         'sharding_logging.cpp',
     ],
     LIBDEPS=[
-        'sharding_api_d',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
+        'sharding_api_d',
     ],
 )
 

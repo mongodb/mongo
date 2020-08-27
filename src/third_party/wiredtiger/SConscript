@@ -200,10 +200,10 @@ wtlib = env.Library(
     target="wiredtiger",
     source=wtsources,
     LIBDEPS_PRIVATE=[
-        'wiredtiger_checksum',
         '$BUILD_DIR/third_party/shim_snappy',
         '$BUILD_DIR/third_party/shim_zlib',
         '$BUILD_DIR/third_party/shim_zstd',
+        'wiredtiger_checksum',
     ],
     LIBDEPS_TAGS=[
         'init-no-global-side-effects',

@@ -21,10 +21,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/storage/oplog_hack',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
-        '$BUILD_DIR/mongo/db/commands/server_status',
     ],
 )
 
@@ -40,9 +40,9 @@ env.Library(
         'storage_ephemeral_for_test_core',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
-        '$BUILD_DIR/mongo/db/commands/server_status',
     ],
 )
 
@@ -58,16 +58,16 @@ env.CppUnitTest(
         'ephemeral_for_test_sorted_impl_test.cpp',
     ],
     LIBDEPS=[
-        'storage_ephemeral_for_test_core',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
         '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
         '$BUILD_DIR/mongo/db/storage/recovery_unit_test_harness',
         '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
+        'storage_ephemeral_for_test_core',
     ],
 )

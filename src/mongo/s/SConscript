@@ -102,9 +102,9 @@ env.Library(
         'common_s',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/idl/server_parameter",
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/executor/connection_pool_executor',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        "$BUILD_DIR/mongo/idl/server_parameter",
         'coreshard',
         'sharding_task_executor',
     ],
@@ -117,13 +117,13 @@ env.Library(
         'hedge_options_util.cpp',
     ],
     LIBDEPS=[
-        'mongos_server_parameters',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/executor/scoped_task_executor',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
+        '$BUILD_DIR/mongo/s/client/shard_interface',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/client/shard_interface',
+        'mongos_server_parameters',
     ],
 )
 
@@ -258,9 +258,9 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/util/caching',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'client/shard_interface',
         'query/cluster_cursor_manager',
         'sharding_routing_table',
@@ -291,8 +291,8 @@ env.Benchmark(
         'chunk_manager_refresh_bm.cpp',
     ],
     LIBDEPS=[
-        'sharding_routing_table',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        'sharding_routing_table',
     ],
 )
 
@@ -369,9 +369,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/rpc/metadata',
         'mongos_is_master_response',
     ],
 )

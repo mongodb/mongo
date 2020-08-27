@@ -76,8 +76,8 @@ env.Library(
         "aead_encryption.cpp",
     ],
     LIBDEPS=[
-        'symmetric_crypto',
         '$BUILD_DIR/mongo/db/matcher/expressions',
+        'symmetric_crypto',
     ],
 )
 

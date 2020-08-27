@@ -61,8 +61,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        'update_nodes',
         'update_document_diff',
+        'update_nodes',
     ],
 )
 

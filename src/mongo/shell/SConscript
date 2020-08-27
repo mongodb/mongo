@@ -109,8 +109,8 @@ env.Library(
         env.Idlc('shell_options.idl')[0],
     ],
     LIBDEPS=[
-        'shell_options_storage',
         '$BUILD_DIR/mongo/base',
+        'shell_options_storage',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
@@ -127,7 +127,6 @@ env.Library(
         'shell_utils_launcher.cpp',
     ],
     LIBDEPS=[
-        'benchrun',
         '$BUILD_DIR/mongo/base/environment_buffer',
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/db/mongohasher',
@@ -135,6 +134,7 @@ env.Library(
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/util/password',
+        'benchrun',
         'shell_options_storage',
     ]
 )
@@ -186,9 +186,9 @@ scriptingEnv.Library(
         scriptingEnv.Idlc("fle_shell_options.idl")[0],
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/crypto/aead_encryption',
         '$BUILD_DIR/mongo/crypto/symmetric_crypto',
-        '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/shell/shell_options_register',
         '$BUILD_DIR/third_party/shim_mozjs',

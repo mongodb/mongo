@@ -114,8 +114,8 @@ if not get_option('ssl') == 'off':
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/auth/auth',
             '$BUILD_DIR/mongo/client/internal_auth',
+            '$BUILD_DIR/mongo/db/auth/auth',
             '$BUILD_DIR/mongo/util/caching',
             '$BUILD_DIR/mongo/util/concurrency/thread_pool',
             '$BUILD_DIR/third_party/shim_asio',
@@ -144,10 +144,10 @@ if not get_option('ssl') == 'off':
             env.Idlc('ssl_parameters_auth.idl')[0],
         ],
         LIBDEPS_PRIVATE=[
-            'ssl_options',
             '$BUILD_DIR/mongo/client/authentication',
             '$BUILD_DIR/mongo/db/server_options_core',
             '$BUILD_DIR/mongo/idl/server_parameter',
+            'ssl_options',
         ],
     )
 else:
@@ -230,11 +230,11 @@ if get_option('ssl') == 'on':
             'sock_test.cpp',
         ],
         LIBDEPS=[
-            'network',
-            'ssl_manager',
-            'ssl_options_server',
             '$BUILD_DIR/mongo/db/server_options_servers',
             '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
             '$BUILD_DIR/mongo/util/fail_point',
+            'network',
+            'ssl_manager',
+            'ssl_options_server',
         ],
     )

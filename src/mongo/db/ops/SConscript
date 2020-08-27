@@ -8,11 +8,11 @@ env.Library(
     target='write_ops_exec',
     source=[
         'write_ops_exec.cpp',
-        ],
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/curop_metrics',
         '$BUILD_DIR/mongo/db/repl/oplog',

@@ -41,10 +41,10 @@ if free_monitoring == "on":
             'free_mon_status.cpp',
         ],
         LIBDEPS=[
-            'free_mon',
             '$BUILD_DIR/mongo/db/commands/server_status',
             '$BUILD_DIR/mongo/db/ftdc/ftdc_server',
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
+            'free_mon',
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/client/clientdriver_network',
@@ -60,11 +60,11 @@ else:
             'free_mon_stub.cpp',
         ],
         LIBDEPS_PRIVATE=[
-            'free_mon',
             '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/commands',
             '$BUILD_DIR/mongo/db/auth/auth',
             '$BUILD_DIR/mongo/db/auth/authprivilege',
+            '$BUILD_DIR/mongo/db/commands',
+            'free_mon',
         ],
     )
 
@@ -80,8 +80,8 @@ fmEnv.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_d',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'free_mon',

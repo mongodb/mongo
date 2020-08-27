@@ -44,8 +44,8 @@ tlEnv.Library(
         'transport_layer',
     ],
     LIBDEPS_PRIVATE=[
-        'service_executor',
         '$BUILD_DIR/third_party/shim_asio',
+        'service_executor',
     ],
 )
 
@@ -56,12 +56,12 @@ tlEnv.Library(
         env.Idlc('transport_options.idl')[0],
     ],
     LIBDEPS=[
-        'transport_layer_common',
         '$BUILD_DIR/mongo/base/system_error',
         '$BUILD_DIR/mongo/db/auth/authentication_restriction',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
+        'transport_layer_common',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -96,8 +96,8 @@ tlEnv.Library(
         '$BUILD_DIR/mongo/db/service_context',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/idl/server_parameter",
         "$BUILD_DIR/mongo/db/server_options_core",
+        "$BUILD_DIR/mongo/idl/server_parameter",
         "$BUILD_DIR/mongo/util/concurrency/thread_pool",
         "$BUILD_DIR/mongo/util/processinfo",
         '$BUILD_DIR/third_party/shim_asio',
@@ -208,12 +208,12 @@ tlEnv.CppIntegrationTest(
         'transport_layer_asio_integration_test.cpp',
     ],
     LIBDEPS=[
-        'transport_layer_egress_init',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/async_client',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/version_impl',
         '$BUILD_DIR/third_party/shim_asio',
+        'transport_layer_egress_init',
     ],
 )

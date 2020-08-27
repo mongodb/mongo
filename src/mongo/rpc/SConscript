@@ -47,9 +47,7 @@ protoEnv.Library(
 )
 
 env.Library(
-    target=[
-        'rpc',
-    ],
+    target='rpc',
     source=[
         'factory.cpp',
         'object_check.cpp',
@@ -61,13 +59,13 @@ env.Library(
         env.Idlc('object_check.idl')[0],
     ],
     LIBDEPS=[
-        'metadata',
-        'protocol',
-        '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/s/common_s',
+        '$BUILD_DIR/mongo/util/net/network',
+        'metadata',
+        'protocol',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -88,9 +86,7 @@ env.CppLibfuzzerTest(
 )
 
 env.Library(
-    target=[
-        'metadata',
-    ],
+    target='metadata',
     source=[
         'metadata.cpp',
         'metadata/config_server_metadata.cpp',
@@ -102,13 +98,13 @@ env.Library(
         env.Idlc('topology_version.idl')[0],
     ],
     LIBDEPS=[
-        'client_metadata',
-        'metadata_impersonated_user',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/signed_logical_time',
+        'client_metadata',
+        'metadata_impersonated_user',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/vector_clock',
@@ -184,9 +180,9 @@ env.CppIntegrationTest(
         'op_msg_integration_test.cpp',
     ],
     LIBDEPS=[
-        'protocol',
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
         '$BUILD_DIR/mongo/util/version_impl',
+        'protocol',
     ],
 )

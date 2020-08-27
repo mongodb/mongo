@@ -31,13 +31,13 @@ env.Library(
         'catalog_test_fixture.cpp',
     ],
     LIBDEPS=[
-        'catalog_helpers',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        'catalog_helpers',
     ],
 )
 
@@ -67,9 +67,9 @@ env.Library(
         env.Idlc('commit_quorum.idl')[0],
     ],
     LIBDEPS=[
-        'commit_quorum_options',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        'commit_quorum_options',
     ],
 )
 
@@ -89,8 +89,8 @@ env.Library(
         env.Idlc('index_build_entry.idl')[0],
     ],
     LIBDEPS=[
-        'commit_quorum_idl',
         '$BUILD_DIR/mongo/util/net/network',
+        'commit_quorum_idl',
     ],
 )
 
@@ -114,8 +114,8 @@ env.Library(
         'index_builds_manager.cpp',
     ],
     LIBDEPS=[
-        'multi_index_block',
         '$BUILD_DIR/mongo/base',
+        'multi_index_block',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog_raii',
@@ -214,9 +214,9 @@ env.Library(
         'database_holder.cpp',
     ],
     LIBDEPS=[
-        'collection',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
+        'collection',
     ],
 )
 
@@ -273,8 +273,8 @@ env.Library(
         'collection_catalog_helper.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        'collection_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        'collection_catalog',
     ]
 )
 
@@ -284,12 +284,12 @@ env.Library(
         "catalog_control.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        'collection',
-        'collection_catalog',
-        'database_holder',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/rebuild_indexes',
         '$BUILD_DIR/mongo/db/service_context',
+        'collection',
+        'collection_catalog',
+        'database_holder',
     ],
 )
 
@@ -299,13 +299,13 @@ env.Library(
         "validate_state.cpp"
     ],
     LIBDEPS_PRIVATE=[
-        "collection_catalog",
-        "database_holder",
-        "throttle_cursor",
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/catalog_raii",
         "$BUILD_DIR/mongo/db/views/views",
         "$BUILD_DIR/mongo/util/fail_point",
+        "collection_catalog",
+        "database_holder",
+        "throttle_cursor",
     ]
 )
 
@@ -320,13 +320,6 @@ env.Library(
         "index_consistency.cpp",
     ],
     LIBDEPS=[
-        'collection',
-        'collection_options',
-        'database_holder',
-        'health_log',
-        'index_catalog',
-        'index_catalog_entry',
-        'index_key_validate',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
@@ -339,22 +332,29 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
         '$BUILD_DIR/mongo/db/storage/execution_context',
+        '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
         '$BUILD_DIR/mongo/db/system_index',
         '$BUILD_DIR/mongo/db/views/views_mongod',
+        'collection',
+        'collection_options',
+        'database_holder',
+        'health_log',
+        'index_catalog',
+        'index_catalog_entry',
+        'index_key_validate',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog_helper',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/index/index_build_interceptor',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/mongo/db/index/index_build_interceptor',
         '$BUILD_DIR/mongo/db/repl/repl_settings',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/db/storage/storage_debug_util',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/db/storage/storage_util',
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/vector_clock',
@@ -425,8 +425,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/db/write_ops',
-        'collection_options',
         'collection',
+        'collection_options',
         'index_catalog',
         'index_key_validate',
         'multi_index_block',
@@ -449,8 +449,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/query/query_planner',
-        '$BUILD_DIR/mongo/db/update_index_data',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/update_index_data',
     ],
 )
 
@@ -485,8 +485,8 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/op_observer_impl',
         '$BUILD_DIR/mongo/db/op_observer',
+        '$BUILD_DIR/mongo/db/op_observer_impl',
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
@@ -495,9 +495,9 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
         '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
         '$BUILD_DIR/mongo/unittest/unittest',
@@ -506,11 +506,11 @@ env.CppUnitTest(
         'catalog_control',
         'catalog_helpers',
         'catalog_test_fixture',
-        'collection_catalog_helper',
+        'collection',
         'collection_catalog',
+        'collection_catalog_helper',
         'collection_options',
         'collection_validation',
-        'collection',
         'commit_quorum_options',
         'database_holder',
         'index_build_block',

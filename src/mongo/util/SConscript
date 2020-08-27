@@ -1,5 +1,7 @@
 # -*- mode: python -*-
 
+from site_scons.mongo import insort_wrapper
+
 Import([
     "endian",
     "env",
@@ -177,8 +179,8 @@ env.Library(
         'alarm_runner_background_thread.cpp',
     ],
     LIBDEPS=[
-        'clock_sources',
         '$BUILD_DIR/mongo/base',
+        'clock_sources',
     ],
 )
 
@@ -347,8 +349,8 @@ env.Library(
         'ntservice.cpp',
     ],
     LIBDEPS=[
-        'signal_handlers',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'signal_handlers',
     ],
 )
 
@@ -451,8 +453,8 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/log_process_details",
-        "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/db/server_options_core",
+        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 
@@ -589,9 +591,9 @@ icuEnv.Library(
         'icu.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        'icu_init',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/third_party/shim_icu',
+        'icu_init',
     ],
 )
 
@@ -737,12 +739,15 @@ if use_libunwind:
         # overwrite it.
     )
 
+stacktrace_test_LIBDEPS = stacktraceEnv.get('LIBDEPS', []).copy()
+insort_wrapper(stacktrace_test_LIBDEPS, '$BUILD_DIR/third_party/shim_pcrecpp')
+
 stacktraceEnv.CppUnitTest(
     target='stacktrace_test',
-    source='stacktrace_test.cpp',
-    LIBDEPS=(stacktraceEnv.get('LIBDEPS', []) + [
-        '$BUILD_DIR/third_party/shim_pcrecpp'
-    ]),
+    source=[
+        'stacktrace_test.cpp',
+    ],
+    LIBDEPS=stacktrace_test_LIBDEPS,
 )
 
 stacktraceEnv.Benchmark(

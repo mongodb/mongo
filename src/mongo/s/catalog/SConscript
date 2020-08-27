@@ -10,8 +10,8 @@ env.Library(
         'sharding_catalog_client.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/db/keys_collection_document',
+        '$BUILD_DIR/mongo/db/write_concern_options',
     ],
 )
 

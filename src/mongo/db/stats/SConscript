@@ -22,8 +22,8 @@ env.Library(
         'operation_latency_histogram.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 
@@ -36,8 +36,8 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/db/shared_request_handling',
+        '$BUILD_DIR/mongo/rpc/client_metadata',
     ]
 )
 

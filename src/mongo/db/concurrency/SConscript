@@ -91,9 +91,9 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/util/progress_meter',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/mongo/util/progress_meter',
         'lock_manager',
         'write_conflict_exception',
     ]

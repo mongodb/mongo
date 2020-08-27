@@ -65,9 +65,9 @@ mongoEmbeddedTargets = mongoEmbeddedEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/embedded/embedded',
         '$BUILD_DIR/mongo/rpc/protocol',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
-        '$BUILD_DIR/mongo/embedded/embedded',
     ],
     AIB_COMPONENT='embedded',
 )

@@ -92,8 +92,8 @@ env.Library(
         'variable_validation',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/vector_clock',
     ],
 )
 
@@ -165,10 +165,10 @@ env.Library(
         'sharded_agg_helpers.cpp',
     ],
     LIBDEPS=[
-        'aggregation',
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         '$BUILD_DIR/mongo/s/query/cluster_query',
+        'aggregation',
     ],
 )
 

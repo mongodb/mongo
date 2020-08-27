@@ -18,8 +18,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/flow_control_parameters',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
     ],
 )
 
@@ -35,8 +35,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
         '$BUILD_DIR/mongo/db/op_observer',
-        '$BUILD_DIR/mongo/db/service_context_d',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
+        '$BUILD_DIR/mongo/db/service_context_d',
         '$BUILD_DIR/mongo/db/storage/storage_control',
         '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/unittest/unittest',

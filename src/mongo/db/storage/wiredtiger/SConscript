@@ -63,8 +63,8 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/concurrency/lock_manager',
             '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
             '$BUILD_DIR/mongo/db/curop',
-            '$BUILD_DIR/mongo/db/index/index_descriptor',
             '$BUILD_DIR/mongo/db/global_settings',
+            '$BUILD_DIR/mongo/db/index/index_descriptor',
             '$BUILD_DIR/mongo/db/namespace_string',
             '$BUILD_DIR/mongo/db/prepare_conflict_tracker',
             '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
@@ -87,13 +87,13 @@ if wiredtiger:
             'storage_wiredtiger_customization_hooks',
         ],
         LIBDEPS_PRIVATE= [
-            'oplog_stone_parameters',
-            '$BUILD_DIR/mongo/db/db_raii',
             '$BUILD_DIR/mongo/db/catalog/database_holder',
             '$BUILD_DIR/mongo/db/commands/server_status',
+            '$BUILD_DIR/mongo/db/db_raii',
             '$BUILD_DIR/mongo/db/snapshot_window_options',
             '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
+            'oplog_stone_parameters',
         ],
     )
 
@@ -106,12 +106,12 @@ if wiredtiger:
             env.Idlc('wiredtiger_global_options.idl')[0],
         ],
         LIBDEPS=[
-            'storage_wiredtiger_core',
-            'storage_wiredtiger_customization_hooks',
             '$BUILD_DIR/mongo/db/db_raii',
             '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
             '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
             '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
+            'storage_wiredtiger_core',
+            'storage_wiredtiger_customization_hooks',
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/db/catalog/database_holder',
@@ -134,8 +134,8 @@ if wiredtiger:
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/auth/authmocks',
             '$BUILD_DIR/mongo/db/index/index_access_methods',
-            '$BUILD_DIR/mongo/db/repl/replmocks',
             '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+            '$BUILD_DIR/mongo/db/repl/replmocks',
             '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/mongo/db/service_context_d',
             '$BUILD_DIR/mongo/db/service_context_test_fixture',
@@ -196,12 +196,12 @@ if wiredtiger:
                 'wiredtiger_standard_record_store_test.cpp',
             ],
             LIBDEPS=[
+                '$BUILD_DIR/mongo/db/auth/authmocks',
+                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+                '$BUILD_DIR/mongo/db/repl/replmocks',
+                '$BUILD_DIR/mongo/db/service_context_test_fixture',
                 'additional_wiredtiger_index_tests',
                 'additional_wiredtiger_record_store_tests',
-                '$BUILD_DIR/mongo/db/auth/authmocks',
-                '$BUILD_DIR/mongo/db/repl/replmocks',
-                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-                '$BUILD_DIR/mongo/db/service_context_test_fixture',
             ],
         )
 
@@ -212,12 +212,12 @@ if wiredtiger:
                 'wiredtiger_prefixed_record_store_test.cpp',
             ],
             LIBDEPS=[
+                '$BUILD_DIR/mongo/db/auth/authmocks',
+                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+                '$BUILD_DIR/mongo/db/repl/replmocks',
+                '$BUILD_DIR/mongo/db/service_context_test_fixture',
                 'additional_wiredtiger_index_tests',
                 'additional_wiredtiger_record_store_tests',
-                '$BUILD_DIR/mongo/db/auth/authmocks',
-                '$BUILD_DIR/mongo/db/repl/replmocks',
-                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-                '$BUILD_DIR/mongo/db/service_context_test_fixture',
             ],
         )
 
