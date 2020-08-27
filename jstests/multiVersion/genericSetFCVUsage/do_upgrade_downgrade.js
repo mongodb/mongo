@@ -62,6 +62,10 @@ let recreateUniqueIndexes = function(db, secondary) {
         let mdb = db.getSiblingDB(d.name);
         mdb.getCollectionInfos().forEach(function(c) {
             let currentCollection = mdb.getCollection(c.name);
+            if (c.type == "view") {
+                return;
+            }
+
             currentCollection.getIndexes().forEach(function(spec) {
                 if (!spec.unique) {
                     return;

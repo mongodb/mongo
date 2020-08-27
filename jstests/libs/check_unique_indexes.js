@@ -23,6 +23,10 @@ function checkUniqueIndexFormatVersion(adminDB) {
             currentDatabase.runCommand("listCollections", {includePendingDrops: true})
                 .cursor.firstBatch;
         collectionsWithPending.forEach(function(c) {
+            if (c.type == "view") {
+                return;
+            }
+
             let currentCollection = currentDatabase.getCollection(c.name);
             currentCollection.getIndexes().forEach(function(index) {
                 if (index.unique) {

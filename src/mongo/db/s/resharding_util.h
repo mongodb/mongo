@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -78,5 +79,11 @@ void validateZones(const std::vector<mongo::BSONObj>& zones,
 std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::optional<ReshardingDonorOplogId>& resumeToken);
+
+/**
+ * Creates a view on the oplog that facilitates the specialized oplog tailing a resharding recipient
+ * performs on a donor.
+ */
+void createSlimOplogView(OperationContext* opCtx, Database* db);
 
 }  // namespace mongo

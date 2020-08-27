@@ -30,11 +30,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -150,6 +153,50 @@ std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
     stages.emplace_back(DocumentSourceLookUp::createFromBson(lookupBSON.firstElement(), expCtx));
 
     return Pipeline::create(std::move(stages), expCtx);
+}
+
+void createSlimOplogView(OperationContext* opCtx, Database* db) {
+    writeConflictRetry(
+        opCtx, "createReshardingOplog", "local.system.resharding.slimOplogForGraphLookup", [&] {
+            {
+                // Create 'system.views' in a separate WUOW if it does not exist.
+                WriteUnitOfWork wuow(opCtx);
+                Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+                    opCtx, NamespaceString(db->getSystemViewsName()));
+                if (!coll) {
+                    coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));
+                }
+                invariant(coll);
+                wuow.commit();
+            }
+
+            // Resharding uses the `prevOpTime` to link oplog related entries via a
+            // $graphLookup. Large transactions and prepared transaction use prevOpTime to identify
+            // earlier oplog entries from the same transaction. Retryable writes (identified via the
+            // presence of `stmtId`) use prevOpTime to identify earlier run statements from the same
+            // retryable write.  This view will unlink oplog entries from the same retryable write
+            // by zeroing out their `prevOpTime`.
+            CollectionOptions options;
+            options.viewOn = NamespaceString::kRsOplogNamespace.coll().toString();
+            options.pipeline = BSON_ARRAY(BSON(
+                "$project" << BSON(
+                    "_id"
+                    << "$ts"
+                    << "op" << 1 << "o" << BSON("applyOps" << BSON("ui" << 1 << "reshardDest" << 1))
+                    << "ts" << 1 << "prevOpTime.ts"
+                    << BSON("$cond" << BSON("if" << BSON("$eq" << BSON_ARRAY(BSON("$type"
+                                                                                  << "$stmtId")
+                                                                             << "missing"))
+                                                 << "then"
+                                                 << "$prevOpTime.ts"
+                                                 << "else" << Timestamp::min())))));
+            WriteUnitOfWork wuow(opCtx);
+            uassertStatusOK(
+                db->createView(opCtx,
+                               NamespaceString("local.system.resharding.slimOplogForGraphLookup"),
+                               options));
+            wuow.commit();
+        });
 }
 
 }  // namespace mongo

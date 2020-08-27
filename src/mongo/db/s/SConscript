@@ -52,8 +52,8 @@ env.Library(
         'collection_sharding_state_factory_standalone.cpp',
         'config_server_op_observer.cpp',
         'metadata_manager.cpp',
-        'migration_chunk_cloner_source_legacy.cpp',
         'migration_chunk_cloner_source.cpp',
+        'migration_chunk_cloner_source_legacy.cpp',
         'migration_coordinator.cpp',
         'migration_destination_manager.cpp',
         'migration_session_id.cpp',
@@ -67,7 +67,6 @@ env.Library(
         'periodic_sharded_index_consistency_checker.cpp',
         'range_deletion_util.cpp',
         'read_only_catalog_cache_loader.cpp',
-        'resharding_util.cpp',
         'resharding/resharding_coordinator_observer.cpp',
         'resharding/resharding_coordinator_service.cpp',
         'scoped_operation_completion_sharding_actions.cpp',
@@ -76,6 +75,7 @@ env.Library(
         'shard_filtering_metadata_refresh.cpp',
         'shard_identity_rollback_notifier.cpp',
         'shard_key_util.cpp',
+        'shard_local.cpp',
         'shard_metadata_util.cpp',
         'shard_server_catalog_cache_loader.cpp',
         'shard_server_op_observer.cpp',
@@ -84,14 +84,12 @@ env.Library(
         'sharding_state_recovery.cpp',
         'sharding_statistics.cpp',
         'split_chunk.cpp',
-        'shard_local.cpp',
         'split_vector.cpp',
         'start_chunk_clone_request.cpp',
         env.Idlc('migration_coordinator_document.idl')[0],
         env.Idlc('range_deletion_task.idl')[0],
         env.Idlc('resharding/coordinator_document.idl')[0],
         env.Idlc('resharding/donor_document.idl')[0],
-        env.Idlc('resharding/donor_oplog_id.idl')[0],
         env.Idlc('resharding/recipient_document.idl')[0],
     ],
     LIBDEPS=[
@@ -102,8 +100,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/op_observer_impl',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
-        '$BUILD_DIR/mongo/db/pipeline/expression_context',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
@@ -125,6 +121,27 @@ env.Library(
         '$BUILD_DIR/mongo/db/rs_local_client',
         '$BUILD_DIR/mongo/db/session_catalog',
         '$BUILD_DIR/mongo/idl/server_parameter',
+        'resharding_util',
+    ],
+)
+
+env.Library(
+    target='resharding_util',
+    source=[
+        'resharding_util.cpp',
+        env.Idlc('resharding/donor_oplog_id.idl')[0],
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/pipeline/expression_context',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        '$BUILD_DIR/mongo/s/common_s',
+        '$BUILD_DIR/mongo/s/grid',
     ],
 )
 
@@ -326,6 +343,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_initialization',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'balancer',
+        'resharding_util',
         'sharding_runtime_d',
     ],
 )
@@ -516,5 +534,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/version_impl',
         'balancer',
         'config_server_test_fixture',
-    ]
+        'resharding_util',
+    ],
 )

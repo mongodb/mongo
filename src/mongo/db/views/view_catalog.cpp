@@ -417,11 +417,6 @@ Status ViewCatalog::createView(OperationContext* opCtx,
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
 
-    if (viewName.isSystem())
-        return Status(
-            ErrorCodes::InvalidNamespace,
-            "View name cannot start with 'system.', which is reserved for system namespaces");
-
     auto collator = parseCollator(opCtx, collation);
     if (!collator.isOK())
         return collator.getStatus();

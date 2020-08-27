@@ -13,6 +13,10 @@ function checkCollectionUUIDs(adminDB) {
         let currentDatabase = adminDB.getSiblingDB(database.name);
         let collectionInfos = currentDatabase.getCollectionInfos();
         for (let i = 0; i < collectionInfos.length; i++) {
+            if (collectionInfos[i].type == "view") {
+                continue;
+            }
+
             assert(collectionInfos[i].info.uuid,
                    "Expect uuid for collection: " + tojson(collectionInfos[i]));
         }
