@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 
 #include "mongo/base/status.h"
@@ -80,17 +81,11 @@ private:
     // Maintains the execution state (e.g., recursion depth) for executor threads
     class ExecutorThreadContext {
     public:
-        ExecutorThreadContext(std::weak_ptr<ServiceExecutorFixed> serviceExecutor)
-            : _executor(std::move(serviceExecutor)) {
-            _adjustRunningExecutorThreads(1);
-        }
+        ExecutorThreadContext(std::weak_ptr<ServiceExecutorFixed> serviceExecutor);
+        ~ExecutorThreadContext();
 
         ExecutorThreadContext(ExecutorThreadContext&&) = delete;
         ExecutorThreadContext(const ExecutorThreadContext&) = delete;
-
-        ~ExecutorThreadContext() {
-            _adjustRunningExecutorThreads(-1);
-        }
 
         void run(ServiceExecutor::Task task) {
             // Yield here to improve concurrency, especially when there are more executor threads
@@ -106,10 +101,11 @@ private:
         }
 
     private:
-        void _adjustRunningExecutorThreads(int adjustment) {
+        boost::optional<int> _adjustRunningExecutorThreads(int adjustment) {
             if (auto executor = _executor.lock()) {
-                executor->_numRunningExecutorThreads.fetchAndAdd(adjustment);
+                return executor->_numRunningExecutorThreads.addAndFetch(adjustment);
             }
+            return boost::none;
         }
 
         int _recursionDepth = 0;
