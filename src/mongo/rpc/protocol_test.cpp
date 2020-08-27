@@ -74,15 +74,42 @@ TEST(Protocol, FailedNegotiation) {
     assert_not_negotiated(supports::kOpMsgOnly, supports::kNone);
 }
 
+/*
+ * Tests the following:
+ * - Replies from MongoDB 2.4 and older reply with supports::kOpQueryOnly
+ * - Replies from versions of MongoDB older than 3.6 returns supports::kOpQueryOnly
+ * - Replies from MongoDB 3.6 reply with supports::kAll
+ * - Replies from latest, last-continuous, and last-lts versions of MongoDB returns supports::kAll
+ */
 TEST(Protocol, parseProtocolSetFromIsMasterReply) {
     {
-        // MongoDB 4.0
-        auto mongod40 =
-            BSON("maxWireVersion" << static_cast<int>(WireVersion::REPLICA_SET_TRANSACTIONS)
+        // latest version of MongoDB (mongod)
+        auto latestMongod =
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::LATEST_WIRE_VERSION)
                                   << "minWireVersion"
                                   << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
 
-        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod40)).protocolSet,
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(latestMongod)).protocolSet,
+                  supports::kAll);
+    }
+    {
+        // last continuous version of MongoDB (mongod)
+        auto lastContMongod =
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::LAST_CONT_WIRE_VERSION)
+                                  << "minWireVersion"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
+
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(lastContMongod)).protocolSet,
+                  supports::kAll);
+    }
+    {
+        // last LTS version of MongoDB (mongod)
+        auto lastLtsMongod =
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::LAST_LTS_WIRE_VERSION)
+                                  << "minWireVersion"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
+
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(lastLtsMongod)).protocolSet,
                   supports::kAll);
     }
     {
@@ -117,14 +144,8 @@ TEST(Protocol, parseProtocolSetFromIsMasterReply) {
                   supports::kOpQueryOnly);
     }
     {
-        // MongoDB 3.0 (mongod)
-        auto mongod30 = BSON("maxWireVersion"
-                             << static_cast<int>(WireVersion::RELEASE_2_7_7) << "minWireVersion"
-                             << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
-        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod30)).protocolSet,
-                  supports::kOpQueryOnly);
-    }
-    {
+        // MongoDB 2.4 and earlier do not have maxWireVersion/minWireVersion in their 'isMaster'
+        // replies.
         auto mongod24 = BSONObj();
         ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod24)).protocolSet,
                   supports::kOpQueryOnly);
