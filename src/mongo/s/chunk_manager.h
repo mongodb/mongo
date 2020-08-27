@@ -39,6 +39,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/database_version_gen.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -150,6 +151,9 @@ public:
      *
      * The "chunks" vector must contain the chunk routing information sorted in ascending order by
      * chunk version, and adhere to the requirements of the routing table update algorithm.
+     *
+     * The existence of "reshardingFields" inside the optional implies that this field was present
+     * inside the config.collections entry when refreshing.
      */
     static std::shared_ptr<RoutingTableHistory> makeNew(
         NamespaceString nss,
@@ -158,6 +162,7 @@ public:
         std::unique_ptr<CollatorInterface> defaultCollator,
         bool unique,
         OID epoch,
+        boost::optional<TypeCollectionReshardingFields> reshardingFields,
         const std::vector<ChunkType>& chunks);
 
     /**
@@ -166,8 +171,15 @@ public:
      *
      * The changes in "changedChunks" must be sorted in ascending order by chunk version, and adhere
      * to the requirements of the routing table update algorithm.
+     *
+     * The existence of "reshardingFields" inside the optional implies that this field was present
+     * inside the config.collections entry when refreshing. An uninitialized "reshardingFields"
+     * parameter implies that the field was not present, and will clear any currently held
+     * resharding fields inside the resulting RoutingTableHistory.
      */
-    std::shared_ptr<RoutingTableHistory> makeUpdated(const std::vector<ChunkType>& changedChunks);
+    std::shared_ptr<RoutingTableHistory> makeUpdated(
+        boost::optional<TypeCollectionReshardingFields> reshardingFields,
+        const std::vector<ChunkType>& changedChunks);
 
     const NamespaceString& nss() const {
         return _nss;
@@ -261,6 +273,10 @@ public:
         return _uuid;
     }
 
+    const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
+        return _reshardingFields;
+    }
+
 private:
     friend class ChunkManager;
 
@@ -269,6 +285,7 @@ private:
                         KeyPattern shardKeyPattern,
                         std::unique_ptr<CollatorInterface> defaultCollator,
                         bool unique,
+                        boost::optional<TypeCollectionReshardingFields> reshardingFields,
                         ChunkMap chunkMap);
 
     ChunkVersion _getVersion(const ShardId& shardName, bool throwOnStaleShard) const;
@@ -287,6 +304,12 @@ private:
 
     // Whether the sharding key is unique
     bool _unique;
+
+    // The set of fields related to an ongoing resharding operation involving this collection. The
+    // presence of the type inside the optional indicates that the collection is involved in a
+    // resharding operation, and that these fields were present in the config.collections entry
+    // for this collection.
+    const boost::optional<TypeCollectionReshardingFields> _reshardingFields;
 
     // Map from the max for each chunk to an entry describing the chunk. The union of all chunks'
     // ranges must cover the complete space from [MinKey, MaxKey).
@@ -483,6 +506,10 @@ public:
 
     boost::optional<UUID> getUUID() const {
         return _rt->getUUID();
+    }
+
+    const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
+        return _rt->getReshardingFields();
     }
 
 private:

@@ -64,7 +64,14 @@ protected:
         const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
         auto rt = RoutingTableHistory::makeNew(
-            kNss, UUID::gen(), shardKeyPattern.getKeyPattern(), nullptr, false, epoch, [&] {
+            kNss,
+            UUID::gen(),
+            shardKeyPattern.getKeyPattern(),
+            nullptr,
+            false,
+            epoch,
+            boost::none,
+            [&] {
                 ChunkVersion version(1, 0, epoch);
 
                 ChunkType chunk1(kNss,

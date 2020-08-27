@@ -194,9 +194,9 @@ public:
         return _distributionMode.get_value_or(DistributionMode::kSharded);
     }
 
-    void setReshardingFields(const ReshardingFields& reshardingFields);
+    void setReshardingFields(boost::optional<ReshardingFields> reshardingFields);
 
-    boost::optional<ReshardingFields> getReshardingFields() const {
+    const boost::optional<ReshardingFields>& getReshardingFields() const {
         return _reshardingFields;
     }
 

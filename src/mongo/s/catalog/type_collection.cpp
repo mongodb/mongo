@@ -322,8 +322,8 @@ void CollectionType::setKeyPattern(const KeyPattern& keyPattern) {
     _keyPattern = keyPattern;
 }
 
-void CollectionType::setReshardingFields(const ReshardingFields& reshardingFields) {
-    _reshardingFields = reshardingFields;
+void CollectionType::setReshardingFields(boost::optional<ReshardingFields> reshardingFields) {
+    _reshardingFields = std::move(reshardingFields);
 }
 
 bool CollectionType::hasSameOptions(const CollectionType& other) const {

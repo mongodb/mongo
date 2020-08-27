@@ -47,13 +47,15 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
     const BSONObj& collShardKeyPattern,
     const BSONObj& collDefaultCollation,
     bool collShardKeyIsUnique,
+    boost::optional<TypeCollectionReshardingFields> collReshardingFields,
     std::vector<ChunkType> chunks)
     : uuid(collUuid),
       epoch(collEpoch),
       shardKeyPattern(collShardKeyPattern),
       defaultCollation(collDefaultCollation),
       shardKeyIsUnique(collShardKeyIsUnique),
-      changedChunks(chunks) {}
+      reshardingFields(std::move(collReshardingFields)),
+      changedChunks(std::move(chunks)) {}
 
 void CatalogCacheLoader::set(ServiceContext* serviceContext,
                              std::unique_ptr<CatalogCacheLoader> loader) {

@@ -85,6 +85,7 @@ protected:
             nullptr,
             false,
             epoch,
+            boost::none,
             {ChunkType{kNss, range, ChunkVersion(1, 0, epoch), kOtherShard}});
 
         return CollectionMetadata(
@@ -128,7 +129,7 @@ protected:
         splitChunks.emplace_back(
             kNss, ChunkRange(maxKey, chunkToSplit.getMax()), chunkVersion, kOtherShard);
 
-        auto rt = cm->getRoutingHistory()->makeUpdated(splitChunks);
+        auto rt = cm->getRoutingHistory()->makeUpdated(boost::none, splitChunks);
 
         return CollectionMetadata(ChunkManager(cm->dbPrimary(), cm->dbVersion(), rt, boost::none),
                                   kThisShard);
@@ -150,7 +151,7 @@ protected:
         chunkVersion.incMajor();
 
         auto rt = cm->getRoutingHistory()->makeUpdated(
-            {ChunkType(kNss, ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
+            boost::none, {ChunkType(kNss, ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
 
         return CollectionMetadata(ChunkManager(cm->dbPrimary(), cm->dbVersion(), rt, boost::none),
                                   kThisShard);

@@ -114,6 +114,7 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                       coll.getKeyPattern().toBSON(),
                                       coll.getDefaultCollation(),
                                       coll.getUnique(),
+                                      coll.getReshardingFields(),
                                       std::move(changedChunks));
 }
 

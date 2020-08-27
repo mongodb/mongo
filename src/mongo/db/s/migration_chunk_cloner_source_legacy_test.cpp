@@ -154,6 +154,7 @@ protected:
                 nullptr,
                 false,
                 epoch,
+                boost::none,
                 {ChunkType{kNss,
                            ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
                            ChunkVersion(1, 0, epoch),

@@ -108,7 +108,8 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
     const ShardKeyPattern& shardKeyPattern,
     std::unique_ptr<CollatorInterface> defaultCollator,
     bool unique,
-    const std::vector<BSONObj>& splitPoints) {
+    const std::vector<BSONObj>& splitPoints,
+    boost::optional<ReshardingFields> reshardingFields) {
     ChunkVersion version(1, 0, OID::gen());
 
     const BSONObj databaseBSON = [&]() {
@@ -125,6 +126,10 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
 
         if (defaultCollator) {
             coll.setDefaultCollation(defaultCollator->getSpec().toBSON());
+        }
+
+        if (reshardingFields) {
+            coll.setReshardingFields(std::move(reshardingFields));
         }
 
         return coll.toBSON();

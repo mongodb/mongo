@@ -86,6 +86,7 @@ SemiFuture<CollectionAndChangedChunks> CatalogCacheLoaderMock::getChunksSince(
                    _swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
                    _swCollectionReturnValue.getValue().getDefaultCollation(),
                    _swCollectionReturnValue.getValue().getUnique(),
+                   boost::none,
                    std::move(chunks));
            })
         .semi();

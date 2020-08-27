@@ -52,7 +52,8 @@ protected:
                                   const ShardKeyPattern& shardKeyPattern,
                                   std::unique_ptr<CollatorInterface> defaultCollator,
                                   bool unique,
-                                  const std::vector<BSONObj>& splitPoints);
+                                  const std::vector<BSONObj>& splitPoints,
+                                  boost::optional<ReshardingFields> reshardingFields = boost::none);
 
     /**
      * Invalidates the catalog cache for 'kNss' and schedules a thread to invoke the blocking 'get'

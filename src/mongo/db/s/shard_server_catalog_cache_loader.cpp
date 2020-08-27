@@ -234,6 +234,7 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
                                       shardCollectionEntry.getKeyPattern().toBSON(),
                                       shardCollectionEntry.getDefaultCollation(),
                                       shardCollectionEntry.getUnique(),
+                                      boost::none,
                                       std::move(changedChunks)};
 }
 

@@ -68,12 +68,14 @@ public:
      */
     struct CollectionAndChangedChunks {
         CollectionAndChangedChunks();
-        CollectionAndChangedChunks(boost::optional<UUID> uuid,
-                                   const OID& collEpoch,
-                                   const BSONObj& collShardKeyPattern,
-                                   const BSONObj& collDefaultCollation,
-                                   bool collShardKeyIsUnique,
-                                   std::vector<ChunkType> chunks);
+        CollectionAndChangedChunks(
+            boost::optional<UUID> uuid,
+            const OID& collEpoch,
+            const BSONObj& collShardKeyPattern,
+            const BSONObj& collDefaultCollation,
+            bool collShardKeyIsUnique,
+            boost::optional<TypeCollectionReshardingFields> collReshardingFields,
+            std::vector<ChunkType> chunks);
 
         // Information about the entire collection
         boost::optional<UUID> uuid;
@@ -81,6 +83,10 @@ public:
         BSONObj shardKeyPattern;
         BSONObj defaultCollation;
         bool shardKeyIsUnique{false};
+
+        // If the collection is currently undergoing a resharding operation, the optional will be
+        // populated.
+        boost::optional<TypeCollectionReshardingFields> reshardingFields;
 
         // The chunks which have changed sorted by their chunkVersion. This list might potentially
         // contain all the chunks in the collection.

@@ -107,7 +107,8 @@ std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
         if (existingRoutingInfo &&
             existingRoutingInfo->getVersion().epoch() == collectionAndChunks.epoch) {
 
-            return existingRoutingInfo->makeUpdated(collectionAndChunks.changedChunks);
+            return existingRoutingInfo->makeUpdated(std::move(collectionAndChunks.reshardingFields),
+                                                    collectionAndChunks.changedChunks);
         }
         auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
             if (!collectionAndChunks.defaultCollation.isEmpty()) {
@@ -123,6 +124,7 @@ std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
                                             std::move(defaultCollator),
                                             collectionAndChunks.shardKeyIsUnique,
                                             collectionAndChunks.epoch,
+                                            std::move(collectionAndChunks.reshardingFields),
                                             collectionAndChunks.changedChunks);
     }();
 

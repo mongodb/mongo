@@ -300,17 +300,20 @@ ChunkMap::_overlappingBounds(const BSONObj& min, const BSONObj& max, bool isMaxI
 ShardVersionTargetingInfo::ShardVersionTargetingInfo(const OID& epoch)
     : shardVersion(0, 0, epoch) {}
 
-RoutingTableHistory::RoutingTableHistory(NamespaceString nss,
-                                         boost::optional<UUID> uuid,
-                                         KeyPattern shardKeyPattern,
-                                         std::unique_ptr<CollatorInterface> defaultCollator,
-                                         bool unique,
-                                         ChunkMap chunkMap)
+RoutingTableHistory::RoutingTableHistory(
+    NamespaceString nss,
+    boost::optional<UUID> uuid,
+    KeyPattern shardKeyPattern,
+    std::unique_ptr<CollatorInterface> defaultCollator,
+    bool unique,
+    boost::optional<TypeCollectionReshardingFields> reshardingFields,
+    ChunkMap chunkMap)
     : _nss(std::move(nss)),
       _uuid(uuid),
       _shardKeyPattern(shardKeyPattern),
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
+      _reshardingFields(std::move(reshardingFields)),
       _chunkMap(std::move(chunkMap)),
       _shardVersions(_chunkMap.constructShardVersionMap()) {}
 
@@ -707,17 +710,20 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeNew(
     std::unique_ptr<CollatorInterface> defaultCollator,
     bool unique,
     OID epoch,
+    boost::optional<TypeCollectionReshardingFields> reshardingFields,
     const std::vector<ChunkType>& chunks) {
     return RoutingTableHistory(std::move(nss),
                                std::move(uuid),
                                std::move(shardKeyPattern),
                                std::move(defaultCollator),
                                std::move(unique),
+                               boost::none,
                                ChunkMap{epoch})
-        .makeUpdated(chunks);
+        .makeUpdated(std::move(reshardingFields), chunks);
 }
 
 std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
+    boost::optional<TypeCollectionReshardingFields> reshardingFields,
     const std::vector<ChunkType>& changedChunks) {
 
     // It's possible for there to be one chunk in changedChunks without the routing table having
@@ -746,6 +752,7 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
                                 KeyPattern(getShardKeyPattern().getKeyPattern()),
                                 CollatorInterface::cloneCollator(getDefaultCollator()),
                                 isUnique(),
+                                std::move(reshardingFields),
                                 std::move(chunkMap)));
 }
 

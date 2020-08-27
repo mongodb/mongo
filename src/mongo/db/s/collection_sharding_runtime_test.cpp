@@ -51,12 +51,17 @@ CollectionMetadata makeShardedMetadata(OperationContext* opCtx, UUID uuid = UUID
     const OID epoch = OID::gen();
     auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
     auto chunk = ChunkType(kTestNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
-    ChunkManager cm(
-        ShardId("0"),
-        DatabaseVersion(UUID::gen(), 1),
-        RoutingTableHistory::makeNew(
-            kTestNss, uuid, kShardKeyPattern, nullptr, false, epoch, {std::move(chunk)}),
-        boost::none);
+    ChunkManager cm(ShardId("0"),
+                    DatabaseVersion(UUID::gen(), 1),
+                    RoutingTableHistory::makeNew(kTestNss,
+                                                 uuid,
+                                                 kShardKeyPattern,
+                                                 nullptr,
+                                                 false,
+                                                 epoch,
+                                                 boost::none,
+                                                 {std::move(chunk)}),
+                    boost::none);
 
     if (!OperationShardingState::isOperationVersioned(opCtx)) {
         const auto version = cm.getVersion(ShardId("0"));

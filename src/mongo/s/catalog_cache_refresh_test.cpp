@@ -66,26 +66,46 @@ protected:
 
     void expectGetCollection(OID epoch, const ShardKeyPattern& shardKeyPattern) {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            CollectionType collType;
-            collType.setNs(kNss);
-            collType.setEpoch(epoch);
-            collType.setKeyPattern(shardKeyPattern.toBSON());
-            collType.setUnique(false);
+            return std::vector<BSONObj>{getDefaultCollectionType(epoch, shardKeyPattern).toBSON()};
+        }());
+    }
+
+    void expectGetCollectionWithReshardingFields(OID epoch,
+                                                 const ShardKeyPattern& shardKeyPattern,
+                                                 UUID reshardingUUID) {
+        expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
+            auto collType = getDefaultCollectionType(epoch, shardKeyPattern);
+
+            TypeCollectionReshardingFields reshardingFields;
+            reshardingFields.setUuid(reshardingUUID);
+            collType.setReshardingFields(std::move(reshardingFields));
 
             return std::vector<BSONObj>{collType.toBSON()};
         }());
+    }
+
+    CollectionType getDefaultCollectionType(OID epoch, const ShardKeyPattern& shardKeyPattern) {
+        CollectionType collType;
+
+        collType.setNs(kNss);
+        collType.setEpoch(epoch);
+        collType.setKeyPattern(shardKeyPattern.toBSON());
+        collType.setUnique(false);
+
+        return collType;
     }
 };
 
 TEST_F(CatalogCacheRefreshTest, FullLoad) {
     const OID epoch = OID::gen();
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+    const UUID reshardingUUID = UUID::gen();
 
     auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
 
     expectGetDatabase();
 
-    expectGetCollection(epoch, shardKeyPattern);
+    expectGetCollectionWithReshardingFields(epoch, shardKeyPattern, reshardingUUID);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         ChunkVersion version(1, 0, epoch);
 
@@ -120,6 +140,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
     auto cm = *future.default_timed_get();
     ASSERT(cm.isSharded());
     ASSERT_EQ(4, cm.numChunks());
+    ASSERT_EQ(reshardingUUID, cm.getReshardingFields()->getUuid());
 }
 
 TEST_F(CatalogCacheRefreshTest, NoLoadIfShardNotMarkedStaleInOperationContext) {
@@ -744,12 +765,14 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
     ASSERT_EQ(ChunkVersion(0, 0, version.epoch()), cm.getVersion({"1"}));
 }
 
-TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMove) {
+TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdded) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+    const UUID reshardingUUID = UUID::gen();
 
     auto initialRoutingInfo(
         makeChunkManager(kNss, shardKeyPattern, nullptr, true, {BSON("_id" << 0)}));
     ASSERT_EQ(2, initialRoutingInfo.numChunks());
+    ASSERT(boost::none == initialRoutingInfo.getReshardingFields());
 
     ChunkVersion version = initialRoutingInfo.getVersion();
 
@@ -757,7 +780,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMove) {
 
     ChunkVersion expectedDestShardVersion;
 
-    expectGetCollection(version.epoch(), shardKeyPattern);
+    expectGetCollectionWithReshardingFields(version.epoch(), shardKeyPattern, reshardingUUID);
 
     // Return set of chunks, which represent a move
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
@@ -778,16 +801,24 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMove) {
     auto cm = *future.default_timed_get();
     ASSERT(cm.isSharded());
     ASSERT_EQ(2, cm.numChunks());
+    ASSERT_EQ(reshardingUUID, cm.getReshardingFields()->getUuid());
     ASSERT_EQ(version, cm.getVersion());
     ASSERT_EQ(version, cm.getVersion({"0"}));
     ASSERT_EQ(expectedDestShardVersion, cm.getVersion({"1"}));
 }
 
-TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunk) {
+TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingFieldsRemoved) {
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+    const UUID reshardingUUID = UUID::gen();
 
-    auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
+    TypeCollectionReshardingFields reshardingFields;
+    reshardingFields.setUuid(reshardingUUID);
+
+    auto initialRoutingInfo(
+        makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}, reshardingFields));
+
     ASSERT_EQ(1, initialRoutingInfo.numChunks());
+    ASSERT_EQ(reshardingUUID, initialRoutingInfo.getReshardingFields()->getUuid());
 
     setupNShards(2);
 
@@ -795,6 +826,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunk) {
 
     auto future = scheduleRoutingInfoForcedRefresh(kNss);
 
+    // The collection type won't have resharding fields this time.
     expectGetCollection(version.epoch(), shardKeyPattern);
 
     // Return set of chunks, which represent a move
@@ -816,6 +848,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunk) {
     ASSERT_EQ(version, cm.getVersion());
     ASSERT_EQ(ChunkVersion(0, 0, version.epoch()), cm.getVersion({"0"}));
     ASSERT_EQ(version, cm.getVersion({"1"}));
+    ASSERT(boost::none == cm.getReshardingFields());
 }
 
 }  // namespace
