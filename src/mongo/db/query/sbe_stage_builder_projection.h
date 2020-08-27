@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/id_generators.h"
 #include "mongo/db/operation_context.h"
@@ -46,6 +47,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateProjectio
     std::unique_ptr<sbe::PlanStage> stage,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::FrameIdGenerator* frameIdGenerator,
-    sbe::value::SlotId inputVar);
+    sbe::value::SlotId inputVar,
+    sbe::RuntimeEnvironment* env);
 
 }  // namespace mongo::stage_builder

@@ -47,7 +47,7 @@ namespace mongo::stage_builder {
  * slots to forward.
  *
  * The 'relevantSlots' is an input/output parameter. Execution of this function may add additional
- * relevant slots to thie list.
+ * relevant slots to the list.
  */
 std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::PlanStage>>
 generateExpression(OperationContext* opCtx,
@@ -56,6 +56,7 @@ generateExpression(OperationContext* opCtx,
                    sbe::value::SlotIdGenerator* slotIdGenerator,
                    sbe::value::FrameIdGenerator* frameIdGenerator,
                    sbe::value::SlotId inputVar,
+                   sbe::RuntimeEnvironment* env,
                    sbe::value::SlotVector* relevantSlots = nullptr);
 
 /**

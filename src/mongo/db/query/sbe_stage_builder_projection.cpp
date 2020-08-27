@@ -132,6 +132,7 @@ struct ProjectionTraversalVisitorContext {
     // The input stage to this projection and the slot to read a root document from.
     PlanStageType inputStage;
     sbe::value::SlotId inputSlot;
+    sbe::RuntimeEnvironment* env;
     std::stack<NestedLevel> levels;
     std::stack<boost::optional<ProjectEval>> evals;
 
@@ -223,6 +224,7 @@ public:
                                _context->slotIdGenerator,
                                _context->frameIdGenerator,
                                _context->inputSlot,
+                               _context->env,
                                &_context->relevantSlots);
         _context->evals.push({{_context->topLevel().inputSlot, outputSlot, std::move(expr)}});
         _context->topLevel().fieldPathExpressionsTraverseStage = std::move(stage);
@@ -373,9 +375,15 @@ std::pair<sbe::value::SlotId, PlanStageType> generateProjection(
     PlanStageType stage,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::FrameIdGenerator* frameIdGenerator,
-    sbe::value::SlotId inputVar) {
-    ProjectionTraversalVisitorContext context{
-        opCtx, projection->type(), slotIdGenerator, frameIdGenerator, std::move(stage), inputVar};
+    sbe::value::SlotId inputVar,
+    sbe::RuntimeEnvironment* env) {
+    ProjectionTraversalVisitorContext context{opCtx,
+                                              projection->type(),
+                                              slotIdGenerator,
+                                              frameIdGenerator,
+                                              std::move(stage),
+                                              inputVar,
+                                              env};
     context.relevantSlots.push_back(inputVar);
     ProjectionTraversalPreVisitor preVisitor{&context};
     ProjectionTraversalPostVisitor postVisitor{&context};

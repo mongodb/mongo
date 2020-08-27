@@ -105,13 +105,13 @@ struct ExpressionVisitorContext {
                              sbe::value::FrameIdGenerator* frameIdGenerator,
                              sbe::value::SlotId rootSlot,
                              sbe::value::SlotVector* relevantSlots,
-                             const TimeZoneDatabase* timeZoneDB)
+                             sbe::RuntimeEnvironment* env)
         : traverseStage(std::move(inputStage)),
           slotIdGenerator(slotIdGenerator),
           frameIdGenerator(frameIdGenerator),
           rootSlot(rootSlot),
           relevantSlots(relevantSlots),
-          timeZoneDB(timeZoneDB) {}
+          runtimeEnvironment(env) {}
 
     void ensureArity(size_t arity) {
         invariant(exprs.size() >= arity);
@@ -285,9 +285,7 @@ struct ExpressionVisitorContext {
     // See the comment above the generateExpression() declaration for an explanation of the
     // 'relevantSlots' list.
     sbe::value::SlotVector* relevantSlots;
-
-    // Unowned timezone database needed to evaluate date/time expressions.
-    const TimeZoneDatabase* timeZoneDB;
+    sbe::RuntimeEnvironment* runtimeEnvironment;
 };
 
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverseHelper(
@@ -1255,22 +1253,22 @@ public:
                                     sbe::EPrimBinary::logicOr, std::move(acc), std::move(b));
                             });
 
-        // The builtins need to access the timeZoneDB in order to compute dates from parts. Here
-        // we pass a pointer to the global timeZoneDB. This should not be freed as it's a singleton
-        // and and it's lifetime is tied to the lifetime of the service context.
-        auto unownedTzDB = sbe::value::bitcastFrom(_context->timeZoneDB);
-
-        auto computeDate = sbe::makeE<sbe::EFunction>(
-            isIsoWeekYear ? "datePartsWeekYear" : "dateParts",
-            sbe::makeEs(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::timeZoneDB, unownedTzDB),
-                        yearRef.clone(),
-                        monthRef.clone(),
-                        dayRef.clone(),
-                        hourRef.clone(),
-                        minRef.clone(),
-                        secRef.clone(),
-                        millisecRef.clone(),
-                        timeZoneRef.clone()));
+        // Invocation of the datePartsWeekYear and dateParts functions depend on a TimeZoneDatabase
+        // for datetime computation. This global object is registered as an unowned value in the
+        // runtime environment so we pass the corresponding slot to the datePartsWeekYear and
+        // dateParts functions as a variable.
+        auto timeZoneDBSlot = _context->runtimeEnvironment->getSlot("timeZoneDB"_sd);
+        auto computeDate =
+            sbe::makeE<sbe::EFunction>(isIsoWeekYear ? "datePartsWeekYear" : "dateParts",
+                                       sbe::makeEs(sbe::makeE<sbe::EVariable>(timeZoneDBSlot),
+                                                   yearRef.clone(),
+                                                   monthRef.clone(),
+                                                   dayRef.clone(),
+                                                   hourRef.clone(),
+                                                   minRef.clone(),
+                                                   secRef.clone(),
+                                                   millisecRef.clone(),
+                                                   timeZoneRef.clone()));
 
         using iterPair_t = std::vector<std::pair<std::unique_ptr<sbe::EExpression>,
                                                  std::unique_ptr<sbe::EExpression>>>::iterator;
@@ -1827,14 +1825,13 @@ generateExpression(OperationContext* opCtx,
                    sbe::value::SlotIdGenerator* slotIdGenerator,
                    sbe::value::FrameIdGenerator* frameIdGenerator,
                    sbe::value::SlotId rootSlot,
+                   sbe::RuntimeEnvironment* env,
                    sbe::value::SlotVector* relevantSlots) {
     auto tempRelevantSlots = sbe::makeSV(rootSlot);
     relevantSlots = relevantSlots ? relevantSlots : &tempRelevantSlots;
 
-    auto timeZoneDB = getTimeZoneDatabase(opCtx);
-
     ExpressionVisitorContext context(
-        std::move(stage), slotIdGenerator, frameIdGenerator, rootSlot, relevantSlots, timeZoneDB);
+        std::move(stage), slotIdGenerator, frameIdGenerator, rootSlot, relevantSlots, env);
 
     ExpressionPreVisitor preVisitor{&context};
     ExpressionInVisitor inVisitor{&context};
