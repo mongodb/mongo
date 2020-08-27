@@ -338,19 +338,23 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                                 << "field when attempting to add "
                                                 << connectionString.toString() << " as a shard");
     }
-    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    if (serverGlobalParams.featureCompatibility.isGreaterThan(
-            ServerGlobalParams::FeatureCompatibility::kLastLTS)) {
+    // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
+    if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            ServerGlobalParams::FeatureCompatibility::kLatest) ||
+        serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
         // If the cluster's FCV is kLatest, or upgrading to / downgrading from, the node being added
         // must be a version kLatest binary.
         invariant(maxWireVersion == WireVersion::LATEST_WIRE_VERSION);
+    } else if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                   ServerGlobalParams::FeatureCompatibility::kLastContinuous)) {
+        // If we are using the kLastContinuous FCV, the node being added must be of the
+        // last-continuous or latest binary version.
+        invariant(maxWireVersion >= WireVersion::LAST_CONT_WIRE_VERSION);
     } else {
-        // If the cluster's FCV is kLastLTS, the node being added must be a version kLastLTS or
-        // version kLatest binary.
-        // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-        invariant(serverGlobalParams.featureCompatibility.getVersion() ==
-                  ServerGlobalParams::FeatureCompatibility::kLastLTS);
-        invariant(maxWireVersion >= WireVersion::LATEST_WIRE_VERSION - 1);
+        // If we are using the kLastLTS FCV, the node being added must be of the last-lts or latest
+        // binary version.
+        invariant(maxWireVersion == WireVersion::LAST_LTS_WIRE_VERSION ||
+                  maxWireVersion == WireVersion::LATEST_WIRE_VERSION);
     }
 
     // Check whether there is a master. If there isn't, the replica set may not have been
