@@ -371,24 +371,30 @@ void ReplicationConsistencyMarkersImpl::ensureFastCountOnOplogTruncateAfterPoint
     invariant(_storageInterface->setCollectionCount(opCtx, _oplogTruncateAfterPointNss, 1).isOK());
 }
 
-void ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument(
+Status ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument(
     OperationContext* opCtx, const BSONObj& updateSpec) {
-    fassert(40512,
-            _storageInterface->upsertById(
-                opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"], updateSpec));
+    return _storageInterface->upsertById(
+        opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"], updateSpec);
 }
 
-void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationContext* opCtx,
-                                                                   const Timestamp& timestamp) {
+Status ReplicationConsistencyMarkersImpl::_setOplogTruncateAfterPoint(OperationContext* opCtx,
+                                                                      const Timestamp& timestamp) {
     LOGV2_DEBUG(21296,
                 3,
                 "setting oplog truncate after point to: {oplogTruncateAfterPoint}",
                 "Setting oplog truncate after point",
                 "oplogTruncateAfterPoint"_attr = timestamp.toBSON());
-    _upsertOplogTruncateAfterPointDocument(
+
+    return _upsertOplogTruncateAfterPointDocument(
         opCtx,
         BSON("$set" << BSON(OplogTruncateAfterPointDocument::kOplogTruncateAfterPointFieldName
                             << timestamp)));
+}
+
+void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationContext* opCtx,
+                                                                   const Timestamp& timestamp) {
+
+    fassert(40512, _setOplogTruncateAfterPoint(opCtx, timestamp));
 }
 
 boost::optional<OplogTruncateAfterPointDocument>
@@ -489,7 +495,9 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     auto truncateTimestamp = _storageInterface->getAllDurableTimestamp(opCtx->getServiceContext());
 
     if (truncateTimestamp != Timestamp(StorageEngine::kMinimumTimestamp)) {
-        setOplogTruncateAfterPoint(opCtx, truncateTimestamp);
+        // Throw write interruption errors up to the caller so that durability attempts can be
+        // retried.
+        uassertStatusOK(_setOplogTruncateAfterPoint(opCtx, truncateTimestamp));
     } else {
         // The all_durable timestamp has not yet been set: there have been no oplog writes since
         // this server instance started up. In this case, we will return the current
