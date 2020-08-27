@@ -1,6 +1,6 @@
 # Linters
 # Note: These versions are checked by python modules in buildscripts/linter/
-GitPython ~= 2.1.11
+GitPython ~= 3.1.7
 mypy ~= 0.800; python_version > "3.5"
 pydocstyle == 2.1.1
 pylint == 2.3.1

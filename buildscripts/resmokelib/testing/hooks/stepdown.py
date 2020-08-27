@@ -369,6 +369,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         self._is_idle_evt = threading.Event()
         self._is_idle_evt.set()
 
+        # pylint: disable=too-many-function-args
         self._step_up_stats = collections.Counter()
 
     def run(self):
