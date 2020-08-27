@@ -46,14 +46,26 @@ public:
                 policy != YieldPolicy::WRITE_CONFLICT_RETRY_ONLY);
     }
 
-    void setRootStage(sbe::PlanStage* rootStage) {
-        _rootStage = rootStage;
+    /**
+     * Registers the tree rooted at 'plan' to yield, in addition to all other plans that have been
+     * previously registered with this yield policy.
+     */
+    void registerPlan(sbe::PlanStage* plan) {
+        _yieldingPlans.push_back(plan);
+    }
+
+    /**
+     * Clears the list of plans currently registered to yield.
+     */
+    void clearRegisteredPlans() {
+        _yieldingPlans.clear();
     }
 
 private:
     Status yield(OperationContext* opCtx, std::function<void()> whileYieldingFn = nullptr) override;
 
-    sbe::PlanStage* _rootStage = nullptr;
+    // The list of plans registered to yield when the configured policy triggers a yield.
+    std::vector<sbe::PlanStage*> _yieldingPlans;
 };
 
 }  // namespace mongo

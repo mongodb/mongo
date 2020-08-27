@@ -73,6 +73,10 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
         opCtx, collection, cq, solution, sbeYieldPolicy, needsTrialRunProgressTracker);
     auto root = builder->build(solution.root.get());
     auto data = builder->getPlanStageData();
+
+    // Register this plan to yield according to the configured policy.
+    sbeYieldPolicy->registerPlan(root.get());
+
     return {std::move(root), std::move(data)};
 }
 }  // namespace mongo::stage_builder

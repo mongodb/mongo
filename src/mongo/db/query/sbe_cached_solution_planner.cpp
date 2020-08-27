@@ -101,6 +101,10 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::finalizeExecutionPlan(
 }
 
 plan_ranker::CandidatePlan CachedSolutionPlanner::replan(bool shouldCache) const {
+    // The plan drawn from the cache is being discarded, and should no longer be registered with the
+    // yield policy.
+    _yieldPolicy->clearRegisteredPlans();
+
     if (shouldCache) {
         // Deactivate the current cache entry.
         auto cache = CollectionQueryInfo::get(_collection).getPlanCache();

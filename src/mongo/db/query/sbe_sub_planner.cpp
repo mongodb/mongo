@@ -53,6 +53,11 @@ plan_ranker::CandidatePlan SubPlanner::plan(
     auto multiplanCallback = [&](CanonicalQuery* cq,
                                  std::vector<std::unique_ptr<QuerySolution>> solutions)
         -> StatusWith<std::unique_ptr<QuerySolution>> {
+        // Before planning a new branch of the $or, we need to clear any plans previously registered
+        // to yield. Each branch of the $or gets multi-planned independently, so we don't want to
+        // try to yield plans leftover from a different branch.
+        _yieldPolicy->clearRegisteredPlans();
+
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots;
         for (auto&& solution : solutions) {
             roots.push_back(stage_builder::buildSlotBasedExecutableTree(
