@@ -951,11 +951,11 @@ TEST(CstPipelineTranslationTest, LnTranslationTest) {
 
 TEST(CstPipelineTranslationTest, LogTranslationTest) {
     const auto cst = CNode{CNode::ObjectChildren{
-        {KeyFieldname::ln,
+        {KeyFieldname::log,
          CNode{CNode::ArrayChildren{CNode{UserDouble{1.5}}, CNode{UserDouble{10}}}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(fromjson("{$ln: [{$const: 1.5}, {$const: 10}]}")) == expr->serialize(false)));
+        Value(fromjson("{$log: [{$const: 1.5}, {$const: 10}]}")) == expr->serialize(false)));
 }
 
 TEST(CstPipelineTranslationTest, LogTenTranslationTest) {
@@ -1478,5 +1478,115 @@ TEST(CstPipelineTranslationTest, SetUnionTest) {
         expr->serialize(false)));
 }
 
+TEST(CstPipelineTranslationTest, SinTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::sin, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$sin: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, CosTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::cos, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$cos: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TanTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::tan, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$tan: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, SinhTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::sinh, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$sinh: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, CoshTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::cosh, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$cosh: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, TanhTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::tanh, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$tanh: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, AsinTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::asin, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$asin: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, AcosTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::acos, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$acos: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, AtanTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::atan, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$atan: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, AsinhTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::asinh, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$asinh: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, AcoshTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::acosh, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$acosh: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, AtanhTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::atanh, CNode{UserDouble{0.927}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$atanh: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, DegreesToRadiansTranslationTest) {
+    const auto cst =
+        CNode{CNode::ObjectChildren{{KeyFieldname::degreesToRadians, CNode{UserInt{30}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$degreesToRadians: [{$const: 30}]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, RadiansToDegreesTranslationTest) {
+    const auto cst =
+        CNode{CNode::ObjectChildren{{KeyFieldname::radiansToDegrees,
+                                     CNode{UserDecimal{"0.9272952180016122324285124629224290"}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$radiansToDegrees: [{$const: "
+                       "NumberDecimal(\"0.9272952180016122324285124629224290\")}]}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, SinArrayTranslationTest) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::sin, CNode{CNode::ArrayChildren{CNode{UserDouble{0.927}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$sin: [{$const: 0.927}]}")) ==
+                                           expr->serialize(false)));
+}
 }  // namespace
 }  // namespace mongo

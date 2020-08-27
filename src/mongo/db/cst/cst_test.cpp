@@ -1195,5 +1195,228 @@ TEST(CstGrammarTest, FailsToParseTooFewParametersSetExpression) {
                                 "'$project' within array at index 0 of input pipeline");
 }
 
+TEST(CstGrammarTest, ParsesValidSin) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$sin: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname sin>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidCos) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$cos: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname cos>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidTan) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$tan: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname tan>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidSinh) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$sinh: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname sinh>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidCosh) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$cosh: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname cosh>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidTanh) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$tanh: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname tanh>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidAsin) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$asin: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname asin>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidAcos) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$acos: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname acos>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidAtan) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$atan: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname atan>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidAsinh) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$asinh: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname asinh>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidAcosh) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$acosh: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname acosh>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidAtanh) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$atanh: 0.927}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname atanh>: "
+              "\"<UserDouble 0.927000>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidDegreesToRadians) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$degreesToRadians: 30}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname "
+              "degreesToRadians>: "
+              "\"<UserInt 30>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidRadiansToDegrees) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: {trig: {$radiansToDegrees: "
+        "NumberDecimal(\"0.9272952180016122324285124629224290\")}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname "
+              "radiansToDegrees>: "
+              "\"<UserDecimal 0.9272952180016122324285124629224290>\" } } }");
+}
+
+TEST(CstGrammarTest, ParsesValidSinAsArray) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$sin: [0.927]}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath trig>: { <KeyFieldname sin>: [ "
+              "\"<UserDouble 0.927000>\" ] } } }");
+}
+
+TEST(CstGrammarTest, FailsToParseInvalidSinAsArray) {
+    CNode output;
+    auto input = fromjson("{pipeline: [{$project: {trig: {$sin: [0.927, 5]}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+}
+
+
 }  // namespace
 }  // namespace mongo
