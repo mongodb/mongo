@@ -756,12 +756,11 @@ MongoDB repair attempts to address the following forms of corruption:
   * Includes all collections, `_mdb_catalog`, and `sizeStorer`
 * Missing WiredTiger data files
   * Includes all collections, `_mdb_catalog`, and `sizeStorer`
-* Indexes
-  * Prior to 4.4, all indexes were always rebuilt on all collections, even if not missing or
-    corrupt.
-  * Starting in 4.4, indexes are only rebuilt on collections that are salvaged or fail validation
-    with inconsistencies. See
-    [repairCollections](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L115).
+* Index inconsistencies
+  * Validate [repair mode](#repair-mode) attempts to fix index inconsistencies to avoid a full index
+    rebuild.
+  * Indexes are rebuilt on collections after they have been salvaged or if they fail validation and
+    validate repair mode is unable to fix all errors.
 * Unsalvageable collection data files
 * Corrupt metadata
     * `WiredTiger.wt`, `WiredTiger.turtle`, and WT journal files
@@ -812,11 +811,17 @@ MongoDB repair attempts to address the following forms of corruption:
     * After any salvage operation, [all indexes are
       rebuilt](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L134-L149)
       for that collection.
-5. Validate collection and index consistency.
+5. Validate collection and index consistency
     * [Collection validation](#collection-validation) checks for consistency between the collection
-      and indexes. If any inconsistencies are found, [all indexes are
-      rebuilt](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database.cpp#L167-L184).
-6. [Invalidate the replica set
+      and indexes. Validate repair mode attempts to fix any inconsistencies it finds.
+6. Rebuild indexes
+    * If a collection's data has been salvaged or any index inconsistencies are not repairable by
+      validate repair mode, [all indexes are
+      rebuilt](https://github.com/mongodb/mongo/blob/4406491b2b137984c2583db98068b7d18ea32171/src/mongo/db/repair.cpp#L273-L275).
+    * While a unique index is being rebuilt, if any documents are found to have duplicate keys, then
+      those documents are inserted into a lost and found collection with the format
+      `local.lost_and_found.<collection UUID>`.
+7. [Invalidate the replica set
    configuration](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repair_database_and_check_version.cpp#L460-L485)
    if data has been or could have been modified. This [prevents a repaired node from
    joining](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L486-L494)
@@ -1322,6 +1327,26 @@ Additionally, users can specify that they'd like to perform a `full` validation.
       of validation (keys that hashed to buckets where the value was not 0 in the end).
     + This is used to [pinpoint exactly where the index inconsistencies were detected](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L109-L202)
       and to report them.
+
+## Repair Mode
+
+Validate accepts a RepairMode flag that instructs it to attempt to fix certain index
+inconsistencies. Repair mode can fix inconsistencies by applying the following remediations:
+* Missing index entries
+  * Missing keys are inserted into the index
+* Extra index entries
+  * Extra keys are removed from the index
+* Multikey documents are found for an index that is not marked multikey
+  * The index is marked as multikey
+* Multikey documents are found that are not covered by an index's multikey paths
+  * The index's multikey paths are updated
+* Corrupt documents
+  * Documents with invalid BSON are removed
+
+Repair mode is used by startup repair to avoid rebuilding indexes. Repair mode may also be used on
+standalone nodes by passing `{ repair: true }` to the validate command.
+
+See [RepairMode](https://github.com/mongodb/mongo/blob/4406491b2b137984c2583db98068b7d18ea32171/src/mongo/db/catalog/collection_validation.h#L71).
 
 # Oplog Collection
 
