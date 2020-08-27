@@ -70,6 +70,7 @@ def callo(args, **kwargs):
 
 def get_tar_path(version, tar_path):
     """Return the path to clang-format in the llvm tarball."""
+    # pylint: disable=too-many-function-args
     return CLANG_FORMAT_SOURCE_TAR_BASE.substitute(version=version, tar_path=tar_path)
 
 

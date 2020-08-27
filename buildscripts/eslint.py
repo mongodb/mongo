@@ -87,6 +87,7 @@ def get_eslint_from_cache(dest_file, platform, arch):
     print("Downloading ESLint %s from %s, saving to %s" % (ESLINT_VERSION, url, temp_tar_file))
     urllib.request.urlretrieve(url, temp_tar_file)
 
+    # pylint: disable=too-many-function-args
     eslint_distfile = ESLINT_SOURCE_TAR_BASE.substitute(platform=platform, arch=arch)
     extract_eslint(temp_tar_file, eslint_distfile)
     shutil.move(eslint_distfile, dest_file)
