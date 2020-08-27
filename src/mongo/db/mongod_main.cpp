@@ -135,6 +135,7 @@
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
+#include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
@@ -305,6 +306,10 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     std::unique_ptr<TenantMigrationDonorService> tenantMigrationDonorService =
         std::make_unique<TenantMigrationDonorService>(serviceContext);
     registry->registerService(std::move(tenantMigrationDonorService));
+
+    std::unique_ptr<ReshardingCoordinatorService> reshardingCoordinatorService =
+        std::make_unique<ReshardingCoordinatorService>(serviceContext);
+    registry->registerService(std::move(reshardingCoordinatorService));
 }
 
 MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);

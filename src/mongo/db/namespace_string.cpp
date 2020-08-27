@@ -252,7 +252,7 @@ bool NamespaceString::isConfigDotCacheDotChunks() const {
 }
 
 bool NamespaceString::isTemporaryReshardingCollection() const {
-    return coll().startsWith("system.resharding.");
+    return coll().startsWith(kTemporaryReshardingCollectionPrefix);
 }
 
 bool NamespaceString::isReplicated() const {

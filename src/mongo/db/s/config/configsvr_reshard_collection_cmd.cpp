@@ -34,6 +34,9 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/resharding/coordinator_document_gen.h"
+#include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -105,15 +108,69 @@ public:
                     "Must specify only one of _presetReshardedChunks or numInitialChunks",
                     !(presetReshardedChunksSpecified && bool(request().getNumInitialChunks())));
 
+            std::set<ShardId> donorShardIds;
+            cm.getAllShardIds(&donorShardIds);
+
             int numInitialChunks;
+            std::set<ShardId> recipientShardIds;
             if (presetReshardedChunksSpecified) {
                 const auto chunks = request().get_presetReshardedChunks().get();
                 validateReshardedChunks(
                     chunks, opCtx, ShardKeyPattern(request().getKey()).getKeyPattern());
                 numInitialChunks = chunks.size();
+
+                // Use the provided shardIds from presetReshardedChunks to construct the
+                // recipient list.
+                for (const BSONObj& obj : chunks) {
+                    recipientShardIds.emplace(
+                        obj.getStringField(ReshardedChunk::kRecipientShardIdFieldName));
+                }
             } else {
                 numInitialChunks = request().getNumInitialChunks().get_value_or(cm.numChunks());
+
+                // No presetReshardedChunks were provided, make the recipients list be the same as
+                // the donors list by default.
+                recipientShardIds = donorShardIds;
             }
+
+            // Construct the lists of donor and recipient shard entries, where each ShardEntry is
+            // in state kUnused.
+            std::vector<DonorShardEntry> donorShards;
+            std::transform(donorShardIds.begin(),
+                           donorShardIds.end(),
+                           std::back_inserter(donorShards),
+                           [](const ShardId& shardId) -> DonorShardEntry {
+                               DonorShardEntry entry{shardId};
+                               entry.setState(DonorStateEnum::kUnused);
+                               return entry;
+                           });
+            std::vector<RecipientShardEntry> recipientShards;
+            std::transform(recipientShardIds.begin(),
+                           recipientShardIds.end(),
+                           std::back_inserter(recipientShards),
+                           [](const ShardId& shardId) -> RecipientShardEntry {
+                               RecipientShardEntry entry{shardId};
+                               entry.setState(RecipientStateEnum::kUnused);
+                               return entry;
+                           });
+
+            auto tempReshardingNss = constructTemporaryReshardingNss(nss, cm);
+            auto coordinatorDoc =
+                ReshardingCoordinatorDocument(std::move(tempReshardingNss),
+                                              std::move(CoordinatorStateEnum::kInitializing),
+                                              std::move(donorShards),
+                                              std::move(recipientShards));
+
+            // Generate the resharding metadata for the ReshardingCoordinatorDocument.
+            auto reshardingUUID = UUID::gen();
+            auto commonMetadata =
+                CommonReshardingMetadata(std::move(reshardingUUID), ns(), request().getKey());
+            coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
+
+            auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+            auto service = registry->lookupServiceByName(kReshardingCoordinatorServiceName);
+            auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(
+                service, coordinatorDoc.toBSON());
         }
 
     private:

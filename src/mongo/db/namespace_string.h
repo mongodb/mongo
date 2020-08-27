@@ -73,6 +73,9 @@ public:
     static constexpr StringData kOrphanCollectionPrefix = "orphan."_sd;
     static constexpr StringData kOrphanCollectionDb = "local"_sd;
 
+    // Prefix for temporary resharding collection.
+    static constexpr StringData kTemporaryReshardingCollectionPrefix = "system.resharding."_sd;
+
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration
     // state of the server, which needs to be recovered/consulted at startup. Each document in this
@@ -118,7 +121,7 @@ public:
     // Namespace for pending range deletions.
     static const NamespaceString kRangeDeletionNamespace;
 
-    // Namespace for the config server's resharding operation state.
+    // Namespace for the coordinator's resharding operation state.
     static const NamespaceString kConfigReshardingOperationsNamespace;
 
     // Namespace for the donor shard's local resharding operation state.

@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <fmt/format.h>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/namespace_string.h"
@@ -47,6 +49,20 @@
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
 namespace mongo {
+using namespace fmt::literals;
+
+NamespaceString constructTemporaryReshardingNss(const NamespaceString& originalNss,
+                                                const ChunkManager& cm) {
+    auto collectionUUID = cm.getUUID();
+    uassert(ErrorCodes::InvalidUUID,
+            "Cannot reshard collection {} due to missing UUID"_format(originalNss.ns()),
+            collectionUUID);
+    NamespaceString tempReshardingNss(
+        originalNss.db(),
+        "{}{}"_format(NamespaceString::kTemporaryReshardingCollectionPrefix,
+                      collectionUUID->toString()));
+    return tempReshardingNss;
+}
 
 void tellShardsToRefresh(OperationContext* opCtx,
                          const std::vector<ShardId>& shardIds,

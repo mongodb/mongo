@@ -38,12 +38,24 @@
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/resharded_chunk_gen.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
 
 constexpr auto kReshardingOplogPrePostImageOps = "prePostImageOps"_sd;
+
+/**
+ * Constructs the temporary resharding collection's namespace provided the original collection's
+ * namespace and chunk manager.
+ *
+ *      <db>.system.resharding.<existing collection's UUID>
+ *
+ * Note: throws if the original collection does not have a UUID.
+ */
+NamespaceString constructTemporaryReshardingNss(const NamespaceString& originalNss,
+                                                const ChunkManager& cm);
 
 /**
  * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Throws if one of the
