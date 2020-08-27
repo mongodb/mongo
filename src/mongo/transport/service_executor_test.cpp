@@ -221,8 +221,12 @@ TEST_F(ServiceExecutorFixedFixture, ScheduleFailsBeforeStartup) {
 }
 
 DEATH_TEST_F(ServiceExecutorFixedFixture, DestructorFailsBeforeShutdown, "invariant") {
+    FailPointEnableBlock failpoint("hangAfterServiceExecutorFixedExecutorThreadsStart");
     ServiceExecutorHandle executorHandle(ServiceExecutorHandle::kStartExecutor |
                                          ServiceExecutorHandle::kSkipShutdown);
+    // The following ensures `executorHandle` holds the only reference to the service executor, thus
+    // returning from this block would trigger destruction of the executor.
+    failpoint->waitForTimesEntered(kNumExecutorThreads);
 }
 
 TEST_F(ServiceExecutorFixedFixture, BasicTaskRuns) {
@@ -367,6 +371,31 @@ TEST_F(ServiceExecutorFixedFixture, RunTaskAfterWaitingForData) {
     reinterpret_cast<MockSession*>(session.get())->signalAvailableData();
     barrier->countDownAndWait();
     ASSERT(ranOnDataAvailable.load());
+}
+
+TEST_F(ServiceExecutorFixedFixture, StartAndShutdownAreDeterministic) {
+
+    std::unique_ptr<ServiceExecutorHandle> handle;
+
+    // Ensure starting the executor results in spawning the specified number of executor threads.
+    {
+        FailPointEnableBlock failpoint("hangAfterServiceExecutorFixedExecutorThreadsStart");
+        handle = std::make_unique<ServiceExecutorHandle>(ServiceExecutorHandle::kNone);
+        ASSERT_OK((*handle)->start());
+        failpoint->waitForTimesEntered(kNumExecutorThreads);
+    }
+
+    // Since destroying ServiceExecutorFixed is blocking, spawn a thread to issue the destruction
+    // off of the main execution path.
+    stdx::thread shutdownThread;
+
+    // Ensure all executor threads return after receiving the shutdown signal.
+    {
+        FailPointEnableBlock failpoint("hangBeforeServiceExecutorFixedLastExecutorThreadReturns");
+        shutdownThread = stdx::thread{[handle = std::move(handle)]() mutable { handle.reset(); }};
+        failpoint->waitForTimesEntered(1);
+    }
+    shutdownThread.join();
 }
 
 }  // namespace

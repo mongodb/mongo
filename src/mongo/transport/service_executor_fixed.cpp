@@ -42,6 +42,8 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeSchedulingServiceExecutorFixedTask);
+MONGO_FAIL_POINT_DEFINE(hangAfterServiceExecutorFixedExecutorThreadsStart);
+MONGO_FAIL_POINT_DEFINE(hangBeforeServiceExecutorFixedLastExecutorThreadReturns);
 
 namespace transport {
 namespace {
@@ -185,6 +187,20 @@ void ServiceExecutorFixed::appendStats(BSONObjBuilder* bob) const {
 int ServiceExecutorFixed::getRecursionDepthForExecutorThread() const {
     invariant(_executorContext);
     return _executorContext->getRecursionDepth();
+}
+
+ServiceExecutorFixed::ExecutorThreadContext::ExecutorThreadContext(
+    std::weak_ptr<ServiceExecutorFixed> serviceExecutor)
+    : _executor(std::move(serviceExecutor)) {
+    _adjustRunningExecutorThreads(1);
+    hangAfterServiceExecutorFixedExecutorThreadsStart.pauseWhileSet();
+}
+
+ServiceExecutorFixed::ExecutorThreadContext::~ExecutorThreadContext() {
+    if (auto threadsRunning = _adjustRunningExecutorThreads(-1);
+        threadsRunning.has_value() && threadsRunning.value() == 0) {
+        hangBeforeServiceExecutorFixedLastExecutorThreadReturns.pauseWhileSet();
+    }
 }
 
 }  // namespace transport
