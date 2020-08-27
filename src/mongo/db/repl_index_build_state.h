@@ -278,7 +278,7 @@ struct ReplIndexBuildState {
 
     // The OperationId of the index build. This allows external callers to interrupt the index build
     // thread.
-    OperationId opId;
+    OperationId opId = 0;
 
     /*
      * Readers who read the commit quorum value from "config.system.indexBuilds" collection
