@@ -3,6 +3,12 @@
  * duplicate documents. For example, the object {a: {b: 1, c: 1}} will generate $** index keys with
  * paths "a.b" and "a.c". An index scan that covers both paths should deduplicate the documents
  * scanned and return only a single object.
+ *
+ * This test is currently disabled in SBE passthroughs due to bugs that cause problems on big-endian
+ * platforms. Once these bugs are fixed, this test should be re-enabled for SBE.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

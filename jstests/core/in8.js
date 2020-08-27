@@ -1,4 +1,10 @@
 // Test $in regular expressions with overlapping index bounds.  SERVER-4677
+//
+// This test is currently disabled in SBE passthroughs due to bugs that cause problems on big-endian
+// platforms. Once these bugs are fixed, this test should be re-enabled for SBE.
+// @tags: [
+//   sbe_incompatible,
+// ]
 
 t = db.jstests_inb;
 t.drop();
