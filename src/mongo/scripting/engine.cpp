@@ -249,6 +249,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
                 v.type() != BSONType::CodeWScope);
 
         if (MONGO_unlikely(mr_killop_test_fp.shouldFail())) {
+            LOGV2(5062200, "Pausing mr_killop_test_fp for system.js entry", "entryName"_attr = n);
 
             /* This thread sleep makes the interrupts in the test come in at a time
              *  where the js misses the interrupt and throw an exception instead of
