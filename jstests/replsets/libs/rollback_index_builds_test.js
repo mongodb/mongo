@@ -9,14 +9,11 @@ load('jstests/replsets/libs/rollback_test.js');     // for RollbackTest
 
 class RollbackIndexBuildsTest {
     constructor() {
-        // This test create indexes with majority of nodes not avialable for replication. So,
-        // disabling index build commit quorum.
-        jsTestLog("Set up a Rollback Test with enableIndexBuildCommitQuorum=false");
+        jsTestLog("Set up a Rollback Test.");
         const replTest = new ReplSetTest({
             name: jsTestName(),
             nodes: 3,
             useBridge: true,
-            nodeOptions: {setParameter: "enableIndexBuildCommitQuorum=false"}
         });
         replTest.startSet();
         let config = replTest.getReplSetConfig();
@@ -112,8 +109,11 @@ class RollbackIndexBuildsTest {
                             createdColl = true;
                         }
                         IndexBuildTest.pauseIndexBuilds(primary);
+
+                        // This test create indexes with majority of nodes not available for
+                        // replication. So, disabling index build commit quorum.
                         IndexBuildTest.startIndexBuild(
-                            primary, collection.getFullName(), indexSpec);
+                            primary, collection.getFullName(), indexSpec, {}, [], 0);
                         IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, "a_1");
                         break;
                     case "commit":
