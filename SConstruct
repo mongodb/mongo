@@ -933,6 +933,9 @@ env_vars.Add('STRIP',
     help='Path to the strip utility (non-darwin platforms probably use OBJCOPY for this)',
 )
 
+env_vars.Add('TAPI',
+    help="Configures the path to the 'tapi' (an Xcode) utility")
+
 env_vars.Add('TARGET_ARCH',
     help='Sets the architecture to build for',
     converter=variable_arch_converter,
@@ -1723,6 +1726,11 @@ if link_model.startswith("dynamic"):
         abilink = Tool('abilink')
         if abilink.exists(env):
             abilink(env)
+
+    if env.TargetOSIs('darwin') and env.get('TAPI'):
+        tapilink = Tool('tapilink')
+        if tapilink.exists(env):
+            tapilink(env)
 
 if env['_LIBDEPS'] == '$_LIBDEPS_LIBS':
     # The following platforms probably aren't using the binutils
