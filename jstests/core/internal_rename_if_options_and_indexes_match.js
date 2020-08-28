@@ -5,6 +5,7 @@
 //   assumes_against_mongod_not_mongos,
 //   incompatible_with_embedded,
 //   requires_capped,
+//   requires_non_retryable_commands,
 // ]
 
 (function() {
