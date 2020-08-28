@@ -325,21 +325,30 @@ void PrimaryOnlyService::onStepDown() {
 void PrimaryOnlyService::shutdown() {
     InstanceMap savedInstances;
     std::shared_ptr<executor::TaskExecutor> savedExecutor;
+    std::shared_ptr<executor::ScopedTaskExecutor> savedScopedExecutor;
 
     {
         stdx::lock_guard lk(_mutex);
 
         // Save the executor to join() with it outside of _mutex.
         using std::swap;
+        swap(savedScopedExecutor, _scopedExecutor);
         swap(savedExecutor, _executor);
+
         // Maintain the lifetime of the instances until all outstanding tasks using them are
         // complete.
         swap(savedInstances, _instances);
 
-        _scopedExecutor.reset();
         _state = State::kShutdown;
     }
 
+    if (savedScopedExecutor) {
+        // Make sure to shut down the scoped executor before the parent executor to avoid
+        // SERVER-50612.
+        (*savedScopedExecutor)->shutdown();
+        // No need to join() here since joining the parent executor below will join with all tasks
+        // owned by the scoped executor.
+    }
     if (savedExecutor) {
         savedExecutor->shutdown();
         savedExecutor->join();
