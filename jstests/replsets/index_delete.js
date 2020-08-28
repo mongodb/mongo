@@ -19,11 +19,8 @@ function indexBuildInProgress(checkDB) {
 }
 
 // Set up replica set.
-// This test create indexes with fail point enabled on secondary which prevents secondary from
-// voting. So, disabling index build commit quorum.
 var replTest = new ReplSetTest({
     nodes: [{}, {}, {arbiter: true}],
-    nodeOptions: {setParameter: "enableIndexBuildCommitQuorum=false"}
 });
 var nodes = replTest.nodeList();
 
@@ -50,8 +47,10 @@ for (var i = 0; i < size; ++i) {
 }
 assert.commandWorked(bulk.execute());
 
+// This test create indexes with fail point enabled on secondary which prevents secondary from
+// voting. So, disabling index build commit quorum.
 jsTest.log("Creating index");
-masterDB[collName].ensureIndex({i: 1});
+assert.commandWorked(masterDB[collName].createIndex({i: 1}, {}, 0));
 assert.eq(2, masterDB[collName].getIndexes().length);
 
 try {
@@ -80,9 +79,10 @@ assert.soon(function() {
 }, "Index not dropped on secondary");
 assert.eq(1, secondDB[collName].getIndexes().length);
 
+// Secondary index builds have been unblocked, so we can build indexes with commit quorum enabled.
 jsTest.log("Creating two more indexes on primary");
-masterDB[collName].ensureIndex({j: 1});
-masterDB[collName].ensureIndex({k: 1});
+assert.commandWorked(masterDB[collName].createIndex({j: 1}));
+assert.commandWorked(masterDB[collName].createIndex({k: 1}));
 assert.eq(3, masterDB[collName].getIndexes().length);
 
 jsTest.log("Waiting on replication of second index creations");

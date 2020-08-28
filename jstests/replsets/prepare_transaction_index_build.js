@@ -14,10 +14,7 @@
 "use strict";
 load("jstests/core/txns/libs/prepare_helpers.js");
 
-// This test create indexes with fail point enabled on secondary which prevents secondary from
-// voting. So, disabling index build commit quorum.
-const replTest =
-    new ReplSetTest({nodes: 2, nodeOptions: {setParameter: "enableIndexBuildCommitQuorum=false"}});
+const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();
 
@@ -41,10 +38,13 @@ assert.commandWorked(bulk.execute());
 secondary.getDB("admin").runCommand(
     {configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'});
 
+// This test create indexes with fail point enabled on secondary which prevents secondary from
+// voting. So, disabling index build commit quorum.
 jsTestLog("Starting a background index build.");
 assert.commandWorked(testDB.runCommand({
     createIndexes: collName,
     indexes: [{key: {x: 1}, name: 'x_1'}],
+    commitQuorum: 0,
 }));
 
 const session = primary.startSession({causalConsistency: false});

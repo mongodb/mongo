@@ -25,17 +25,11 @@
 "use strict";
 
 load('jstests/noPassthrough/libs/index_build.js');
-// This test create indexes with majority of nodes not avialable for replication. So, disabling
-// index build commit quorum.
+
 const rst = new ReplSetTest({
     name: "timestampingIndexBuilds",
     nodes: 2,
-    nodeOptions: {
-        setParameter: {
-            enableIndexBuildCommitQuorum: false,
-            logComponentVerbosity: tojsononeline({storage: {recovery: 2}})
-        }
-    }
+    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}}
 });
 const nodes = rst.startSet();
 rst.initiateWithHighElectionTimeout();
@@ -64,7 +58,9 @@ rst.awaitLastOpCommitted();
 nodes.forEach(node => assert.commandWorked(node.adminCommand(
                   {configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})));
 
-assert.commandWorked(coll.createIndexes([{foo: 1}], {background: true}));
+// This test create indexes with majority of nodes not available for replication. So, disabling
+// index build commit quorum.
+assert.commandWorked(coll.createIndexes([{foo: 1}], {background: true}, 0));
 rst.awaitReplication();
 
 rst.stopSet(undefined, true);

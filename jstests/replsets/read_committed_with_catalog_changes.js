@@ -130,24 +130,15 @@ const testCases = {
         blockedCollections: ['coll'],
         unblockedCollections: ['other', 'from' /*doesNotExist*/],
     },
-    createIndexForeground: {
+    createIndex: {
         prepare: function(db) {
             assert.commandWorked(db.other.insert({_id: 1}));
             assert.commandWorked(db.coll.insert({_id: 1}));
         },
         performOp: function(db) {
-            assert.commandWorked(db.coll.ensureIndex({x: 1}, {background: false}));
-        },
-        blockedCollections: ['coll'],
-        unblockedCollections: ['other'],
-    },
-    createIndexBackground: {
-        prepare: function(db) {
-            assert.commandWorked(db.other.insert({_id: 1}));
-            assert.commandWorked(db.coll.insert({_id: 1}));
-        },
-        performOp: function(db) {
-            assert.commandWorked(db.coll.ensureIndex({x: 1}, {background: true}));
+            // This test create indexes with majority of nodes not available for replication.
+            // So, disabling index build commit quorum.
+            assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
         },
         blockedCollections: ['coll'],
         unblockedCollections: ['other'],
@@ -156,7 +147,10 @@ const testCases = {
         prepare: function(db) {
             assert.commandWorked(db.other.insert({_id: 1}));
             assert.commandWorked(db.coll.insert({_id: 1}));
-            assert.commandWorked(db.coll.ensureIndex({x: 1}));
+
+            // This test create indexes with majority of nodes not available for replication.
+            // So, disabling index build commit quorum.
+            assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
         },
         performOp: function(db) {
             assert.commandWorked(db.coll.dropIndex({x: 1}));
@@ -171,7 +165,10 @@ const testCases = {
         prepare: function(db) {
             assert.commandWorked(db.other.insert({_id: 1}));
             assert.commandWorked(db.coll.insert({_id: 1}));
-            assert.commandWorked(db.coll.ensureIndex({x: 1}));
+
+            // This test create indexes with majority of nodes not available for replication.
+            // So, disabling index build commit quorum.
+            assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
         },
         performOp: function(db) {
             var res = db.coll.runCommand('compact', {force: true});
@@ -206,12 +203,10 @@ function assertReadsSucceed(coll, timeoutMs = 20000) {
 
 // Set up a set and grab things for later.
 var name = "read_committed_with_catalog_changes";
-// This test create indexes with majority of nodes not avialable for replication. So, disabling
-// index build commit quorum.
 var replTest = new ReplSetTest({
     name: name,
     nodes: 3,
-    nodeOptions: {enableMajorityReadConcern: '', setParameter: "enableIndexBuildCommitQuorum=false"}
+    nodeOptions: {enableMajorityReadConcern: ''},
 });
 
 replTest.startSet();

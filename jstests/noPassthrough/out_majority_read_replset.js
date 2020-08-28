@@ -5,12 +5,7 @@
 
 load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
 
-// This test create indexes with majority of nodes not avialable for replication. So, disabling
-// index build commit quorum.
-const rst = new ReplSetTest({
-    nodes: 2,
-    nodeOptions: {enableMajorityReadConcern: "", setParameter: "enableIndexBuildCommitQuorum=false"}
-});
+const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
 
 // Skip this test if running with --nojournal and WiredTiger.
 if (jsTest.options().noJournal &&
@@ -34,7 +29,9 @@ rst.awaitLastOpCommitted();
 stopReplicationOnSecondaries(rst);
 
 // Create the index that is not majority commited
-assert.commandWorked(sourceColl.createIndex({state: 1}, {name: "secondIndex"}));
+// This test create indexes with majority of nodes not available for replication. So, disabling
+// index build commit quorum.
+assert.commandWorked(sourceColl.createIndex({state: 1}, {name: "secondIndex"}, 0));
 
 // Run the $out in the parallel shell as it will block in the metadata until the shapshot is
 // advanced.

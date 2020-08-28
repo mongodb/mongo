@@ -33,13 +33,10 @@ var checkFinalResults = function(db) {
 };
 
 var name = "rollback_ddl_op_sequences";
-// This test create indexes with majority of nodes not avialable for replication. So, disabling
-// index build commit quorum.
 var replTest = new ReplSetTest({
     name: name,
     nodes: 3,
     useBridge: true,
-    nodeOptions: {setParameter: "enableIndexBuildCommitQuorum=false"}
 });
 var nodes = replTest.nodeList();
 
@@ -69,12 +66,14 @@ assert.eq(a_conn, master);
 var a = a_conn.getDB("foo");
 var b = b_conn.getDB("foo");
 
+// This test create indexes with fail point enabled on secondary which prevents secondary from
+// voting. So, disabling index build commit quorum.
 // initial data for both nodes
 assert.commandWorked(a.b.insert({x: 1}));
-a.b.ensureIndex({x: 1});
+assert.commandWorked(a.b.createIndex({x: 1}, {}, 0));
 assert.commandWorked(a.oldname.insert({y: 1}));
 assert.commandWorked(a.oldname.insert({y: 2}));
-a.oldname.ensureIndex({y: 1}, true);
+assert.commandWorked(a.oldname.createIndex({y: 1}, {unique: true}, 0));
 assert.commandWorked(a.bar.insert({q: 0}));
 assert.commandWorked(a.bar.insert({q: 1, a: "foo"}));
 assert.commandWorked(a.bar.insert({q: 2, a: "foo", x: 1}));
@@ -123,7 +122,7 @@ b.oldname.renameCollection("newname");
 b.newname.renameCollection("fooname");
 assert(b.fooname.find().itcount() > 0, "count rename");
 // create an index - verify that it is removed
-b.fooname.ensureIndex({q: 1});
+assert.commandWorked(b.fooname.createIndex({q: 1}, {}, 0));
 // test roll back (drop) a whole database
 var abc = b.getSiblingDB("abc");
 assert.commandWorked(abc.foo.insert({x: 1}));
