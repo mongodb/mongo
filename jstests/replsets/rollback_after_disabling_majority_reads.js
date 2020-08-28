@@ -1,6 +1,6 @@
 /**
  * This test demonstrates that a rollback immediately after disabling majority reads succeeds.
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, requires_journaling]
  */
 (function() {
     "use strict";
