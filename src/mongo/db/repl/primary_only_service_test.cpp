@@ -352,6 +352,9 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstance) {
 }
 
 TEST_F(PrimaryOnlyServiceTest, DoubleCreateInstance) {
+    // Make sure the first instance doesn't complete before we try to create the second.
+    TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
     auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
     ASSERT(instance.get());
     ASSERT_EQ(0, instance->getID());
@@ -360,6 +363,8 @@ TEST_F(PrimaryOnlyServiceTest, DoubleCreateInstance) {
     // the already existing instance based on the _id only.
     auto instance2 = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 1));
     ASSERT_EQ(instance.get(), instance2.get());
+
+    TestServiceHangDuringInitialization.setMode(FailPoint::off);
 }
 
 TEST_F(PrimaryOnlyServiceTest, CreateWhenNotPrimary) {
