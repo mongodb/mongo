@@ -182,8 +182,6 @@ void TenantMigrationAccessBlocker::commit(repl::OpTime commitOpTime) {
 void TenantMigrationAccessBlocker::abort(repl::OpTime abortOpTime) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    invariant(_access == Access::kBlockWritesAndReads);
-    invariant(_blockTimestamp);
     invariant(!_commitOrAbortOpTime);
     invariant(!_waitForCommitOrAbortToMajorityCommitOpCtx);
 
@@ -192,8 +190,6 @@ void TenantMigrationAccessBlocker::abort(repl::OpTime abortOpTime) {
     const auto callbackFn = [this, abortOpTime]() {
         stdx::lock_guard<Latch> lg(_mutex);
 
-        invariant(_access == Access::kBlockWritesAndReads);
-        invariant(_blockTimestamp);
         invariant(_commitOrAbortOpTime == abortOpTime);
         invariant(_waitForCommitOrAbortToMajorityCommitOpCtx);
 
