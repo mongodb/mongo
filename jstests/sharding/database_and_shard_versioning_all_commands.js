@@ -305,6 +305,7 @@
         },
         listShards: {skip: "does not forward command to primary shard"},
         logApplicationMessage: {skip: "not on a user database", conditional: true},
+        logMessage: {skip: "not on a user database", conditional: true},
         logRotate: {skip: "executes locally on mongos (not sent to any remote node)"},
         logout: {skip: "not on a user database"},
         mapReduce: {

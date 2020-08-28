@@ -185,5 +185,46 @@ public:
 
 } listCommandsCmd;
 
+class CmdLogMessage : public BasicCommand {
+public:
+    CmdLogMessage() : BasicCommand("logMessage") {}
+
+    std::string help() const final {
+        return "Send a message to the server log";
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
+        return false;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
+        return AllowedOnSecondary::kAlways;
+    }
+
+    bool adminOnly() const final {
+        return true;
+    }
+
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const final {
+        out->push_back(
+            Privilege(ResourcePattern::forClusterResource(), ActionType::applicationMessage));
+    }
+
+    bool run(OperationContext* opCtx,
+             const std::string& ns,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) final {
+        auto msgElem = cmdObj["logMessage"];
+        uassert(ErrorCodes::BadValue, "logMessage must be a string", msgElem.type() == String);
+
+        log() << "logMessage: " << msgElem.valueStringData();
+        return true;
+    }
+};
+
+MONGO_REGISTER_TEST_COMMAND(CmdLogMessage);
+
 }  // namespace
 }  // namespace mongo

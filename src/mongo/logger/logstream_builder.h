@@ -124,24 +124,19 @@ public:
     }
 
     LogstreamBuilder& operator<<(const char* x) {
-        stream() << x;
-        return *this;
+        return appendEscapedString(x);
     }
     LogstreamBuilder& operator<<(const std::string& x) {
-        stream() << x;
-        return *this;
+        return appendEscapedString(x);
     }
     LogstreamBuilder& operator<<(StringData x) {
-        stream() << x;
-        return *this;
+        return appendEscapedString(x);
     }
     LogstreamBuilder& operator<<(char* x) {
-        stream() << x;
-        return *this;
+        return appendEscapedString(x);
     }
     LogstreamBuilder& operator<<(char x) {
-        stream() << x;
-        return *this;
+        return appendEscapedChar(x);
     }
     LogstreamBuilder& operator<<(int x) {
         stream() << x;
@@ -210,8 +205,7 @@ public:
 
     template <typename T>
     LogstreamBuilder& operator<<(const T& x) {
-        stream() << x.toString();
-        return *this;
+        return appendEscapedString(x.toString());
     }
 
     LogstreamBuilder& operator<<(std::ostream& (*manip)(std::ostream&)) {
@@ -229,8 +223,56 @@ public:
      */
     void operator<<(Tee* tee);
 
+    /**
+     * Enable newilne escaping behavior.
+     */
+    static void setNewlineEscape() {
+        newlineEscape = true;
+    }
+
 private:
+    /**
+     * Global option to escape newlines.
+     */
+    static bool newlineEscape;
+
     void makeStream();
+
+    // Append a string explicitly escaping \r and \n only.
+    LogstreamBuilder& appendEscapedString(StringData x) {
+        if (newlineEscape) {
+            auto idx = std::min(x.find('\r'), x.find('\n'));
+            while (idx != std::string::npos) {
+                if (idx > 0) {
+                    stream() << x.substr(0, idx);
+                }
+                appendEscapedChar(x[idx]);
+                x = x.substr(idx + 1);
+                idx = std::min(x.find('\r'), x.find('\n'));
+            }
+        }
+
+        stream() << x;
+        return *this;
+    }
+
+    LogstreamBuilder& appendEscapedChar(char ch) {
+        if (newlineEscape) {
+            switch (ch) {
+                case '\n':
+                    stream() << "\\n";
+                    break;
+                case '\r':
+                    stream() << "\\r";
+                    break;
+                default:
+                    stream() << ch;
+            }
+        } else {
+            stream() << ch;
+        }
+        return *this;
+    }
 
     MessageLogDomain* _domain;
     std::string _contextName;
