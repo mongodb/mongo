@@ -579,6 +579,7 @@ TEST_F(MongodbCAPITest, RunListCommands) {
         "listDatabases",
         "listIndexes",
         "lockInfo",
+        "logMessage",
         "ping",
         "planCacheClear",
         "planCacheClearFilters",

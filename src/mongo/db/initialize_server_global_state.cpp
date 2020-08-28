@@ -313,6 +313,7 @@ MONGO_INITIALIZER_GENERAL(
 
     logger::globalLogDomain()->attachAppender(
         std::make_unique<RamLogAppender>(RamLog::get("global")));
+    logger::LogstreamBuilder::setNewlineEscape();
 
     return Status::OK();
 }
