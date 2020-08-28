@@ -1128,7 +1128,7 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearPositionList) {
 // Verifies that $bitsAllClear expression with BinData bitmask correctly generates a validation
 // error.
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearBinData) {
-    int binaryData = 0x02;
+    const unsigned char binaryData[] = {0x02};
     BSONObj query = BSON("a" << BSON("$bitsAllClear" << BSONBinData(
                                          &binaryData, sizeof(binaryData), BinDataGeneral)));
     BSONObj document = BSON("a" << 7);
@@ -1168,7 +1168,7 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllSetPositionList) {
 // Verifies that $bitsAllSet expression with BinData bitmask correctly generates a validation
 // error.
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllSetBinData) {
-    int binaryData = 0x02;
+    const unsigned char binaryData[] = {0x02};
     BSONObj query = BSON(
         "a" << BSON("$bitsAllSet" << BSONBinData(&binaryData, sizeof(binaryData), BinDataGeneral)));
     BSONObj document = BSON("a" << 5);
@@ -1208,7 +1208,7 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnyClearPositionList) {
 // Verifies that $bitsAnyClear expression with BinData bitmask correctly generates a validation
 // error.
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnyClearBinData) {
-    int binaryData = 0x03;
+    const unsigned char binaryData[] = {0x03};
     BSONObj query = BSON("a" << BSON("$bitsAnyClear" << BSONBinData(
                                          &binaryData, sizeof(binaryData), BinDataGeneral)));
     BSONObj document = BSON("a" << 7);
@@ -1248,7 +1248,7 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnySetPositionList) {
 // Verifies that $bitsAnySet expression with BinData bitmask correctly generates a validation
 // error.
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAnySetBinData) {
-    int binaryData = 0x03;
+    const unsigned char binaryData[] = {0x03};
     BSONObj query = BSON(
         "a" << BSON("$bitsAnySet" << BSONBinData(&binaryData, sizeof(binaryData), BinDataGeneral)));
     BSONObj document = BSON("a" << 0);
