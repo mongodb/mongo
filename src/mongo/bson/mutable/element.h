@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/visibility.h"
 #include "mongo/util/safe_num.h"
 
 namespace mongo {
@@ -111,7 +112,7 @@ class Document;
  *    be removed.
  */
 
-class Element {
+class MONGO_API(mutable_bson) Element {
 public:
     typedef uint32_t RepIdx;
 
@@ -617,11 +618,11 @@ private:
 
     inline Element(Document* doc, RepIdx repIdx);
 
-    Status addChild(Element e, bool front);
+    MONGO_PRIVATE Status addChild(Element e, bool front);
 
-    StringData getValueStringOrSymbol() const;
+    MONGO_PRIVATE StringData getValueStringOrSymbol() const;
 
-    Status setValue(Element::RepIdx newValueIdx);
+    MONGO_PRIVATE Status setValue(Element::RepIdx newValueIdx);
 
     Document* _doc;
     RepIdx _repIdx;

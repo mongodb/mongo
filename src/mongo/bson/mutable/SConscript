@@ -14,6 +14,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/safe_num',
     ],
+    MONGO_API_NAME='mutable_bson',
 )
 
 env.Library(

@@ -36,6 +36,7 @@
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/visibility.h"
 #include "mongo/util/safe_num.h"
 
 namespace mongo {
@@ -230,7 +231,7 @@ namespace mutablebson {
  *  ConstElement for the root. ConstElement is much like Element, but does not permit
  *  mutations. See the class comment for ConstElement for more information.
  */
-class Document {
+class MONGO_API(mutable_bson) Document {
     // TODO: In principle there is nothing that prevents implementing a deep copy for
     // Document, but for now it is not permitted.
     Document(const Document&) = delete;
@@ -504,13 +505,13 @@ private:
     friend class Element;
 
     // For now, the implementation of Document is firewalled.
-    class Impl;
+    class MONGO_PRIVATE Impl;
     inline Impl& getImpl();
     inline const Impl& getImpl() const;
 
-    Element makeRootElement();
-    Element makeRootElement(const BSONObj& value);
-    Element makeElement(ConstElement element, const StringData* fieldName);
+    MONGO_PRIVATE Element makeRootElement();
+    MONGO_PRIVATE Element makeRootElement(const BSONObj& value);
+    MONGO_PRIVATE Element makeElement(ConstElement element, const StringData* fieldName);
 
     const std::unique_ptr<Impl> _impl;
 
