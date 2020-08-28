@@ -86,6 +86,7 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -2142,13 +2143,6 @@ public:
 class TimestampMultiIndexBuilds : public StorageTimestampTest {
 public:
     void run() {
-        // Disable index build commit quorum as we don't have support of replication subsystem for
-        // voting.
-        ASSERT_OK(ServerParameterSet::getGlobal()
-                      ->getMap()
-                      .find("enableIndexBuildCommitQuorum")
-                      ->second->setFromString("false"));
-
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto durableCatalog = storageEngine->getCatalog();
 
@@ -2190,16 +2184,17 @@ public:
 
         DBDirectClient client(_opCtx);
         {
-            IndexSpec index1;
-            // Name this index for easier querying.
-            index1.addKeys(BSON("a" << 1)).name("a_1");
-            IndexSpec index2;
-            index2.addKeys(BSON("b" << 1)).name("b_1");
-
-            std::vector<const IndexSpec*> indexes;
-            indexes.push_back(&index1);
-            indexes.push_back(&index2);
-            client.createIndexes(nss.ns(), indexes);
+            // Disable index build commit quorum as we don't have support of replication subsystem
+            // for voting.
+            auto index1 = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
+                                   << "a_1");
+            auto index2 = BSON("v" << kIndexVersion << "key" << BSON("b" << 1) << "name"
+                                   << "b_1");
+            auto createIndexesCmdObj =
+                BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1 << index2)
+                                     << "commitQuorum" << 0);
+            BSONObj result;
+            ASSERT(client.runCommand(nss.db().toString(), createIndexesCmdObj, result)) << result;
         }
 
         auto indexCreateInitTs = queryOplog(BSON("op"
@@ -2265,12 +2260,6 @@ public:
 class TimestampMultiIndexBuildsDuringRename : public StorageTimestampTest {
 public:
     void run() {
-        // Disable index build commit quorum as we don't have support of replication subsystem for
-        // voting.
-        ASSERT_OK(ServerParameterSet::getGlobal()
-                      ->getMap()
-                      .find("enableIndexBuildCommitQuorum")
-                      ->second->setFromString("false"));
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto durableCatalog = storageEngine->getCatalog();
 
@@ -2298,16 +2287,17 @@ public:
 
         DBDirectClient client(_opCtx);
         {
-            IndexSpec index1;
-            // Name this index for easier querying.
-            index1.addKeys(BSON("a" << 1)).name("a_1");
-            IndexSpec index2;
-            index2.addKeys(BSON("b" << 1)).name("b_1");
-
-            std::vector<const IndexSpec*> indexes;
-            indexes.push_back(&index1);
-            indexes.push_back(&index2);
-            client.createIndexes(nss.ns(), indexes);
+            // Disable index build commit quorum as we don't have support of replication subsystem
+            // for voting.
+            auto index1 = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
+                                   << "a_1");
+            auto index2 = BSON("v" << kIndexVersion << "key" << BSON("b" << 1) << "name"
+                                   << "b_1");
+            auto createIndexesCmdObj =
+                BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1 << index2)
+                                     << "commitQuorum" << 0);
+            BSONObj result;
+            ASSERT(client.runCommand(nss.db().toString(), createIndexesCmdObj, result)) << result;
         }
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
@@ -2321,10 +2311,11 @@ public:
 
         // Rename collection.
         BSONObj renameResult;
-        client.runCommand(
+        ASSERT(client.runCommand(
             "admin",
             BSON("renameCollection" << nss.ns() << "to" << renamedNss.ns() << "dropTarget" << true),
-            renameResult);
+            renameResult))
+            << renameResult;
 
         NamespaceString tmpName;
         Timestamp indexCommitTs;
@@ -2377,13 +2368,6 @@ public:
 class TimestampAbortIndexBuild : public StorageTimestampTest {
 public:
     void run() {
-        // Disable index build commit quorum as we don't have support of replication subsystem for
-        // voting.
-        ASSERT_OK(ServerParameterSet::getGlobal()
-                      ->getMap()
-                      .find("enableIndexBuildCommitQuorum")
-                      ->second->setFromString("false"));
-
         auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto durableCatalog = storageEngine->getCatalog();
 
@@ -2431,16 +2415,19 @@ public:
         }
 
         {
+            // Disable index build commit quorum as we don't have support of replication subsystem
+            // for voting.
+            auto index1 = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
+                                   << "a_1"
+                                   << "unique" << true);
+            auto createIndexesCmdObj =
+                BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1)
+                                     << "commitQuorum" << 0);
+
             DBDirectClient client(_opCtx);
-
-            IndexSpec index1;
-            // Name this index for easier querying.
-            index1.addKeys(BSON("a" << 1)).name("a_1").unique();
-
-            std::vector<const IndexSpec*> indexes;
-            indexes.push_back(&index1);
-            ASSERT_THROWS_CODE(
-                client.createIndexes(nss.ns(), indexes), DBException, ErrorCodes::DuplicateKey);
+            BSONObj result;
+            ASSERT_FALSE(client.runCommand(nss.db().toString(), createIndexesCmdObj, result));
+            ASSERT_EQUALS(ErrorCodes::DuplicateKey, getStatusFromCommandResult(result));
         }
 
         // Confirm that startIndexBuild and abortIndexBuild oplog entries have been written to the
