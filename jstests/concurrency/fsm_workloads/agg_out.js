@@ -132,10 +132,12 @@ var $config = extendWorkload($config, function($config, $super) {
 
     /**
      * If being run against a mongos, shards '$config.data.outputCollName'. This is never undone,
-     * and all subsequent $out's to this collection should fail.
+     * and all subsequent $out's to this collection should fail. Collection sharding is restricted
+     * to a single thread as multiple concurrent invocations can result in command timeout /
+     * failure.
      */
     $config.states.shardCollection = function shardCollection(db, unusedCollName) {
-        if (isMongos(db)) {
+        if (isMongos(db) && this.tid === 0) {
             assertWhenOwnDB.commandWorked(db.adminCommand({enableSharding: db.getName()}));
             assertWhenOwnDB.commandWorked(db.adminCommand(
                 {shardCollection: db[this.outputCollName].getFullName(), key: {_id: 'hashed'}}));
