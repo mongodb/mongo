@@ -579,10 +579,14 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     const executor::TaskExecutor::CallbackArgs& callbackArgs,
     std::uint32_t initialSyncAttempt,
     std::uint32_t initialSyncMaxAttempts) noexcept {
-    auto status = _checkForShutdownAndConvertStatus_inlock(
-        callbackArgs,
-        str::stream() << "error while starting initial sync attempt " << (initialSyncAttempt + 1)
-                      << " of " << initialSyncMaxAttempts);
+    auto status = [&] {
+        stdx::lock_guard<Latch> lock(_mutex);
+        return _checkForShutdownAndConvertStatus_inlock(
+            callbackArgs,
+            str::stream() << "error while starting initial sync attempt "
+                          << (initialSyncAttempt + 1) << " of " << initialSyncMaxAttempts);
+    }();
+
     if (!status.isOK()) {
         _finishInitialSyncAttempt(status);
         return;
