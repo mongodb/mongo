@@ -134,7 +134,7 @@ checkLog = (function() {
                 return checkContainsOnceJson(conn, id, attrsDict);
             },
             'Could not find log entries containing the following id: ' + id +
-                ', and attrs: ' + attrsDict,
+                ', and attrs: ' + tojson(attrsDict),
             timeout,
             300,
             {runHangAnalyzer: false});

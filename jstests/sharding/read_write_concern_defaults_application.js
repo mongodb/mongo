@@ -478,6 +478,7 @@ let testCases = {
     listShards: {skip: "does not accept read or write concern"},
     lockInfo: {skip: "does not accept read or write concern"},
     logApplicationMessage: {skip: "does not accept read or write concern"},
+    logMessage: {skip: "does not accept read or write concern"},
     logRotate: {skip: "does not accept read or write concern"},
     logout: {skip: "does not accept read or write concern"},
     makeSnapshot: {skip: "does not accept read or write concern"},

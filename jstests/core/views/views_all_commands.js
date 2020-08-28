@@ -397,6 +397,7 @@ let viewsCommandTests = {
     listShards: {skip: isUnrelated},
     lockInfo: {skip: isUnrelated},
     logApplicationMessage: {skip: isUnrelated},
+    logMessage: {skip: isUnrelated},
     logRotate: {skip: isUnrelated},
     logout: {skip: isUnrelated},
     makeSnapshot: {skip: isAnInternalCommand},

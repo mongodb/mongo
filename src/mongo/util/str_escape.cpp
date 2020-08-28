@@ -384,7 +384,7 @@ void escapeForJSON(fmt::memory_buffer& buffer, StringData str) {
                 writer(1, "\\u001b"_sd);
                 break;
             case 0x1c:
-                writer(1, "\\u000c"_sd);
+                writer(1, "\\u001c"_sd);
                 break;
             case 0x1d:
                 writer(1, "\\u001d"_sd);
