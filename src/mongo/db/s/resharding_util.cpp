@@ -302,8 +302,9 @@ void validateZones(const std::vector<mongo::BSONObj>& zones,
 
 std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const boost::optional<ReshardingDonorOplogId>& resumeToken) {
-    std::list<boost::intrusive_ptr<DocumentSource>> stages;
+    const boost::optional<ReshardingDonorOplogId>& resumeToken,
+    bool doAttachDocumentCursor) {
+    Pipeline::SourceContainer stages;
 
     if (resumeToken) {
         stages.emplace_back(DocumentSourceMatch::create(
@@ -336,7 +337,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
     BSONObj lookupBSON(BSON("" << lookupBuilder.obj()));
     stages.emplace_back(DocumentSourceLookUp::createFromBson(lookupBSON.firstElement(), expCtx));
 
-    return Pipeline::create(std::move(stages), expCtx);
+    auto pipeline = Pipeline::create(std::move(stages), expCtx);
+    if (doAttachDocumentCursor) {
+        pipeline = expCtx->mongoProcessInterface->attachCursorSourceToPipeline(
+            pipeline.release(), false /* allowTargetingShards */);
+    }
+
+    return pipeline;
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResharding(

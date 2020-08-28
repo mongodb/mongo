@@ -460,7 +460,7 @@ TEST_F(ReshardingAggTest, OplogPipelineBasicCRUDOnly) {
     expCtx->ns = localOplogBufferNss();
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
 
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none);
+    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none, false);
 
     // Mock non-lookup collection document source.
     auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
@@ -496,7 +496,7 @@ TEST_F(ReshardingAggTest, OplogPipelineWithResumeToken) {
     expCtx->ns = localOplogBufferNss();
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
 
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, getOplogId(insertOplog));
+    auto pipeline = createAggForReshardingOplogBuffer(expCtx, getOplogId(insertOplog), false);
 
     // Mock non-lookup collection document source.
     auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
@@ -538,7 +538,7 @@ TEST_F(ReshardingAggTest, OplogPipelineWithResumeTokenClusterTimeNotEqualTs) {
     expCtx->ns = localOplogBufferNss();
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
 
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, getOplogId(insertOplog));
+    auto pipeline = createAggForReshardingOplogBuffer(expCtx, getOplogId(insertOplog), false);
 
     // Mock non-lookup collection document source.
     auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
@@ -569,7 +569,7 @@ TEST_F(ReshardingAggTest, OplogPipelineWithPostImage) {
     expCtx->ns = localOplogBufferNss();
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
 
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none);
+    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none, false);
 
     // Mock non-lookup collection document source.
     auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
@@ -610,7 +610,7 @@ TEST_F(ReshardingAggTest, OplogPipelineWithLargeBSONPostImage) {
     expCtx->ns = localOplogBufferNss();
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
 
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none);
+    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none, false);
 
     // Mock non-lookup collection document source.
     auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
@@ -651,7 +651,7 @@ TEST_F(ReshardingAggTest, OplogPipelineResumeAfterPostImage) {
     expCtx->ns = localOplogBufferNss();
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
 
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, getOplogId(postImageOplog));
+    auto pipeline = createAggForReshardingOplogBuffer(expCtx, getOplogId(postImageOplog), false);
 
     // Mock non-lookup collection document source.
     auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
@@ -683,7 +683,7 @@ TEST_F(ReshardingAggTest, OplogPipelineWithPreImage) {
     expCtx->ns = localOplogBufferNss();
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
 
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none);
+    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none, false);
 
     // Mock non-lookup collection document source.
     auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
@@ -724,7 +724,7 @@ TEST_F(ReshardingAggTest, OplogPipelineWithPreAndPostImage) {
     expCtx->ns = localOplogBufferNss();
     expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockResults);
 
-    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none);
+    auto pipeline = createAggForReshardingOplogBuffer(expCtx, boost::none, false);
 
     // Mock non-lookup collection document source.
     auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
