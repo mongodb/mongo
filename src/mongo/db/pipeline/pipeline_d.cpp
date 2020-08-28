@@ -659,6 +659,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                         QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
     }
 
+    // The aggregate command's $_requestResumeToken parameter can only be used for the oplog.
+    if (aggRequest && aggRequest->getRequestResumeToken()) {
+        plannerOpts |= QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
+    }
+
     // If there is a sort stage eligible for pushdown, serialize its SortPattern to a BSONObj. The
     // BSONObj format is currently necessary to request that the sort is computed by the query layer
     // inside the inner PlanExecutor. We also remove the $sort stage from the Pipeline, since it

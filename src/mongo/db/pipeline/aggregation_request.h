@@ -67,6 +67,7 @@ public:
     static constexpr StringData kIsMapReduceCommandName = "isMapReduceCommand"_sd;
     static constexpr StringData kLetName = "let"_sd;
     static constexpr StringData kCollectionUUIDName = "collectionUUID"_sd;
+    static constexpr StringData kRequestResumeToken = "$_requestResumeToken"_sd;
 
     static constexpr long long kDefaultBatchSize = 101;
 
@@ -181,6 +182,10 @@ public:
         return _bypassDocumentValidation;
     }
 
+    bool getRequestResumeToken() const {
+        return _requestResumeToken;
+    }
+
     /**
      * Returns an empty object if no collation was specified.
      */
@@ -272,6 +277,10 @@ public:
         _bypassDocumentValidation = shouldBypassDocumentValidation;
     }
 
+    void setRequestResumeToken(bool requestResumeToken) {
+        _requestResumeToken = requestResumeToken;
+    }
+
     void setMaxTimeMS(unsigned int maxTimeMS) {
         _maxTimeMS = maxTimeMS;
     }
@@ -342,6 +351,7 @@ private:
     bool _fromMongos = false;
     bool _needsMerge = false;
     bool _bypassDocumentValidation = false;
+    bool _requestResumeToken = false;
 
     // A user-specified maxTimeMS limit, or a value of '0' if not specified.
     unsigned int _maxTimeMS = 0;
