@@ -1279,7 +1279,8 @@ env.Library(
     ],
     LIBDEPS=[
         'primary_only_service',
-        'tenant_migration_donor'
+        'tenant_migration_donor',
+        'wait_for_majority_service',
     ],
 )
 

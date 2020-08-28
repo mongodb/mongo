@@ -84,24 +84,31 @@ public:
         const NamespaceString _stateDocumentsNS = NamespaceString::kTenantMigrationDonorsNamespace;
 
         /**
-         * Inserts the state document to _stateDocumentsNS and waits for majority write concern.
+         * Inserts the state document to _stateDocumentsNS and returns the opTime for the insert
+         * oplog entry.
          */
-        void _insertStateDocument(OperationContext* opCtx);
+        repl::OpTime _insertStateDocument();
 
         /**
          * Updates the state document to have the given state. Then, persists the updated document
          * by reserving an oplog slot beforehand and using its timestamp as the blockTimestamp or
-         * commitOrAbortTimestamp depending on the state.
+         * commitOrAbortTimestamp depending on the state. Returns the opTime for the update oplog
+         * entry.
          */
-        void _updateStateDocument(OperationContext* opCtx,
-                                  const TenantMigrationDonorStateEnum nextState);
+        repl::OpTime _updateStateDocument(const TenantMigrationDonorStateEnum nextState);
+
+        /**
+         * Waits for given opTime to be majority committed.
+         */
+        ExecutorFuture<void> _waitForMajorityWriteConcern(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor, repl::OpTime opTime);
 
         /**
          * Sends the recipientSyncData command to the recipient replica set.
          */
-        void _sendRecipientSyncDataCommand(OperationContext* opCtx,
-                                           executor::TaskExecutor* executor,
-                                           RemoteCommandTargeter* recipientTargeter);
+        ExecutorFuture<void> _sendRecipientSyncDataCommand(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            RemoteCommandTargeter* recipientTargeter);
 
         ServiceContext* _serviceContext;
 
