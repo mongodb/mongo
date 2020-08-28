@@ -248,6 +248,7 @@
         listShards: {skip: "does not return user data"},
         lockInfo: {skip: "primary only"},
         logApplicationMessage: {skip: "primary only"},
+        logMessage: {skip: "does not return user data"},
         logRotate: {skip: "does not return user data"},
         logout: {skip: "does not return user data"},
         makeSnapshot: {skip: "does not return user data"},

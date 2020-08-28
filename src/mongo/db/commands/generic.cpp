@@ -500,6 +500,53 @@ public:
 MONGO_FP_DECLARE(crashOnShutdown);
 int* volatile illegalAddress;  // NOLINT - used for fail point only
 
+class CmdLogMessage : public BasicCommand {
+public:
+    CmdLogMessage() : BasicCommand("logMessage") {}
+
+    void help(stringstream& help) const final {
+        help << "Send a message to the server log";
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
+        return false;
+    }
+
+    bool slaveOk() const final {
+        return true;
+    }
+
+    bool adminOnly() const final {
+        return true;
+    }
+
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) final {
+        out->push_back(
+            Privilege(ResourcePattern::forClusterResource(), ActionType::applicationMessage));
+    }
+
+    bool run(OperationContext* opCtx,
+             const std::string& ns,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) final {
+        auto msgElem = cmdObj["logMessage"];
+        uassert(ErrorCodes::BadValue, "logMessage must be a string", msgElem.type() == String);
+
+        log() << "logMessage: " << msgElem.valueStringData();
+        return true;
+    }
+};
+
+MONGO_INITIALIZER(RegisterCmdLogMessage)(InitializerContext* context) {
+    if (Command::testCommandsEnabled) {
+        // Leaked intentionally: a Command registers itself when constructed.
+        new CmdLogMessage();
+    }
+    return Status::OK();
+}
+
 }  // namespace
 
 void CmdShutdown::addRequiredPrivileges(const std::string& dbname,

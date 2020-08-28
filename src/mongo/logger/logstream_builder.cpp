@@ -71,6 +71,8 @@ struct ThreadOstreamCacheFinalizer {
 
 namespace logger {
 
+bool LogstreamBuilder::newlineEscape = false;
+
 LogstreamBuilder::LogstreamBuilder(MessageLogDomain* domain,
                                    StringData contextName,
                                    LogSeverity severity)

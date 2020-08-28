@@ -316,6 +316,7 @@ MONGO_INITIALIZER_GENERAL(
 
     logger::globalLogDomain()->attachAppender(
         logger::MessageLogDomain::AppenderAutoPtr(new RamLogAppender(RamLog::get("global"))));
+    logger::LogstreamBuilder::setNewlineEscape();
 
     return Status::OK();
 }
