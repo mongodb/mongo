@@ -380,12 +380,6 @@ config_backward_compatible(void)
     if (!backward_compatible)
         return;
 
-    if (g.c_backup_incr_flag != INCREMENTAL_OFF) {
-        if (config_is_perm("backup.incremental"))
-            testutil_die(EINVAL, "incremental backup not supported in backward compatibility mode");
-        config_single("backup.incremental=off", false);
-    }
-
     if (g.c_mmap_all) {
         if (config_is_perm("disk.mmap_all"))
             testutil_die(EINVAL, "disk.mmap_all not supported in backward compatibility mode");
