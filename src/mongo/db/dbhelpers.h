@@ -31,6 +31,7 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
+#include <ios>
 #include <memory>
 
 #include "mongo/db/namespace_string.h"
@@ -158,7 +159,11 @@ struct Helpers {
         MONGO_DISALLOW_COPYING(RemoveSaver);
 
     public:
-        RemoveSaver(const std::string& type, const std::string& ns, const std::string& why);
+        class Storage;
+        RemoveSaver(const std::string& type,
+                    const std::string& ns,
+                    const std::string& why,
+                    std::unique_ptr<Storage> storage = std::make_unique<Storage>());
         ~RemoveSaver();
 
         /**
@@ -184,11 +189,20 @@ struct Helpers {
         }
         void file() && = delete;
 
+        class Storage {
+        public:
+            virtual ~Storage() = default;
+            virtual std::unique_ptr<std::ostream> makeOstream(const boost::filesystem::path& file,
+                                                              const boost::filesystem::path& root);
+            virtual void dumpBuffer() {}
+        };
+
     private:
         boost::filesystem::path _root;
         boost::filesystem::path _file;
         std::unique_ptr<DataProtector> _protector;
         std::unique_ptr<std::ostream> _out;
+        std::unique_ptr<Storage> _storage;
     };
 };
 

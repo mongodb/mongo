@@ -68,12 +68,12 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::ios_base;
 using std::ofstream;
 using std::set;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 /* fetch a single object from collection ns that matches query
    set your db SavedContext first
@@ -282,7 +282,11 @@ void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& ns
     deleteObjects(opCtx, collection, nss, BSONObj(), false);
 }
 
-Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string& why) {
+Helpers::RemoveSaver::RemoveSaver(const string& a,
+                                  const string& b,
+                                  const string& why,
+                                  std::unique_ptr<Storage> storage)
+    : _storage(std::move(storage)) {
     static int NUM = 0;
 
     _root = storageGlobalParams.dbpath;
@@ -348,16 +352,14 @@ Helpers::RemoveSaver::~RemoveSaver() {
                      << " for remove saving: " << redact(errnoWithDescription());
             fassertFailed(34354);
         }
+
+        _storage->dumpBuffer();
     }
 }
 
 Status Helpers::RemoveSaver::goingToDelete(const BSONObj& o) {
     if (!_out) {
-        // We don't expect to ever pass "" to create_directories below, but catch
-        // this anyway as per SERVER-26412.
-        invariant(!_root.empty());
-        boost::filesystem::create_directories(_root);
-        _out.reset(new ofstream(_file.string().c_str(), ios_base::out | ios_base::binary));
+        _out = _storage->makeOstream(_file, _root);
         if (_out->fail()) {
             string msg = str::stream() << "couldn't create file: " << _file.string()
                                        << " for remove saving: " << redact(errnoWithDescription());
@@ -400,5 +402,13 @@ Status Helpers::RemoveSaver::goingToDelete(const BSONObj& o) {
     return Status::OK();
 }
 
-
+std::unique_ptr<std::ostream> Helpers::RemoveSaver::Storage::makeOstream(
+    const boost::filesystem::path& file, const boost::filesystem::path& root) {
+    // We don't expect to ever pass "" to create_directories below, but catch
+    // this anyway as per SERVER-26412.
+    invariant(!root.empty());
+    boost::filesystem::create_directories(root);
+    return std::make_unique<std::ofstream>(file.string().c_str(),
+                                           std::ios_base::out | std::ios_base::binary);
+}
 }  // namespace mongo
