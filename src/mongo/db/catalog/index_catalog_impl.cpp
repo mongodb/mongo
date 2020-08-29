@@ -1059,13 +1059,14 @@ MultikeyPaths IndexCatalogImpl::getMultikeyPaths(OperationContext* opCtx,
 
 void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,
                                         const IndexDescriptor* desc,
+                                        const std::vector<BSONObj>& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths) {
     IndexCatalogEntry* entry = _readyIndexes.find(desc);
     if (!entry) {
         entry = _buildingIndexes.find(desc);
     }
     invariant(entry);
-    entry->setMultikey(opCtx, multikeyPaths);
+    entry->setMultikey(opCtx, multikeyMetadataKeys, multikeyPaths);
 };
 
 // ---------------------------
@@ -1313,7 +1314,7 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
         }
     } else {
         int64_t numInserted;
-        status = index->accessMethod()->insertKeys(
+        status = index->accessMethod()->insertKeysAndUpdateMultikeyPaths(
             opCtx,
             keys,
             {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},

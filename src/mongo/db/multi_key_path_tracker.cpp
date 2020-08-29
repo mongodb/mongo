@@ -87,6 +87,9 @@ void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo info) {
         }
 
         mergeMultikeyPaths(&existingChanges.multikeyPaths, info.multikeyPaths);
+        existingChanges.multikeyMetadataKeys.insert(existingChanges.multikeyMetadataKeys.end(),
+                                                    info.multikeyMetadataKeys.begin(),
+                                                    info.multikeyMetadataKeys.end());
         return;
     }
 
@@ -103,6 +106,17 @@ const boost::optional<MultikeyPaths> MultikeyPathTracker::getMultikeyPathInfo(
     for (const auto& multikeyPathInfo : _multikeyPathInfo) {
         if (multikeyPathInfo.nss == nss && multikeyPathInfo.indexName == indexName) {
             return multikeyPathInfo.multikeyPaths;
+        }
+    }
+
+    return boost::none;
+}
+
+const boost::optional<std::vector<BSONObj>> MultikeyPathTracker::getMultikeyMetadataKeys(
+    const NamespaceString& nss, const std::string& indexName) {
+    for (const auto& multikeyPathInfo : _multikeyPathInfo) {
+        if (multikeyPathInfo.nss == nss && multikeyPathInfo.indexName == indexName) {
+            return multikeyPathInfo.multikeyMetadataKeys;
         }
     }
 

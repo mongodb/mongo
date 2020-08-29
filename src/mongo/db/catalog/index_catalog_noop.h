@@ -184,6 +184,7 @@ public:
 
     void setMultikeyPaths(OperationContext* const opCtx,
                           const IndexDescriptor* const desc,
+                          const std::vector<BSONObj>& multikeyMetadataKeys,
                           const MultikeyPaths& multikeyPaths) override {}
 
     Status indexRecords(OperationContext* const opCtx,

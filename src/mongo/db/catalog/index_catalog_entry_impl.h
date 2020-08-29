@@ -152,7 +152,9 @@ public:
      * namespace, index name, and multikey paths on the OperationContext rather than set the index
      * as multikey here.
      */
-    void setMultikey(OperationContext* opCtx, const MultikeyPaths& multikeyPaths) final;
+    void setMultikey(OperationContext* opCtx,
+                     const std::vector<BSONObj>& multikeyMetadataKeys,
+                     const MultikeyPaths& multikeyPaths) final;
 
     // if this ready is ready for queries
     bool isReady(OperationContext* opCtx) const final;
@@ -210,10 +212,9 @@ private:
     Ordering _ordering;  // TODO: this might be b-tree specific
     bool _isReady;       // cache of NamespaceDetails info
 
-    // Set to true if this index supports path-level multikey tracking.
-    // '_indexTracksPathLevelMultikeyInfo' is effectively const after IndexCatalogEntry::init() is
-    // called.
-    bool _indexTracksPathLevelMultikeyInfo = false;
+    // Set to true if this index can track path-level multikey information in the catalog. This
+    // member is effectively const after IndexCatalogEntry::init() is called.
+    bool _indexTracksMultikeyPathsInCatalog = false;
 
     // Set to true if this index is multikey. '_isMultikey' serves as a cache of the information
     // stored in the NamespaceDetails or DurableCatalog.

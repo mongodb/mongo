@@ -48,6 +48,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/multi_key_path_tracker.h"
@@ -1320,6 +1321,196 @@ public:
             _opCtx, autoColl.getCollection(), indexName, insertTime1.asTimestamp(), true, {{0}});
         assertMultikeyPaths(
             _opCtx, autoColl.getCollection(), indexName, insertTime2.asTimestamp(), true, {{0}});
+    }
+};
+
+class SecondarySetWildcardIndexMultikeyOnInsert : public StorageTimestampTest {
+
+public:
+    void run() {
+        // Pretend to be a secondary.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        NamespaceString nss("unittests.SecondarySetWildcardIndexMultikeyOnInsert");
+        reset(nss);
+        UUID uuid = UUID::gen();
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+            uuid = *autoColl.getCollection()->uuid();
+        }
+        auto indexName = "a_1";
+        auto indexSpec = BSON("name" << indexName << "key" << BSON("$**" << 1) << "v"
+                                     << static_cast<int>(kIndexVersion));
+        ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+
+        _coordinatorMock->alwaysAllowWrites(false);
+
+        const LogicalTime pastTime = _clock->reserveTicks(1);
+        const LogicalTime insertTime0 = _clock->reserveTicks(1);
+        const LogicalTime insertTime1 = _clock->reserveTicks(1);
+        const LogicalTime insertTime2 = _clock->reserveTicks(1);
+
+        BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
+        BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
+        BSONObj doc2 = BSON("_id" << 2 << "a" << BSON_ARRAY(1 << 2));
+        auto op0 = repl::OplogEntry(
+            BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "i"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc0));
+        auto op1 = repl::OplogEntry(
+            BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "i"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc1));
+        auto op2 = repl::OplogEntry(
+            BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "i"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc2));
+
+        std::vector<repl::OplogEntry> ops = {op0, op1, op2};
+
+        DoNothingOplogApplierObserver observer;
+        auto storageInterface = repl::StorageInterface::get(_opCtx);
+        auto writerPool = repl::OplogApplier::makeWriterPool();
+        repl::OplogApplierImpl oplogApplier(
+            nullptr,  // task executor. not required for multiApply().
+            nullptr,  // oplog buffer. not required for multiApply().
+            &observer,
+            _coordinatorMock,
+            _consistencyMarkers,
+            storageInterface,
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
+            writerPool.get());
+
+        uassertStatusOK(oplogApplier.multiApply(_opCtx, ops));
+
+        AutoGetCollectionForRead autoColl(_opCtx, nss);
+        auto wildcardIndexDescriptor =
+            autoColl.getCollection()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+        const IndexAccessMethod* wildcardIndexAccessMethod = autoColl.getCollection()
+                                                                 ->getIndexCatalog()
+                                                                 ->getEntry(wildcardIndexDescriptor)
+                                                                 ->accessMethod();
+        {
+            // Verify that the index is not multikey prior to the earliest insert timestamp.
+            OneOffRead oor(_opCtx, pastTime.asTimestamp());
+            const WildcardAccessMethod* wam =
+                dynamic_cast<const WildcardAccessMethod*>(wildcardIndexAccessMethod);
+            MultikeyMetadataAccessStats stats;
+            std::set<FieldRef> paths = wam->getMultikeyPathSet(_opCtx, &stats);
+            ASSERT_EQUALS(0UL, paths.size());
+        }
+        {
+            // Oplog application conservatively uses the first optime in the batch, insertTime0, as
+            // the point at which the index became multikey, despite the fact that the earliest op
+            // which caused the index to become multikey did not occur until insertTime1. This works
+            // because if we construct a query plan that incorrectly believes a particular path to
+            // be multikey, the plan will still be correct (if possibly sub-optimal). Conversely, if
+            // we were to construct a query plan that incorrectly believes a path is NOT multikey,
+            // it could produce incorrect results.
+            OneOffRead oor(_opCtx, insertTime0.asTimestamp());
+            const WildcardAccessMethod* wam =
+                dynamic_cast<const WildcardAccessMethod*>(wildcardIndexAccessMethod);
+            MultikeyMetadataAccessStats stats;
+            std::set<FieldRef> paths = wam->getMultikeyPathSet(_opCtx, &stats);
+            ASSERT_EQUALS(1UL, paths.size());
+            ASSERT_EQUALS("a", paths.begin()->dottedField());
+        }
+    }
+};
+
+class SecondarySetWildcardIndexMultikeyOnUpdate : public StorageTimestampTest {
+
+public:
+    void run() {
+        // Pretend to be a secondary.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        NamespaceString nss("unittests.SecondarySetWildcardIndexMultikeyOnUpdate");
+        reset(nss);
+        UUID uuid = UUID::gen();
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+            uuid = *autoColl.getCollection()->uuid();
+        }
+        auto indexName = "a_1";
+        auto indexSpec = BSON("name" << indexName << "key" << BSON("$**" << 1) << "v"
+                                     << static_cast<int>(kIndexVersion));
+        ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+
+        _coordinatorMock->alwaysAllowWrites(false);
+
+        const LogicalTime pastTime = _clock->reserveTicks(1);
+        const LogicalTime insertTime0 = _clock->reserveTicks(1);
+        const LogicalTime updateTime1 = _clock->reserveTicks(1);
+        const LogicalTime updateTime2 = _clock->reserveTicks(1);
+
+        BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
+        BSONObj doc1 = BSON("$v" << 1 << "$set" << BSON("a" << BSON_ARRAY(1 << 2)));
+        BSONObj doc2 = BSON("$v" << 1 << "$set" << BSON("a" << BSON_ARRAY(1 << 2)));
+        auto op0 = repl::OplogEntry(
+            BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "i"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc0));
+        auto op1 = repl::OplogEntry(
+            BSON("ts" << updateTime1.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "u"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc1
+                      << "o2" << BSON("_id" << 0)));
+        auto op2 = repl::OplogEntry(
+            BSON("ts" << updateTime2.asTimestamp() << "t" << 1LL << "v" << 2 << "op"
+                      << "u"
+                      << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc2
+                      << "o2" << BSON("_id" << 0)));
+
+        std::vector<repl::OplogEntry> ops = {op0, op1, op2};
+
+        DoNothingOplogApplierObserver observer;
+        auto storageInterface = repl::StorageInterface::get(_opCtx);
+        auto writerPool = repl::OplogApplier::makeWriterPool();
+        repl::OplogApplierImpl oplogApplier(
+            nullptr,  // task executor. not required for multiApply().
+            nullptr,  // oplog buffer. not required for multiApply().
+            &observer,
+            _coordinatorMock,
+            _consistencyMarkers,
+            storageInterface,
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
+            writerPool.get());
+
+        uassertStatusOK(oplogApplier.multiApply(_opCtx, ops));
+
+        AutoGetCollectionForRead autoColl(_opCtx, nss);
+        auto wildcardIndexDescriptor =
+            autoColl.getCollection()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+        const IndexAccessMethod* wildcardIndexAccessMethod = autoColl.getCollection()
+                                                                 ->getIndexCatalog()
+                                                                 ->getEntry(wildcardIndexDescriptor)
+                                                                 ->accessMethod();
+        {
+            // Verify that the index is not multikey prior to the earliest insert timestamp.
+            OneOffRead oor(_opCtx, pastTime.asTimestamp());
+            const WildcardAccessMethod* wam =
+                dynamic_cast<const WildcardAccessMethod*>(wildcardIndexAccessMethod);
+            MultikeyMetadataAccessStats stats;
+            std::set<FieldRef> paths = wam->getMultikeyPathSet(_opCtx, &stats);
+            ASSERT_EQUALS(0UL, paths.size());
+        }
+        {
+            // Oplog application conservatively uses the first optime in the batch, insertTime0, as
+            // the point at which the index became multikey, despite the fact that the earliest op
+            // which caused the index to become multikey did not occur until updateTime1. This works
+            // because if we construct a query plan that incorrectly believes a particular path to
+            // be multikey, the plan will still be correct (if possibly sub-optimal). Conversely, if
+            // we were to construct a query plan that incorrectly believes a path is NOT multikey,
+            // it could produce incorrect results.
+            OneOffRead oor(_opCtx, insertTime0.asTimestamp());
+            const WildcardAccessMethod* wam =
+                dynamic_cast<const WildcardAccessMethod*>(wildcardIndexAccessMethod);
+            MultikeyMetadataAccessStats stats;
+            std::set<FieldRef> paths = wam->getMultikeyPathSet(_opCtx, &stats);
+            ASSERT_EQUALS(1UL, paths.size());
+            ASSERT_EQUALS("a", paths.begin()->dottedField());
+        }
     }
 };
 
@@ -3432,6 +3623,8 @@ public:
         add<SecondaryCreateCollectionBetweenInserts>();
         add<PrimaryCreateCollectionInApplyOps>();
         add<SecondarySetIndexMultikeyOnInsert>();
+        add<SecondarySetWildcardIndexMultikeyOnInsert>();
+        add<SecondarySetWildcardIndexMultikeyOnUpdate>();
         add<InitialSyncSetIndexMultikeyOnInsert>();
         add<PrimarySetIndexMultikeyOnInsert>();
         add<PrimarySetIndexMultikeyOnInsertUnreplicated>();

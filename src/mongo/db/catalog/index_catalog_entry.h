@@ -124,7 +124,9 @@ public:
      * namespace, index name, and multikey paths on the OperationContext rather than set the index
      * as multikey here.
      */
-    virtual void setMultikey(OperationContext* const opCtx, const MultikeyPaths& multikeyPaths) = 0;
+    virtual void setMultikey(OperationContext* const opCtx,
+                             const std::vector<BSONObj>& multikeyMetadataKeys,
+                             const MultikeyPaths& multikeyPaths) = 0;
 
     // if this ready is ready for queries
     virtual bool isReady(OperationContext* const opCtx) const = 0;

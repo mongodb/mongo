@@ -75,7 +75,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
     {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
         _isMultikey.store(_catalogIsMultikey(opCtx, &_indexMultikeyPaths));
-        _indexTracksPathLevelMultikeyInfo = !_indexMultikeyPaths.empty();
+        _indexTracksMultikeyPathsInCatalog = !_indexMultikeyPaths.empty();
     }
 
     const BSONObj& collation = _descriptor->collation();
@@ -199,14 +199,19 @@ void IndexCatalogEntryImpl::setIsReady(bool newIsReady) {
 }
 
 void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
+                                        const std::vector<BSONObj>& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths) {
-    if (!_indexTracksPathLevelMultikeyInfo && isMultikey(opCtx)) {
-        // If the index is already set as multikey and we don't have any path-level information to
-        // update, then there's nothing more for us to do.
+    // An index can either track path-level multikey information in the catalog or as metadata keys
+    // in the index itself, but not both.
+    invariant(!(_indexTracksMultikeyPathsInCatalog && multikeyMetadataKeys.size() > 0));
+    // If the index is already set as multikey and we don't have any path-level information to
+    // update, then there's nothing more for us to do.
+    bool hasNoPathLevelInfo = (!_indexTracksMultikeyPathsInCatalog && multikeyMetadataKeys.empty());
+    if (hasNoPathLevelInfo && _isMultikey.load()) {
         return;
     }
 
-    if (_indexTracksPathLevelMultikeyInfo) {
+    if (_indexTracksMultikeyPathsInCatalog) {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
         invariant(multikeyPaths.size() == _indexMultikeyPaths.size());
 
@@ -230,7 +235,7 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
         }
     }
 
-    MultikeyPaths paths = _indexTracksPathLevelMultikeyInfo ? multikeyPaths : MultikeyPaths{};
+    MultikeyPaths paths = _indexTracksMultikeyPathsInCatalog ? multikeyPaths : MultikeyPaths{};
 
     // On a primary, we can simply assign this write the same timestamp as the index creation,
     // insert, or update that caused this index to become multikey. This is because if two
@@ -253,12 +258,19 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // it multikey, that write will be marked as "isTrackingMultikeyPathInfo" on the applier's
     // OperationContext and we can safely defer that write to the end of the batch.
     if (MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
-        MultikeyPathInfo info;
-        info.nss = _ns;
-        info.indexName = _descriptor->indexName();
-        info.multikeyPaths = paths;
-        MultikeyPathTracker::get(opCtx).addMultikeyPathInfo(info);
+        MultikeyPathTracker::get(opCtx).addMultikeyPathInfo(
+            {_ns, _descriptor->indexName(), multikeyMetadataKeys, std::move(paths)});
         return;
+    }
+
+    // If multikeyMetadataKeys is non-empty, we must insert these keys into the index itself. We do
+    // not have to account for potential dupes, since all metadata keys are indexed against a single
+    // RecordId. An attempt to write a duplicate key will therefore be ignored.
+    if (!multikeyMetadataKeys.empty()) {
+        static const auto kMultikeyMetadataKeyId =
+            RecordId{RecordId::ReservedId::kWildcardMultikeyMetadataId};
+        uassertStatusOK(accessMethod()->insertKeys(
+            opCtx, multikeyMetadataKeys, kMultikeyMetadataKeyId, {}, {}, nullptr));
     }
 
     // It's possible that the index type (e.g. ascending/descending index) supports tracking
@@ -274,7 +286,7 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     auto onMultikeyCommitFn = [this, multikeyPaths](bool indexMetadataHasChanged) {
         _isMultikey.store(true);
 
-        if (_indexTracksPathLevelMultikeyInfo) {
+        if (_indexTracksMultikeyPathsInCatalog) {
             stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
             for (size_t i = 0; i < multikeyPaths.size(); ++i) {
                 _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
@@ -345,8 +357,8 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // previous write in the transaction.
     if (opCtx->inMultiDocumentTransaction()) {
         invariant(txnParticipant);
-        txnParticipant.addUncommittedMultikeyPathInfo(
-            MultikeyPathInfo{_ns, _descriptor->indexName(), std::move(paths)});
+        txnParticipant.addUncommittedMultikeyPathInfo(MultikeyPathInfo{
+            _ns, _descriptor->indexName(), multikeyMetadataKeys, std::move(paths)});
     }
 }
 

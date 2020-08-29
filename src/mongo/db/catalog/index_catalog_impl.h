@@ -250,6 +250,7 @@ public:
 
     void setMultikeyPaths(OperationContext* const opCtx,
                           const IndexDescriptor* desc,
+                          const std::vector<BSONObj>& multikeyMetadataKeys,
                           const MultikeyPaths& multikeyPaths) override;
 
     // --- these probably become private?

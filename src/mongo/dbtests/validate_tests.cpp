@@ -1609,8 +1609,6 @@ public:
                 auto insertStatus = iam->insertKeys(
                     &_opCtx,
                     {keys.begin(), keys.end()},
-                    {},
-                    MultikeyPaths{},
                     swRecordId.getValue(),
                     options,
                     [this, &interceptor](const BSONObj& duplicateKey) {
@@ -1648,8 +1646,6 @@ public:
                 auto insertStatus = iam->insertKeys(
                     &_opCtx,
                     {keys.begin(), keys.end()},
-                    {},
-                    MultikeyPaths{},
                     swRecordId.getValue(),
                     options,
                     [this, &interceptor](const BSONObj& duplicateKey) {

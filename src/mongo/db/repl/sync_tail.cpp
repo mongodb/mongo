@@ -1438,8 +1438,12 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
             // the first timestamp in the batch since we do not have enough information to find out
             // the timestamp of the first write that set the given multikey path.
             fassert(50686,
-                    _storageInterface->setIndexIsMultikey(
-                        opCtx, info.nss, info.indexName, info.multikeyPaths, firstTimeInBatch));
+                    _storageInterface->setIndexIsMultikey(opCtx,
+                                                          info.nss,
+                                                          info.indexName,
+                                                          info.multikeyMetadataKeys,
+                                                          info.multikeyPaths,
+                                                          firstTimeInBatch));
         }
     }
 

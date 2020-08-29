@@ -41,6 +41,7 @@ namespace mongo {
 struct MultikeyPathInfo {
     NamespaceString nss;
     std::string indexName;
+    std::vector<BSONObj> multikeyMetadataKeys;
     MultikeyPaths multikeyPaths;
 };
 
@@ -89,6 +90,12 @@ public:
      */
     const boost::optional<MultikeyPaths> getMultikeyPathInfo(const NamespaceString& nss,
                                                              const std::string& indexName);
+
+    /**
+     * Returns the multikey metadata keys for the given inputs, or boost::none if none exist.
+     */
+    const boost::optional<std::vector<BSONObj>> getMultikeyMetadataKeys(
+        const NamespaceString& nss, const std::string& indexName);
 
     /**
      * Specifies that we should track multikey path information on this MultikeyPathTracker. This is

@@ -97,15 +97,26 @@ public:
     /**
      * Inserts the specified keys into the index, and determines whether these keys should cause the
      * index to become multikey. If so, this method also handles the task of marking the index as
-     * multikey in the catalog, and sets the path-level multikey information if applicable. The
-     * 'numInserted' output parameter, if non-nullptr, will be reset to the number of keys inserted
-     * by this function call, or to zero in the case of either a non-OK return Status or an empty
-     * 'keys' argument.
+     * multikey in the catalog, and sets the path-level multikey information if applicable.
+     */
+    virtual Status insertKeysAndUpdateMultikeyPaths(
+        OperationContext* opCtx,
+        const std::vector<BSONObj>& keys,
+        const std::vector<BSONObj>& multikeyMetadataKeys,
+        const MultikeyPaths& multikeyPaths,
+        const RecordId& loc,
+        const InsertDeleteOptions& options,
+        KeyHandlerFn&& onDuplicateKey,
+        int64_t* numInserted) = 0;
+
+    /**
+     * Inserts the specified keys into the index. Does not attempt to determine whether the
+     * insertion of these keys should cause the index to become multikey. The 'numInserted' output
+     * parameter, if non-nullptr, will be reset to the number of keys inserted by this function
+     * call, or to zero in the case of either a non-OK return Status or an empty 'keys' argument.
      */
     virtual Status insertKeys(OperationContext* opCtx,
                               const std::vector<BSONObj>& keys,
-                              const std::vector<BSONObj>& multikeyMetadataKeys,
-                              const MultikeyPaths& multikeyPaths,
                               const RecordId& loc,
                               const InsertDeleteOptions& options,
                               KeyHandlerFn&& onDuplicateKey,
@@ -216,7 +227,9 @@ public:
     /**
      * Sets this index as multikey with the provided paths.
      */
-    virtual void setIndexIsMultikey(OperationContext* opCtx, MultikeyPaths paths) = 0;
+    virtual void setIndexIsMultikey(OperationContext* opCtx,
+                                    std::vector<BSONObj> multikeyMetadataKeys,
+                                    MultikeyPaths paths) = 0;
 
     //
     // Bulk operations support
@@ -461,12 +474,19 @@ public:
 
     Status insertKeys(OperationContext* opCtx,
                       const std::vector<BSONObj>& keys,
-                      const std::vector<BSONObj>& multikeyMetadataKeys,
-                      const MultikeyPaths& multikeyPaths,
                       const RecordId& loc,
                       const InsertDeleteOptions& options,
                       KeyHandlerFn&& onDuplicateKey,
                       int64_t* numInserted) final;
+
+    Status insertKeysAndUpdateMultikeyPaths(OperationContext* opCtx,
+                                            const std::vector<BSONObj>& keys,
+                                            const std::vector<BSONObj>& multikeyMetadataKeys,
+                                            const MultikeyPaths& multikeyPaths,
+                                            const RecordId& loc,
+                                            const InsertDeleteOptions& options,
+                                            KeyHandlerFn&& onDuplicateKey,
+                                            int64_t* numInserted) final;
 
     Status removeKeys(OperationContext* opCtx,
                       const std::vector<BSONObj>& keys,
@@ -511,7 +531,9 @@ public:
 
     Status compact(OperationContext* opCtx) final;
 
-    void setIndexIsMultikey(OperationContext* opCtx, MultikeyPaths paths) final;
+    void setIndexIsMultikey(OperationContext* opCtx,
+                            std::vector<BSONObj> multikeyMetadataKeys,
+                            MultikeyPaths paths) final;
 
     std::unique_ptr<BulkBuilder> initiateBulk(size_t maxMemoryUsageBytes) final;
 

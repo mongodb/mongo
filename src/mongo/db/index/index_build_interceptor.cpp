@@ -276,7 +276,7 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {
         int64_t numInserted;
-        auto status = accessMethod->insertKeys(
+        auto status = accessMethod->insertKeysAndUpdateMultikeyPaths(
             opCtx,
             {keySet.begin(), keySet.end()},
             {},

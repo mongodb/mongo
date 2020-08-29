@@ -2607,7 +2607,7 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsNamespaceNotFoundForMi
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  storage.setIndexIsMultikey(opCtx, nss, "foo", {}, Timestamp(3, 3)));
+                  storage.setIndexIsMultikey(opCtx, nss, "foo", {}, {}, Timestamp(3, 3)));
 }
 
 TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsNamespaceNotFoundForMissingCollection) {
@@ -2617,7 +2617,7 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsNamespaceNotFoundForMi
     NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  storage.setIndexIsMultikey(opCtx, wrongColl, "foo", {}, Timestamp(3, 3)));
+                  storage.setIndexIsMultikey(opCtx, wrongColl, "foo", {}, {}, Timestamp(3, 3)));
 }
 
 TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsIndexNotFoundForMissingIndex) {
@@ -2626,7 +2626,7 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsIndexNotFoundForMissin
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
     ASSERT_EQUALS(ErrorCodes::IndexNotFound,
-                  storage.setIndexIsMultikey(opCtx, nss, "foo", {}, Timestamp(3, 3)));
+                  storage.setIndexIsMultikey(opCtx, nss, "foo", {}, {}, Timestamp(3, 3)));
 }
 
 TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsInvalidOptionsForNullTimestamp) {
@@ -2635,7 +2635,7 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsInvalidOptionsForNullT
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
     ASSERT_EQUALS(ErrorCodes::InvalidOptions,
-                  storage.setIndexIsMultikey(opCtx, nss, "foo", {}, Timestamp()));
+                  storage.setIndexIsMultikey(opCtx, nss, "foo", {}, {}, Timestamp()));
 }
 
 TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeySucceeds) {
@@ -2650,7 +2650,7 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeySucceeds) {
     ASSERT_EQUALS(_createIndexOnEmptyCollection(opCtx, nss, indexSpec), 2);
 
     MultikeyPaths paths = {{1}};
-    ASSERT_OK(storage.setIndexIsMultikey(opCtx, nss, indexName, paths, Timestamp(3, 3)));
+    ASSERT_OK(storage.setIndexIsMultikey(opCtx, nss, indexName, {}, paths, Timestamp(3, 3)));
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     ASSERT_TRUE(autoColl.getCollection());
     auto indexCatalog = autoColl.getCollection()->getIndexCatalog();

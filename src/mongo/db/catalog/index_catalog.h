@@ -443,6 +443,7 @@ public:
      */
     virtual void setMultikeyPaths(OperationContext* const opCtx,
                                   const IndexDescriptor* const desc,
+                                  const std::vector<BSONObj>& multikeyMetadataKeys,
                                   const MultikeyPaths& multikeyPaths) = 0;
 
     // ----- data modifiers ------

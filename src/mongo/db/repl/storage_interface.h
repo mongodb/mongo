@@ -186,6 +186,7 @@ public:
     virtual Status setIndexIsMultikey(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const std::string& indexName,
+                                      const std::vector<BSONObj>& multikeyMetadataKeys,
                                       const MultikeyPaths& paths,
                                       Timestamp ts) = 0;
     /**
