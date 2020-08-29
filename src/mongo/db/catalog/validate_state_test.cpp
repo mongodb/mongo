@@ -35,7 +35,8 @@
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -122,8 +123,18 @@ void ValidateStateTest::setUp() {
  * Builds an index on the given 'nss'. 'indexKey' specifies the index key, e.g. {'a': 1};
  */
 void createIndex(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& indexKey) {
-    DBDirectClient client(opCtx);
-    client.createIndex(nss.ns(), indexKey);
+    AutoGetCollection autoColl(opCtx, nss, MODE_X);
+    auto collection = autoColl.getCollection();
+    ASSERT(collection);
+
+    ASSERT_EQ(1, indexKey.nFields()) << nss << "/" << indexKey;
+    auto spec = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << indexKey << "name"
+                         << (indexKey.firstElementFieldNameStringData() + "_1"));
+
+    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
+    auto fromMigrate = false;
+    indexBuildsCoord->createIndex(opCtx, collection->uuid(), spec, indexConstraints, fromMigrate);
 }
 
 /**
@@ -186,17 +197,7 @@ TEST_F(ValidateStateTest, UncheckpointedCollectionShouldBeAbleToInitializeCursor
 
 // Basic test with {background:false} to open cursors against all collection indexes.
 TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
-    // Disable index build commit quorum as we don't have support of replication subsystem for
-    // voting.
-    ASSERT_OK(ServerParameterSet::getGlobal()
-                  ->getMap()
-                  .find("enableIndexBuildCommitQuorum")
-                  ->second->setFromString("false"));
     auto opCtx = operationContext();
-    // Create config.system.indexBuilds collection to store commit quorum value during index
-    // building.
-    createCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
-
     createCollectionAndPopulateIt(opCtx, kNss);
 
     // Disable periodic checkpoint'ing thread so we can control when checkpoints occur.
@@ -239,18 +240,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
 
 // Open cursors against all indexes with {background:true}.
 TEST_F(ValidateStateTest, OpenCursorsOnAllIndexesWithBackground) {
-    // Disable index build commit quorum as we don't have support of replication subsystem for
-    // voting.
-    ASSERT_OK(ServerParameterSet::getGlobal()
-                  ->getMap()
-                  .find("enableIndexBuildCommitQuorum")
-                  ->second->setFromString("false"));
-
     auto opCtx = operationContext();
-    // Create config.system.indexBuilds collection to store commit quorum value during index
-    // building.
-    createCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
-
     createCollectionAndPopulateIt(opCtx, kNss);
 
     // Disable periodic checkpoint'ing thread so we can control when checkpoints occur.
@@ -281,18 +271,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexesWithBackground) {
 // Indexes in the checkpoint that were dropped in the present should not have cursors opened against
 // them.
 TEST_F(ValidateStateTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatWereLaterDropped) {
-    // Disable index build commit quorum as we don't have support of replication subsystem for
-    // voting.
-    ASSERT_OK(ServerParameterSet::getGlobal()
-                  ->getMap()
-                  .find("enableIndexBuildCommitQuorum")
-                  ->second->setFromString("false"));
-
     auto opCtx = operationContext();
-    // Create config.system.indexBuilds collection to store commit quorum value during index
-    // building.
-    createCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
-
     createCollectionAndPopulateIt(opCtx, kNss);
 
     // Disable periodic checkpoint'ing thread so we can control when checkpoints occur.
