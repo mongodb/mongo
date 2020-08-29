@@ -119,7 +119,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                 writeConflictRetry(opCtx, "setIndexAsMultikey", coll->ns().ns(), [&] {
                     WriteUnitOfWork wuow(opCtx);
                     coll->getIndexCatalog()->setMultikeyPaths(
-                        opCtx, coll, descriptor, *documentMultikeyPaths);
+                        opCtx, coll, descriptor, *multikeyMetadataKeys, *documentMultikeyPaths);
                     wuow.commit();
                 });
 
@@ -150,7 +150,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                     writeConflictRetry(opCtx, "increaseMultikeyPathCoverage", coll->ns().ns(), [&] {
                         WriteUnitOfWork wuow(opCtx);
                         coll->getIndexCatalog()->setMultikeyPaths(
-                            opCtx, coll, descriptor, *documentMultikeyPaths);
+                            opCtx, coll, descriptor, *multikeyMetadataKeys, *documentMultikeyPaths);
                         wuow.commit();
                     });
 

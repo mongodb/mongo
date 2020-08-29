@@ -223,6 +223,7 @@ public:
     void setMultikeyPaths(OperationContext* const opCtx,
                           const Collection* coll,
                           const IndexDescriptor* desc,
+                          const KeyStringSet& multikeyMetadataKeys,
                           const MultikeyPaths& multikeyPaths) const override;
 
     // ----- data modifiers ------

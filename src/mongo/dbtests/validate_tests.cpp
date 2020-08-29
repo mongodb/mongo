@@ -2043,7 +2043,7 @@ public:
                     WriteUnitOfWork wunit(&_opCtx);
 
                     int64_t numInserted;
-                    auto insertStatus = iam->insertKeys(
+                    auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
                         coll,
                         {keys.begin(), keys.end()},
@@ -2592,7 +2592,7 @@ public:
                     WriteUnitOfWork wunit(&_opCtx);
 
                     int64_t numInserted;
-                    auto insertStatus = iam->insertKeys(
+                    auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
                         coll,
                         {keys.begin(), keys.end()},
@@ -2644,7 +2644,7 @@ public:
                     WriteUnitOfWork wunit(&_opCtx);
 
                     int64_t numInserted;
-                    auto insertStatus = iam->insertKeys(
+                    auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
                         coll,
                         {keys.begin(), keys.end()},
@@ -3033,29 +3033,29 @@ public:
                 // and allows us to pass in an empty set of MultikeyPaths.
                 int64_t numInserted;
                 auto keysIterator = keys.begin();
-                auto insertStatus = iam->insertKeys(&_opCtx,
-                                                    coll,
-                                                    {*keysIterator},
-                                                    {},
-                                                    MultikeyPaths{},
-                                                    id1,
-                                                    options,
-                                                    nullptr,
-                                                    &numInserted);
+                auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
+                                                                          coll,
+                                                                          {*keysIterator},
+                                                                          {},
+                                                                          MultikeyPaths{},
+                                                                          id1,
+                                                                          options,
+                                                                          nullptr,
+                                                                          &numInserted);
                 ASSERT_EQUALS(numInserted, 1);
                 ASSERT_OK(insertStatus);
 
                 keysIterator++;
                 numInserted = 0;
-                insertStatus = iam->insertKeys(&_opCtx,
-                                               coll,
-                                               {*keysIterator},
-                                               {},
-                                               MultikeyPaths{},
-                                               id1,
-                                               options,
-                                               nullptr,
-                                               &numInserted);
+                insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
+                                                                     coll,
+                                                                     {*keysIterator},
+                                                                     {},
+                                                                     MultikeyPaths{},
+                                                                     id1,
+                                                                     options,
+                                                                     nullptr,
+                                                                     &numInserted);
                 ASSERT_EQUALS(numInserted, 1);
                 ASSERT_OK(insertStatus);
                 wunit.commit();
@@ -3255,7 +3255,7 @@ public:
                 ASSERT_EQ(keys.size(), 2);
 
                 int64_t numInserted;
-                auto insertStatus = iam->insertKeys(
+                auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                     &_opCtx, coll, keys, {}, oldMultikeyPaths, id1, options, nullptr, &numInserted);
 
                 ASSERT_EQUALS(numInserted, 2);

@@ -200,6 +200,7 @@ public:
     Status setIndexIsMultikey(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const std::string& indexName,
+                              const KeyStringSet& multikeyMetadataKeys,
                               const MultikeyPaths& paths,
                               Timestamp ts) override {
 

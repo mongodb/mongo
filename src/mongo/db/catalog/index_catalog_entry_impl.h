@@ -162,6 +162,7 @@ public:
      */
     void setMultikey(OperationContext* opCtx,
                      const Collection* coll,
+                     const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths) final;
 
     // if this ready is ready for queries
@@ -241,10 +242,9 @@ private:
     bool _isFrozen;
     AtomicWord<bool> _isDropped;  // Whether the index drop is committed.
 
-    // Set to true if this index supports path-level multikey tracking.
-    // '_indexTracksPathLevelMultikeyInfo' is effectively const after IndexCatalogEntry::init() is
-    // called.
-    bool _indexTracksPathLevelMultikeyInfo = false;
+    // Set to true if this index can track path-level multikey information in the catalog. This
+    // member is effectively const after IndexCatalogEntry::init() is called.
+    bool _indexTracksMultikeyPathsInCatalog = false;
 
     // Set to true if this index may contain multikey data.
     AtomicWord<bool> _isMultikeyForRead;

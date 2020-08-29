@@ -786,22 +786,27 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         onCreateEach(_indexes[i].block->getSpec());
 
         // Do this before calling success(), which unsets the interceptor pointer on the index
-        // catalog entry.
+        // catalog entry. The interceptor will write multikey metadata keys into the index during
+        // IndexBuildInterceptor::sideWrite, so we only need to pass the cached MultikeyPaths into
+        // IndexCatalogEntry::setMultikey here.
         auto interceptor = _indexes[i].block->getEntry()->indexBuildInterceptor();
         if (interceptor) {
             auto multikeyPaths = interceptor->getMultikeyPaths();
             if (multikeyPaths) {
-                _indexes[i].block->getEntry()->setMultikey(opCtx, collection, multikeyPaths.get());
+                _indexes[i].block->getEntry()->setMultikey(
+                    opCtx, collection, {}, multikeyPaths.get());
             }
         }
 
         _indexes[i].block->success(opCtx, collection);
 
-        // The bulk builder will track multikey information itself.
+        // The bulk builder will track multikey information itself, and will write cached multikey
+        // metadata keys into the index just before committing. We therefore only need to pass the
+        // MultikeyPaths into IndexCatalogEntry::setMultikey here.
         const auto& bulkBuilder = _indexes[i].bulk;
         if (bulkBuilder->isMultikey()) {
             _indexes[i].block->getEntry()->setMultikey(
-                opCtx, collection, bulkBuilder->getMultikeyPaths());
+                opCtx, collection, {}, bulkBuilder->getMultikeyPaths());
         }
 
         // The commit() function can be called multiple times on write conflict errors. Dropping the

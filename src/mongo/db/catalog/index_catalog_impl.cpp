@@ -1107,10 +1107,11 @@ void IndexCatalogImpl::deleteIndexFromDisk(OperationContext* opCtx, const string
 void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,
                                         const Collection* coll,
                                         const IndexDescriptor* desc,
+                                        const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths) const {
     IndexCatalogEntry* entry = desc->getEntry();
     invariant(entry);
-    entry->setMultikey(opCtx, coll, multikeyPaths);
+    entry->setMultikey(opCtx, coll, multikeyMetadataKeys, multikeyPaths);
 };
 
 // ---------------------------
@@ -1366,7 +1367,7 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
         }
     } else {
         int64_t numInserted;
-        status = index->accessMethod()->insertKeys(
+        status = index->accessMethod()->insertKeysAndUpdateMultikeyPaths(
             opCtx,
             coll,
             keys,

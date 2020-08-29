@@ -134,54 +134,71 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
             loc,
             kNoopOnSuppressedErrorFn);
 
-    return insertKeys(opCtx,
-                      coll,
-                      *keys,
-                      *multikeyMetadataKeys,
-                      *multikeyPaths,
-                      loc,
-                      options,
-                      std::move(onDuplicateKey),
-                      numInserted);
+    return insertKeysAndUpdateMultikeyPaths(opCtx,
+                                            coll,
+                                            *keys,
+                                            *multikeyMetadataKeys,
+                                            *multikeyPaths,
+                                            loc,
+                                            options,
+                                            std::move(onDuplicateKey),
+                                            numInserted);
+}
+
+Status AbstractIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
+    OperationContext* opCtx,
+    const Collection* coll,
+    const KeyStringSet& keys,
+    const KeyStringSet& multikeyMetadataKeys,
+    const MultikeyPaths& multikeyPaths,
+    const RecordId& loc,
+    const InsertDeleteOptions& options,
+    KeyHandlerFn&& onDuplicateKey,
+    int64_t* numInserted) {
+    // Insert the specified data keys into the index.
+    auto status =
+        insertKeys(opCtx, coll, keys, loc, options, std::move(onDuplicateKey), numInserted);
+    if (!status.isOK()) {
+        return status;
+    }
+    // If these keys should cause the index to become multikey, pass them into the catalog.
+    if (shouldMarkIndexAsMultikey(keys.size(), multikeyMetadataKeys, multikeyPaths)) {
+        _indexCatalogEntry->setMultikey(opCtx, coll, multikeyMetadataKeys, multikeyPaths);
+    }
+    // If we have some multikey metadata keys, they should have been added while marking the index
+    // as multikey in the catalog. Add them to the count of keys inserted for completeness.
+    if (numInserted && !multikeyMetadataKeys.empty()) {
+        *numInserted += multikeyMetadataKeys.size();
+    }
+    return Status::OK();
 }
 
 Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
                                              const Collection* coll,
                                              const KeyStringSet& keys,
-                                             const KeyStringSet& multikeyMetadataKeys,
-                                             const MultikeyPaths& multikeyPaths,
                                              const RecordId& loc,
                                              const InsertDeleteOptions& options,
                                              KeyHandlerFn&& onDuplicateKey,
                                              int64_t* numInserted) {
-    // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
-    // over the data keys, each of them should point to the doc's RecordId. When iterating over
-    // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
-    for (const auto keyVec : {&keys, &multikeyMetadataKeys}) {
-        for (const auto& keyString : *keyVec) {
-            bool unique = _descriptor->unique();
-            Status status = _newInterface->insert(opCtx, keyString, !unique /* dupsAllowed */);
+    // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
+    for (const auto& keyString : keys) {
+        bool unique = _descriptor->unique();
+        Status status = _newInterface->insert(opCtx, keyString, !unique /* dupsAllowed */);
 
-            // When duplicates are encountered and allowed, retry with dupsAllowed. Call
-            // onDuplicateKey() with the inserted duplicate key.
-            if (ErrorCodes::DuplicateKey == status.code() && options.dupsAllowed) {
-                invariant(unique);
-                status = _newInterface->insert(opCtx, keyString, true /* dupsAllowed */);
+        // When duplicates are encountered and allowed, retry with dupsAllowed. Call
+        // onDuplicateKey() with the inserted duplicate key.
+        if (ErrorCodes::DuplicateKey == status.code() && options.dupsAllowed) {
+            invariant(unique);
+            status = _newInterface->insert(opCtx, keyString, true /* dupsAllowed */);
 
-                if (status.isOK() && onDuplicateKey)
-                    status = onDuplicateKey(keyString);
-            }
-            if (!status.isOK())
-                return status;
+            if (status.isOK() && onDuplicateKey)
+                status = onDuplicateKey(keyString);
         }
+        if (!status.isOK())
+            return status;
     }
-
     if (numInserted) {
-        *numInserted = keys.size() + multikeyMetadataKeys.size();
-    }
-
-    if (shouldMarkIndexAsMultikey(keys.size(), multikeyMetadataKeys, multikeyPaths)) {
-        _indexCatalogEntry->setMultikey(opCtx, coll, multikeyPaths);
+        *numInserted = keys.size();
     }
     return Status::OK();
 }
@@ -415,24 +432,24 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
         _newInterface->unindex(opCtx, remKey, ticket.dupsAllowed);
     }
 
-    // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
-    // over the data keys, each of them should point to the doc's RecordId. When iterating over
-    // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
-    for (const auto keySet : {&ticket.added, &ticket.newMultikeyMetadataKeys}) {
-        for (const auto& keyString : *keySet) {
-            Status status = _newInterface->insert(opCtx, keyString, ticket.dupsAllowed);
-            if (!status.isOK())
-                return status;
-        }
+    // Add all new data keys into the index.
+    for (const auto keyString : ticket.added) {
+        Status status = _newInterface->insert(opCtx, keyString, ticket.dupsAllowed);
+        if (!status.isOK())
+            return status;
     }
 
+    // If these keys should cause the index to become multikey, pass them into the catalog.
     if (shouldMarkIndexAsMultikey(
             ticket.newKeys.size(), ticket.newMultikeyMetadataKeys, ticket.newMultikeyPaths)) {
-        _indexCatalogEntry->setMultikey(opCtx, coll, ticket.newMultikeyPaths);
+        _indexCatalogEntry->setMultikey(
+            opCtx, coll, ticket.newMultikeyMetadataKeys, ticket.newMultikeyPaths);
     }
 
+    // If we have some multikey metadata keys, they should have been added while marking the index
+    // as multikey in the catalog. Add them to the count of keys inserted for completeness.
+    *numInserted = ticket.added.size() + ticket.newMultikeyMetadataKeys.size();
     *numDeleted = ticket.removed.size();
-    *numInserted = ticket.added.size();
 
     return Status::OK();
 }
@@ -727,8 +744,9 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
 void AbstractIndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx,
                                                    const Collection* collection,
+                                                   KeyStringSet multikeyMetadataKeys,
                                                    MultikeyPaths paths) {
-    _indexCatalogEntry->setMultikey(opCtx, collection, paths);
+    _indexCatalogEntry->setMultikey(opCtx, collection, multikeyMetadataKeys, paths);
 }
 
 IndexAccessMethod::OnSuppressedErrorFn IndexAccessMethod::kNoopOnSuppressedErrorFn =

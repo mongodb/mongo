@@ -35,12 +35,14 @@
 
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/key_string.h"
 
 namespace mongo {
 
 struct MultikeyPathInfo {
     NamespaceString nss;
     std::string indexName;
+    KeyStringSet multikeyMetadataKeys;
     MultikeyPaths multikeyPaths;
 };
 

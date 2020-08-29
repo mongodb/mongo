@@ -100,6 +100,9 @@ void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo info) {
         }
 
         mergeMultikeyPaths(&existingChanges.multikeyPaths, info.multikeyPaths);
+        existingChanges.multikeyMetadataKeys.insert(
+            std::make_move_iterator(info.multikeyMetadataKeys.begin()),
+            std::make_move_iterator(info.multikeyMetadataKeys.end()));
         return;
     }
 

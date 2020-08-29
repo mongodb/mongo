@@ -345,19 +345,20 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {
         int64_t numInserted;
-        auto status = accessMethod->insertKeys(opCtx,
-                                               coll,
-                                               {keySet.begin(), keySet.end()},
-                                               {},
-                                               MultikeyPaths{},
-                                               opRecordId,
-                                               options,
-                                               [=](const KeyString::Value& duplicateKey) {
-                                                   return trackDups == TrackDuplicates::kTrack
-                                                       ? recordDuplicateKey(opCtx, duplicateKey)
-                                                       : Status::OK();
-                                               },
-                                               &numInserted);
+        auto status = accessMethod->insertKeysAndUpdateMultikeyPaths(
+            opCtx,
+            coll,
+            {keySet.begin(), keySet.end()},
+            {},
+            MultikeyPaths{},
+            opRecordId,
+            options,
+            [=](const KeyString::Value& duplicateKey) {
+                return trackDups == TrackDuplicates::kTrack
+                    ? recordDuplicateKey(opCtx, duplicateKey)
+                    : Status::OK();
+            },
+            &numInserted);
         if (!status.isOK()) {
             return status;
         }

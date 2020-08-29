@@ -94,11 +94,28 @@ public:
                           KeyHandlerFn&& onDuplicateKey,
                           int64_t* numInserted) = 0;
 
+    /**
+     * Inserts the specified keys into the index. and determines whether these keys should cause the
+     * index to become multikey. If so, this method also handles the task of marking the index as
+     * multikey in the catalog, and sets the path-level multikey information if applicable.
+     */
+    virtual Status insertKeysAndUpdateMultikeyPaths(OperationContext* opCtx,
+                                                    const Collection* coll,
+                                                    const KeyStringSet& keys,
+                                                    const KeyStringSet& multikeyMetadataKeys,
+                                                    const MultikeyPaths& multikeyPaths,
+                                                    const RecordId& loc,
+                                                    const InsertDeleteOptions& options,
+                                                    KeyHandlerFn&& onDuplicateKey,
+                                                    int64_t* numInserted) = 0;
+
+    /**
+     * Inserts the specified keys into the index. Does not attempt to determine whether the
+     * insertion of these keys should cause the index to become multikey.
+     */
     virtual Status insertKeys(OperationContext* opCtx,
                               const Collection* coll,
                               const KeyStringSet& keys,
-                              const KeyStringSet& multikeyMetadataKeys,
-                              const MultikeyPaths& multikeyPaths,
                               const RecordId& loc,
                               const InsertDeleteOptions& options,
                               KeyHandlerFn&& onDuplicateKey,
@@ -199,6 +216,7 @@ public:
      */
     virtual void setIndexIsMultikey(OperationContext* opCtx,
                                     const Collection* collection,
+                                    KeyStringSet multikeyMetadataKeys,
                                     MultikeyPaths paths) = 0;
 
     //
@@ -451,12 +469,20 @@ public:
     Status insertKeys(OperationContext* opCtx,
                       const Collection* coll,
                       const KeyStringSet& keys,
-                      const KeyStringSet& multikeyMetadataKeys,
-                      const MultikeyPaths& multikeyPaths,
                       const RecordId& loc,
                       const InsertDeleteOptions& options,
                       KeyHandlerFn&& onDuplicateKey,
                       int64_t* numInserted) final;
+
+    Status insertKeysAndUpdateMultikeyPaths(OperationContext* opCtx,
+                                            const Collection* coll,
+                                            const KeyStringSet& keys,
+                                            const KeyStringSet& multikeyMetadataKeys,
+                                            const MultikeyPaths& multikeyPaths,
+                                            const RecordId& loc,
+                                            const InsertDeleteOptions& options,
+                                            KeyHandlerFn&& onDuplicateKey,
+                                            int64_t* numInserted) final;
 
     Status removeKeys(OperationContext* opCtx,
                       const KeyStringSet& keys,
@@ -500,6 +526,7 @@ public:
 
     void setIndexIsMultikey(OperationContext* opCtx,
                             const Collection* collection,
+                            KeyStringSet multikeyMetadataKeys,
                             MultikeyPaths paths) final;
 
     std::unique_ptr<BulkBuilder> initiateBulk(

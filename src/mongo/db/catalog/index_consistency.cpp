@@ -152,15 +152,16 @@ void IndexConsistency::repairMissingIndexEntries(OperationContext* opCtx,
         int64_t numInserted = 0;
         writeConflictRetry(opCtx, "insertingMissingIndexEntries", _validateState->nss().ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            Status status = accessMethod->insertKeys(opCtx,
-                                                     _validateState->getCollection(),
-                                                     {ks},
-                                                     {},
-                                                     {},
-                                                     rid,
-                                                     options,
-                                                     nullptr,
-                                                     &numInserted);
+            Status status =
+                accessMethod->insertKeysAndUpdateMultikeyPaths(opCtx,
+                                                               _validateState->getCollection(),
+                                                               {ks},
+                                                               {},
+                                                               {},
+                                                               rid,
+                                                               options,
+                                                               nullptr,
+                                                               &numInserted);
             wunit.commit();
         });
 
