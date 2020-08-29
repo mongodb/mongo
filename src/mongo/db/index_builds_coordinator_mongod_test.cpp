@@ -78,13 +78,6 @@ void IndexBuildsCoordinatorMongodTest::setUp() {
     createCollection(_othertestFooNss, _othertestFooUUID);
 
     _indexBuildsCoord = std::make_unique<IndexBuildsCoordinatorMongod>();
-
-    // Disable index build commit quorum as we don't have support of replication subsystem for
-    // voting.
-    ASSERT_OK(ServerParameterSet::getGlobal()
-                  ->getMap()
-                  .find("enableIndexBuildCommitQuorum")
-                  ->second->setFromString("false"));
 }
 
 void IndexBuildsCoordinatorMongodTest::tearDown() {
