@@ -6212,6 +6212,17 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_jscore_op_query_passthrough --storageEngine=wiredTiger
 
+- <<: *task_template
+  name: sharding_update_v1_oplog_jscore_passthrough
+  tags: ["sharding", "jscore"]
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_jscore_op_query_passthrough --storageEngine=wiredTiger
+
 - name: sharding_jscore_passthrough_wire_ops_gen
   tags: ["sharding", "jscore"]
   depends_on:
@@ -6959,6 +6970,15 @@ tasks:
       use_multiversion: /data/multiversion
       resmoke_args: --tagFile=generated_resmoke_config/multiversion_exclude_tags.yml
       fallback_num_sub_suites: 24
+
+- name: sharding_update_v1_oplog_gen
+  tags: ["sharding", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 31
 
 - <<: *task_template
   name: snmp
