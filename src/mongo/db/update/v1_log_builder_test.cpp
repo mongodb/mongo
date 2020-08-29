@@ -48,10 +48,9 @@ namespace mmb = mongo::mutablebson;
  */
 RuntimeUpdatePath makeRuntimeUpdatePathAssumeAllComponentsFieldNames(StringData path) {
     FieldRef fieldRef(path);
-    return RuntimeUpdatePath(
-        std::move(fieldRef),
-        std::vector<RuntimeUpdatePath::ComponentType>(
-            fieldRef.numParts(), RuntimeUpdatePath::ComponentType::kFieldName));
+    RuntimeUpdatePath::ComponentTypeVector types(fieldRef.numParts(),
+                                                 RuntimeUpdatePath::ComponentType::kFieldName);
+    return RuntimeUpdatePath(std::move(fieldRef), std::move(types));
 }
 
 TEST(V1LogBuilder, UpdateFieldMutableBson) {
