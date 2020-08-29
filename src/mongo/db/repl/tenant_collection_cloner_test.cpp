@@ -31,12 +31,11 @@
 
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/repl/tenant_cloner_test_fixture.h"
 #include "mongo/db/repl/tenant_collection_cloner.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
@@ -56,14 +55,13 @@ public:
     }
 };
 
-class TenantCollectionClonerTest : public ClonerTestFixture {
+class TenantCollectionClonerTest : public TenantClonerTestFixture {
 public:
     TenantCollectionClonerTest() {}
 
 protected:
     void setUp() override {
-        ClonerTestFixture::setUp();
-        _sharedData = std::make_unique<TenantMigrationSharedData>(kInitialRollbackId, &_clock);
+        TenantClonerTestFixture::setUp();
         _standardCreateCollectionFn = [this](OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const CollectionOptions& options) -> Status {
@@ -87,8 +85,6 @@ protected:
         };
 
         _mockServer->assignCollectionUuid(_nss.ns(), _collUuid);
-        _mockServer->setCommandReply("replSetGetRBID",
-                                     BSON("ok" << 1 << "rbid" << getSharedData()->getRollBackId()));
         _mockClient->setOperationTime(_operationTime);
     }
     std::unique_ptr<TenantCollectionCloner> makeCollectionCloner(
@@ -128,10 +124,6 @@ protected:
         return cloner->_idIndexSpec;
     }
 
-    TenantMigrationSharedData* getSharedData() {
-        return checked_cast<TenantMigrationSharedData*>(_sharedData.get());
-    }
-
     StorageInterfaceMock::CreateCollectionFn _standardCreateCollectionFn;
     StorageInterfaceMock::CreateIndexesOnEmptyCollectionFn
         _standardCreateIndexesOnEmptyCollectionFn;
@@ -148,16 +140,8 @@ protected:
                                                        << "a_1"),
                                               BSON("v" << 1 << "key" << BSON("b" << 1) << "name"
                                                        << "b_1")};
-    static std::string _tenantId;
-    static NamespaceString _nss;
-    static Timestamp _operationTime;
+    const NamespaceString _nss = {_tenantId + "_testDb", "testcoll"};
 };
-
-/* static */
-std::string TenantCollectionClonerTest::_tenantId = "tenant42";
-NamespaceString TenantCollectionClonerTest::_nss = {_tenantId + "_testDb", "testcoll"};
-Timestamp TenantCollectionClonerTest::_operationTime = Timestamp(12345, 42);
-
 
 TEST_F(TenantCollectionClonerTest, CountStage) {
     auto cloner = makeCollectionCloner();

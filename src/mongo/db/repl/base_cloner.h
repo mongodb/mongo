@@ -43,6 +43,11 @@
 #include "mongo/util/future.h"
 
 namespace mongo {
+
+namespace logv2 {
+class LogComponent;
+}
+
 namespace repl {
 
 class BaseCloner {
@@ -242,6 +247,11 @@ protected:
     virtual std::string describeForFuzzer(BaseClonerStage*) const {
         return "";
     }
+
+    /**
+     * Must override this to specify the log component for messages in this class.
+     */
+    virtual logv2::LogComponent getLogComponent() = 0;
 
 private:
     virtual ClonerStages getStages() = 0;

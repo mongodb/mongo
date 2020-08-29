@@ -1012,7 +1012,7 @@ env.Library(
         'tenant_all_database_cloner.cpp',
         'tenant_collection_cloner.cpp',
         'tenant_database_cloner.cpp',
-        'tenant_migration_base_cloner.cpp',
+        'tenant_base_cloner.cpp',
     ],
     LIBDEPS = [
         '$BUILD_DIR/mongo/base',
@@ -1533,10 +1533,12 @@ env.CppUnitTest(
         'cloner_test_fixture.cpp',
         'collection_cloner_test.cpp',
         'database_cloner_test.cpp',
+        'initial_sync_cloner_test_fixture.cpp',
         'initial_sync_shared_data_test.cpp',
         'tenant_all_database_cloner_test.cpp',
         'tenant_collection_cloner_test.cpp',
-        'tenant_database_cloner_test.cpp'
+        'tenant_database_cloner_test.cpp',
+        'tenant_cloner_test_fixture.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',  # Required for service context test fixture

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
+#pragma once
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/tenant_migration_base_cloner.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/repl/cloner_test_fixture.h"
+#include "mongo/db/repl/tenant_migration_shared_data.h"
 
 namespace mongo {
 namespace repl {
 
-TenantMigrationBaseCloner::TenantMigrationBaseCloner(StringData clonerName,
-                                                     TenantMigrationSharedData* sharedData,
-                                                     const HostAndPort& source,
-                                                     DBClientConnection* client,
-                                                     StorageInterface* storageInterface,
-                                                     ThreadPool* dbPool)
-    : BaseCloner(clonerName, sharedData, source, client, storageInterface, dbPool) {}
+class TenantClonerTestFixture : public ClonerTestFixture {
+protected:
+    void setUp() override;
+
+    TenantMigrationSharedData* getSharedData();
+
+    const Timestamp _operationTime = Timestamp(12345, 67);
+    const std::string _tenantId = "tenant42";
+};
 
 }  // namespace repl
 }  // namespace mongo

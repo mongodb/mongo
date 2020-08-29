@@ -87,8 +87,21 @@ private:
      */
     void pauseForFuzzer(BaseClonerStage* stage) final;
 
+    /**
+     * Provides part of a log message for the initial sync describing the namespace the
+     * cloner is operating on.  It must start with the database name, followed by the
+     * string ' db: { ', followed by the stage name, followed by ': ' and the collection UUID
+     * if known.
+     */
+    virtual std::string describeForFuzzer(BaseClonerStage*) const = 0;
+
+    /**
+     * Overriden to allow the BaseCloner to use the initial sync log component.
+     */
+    virtual logv2::LogComponent getLogComponent() final;
+
     // Operation that may currently be retrying.
-    ReplSyncSharedData::RetryableOperation _retryableOp;
+    InitialSyncSharedData::RetryableOperation _retryableOp;
 };
 
 }  // namespace repl

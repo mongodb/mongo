@@ -32,14 +32,14 @@
 #include <vector>
 
 #include "mongo/db/repl/base_cloner.h"
+#include "mongo/db/repl/tenant_base_cloner.h"
 #include "mongo/db/repl/tenant_collection_cloner.h"
-#include "mongo/db/repl/tenant_migration_base_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 
 namespace mongo {
 namespace repl {
 
-class TenantDatabaseCloner final : public TenantMigrationBaseCloner {
+class TenantDatabaseCloner final : public TenantBaseCloner {
 public:
     struct Stats {
         std::string dbname;

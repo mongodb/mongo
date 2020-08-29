@@ -32,7 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/all_database_cloner.h"
-#include "mongo/db/repl/cloner_test_fixture.h"
+#include "mongo/db/repl/initial_sync_cloner_test_fixture.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -46,15 +46,11 @@
 namespace mongo {
 namespace repl {
 
-class AllDatabaseClonerTest : public ClonerTestFixture {
+class AllDatabaseClonerTest : public InitialSyncClonerTestFixture {
 public:
     AllDatabaseClonerTest() {}
 
 protected:
-    void setUp() override {
-        ClonerTestFixture::setUp();
-        _sharedData = std::make_unique<InitialSyncSharedData>(kInitialRollbackId, Days(1), &_clock);
-    }
     std::unique_ptr<AllDatabaseCloner> makeAllDatabaseCloner() {
         return std::make_unique<AllDatabaseCloner>(getSharedData(),
                                                    _source,
@@ -65,10 +61,6 @@ protected:
 
     std::vector<std::string> getDatabasesFromCloner(AllDatabaseCloner* cloner) {
         return cloner->_databases;
-    }
-
-    InitialSyncSharedData* getSharedData() {
-        return checked_cast<InitialSyncSharedData*>(_sharedData.get());
     }
 };
 

@@ -27,50 +27,35 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/base_cloner.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/unittest/log_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/base/checked_cast.h"
+#include "mongo/db/repl/initial_sync_cloner_test_fixture.h"
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
 
 namespace mongo {
 namespace repl {
 
-class ClonerTestFixture : public unittest::Test, public ScopedGlobalServiceContextForTest {
-public:
-    ClonerTestFixture() : _storageInterface{} {}
+void InitialSyncClonerTestFixture::setUp() {
+    ClonerTestFixture::setUp();
 
-    static BSONObj createCountResponse(int documentCount);
+    _sharedData = std::make_unique<InitialSyncSharedData>(kInitialRollbackId, Days(1), &_clock);
 
-    // Since the DBClient handles the cursor iterating, we assume that works for the purposes of the
-    // cloner unit test and just use a single batch for all mock responses.
-    static BSONObj createCursorResponse(const std::string& nss, const BSONArray& docs);
+    // Set the initial sync ID on the mock server.
+    _mockServer->insert(
+        ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(),
+        BSON("_id" << _initialSyncId));
+}
 
-protected:
-    void setUp() override;
+InitialSyncSharedData* InitialSyncClonerTestFixture::getSharedData() {
+    return checked_cast<InitialSyncSharedData*>(_sharedData.get());
+}
 
-    void tearDown() override;
-
-    StorageInterfaceMock _storageInterface;
-    HostAndPort _source;
-    std::unique_ptr<ThreadPool> _dbWorkThreadPool;
-    std::unique_ptr<MockRemoteDBServer> _mockServer;
-    std::unique_ptr<DBClientConnection> _mockClient;
-    std::unique_ptr<ReplSyncSharedData> _sharedData;
-    ClockSourceMock _clock;
-
-private:
-    unittest::MinimumLoggedSeverityGuard _verboseGuard{logv2::LogComponent::kReplicationInitialSync,
-                                                       logv2::LogSeverity::Debug(1)};
-};
+void InitialSyncClonerTestFixture::setInitialSyncId() {
+    stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
+    getSharedData()->setSyncSourceWireVersion(lk, WireVersion::RESUMABLE_INITIAL_SYNC);
+    getSharedData()->setInitialSyncSourceId(lk, _initialSyncId);
+}
 
 }  // namespace repl
 }  // namespace mongo

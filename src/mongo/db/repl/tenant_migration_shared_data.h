@@ -36,28 +36,11 @@ namespace mongo {
 namespace repl {
 class TenantMigrationSharedData final : public ReplSyncSharedData {
 public:
-    TenantMigrationSharedData(int rollBackId, ClockSource* clock)
-        : ReplSyncSharedData(rollBackId, Days(1) /* allowedOutageDuration */, clock) {}
+    TenantMigrationSharedData(ClockSource* clock) : ReplSyncSharedData(clock) {}
 
     void setLastVisibleOpTime(WithLock, OpTime opTime);
 
     OpTime getLastVisibleOpTime(WithLock);
-
-    // These are all dummy implementations.
-    void setSyncSourceWireVersion(WithLock, WireVersion wireVersion) override {}
-    boost::optional<WireVersion> getSyncSourceWireVersion(WithLock) override {
-        return boost::none;
-    }
-    void setInitialSyncSourceId(WithLock, boost::optional<UUID> syncSourceId) override {}
-    boost::optional<UUID> getInitialSyncSourceId(WithLock) override {
-        return boost::none;
-    }
-    bool shouldRetryOperation(WithLock lk, RetryableOperation* retryableOp) override {
-        return false;
-    };
-    int decrementRetryingOperations(WithLock lk) override {
-        return 0;
-    }
 
 private:
     // Must hold mutex (in base class) to access this.

@@ -32,14 +32,14 @@
 #include <vector>
 
 #include "mongo/db/repl/base_cloner.h"
+#include "mongo/db/repl/tenant_base_cloner.h"
 #include "mongo/db/repl/tenant_database_cloner.h"
-#include "mongo/db/repl/tenant_migration_base_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 
 namespace mongo {
 namespace repl {
 
-class TenantAllDatabaseCloner final : public TenantMigrationBaseCloner {
+class TenantAllDatabaseCloner final : public TenantBaseCloner {
 public:
     struct Stats {
         size_t databasesCloned{0};

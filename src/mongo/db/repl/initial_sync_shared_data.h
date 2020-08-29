@@ -41,8 +41,16 @@ private:
     class RetryingOperation;
 
 public:
+    typedef boost::optional<RetryingOperation> RetryableOperation;
+
     InitialSyncSharedData(int rollBackId, Milliseconds allowedOutageDuration, ClockSource* clock)
-        : ReplSyncSharedData(rollBackId, allowedOutageDuration, clock) {}
+        : ReplSyncSharedData(clock),
+          _rollBackId(rollBackId),
+          _allowedOutageDuration(allowedOutageDuration) {}
+
+    int getRollBackId() const {
+        return _rollBackId;
+    }
 
     int getRetryingOperationsCount(WithLock lk) {
         return _retryingOperationsCount;
@@ -55,28 +63,28 @@ public:
     /**
      * Sets the wire version of the sync source.
      */
-    void setSyncSourceWireVersion(WithLock, WireVersion wireVersion) final {
+    void setSyncSourceWireVersion(WithLock, WireVersion wireVersion) {
         _syncSourceWireVersion = wireVersion;
     }
 
     /**
      * Returns the wire version of the sync source, if previously set.
      */
-    boost::optional<WireVersion> getSyncSourceWireVersion(WithLock) final {
+    boost::optional<WireVersion> getSyncSourceWireVersion(WithLock) {
         return _syncSourceWireVersion;
     }
 
     /**
      * Sets the initial sync ID of the sync source.
      */
-    void setInitialSyncSourceId(WithLock, boost::optional<UUID> syncSourceId) final {
+    void setInitialSyncSourceId(WithLock, boost::optional<UUID> syncSourceId) {
         _initialSyncSourceId = syncSourceId;
     }
 
     /**
      * Gets the previously-set initial sync ID of the sync source.
      */
-    boost::optional<UUID> getInitialSyncSourceId(WithLock) final {
+    boost::optional<UUID> getInitialSyncSourceId(WithLock) {
         return _initialSyncSourceId;
     }
 
@@ -106,9 +114,54 @@ public:
      *
      * Returns true if the operation should be retried, false if it has timed out.
      */
-    bool shouldRetryOperation(WithLock lk, RetryableOperation* retryableOp) override;
+    bool shouldRetryOperation(WithLock lk, RetryableOperation* retryableOp);
+
+    /**
+     * Returns the total time the sync source may be unreachable in a single outage before
+     * shouldRetryOperation() returns false.
+     */
+    Milliseconds getAllowedOutageDuration(WithLock lk) {
+        return _allowedOutageDuration;
+    }
+
+    void setAllowedOutageDuration_forTest(WithLock, Milliseconds allowedOutageDuration) {
+        _allowedOutageDuration = allowedOutageDuration;
+    }
 
 private:
+    class RetryingOperation {
+    public:
+        RetryingOperation(InitialSyncSharedData* sharedData) : _sharedData(sharedData) {}
+        // This class is a non-copyable RAII class.
+        RetryingOperation(const RetryingOperation&) = delete;
+        RetryingOperation(RetryingOperation&&) = delete;
+        ~RetryingOperation() {
+            if (_sharedData) {
+                stdx::lock_guard<InitialSyncSharedData> lk(*_sharedData);
+                release(lk);
+            }
+        }
+
+        RetryingOperation& operator=(const RetryingOperation&) = delete;
+        RetryingOperation& operator=(RetryingOperation&&) = default;
+
+        /**
+         * release() is used by shouldRetryOperation to allow destroying a RetryingOperation
+         * while holding the lock.
+         */
+        void release(WithLock lk) {
+            _sharedData->decrementRetryingOperations(lk);
+            _sharedData = nullptr;
+        }
+
+        InitialSyncSharedData* getSharedData() {
+            return _sharedData;
+        }
+
+    private:
+        InitialSyncSharedData* _sharedData;
+    };
+
     /**
      * Increment the number of retrying operations, set syncSourceUnreachableSince if this is the
      * only retrying operation. This is used when an operation starts retrying.
@@ -122,11 +175,14 @@ private:
      * and update _totalTimeUnreachable.
      * Returns the new number of retrying operations.
      */
-    int decrementRetryingOperations(WithLock lk) override;
+    int decrementRetryingOperations(WithLock lk);
 
     void incrementTotalRetries(WithLock lk) {
         _totalRetries++;
     }
+
+    // Rollback ID at start of initial sync.
+    const int _rollBackId;
 
     /**
      * This object must be locked when accessing the members below.
@@ -146,6 +202,9 @@ private:
     // The total time across all outages in this initial sync attempt, but excluding any current
     // outage, that we were retrying because we were unable to reach the sync source.
     Milliseconds _totalTimeUnreachable;
+
+    // Time allowed for an outage before "shouldRetryOperation" returns false.
+    Milliseconds _allowedOutageDuration;
 
     // Operation that may currently be retrying.
     RetryableOperation _retryableOp;

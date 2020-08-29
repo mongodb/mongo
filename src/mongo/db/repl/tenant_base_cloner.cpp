@@ -27,30 +27,27 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/db/repl/base_cloner.h"
-#include "mongo/db/repl/tenant_migration_shared_data.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/repl/tenant_base_cloner.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace repl {
 
-class TenantMigrationBaseCloner : public BaseCloner {
-public:
-    TenantMigrationBaseCloner(StringData clonerName,
-                              TenantMigrationSharedData* sharedData,
-                              const HostAndPort& source,
-                              DBClientConnection* client,
-                              StorageInterface* storageInterface,
-                              ThreadPool* dbPool);
-    virtual ~TenantMigrationBaseCloner() = default;
+TenantBaseCloner::TenantBaseCloner(StringData clonerName,
+                                   TenantMigrationSharedData* sharedData,
+                                   const HostAndPort& source,
+                                   DBClientConnection* client,
+                                   StorageInterface* storageInterface,
+                                   ThreadPool* dbPool)
+    : BaseCloner(clonerName, sharedData, source, client, storageInterface, dbPool) {}
 
-protected:
-    TenantMigrationSharedData* getSharedData() const override {
-        return checked_cast<TenantMigrationSharedData*>(BaseCloner::getSharedData());
-    }
-};
+logv2::LogComponent TenantBaseCloner::getLogComponent() {
+    return logv2::LogComponent::kTenantMigration;
+}
 
 }  // namespace repl
 }  // namespace mongo

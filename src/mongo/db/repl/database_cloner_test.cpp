@@ -29,10 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/database_cloner.h"
+#include "mongo/db/repl/initial_sync_cloner_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -49,14 +48,13 @@ struct CollectionCloneInfo {
     CollectionBulkLoaderMock* loader = nullptr;
 };
 
-class DatabaseClonerTest : public ClonerTestFixture {
+class DatabaseClonerTest : public InitialSyncClonerTestFixture {
 public:
     DatabaseClonerTest() {}
 
 protected:
     void setUp() override {
-        ClonerTestFixture::setUp();
-        _sharedData = std::make_unique<InitialSyncSharedData>(kInitialRollbackId, Days(1), &_clock);
+        InitialSyncClonerTestFixture::setUp();
         _storageInterface.createCollectionForBulkFn =
             [this](const NamespaceString& nss,
                    const CollectionOptions& options,
@@ -105,10 +103,6 @@ protected:
     std::vector<std::pair<NamespaceString, CollectionOptions>> getCollectionsFromCloner(
         DatabaseCloner* cloner) {
         return cloner->_collections;
-    }
-
-    InitialSyncSharedData* getSharedData() {
-        return checked_cast<InitialSyncSharedData*>(_sharedData.get());
     }
 
     std::map<NamespaceString, CollectionCloneInfo> _collections;

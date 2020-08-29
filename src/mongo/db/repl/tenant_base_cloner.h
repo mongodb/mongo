@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,47 +29,33 @@
 
 #pragma once
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/repl/base_cloner.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/unittest/log_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/db/repl/tenant_migration_shared_data.h"
 
 namespace mongo {
 namespace repl {
 
-class ClonerTestFixture : public unittest::Test, public ScopedGlobalServiceContextForTest {
+class TenantBaseCloner : public BaseCloner {
 public:
-    ClonerTestFixture() : _storageInterface{} {}
-
-    static BSONObj createCountResponse(int documentCount);
-
-    // Since the DBClient handles the cursor iterating, we assume that works for the purposes of the
-    // cloner unit test and just use a single batch for all mock responses.
-    static BSONObj createCursorResponse(const std::string& nss, const BSONArray& docs);
+    TenantBaseCloner(StringData clonerName,
+                     TenantMigrationSharedData* sharedData,
+                     const HostAndPort& source,
+                     DBClientConnection* client,
+                     StorageInterface* storageInterface,
+                     ThreadPool* dbPool);
+    virtual ~TenantBaseCloner() = default;
 
 protected:
-    void setUp() override;
-
-    void tearDown() override;
-
-    StorageInterfaceMock _storageInterface;
-    HostAndPort _source;
-    std::unique_ptr<ThreadPool> _dbWorkThreadPool;
-    std::unique_ptr<MockRemoteDBServer> _mockServer;
-    std::unique_ptr<DBClientConnection> _mockClient;
-    std::unique_ptr<ReplSyncSharedData> _sharedData;
-    ClockSourceMock _clock;
+    TenantMigrationSharedData* getSharedData() const override {
+        return checked_cast<TenantMigrationSharedData*>(BaseCloner::getSharedData());
+    }
 
 private:
-    unittest::MinimumLoggedSeverityGuard _verboseGuard{logv2::LogComponent::kReplicationInitialSync,
-                                                       logv2::LogSeverity::Debug(1)};
+    /**
+     * Overriden to allow the BaseCloner to use the tenant migration log component.
+     */
+    virtual logv2::LogComponent getLogComponent() final;
 };
 
 }  // namespace repl

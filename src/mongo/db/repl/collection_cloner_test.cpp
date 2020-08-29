@@ -31,10 +31,9 @@
 
 #include <vector>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/collection_cloner.h"
+#include "mongo/db/repl/initial_sync_cloner_test_fixture.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -56,14 +55,13 @@ public:
     }
 };
 
-class CollectionClonerTest : public ClonerTestFixture {
+class CollectionClonerTest : public InitialSyncClonerTestFixture {
 public:
     CollectionClonerTest() {}
 
 protected:
     void setUp() override {
-        ClonerTestFixture::setUp();
-        _sharedData = std::make_unique<InitialSyncSharedData>(kInitialRollbackId, Days(1), &_clock);
+        InitialSyncClonerTestFixture::setUp();
         _collectionStats = std::make_shared<CollectionMockStats>();
         _standardCreateCollectionFn = [this](const NamespaceString& nss,
                                              const CollectionOptions& options,
@@ -115,10 +113,6 @@ protected:
 
     BSONObj& getIdIndexSpec(CollectionCloner* cloner) {
         return cloner->_idIndexSpec;
-    }
-
-    InitialSyncSharedData* getSharedData() {
-        return checked_cast<InitialSyncSharedData*>(_sharedData.get());
     }
 
     std::shared_ptr<CollectionMockStats> _collectionStats;  // Used by the _loader.

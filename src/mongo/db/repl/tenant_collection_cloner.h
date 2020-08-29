@@ -34,14 +34,14 @@
 
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/task_runner.h"
-#include "mongo/db/repl/tenant_migration_base_cloner.h"
+#include "mongo/db/repl/tenant_base_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
 namespace repl {
 
-class TenantCollectionCloner : public TenantMigrationBaseCloner {
+class TenantCollectionCloner : public TenantBaseCloner {
 public:
     struct Stats {
         static constexpr StringData kDocumentsToCopyFieldName = "documentsToCopy"_sd;
@@ -229,11 +229,9 @@ private:
     TaskRunner _dbWorkTaskRunner;  // (R)
 
     // The database name prefix of the tenant associated with this migration.
-    // TODO(SERVER-50492): Consider moving this into TenantMigrationSharedData.
     std::string _tenantId;  // (R)
 
     // The operationTime returned with the listIndexes result.
-    // TODO(SERVER-50492): Consider moving this into TenantMigrationSharedData.
     Timestamp _operationTime;  // (X)
 };
 

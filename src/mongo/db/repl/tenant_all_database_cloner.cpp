@@ -53,7 +53,7 @@ TenantAllDatabaseCloner::TenantAllDatabaseCloner(TenantMigrationSharedData* shar
                                                  StorageInterface* storageInterface,
                                                  ThreadPool* dbPool,
                                                  StringData tenantId)
-    : TenantMigrationBaseCloner(
+    : TenantBaseCloner(
           "TenantAllDatabaseCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _tenantId(tenantId),
       _listDatabasesStage("listDatabases", this, &TenantAllDatabaseCloner::listDatabasesStage) {}

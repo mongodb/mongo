@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,59 +27,24 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <mutex>
-
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/uuid.h"
+#include "mongo/base/checked_cast.h"
+#include "mongo/db/repl/tenant_cloner_test_fixture.h"
 
 namespace mongo {
 namespace repl {
-class ReplSyncSharedData {
-public:
-    ReplSyncSharedData(ClockSource* clock) : _clock(clock) {}
-    virtual ~ReplSyncSharedData() {}
 
-    ClockSource* getClock() const {
-        return _clock;
-    }
+void TenantClonerTestFixture::setUp() {
+    ClonerTestFixture::setUp();
 
-    /**
-     * BasicLockable C++ methods; they merely delegate to the mutex.
-     * The presence of these methods means we can use stdx::unique_lock<ReplSyncSharedData> and
-     * stdx::lock_guard<ReplSyncSharedData>.
-     */
-    void lock();
+    _sharedData = std::make_unique<TenantMigrationSharedData>(&_clock);
 
-    void unlock();
+    _mockClient->setOperationTime(_operationTime);
+}
 
-    /**
-     * In all cases below, the lock must be a lock on this object itself for access to be valid.
-     */
-
-    Status getStatus(WithLock lk);
-
-    void setStatus(WithLock lk, Status newStatus);
-
-    /**
-     * Sets the status to the new status if and only if the old status is "OK".
-     */
-    void setStatusIfOK(WithLock lk, Status newStatus);
-
-private:
-    // Clock source used for timing outages and recording stats.
-    ClockSource* const _clock;
-
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplSyncSharedData::_mutex"_sd);
-
-    // Status of the entire sync process.  All syncing tasks should exit if this becomes non-OK.
-    Status _status = Status::OK();
-};
+TenantMigrationSharedData* TenantClonerTestFixture::getSharedData() {
+    return checked_cast<TenantMigrationSharedData*>(_sharedData.get());
+}
 }  // namespace repl
 }  // namespace mongo

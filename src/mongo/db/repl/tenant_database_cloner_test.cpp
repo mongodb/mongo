@@ -29,11 +29,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/repl/tenant_cloner_test_fixture.h"
 #include "mongo/db/repl/tenant_database_cloner.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
@@ -49,14 +48,13 @@ struct TenantCollectionCloneInfo {
     bool collCreated = false;
 };
 
-class TenantDatabaseClonerTest : public ClonerTestFixture {
+class TenantDatabaseClonerTest : public TenantClonerTestFixture {
 public:
     TenantDatabaseClonerTest() {}
 
 protected:
     void setUp() override {
-        ClonerTestFixture::setUp();
-        _sharedData = std::make_unique<TenantMigrationSharedData>(kInitialRollbackId, &_clock);
+        TenantClonerTestFixture::setUp();
         _storageInterface.createCollFn = [this](OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const CollectionOptions& options) -> Status {
@@ -78,7 +76,6 @@ protected:
             collInfo->numDocsInserted += ops.size();
             return Status::OK();
         };
-        setInitialSyncId();
         _mockClient->setOperationTime(_operationTime);
     }
 
@@ -127,21 +124,10 @@ protected:
         return cloner->_collections;
     }
 
-    TenantMigrationSharedData* getSharedData() {
-        return checked_cast<TenantMigrationSharedData*>(_sharedData.get());
-    }
-
     std::map<NamespaceString, TenantCollectionCloneInfo> _collections;
 
-    static std::string _tenantId;
-    static std::string _dbName;
-    static Timestamp _operationTime;
+    const std::string _dbName = _tenantId + "_testDb";
 };
-
-/* static */
-std::string TenantDatabaseClonerTest::_tenantId = "tenant42";
-std::string TenantDatabaseClonerTest::_dbName = _tenantId + "_testDb";
-Timestamp TenantDatabaseClonerTest::_operationTime = Timestamp(12345, 42);
 
 // A database may have no collections. Nothing to do for the tenant database cloner.
 TEST_F(TenantDatabaseClonerTest, ListCollectionsReturnedNoCollections) {

@@ -205,5 +205,9 @@ void InitialSyncBaseCloner::pauseForFuzzer(BaseClonerStage* stage) {
     }
 }
 
+logv2::LogComponent InitialSyncBaseCloner::getLogComponent() {
+    return logv2::LogComponent::kReplicationInitialSync;
+}
+
 }  // namespace repl
 }  // namespace mongo
