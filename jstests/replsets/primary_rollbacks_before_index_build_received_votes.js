@@ -21,12 +21,6 @@ const collNss = primaryColl.getFullName();
 const secondary = rollbackTest.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
 
-if (!IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
-    jsTestLog('Skipping test because index build commit quorum is not supported.');
-    rollbackTest.stop();
-    return;
-}
-
 jsTestLog("Do a document write.");
 assert.commandWorked(
         primaryColl.insert({_id: 0, x: 0}, {"writeConcern": {"w": "majority"}}));

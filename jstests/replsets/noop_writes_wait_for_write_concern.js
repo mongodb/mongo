@@ -210,12 +210,6 @@ function testCommandWithWriteConcern(cmd) {
     cmd.req.writeConcern = {w: 3, wtimeout: 1000};
     jsTest.log("Testing " + tojson(cmd.req));
 
-    if (cmd.req["createIndexes"] !== undefined &&
-        !IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
-        jsTest.log("Skipping test because index build commit quorum is not supported.");
-        return;
-    }
-
     dropTestCollection();
 
     cmd.setupFunc();

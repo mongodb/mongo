@@ -19,12 +19,6 @@ const indexName = "x_1";
 const primary = rst.getPrimary();
 const secondary = rst.getSecondary();
 
-if (!IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
-    jsTestLog('Skipping test because index build commit quorum are not supported.');
-    rst.stopSet();
-    return;
-}
-
 const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB[collName];
 const OplogColl = primary.getDB("local")["oplog.rs"];

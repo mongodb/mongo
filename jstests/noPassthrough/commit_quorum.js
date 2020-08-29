@@ -24,12 +24,6 @@ replSet.startSet();
 replSet.initiate();
 
 const primary = replSet.getPrimary();
-if (!IndexBuildTest.indexBuildCommitQuorumEnabled(primary)) {
-    jsTestLog('Skipping test because index build commit quorum is not supported.');
-    replSet.stopSet();
-    return;
-}
-
 const testDB = primary.getDB('test');
 const coll = testDB.twoPhaseIndexBuild;
 

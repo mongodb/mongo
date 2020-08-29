@@ -208,15 +208,6 @@ var IndexBuildTest = class {
         assert.commandWorked(
             conn.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
     }
-
-    /**
-     * Returns true if majority commit quorum is supported by two phase index builds.
-     */
-    static indexBuildCommitQuorumEnabled(conn) {
-        return assert
-            .commandWorked(conn.adminCommand({getParameter: 1, enableIndexBuildCommitQuorum: 1}))
-            .enableIndexBuildCommitQuorum;
-    }
 };
 
 const ResumableIndexBuildTest = class {

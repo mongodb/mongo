@@ -35,12 +35,6 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 
-if (!(IndexBuildTest.indexBuildCommitQuorumEnabled(primary))) {
-    jsTestLog('Skipping test because index build commit quorum is not supported.');
-    rst.stopSet();
-    return;
-}
-
 const db = primary.getDB(dbName);
 const coll = db.getCollection(collName);
 
