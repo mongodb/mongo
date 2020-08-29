@@ -240,6 +240,7 @@ public:
 
     void setMultikeyPaths(OperationContext* const opCtx,
                           const IndexDescriptor* desc,
+                          const KeyStringSet& multikeyMetadataKeys,
                           const MultikeyPaths& multikeyPaths) override;
 
     // ----- data modifiers ------
@@ -308,7 +309,7 @@ private:
 
     Status _indexKeys(OperationContext* opCtx,
                       IndexCatalogEntry* index,
-                      const std::vector<KeyString::Value>& keys,
+                      const KeyStringSet& keys,
                       const KeyStringSet& multikeyMetadataKeys,
                       const MultikeyPaths& multikeyPaths,
                       const BSONObj& obj,
@@ -336,7 +337,7 @@ private:
 
     void _unindexKeys(OperationContext* opCtx,
                       IndexCatalogEntry* index,
-                      const std::vector<KeyString::Value>& keys,
+                      const KeyStringSet& keys,
                       const BSONObj& obj,
                       RecordId loc,
                       bool logIfError,

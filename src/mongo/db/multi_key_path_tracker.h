@@ -35,12 +35,14 @@
 
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/key_string.h"
 
 namespace mongo {
 
 struct MultikeyPathInfo {
     NamespaceString nss;
     std::string indexName;
+    KeyStringSet multikeyMetadataKeys;
     MultikeyPaths multikeyPaths;
 };
 
@@ -94,6 +96,12 @@ public:
      */
     const boost::optional<MultikeyPaths> getMultikeyPathInfo(const NamespaceString& nss,
                                                              const std::string& indexName);
+
+    /**
+     * Returns the multikey metadata keys for the given inputs, or boost::none if none exist.
+     */
+    const boost::optional<KeyStringSet> getMultikeyMetadataKeys(const NamespaceString& nss,
+                                                                const std::string& indexName);
 
     /**
      * Specifies that we should track multikey path information on this MultikeyPathTracker. This is

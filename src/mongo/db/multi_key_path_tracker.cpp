@@ -33,6 +33,7 @@
 
 #include "mongo/db/multi_key_path_tracker.h"
 
+#include "mongo/db/storage/key_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -100,6 +101,8 @@ void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo info) {
         }
 
         mergeMultikeyPaths(&existingChanges.multikeyPaths, info.multikeyPaths);
+        existingChanges.multikeyMetadataKeys.insert(info.multikeyMetadataKeys.begin(),
+                                                    info.multikeyMetadataKeys.end());
         return;
     }
 
@@ -116,6 +119,17 @@ const boost::optional<MultikeyPaths> MultikeyPathTracker::getMultikeyPathInfo(
     for (const auto& multikeyPathInfo : _multikeyPathInfo) {
         if (multikeyPathInfo.nss == nss && multikeyPathInfo.indexName == indexName) {
             return multikeyPathInfo.multikeyPaths;
+        }
+    }
+
+    return boost::none;
+}
+
+const boost::optional<KeyStringSet> MultikeyPathTracker::getMultikeyMetadataKeys(
+    const NamespaceString& nss, const std::string& indexName) {
+    for (const auto& multikeyPathInfo : _multikeyPathInfo) {
+        if (multikeyPathInfo.nss == nss && multikeyPathInfo.indexName == indexName) {
+            return multikeyPathInfo.multikeyMetadataKeys;
         }
     }
 

@@ -115,9 +115,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
         if (!descriptor->isMultikey() &&
             iam->shouldMarkIndexAsMultikey(
-                documentKeySet.size(),
-                {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
-                documentMultikeyPaths)) {
+                documentKeySet.size(), multikeyMetadataKeys, documentMultikeyPaths)) {
             std::string msg = str::stream()
                 << "Index " << descriptor->indexName() << " is not multi-key but has more than one"
                 << " key in document " << recordId;

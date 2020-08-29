@@ -38,6 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -128,7 +129,9 @@ public:
      * namespace, index name, and multikey paths on the OperationContext rather than set the index
      * as multikey here.
      */
-    virtual void setMultikey(OperationContext* const opCtx, const MultikeyPaths& multikeyPaths) = 0;
+    virtual void setMultikey(OperationContext* const opCtx,
+                             const KeyStringSet& multikeyMetadataKeys,
+                             const MultikeyPaths& multikeyPaths) = 0;
 
     // if this ready is ready for queries
     virtual bool isReady(OperationContext* const opCtx) const = 0;

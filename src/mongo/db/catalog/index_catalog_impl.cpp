@@ -1097,13 +1097,14 @@ MultikeyPaths IndexCatalogImpl::getMultikeyPaths(OperationContext* opCtx,
 
 void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,
                                         const IndexDescriptor* desc,
+                                        const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths) {
     IndexCatalogEntry* entry = _readyIndexes.find(desc);
     if (!entry) {
         entry = _buildingIndexes.find(desc);
     }
     invariant(entry);
-    entry->setMultikey(opCtx, multikeyPaths);
+    entry->setMultikey(opCtx, multikeyMetadataKeys, multikeyPaths);
 };
 
 // ---------------------------
@@ -1333,7 +1334,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
 Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
                                     IndexCatalogEntry* index,
-                                    const std::vector<KeyString::Value>& keys,
+                                    const KeyStringSet& keys,
                                     const KeyStringSet& multikeyMetadataKeys,
                                     const MultikeyPaths& multikeyPaths,
                                     const BSONObj& obj,
@@ -1365,15 +1366,8 @@ Status IndexCatalogImpl::_indexKeys(OperationContext* opCtx,
         }
     } else {
         int64_t numInserted;
-        status = index->accessMethod()->insertKeys(
-            opCtx,
-            keys,
-            {multikeyMetadataKeys.begin(), multikeyMetadataKeys.end()},
-            multikeyPaths,
-            loc,
-            options,
-            nullptr,
-            &numInserted);
+        status = index->accessMethod()->insertKeysAndUpdateMultikeyPaths(
+            opCtx, keys, multikeyMetadataKeys, multikeyPaths, loc, options, nullptr, &numInserted);
         if (keysInsertedOut) {
             *keysInsertedOut += numInserted;
         }
@@ -1413,7 +1407,7 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
 
         Status status = _indexKeys(opCtx,
                                    index,
-                                   {keys.begin(), keys.end()},
+                                   keys,
                                    multikeyMetadataKeys,
                                    multikeyPaths,
                                    *bsonRecord.docPtr,
@@ -1497,7 +1491,7 @@ Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
 
 void IndexCatalogImpl::_unindexKeys(OperationContext* opCtx,
                                     IndexCatalogEntry* index,
-                                    const std::vector<KeyString::Value>& keys,
+                                    const KeyStringSet& keys,
                                     const BSONObj& obj,
                                     RecordId loc,
                                     bool logIfError,
@@ -1583,7 +1577,7 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
             return;
         }
     }
-    _unindexKeys(opCtx, entry, {keys.begin(), keys.end()}, obj, loc, logIfError, keysDeletedOut);
+    _unindexKeys(opCtx, entry, keys, obj, loc, logIfError, keysDeletedOut);
 }
 
 Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,

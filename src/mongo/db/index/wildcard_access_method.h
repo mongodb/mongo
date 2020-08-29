@@ -67,7 +67,7 @@ public:
      * vector is non-empty.
      */
     bool shouldMarkIndexAsMultikey(size_t numberOfKeys,
-                                   const std::vector<KeyString::Value>& multikeyMetadataKeys,
+                                   const KeyStringSet& multikeyMetadataKeys,
                                    const MultikeyPaths& multikeyPaths) const final;
 
     /**

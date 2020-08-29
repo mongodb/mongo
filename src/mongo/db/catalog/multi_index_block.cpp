@@ -766,37 +766,47 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         onCreateEach(_indexes[i].block->getSpec());
 
         // Do this before calling success(), which unsets the interceptor pointer on the index
-        // catalog entry.
+        // catalog entry. The interceptor will write multikey metadata keys into the index during
+        // IndexBuildInterceptor::sideWrite, so we only need to pass the cached MultikeyPaths into
+        // IndexCatalogEntry::setMultikey here.
         auto interceptor = _indexes[i].block->getEntry()->indexBuildInterceptor();
         if (interceptor) {
             auto multikeyPaths = interceptor->getMultikeyPaths();
             if (multikeyPaths) {
-                _indexes[i].block->getEntry()->setMultikey(opCtx, multikeyPaths.get());
+                _indexes[i].block->getEntry()->setMultikey(opCtx, {}, multikeyPaths.get());
             }
         }
 
         _indexes[i].block->success(opCtx, collection);
 
-        // The bulk builder will track multikey information itself. Non-bulk builders re-use the
-        // code path that a typical insert/update uses. State is altered on the non-bulk build
-        // path to accumulate the multikey information on the `MultikeyPathTracker`.
+        // The bulk builder will track multikey information itself, and will write cached multikey
+        // metadata keys into the index just before committing. We therefore only need to pass the
+        // MultikeyPaths into IndexCatalogEntry::setMultikey here.
         if (_indexes[i].bulk) {
             const auto& bulkBuilder = _indexes[i].bulk;
             if (bulkBuilder->isMultikey()) {
-                _indexes[i].block->getEntry()->setMultikey(opCtx, bulkBuilder->getMultikeyPaths());
+                _indexes[i].block->getEntry()->setMultikey(
+                    opCtx, {}, bulkBuilder->getMultikeyPaths());
             }
         } else {
-            auto multikeyPaths =
-                boost::optional<MultikeyPaths>(MultikeyPathTracker::get(opCtx).getMultikeyPathInfo(
-                    collection->ns(), _indexes[i].block->getIndexName()));
-            if (multikeyPaths) {
+            // Non-bulk builders re-use the code path that a typical insert/update uses. State is
+            // altered on the non-bulk build path to accumulate the multikey information on the
+            // MultikeyPathTracker.
+            auto multikeyPaths = MultikeyPathTracker::get(opCtx).getMultikeyPathInfo(
+                collection->ns(), _indexes[i].block->getIndexName());
+            auto multikeyMetadataKeys = MultikeyPathTracker::get(opCtx).getMultikeyMetadataKeys(
+                collection->ns(), _indexes[i].block->getIndexName());
+            if (multikeyPaths || multikeyMetadataKeys) {
                 // Upon reaching this point, multikeyPaths must either have at least one (possibly
                 // empty) element unless it is of an index with a type that doesn't support tracking
                 // multikeyPaths via the multikeyPaths array or has "special" multikey semantics.
-                invariant(!multikeyPaths.get().empty() ||
+                invariant(multikeyMetadataKeys || !multikeyPaths.get().empty() ||
                           !IndexBuildInterceptor::typeCanFastpathMultikeyUpdates(
                               _indexes[i].block->getEntry()->descriptor()->getIndexType()));
-                _indexes[i].block->getEntry()->setMultikey(opCtx, *multikeyPaths);
+                _indexes[i].block->getEntry()->setMultikey(
+                    opCtx,
+                    multikeyMetadataKeys.value_or(KeyStringSet{}),
+                    multikeyPaths.value_or(MultikeyPaths{{}}));
             }
         }
 

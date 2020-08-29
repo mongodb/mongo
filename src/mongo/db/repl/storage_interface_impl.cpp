@@ -559,6 +559,7 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
 Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const std::string& indexName,
+                                                const KeyStringSet& multikeyMetadataKeys,
                                                 const MultikeyPaths& paths,
                                                 Timestamp ts) {
     if (ts.isNull()) {
@@ -589,7 +590,7 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
                           str::stream() << "Could not find index " << indexName << " in "
                                         << nss.ns() << " to set to multikey.");
         }
-        collection->getIndexCatalog()->setMultikeyPaths(opCtx, idx, paths);
+        collection->getIndexCatalog()->setMultikeyPaths(opCtx, idx, multikeyMetadataKeys, paths);
         wunit.commit();
         return Status::OK();
     });

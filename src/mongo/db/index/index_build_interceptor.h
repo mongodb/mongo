@@ -86,7 +86,7 @@ public:
      * On success, `numKeysOut` if non-null will contain the number of keys added or removed.
      */
     Status sideWrite(OperationContext* opCtx,
-                     const std::vector<KeyString::Value>& keys,
+                     const KeyStringSet& keys,
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths,
                      RecordId loc,

@@ -282,18 +282,19 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     auto accessMethod = _indexCatalogEntry->accessMethod();
     if (opType == Op::kInsert) {
         int64_t numInserted;
-        auto status = accessMethod->insertKeys(opCtx,
-                                               {keySet.begin(), keySet.end()},
-                                               {},
-                                               MultikeyPaths{},
-                                               opRecordId,
-                                               options,
-                                               [=](const KeyString::Value& duplicateKey) {
-                                                   return trackDups == TrackDuplicates::kTrack
-                                                       ? recordDuplicateKey(opCtx, duplicateKey)
-                                                       : Status::OK();
-                                               },
-                                               &numInserted);
+        auto status = accessMethod->insertKeysAndUpdateMultikeyPaths(
+            opCtx,
+            keySet,
+            {},
+            MultikeyPaths{},
+            opRecordId,
+            options,
+            [=](const KeyString::Value& duplicateKey) {
+                return trackDups == TrackDuplicates::kTrack
+                    ? recordDuplicateKey(opCtx, duplicateKey)
+                    : Status::OK();
+            },
+            &numInserted);
         if (!status.isOK()) {
             return status;
         }
@@ -307,8 +308,7 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
             invariant(strcmp(operation.getStringField("op"), "d") == 0);
 
         int64_t numDeleted;
-        Status s = accessMethod->removeKeys(
-            opCtx, {keySet.begin(), keySet.end()}, opRecordId, options, &numDeleted);
+        Status s = accessMethod->removeKeys(opCtx, keySet, opRecordId, options, &numDeleted);
         if (!s.isOK()) {
             return s;
         }
@@ -376,7 +376,7 @@ boost::optional<MultikeyPaths> IndexBuildInterceptor::getMultikeyPaths() const {
 }
 
 Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
-                                        const std::vector<KeyString::Value>& keys,
+                                        const KeyStringSet& keys,
                                         const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths,
                                         RecordId loc,

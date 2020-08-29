@@ -895,8 +895,7 @@ public:
                          id1,
                          IndexAccessMethod::kNoopOnSuppressedErrorFn);
 
-            auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(&_opCtx, keys, id1, options, &numDeleted);
             auto insertStatus = iam->insert(&_opCtx, badKey, id1, options, nullptr, &numInserted);
 
             ASSERT_EQUALS(numDeleted, 1);
@@ -1309,8 +1308,7 @@ public:
                          nullptr,
                          rid,
                          IndexAccessMethod::kNoopOnSuppressedErrorFn);
-            auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(&_opCtx, keys, rid, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -1542,8 +1540,7 @@ public:
                          nullptr,
                          rid,
                          IndexAccessMethod::kNoopOnSuppressedErrorFn);
-            auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(&_opCtx, keys, rid, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -1578,8 +1575,7 @@ public:
                          nullptr,
                          rid,
                          IndexAccessMethod::kNoopOnSuppressedErrorFn);
-            auto removeStatus =
-                iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(&_opCtx, keys, rid, options, &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -1705,9 +1701,7 @@ public:
                 int64_t numInserted;
                 auto insertStatus = iam->insertKeys(
                     &_opCtx,
-                    {keys.begin(), keys.end()},
-                    {},
-                    MultikeyPaths{},
+                    keys,
                     swRecordId.getValue(),
                     options,
                     [this, &interceptor](const KeyString::Value& duplicateKey) {
@@ -1746,9 +1740,7 @@ public:
                 ASSERT_EQ(1, keys.size());
                 auto insertStatus = iam->insertKeys(
                     &_opCtx,
-                    {keys.begin(), keys.end()},
-                    {},
-                    MultikeyPaths{},
+                    keys,
                     swRecordId.getValue(),
                     options,
                     [this, &interceptor](const KeyString::Value& duplicateKey) {
