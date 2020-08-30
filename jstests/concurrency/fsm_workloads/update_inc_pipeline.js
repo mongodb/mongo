@@ -16,5 +16,17 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.data.update_inc = "update_inc_pipeline";
 
+    $config.setup = function(db, collName, cluster) {
+        // Add 'largeStr' to the documents in order to make pipeline-based updates generate delta
+        // oplog entries.
+        var doc = {_id: this.id, largeStr: '*'.repeat(128)};
+
+        // Pre-populate the fields we need to avoid size change for capped collections.
+        for (var i = 0; i < this.threadCount; ++i) {
+            doc['t' + i] = 0;
+        }
+        assert.commandWorked(db[collName].insert(doc));
+    };
+
     return $config;
 });

@@ -62,12 +62,15 @@ function testUpsertDoesInsert(query, update, resultDoc) {
     assert.eq(coll.findOne({}), resultDoc, coll.find({}).toArray());
 }
 
+// This can be used to make sure pipeline-based updates generate delta oplog entries.
+const largeStr = "x".repeat(1000);
+
 // Update with existing document.
 testUpdate({
     query: {_id: 1},
-    initialDocumentList: [{_id: 1, x: 1}],
+    initialDocumentList: [{_id: 1, x: 1, largeStr: largeStr}],
     update: [{$set: {foo: 4}}],
-    resultDocList: [{_id: 1, x: 1, foo: 4}],
+    resultDocList: [{_id: 1, x: 1, largeStr: largeStr, foo: 4}],
     nModified: 1
 });
 testUpdate({
@@ -79,25 +82,26 @@ testUpdate({
 });
 testUpdate({
     query: {_id: 1},
-    initialDocumentList: [{_id: 1, x: 1, y: [{z: 1, foo: 1}]}],
+    initialDocumentList: [{_id: 1, x: 1, y: [{z: 1, foo: 1}], largeStr: largeStr}],
     update: [{$unset: ["x", "y.z"]}],
-    resultDocList: [{_id: 1, y: [{foo: 1}]}],
+    resultDocList: [{_id: 1, y: [{foo: 1}], largeStr: largeStr}],
     nModified: 1
 });
 testUpdate({
     query: {_id: 1},
-    initialDocumentList: [{_id: 1, x: 1, t: {u: {v: 1}}}],
+    initialDocumentList: [{_id: 1, x: 1, t: {u: {v: 1}, largeStr: largeStr}}],
     update: [{$replaceWith: "$t"}],
-    resultDocList: [{_id: 1, u: {v: 1}}],
+    resultDocList: [{_id: 1, u: {v: 1}, largeStr: largeStr}],
     nModified: 1
 });
 
 // Multi-update.
 testUpdate({
     query: {x: 1},
-    initialDocumentList: [{_id: 1, x: 1}, {_id: 2, x: 1}],
+    initialDocumentList: [{_id: 1, x: 1, largeStr: largeStr}, {_id: 2, x: 1, largeStr: largeStr}],
     update: [{$set: {bar: 4}}],
-    resultDocList: [{_id: 1, x: 1, bar: 4}, {_id: 2, x: 1, bar: 4}],
+    resultDocList:
+        [{_id: 1, x: 1, largeStr: largeStr, bar: 4}, {_id: 2, x: 1, largeStr: largeStr, bar: 4}],
     nModified: 2,
     options: {multi: true}
 });
@@ -236,7 +240,6 @@ testUpdate({
     nModified: 1
 });
 
-const largeStr = "x".repeat(1000);
 testUpdate({
     query: {_id: 1},
     initialDocumentList: [{_id: 1, x: 1}],

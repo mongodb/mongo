@@ -209,12 +209,14 @@ function testNestedShardKeys(collName, keyPattern) {
     assert.commandWorked(sessionColl.update({_id: 15, skey: 1}, {$unset: {skey: 1}}));
     assert.docEq(sessionColl.findOne({_id: 15}), {_id: 15});
 
+    // This can be used to make sure pipeline-based updates generate delta oplog entries.
+    const largeStr = '*'.repeat(128);
     // For pipeline style.
-    assert.commandWorked(coll.insert({_id: 16, skey: {skey: 1}}));
+    assert.commandWorked(coll.insert({_id: 16, skey: {skey: 1}, largeStr: largeStr}));
     assert.commandWorked(sessionColl.update({_id: 16, "skey.skey": 1}, [{$unset: "skey.skey"}]));
-    assert.docEq(sessionColl.findOne({_id: 16}), {_id: 16, skey: {}});
+    assert.docEq(sessionColl.findOne({_id: 16}), {_id: 16, skey: {}, largeStr: largeStr});
     assert.commandWorked(sessionColl.update({_id: 16, skey: {}}, [{$unset: "skey"}]));
-    assert.docEq(sessionColl.findOne({_id: 16}), {_id: 16});
+    assert.docEq(sessionColl.findOne({_id: 16}), {_id: 16, largeStr: largeStr});
 }
 
 testNestedShardKeys("update_nested", {"skey.skey": 1});
