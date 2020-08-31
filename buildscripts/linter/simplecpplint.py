@@ -2,6 +2,7 @@
 """Simple C++ Linter."""
 
 import argparse
+import bisect
 import io
 import logging
 import re
@@ -58,6 +59,19 @@ _RE_MUTEX = re.compile('[ ({,]stdx?::mutex[ ({]')
 _RE_ASSERT = re.compile(r'\bassert\s*\(')
 _RE_UNSTRUCTURED_LOG = re.compile(r'\blogd\s*\(')
 
+_RE_GENERIC_FCV_COMMENT = re.compile(r'\(Generic FCV reference\):')
+GENERIC_FCV = [
+    r'::kLatest',
+    r'::kLastContinuous',
+    r'::kLastLTS',
+    r'::kUpgradingFromLastLTSToLatest',
+    r'::kUpgradingFromLastContinuousToLatest',
+    r'::kDowngradingFromLatestToLastLTS',
+    r'::kDowngradingFromLatestToLastContinuous',
+    r'\.isUpgradingOrDowngrading',
+]
+_RE_GENERIC_FCV_REF = re.compile(r'(' + '|'.join(GENERIC_FCV) + r')\b')
+
 
 class Linter:
     """Simple C++ Linter."""
@@ -68,6 +82,7 @@ class Linter:
         self.raw_lines = raw_lines
         self.clean_lines = []
         self.nolint_supression = []
+        self.generic_fcv_comments = []
         self._error_count = 0
 
         self.found_config_header = False
@@ -110,6 +125,11 @@ class Linter:
             self._check_for_mongo_unstructured_log(linenum)
             self._check_for_mongo_config_header(linenum)
 
+            # Relax the rule of commenting generic FCV references for files directly related to FCV
+            # implementations.
+            if not "feature_compatibility_version" in self.file_name:
+                self._check_for_generic_fcv(linenum)
+
         return self._error_count
 
     def _check_and_strip_comments(self):
@@ -124,6 +144,9 @@ class Linter:
             # so we need a regular expression
             if _RE_LINT.search(clean_line):
                 self.nolint_supression.append(linenum)
+
+            if _RE_GENERIC_FCV_COMMENT.search(clean_line):
+                self.generic_fcv_comments.append(linenum)
 
             if not in_multi_line_comment:
                 if "/*" in clean_line and not "*/" in clean_line:
@@ -254,6 +277,17 @@ class Linter:
         if not self.found_config_header and "MONGO_CONFIG_" in line:
             self._error(linenum, 'build/config_h_include',
                         'MONGO_CONFIG define used without prior inclusion of config.h.')
+
+    def _check_for_generic_fcv(self, linenum):
+        line = self.clean_lines[linenum]
+        if _RE_GENERIC_FCV_REF.search(line):
+            # Find the first generic FCV comment preceding the current line.
+            i = bisect.bisect_right(self.generic_fcv_comments, linenum)
+            if not i or self.generic_fcv_comments[i - 1] < (linenum - 10):
+                self._error(
+                    linenum, 'mongodb/fcv',
+                    'Please add a comment containing "(Generic FCV reference):" within 10 lines ' +
+                    'before the generic FCV reference.')
 
     def _error(self, linenum, category, message):
         if linenum in self.nolint_supression:

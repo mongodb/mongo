@@ -96,6 +96,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
     // create it.
     if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
             opCtx, NamespaceString::kServerConfigurationNamespace)) {
+        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         LOGV2(4926905,
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
               "document with last LTS version.",
@@ -122,6 +123,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
               "version"_attr = FeatureCompatibilityVersionParser::kVersion44);
 
         FeatureCompatibilityVersionDocument fcvDoc;
+        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
 
         writeConflictRetry(opCtx, "insertFCVDocument", fcvNss.ns(), [&] {

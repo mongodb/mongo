@@ -75,6 +75,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     // transactions here to release the global IX locks held by the transactions more proactively
     // rather than waiting for the transactions to complete. FCV changes take the global S lock when
     // in the upgrading/downgrading state.
+    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
         SessionKiller::Matcher matcherAllSessions(
             KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
