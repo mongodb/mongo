@@ -10750,7 +10750,7 @@ buildvariants:
   - name: .stitch
   - name: .publish
     distros:
-    - rhel82-arm64-small
+    - rhel80-small
 
 # This variant is to intentionally test uncommon features nightly
 - <<: *enterprise-rhel-70-64-bit-template
@@ -11112,7 +11112,7 @@ buildvariants:
   - name: .stitch
   - name: .publish
     distros:
-    - rhel82-arm64-small
+    - rhel80-small
 
 # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
 - name: rhel76_compile_rhel70
