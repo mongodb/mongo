@@ -536,14 +536,12 @@ __wt_meta_track_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_SESSION *wt_session;
 
     conn = S2C(session);
 
     /* Close the session used for metadata checkpoints. */
     if (conn->meta_ckpt_session != NULL) {
-        wt_session = &conn->meta_ckpt_session->iface;
-        WT_TRET(wt_session->close(wt_session, NULL));
+        WT_TRET(__wt_session_close_internal(conn->meta_ckpt_session));
         conn->meta_ckpt_session = NULL;
     }
 

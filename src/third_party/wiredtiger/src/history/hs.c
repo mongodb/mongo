@@ -42,10 +42,7 @@ __hs_start_internal_session(WT_SESSION_IMPL *session, WT_SESSION_IMPL **int_sess
 static int
 __hs_release_internal_session(WT_SESSION_IMPL *int_session)
 {
-    WT_SESSION *wt_session;
-
-    wt_session = &int_session->iface;
-    return (wt_session->close(wt_session, NULL));
+    return (__wt_session_close_internal(int_session));
 }
 
 /*

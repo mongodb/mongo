@@ -100,12 +100,8 @@ __wt_schema_internal_session(WT_SESSION_IMPL *session, WT_SESSION_IMPL **int_ses
 int
 __wt_schema_session_release(WT_SESSION_IMPL *session, WT_SESSION_IMPL *int_session)
 {
-    WT_SESSION *wt_session;
-
-    if (session != int_session) {
-        wt_session = &int_session->iface;
-        WT_RET(wt_session->close(wt_session, NULL));
-    }
+    if (session != int_session)
+        WT_RET(__wt_session_close_internal(int_session));
 
     return (0);
 }

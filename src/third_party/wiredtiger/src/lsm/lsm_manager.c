@@ -261,7 +261,6 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
     WT_DECL_RET;
     WT_LSM_MANAGER *manager;
     WT_LSM_WORK_UNIT *current;
-    WT_SESSION *wt_session;
     uint64_t removed;
     uint32_t i;
 
@@ -303,10 +302,8 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
         }
 
         /* Close all LSM worker sessions. */
-        for (i = 0; i < WT_LSM_MAX_WORKERS; i++) {
-            wt_session = &manager->lsm_worker_cookies[i].session->iface;
-            WT_TRET(wt_session->close(wt_session, NULL));
-        }
+        for (i = 0; i < WT_LSM_MAX_WORKERS; i++)
+            WT_TRET(__wt_session_close_internal(manager->lsm_worker_cookies[i].session));
     }
     WT_STAT_CONN_INCRV(session, lsm_work_units_discarded, removed);
 

@@ -281,7 +281,6 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
     WT_CACHE_POOL *cp;
     WT_CONNECTION_IMPL *conn, *entry;
     WT_DECL_RET;
-    WT_SESSION *wt_session;
     bool cp_locked, found;
 
     conn = S2C(session);
@@ -325,8 +324,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
         __wt_cond_signal(session, cp->cache_pool_cond);
         WT_TRET(__wt_thread_join(session, &cache->cp_tid));
 
-        wt_session = &cache->cp_session->iface;
-        WT_TRET(wt_session->close(wt_session, NULL));
+        WT_TRET(__wt_session_close_internal(cache->cp_session));
 
         /*
          * Grab the lock again now to stop other threads joining the pool while we are figuring out

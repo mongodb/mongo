@@ -682,7 +682,6 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_SESSION *wt_session;
 
     conn = S2C(session);
 
@@ -704,8 +703,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
 
     /* Close the server thread's session. */
     if (conn->stat_session != NULL) {
-        wt_session = &conn->stat_session->iface;
-        WT_TRET(wt_session->close(wt_session, NULL));
+        WT_TRET(__wt_session_close_internal(conn->stat_session));
         conn->stat_session = NULL;
     }
 

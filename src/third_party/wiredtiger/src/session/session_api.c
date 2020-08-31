@@ -259,22 +259,38 @@ __session_close_cached_cursors(WT_SESSION_IMPL *session)
 static int
 __session_close(WT_SESSION *wt_session, const char *config)
 {
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    conn = (WT_CONNECTION_IMPL *)wt_session->connection;
     session = (WT_SESSION_IMPL *)wt_session;
 
     SESSION_API_CALL_PREPARE_ALLOWED(session, close, config, cfg);
     WT_UNUSED(cfg);
+
+    return (__wt_session_close_internal(session));
+
+err:
+    API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __wt_session_close_internal --
+ *     Internal function of WT_SESSION->close method.
+ */
+int
+__wt_session_close_internal(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+
+    conn = S2C(session);
 
     /* Close all open cursors while the cursor cache is disabled. */
     F_CLR(session, WT_SESSION_CACHE_CURSORS);
 
     /* Rollback any active transaction. */
     if (F_ISSET(session->txn, WT_TXN_RUNNING))
-        WT_TRET(__session_rollback_transaction(wt_session, NULL));
+        WT_TRET(__session_rollback_transaction((WT_SESSION *)session, NULL));
 
     /*
      * Also release any pinned transaction ID from a non-transactional operation.
@@ -350,9 +366,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
     /* We no longer have a session, don't try to update it. */
     session = NULL;
-
-err:
-    API_END_RET_NOTFOUND_MAP(session, ret);
+    return (ret);
 }
 
 /*
@@ -2174,7 +2188,6 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, con
   bool open_metadata, WT_SESSION_IMPL **sessionp)
 {
     WT_DECL_RET;
-    WT_SESSION *wt_session;
     WT_SESSION_IMPL *session;
 
     *sessionp = NULL;
@@ -2192,8 +2205,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, con
     if (open_metadata) {
         WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
         if ((ret = __wt_metadata_cursor(session, NULL)) != 0) {
-            wt_session = &session->iface;
-            WT_TRET(wt_session->close(wt_session, NULL));
+            WT_TRET(__wt_session_close_internal(session));
             return (ret);
         }
     }

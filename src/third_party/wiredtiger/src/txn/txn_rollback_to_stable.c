@@ -1326,7 +1326,7 @@ __wt_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckp
      */
     if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !no_ckpt)
         WT_TRET(session->iface.checkpoint(&session->iface, "force=1"));
-    WT_TRET(session->iface.close(&session->iface, NULL));
+    WT_TRET(__wt_session_close_internal(session));
 
     return (ret);
 }

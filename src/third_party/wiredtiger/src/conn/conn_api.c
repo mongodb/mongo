@@ -1043,7 +1043,7 @@ err:
              */
             if (s->event_handler->handle_close != NULL)
                 WT_TRET(s->event_handler->handle_close(s->event_handler, wt_session, NULL));
-            WT_TRET(wt_session->close(wt_session, config));
+            WT_TRET(__wt_session_close_internal(s));
         }
 
     /* Wait for in-flight operations to complete. */
@@ -1080,7 +1080,7 @@ err:
     WT_TRET(__wt_checkpoint_server_destroy(session));
 
     /* Perform a final checkpoint and shut down the global transaction state. */
-    WT_TRET(__wt_txn_global_shutdown(session, config, cfg));
+    WT_TRET(__wt_txn_global_shutdown(session, cfg));
 
     if (ret != 0) {
         __wt_err(session, ret, "failure during close, disabling further writes");
@@ -2812,8 +2812,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     if (verify_meta) {
         WT_ERR(__wt_open_internal_session(conn, "verify hs", false, 0, &verify_session));
         ret = __wt_history_store_verify(verify_session);
-        wt_session = &verify_session->iface;
-        WT_TRET(wt_session->close(wt_session, NULL));
+        WT_TRET(__wt_session_close_internal(verify_session));
         WT_ERR(ret);
     }
 #endif

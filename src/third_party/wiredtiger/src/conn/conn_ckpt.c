@@ -198,7 +198,6 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_SESSION *wt_session;
 
     conn = S2C(session);
 
@@ -211,10 +210,8 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
     __wt_cond_destroy(session, &conn->ckpt_cond);
 
     /* Close the server thread's session. */
-    if (conn->ckpt_session != NULL) {
-        wt_session = &conn->ckpt_session->iface;
-        WT_TRET(wt_session->close(wt_session, NULL));
-    }
+    if (conn->ckpt_session != NULL)
+        WT_TRET(__wt_session_close_internal(conn->ckpt_session));
 
     /*
      * Ensure checkpoint settings are cleared - so that reconfigure doesn't get confused.

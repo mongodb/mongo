@@ -1991,12 +1991,11 @@ __wt_txn_activity_drain(WT_SESSION_IMPL *session)
  *     Shut down the global transaction state.
  */
 int
-__wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char *config, const char **cfg)
+__wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_SESSION *wt_session;
     WT_SESSION_IMPL *s;
     char ts_string[WT_TS_INT_STRING_SIZE];
     const char *ckpt_cfg;
@@ -2016,7 +2015,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char *config, const cha
         if (conn->txn_global.has_stable_timestamp)
             F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
     }
-    if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY)) {
+    if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY | WT_CONN_PANIC)) {
         /*
          * Perform rollback to stable to ensure that the stable version is written to disk on a
          * clean shutdown.
@@ -2033,7 +2032,6 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char *config, const cha
         if (s != NULL) {
             const char *checkpoint_cfg[] = {
               WT_CONFIG_BASE(session, WT_SESSION_checkpoint), ckpt_cfg, NULL};
-            wt_session = &s->iface;
             WT_TRET(__wt_txn_checkpoint(s, checkpoint_cfg, true));
 
             /*
@@ -2041,7 +2039,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char *config, const cha
              */
             WT_WITH_DHANDLE(s, WT_SESSION_META_DHANDLE(s), __wt_tree_modify_set(s));
 
-            WT_TRET(wt_session->close(wt_session, config));
+            WT_TRET(__wt_session_close_internal(s));
         }
     }
 

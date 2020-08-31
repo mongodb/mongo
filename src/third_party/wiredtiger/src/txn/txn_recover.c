@@ -897,7 +897,7 @@ err:
     if (eviction_started)
         WT_TRET(__wt_evict_destroy(session));
 
-    WT_TRET(session->iface.close(&session->iface, NULL));
+    WT_TRET(__wt_session_close_internal(session));
     F_CLR(conn, WT_CONN_RECOVERING);
 
     return (ret);
