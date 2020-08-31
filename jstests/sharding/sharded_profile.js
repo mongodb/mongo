@@ -25,7 +25,7 @@ var inserts = [{_id: 0}, {_id: 1}, {_id: 2}];
 
 assert.commandWorked(st.s1.getCollection(coll.toString()).insert(inserts));
 
-profileEntry = profileColl.findOne();
+profileEntry = profileColl.findOne({"op": "insert", "ns": coll.getFullName()});
 assert.neq(null, profileEntry);
 printjson(profileEntry);
 assert.eq(profileEntry.command.documents, inserts);
