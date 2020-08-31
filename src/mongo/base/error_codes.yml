@@ -183,7 +183,7 @@ error_codes:
     - {code: 146,name: ExceededMemoryLimit}
     - {code: 147,name: ZLibError}
     - {code: 148,name: ReadConcernMajorityNotEnabled,categories: [VoteAbortError]}
-    - {code: 149,name: NoConfigMaster}
+    - {code: 149,name: NoConfigPrimary}
     - {code: 150,name: StaleEpoch,categories: [StaleShardVersionError,NeedRetargettingError]}
     - {code: 151,name: OperationCannotBeBatched}
     - {code: 152,name: OplogOutOfOrder}
