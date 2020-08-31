@@ -2272,7 +2272,7 @@ BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
 
     const auto primaryHostAndPort = getCurrentPrimaryHostAndPort();
     if (primaryHostAndPort.empty()) {
-        uassertStatusOK(Status{ErrorCodes::NoConfigMaster, "Primary is unknown/down."});
+        uassertStatusOK(Status{ErrorCodes::NoConfigPrimary, "Primary is unknown/down."});
     }
 
     // Run the command via AsyncDBClient which performs a network call. This is also the desired
