@@ -195,6 +195,7 @@ const allCommands = {
     insert: {skip: isPrimaryOnly},
     internalRenameIfOptionsAndIndexesMatch: {skip: isAnInternalCommand},
     invalidateUserCache: {skip: isNotAUserDataRead},
+    isMaster: {skip: isNotAUserDataRead},
     killAllSessions: {skip: isNotAUserDataRead},
     killAllSessionsByPattern: {skip: isNotAUserDataRead},
     killCursors: {skip: isNotAUserDataRead},

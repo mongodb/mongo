@@ -470,6 +470,7 @@ let testCases = {
     internalRenameIfOptionsAndIndexesMatch: {skip: "internal command"},
     invalidateUserCache: {skip: "does not accept read or write concern"},
     isdbgrid: {skip: "does not accept read or write concern"},
+    isMaster: {skip: "does not accept read or write concern"},
     killAllSessions: {skip: "does not accept read or write concern"},
     killAllSessionsByPattern: {skip: "does not accept read or write concern"},
     killCursors: {skip: "does not accept read or write concern"},
