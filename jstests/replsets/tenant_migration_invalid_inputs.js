@@ -39,5 +39,15 @@ assert.commandFailedWithCode(primary.adminCommand({
 }),
                              ErrorCodes.InvalidOptions);
 
+// Test migrating a database to a recipient that has one or more same hosts as donor
+const conflictingRecipientConnectionString = "foo/bar:12345," + primary.host;
+assert.commandFailedWithCode(primary.adminCommand({
+    donorStartMigration: 1,
+    migrationId: UUID(),
+    recipientConnectionString: conflictingRecipientConnectionString,
+    databasePrefix: "testDbPrefix",
+    readPreference: {mode: "primary"}
+}),
+                             ErrorCodes.InvalidOptions);
 rst.stopSet();
 })();
