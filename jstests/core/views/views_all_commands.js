@@ -353,6 +353,7 @@ let viewsCommandTests = {
     internalRenameIfOptionsAndIndexesMatch: {skip: isAnInternalCommand},
     invalidateUserCache: {skip: isUnrelated},
     isdbgrid: {skip: isUnrelated},
+    isMaster: {skip: isUnrelated},
     killCursors: {
         setup: function(conn) {
             assert.commandWorked(conn.collection.remove({}));
