@@ -90,12 +90,11 @@ void MultiIndexBlockTest::tearDown() {
 TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
     auto indexer = getIndexer();
 
-    AutoGetCollection coll(operationContext(), getNSS(), MODE_X);
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(autoColl);
 
-    auto specs = unittest::assertGet(indexer->init(operationContext(),
-                                                   coll.getWritableCollection(),
-                                                   std::vector<BSONObj>(),
-                                                   MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(
+        operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext()));
@@ -114,12 +113,11 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
 TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
     auto indexer = getIndexer();
 
-    AutoGetCollection coll(operationContext(), getNSS(), MODE_X);
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(autoColl);
 
-    auto specs = unittest::assertGet(indexer->init(operationContext(),
-                                                   coll.getWritableCollection(),
-                                                   std::vector<BSONObj>(),
-                                                   MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(
+        operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(), {}, {}));
@@ -136,19 +134,17 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
     }
 
     // abort() should have no effect after the index build is committed.
-    indexer->abortIndexBuild(
-        operationContext(), coll.getWritableCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
 TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
     auto indexer = getIndexer();
 
-    AutoGetCollection coll(operationContext(), getNSS(), MODE_X);
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(autoColl);
 
-    auto specs = unittest::assertGet(indexer->init(operationContext(),
-                                                   coll.getWritableCollection(),
-                                                   std::vector<BSONObj>(),
-                                                   MultiIndexBlock::kNoopOnInitFn));
+    auto specs = unittest::assertGet(indexer->init(
+        operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(), {}, {}));
     auto isResumable = false;
@@ -158,7 +154,8 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
 TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
     auto indexer = getIndexer();
 
-    AutoGetCollection coll(operationContext(), getNSS(), MODE_X);
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(autoColl);
 
     BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
                               << "a_1"
@@ -167,7 +164,7 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
     {
         WriteUnitOfWork wuow(operationContext());
         ASSERT_THROWS_CODE(indexer->init(operationContext(),
-                                         coll.getWritableCollection(),
+                                         coll,
                                          {spec},
                                          [](std::vector<BSONObj>& specs) -> Status {
                                              throw WriteConflictException();
@@ -178,17 +175,12 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(indexer
-                      ->init(operationContext(),
-                             coll.getWritableCollection(),
-                             {spec},
-                             MultiIndexBlock::kNoopOnInitFn)
+        ASSERT_OK(indexer->init(operationContext(), coll, {spec}, MultiIndexBlock::kNoopOnInitFn)
                       .getStatus());
         wuow.commit();
     }
 
-    indexer->abortIndexBuild(
-        operationContext(), coll.getWritableCollection(), MultiIndexBlock::kNoopOnCleanUpFn);
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
 }  // namespace

@@ -87,7 +87,7 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
 }
 
 namespace {
-Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
+Status dropUnfinishedIndexes(OperationContext* opCtx, const Collection* collection) {
     std::vector<std::string> indexNames;
     auto durableCatalog = DurableCatalog::get(opCtx);
     durableCatalog->getAllIndexes(opCtx, collection->getCatalogId(), &indexNames);
@@ -173,7 +173,8 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
         auto clusterTime = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
 
         for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
-            auto collection = *collIt;
+            auto collection =
+                collIt.getWritableCollection(opCtx, CollectionCatalog::LifetimeMode::kInplace);
             if (collection) {
                 collection->setMinimumVisibleSnapshot(clusterTime);
             }
@@ -201,14 +202,17 @@ Status repairCollection(OperationContext* opCtx,
 
     LOGV2(21027, "Repairing collection", "namespace"_attr = nss);
 
-    auto collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
-    Status status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
+    Status status = Status::OK();
+    {
+        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+        status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
+    }
+
 
     // Need to lookup from catalog again because the old collection object was invalidated by
     // repairRecordStore.
-    collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
+    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(
+        opCtx, CollectionCatalog::LifetimeMode::kInplace, nss);
 
     // If data was modified during repairRecordStore, we know to rebuild indexes without needing
     // to run an expensive collection validation.

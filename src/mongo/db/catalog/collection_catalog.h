@@ -57,9 +57,23 @@ class CollectionCatalog {
 public:
     using CollectionInfoFn = std::function<bool(const Collection* collection)>;
 
+    enum class LifetimeMode {
+        // Lifetime of writable Collection is managed by an active write unit of work. The writable
+        // collection is installed in the catalog during commit.
+        kManagedInWriteUnitOfWork,
+
+        // Unmanaged writable Collection usable outside of write unit of work. Users need to commit
+        // the Collection to the catalog.
+        kUnmanagedClone,
+
+        // Inplace writable access to the Collection currently installed in the catalog. This is
+        // only safe when the server is in a state where there can be no concurrent readers.
+        kInplace
+    };
+
     class iterator {
     public:
-        using value_type = Collection*;
+        using value_type = const Collection*;
 
         iterator(StringData dbName, uint64_t genNum, const CollectionCatalog& catalog);
         iterator(std::map<std::pair<std::string, CollectionUUID>,
@@ -68,6 +82,8 @@ public:
         iterator operator++();
         iterator operator++(int);
         boost::optional<CollectionUUID> uuid();
+
+        Collection* getWritableCollection(OperationContext* opCtx, LifetimeMode mode);
 
         /*
          * Equality operators == and != do not attempt to reposition the iterators being compared.
@@ -164,6 +180,7 @@ public:
      * Returns nullptr if the 'uuid' is not known.
      */
     Collection* lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
+                                                       LifetimeMode mode,
                                                        CollectionUUID uuid);
     const Collection* lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
     std::shared_ptr<const Collection> lookupCollectionByUUIDForRead(OperationContext* opCtx,
@@ -186,6 +203,7 @@ public:
      * Returns nullptr if the namespace is unknown.
      */
     Collection* lookupCollectionByNamespaceForMetadataWrite(OperationContext* opCtx,
+                                                            LifetimeMode mode,
                                                             const NamespaceString& nss);
     const Collection* lookupCollectionByNamespace(OperationContext* opCtx,
                                                   const NamespaceString& nss) const;
@@ -325,6 +343,18 @@ public:
      * Inserts a new ResourceId 'rid' into the map with namespace 'entry'.
      */
     void addResource(const ResourceId& rid, const std::string& entry);
+
+    /**
+     * Commit unmanaged Collection that was acquired by lookupCollectionBy***ForMetadataWrite and
+     * lifetime mode kUnmanagedClone.
+     */
+    void commitUnmanagedClone(Collection* collection);
+
+    /**
+     * Discard unmanaged Collection that was acquired by lookupCollectionBy***ForMetadataWrite and
+     * lifetime mode kUnmanagedClone.
+     */
+    void discardUnmanagedClone(Collection* collection);
 
 private:
     friend class CollectionCatalog::iterator;

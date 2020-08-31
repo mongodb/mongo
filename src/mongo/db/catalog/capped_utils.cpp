@@ -71,9 +71,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     Database* db = autoDb.getDb();
     uassert(ErrorCodes::NamespaceNotFound, "no such database", db);
 
-    Collection* collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx,
-                                                                                  collectionName);
+    CollectionWriter collection(opCtx, collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
             collection || !ViewCatalog::get(db)->lookup(opCtx, collectionName.ns()));
@@ -96,7 +94,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
 
     WriteUnitOfWork wuow(opCtx);
 
-    Status status = collection->truncate(opCtx);
+    Status status = collection.getWritableCollection()->truncate(opCtx);
     if (!status.isOK()) {
         return status;
     }

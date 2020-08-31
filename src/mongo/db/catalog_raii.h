@@ -169,7 +169,7 @@ public:
         return _resolvedNss;
     }
 
-private:
+protected:
     AutoGetDb _autoDb;
 
     // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
@@ -205,15 +205,97 @@ struct CatalogCollectionLookupForRead {
 
 class AutoGetCollection : public AutoGetCollectionBase<CatalogCollectionLookup> {
 public:
-    using AutoGetCollectionBase::AutoGetCollectionBase;
+    AutoGetCollection(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nsOrUUID,
+        LockMode modeColl,
+        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        Date_t deadline = Date_t::max());
 
     /**
      * Returns writable Collection. Necessary Collection lock mode is required.
      * Any previous Collection that has been returned may be invalidated.
      */
-    Collection* getWritableCollection() const {
-        return const_cast<Collection*>(getCollection());
+    Collection* getWritableCollection(
+        CollectionCatalog::LifetimeMode mode =
+            CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
+
+    OperationContext* getOperationContext() const {
+        return _opCtx;
     }
+
+private:
+    Collection* _writableColl = nullptr;
+    OperationContext* _opCtx = nullptr;
+};
+
+/**
+ * RAII-style class to handle the lifetime of writable Collections.
+ * It does not take any locks, concurrency needs to be handled separately using explicit locks or
+ * AutoGetCollection. This class can serve as an adaptor to unify different methods of acquiring a
+ * writable collection.
+ *
+ * It is safe to re-use an instance for multiple WriteUnitOfWorks or to destroy it before the active
+ * WriteUnitOfWork finishes.
+ */
+class CollectionWriter final {
+public:
+    // Gets the collection from the catalog for the provided uuid
+    CollectionWriter(OperationContext* opCtx,
+                     const CollectionUUID& uuid,
+                     CollectionCatalog::LifetimeMode mode =
+                         CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
+    // Gets the collection from the catalog for the provided namespace string
+    CollectionWriter(OperationContext* opCtx,
+                     const NamespaceString& nss,
+                     CollectionCatalog::LifetimeMode mode =
+                         CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
+    // Acts as an adaptor for AutoGetCollection
+    CollectionWriter(AutoGetCollection& autoCollection,
+                     CollectionCatalog::LifetimeMode mode =
+                         CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
+    // Acts as an adaptor for a writable Collection that has been retrieved elsewhere
+    CollectionWriter(Collection* writableCollection);
+
+    ~CollectionWriter();
+
+    // Not allowed to copy or move.
+    CollectionWriter(const CollectionWriter&) = delete;
+    CollectionWriter(CollectionWriter&&) = delete;
+    CollectionWriter& operator=(const CollectionWriter&) = delete;
+    CollectionWriter& operator=(CollectionWriter&&) = delete;
+
+    explicit operator bool() const {
+        return get();
+    }
+
+    const Collection* operator->() const {
+        return get();
+    }
+
+    const Collection& operator*() const {
+        return *get();
+    }
+
+    const Collection* get() const {
+        return _collection;
+    }
+
+    // Returns writable Collection, any previous Collection that has been returned may be
+    // invalidated.
+    Collection* getWritableCollection();
+
+    // Commits unmanaged Collection to the catalog
+    void commitToCatalog();
+
+private:
+    const Collection* _collection = nullptr;
+    Collection* _writableCollection = nullptr;
+    OperationContext* _opCtx = nullptr;
+    CollectionCatalog::LifetimeMode _mode;
+
+    struct SharedImpl;
+    std::shared_ptr<SharedImpl> _sharedImpl;
 };
 
 /**

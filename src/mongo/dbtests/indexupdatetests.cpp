@@ -80,9 +80,9 @@ public:
         wuow.commit();
     }
 
-    Collection* collection() {
-        return CollectionCatalog::get(_opCtx).lookupCollectionByNamespaceForMetadataWrite(_opCtx,
-                                                                                          _nss);
+    CollectionWriter& collection() {
+        _collection.emplace(_opCtx, _nss);
+        return *_collection;
     }
 
 protected:
@@ -98,10 +98,10 @@ protected:
 
             uassertStatusOK(
                 indexer.init(_opCtx, collection(), key, MultiIndexBlock::kNoopOnInitFn));
-            uassertStatusOK(indexer.insertAllDocumentsInCollection(_opCtx, collection()));
+            uassertStatusOK(indexer.insertAllDocumentsInCollection(_opCtx, collection().get()));
             WriteUnitOfWork wunit(_opCtx);
             ASSERT_OK(indexer.commit(_opCtx,
-                                     collection(),
+                                     collection().getWritableCollection(),
                                      MultiIndexBlock::kNoopOnCreateEachFn,
                                      MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
@@ -123,6 +123,7 @@ protected:
 
     ServiceContext::UniqueOperationContext _txnPtr;  // = cc().makeOperationContext();
     OperationContext* _opCtx;                        // = _txnPtr.get();
+    boost::optional<CollectionWriter> _collection;
 };
 
 /** Index creation ignores unique constraints when told to. */
@@ -132,7 +133,7 @@ public:
     void run() {
         AutoGetOrCreateDb dbRaii(_opCtx, _nss.db(), LockMode::MODE_IX);
         Lock::CollectionLock collLk(_opCtx, _nss, LockMode::MODE_X);
-        Collection* coll = collection();
+        auto& coll = collection();
         {
             WriteUnitOfWork wunit(_opCtx);
             OpDebug* const nullOpDebug = nullptr;
@@ -163,12 +164,14 @@ public:
         });
 
         ASSERT_OK(indexer.init(_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
-        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll));
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
         ASSERT_OK(indexer.checkConstraints(_opCtx));
 
         WriteUnitOfWork wunit(_opCtx);
-        ASSERT_OK(indexer.commit(
-            _opCtx, coll, MultiIndexBlock::kNoopOnCreateEachFn, MultiIndexBlock::kNoopOnCommitFn));
+        ASSERT_OK(indexer.commit(_opCtx,
+                                 coll.getWritableCollection(),
+                                 MultiIndexBlock::kNoopOnCreateEachFn,
+                                 MultiIndexBlock::kNoopOnCommitFn));
         wunit.commit();
         abortOnExit.dismiss();
     }
@@ -183,7 +186,7 @@ public:
         AutoGetOrCreateDb dbRaii(_opCtx, _nss.db(), LockMode::MODE_IX);
         boost::optional<Lock::CollectionLock> collLk;
         collLk.emplace(_opCtx, _nss, LockMode::MODE_IX);
-        Collection* coll = collection();
+        auto& coll = collection();
         {
             WriteUnitOfWork wunit(_opCtx);
             OpDebug* const nullOpDebug = nullptr;
@@ -213,14 +216,15 @@ public:
             indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
-        ASSERT_OK(indexer.init(_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
+        ASSERT_OK(
+            indexer.init(_opCtx, collection(), spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
 
         auto desc =
             coll->getIndexCatalog()->findIndexByName(_opCtx, "a", true /* includeUnfinished */);
         ASSERT(desc);
 
         // Hybrid index builds check duplicates explicitly.
-        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll));
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
 
         auto status = indexer.checkConstraints(_opCtx);
         ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
@@ -236,11 +240,11 @@ public:
             boost::optional<Lock::CollectionLock> collLk;
             collLk.emplace(_opCtx, _nss, LockMode::MODE_X);
 
-            Collection* coll = collection();
+            auto& coll = collection();
             {
                 WriteUnitOfWork wunit(_opCtx);
                 // Drop all indexes including id index.
-                coll->getIndexCatalog()->dropAllIndexes(_opCtx, true);
+                coll.getWritableCollection()->getIndexCatalog()->dropAllIndexes(_opCtx, true);
                 // Insert some documents.
                 int32_t nDocs = 1000;
                 OpDebug* const nullOpDebug = nullptr;
@@ -335,7 +339,7 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.insertAllDocumentsInCollection(_opCtx, collection());
+    status = indexer.insertAllDocumentsInCollection(_opCtx, collection().get());
     if (!status.isOK()) {
         return status;
     }
@@ -345,7 +349,7 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
     }
     WriteUnitOfWork wunit(_opCtx);
     ASSERT_OK(indexer.commit(_opCtx,
-                             collection(),
+                             collection().getWritableCollection(),
                              MultiIndexBlock::kNoopOnCreateEachFn,
                              MultiIndexBlock::kNoopOnCommitFn));
     wunit.commit();

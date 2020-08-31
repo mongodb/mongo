@@ -80,7 +80,7 @@ IndexBuildsManager::~IndexBuildsManager() {
 }
 
 Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
-                                           Collection* collection,
+                                           CollectionWriter& collection,
                                            const std::vector<BSONObj>& specs,
                                            const UUID& buildUUID,
                                            OnInitFn onInit,
@@ -135,7 +135,7 @@ Status IndexBuildsManager::resumeBuildingIndexFromBulkLoadPhase(OperationContext
 }
 
 StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingIndexForRecovery(
-    OperationContext* opCtx, Collection* coll, const UUID& buildUUID, RepairData repair) {
+    OperationContext* opCtx, const Collection* coll, const UUID& buildUUID, RepairData repair) {
     auto builder = invariant(_getBuilder(buildUUID));
 
     // Iterate all records in the collection. Validate the records and index them
@@ -290,7 +290,7 @@ Status IndexBuildsManager::checkIndexConstraintViolations(OperationContext* opCt
 }
 
 Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
-                                            Collection* collection,
+                                            CollectionWriter& collection,
                                             const NamespaceString& nss,
                                             const UUID& buildUUID,
                                             MultiIndexBlock::OnCreateEachFn onCreateEachFn,
@@ -301,9 +301,10 @@ Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
         opCtx,
         "IndexBuildsManager::commitIndexBuild",
         nss.ns(),
-        [this, builder, buildUUID, opCtx, collection, nss, &onCreateEachFn, &onCommitFn] {
+        [this, builder, buildUUID, opCtx, &collection, nss, &onCreateEachFn, &onCommitFn] {
             WriteUnitOfWork wunit(opCtx);
-            auto status = builder->commit(opCtx, collection, onCreateEachFn, onCommitFn);
+            auto status = builder->commit(
+                opCtx, collection.getWritableCollection(), onCreateEachFn, onCommitFn);
             if (!status.isOK()) {
                 return status;
             }
@@ -313,7 +314,7 @@ Status IndexBuildsManager::commitIndexBuild(OperationContext* opCtx,
 }
 
 bool IndexBuildsManager::abortIndexBuild(OperationContext* opCtx,
-                                         Collection* collection,
+                                         CollectionWriter& collection,
                                          const UUID& buildUUID,
                                          OnCleanUpFn onCleanUpFn) {
     auto builder = _getBuilder(buildUUID);

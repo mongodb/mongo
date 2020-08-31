@@ -438,7 +438,7 @@ public:
      */
     virtual void cappedTruncateAfter(OperationContext* const opCtx,
                                      RecordId end,
-                                     const bool inclusive) = 0;
+                                     const bool inclusive) const = 0;
 
     /**
      * Returns a non-ok Status if validator is not legal for this collection.

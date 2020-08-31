@@ -320,20 +320,19 @@ Status dropIndexes(OperationContext* opCtx,
                    BSONObjBuilder* result) {
     // We only need to hold an intent lock to send abort signals to the active index builder(s) we
     // intend to abort.
-    boost::optional<AutoGetCollection> autoColl;
-    autoColl.emplace(opCtx, nss, MODE_IX);
+    boost::optional<AutoGetCollection> collection;
+    collection.emplace(opCtx, nss, MODE_IX);
 
-    Database* db = autoColl->getDb();
-    Collection* collection = autoColl->getWritableCollection();
-    Status status = checkView(opCtx, nss, db, collection);
+    Database* db = collection->getDb();
+    Status status = checkView(opCtx, nss, db, collection->getCollection());
     if (!status.isOK()) {
         return status;
     }
 
-    const UUID collectionUUID = collection->uuid();
+    const UUID collectionUUID = (*collection)->uuid();
     const NamespaceStringOrUUID dbAndUUID = {nss.db().toString(), collectionUUID};
 
-    status = checkReplState(opCtx, dbAndUUID, collection);
+    status = checkReplState(opCtx, dbAndUUID, collection->getCollection());
     if (!status.isOK()) {
         return status;
     }
@@ -346,7 +345,7 @@ Status dropIndexes(OperationContext* opCtx,
               "indexes"_attr = cmdObj[kIndexFieldName].toString(false));
     }
 
-    result->appendNumber("nIndexesWas", collection->getIndexCatalog()->numIndexesTotal(opCtx));
+    result->appendNumber("nIndexesWas", (*collection)->getIndexCatalog()->numIndexesTotal(opCtx));
 
     // Validate basic user input.
     BSONElement indexElem = cmdObj.getField(kIndexFieldName);
@@ -358,7 +357,7 @@ Status dropIndexes(OperationContext* opCtx,
             if (indexNameElem.type() != String) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream()
-                                  << "dropIndexes " << collection->ns() << " (" << collectionUUID
+                                  << "dropIndexes " << (*collection)->ns() << " (" << collectionUUID
                                   << ") failed to drop multiple indexes "
                                   << indexElem.toString(false) << ": index name must be a string");
             }
@@ -373,7 +372,7 @@ Status dropIndexes(OperationContext* opCtx,
     std::vector<UUID> abortedIndexBuilders;
     std::vector<std::string> indexNames;
     while (true) {
-        auto swIndexNames = getIndexNames(opCtx, collection, indexElem);
+        auto swIndexNames = getIndexNames(opCtx, collection->getCollection(), indexElem);
         if (!swIndexNames.isOK()) {
             return swIndexNames.getStatus();
         }
@@ -381,11 +380,11 @@ Status dropIndexes(OperationContext* opCtx,
         indexNames = swIndexNames.getValue();
 
         // Copy the namespace and UUID before dropping locks.
-        auto collUUID = collection->uuid();
-        auto collNs = collection->ns();
+        auto collUUID = (*collection)->uuid();
+        auto collNs = (*collection)->ns();
 
         // Release locks before aborting index builds. The helper will acquire locks on our behalf.
-        autoColl = boost::none;
+        collection = boost::none;
 
         // Send the abort signal to any index builders that match the users request. Waits until all
         // aborted builders complete.
@@ -400,22 +399,21 @@ Status dropIndexes(OperationContext* opCtx,
 
         // Take an exclusive lock on the collection now to be able to perform index catalog writes
         // when removing ready indexes from disk.
-        autoColl.emplace(opCtx, dbAndUUID, MODE_X);
+        collection.emplace(opCtx, dbAndUUID, MODE_X);
 
         // Abandon the snapshot as the index catalog will compare the in-memory state to the disk
         // state, which may have changed when we released the lock temporarily.
         opCtx->recoveryUnit()->abandonSnapshot();
 
-        db = autoColl->getDb();
-        collection = autoColl->getWritableCollection();
-        if (!collection) {
+        db = collection->getDb();
+        if (!*collection) {
             return Status(ErrorCodes::NamespaceNotFound,
                           str::stream()
                               << "Collection '" << nss << "' with UUID " << dbAndUUID.uuid()
                               << " in database " << dbAndUUID.db() << " does not exist.");
         }
 
-        status = checkReplState(opCtx, dbAndUUID, collection);
+        status = checkReplState(opCtx, dbAndUUID, collection->getCollection());
         if (!status.isOK()) {
             return status;
         }
@@ -441,12 +439,12 @@ Status dropIndexes(OperationContext* opCtx,
             WriteUnitOfWork wuow(opCtx);
 
             // This is necessary to check shard version.
-            OldClientContext ctx(opCtx, collection->ns().ns());
+            OldClientContext ctx(opCtx, (*collection)->ns().ns());
 
             // Iterate through all the aborted indexes and drop any indexes that are ready in the
             // index catalog. This would indicate that while we yielded our locks during the abort
             // phase, a new identical index was created.
-            auto indexCatalog = collection->getIndexCatalog();
+            auto indexCatalog = collection->getWritableCollection()->getIndexCatalog();
             const bool includeUnfinished = false;
             for (const auto& indexName : indexNames) {
                 auto desc = indexCatalog->findIndexByName(opCtx, indexName, includeUnfinished);
@@ -455,7 +453,8 @@ Status dropIndexes(OperationContext* opCtx,
                     continue;
                 }
 
-                Status status = dropIndexByDescriptor(opCtx, collection, indexCatalog, desc);
+                Status status =
+                    dropIndexByDescriptor(opCtx, collection->getCollection(), indexCatalog, desc);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -472,7 +471,7 @@ Status dropIndexes(OperationContext* opCtx,
         invariant(isWildcard);
         invariant(indexNames.size() == 1);
         invariant(indexNames.front() == "*");
-        invariant(collection->getIndexCatalog()->numIndexesInProgress(opCtx) == 0);
+        invariant((*collection)->getIndexCatalog()->numIndexesInProgress(opCtx) == 0);
     } else {
         // The index catalog requires that no active index builders are running when dropping
         // indexes.
@@ -484,11 +483,12 @@ Status dropIndexes(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
 
             // This is necessary to check shard version.
-            OldClientContext ctx(opCtx, collection->ns().ns());
+            OldClientContext ctx(opCtx, (*collection)->ns().ns());
 
             // Use an empty BSONObjBuilder to avoid duplicate appends to result on retry loops.
             BSONObjBuilder tempObjBuilder;
-            Status status = dropReadyIndexes(opCtx, collection, indexNames, &tempObjBuilder);
+            Status status = dropReadyIndexes(
+                opCtx, collection->getWritableCollection(), indexNames, &tempObjBuilder);
             if (!status.isOK()) {
                 return status;
             }

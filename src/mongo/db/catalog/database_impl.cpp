@@ -172,7 +172,8 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
 
     auto& catalog = CollectionCatalog::get(opCtx);
     for (const auto& uuid : catalog.getAllCollectionUUIDsFromDb(_name)) {
-        auto collection = catalog.lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
+        auto collection = catalog.lookupCollectionByUUIDForMetadataWrite(
+            opCtx, CollectionCatalog::LifetimeMode::kInplace, uuid);
         invariant(collection);
         // If this is called from the repair path, the collection is already initialized.
         if (!collection->isInitialized())
@@ -360,8 +361,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
             "dropCollection() cannot accept a valid drop optime when writes are replicated.");
     }
 
-    Collection* collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx, nss);
+    CollectionWriter collection(opCtx, nss);
 
     if (!collection) {
         return Status::OK();  // Post condition already met.
@@ -390,10 +390,10 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto opObserver = serviceContext->getOpObserver();
     auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, nss);
     if (dropOpTime.isNull() && isOplogDisabledForNamespace) {
-        _dropCollectionIndexes(opCtx, nss, collection);
+        _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection());
         opObserver->onDropCollection(
             opCtx, nss, uuid, numRecords, OpObserver::CollectionDropType::kOnePhase);
-        return _finishDropCollection(opCtx, nss, collection);
+        return _finishDropCollection(opCtx, nss, collection.get());
     }
 
     // Replicated collections should be dropped in two phases.
@@ -402,7 +402,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     // storage engine and will no longer be visible at the catalog layer with 3.6-style
     // <db>.system.drop.* namespaces.
     if (serviceContext->getStorageEngine()->supportsPendingDrops()) {
-        _dropCollectionIndexes(opCtx, nss, collection);
+        _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection());
 
         auto commitTimestamp = opCtx->recoveryUnit()->getCommitTimestamp();
         LOGV2(20314,
@@ -430,7 +430,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                       str::stream() << "OpTime is not null. OpTime: " << opTime.toString());
         }
 
-        return _finishDropCollection(opCtx, nss, collection);
+        return _finishDropCollection(opCtx, nss, collection.get());
     }
 
     // Old two-phase drop: Replicated collections will be renamed with a special drop-pending
@@ -527,8 +527,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
                                     << "' because the destination namespace already exists");
     }
 
-    Collection* collToRename =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx, fromNss);
+    CollectionWriter collToRename(opCtx, fromNss);
     if (!collToRename) {
         return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
     }
@@ -550,12 +549,13 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     // Set the namespace of 'collToRename' from within the CollectionCatalog. This is necessary
     // because the CollectionCatalog mutex synchronizes concurrent access to the collection's
     // namespace for callers that may not hold a collection lock.
-    CollectionCatalog::get(opCtx).setCollectionNamespace(opCtx, collToRename, fromNss, toNss);
+    auto writableCollection = collToRename.getWritableCollection();
+    CollectionCatalog::get(opCtx).setCollectionNamespace(opCtx, writableCollection, fromNss, toNss);
 
-    opCtx->recoveryUnit()->onCommit([collToRename](auto commitTime) {
+    opCtx->recoveryUnit()->onCommit([writableCollection](auto commitTime) {
         // Ban reading from this collection on committed reads on snapshots before now.
         if (commitTime) {
-            collToRename->setMinimumVisibleSnapshot(commitTime.get());
+            writableCollection->setMinimumVisibleSnapshot(commitTime.get());
         }
     });
 

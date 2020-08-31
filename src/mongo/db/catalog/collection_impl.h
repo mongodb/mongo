@@ -237,7 +237,7 @@ public:
      * The caller should hold a collection X lock and ensure there are no index builds in progress
      * on the collection.
      */
-    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) final;
+    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) const final;
 
     /**
      * Returns a non-ok Status if validator is not legal for this collection.

@@ -59,9 +59,8 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient&
                                                    const BSONObj& idIndexSpec)
     : _client{std::move(client)},
       _opCtx{std::move(opCtx)},
-      _autoColl{std::move(autoColl)},
-      _collection{_autoColl->getWritableCollection()},
-      _nss{_autoColl->getCollection()->ns()},
+      _collection{std::move(autoColl)},
+      _nss{_collection->getCollection()->ns()},
       _idIndexBlock(std::make_unique<MultiIndexBlock>()),
       _secondaryIndexesBlock(std::make_unique<MultiIndexBlock>()),
       _idIndexSpec(idIndexSpec.getOwned()) {
@@ -75,20 +74,20 @@ CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
 }
 
 Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
-    return _runTaskReleaseResourcesOnFailure([coll = _autoColl->getCollection(),
-                                              &secondaryIndexSpecs,
-                                              this]() -> Status {
+    return _runTaskReleaseResourcesOnFailure([&secondaryIndexSpecs, this]() -> Status {
+        WriteUnitOfWork wuow(_opCtx.get());
         // All writes in CollectionBulkLoaderImpl should be unreplicated.
         // The opCtx is accessed indirectly through _secondaryIndexesBlock.
         UnreplicatedWritesBlock uwb(_opCtx.get());
         // This enforces the buildIndexes setting in the replica set configuration.
-        auto indexCatalog = coll->getIndexCatalog();
+        CollectionWriter collWriter(*_collection);
+        auto indexCatalog = collWriter.getWritableCollection()->getIndexCatalog();
         auto specs = indexCatalog->removeExistingIndexesNoChecks(_opCtx.get(), secondaryIndexSpecs);
         if (specs.size()) {
             _secondaryIndexesBlock->ignoreUniqueConstraint();
             auto status =
                 _secondaryIndexesBlock
-                    ->init(_opCtx.get(), _collection, specs, MultiIndexBlock::kNoopOnInitFn)
+                    ->init(_opCtx.get(), collWriter, specs, MultiIndexBlock::kNoopOnInitFn)
                     .getStatus();
             if (!status.isOK()) {
                 return status;
@@ -99,7 +98,7 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
         if (!_idIndexSpec.isEmpty()) {
             auto status =
                 _idIndexBlock
-                    ->init(_opCtx.get(), _collection, _idIndexSpec, MultiIndexBlock::kNoopOnInitFn)
+                    ->init(_opCtx.get(), collWriter, _idIndexSpec, MultiIndexBlock::kNoopOnInitFn)
                     .getStatus();
             if (!status.isOK()) {
                 return status;
@@ -108,6 +107,7 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
             _idIndexBlock.reset();
         }
 
+        wuow.commit();
         return Status::OK();
     });
 }
@@ -134,8 +134,9 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
                     const auto& doc = *insertIter++;
                     bytesInBlock += doc.objsize();
                     // This version of insert will not update any indexes.
-                    const auto status = _autoColl->getCollection()->insertDocumentForBulkLoader(
-                        _opCtx.get(), doc, onRecordInserted);
+                    const auto status =
+                        (*_collection)
+                            ->insertDocumentForBulkLoader(_opCtx.get(), doc, onRecordInserted);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -181,8 +182,8 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForCappedCollection(
                 WriteUnitOfWork wunit(_opCtx.get());
                 // For capped collections, we use regular insertDocument, which
                 // will update pre-existing indexes.
-                const auto status = _autoColl->getCollection()->insertDocument(
-                    _opCtx.get(), InsertStatement(doc), nullptr);
+                const auto status =
+                    (*_collection)->insertDocument(_opCtx.get(), InsertStatement(doc), nullptr);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -235,7 +236,7 @@ Status CollectionBulkLoaderImpl::commit() {
                     WriteUnitOfWork wunit(_opCtx.get());
                     auto status =
                         _secondaryIndexesBlock->commit(_opCtx.get(),
-                                                       _collection,
+                                                       _collection->getWritableCollection(),
                                                        MultiIndexBlock::kNoopOnCreateEachFn,
                                                        MultiIndexBlock::kNoopOnCommitFn);
                     if (!status.isOK()) {
@@ -262,12 +263,13 @@ Status CollectionBulkLoaderImpl::commit() {
                             // before committing the index build, the index removal code uses
                             // 'dupsAllowed', which forces the storage engine to only unindex
                             // records that match the same key and RecordId.
-                            _autoColl->getCollection()->deleteDocument(_opCtx.get(),
-                                                                       kUninitializedStmtId,
-                                                                       rid,
-                                                                       nullptr /** OpDebug **/,
-                                                                       false /* fromMigrate */,
-                                                                       true /* noWarn */);
+                            (*_collection)
+                                ->deleteDocument(_opCtx.get(),
+                                                 kUninitializedStmtId,
+                                                 rid,
+                                                 nullptr /** OpDebug **/,
+                                                 false /* fromMigrate */,
+                                                 true /* noWarn */);
                             wunit.commit();
                             return Status::OK();
                         });
@@ -296,7 +298,7 @@ Status CollectionBulkLoaderImpl::commit() {
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
                     auto status = _idIndexBlock->commit(_opCtx.get(),
-                                                        _collection,
+                                                        _collection->getWritableCollection(),
                                                         MultiIndexBlock::kNoopOnCreateEachFn,
                                                         MultiIndexBlock::kNoopOnCommitFn);
                     if (!status.isOK()) {
@@ -322,7 +324,7 @@ Status CollectionBulkLoaderImpl::commit() {
         // _releaseResources.
         _idIndexBlock.reset();
         _secondaryIndexesBlock.reset();
-        _autoColl.reset();
+        _collection.reset();
         return Status::OK();
     });
 }
@@ -330,19 +332,20 @@ Status CollectionBulkLoaderImpl::commit() {
 void CollectionBulkLoaderImpl::_releaseResources() {
     invariant(&cc() == _opCtx->getClient());
     if (_secondaryIndexesBlock) {
+        CollectionWriter collWriter(*_collection);
         _secondaryIndexesBlock->abortIndexBuild(
-            _opCtx.get(), _collection, MultiIndexBlock::kNoopOnCleanUpFn);
+            _opCtx.get(), collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
         _secondaryIndexesBlock.reset();
     }
 
     if (_idIndexBlock) {
-        _idIndexBlock->abortIndexBuild(
-            _opCtx.get(), _collection, MultiIndexBlock::kNoopOnCleanUpFn);
+        CollectionWriter collWriter(*_collection);
+        _idIndexBlock->abortIndexBuild(_opCtx.get(), collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
         _idIndexBlock.reset();
     }
 
     // release locks.
-    _autoColl.reset();
+    _collection.reset();
 }
 
 template <typename F>

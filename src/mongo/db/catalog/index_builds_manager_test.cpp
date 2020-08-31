@@ -81,18 +81,14 @@ std::vector<BSONObj> makeSpecs(const NamespaceString& nss, std::vector<std::stri
 
 TEST_F(IndexBuildsManagerTest, IndexBuildsManagerSetUpAndTearDown) {
     AutoGetCollection autoColl(operationContext(), _nss, MODE_X);
+    CollectionWriter collection(autoColl);
 
     auto specs = makeSpecs(_nss, {"a", "b"});
-    ASSERT_OK(_indexBuildsManager.setUpIndexBuild(operationContext(),
-                                                  autoColl.getWritableCollection(),
-                                                  specs,
-                                                  _buildUUID,
-                                                  MultiIndexBlock::kNoopOnInitFn));
+    ASSERT_OK(_indexBuildsManager.setUpIndexBuild(
+        operationContext(), collection, specs, _buildUUID, MultiIndexBlock::kNoopOnInitFn));
 
-    _indexBuildsManager.abortIndexBuild(operationContext(),
-                                        autoColl.getWritableCollection(),
-                                        _buildUUID,
-                                        MultiIndexBlock::kNoopOnCleanUpFn);
+    _indexBuildsManager.abortIndexBuild(
+        operationContext(), collection, _buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
     _indexBuildsManager.unregisterIndexBuild(_buildUUID);
 }
 }  // namespace

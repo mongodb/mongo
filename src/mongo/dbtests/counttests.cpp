@@ -51,21 +51,23 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
 
-            _collection =
-                CollectionCatalog::get(&_opCtx).lookupCollectionByNamespaceForMetadataWrite(&_opCtx,
-                                                                                            nss());
-            if (_collection) {
+            auto collection =
+                CollectionCatalog::get(&_opCtx).lookupCollectionByNamespaceForMetadataWrite(
+                    &_opCtx, CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork, nss());
+            if (collection) {
                 _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            _collection = _database->createCollection(&_opCtx, nss());
+            collection = _database->createCollection(&_opCtx, nss());
 
-            IndexCatalog* indexCatalog = _collection->getIndexCatalog();
+            IndexCatalog* indexCatalog = collection->getIndexCatalog();
             auto indexSpec = BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
                                       << "key" << BSON("a" << 1) << "name"
                                       << "a_1");
             uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(&_opCtx, indexSpec));
 
             wunit.commit();
+
+            _collection = collection;
         }
     }
 
@@ -115,7 +117,7 @@ protected:
     OldClientContext _context;
 
     Database* _database;
-    Collection* _collection;
+    const Collection* _collection;
 
     DBDirectClient _client;
 };

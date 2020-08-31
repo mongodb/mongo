@@ -106,7 +106,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     {
         WriteUnitOfWork wunit(opCtx);
         coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(
-            opCtx, NamespaceString(ns));
+            opCtx, CollectionCatalog::LifetimeMode::kInplace, NamespaceString(ns));
         if (!coll) {
             coll = autoDb.getDb()->createCollection(opCtx, NamespaceString(ns));
         }
@@ -114,11 +114,12 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         wunit.commit();
     }
     MultiIndexBlock indexer;
-    auto abortOnExit =
-        makeGuard([&] { indexer.abortIndexBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
+    CollectionWriter collection(coll);
+    auto abortOnExit = makeGuard(
+        [&] { indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
     Status status = indexer
                         .init(opCtx,
-                              coll,
+                              collection,
                               spec,
                               [opCtx](const std::vector<BSONObj>& specs) -> Status {
                                   if (opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {

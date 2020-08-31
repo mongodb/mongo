@@ -1027,7 +1027,9 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void CollectionImpl::cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
+void CollectionImpl::cappedTruncateAfter(OperationContext* opCtx,
+                                         RecordId end,
+                                         bool inclusive) const {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
     invariant(isCapped());
     invariant(_indexCatalog->numIndexesInProgress(opCtx) == 0);

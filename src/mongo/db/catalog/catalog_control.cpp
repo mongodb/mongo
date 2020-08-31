@@ -190,8 +190,8 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
              CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName)) {
             // Note that the collection name already includes the database component.
             auto collection =
-                CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(opCtx,
-                                                                                          collNss);
+                CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(
+                    opCtx, CollectionCatalog::LifetimeMode::kInplace, collNss);
             invariant(collection,
                       str::stream()
                           << "failed to get valid collection pointer for namespace " << collNss);

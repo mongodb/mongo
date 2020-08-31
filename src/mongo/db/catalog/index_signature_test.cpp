@@ -44,10 +44,10 @@ public:
     IndexSignatureTest() : CatalogTestFixture() {}
 
     StatusWith<const IndexCatalogEntry*> createIndex(BSONObj spec) {
-        // Get the index catalog associated with the test collection.
-        auto* indexCatalog = coll()->getIndexCatalog();
         // Build the specified index on the collection.
         WriteUnitOfWork wuow(opCtx());
+        // Get the index catalog associated with the test collection.
+        auto* indexCatalog = _coll->getWritableCollection()->getIndexCatalog();
         auto status = indexCatalog->createIndexOnEmptyCollection(opCtx(), spec);
         if (!status.isOK()) {
             return status.getStatus();
@@ -68,8 +68,8 @@ public:
         return _nss;
     }
 
-    Collection* coll() const {
-        return _coll->getWritableCollection();
+    const Collection* coll() const {
+        return (*_coll).getCollection();
     }
 
     OperationContext* opCtx() {

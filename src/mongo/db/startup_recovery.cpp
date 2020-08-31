@@ -164,13 +164,16 @@ bool checkIdIndexExists(OperationContext* opCtx, RecordId catalogId) {
 Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
     LOGV2(4805002, "Building missing _id index", logAttrs(*collection));
     MultiIndexBlock indexer;
-    auto abortOnExit = makeGuard(
-        [&] { indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn); });
+    auto abortOnExit = makeGuard([&] {
+        CollectionWriter collWriter(collection);
+        indexer.abortIndexBuild(opCtx, collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
+    });
 
     const auto indexCatalog = collection->getIndexCatalog();
     const auto idIndexSpec = indexCatalog->getDefaultIdIndexSpec();
 
-    auto swSpecs = indexer.init(opCtx, collection, idIndexSpec, MultiIndexBlock::kNoopOnInitFn);
+    CollectionWriter collWriter(collection);
+    auto swSpecs = indexer.init(opCtx, collWriter, idIndexSpec, MultiIndexBlock::kNoopOnInitFn);
     if (!swSpecs.isOK()) {
         return swSpecs.getStatus();
     }
@@ -213,7 +216,7 @@ Status ensureCollectionProperties(OperationContext* opCtx,
                                   Database* db,
                                   EnsureIndexPolicy ensureIndexPolicy) {
     for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
-        auto coll = *collIt;
+        auto coll = collIt.getWritableCollection(opCtx, CollectionCatalog::LifetimeMode::kInplace);
         if (!coll) {
             break;
         }

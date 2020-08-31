@@ -145,8 +145,7 @@ public:
         }
 
         // Lock the database in mode IX and lock the collection exclusively.
-        AutoGetCollection autoColl(opCtx, fullNs, MODE_X);
-        Collection* collection = autoColl.getWritableCollection();
+        AutoGetCollection collection(opCtx, fullNs, MODE_X);
         if (!collection) {
             uasserted(ErrorCodes::NamespaceNotFound,
                       str::stream() << "collection " << fullNs.ns() << " does not exist");
@@ -163,7 +162,7 @@ public:
             // end.
             auto exec = InternalPlanner::collectionScan(opCtx,
                                                         fullNs.ns(),
-                                                        collection,
+                                                        collection.getCollection(),
                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                         InternalPlanner::BACKWARD);
 

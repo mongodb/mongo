@@ -68,14 +68,14 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             _database = _context.db();
-            _collection =
-                CollectionCatalog::get(&_opCtx).lookupCollectionByNamespaceForMetadataWrite(&_opCtx,
-                                                                                            nss());
-            if (_collection) {
+            auto collection =
+                CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
+            if (collection) {
                 _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
-            _collection = _database->createCollection(&_opCtx, nss());
+            collection = _database->createCollection(&_opCtx, nss());
             wunit.commit();
+            _collection = collection;
         }
 
         addIndex(IndexSpec().addKey("a").unique(false));
@@ -104,17 +104,18 @@ protected:
         builder.append("v", int(IndexDescriptor::kLatestIndexVersion));
         auto specObj = builder.obj();
 
+        CollectionWriter collection(&_opCtx, _collection->ns());
         MultiIndexBlock indexer;
         auto abortOnExit = makeGuard([&] {
-            indexer.abortIndexBuild(&_opCtx, _collection, MultiIndexBlock::kNoopOnCleanUpFn);
+            indexer.abortIndexBuild(&_opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
         });
         {
             WriteUnitOfWork wunit(&_opCtx);
             uassertStatusOK(
-                indexer.init(&_opCtx, _collection, specObj, MultiIndexBlock::kNoopOnInitFn));
+                indexer.init(&_opCtx, collection, specObj, MultiIndexBlock::kNoopOnInitFn));
             wunit.commit();
         }
-        uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, _collection));
+        uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, collection.get()));
         uassertStatusOK(
             indexer.drainBackgroundWrites(&_opCtx,
                                           RecoveryUnit::ReadSource::kNoTimestamp,
@@ -123,12 +124,13 @@ protected:
         {
             WriteUnitOfWork wunit(&_opCtx);
             uassertStatusOK(indexer.commit(&_opCtx,
-                                           _collection,
+                                           collection.getWritableCollection(),
                                            MultiIndexBlock::kNoopOnCreateEachFn,
                                            MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
         }
         abortOnExit.dismiss();
+        _collection = collection.get();
     }
 
     void insert(const char* s) {
@@ -160,7 +162,7 @@ protected:
     OldClientContext _context;
 
     Database* _database;
-    Collection* _collection;
+    const Collection* _collection;
 };
 
 class FindOneOr : public Base {

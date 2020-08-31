@@ -103,6 +103,12 @@ CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*()
     return _mapIter->second.get();
 }
 
+Collection* CollectionCatalog::iterator::getWritableCollection(OperationContext* opCtx,
+                                                               LifetimeMode mode) {
+    return CollectionCatalog::get(opCtx).lookupCollectionByUUIDForMetadataWrite(
+        opCtx, mode, operator*()->uuid());
+}
+
 boost::optional<CollectionUUID> CollectionCatalog::iterator::uuid() {
     return _uuid;
 }
@@ -269,8 +275,26 @@ std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByUUIDForRe
 }
 
 Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
+                                                                      LifetimeMode mode,
                                                                       CollectionUUID uuid) {
-    return const_cast<Collection*>(lookupCollectionByUUID(opCtx, uuid));
+    if (mode == LifetimeMode::kManagedInWriteUnitOfWork) {
+        // Placeholder to invariant if not in wuow
+        opCtx->recoveryUnit()->onCommit([](boost::optional<Timestamp>) {});
+    }
+
+    if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
+        invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IX));
+        return coll.get();
+    }
+
+    stdx::lock_guard<Latch> lock(_catalogLock);
+    auto coll = _lookupCollectionByUUID(lock, uuid);
+    if (coll && coll->isCommitted()) {
+        invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_X));
+        return coll.get();
+    }
+
+    return nullptr;
 }
 
 const Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
@@ -315,8 +339,26 @@ std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByNamespace
 }
 
 Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    return const_cast<Collection*>(lookupCollectionByNamespace(opCtx, nss));
+    OperationContext* opCtx, LifetimeMode mode, const NamespaceString& nss) {
+    if (mode == LifetimeMode::kManagedInWriteUnitOfWork) {
+        // Placeholder to invariant if not in wuow
+        opCtx->recoveryUnit()->onCommit([](boost::optional<Timestamp>) {});
+    }
+
+    if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
+        invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+        return coll.get();
+    }
+
+    stdx::lock_guard<Latch> lock(_catalogLock);
+    auto it = _collections.find(nss);
+    auto coll = (it == _collections.end() ? nullptr : it->second);
+    if (coll && coll->isCommitted()) {
+        invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+        return coll.get();
+    }
+
+    return nullptr;
 }
 
 const Collection* CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
@@ -647,6 +689,14 @@ void CollectionCatalog::addResource(const ResourceId& rid, const std::string& en
     }
 
     namespaces.insert(entry);
+}
+
+void CollectionCatalog::commitUnmanagedClone(Collection* collection) {
+    // TODO SERVER-50145
+}
+
+void CollectionCatalog::discardUnmanagedClone(Collection* collection) {
+    // TODO SERVER-50145
 }
 
 }  // namespace mongo

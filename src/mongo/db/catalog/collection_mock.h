@@ -170,7 +170,7 @@ public:
         std::abort();
     }
 
-    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
+    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) const {
         std::abort();
     }
 

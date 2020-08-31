@@ -118,7 +118,7 @@ MultiIndexBlock::~MultiIndexBlock() {
 MultiIndexBlock::OnCleanUpFn MultiIndexBlock::kNoopOnCleanUpFn = []() {};
 
 void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
-                                      Collection* collection,
+                                      CollectionWriter& collection,
                                       OnCleanUpFn onCleanUp) noexcept {
     if (_collectionUUID) {
         // init() was previously called with a collection pointer, so ensure that the same
@@ -139,7 +139,7 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
             // This cleans up all index builds. Because that may need to write, it is done inside of
             // a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
             for (size_t i = 0; i < _indexes.size(); i++) {
-                _indexes[i].block->fail(opCtx, collection);
+                _indexes[i].block->fail(opCtx, collection.getWritableCollection());
                 _indexes[i].block->finalizeTemporaryTables(
                     opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
             }
@@ -187,7 +187,7 @@ MultiIndexBlock::OnInitFn MultiIndexBlock::makeTimestampedIndexOnInitFn(Operatio
 }
 
 StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
-                                                       Collection* collection,
+                                                       CollectionWriter& collection,
                                                        const BSONObj& spec,
                                                        OnInitFn onInit) {
     const auto indexes = std::vector<BSONObj>(1, spec);
@@ -196,7 +196,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 
 StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     OperationContext* opCtx,
-    Collection* collection,
+    CollectionWriter& collection,
     const std::vector<BSONObj>& indexSpecs,
     OnInitFn onInit,
     const boost::optional<ResumeIndexInfo>& resumeInfo) {
@@ -277,7 +277,11 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             boost::optional<IndexSorterInfo> sorterInfo;
             IndexToBuild index;
             index.block = std::make_unique<IndexBuildBlock>(
-                collection->getIndexCatalog(), collection->ns(), info, _method, _buildUUID);
+                collection.getWritableCollection()->getIndexCatalog(),
+                collection->ns(),
+                info,
+                _method,
+                _buildUUID);
             if (resumeInfo) {
                 auto resumeInfoIndexes = resumeInfo->getIndexes();
                 // Find the resume information that corresponds to this spec.
@@ -296,9 +300,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
                 sorterInfo = *sorterInfoIt;
                 status = index.block->initForResume(
-                    opCtx, collection, *sorterInfo, resumeInfo->getPhase());
+                    opCtx, collection.getWritableCollection(), *sorterInfo, resumeInfo->getPhase());
             } else {
-                status = index.block->init(opCtx, collection);
+                status = index.block->init(opCtx, collection.getWritableCollection());
             }
             if (!status.isOK())
                 return status;
