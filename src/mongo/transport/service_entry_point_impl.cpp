@@ -40,6 +40,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/hello_metrics.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/processinfo.h"
@@ -164,16 +165,6 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     auto clientName = "conn{}"_format(session->id());
     auto client = _svcCtx->makeClient(clientName, session);
 
-    {
-        stdx::lock_guard lk(*client);
-        auto seCtx =
-            transport::ServiceExecutorContext{}
-                .setThreadingModel(transport::ServiceExecutorContext::ThreadingModel::kDedicated)
-                .setCanUseReserved(canOverrideMaxConns);
-
-        transport::ServiceExecutorContext::set(client.get(), std::move(seCtx));
-    }
-
     auto ssm = std::make_shared<transport::ServiceStateMachine>(std::move(client));
 
     const bool quiet = serverGlobalParams.quiet.load();
@@ -197,6 +188,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         if (!quiet) {
             LOGV2(22942,
                   "Connection refused because there are too many open connections",
+                  "remote"_attr = session->remote(),
                   "connectionCount"_attr = connectionCount);
         }
         return;
@@ -228,7 +220,10 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         }
     });
 
-    ssm->start();
+    auto seCtx = transport::ServiceExecutorContext{};
+    seCtx.setThreadingModel(transport::ServiceExecutorContext::ThreadingModel::kDedicated);
+    seCtx.setCanUseReserved(canOverrideMaxConns);
+    ssm->start(std::move(seCtx));
 }
 
 void ServiceEntryPointImpl::endAllSessions(transport::Session::TagMask tags) {
@@ -330,6 +325,13 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
 
     invariant(_svcCtx);
     bob->append("active", static_cast<int>(_svcCtx->getActiveClientOperations()));
+
+    const auto seStats = transport::ServiceExecutorStats::get(_svcCtx);
+    bob->append("threaded", static_cast<int>(seStats.usesDedicated));
+    if (serverGlobalParams.maxConnsOverride.size()) {
+        bob->append("limitExempt", static_cast<int>(seStats.limitExempt));
+    }
+
     bob->append("exhaustIsMaster",
                 static_cast<int>(HelloMetrics::get(_svcCtx)->getNumExhaustIsMaster()));
     bob->append("exhaustHello", static_cast<int>(HelloMetrics::get(_svcCtx)->getNumExhaustHello()));

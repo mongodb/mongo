@@ -146,21 +146,43 @@ public:
      */
     static void set(Client* client, ServiceExecutorContext seCtx) noexcept;
 
+
+    /**
+     * Reset the ServiceExecutorContext for a given client.
+     *
+     * This function may only be invoked once and only while under the Client lock.
+     */
+    static void reset(Client* client) noexcept;
+
     ServiceExecutorContext() = default;
+    ServiceExecutorContext(const ServiceExecutorContext&) = delete;
+    ServiceExecutorContext& operator=(const ServiceExecutorContext&) = delete;
+    ServiceExecutorContext(ServiceExecutorContext&& seCtx)
+        : _client{std::exchange(seCtx._client, nullptr)},
+          _sep{std::exchange(seCtx._sep, nullptr)},
+          _threadingModel{seCtx._threadingModel},
+          _canUseReserved{seCtx._canUseReserved} {}
+    ServiceExecutorContext& operator=(ServiceExecutorContext&& seCtx) {
+        _client = std::exchange(seCtx._client, nullptr);
+        _sep = std::exchange(seCtx._sep, nullptr);
+        _threadingModel = seCtx._threadingModel;
+        _canUseReserved = seCtx._canUseReserved;
+        return *this;
+    }
 
     /**
      * Set the ThreadingModel for the associated Client's service execution.
      *
      * This function is only valid to invoke with the Client lock or before the Client is set.
      */
-    ServiceExecutorContext& setThreadingModel(ThreadingModel threadingModel) noexcept;
+    void setThreadingModel(ThreadingModel threadingModel) noexcept;
 
     /**
      * Set if reserved resources are available for the associated Client's service execution.
      *
      * This function is only valid to invoke with the Client lock or before the Client is set.
      */
-    ServiceExecutorContext& setCanUseReserved(bool canUseReserved) noexcept;
+    void setCanUseReserved(bool canUseReserved) noexcept;
 
     /**
      * Get the ThreadingModel for the associated Client.
@@ -177,7 +199,7 @@ public:
      * This function is only valid to invoke from the associated Client thread. This function does
      * not require the Client lock since all writes must also happen from that thread.
      */
-    ServiceExecutor* getServiceExecutor() const noexcept;
+    ServiceExecutor* getServiceExecutor() noexcept;
 
 private:
     friend StringData toString(ThreadingModel threadingModel);
@@ -187,8 +209,31 @@ private:
 
     ThreadingModel _threadingModel = ThreadingModel::kDedicated;
     bool _canUseReserved = false;
+    bool _hasUsedSynchronous = false;
 };
 
+/**
+ * A small statlet for tracking which executors may be in use.
+ */
+class ServiceExecutorStats {
+public:
+    /**
+     * Get the current value of ServiceExecutorStats for the given ServiceContext.
+     *
+     * Note that this value is intended for statistics and logging. It is unsynchronized and
+     * unsuitable for informing decisions in runtime.
+     */
+    static ServiceExecutorStats get(ServiceContext* ctx) noexcept;
+
+    // The number of Clients who use the dedicated executors.
+    size_t usesDedicated = 0;
+
+    // The number of Clients who use the borrowed executors.
+    size_t usesBorrowed = 0;
+
+    // The number of Clients that are allowed to ignore maxConns and use reserved resources.
+    size_t limitExempt = 0;
+};
 
 }  // namespace transport
 

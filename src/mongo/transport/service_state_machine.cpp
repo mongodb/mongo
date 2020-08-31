@@ -162,9 +162,6 @@ Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
 }
 }  // namespace
 
-using transport::ServiceExecutor;
-using transport::TransportLayer;
-
 /*
  * This class wraps up the logic for swapping/unswapping the Client when transitioning
  * between states.
@@ -177,115 +174,83 @@ class ServiceStateMachine::ThreadGuard {
 
 public:
     explicit ThreadGuard(ServiceStateMachine* ssm) : _ssm{ssm} {
-        auto owned = Ownership::kUnowned;
-        _ssm->_owned.compareAndSwap(&owned, Ownership::kOwned);
-        if (owned == Ownership::kStatic) {
-            dassert(haveClient());
-            dassert(Client::getCurrent() == _ssm->_dbClientPtr);
-            _haveTakenOwnership = true;
+        invariant(_ssm);
+
+        if (_ssm->_clientPtr == Client::getCurrent()) {
+            // We're not the first on this thread, nothing more to do.
             return;
         }
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
-        invariant(owned == Ownership::kUnowned);
-        _ssm->_owningThread.store(stdx::this_thread::get_id());
-#endif
+        auto& client = _ssm->_client;
+        invariant(client);
 
         // Set up the thread name
         auto oldThreadName = getThreadName();
-        const auto& threadName = _ssm->_dbClient->desc();
+        const auto& threadName = client->desc();
         if (oldThreadName != threadName) {
             _oldThreadName = oldThreadName.toString();
             setThreadName(threadName);
         }
 
         // Swap the current Client so calls to cc() work as expected
-        Client::setCurrent(std::move(_ssm->_dbClient));
+        Client::setCurrent(std::move(client));
         _haveTakenOwnership = true;
     }
 
     // Constructing from a moved ThreadGuard invalidates the other thread guard.
     ThreadGuard(ThreadGuard&& other)
-        : _ssm(other._ssm), _haveTakenOwnership(other._haveTakenOwnership) {
-        other._haveTakenOwnership = false;
-    }
+        : _ssm{std::exchange(other._ssm, nullptr)},
+          _haveTakenOwnership{std::exchange(_haveTakenOwnership, false)} {}
 
     ThreadGuard& operator=(ThreadGuard&& other) {
-        if (this != &other) {
-            _ssm = other._ssm;
-            _haveTakenOwnership = other._haveTakenOwnership;
-            other._haveTakenOwnership = false;
-        }
+        _ssm = std::exchange(other._ssm, nullptr);
+        _haveTakenOwnership = std::exchange(other._haveTakenOwnership, false);
         return *this;
     };
 
     ThreadGuard() = delete;
 
     ~ThreadGuard() {
-        if (_haveTakenOwnership)
-            release();
+        release();
     }
 
     explicit operator bool() const {
-#ifdef MONGO_CONFIG_DEBUG_BUILD
-        if (_haveTakenOwnership) {
-            invariant(_ssm->_owned.load() != Ownership::kUnowned);
-            invariant(_ssm->_owningThread.load() == stdx::this_thread::get_id());
-            return true;
-        } else {
-            return false;
-        }
-#else
-        return _haveTakenOwnership;
-#endif
-    }
-
-    void markStaticOwnership() {
-        dassert(static_cast<bool>(*this));
-        _ssm->_owned.store(Ownership::kStatic);
+        return _ssm;
     }
 
     void release() {
-        auto owned = _ssm->_owned.load();
-
-#ifdef MONGO_CONFIG_DEBUG_BUILD
-        dassert(_haveTakenOwnership);
-        dassert(owned != Ownership::kUnowned);
-        dassert(_ssm->_owningThread.load() == stdx::this_thread::get_id());
-#endif
-        if (owned != Ownership::kStatic) {
-            if (haveClient()) {
-                _ssm->_dbClient = Client::releaseCurrent();
-            }
-
-            if (!_oldThreadName.empty()) {
-                setThreadName(_oldThreadName);
-            }
-        }
-
-        // If the session has ended, then it's unsafe to do anything but call the cleanup hook.
-        if (_ssm->state() == State::Ended) {
-            // The cleanup hook gets moved out of _ssm->_cleanupHook so that it can only be called
-            // once.
-            auto cleanupHook = std::move(_ssm->_cleanupHook);
-            if (cleanupHook)
-                cleanupHook();
-
-            // It's very important that the Guard returns here and that the SSM's state does not
-            // get modified in any way after the cleanup hook is called.
+        if (!_ssm) {
+            // We've been released or moved from.
             return;
         }
 
-        _haveTakenOwnership = false;
-        // If owned != Ownership::kOwned here then it can only equal Ownership::kStatic and we
-        // should just return
-        if (owned == Ownership::kOwned) {
-            _ssm->_owned.store(Ownership::kUnowned);
+        // If we have a ServiceStateMachine pointer, then it should control the current Client.
+        invariant(_ssm->_clientPtr == Client::getCurrent());
+
+        if (auto haveTakenOwnership = std::exchange(_haveTakenOwnership, false);
+            !haveTakenOwnership) {
+            // Reset our pointer so that we cannot release again.
+            _ssm = nullptr;
+
+            // We are not the original owner, nothing more to do.
+            return;
+        }
+
+        // Reclaim the client.
+        _ssm->_client = Client::releaseCurrent();
+
+        // Reset our pointer so that we cannot release again.
+        _ssm = nullptr;
+
+        if (!_oldThreadName.empty()) {
+            // Reset the old thread name.
+            setThreadName(_oldThreadName);
         }
     }
 
 private:
-    ServiceStateMachine* _ssm;
+    ServiceStateMachine* _ssm = nullptr;
+
     bool _haveTakenOwnership = false;
     std::string _oldThreadName;
 };
@@ -294,22 +259,23 @@ ServiceStateMachine::ServiceStateMachine(ServiceContext::UniqueClient client)
     : _state{State::Created},
       _serviceContext{client->getServiceContext()},
       _sep{_serviceContext->getServiceEntryPoint()},
-      _dbClient{std::move(client)},
-      _dbClientPtr{_dbClient.get()} {}
+      _client{std::move(client)},
+      _clientPtr{_client.get()} {}
 
-const transport::SessionHandle& ServiceStateMachine::_session() const {
-    return _dbClientPtr->session();
+const transport::SessionHandle& ServiceStateMachine::_session() {
+    return _clientPtr->session();
 }
 
 ServiceExecutor* ServiceStateMachine::_executor() {
-    return ServiceExecutorContext::get(_dbClientPtr)->getServiceExecutor();
+    return ServiceExecutorContext::get(_clientPtr)->getServiceExecutor();
 }
 
-Future<void> ServiceStateMachine::_sourceMessage(ThreadGuard guard) {
+Future<void> ServiceStateMachine::_sourceMessage() {
+    auto guard = ThreadGuard(this);
+
     invariant(_inMessage.empty());
     invariant(_state.load() == State::Source);
     _state.store(State::SourceWait);
-    guard.release();
 
     auto sourceMsgImpl = [&] {
         const auto& transportMode = _executor()->transportMode();
@@ -332,11 +298,12 @@ Future<void> ServiceStateMachine::_sourceMessage(ThreadGuard guard) {
     });
 }
 
-Future<void> ServiceStateMachine::_sinkMessage(ThreadGuard guard) {
+Future<void> ServiceStateMachine::_sinkMessage() {
+    auto guard = ThreadGuard(this);
+
     // Sink our response to the client
     invariant(_state.load() == State::Process);
     _state.store(State::SinkWait);
-    guard.release();
     auto toSink = std::exchange(_outMessage, {});
 
     auto sinkMsgImpl = [&] {
@@ -359,12 +326,10 @@ Future<void> ServiceStateMachine::_sinkMessage(ThreadGuard guard) {
 }
 
 void ServiceStateMachine::_sourceCallback(Status status) {
-    // The first thing to do is create a ThreadGuard which will take ownership of the SSM in this
-    // thread.
-    ThreadGuard guard(this);
+    auto guard = ThreadGuard(this);
 
-    // Make sure we just called sourceMessage();
-    dassert(state() == State::SourceWait);
+    invariant(state() == State::SourceWait);
+
     auto remote = _session()->remote();
 
     if (status.isOK()) {
@@ -404,11 +369,9 @@ void ServiceStateMachine::_sourceCallback(Status status) {
 }
 
 void ServiceStateMachine::_sinkCallback(Status status) {
-    // The first thing to do is create a ThreadGuard which will take ownership of the SSM in this
-    // thread.
-    ThreadGuard guard(this);
+    auto guard = ThreadGuard(this);
 
-    dassert(state() == State::SinkWait);
+    invariant(state() == State::SinkWait);
 
     // If there was an error sinking the message to the client, then we should print an error and
     // end the session.
@@ -430,7 +393,9 @@ void ServiceStateMachine::_sinkCallback(Status status) {
     }
 }
 
-Future<void> ServiceStateMachine::_processMessage(ThreadGuard guard) {
+Future<void> ServiceStateMachine::_processMessage() {
+    auto guard = ThreadGuard(this);
+
     invariant(!_inMessage.empty());
 
     TrafficRecorder::get(_serviceContext)
@@ -458,10 +423,10 @@ Future<void> ServiceStateMachine::_processMessage(ThreadGuard guard) {
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
     return _sep->handleRequest(opCtx.get(), _inMessage)
-        .then([this,
-               &compressorMgr = compressorMgr,
-               opCtx = std::move(opCtx),
-               guard = std::move(guard)](DbResponse dbresponse) mutable -> void {
+        .then([this, &compressorMgr = compressorMgr, opCtx = std::move(opCtx)](
+                  DbResponse dbresponse) mutable -> void {
+            auto guard = ThreadGuard(this);
+
             // opCtx must be killed and delisted here so that the operation cannot show up in
             // currentOp results after the response reaches the client. The destruction is postponed
             // for later to mitigate its performance impact on the critical path of execution.
@@ -518,14 +483,15 @@ Future<void> ServiceStateMachine::_processMessage(ThreadGuard guard) {
         });
 }
 
-void ServiceStateMachine::start() {
+void ServiceStateMachine::start(ServiceExecutorContext seCtx) {
+    {
+        stdx::lock_guard lk(*_clientPtr);
+
+        ServiceExecutorContext::set(_clientPtr, std::move(seCtx));
+    }
+
     _executor()->schedule(
         GuaranteedExecutor::enforceRunOnce([this, anchor = shared_from_this()](Status status) {
-            // TODO(SERVER-49109) We can't use static ownership in general with
-            // a ServiceExecutorFixed and async commands. ThreadGuard needs to become smarter.
-            ThreadGuard guard(shared_from_this().get());
-            guard.markStaticOwnership();
-
             // If this is the first run of the SSM, then update its state to Source
             if (state() == State::Created) {
                 _state.store(State::Source);
@@ -540,16 +506,16 @@ void ServiceStateMachine::_runOnce() {
         if (_inExhaust) {
             return Status::OK();
         } else {
-            return _sourceMessage(ThreadGuard(this));
+            return _sourceMessage();
         }
     })
-        .then([this]() { return _processMessage(ThreadGuard(this)); })
+        .then([this]() { return _processMessage(); })
         .then([this]() -> Future<void> {
             if (_outMessage.empty()) {
                 return Status::OK();
             }
 
-            return _sinkMessage(ThreadGuard(this));
+            return _sinkMessage();
         })
         .getAsync([this, anchor = shared_from_this()](Status status) {
             // Destroy the opCtx (already killed) here, to potentially use the delay between
@@ -559,9 +525,9 @@ void ServiceStateMachine::_runOnce() {
             }
             if (!status.isOK()) {
                 _state.store(State::EndSession);
-                // The service executor failed to schedule the task. This could for example be that
-                // we failed to start a worker thread. Terminate this connection to leave the system
-                // in a valid state.
+                // The service executor failed to schedule the task. This could for example be
+                // that we failed to start a worker thread. Terminate this connection to leave
+                // the system in a valid state.
                 LOGV2_WARNING_OPTIONS(4910400,
                                       {logv2::LogComponent::kExecutor},
                                       "Terminating session due to error: {error}",
@@ -569,8 +535,8 @@ void ServiceStateMachine::_runOnce() {
                                       "error"_attr = status);
                 terminate();
 
-                ThreadGuard terminateGuard(this);
-                _cleanupSession(std::move(terminateGuard));
+                _executor()->schedule(GuaranteedExecutor::enforceRunOnce(
+                    [this, anchor = shared_from_this()](Status status) { _cleanupSession(); }));
                 return;
             }
 
@@ -592,8 +558,8 @@ void ServiceStateMachine::terminateIfTagsDontMatch(transport::Session::TagMask t
 
     auto sessionTags = _session()->getTags();
 
-    // If terminateIfTagsDontMatch gets called when we still are 'pending' where no tags have been
-    // set, then skip the termination check.
+    // If terminateIfTagsDontMatch gets called when we still are 'pending' where no tags have
+    // been set, then skip the termination check.
     if ((sessionTags & tags) || (sessionTags & transport::Session::kPending)) {
         LOGV2(22991,
               "Skip closing connection for connection",
@@ -645,7 +611,9 @@ void ServiceStateMachine::_cleanupExhaustResources() noexcept try {
           "error"_attr = e.toStatus());
 }
 
-void ServiceStateMachine::_cleanupSession(ThreadGuard guard) {
+void ServiceStateMachine::_cleanupSession() {
+    auto guard = ThreadGuard(this);
+
     // Ensure the delayed destruction of opCtx always happens before doing the cleanup.
     if (MONGO_likely(_killedOpCtx)) {
         _killedOpCtx.reset();
@@ -654,15 +622,20 @@ void ServiceStateMachine::_cleanupSession(ThreadGuard guard) {
 
     _cleanupExhaustResources();
 
+    {
+        stdx::lock_guard lk(*_clientPtr);
+        transport::ServiceExecutorContext::reset(_clientPtr);
+    }
+
+    if (auto cleanupHook = std::exchange(_cleanupHook, {})) {
+        cleanupHook();
+    }
+
     _state.store(State::Ended);
 
     _inMessage.reset();
 
     _outMessage.reset();
-
-    // By ignoring the return value of Client::releaseCurrent() we destroy the session.
-    // _dbClient is now nullptr and _dbClientPtr is invalid and should never be accessed.
-    Client::releaseCurrent();
 }
 
 }  // namespace transport

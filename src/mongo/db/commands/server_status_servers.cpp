@@ -78,7 +78,7 @@ public:
         return true;
     }
 
-    // TODO: need to track connections in server stats (see SERVER-49073)
+    // TODO: need to track connections in server stats (see SERVER-49109)
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder b;
