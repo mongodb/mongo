@@ -656,11 +656,11 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult(
     if (!isError)
         return result;
 
-    // We only check for "not master or secondary" errors here
+    // We only check for NotPrimaryOrSecondary errors here
 
     // If the error code here ever changes, we need to change this code also
     BSONElement code = error["code"];
-    if (code.isNumber() && code.Int() == ErrorCodes::NotMasterOrSecondary) {
+    if (code.isNumber() && code.Int() == ErrorCodes::NotPrimaryOrSecondary) {
         isntSecondary();
         uasserted(14812,
                   str::stream() << "slave " << _lastSlaveOkHost.toString()
@@ -671,10 +671,10 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult(
 }
 
 void DBClientReplicaSet::isntSecondary() {
-    // Failover to next slave
+    // Failover to next secondary
     _getMonitor()->failedHost(
         _lastSlaveOkHost,
-        {ErrorCodes::NotMasterOrSecondary,
+        {ErrorCodes::NotPrimaryOrSecondary,
          str::stream() << "slave no longer has secondary status: " << _lastSlaveOkHost});
 
     resetSlaveOkConn();
@@ -885,7 +885,7 @@ void DBClientReplicaSet::checkResponse(const std::vector<BSONObj>& batch,
 
         if (networkError ||
             (hasErrField(dataObj) && !dataObj["code"].eoo() &&
-             dataObj["code"].Int() == ErrorCodes::NotMasterOrSecondary)) {
+             dataObj["code"].Int() == ErrorCodes::NotPrimaryOrSecondary)) {
             if (_lazyState._lastClient == _lastSlaveOkConn.get()) {
                 isntSecondary();
             } else if (_lazyState._lastClient == _master.get()) {

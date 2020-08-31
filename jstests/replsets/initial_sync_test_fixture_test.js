@@ -81,7 +81,7 @@ secondary.setSlaveOk();
 
 // Make sure that we cannot read from this node yet.
 assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
-                             ErrorCodes.NotMasterOrSecondary);
+                             ErrorCodes.NotPrimaryOrSecondary);
 
 // Make sure that we saw the listDatabases call in the log messages, but didn't see any
 // listCollections or listIndexes call.
@@ -115,7 +115,7 @@ for (let dbObj of databases) {
 
     // Make sure that we cannot read from this node yet.
     assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
-                                 ErrorCodes.NotMasterOrSecondary);
+                                 ErrorCodes.NotPrimaryOrSecondary);
 
     // Make sure that we saw the listCollections call in the log messages, but didn't see a
     // listIndexes call.
@@ -131,7 +131,7 @@ for (let dbObj of databases) {
 
         // Make sure that we cannot read from this node yet.
         assert.commandFailedWithCode(secondary.getDB("test").runCommand({count: "foo"}),
-                                     ErrorCodes.NotMasterOrSecondary);
+                                     ErrorCodes.NotPrimaryOrSecondary);
 
         // Make sure that we saw the listIndexes call in the log messages, but didn't
         // see a listCollections call.
