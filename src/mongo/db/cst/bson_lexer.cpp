@@ -104,6 +104,7 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"$indexOfBytes", PipelineParserGen::token::INDEX_OF_BYTES},
     {"$indexOfCP", PipelineParserGen::token::INDEX_OF_CP},
     {"$ltrim", PipelineParserGen::token::LTRIM},
+    {"$meta", PipelineParserGen::token::META},
     {"$regexFind", PipelineParserGen::token::REGEX_FIND},
     {"$regexFindAll", PipelineParserGen::token::REGEX_FIND_ALL},
     {"$regexMatch", PipelineParserGen::token::REGEX_MATCH},
@@ -130,6 +131,13 @@ const StringMap<PipelineParserGen::token_type> reservedKeyLookup = {
     {"find", PipelineParserGen::token::ARG_FIND},
     {"replacement", PipelineParserGen::token::ARG_REPLACEMENT},
 };
+// Mapping of reserved keywords to BSON tokens. Any key which is not included in this map is
+// assumed to be a user value.
+const StringMap<PipelineParserGen::token_type> reservedKeyValueLookup = {
+    {"randVal", PipelineParserGen::token::RAND_VAL},
+    {"textScore", PipelineParserGen::token::TEXT_SCORE},
+};
+
 bool isCompound(PipelineParserGen::symbol_type token) {
     return token.type_get() == static_cast<int>(PipelineParserGen::token::START_OBJECT) ||
         token.type_get() == static_cast<int>(PipelineParserGen::token::START_ARRAY);
@@ -246,11 +254,18 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
         case NumberDouble:
             if (elem.numberDouble() == 0.0)
                 pushToken(elem, PipelineParserGen::token::DOUBLE_ZERO);
+            else if (elem.numberDouble() == 1.0)
+                pushToken(elem, PipelineParserGen::token::DOUBLE_ONE);
+            else if (elem.numberDouble() == -1.0)
+                pushToken(elem, PipelineParserGen::token::DOUBLE_NEGATIVE_ONE);
             else
-                pushToken(elem, PipelineParserGen::token::DOUBLE_NON_ZERO, elem.numberDouble());
+                pushToken(elem, PipelineParserGen::token::DOUBLE_OTHER, elem.numberDouble());
             break;
         case BSONType::String:
-            if (elem.valueStringData()[0] == '$') {
+            if (auto it = reservedKeyValueLookup.find(elem.valueStringData());
+                it != reservedKeyValueLookup.end()) {
+                pushToken(elem.String(), it->second);
+            } else if (elem.valueStringData()[0] == '$') {
                 if (elem.valueStringData()[1] == '$') {
                     pushToken(elem.valueStringData(),
                               PipelineParserGen::token::DOLLAR_DOLLAR_STRING,
@@ -314,8 +329,12 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
         case NumberInt:
             if (elem.numberInt() == 0)
                 pushToken(elem, PipelineParserGen::token::INT_ZERO);
+            else if (elem.numberInt() == 1)
+                pushToken(elem, PipelineParserGen::token::INT_ONE);
+            else if (elem.numberInt() == -1)
+                pushToken(elem, PipelineParserGen::token::INT_NEGATIVE_ONE);
             else
-                pushToken(elem, PipelineParserGen::token::INT_NON_ZERO, elem.numberInt());
+                pushToken(elem, PipelineParserGen::token::INT_OTHER, elem.numberInt());
             break;
         case BSONType::bsonTimestamp:
             pushToken(elem, PipelineParserGen::token::TIMESTAMP, elem.timestamp());
@@ -323,14 +342,22 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
         case NumberLong:
             if (elem.numberLong() == 0ll)
                 pushToken(elem, PipelineParserGen::token::LONG_ZERO);
+            else if (elem.numberLong() == 1ll)
+                pushToken(elem, PipelineParserGen::token::LONG_ONE);
+            else if (elem.numberLong() == -1ll)
+                pushToken(elem, PipelineParserGen::token::LONG_NEGATIVE_ONE);
             else
-                pushToken(elem, PipelineParserGen::token::LONG_NON_ZERO, elem.numberLong());
+                pushToken(elem, PipelineParserGen::token::LONG_OTHER, elem.numberLong());
             break;
         case NumberDecimal:
             if (elem.numberDecimal() == Decimal128::kNormalizedZero)
                 pushToken(elem, PipelineParserGen::token::DECIMAL_ZERO);
-            else
-                pushToken(elem, PipelineParserGen::token::DECIMAL_NON_ZERO, elem.numberDecimal());
+            else if (elem.numberDecimal() == Decimal128(1)) {
+                pushToken(elem, PipelineParserGen::token::DECIMAL_ONE);
+            } else if (elem.numberDecimal() == Decimal128(-1)) {
+                pushToken(elem, PipelineParserGen::token::DECIMAL_NEGATIVE_ONE);
+            } else
+                pushToken(elem, PipelineParserGen::token::DECIMAL_OTHER, elem.numberDecimal());
             break;
         case BSONType::MinKey:
             pushToken(elem, PipelineParserGen::token::MIN_KEY, UserMinKey{});

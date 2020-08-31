@@ -71,6 +71,7 @@
     ENUMIFY(lte)                 \
     ENUMIFY(ltrim)               \
     ENUMIFY(match)               \
+    ENUMIFY(meta)                \
     ENUMIFY(mod)                 \
     ENUMIFY(multiply)            \
     ENUMIFY(ne)                  \
@@ -88,8 +89,8 @@
     ENUMIFY(regexFindAll)        \
     ENUMIFY(regexMatch)          \
     ENUMIFY(replaceAll)          \
-    ENUMIFY(replacementArg)      \
     ENUMIFY(replaceOne)          \
+    ENUMIFY(replacementArg)      \
     ENUMIFY(round)               \
     ENUMIFY(rtrim)               \
     ENUMIFY(sample)              \
@@ -97,9 +98,9 @@
     ENUMIFY(skip)                \
     ENUMIFY(split)               \
     ENUMIFY(sqrt)                \
-    ENUMIFY(strcasecmp)          \
     ENUMIFY(strLenBytes)         \
     ENUMIFY(strLenCP)            \
+    ENUMIFY(strcasecmp)          \
     ENUMIFY(substr)              \
     ENUMIFY(substrBytes)         \
     ENUMIFY(substrCP)            \

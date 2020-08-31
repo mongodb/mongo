@@ -31,27 +31,14 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/printable_enum.h"
+#include <memory>
 
-#define KEYVALUES(ENUMIFY)    \
-    ENUMIFY(intOneKey)        \
-    ENUMIFY(intNegOneKey)     \
-    ENUMIFY(intZeroKey)       \
-    ENUMIFY(longOneKey)       \
-    ENUMIFY(longNegOneKey)    \
-    ENUMIFY(longZeroKey)      \
-    ENUMIFY(doubleOneKey)     \
-    ENUMIFY(doubleNegOneKey)  \
-    ENUMIFY(doubleZeroKey)    \
-    ENUMIFY(decimalOneKey)    \
-    ENUMIFY(decimalNegOneKey) \
-    ENUMIFY(decimalZeroKey)   \
-    ENUMIFY(trueKey)          \
-    ENUMIFY(falseKey)         \
-    ENUMIFY(absentKey)        \
-    ENUMIFY(textScore)        \
-    ENUMIFY(randVal)
+#include "mongo/db/cst/c_node.h"
+#include "mongo/db/query/sort_pattern.h"
 
-MAKE_PRINTABLE_ENUM(KeyValue, KEYVALUES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(key_value, KeyValue, KEYVALUES);
-#undef KEYVALUES
+namespace mongo::cst_sort_translation {
+
+SortPattern translateSortSpec(const CNode& cst,
+                              const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+}  // namespace mongo::cst_sort_translation

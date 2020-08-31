@@ -78,13 +78,13 @@ TEST(CstErrorTest, UnknownStageName) {
 
 TEST(CstErrorTest, InvalidStageArgument) {
     {
-        auto input = fromjson("{pipeline: [{$sample: 1}]}");
+        auto input = fromjson("{pipeline: [{$sample: 2}]}");
         BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
         ASSERT_THROWS_CODE_AND_WHAT(
             PipelineParserGen(lexer, nullptr).parse(),
             AssertionException,
             ErrorCodes::FailedToParse,
-            "syntax error, unexpected non-zero integer, expecting object at element '1' within "
+            "syntax error, unexpected arbitrary integer, expecting object at element '2' within "
             "'$sample' within array at index 0 of input pipeline");
     }
     {
@@ -198,6 +198,36 @@ TEST(CstErrorTest, DeeplyNestedSyntaxError) {
         "within "
         "array at index 0 within '$or' within array at index 1 within '$and' within '$project' "
         "within array at index 0 of input pipeline");
+}
+
+TEST(CstErrorTest, SortWithRandomIntFails) {
+    auto input = fromjson("{val: 5}");
+    BSONLexer lexer(input, PipelineParserGen::token::START_SORT);
+    ASSERT_THROWS_CODE_AND_WHAT(
+        PipelineParserGen(lexer, nullptr).parse(),
+        AssertionException,
+        ErrorCodes::FailedToParse,
+        "syntax error, unexpected arbitrary integer at element '5' of input filter");
+}
+
+TEST(CstErrorTest, SortWithInvalidMetaFails) {
+    auto input = fromjson("{val: {$meta: \"str\"}}");
+    BSONLexer lexer(input, PipelineParserGen::token::START_SORT);
+    ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "syntax error, unexpected string, expecting randVal or textScore "
+                                "at element 'str' within '$meta' of input filter");
+}
+
+TEST(CstErrorTest, SortWithMetaSiblingKeyFails) {
+    auto input = fromjson("{val: {$meta: \"textScore\", someKey: 4}}");
+    BSONLexer lexer(input, PipelineParserGen::token::START_SORT);
+    ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "syntax error, unexpected fieldname, expecting end of object at "
+                                "element 'someKey' of input filter");
 }
 
 }  // namespace

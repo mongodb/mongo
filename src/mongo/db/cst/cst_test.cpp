@@ -244,10 +244,11 @@ TEST(CstGrammarTest, ParsesProject) {
         auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
         ASSERT_EQ(1, stages.size());
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-        ASSERT_EQ(stages[0].toBson().toString(),
-                  "{ projectInclusion: { a: \"<NonZeroKey of type double 1.000000>\", b: { "
-                  "<CompoundInclusionKey>: { c: \"<NonZeroKey of type int 1>\", d: \"<NonZeroKey "
-                  "of type decimal 1.0>\" } }, id: \"<NonZeroKey of type long 1>\" } }");
+        ASSERT_EQ(
+            stages[0].toBson().toString(),
+            "{ projectInclusion: { a: \"<NonZeroKey of type double 1.000000>\", b: { "
+            "<CompoundInclusionKey>: { c: \"<NonZeroKey of type int 1>\", d: \"<NonZeroKey "
+            "of type decimal 1.00000000000000>\" } }, id: \"<NonZeroKey of type long 1>\" } }");
     }
     {
         CNode output;
@@ -905,6 +906,25 @@ TEST(CstGrammarTest, FailsToParseDollarPrefixedPredicates) {
             ErrorCodes::FailedToParse,
             "syntax error, unexpected $-prefixed fieldname at element '$prefixed' of input filter");
     }
+}
+
+TEST(CstGrammarTest, ParsesBasicSort) {
+    CNode output;
+    auto input = fromjson("{val: 1, test: -1}");
+    BSONLexer lexer(input, PipelineParserGen::token::START_SORT);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ val: \"<KeyValue intOneKey>\", test: \"<KeyValue intNegOneKey>\" }");
+}
+
+TEST(CstGrammarTest, ParsesMetaSort) {
+    CNode output;
+    auto input = fromjson("{val: {$meta: \"textScore\"}}");
+    BSONLexer lexer(input, PipelineParserGen::token::START_SORT);
+    auto parseTree = PipelineParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(), "{ val: { meta: \"<KeyValue textScore>\" } }");
 }
 
 }  // namespace

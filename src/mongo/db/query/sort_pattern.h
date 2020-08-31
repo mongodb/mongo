@@ -54,6 +54,9 @@ public:
 
     SortPattern(const BSONObj&, const boost::intrusive_ptr<ExpressionContext>&);
 
+    SortPattern(std::vector<SortPatternPart> patterns, std::set<std::string> paths)
+        : _sortPattern(std::move(patterns)), _paths(std::move(paths)) {}
+
     /**
      * Write out a Document whose contents are the sort key pattern.
      */

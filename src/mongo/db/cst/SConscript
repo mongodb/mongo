@@ -15,6 +15,7 @@ env.Library(
         'c_node_validation.cpp',
         'c_node_disambiguation.cpp',
         'pipeline_parser_gen.cpp',
+        'cst_sort_translation.cpp',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

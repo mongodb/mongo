@@ -1755,6 +1755,8 @@ private:
 
 class ExpressionMeta final : public Expression {
 public:
+    ExpressionMeta(ExpressionContext* const expCtx, DocumentMetadataFields::MetaType metaType);
+
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
 
@@ -1774,8 +1776,6 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
-    ExpressionMeta(ExpressionContext* const expCtx, DocumentMetadataFields::MetaType metaType);
-
     DocumentMetadataFields::MetaType _metaType;
 };
 

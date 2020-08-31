@@ -144,8 +144,12 @@
     CONVERT
     DATE_FROM_STRING
     DATE_TO_STRING
+    DECIMAL_NEGATIVE_ONE "-1 (decimal)"
+    DECIMAL_ONE "1 (decimal)"
     DECIMAL_ZERO "zero (decimal)"
     DIVIDE
+    DOUBLE_NEGATIVE_ONE "-1 (double)"
+    DOUBLE_ONE "1 (double)"
     DOUBLE_ZERO "zero (double)"
     END_ARRAY "end of array"
     END_OBJECT "end of object"
@@ -157,21 +161,27 @@
     ID
     INDEX_OF_BYTES
     INDEX_OF_CP
+    INT_NEGATIVE_ONE "-1 (int)"
+    INT_ONE "1 (int)"
     INT_ZERO "zero (int)"
     LITERAL
     LN
     LOG
     LOGTEN
+    LONG_NEGATIVE_ONE "-1 (long)"
+    LONG_ONE "1 (long)"
     LONG_ZERO "zero (long)"
     LT
     LTE
     LTRIM
+    META
     MOD
     MULTIPLY
     NE
     NOT
     OR
     POW
+    RAND_VAL "randVal"
     REGEX_FIND
     REGEX_FIND_ALL
     REGEX_MATCH
@@ -196,6 +206,7 @@
     SUBSTR_BYTES
     SUBSTR_CP
     SUBTRACT
+    TEXT_SCORE "textScore"
     TO_BOOL
     TO_DATE
     TO_DECIMAL
@@ -225,17 +236,17 @@
 %token <BSONCode> JAVASCRIPT "Code"
 %token <BSONSymbol> SYMBOL "Symbol"
 %token <BSONCodeWScope> JAVASCRIPT_W_SCOPE "CodeWScope"
-%token <int> INT_NON_ZERO "non-zero integer"
-%token <long long> LONG_NON_ZERO "non-zero long"
-%token <double> DOUBLE_NON_ZERO "non-zero double"
-%token <Decimal128> DECIMAL_NON_ZERO "non-zero decimal"
+%token <int> INT_OTHER "arbitrary integer"
+%token <long long> LONG_OTHER "arbitrary long"
+%token <double> DOUBLE_OTHER "arbitrary double"
+%token <Decimal128> DECIMAL_OTHER "arbitrary decimal"
 %token <Timestamp> TIMESTAMP "Timestamp"
 %token <UserMinKey> MIN_KEY "minKey"
 %token <UserMaxKey> MAX_KEY "maxKey"
 %token <std::string> DOLLAR_STRING "$-prefixed string"
 %token <std::string> DOLLAR_DOLLAR_STRING "$$-prefixed string"
 %token <std::string> DOLLAR_PREF_FIELDNAME "$-prefixed fieldname"
-%token START_PIPELINE START_MATCH
+%token START_PIPELINE START_MATCH START_SORT
 
 //
 // Semantic values (aka the C++ types produced by the actions).
@@ -272,6 +283,10 @@
 %nterm <std::vector<CNode>> expressions values exprZeroToTwo
 %nterm <CNode> matchExpression filterFields filterVal
 
+// Sort related rules
+%nterm <CNode> sortSpecs specList metaSort oneOrNegOne metaSortKeyword
+%nterm <std::pair<CNode::Fieldname, CNode>> sortSpec
+
 %start start;
 //
 // Grammar rules
@@ -286,6 +301,9 @@ start:
     | START_MATCH matchExpression {
         invariant(cst);
         *cst = $matchExpression;
+    }
+    | START_SORT sortSpecs {
+        *cst = CNode{$sortSpecs};
     }
 ;
 
@@ -398,25 +416,49 @@ projection:
     | javascript
     | symbol
     | javascriptWScope
-    | INT_NON_ZERO {
+    | INT_ONE {
+        $$ = CNode{NonZeroKey{1}};
+    }
+    | INT_NEGATIVE_ONE {
+        $$ = CNode{NonZeroKey{-1}};
+    }
+    | INT_OTHER {
         $$ = CNode{NonZeroKey{$1}};
     }
     | INT_ZERO {
         $$ = CNode{KeyValue::intZeroKey};
     }
-    | LONG_NON_ZERO {
+    | LONG_ONE {
+        $$ = CNode{NonZeroKey{1ll}};
+    }
+    | LONG_NEGATIVE_ONE {
+        $$ = CNode{NonZeroKey{-1ll}};
+    }
+    | LONG_OTHER {
         $$ = CNode{NonZeroKey{$1}};
     }
     | LONG_ZERO {
         $$ = CNode{KeyValue::longZeroKey};
     }
-    | DOUBLE_NON_ZERO {
+    | DOUBLE_ONE {
+        $$ = CNode{NonZeroKey{1.0}};
+    }
+    | DOUBLE_NEGATIVE_ONE {
+        $$ = CNode{NonZeroKey{-1.0}};
+    }
+    | DOUBLE_OTHER {
         $$ = CNode{NonZeroKey{$1}};
     }
     | DOUBLE_ZERO {
         $$ = CNode{KeyValue::doubleZeroKey};
     }
-    | DECIMAL_NON_ZERO {
+    | DECIMAL_ONE {
+        $$ = CNode{NonZeroKey{1.0}};
+    }
+    | DECIMAL_NEGATIVE_ONE {
+        $$ = CNode{NonZeroKey{-1.0}};
+    }
+    | DECIMAL_OTHER {
         $$ = CNode{NonZeroKey{$1}};
     }
     | DECIMAL_ZERO {
@@ -694,6 +736,9 @@ aggExprAsUserFieldname:
     | LTRIM {
         $$ = UserFieldname{"$ltrim"};
     }
+    | META {
+        $$ = UserFieldname{"$meta"};
+    }
     | REGEX_FIND {
         $$ = UserFieldname{"$regexFind"};
     }
@@ -749,7 +794,16 @@ string:
     STRING {
         $$ = CNode{UserString{$1}};
     }
+    // Here we need to list all keys in value BSON positions so they can be converted back to string
+    // in contexts where they're not special. It's laborious but this is the perennial Bison way.
+    | RAND_VAL {
+        $$ = CNode{UserString{"randVal"}};
+    }
+    | TEXT_SCORE {
+        $$ = CNode{UserString{"textScore"}};
+    }
 ;
+
 fieldPath:
     DOLLAR_STRING {
         std::string str = $1;
@@ -846,38 +900,62 @@ maxKey:
 ;
 
 int:
-    INT_NON_ZERO {
+    INT_OTHER {
         $$ = CNode{UserInt{$1}};
     }
     | INT_ZERO {
         $$ = CNode{UserInt{0}};
     }
+    | INT_ONE {
+        $$ = CNode{UserInt{1}};
+    }
+    | INT_NEGATIVE_ONE {
+        $$ = CNode{UserInt{-1}};
+    }
 ;
 
 long:
-    LONG_NON_ZERO {
+    LONG_OTHER {
         $$ = CNode{UserLong{$1}};
     }
     | LONG_ZERO {
         $$ = CNode{UserLong{0ll}};
     }
+    | LONG_ONE {
+        $$ = CNode{UserLong{1ll}};
+    }
+    | LONG_NEGATIVE_ONE {
+        $$ = CNode{UserLong{-1ll}};
+    }
 ;
 
 double:
-    DOUBLE_NON_ZERO {
+    DOUBLE_OTHER {
         $$ = CNode{UserDouble{$1}};
     }
     | DOUBLE_ZERO {
         $$ = CNode{UserDouble{0.0}};
     }
+    | DOUBLE_ONE {
+        $$ = CNode{UserDouble{1.0}};
+    }
+    | DOUBLE_NEGATIVE_ONE {
+        $$ = CNode{UserDouble{-1.0}};
+    }
 ;
 
 decimal:
-    DECIMAL_NON_ZERO {
+    DECIMAL_OTHER {
         $$ = CNode{UserDecimal{$1}};
     }
     | DECIMAL_ZERO {
         $$ = CNode{UserDecimal{0.0}};
+    }
+    | DECIMAL_ONE {
+        $$ = CNode{UserDecimal{1.0}};
+    }
+    | DECIMAL_NEGATIVE_ONE {
+        $$ = CNode{UserDecimal{-1.0}};
     }
 ;
 
@@ -1347,6 +1425,70 @@ toLower:
 toUpper:
     START_OBJECT TO_UPPER expression END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::toUpper, $expression}}};
+    }
+;
+
+metaSortKeyword:
+    RAND_VAL {
+        $$ = CNode{KeyValue::randVal};
+    }
+    | TEXT_SCORE {
+        $$ = CNode{KeyValue::textScore};
+    }
+;
+
+metaSort:
+    START_OBJECT META metaSortKeyword END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::meta, $metaSortKeyword}}};
+}
+;
+
+sortSpecs:
+    START_OBJECT specList END_OBJECT {
+        $$ = $2;
+}
+
+specList:
+    %empty {
+        $$ = CNode::noopLeaf();
+    }
+    | specList[sortArg] sortSpec {
+        $$ = $sortArg;
+        $$.objectChildren().emplace_back($sortSpec);
+    }
+;
+
+oneOrNegOne:
+    INT_ONE {
+        $$ = CNode{KeyValue::intOneKey};
+    }
+    | INT_NEGATIVE_ONE {
+        $$ = CNode{KeyValue::intNegOneKey};
+    }
+    | LONG_ONE {
+        $$ = CNode{KeyValue::longOneKey};
+    }
+    | LONG_NEGATIVE_ONE {
+        $$ = CNode{KeyValue::longNegOneKey};
+    }
+    | DOUBLE_ONE {
+        $$ = CNode{KeyValue::doubleOneKey};
+    }
+    | DOUBLE_NEGATIVE_ONE {
+        $$ = CNode{KeyValue::doubleNegOneKey};
+    }
+    | DECIMAL_ONE {
+        $$ = CNode{KeyValue::decimalOneKey};
+    }
+    | DECIMAL_NEGATIVE_ONE {
+        $$ = CNode{KeyValue::decimalNegOneKey};
+    }
+
+sortSpec:
+    valueFieldname metaSort {
+        $$ = {$1, $2};
+    } | valueFieldname oneOrNegOne {
+        $$ = {$1, $2};
     }
 ;
 
