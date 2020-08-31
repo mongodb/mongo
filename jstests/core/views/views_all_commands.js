@@ -314,6 +314,7 @@ let viewsCommandTests = {
     insert: {command: {insert: "view", documents: [{x: 1}]}, expectFailure: true},
     invalidateUserCache: {skip: isUnrelated},
     isdbgrid: {skip: isUnrelated},
+    isMaster: {skip: isUnrelated},
     killCursors: {
         setup: function(conn) {
             assert.writeOK(conn.collection.remove({}));

@@ -193,6 +193,7 @@ let testCases = {
     insert: {skip: "primary only"},
     invalidateUserCache: {skip: "does not return user data"},
     isdbgrid: {skip: "does not return user data"},
+    isMaster: {skip: "does not return user data"},
     killAllSessions: {skip: "does not return user data"},
     killAllSessionsByPattern: {skip: "does not return user data"},
     killCursors: {skip: "does not return user data"},
