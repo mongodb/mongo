@@ -35,19 +35,18 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cst/bson_location.h"
-#include "mongo/db/cst/pipeline_parser_gen.hpp"
+#include "mongo/db/cst/parser_gen.hpp"
 
 namespace mongo {
 
 class BSONLexer {
 public:
-    BSONLexer(BSONObj obj, PipelineParserGen::token_type startingToken);
-    BSONLexer(std::vector<BSONElement> pipeline, PipelineParserGen::token_type startingToken);
+    explicit BSONLexer(BSONElement input);
 
     /**
      * Retrieves the next token in the stream.
      */
-    PipelineParserGen::symbol_type getNext() {
+    ParserGen::symbol_type getNext() {
         return _tokens[_position++];
     }
 
@@ -88,8 +87,8 @@ private:
 
     template <class LocationType, class... Args>
     void pushToken(LocationType name, Args&&... args) {
-        auto token = PipelineParserGen::symbol_type(
-            std::forward<Args>(args)..., BSONLocation{std::move(name), _locationPrefixes});
+        auto token = ParserGen::symbol_type(std::forward<Args>(args)...,
+                                            BSONLocation{std::move(name), _locationPrefixes});
         _tokens.emplace_back(std::move(token));
         _position++;
     }
@@ -102,11 +101,11 @@ private:
     // BSON, this will change depending on the context that we're parsing.
     std::vector<BSONLocation::LocationPrefix> _locationPrefixes;
 
-    std::vector<PipelineParserGen::symbol_type> _tokens;
+    std::vector<ParserGen::symbol_type> _tokens;
 };
 
 // This is the entry point for retrieving the next token from the lexer, invoked from Bison's
 // yyparse().
-PipelineParserGen::symbol_type yylex(mongo::BSONLexer& lexer);
+ParserGen::symbol_type yylex(mongo::BSONLexer& lexer);
 
 }  // namespace mongo

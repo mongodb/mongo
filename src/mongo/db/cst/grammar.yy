@@ -28,12 +28,11 @@
  */
 
 //
-// This is a grammar file to describe the syntax of the aggregation pipeline language. It is
+// This is a grammar file to describe the syntax of the Mongo Query Language. It is
 // ingested by GNU Bison (https://www.gnu.org/software/bison/) to generate native C++ parser code
 // based on the rules provided here.
 //
-// To manually generate the parser files, run
-// 'bison pipeline_grammar.yy -o pipeline_parser_gen.cpp'.
+// To manually generate the parser files, run 'bison grammar.yy -o parser_gen.cpp'.
 //
 %require "3.5"
 %language "c++"
@@ -56,7 +55,7 @@
 
 %define parse.assert
 %define api.namespace {mongo}
-%define api.parser.class {PipelineParserGen}
+%define api.parser.class {ParserGen}
 
 // Track locations of symbols.
 %locations
@@ -90,7 +89,7 @@
 
     namespace mongo {
         // Mandatory error function.
-        void PipelineParserGen::error (const PipelineParserGen::location_type& loc,
+        void ParserGen::error (const ParserGen::location_type& loc,
                                        const std::string& msg) {
             uasserted(ErrorCodes::FailedToParse, str::stream() << msg << " at element " << loc);
         }
@@ -122,6 +121,7 @@
     ARG_COLL "coll argument"
     ARG_DATE "date argument"
     ARG_DATE_STRING "dateString argument"
+    ARG_FILTER "filter"
     ARG_FIND "find argument"
     ARG_FORMAT "format argument"
     ARG_INPUT "input argument"
@@ -129,9 +129,12 @@
     ARG_ON_NULL "onNull argument"
     ARG_OPTIONS "options argument"
     ARG_PIPELINE "pipeline argument"
+    ARG_Q "q"
+    ARG_QUERY "query"
     ARG_REGEX "regex argument"
     ARG_REPLACEMENT "replacement argument"
     ARG_SIZE "size argument"
+    ARG_SORT "sort argument"
     ARG_TIMEZONE "timezone argument"
     ARG_TO "to argument"
     ATAN2
@@ -246,7 +249,6 @@
 %token <std::string> DOLLAR_STRING "$-prefixed string"
 %token <std::string> DOLLAR_DOLLAR_STRING "$$-prefixed string"
 %token <std::string> DOLLAR_PREF_FIELDNAME "$-prefixed fieldname"
-%token START_PIPELINE START_MATCH START_SORT
 
 //
 // Semantic values (aka the C++ types produced by the actions).
@@ -294,16 +296,20 @@
 %%
 
 start:
-    START_PIPELINE pipeline {
-        invariant(cst);
+    ARG_PIPELINE pipeline {
         *cst = $pipeline;
     }
-    | START_MATCH matchExpression {
-        invariant(cst);
+    | ARG_FILTER matchExpression {
         *cst = $matchExpression;
     }
-    | START_SORT sortSpecs {
-        *cst = CNode{$sortSpecs};
+    | ARG_QUERY matchExpression {
+        *cst = $matchExpression;
+    }
+    | ARG_Q matchExpression {
+        *cst = $matchExpression;
+    }
+    | ARG_SORT sortSpecs {
+        *cst = $sortSpecs;
     }
 ;
 
@@ -595,6 +601,12 @@ argAsUserFieldname:
     }
     | ARG_REPLACEMENT {
         $$ = UserFieldname{"replacement"};
+    }
+    | ARG_FILTER {
+        $$ = UserFieldname{"filter"};
+    }
+    | ARG_Q {
+        $$ = UserFieldname{"q"};
     }
 ;
 

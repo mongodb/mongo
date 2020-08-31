@@ -36,7 +36,7 @@
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
-#include "mongo/db/cst/pipeline_parser_gen.hpp"
+#include "mongo/db/cst/parser_gen.hpp"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
@@ -45,8 +45,8 @@ namespace {
 
 TEST(CstErrorTest, EmptyStageSpec) {
     auto input = fromjson("{pipeline: [{}]}");
-    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
-    ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+    BSONLexer lexer(input["pipeline"]);
+    ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
                                 "syntax error, unexpected end of object at element 'end object' "
@@ -57,8 +57,8 @@ TEST(CstErrorTest, UnknownStageName) {
     // First stage.
     {
         auto input = fromjson("{pipeline: [{$unknownStage: {}}]}");
-        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
-        ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+        BSONLexer lexer(input["pipeline"]);
+        ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                     AssertionException,
                                     ErrorCodes::FailedToParse,
                                     "syntax error, unexpected $-prefixed fieldname at element "
@@ -67,8 +67,8 @@ TEST(CstErrorTest, UnknownStageName) {
     // Subsequent stage.
     {
         auto input = fromjson("{pipeline: [{$limit: 1}, {$unknownStage: {}}]}");
-        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
-        ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+        BSONLexer lexer(input["pipeline"]);
+        ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                     AssertionException,
                                     ErrorCodes::FailedToParse,
                                     "syntax error, unexpected $-prefixed fieldname at element "
@@ -79,9 +79,9 @@ TEST(CstErrorTest, UnknownStageName) {
 TEST(CstErrorTest, InvalidStageArgument) {
     {
         auto input = fromjson("{pipeline: [{$sample: 2}]}");
-        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        BSONLexer lexer(input["pipeline"]);
         ASSERT_THROWS_CODE_AND_WHAT(
-            PipelineParserGen(lexer, nullptr).parse(),
+            ParserGen(lexer, nullptr).parse(),
             AssertionException,
             ErrorCodes::FailedToParse,
             "syntax error, unexpected arbitrary integer, expecting object at element '2' within "
@@ -89,8 +89,8 @@ TEST(CstErrorTest, InvalidStageArgument) {
     }
     {
         auto input = fromjson("{pipeline: [{$project: {a: 1}}, {$limit: {}}]}");
-        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
-        ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+        BSONLexer lexer(input["pipeline"]);
+        ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                     AssertionException,
                                     ErrorCodes::FailedToParse,
                                     "syntax error, unexpected object at element 'start object' "
@@ -101,9 +101,9 @@ TEST(CstErrorTest, InvalidStageArgument) {
 TEST(CstErrorTest, UnknownArgumentInStageSpec) {
     {
         auto input = fromjson("{pipeline: [{$sample: {huh: 1}}]}");
-        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        BSONLexer lexer(input["pipeline"]);
         ASSERT_THROWS_CODE_AND_WHAT(
-            PipelineParserGen(lexer, nullptr).parse(),
+            ParserGen(lexer, nullptr).parse(),
             AssertionException,
             ErrorCodes::FailedToParse,
             "syntax error, unexpected fieldname, expecting size argument at element 'huh' within "
@@ -111,9 +111,9 @@ TEST(CstErrorTest, UnknownArgumentInStageSpec) {
     }
     {
         auto input = fromjson("{pipeline: [{$project: {a: 1}}, {$limit: 1}, {$sample: {huh: 1}}]}");
-        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        BSONLexer lexer(input["pipeline"]);
         ASSERT_THROWS_CODE_AND_WHAT(
-            PipelineParserGen(lexer, nullptr).parse(),
+            ParserGen(lexer, nullptr).parse(),
             AssertionException,
             ErrorCodes::FailedToParse,
             "syntax error, unexpected fieldname, expecting size argument at element 'huh' within "
@@ -124,9 +124,9 @@ TEST(CstErrorTest, UnknownArgumentInStageSpec) {
 TEST(CstErrorTest, InvalidArgumentTypeWithinStageSpec) {
     {
         auto input = fromjson("{pipeline: [{$sample: {size: 'cmon'}}]}");
-        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+        BSONLexer lexer(input["pipeline"]);
         ASSERT_THROWS_CODE_AND_WHAT(
-            PipelineParserGen(lexer, nullptr).parse(),
+            ParserGen(lexer, nullptr).parse(),
             AssertionException,
             ErrorCodes::FailedToParse,
             "syntax error, unexpected string at element 'cmon' within 'size' within '$sample' "
@@ -134,8 +134,8 @@ TEST(CstErrorTest, InvalidArgumentTypeWithinStageSpec) {
     }
     {
         auto input = fromjson("{pipeline: [{$project: {a: 1}}, {$sample: {size: true}}]}");
-        BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
-        ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+        BSONLexer lexer(input["pipeline"]);
+        ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                     AssertionException,
                                     ErrorCodes::FailedToParse,
                                     "syntax error, unexpected true at element 'true' within 'size' "
@@ -145,9 +145,9 @@ TEST(CstErrorTest, InvalidArgumentTypeWithinStageSpec) {
 
 TEST(CstErrorTest, MissingRequiredArgument) {
     auto input = fromjson("{pipeline: [{$sample: {}}]}");
-    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    BSONLexer lexer(input["pipeline"]);
     ASSERT_THROWS_CODE_AND_WHAT(
-        PipelineParserGen(lexer, nullptr).parse(),
+        ParserGen(lexer, nullptr).parse(),
         AssertionException,
         ErrorCodes::FailedToParse,
         "syntax error, unexpected end of object, expecting size argument at element 'end object' "
@@ -156,9 +156,9 @@ TEST(CstErrorTest, MissingRequiredArgument) {
 
 TEST(CstErrorTest, MissingRequiredArgumentOfMultiArgStage) {
     auto input = fromjson("{pipeline: [{$unionWith: {pipeline: 0.0}}]}");
-    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    BSONLexer lexer(input["pipeline"]);
     ASSERT_THROWS_CODE_AND_WHAT(
-        PipelineParserGen(lexer, nullptr).parse(),
+        ParserGen(lexer, nullptr).parse(),
         AssertionException,
         ErrorCodes::FailedToParse,
         "syntax error, unexpected pipeline argument, expecting coll argument at element 'pipeline' "
@@ -167,8 +167,8 @@ TEST(CstErrorTest, MissingRequiredArgumentOfMultiArgStage) {
 
 TEST(CstErrorTest, InvalidArgumentTypeForProjectionExpression) {
     auto input = fromjson("{pipeline: [{$project: {a: {$eq: '$b'}}}]}");
-    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
-    ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+    BSONLexer lexer(input["pipeline"]);
+    ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
                                 "syntax error, unexpected $-prefixed string, expecting array at "
@@ -178,9 +178,9 @@ TEST(CstErrorTest, InvalidArgumentTypeForProjectionExpression) {
 
 TEST(CstErrorTest, MixedProjectionTypes) {
     auto input = fromjson("{pipeline: [{$project: {a: 1, b: 0}}]}");
-    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    BSONLexer lexer(input["pipeline"]);
     ASSERT_THROWS_CODE_AND_WHAT(
-        PipelineParserGen(lexer, nullptr).parse(),
+        ParserGen(lexer, nullptr).parse(),
         AssertionException,
         ErrorCodes::FailedToParse,
         "$project containing inclusion and/or computed fields must contain no exclusion fields at "
@@ -189,9 +189,9 @@ TEST(CstErrorTest, MixedProjectionTypes) {
 
 TEST(CstErrorTest, DeeplyNestedSyntaxError) {
     auto input = fromjson("{pipeline: [{$project: {a: {$and: [1, {$or: [{$eq: '$b'}]}]}}}]}");
-    BSONLexer lexer(input["pipeline"].Array(), PipelineParserGen::token::START_PIPELINE);
+    BSONLexer lexer(input["pipeline"]);
     ASSERT_THROWS_CODE_AND_WHAT(
-        PipelineParserGen(lexer, nullptr).parse(),
+        ParserGen(lexer, nullptr).parse(),
         AssertionException,
         ErrorCodes::FailedToParse,
         "syntax error, unexpected $-prefixed string, expecting array at element '$b' within '$eq' "
@@ -201,33 +201,33 @@ TEST(CstErrorTest, DeeplyNestedSyntaxError) {
 }
 
 TEST(CstErrorTest, SortWithRandomIntFails) {
-    auto input = fromjson("{val: 5}");
-    BSONLexer lexer(input, PipelineParserGen::token::START_SORT);
+    auto input = fromjson("{sort: {val: 5}}");
+    BSONLexer lexer(input["sort"]);
     ASSERT_THROWS_CODE_AND_WHAT(
-        PipelineParserGen(lexer, nullptr).parse(),
+        ParserGen(lexer, nullptr).parse(),
         AssertionException,
         ErrorCodes::FailedToParse,
-        "syntax error, unexpected arbitrary integer at element '5' of input filter");
+        "syntax error, unexpected arbitrary integer at element '5' of input sort");
 }
 
 TEST(CstErrorTest, SortWithInvalidMetaFails) {
-    auto input = fromjson("{val: {$meta: \"str\"}}");
-    BSONLexer lexer(input, PipelineParserGen::token::START_SORT);
-    ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+    auto input = fromjson("{sort: {val: {$meta: \"str\"}}}");
+    BSONLexer lexer(input["sort"]);
+    ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
                                 "syntax error, unexpected string, expecting randVal or textScore "
-                                "at element 'str' within '$meta' of input filter");
+                                "at element 'str' within '$meta' of input sort");
 }
 
 TEST(CstErrorTest, SortWithMetaSiblingKeyFails) {
-    auto input = fromjson("{val: {$meta: \"textScore\", someKey: 4}}");
-    BSONLexer lexer(input, PipelineParserGen::token::START_SORT);
-    ASSERT_THROWS_CODE_AND_WHAT(PipelineParserGen(lexer, nullptr).parse(),
+    auto input = fromjson("{sort: {val: {$meta: \"textScore\", someKey: 4}}}");
+    BSONLexer lexer(input["sort"]);
+    ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
                                 "syntax error, unexpected fieldname, expecting end of object at "
-                                "element 'someKey' of input filter");
+                                "element 'someKey' of input sort");
 }
 
 }  // namespace

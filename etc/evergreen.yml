@@ -3630,7 +3630,7 @@ tasks:
           set -o errexit
           set -o verbose
           # TODO SERVER-49884 Remove this when we no longer check in generated Bison.
-          BISON_GENERATED_PATTERN=pipeline_parser_gen\.cpp
+          BISON_GENERATED_PATTERN=parser_gen\.cpp
           # This could probably be accelerated with gnu parallel
           /opt/mongodbtoolchain/v3/bin/clang-tidy \
             -p ./compile_commands.json \

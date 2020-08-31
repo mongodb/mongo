@@ -26,8 +26,7 @@ def is_interesting_file(file_name: str) -> bool:
             or file_name.startswith("src") and not file_name.startswith("src/third_party/")
             and not file_name.startswith("src/mongo/gotools/")
             # TODO SERVER-49805: These files should be generated at compile time.
-            and not file_name == "src/mongo/db/cst/pipeline_parser_gen.cpp" and
-            not file_name == "src/mongo/db/cst/location_gen.h") and FILES_RE.search(file_name)
+            and not file_name == "src/mongo/db/cst/parser_gen.cpp") and FILES_RE.search(file_name)
 
 
 def _lint_files(file_names: List[str]) -> None:
