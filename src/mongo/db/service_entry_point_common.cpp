@@ -1051,14 +1051,14 @@ void execCommandDatabase(OperationContext* opCtx,
                 !replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname) &&
                 !replCoord->getMemberState().secondary()) {
 
-                uassert(ErrorCodes::NotMasterOrSecondary,
+                uassert(ErrorCodes::NotPrimaryOrSecondary,
                         "node is recovering",
                         !replCoord->getMemberState().recovering());
-                uassert(ErrorCodes::NotMasterOrSecondary,
+                uassert(ErrorCodes::NotPrimaryOrSecondary,
                         "node is not in primary or recovering state",
                         replCoord->getMemberState().primary());
                 // Check ticket SERVER-21432, slaveOk commands are allowed in drain mode
-                uassert(ErrorCodes::NotMasterOrSecondary,
+                uassert(ErrorCodes::NotPrimaryOrSecondary,
                         "node is in drain mode",
                         optedIn || alwaysAllowed);
             }

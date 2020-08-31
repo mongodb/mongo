@@ -64,20 +64,20 @@ joinGetMoreThread();
 jsTestLog("Reading during rollback.");
 // Make sure that read operations fail during rollback.
 assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand({"find": collName}),
-                             ErrorCodes.NotMasterOrSecondary);
+                             ErrorCodes.NotPrimaryOrSecondary);
 assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand(
                                  {"getMore": cursorIdToBeReadDuringRollback, collection: collName}),
-                             ErrorCodes.NotMasterOrSecondary);
+                             ErrorCodes.NotPrimaryOrSecondary);
 
 // Disable the best-effort check for primary-ness in the service entry point, so that we
 // exercise the real check for primary-ness in 'find' and 'getMore' commands.
 setFailPoint(rollbackNode, "skipCheckingForNotMasterInCommandDispatch");
 jsTestLog("Reading during rollback (again with command dispatch checks disabled).");
 assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand({"find": collName}),
-                             ErrorCodes.NotMasterOrSecondary);
+                             ErrorCodes.NotPrimaryOrSecondary);
 assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand(
                                  {"getMore": cursorIdToBeReadDuringRollback, collection: collName}),
-                             ErrorCodes.NotMasterOrSecondary);
+                             ErrorCodes.NotPrimaryOrSecondary);
 
 clearFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
 

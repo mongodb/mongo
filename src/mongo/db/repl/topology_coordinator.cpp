@@ -1249,7 +1249,7 @@ StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::Up
                                                     long long* configVersion) {
     if (_selfIndex == -1) {
         // Ignore updates when we're in state REMOVED.
-        return Status(ErrorCodes::NotMasterOrSecondary,
+        return Status(ErrorCodes::NotPrimaryOrSecondary,
                       "Received replSetUpdatePosition command but we are in state REMOVED");
     }
     invariant(_rsConfig.isInitialized());  // Can only use setLastOptime in replSet mode.

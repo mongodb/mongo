@@ -656,7 +656,7 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
     expectMoveChunkCommand(
         chunk1,
         kShardId1,
-        Status(ErrorCodes::NotMasterOrSecondary,
+        Status(ErrorCodes::NotPrimaryOrSecondary,
                "RemoteCallErrorConversionToOperationFailedCheck generated error."));
 
     // Expect a moveChunk command that will fail with a replset monitor updating error.

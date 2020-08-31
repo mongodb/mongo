@@ -108,7 +108,7 @@ public:
     inline static const std::vector<Error> kNotMasterAndNodeRecovering{
         ErrorCodes::InterruptedAtShutdown,
         ErrorCodes::InterruptedDueToReplStateChange,
-        ErrorCodes::NotMasterOrSecondary,
+        ErrorCodes::NotPrimaryOrSecondary,
         ErrorCodes::PrimarySteppedDown,
         ErrorCodes::ShutdownInProgress,
         ErrorCodes::NotWritablePrimary,

@@ -391,7 +391,7 @@ error_codes:
                     extra: StaleConfigInfo,
                     categories: [StaleShardVersionError,NeedRetargettingError]}
     - {code: 13435,name: NotPrimaryNoSecondaryOk,categories: [NotMasterError,RetriableError]}
-    - {code: 13436,name: NotMasterOrSecondary,categories: [NotMasterError,RetriableError]}
+    - {code: 13436,name: NotPrimaryOrSecondary,categories: [NotMasterError,RetriableError]}
     - {code: 14031,name: OutOfDiskSpace}
     - {code: 17280,name: OSBELETE_KeyTooLong}
     - {code: 46841,name: ClientMarkedKilled,categories: [Interruption,CancelationError]}

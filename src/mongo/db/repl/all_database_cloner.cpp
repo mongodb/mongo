@@ -74,7 +74,7 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
             return member.getHostAndPort() == source;
         });
     if (syncSourceIter == memberData.end()) {
-        Status status(ErrorCodes::NotMasterOrSecondary,
+        Status status(ErrorCodes::NotPrimaryOrSecondary,
                       str::stream() << "Sync source " << getSource()
                                     << " has been removed from the replication configuration.");
         stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
@@ -89,14 +89,14 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
     // we also check to see if it has a sync source.  A node in STARTUP2 will not have a sync
     // source unless it is in initial sync.
     if (syncSourceIter->getState().startup2() && !syncSourceIter->getSyncSource().empty()) {
-        Status status(ErrorCodes::NotMasterOrSecondary,
+        Status status(ErrorCodes::NotPrimaryOrSecondary,
                       str::stream() << "Sync source " << getSource() << " has been resynced.");
         stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         // Setting the status in the shared data will cancel the initial sync.
         getSharedData()->setInitialSyncStatusIfOK(lk, status);
         return status;
     }
-    return Status(ErrorCodes::NotMasterOrSecondary,
+    return Status(ErrorCodes::NotPrimaryOrSecondary,
                   str::stream() << "Cannot connect because sync source " << getSource()
                                 << " is neither primary nor secondary.");
 }
