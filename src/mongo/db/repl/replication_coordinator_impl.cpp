@@ -2870,7 +2870,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
         stdx::lock_guard<Latch> lock(_mutex);
         if ((_memberState.startup() && client->isFromUserConnection()) || _memberState.startup2() ||
             _memberState.rollback()) {
-            return Status{ErrorCodes::NotMasterOrSecondary,
+            return Status{ErrorCodes::NotPrimaryOrSecondary,
                           "Oplog collection reads are not allowed while in the rollback or "
                           "startup state."};
         }
@@ -2891,7 +2891,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
         if (isPrimaryOrSecondary) {
             return Status::OK();
         }
-        return Status(ErrorCodes::NotMasterOrSecondary,
+        return Status(ErrorCodes::NotPrimaryOrSecondary,
                       "not master or secondary; cannot currently read from this replSet member");
     }
     return Status(ErrorCodes::NotPrimaryNoSecondaryOk, "not master and slaveOk=false");

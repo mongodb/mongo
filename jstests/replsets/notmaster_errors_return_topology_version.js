@@ -20,7 +20,7 @@ const notPrimaryErrorCodes = [
     ErrorCodes.InterruptedDueToReplStateChange,
     ErrorCodes.NotWritablePrimary,
     ErrorCodes.NotPrimaryNoSecondaryOk,
-    ErrorCodes.NotMasterOrSecondary,
+    ErrorCodes.NotPrimaryOrSecondary,
     ErrorCodes.PrimarySteppedDown
 ];
 

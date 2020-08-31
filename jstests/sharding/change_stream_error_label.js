@@ -36,7 +36,7 @@ const expectedStopShardErrors = [
     ErrorCodes.InterruptedAtShutdown,
     ErrorCodes.InterruptedDueToReplStateChange,
     ErrorCodes.NotPrimaryNoSecondaryOk,
-    ErrorCodes.NotMasterOrSecondary
+    ErrorCodes.NotPrimaryOrSecondary
 ];
 
 // First, verify that the 'failGetMoreAfterCursorCheckout' failpoint can effectively exercise the

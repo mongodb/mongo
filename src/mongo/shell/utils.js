@@ -97,7 +97,7 @@ function isRetryableError(error) {
         "SocketException",
         "NotWritablePrimary",
         "NotPrimaryNoSecondaryOk",
-        "NotMasterOrSecondary",
+        "NotPrimaryOrSecondary",
         "PrimarySteppedDown",
         "WriteConcernFailed",
         "WriteConcernLegacyOK",

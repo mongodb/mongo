@@ -73,7 +73,7 @@ assert.sameMembers(secondaryDB.runCommand(findAtClusterTimeDuringInitialSync).cu
 // Test reading at a timestamp before initial sync finishes is not allowed while the node is in
 // initial sync.
 assert.commandFailedWithCode(newNodeDB.runCommand(findAtClusterTimeDuringInitialSync),
-                             ErrorCodes.NotMasterOrSecondary);
+                             ErrorCodes.NotPrimaryOrSecondary);
 
 // Perform another write so that the new node will finish initial sync at a timestamp higher than
 // the timestampDuringInitialSync.

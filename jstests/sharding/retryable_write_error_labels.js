@@ -126,7 +126,7 @@ const retryableCodes = [
     ErrorCodes.InterruptedDueToReplStateChange,
     ErrorCodes.NotWritablePrimary,
     ErrorCodes.NotPrimaryNoSecondaryOk,
-    ErrorCodes.NotMasterOrSecondary,
+    ErrorCodes.NotPrimaryOrSecondary,
     ErrorCodes.PrimarySteppedDown,
     ErrorCodes.ShutdownInProgress,
     ErrorCodes.HostNotFound,
