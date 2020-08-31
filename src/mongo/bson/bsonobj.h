@@ -763,6 +763,25 @@ public:
         _theend = end - 1;
     }
 
+    /*
+     * Advance '_pos' by currentElement.size(). The element passed in must be equivalent to the
+     * current element '_pos' is at.
+     */
+    void advance(const BSONElement& currentElement) {
+        dassert(BSONElement(_pos).size() == currentElement.size());
+        _pos += currentElement.size();
+    }
+
+    /**
+     * Return true if the current element is equal to 'otherElement'.
+     * Do *not* use with moreWithEOO() as the function will return false if the current element and
+     * 'otherElement' are EOO.
+     */
+    bool currentElementBinaryEqual(const BSONElement& otherElement) {
+        auto sz = otherElement.size();
+        return sz <= (_theend - _pos) && memcmp(otherElement.rawdata(), _pos, sz) == 0;
+    }
+
     /** @return true if more elements exist to be enumerated. */
     bool more() const {
         return _pos < _theend;

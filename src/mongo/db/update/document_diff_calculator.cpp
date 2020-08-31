@@ -48,27 +48,37 @@ std::unique_ptr<diff_tree::ArrayNode> computeArrayDiff(const BSONObj& pre, const
     auto postItr = BSONObjIterator(post);
     const size_t postObjSize = static_cast<size_t>(post.objsize());
     size_t nFieldsInPostArray = 0;
-    for (; preItr.more() && postItr.more(); ++preItr, ++postItr, ++nFieldsInPostArray) {
+    while (preItr.more() && postItr.more()) {
         // Bailout if the generated diff so far is larger than the 'post' object.
         if (postObjSize < diffNode->getObjSize()) {
             return nullptr;
         }
-        if (!(*preItr).binaryEqual(*postItr)) {
+
+        auto preVal = *preItr;
+        auto postVal = *postItr;
+
+        if (!preVal.binaryEqual(postVal)) {
             // If both are arrays or objects, then recursively compute the diff of the respective
             // array or object.
-            if ((*preItr).type() == (*postItr).type() &&
-                ((*preItr).type() == BSONType::Object || (*preItr).type() == BSONType::Array)) {
-                calculateSubDiffHelper(*preItr, *postItr, nFieldsInPostArray, diffNode.get());
+            if (preVal.type() == postVal.type() &&
+                (preVal.type() == BSONType::Object || preVal.type() == BSONType::Array)) {
+                calculateSubDiffHelper(preVal, postVal, nFieldsInPostArray, diffNode.get());
             } else {
-                diffNode->addUpdate(nFieldsInPostArray, *postItr);
+                diffNode->addUpdate(nFieldsInPostArray, postVal);
             }
         }
+
+        preItr.advance(preVal);
+        postItr.advance(postVal);
+        ++nFieldsInPostArray;
     }
 
     // When we reach here, only one of postItr or preItr can have more fields. If postItr has more
     // fields, we need to add all the remaining fields.
-    for (; postItr.more(); ++postItr, ++nFieldsInPostArray) {
-        diffNode->addUpdate(nFieldsInPostArray, *postItr);
+    for (; postItr.more(); ++nFieldsInPostArray) {
+        auto postVal = *postItr;
+        diffNode->addUpdate(nFieldsInPostArray, postVal);
+        postItr.advance(postVal);
     }
 
     // If preItr has more fields, we can ignore the remaining fields, since we only need to do a
@@ -88,18 +98,25 @@ std::unique_ptr<diff_tree::DocumentSubDiffNode> computeDocDiff(const BSONObj& pr
     const size_t postObjSize = static_cast<size_t>(post.objsize());
     std::set<StringData> deletes;
     while (preItr.more() && postItr.more()) {
-        auto preVal = *preItr;
-        auto postVal = *postItr;
-
         // Bailout if the generated diff so far is larger than the 'post' object.
         if (postObjSize < diffNode->getObjSize()) {
             return nullptr;
         }
+
+        auto preVal = *preItr;
+        // Fast path for case where they're equal.
+        if (postItr.currentElementBinaryEqual(preVal)) {
+            // Here the current element of preItr and postItr are equal. So it's safe to advance
+            // 'postItr' using 'preVal'. This way we can save the cost of constructing 'postVal'.
+            preItr.advance(preVal);
+            postItr.advance(preVal);
+            continue;
+        }
+
+        auto postVal = *postItr;
         if (preVal.fieldNameStringData() == postVal.fieldNameStringData()) {
-            if (preVal.binaryEqual(postVal)) {
-                // They're identical. Move on.
-            } else if (preVal.type() == postVal.type() &&
-                       (preVal.type() == BSONType::Object || preVal.type() == BSONType::Array)) {
+            if (preVal.type() == postVal.type() &&
+                (preVal.type() == BSONType::Object || preVal.type() == BSONType::Array)) {
                 // Both are either arrays or objects, recursively compute the diff of the respective
                 // array or object.
                 calculateSubDiffHelper(
@@ -108,30 +125,34 @@ std::unique_ptr<diff_tree::DocumentSubDiffNode> computeDocDiff(const BSONObj& pr
                 // Any other case, just replace with the 'postVal'.
                 diffNode->addUpdate((*preItr).fieldNameStringData(), postVal);
             }
-            preItr.next();
-            postItr.next();
+            preItr.advance(preVal);
+            postItr.advance(postVal);
         } else {
             // If the 'preVal' field name does not exist in the 'post' object then, just remove it.
             // If it present, we do nothing for now, since the field gets inserted later.
             deletes.insert(preVal.fieldNameStringData());
-            preItr.next();
+            preItr.advance(preVal);
         }
     }
 
     // When we reach here, only one of postItr or preItr can have more fields. Record remaining
     // fields in preItr as removals.
-    for (; preItr.more(); preItr.next()) {
+    while (preItr.more()) {
         // Note that we don't need to record these into the 'deletes' set because there are no more
         // fields in the post image.
         invariant(!postItr.more());
-        diffNode->addDelete((*preItr).fieldNameStringData());
+        auto next = (*preItr);
+        diffNode->addDelete(next.fieldNameStringData());
+        preItr.advance(next);
     }
 
     // Record remaining fields in postItr as creates.
-    for (; postItr.more(); postItr.next()) {
-        auto fieldName = (*postItr).fieldNameStringData();
-        diffNode->addInsert(fieldName, *postItr);
-        deletes.erase(fieldName);
+    while (postItr.more()) {
+        auto next = (*postItr);
+
+        diffNode->addInsert(next.fieldNameStringData(), next);
+        deletes.erase(next.fieldNameStringData());
+        postItr.advance(next);
     }
     for (auto&& deleteField : deletes) {
         diffNode->addDelete(deleteField);
