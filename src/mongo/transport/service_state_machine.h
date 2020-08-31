@@ -103,7 +103,7 @@ public:
     /*
      * start() schedules a call to _runOnce() in the future.
      */
-    void start();
+    void start(ServiceExecutorContext seCtx);
 
     /*
      * Gets the current state of connection for testing/diagnostic purposes.
@@ -137,7 +137,6 @@ private:
      * each step in _runOnce();
      */
     class ThreadGuard;
-    friend class ThreadGuard;
 
     /*
      * Terminates the associated transport Session if status indicate error.
@@ -147,19 +146,9 @@ private:
     void _terminateAndLogIfError(Status status);
 
     /*
-     * This is a helper function to schedule tasks on the serviceExecutor maintaining a shared_ptr
-     * copy to anchor the lifetime of the SSM while waiting for callbacks to run.
-     *
-     * If scheduling the function fails, the SSM will be terminated and cleaned up immediately
-     */
-    void _scheduleNextWithGuard(ThreadGuard guard,
-                                transport::ServiceExecutor::ScheduleFlags flags,
-                                Ownership ownershipModel = Ownership::kOwned);
-
-    /*
      * Gets the transport::Session associated with this connection
      */
-    const transport::SessionHandle& _session() const;
+    const transport::SessionHandle& _session();
 
     /*
      * Gets the transport::ServiceExecutor associated with this connection.
@@ -170,7 +159,7 @@ private:
      * This function actually calls into the database and processes a request. It's broken out
      * into its own inline function for better readability.
      */
-    Future<void> _processMessage(ThreadGuard guard);
+    Future<void> _processMessage();
 
     /*
      * These get called by the TransportLayer when requested network I/O has completed.
@@ -182,13 +171,13 @@ private:
      * Source/Sink message from the TransportLayer. These will invalidate the ThreadGuard just
      * before waiting on the TL.
      */
-    Future<void> _sourceMessage(ThreadGuard guard);
-    Future<void> _sinkMessage(ThreadGuard guard);
+    Future<void> _sourceMessage();
+    Future<void> _sinkMessage();
 
     /*
      * Releases all the resources associated with the session and call the cleanupHook.
      */
-    void _cleanupSession(ThreadGuard guard);
+    void _cleanupSession();
 
     /*
      * This is the initial function called at the beginning of a thread's lifecycle in the
@@ -207,8 +196,8 @@ private:
     ServiceEntryPoint* const _sep;
 
     transport::SessionHandle _sessionHandle;
-    ServiceContext::UniqueClient _dbClient;
-    Client* _dbClientPtr;
+    ServiceContext::UniqueClient _client;
+    Client* _clientPtr;
     std::function<void()> _cleanupHook;
 
     bool _inExhaust = false;

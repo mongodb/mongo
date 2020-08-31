@@ -40,12 +40,15 @@
 #include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 namespace transport {
 namespace {
 static constexpr auto kDiagnosticLogLevel = 4;
 
+auto getServiceExecutorStats =
+    ServiceContext::declareDecoration<synchronized_value<ServiceExecutorStats>>();
 auto getServiceExecutorContext =
     Client::declareDecoration<boost::optional<ServiceExecutorContext>>();
 }  // namespace
@@ -59,6 +62,10 @@ StringData toString(ServiceExecutorContext::ThreadingModel threadingModel) {
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+ServiceExecutorStats ServiceExecutorStats::get(ServiceContext* ctx) noexcept {
+    return getServiceExecutorStats(ctx).get();
 }
 
 ServiceExecutorContext* ServiceExecutorContext::get(Client* client) noexcept {
@@ -79,6 +86,24 @@ void ServiceExecutorContext::set(Client* client, ServiceExecutorContext seCtx) n
     seCtx._client = client;
     seCtx._sep = client->getServiceContext()->getServiceEntryPoint();
 
+    {
+        auto stats = getServiceExecutorStats(client->getServiceContext()).synchronize();
+        if (seCtx._canUseReserved) {
+            ++stats->limitExempt;
+        }
+
+        switch (seCtx._threadingModel) {
+            case ThreadingModel::kBorrowed: {
+                ++stats->usesBorrowed;
+            } break;
+            case ThreadingModel::kDedicated: {
+                ++stats->usesDedicated;
+            } break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
     LOGV2_DEBUG(4898000,
                 kDiagnosticLogLevel,
                 "Setting initial ServiceExecutor context for client",
@@ -88,18 +113,91 @@ void ServiceExecutorContext::set(Client* client, ServiceExecutorContext seCtx) n
     serviceExecutorContext = std::move(seCtx);
 }
 
-ServiceExecutorContext& ServiceExecutorContext::setThreadingModel(
-    ThreadingModel threadingModel) noexcept {
-    _threadingModel = threadingModel;
-    return *this;
+void ServiceExecutorContext::reset(Client* client) noexcept {
+    if (client) {
+        auto& serviceExecutorContext = getServiceExecutorContext(client);
+
+        auto stats = getServiceExecutorStats(client->getServiceContext()).synchronize();
+
+        LOGV2_DEBUG(4898001,
+                    kDiagnosticLogLevel,
+                    "Resetting ServiceExecutor context for client",
+                    "client"_attr = client->desc(),
+                    "threadingModel"_attr = serviceExecutorContext->_threadingModel,
+                    "canUseReserved"_attr = serviceExecutorContext->_canUseReserved);
+
+        if (serviceExecutorContext->_canUseReserved) {
+            --stats->limitExempt;
+        }
+
+        switch (serviceExecutorContext->_threadingModel) {
+            case ThreadingModel::kBorrowed: {
+                --stats->usesBorrowed;
+            } break;
+            case ThreadingModel::kDedicated: {
+                --stats->usesDedicated;
+            } break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
 }
 
-ServiceExecutorContext& ServiceExecutorContext::setCanUseReserved(bool canUseReserved) noexcept {
+void ServiceExecutorContext::setThreadingModel(ThreadingModel threadingModel) noexcept {
+
+    if (_threadingModel == threadingModel) {
+        // Nothing to do.
+        return;
+    }
+
+    auto lastThreadingModel = std::exchange(_threadingModel, threadingModel);
+
+    if (_client) {
+        auto stats = getServiceExecutorStats(_client->getServiceContext()).synchronize();
+
+        // Decrement the stats for the previous ThreadingModel.
+        switch (lastThreadingModel) {
+            case ThreadingModel::kBorrowed: {
+                --stats->usesBorrowed;
+            } break;
+            case ThreadingModel::kDedicated: {
+                --stats->usesDedicated;
+            } break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+        // Increment the stats for the next ThreadingModel.
+        switch (_threadingModel) {
+            case ThreadingModel::kBorrowed: {
+                ++stats->usesBorrowed;
+            } break;
+            case ThreadingModel::kDedicated: {
+                ++stats->usesDedicated;
+            } break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+}
+
+void ServiceExecutorContext::setCanUseReserved(bool canUseReserved) noexcept {
+    if (_canUseReserved == canUseReserved) {
+        // Nothing to do.
+        return;
+    }
+
     _canUseReserved = canUseReserved;
-    return *this;
+    if (_client) {
+        auto stats = getServiceExecutorStats(_client->getServiceContext()).synchronize();
+        if (canUseReserved) {
+            ++stats->limitExempt;
+        } else {
+            --stats->limitExempt;
+        }
+    }
 }
 
-ServiceExecutor* ServiceExecutorContext::getServiceExecutor() const noexcept {
+ServiceExecutor* ServiceExecutorContext::getServiceExecutor() noexcept {
     invariant(_client);
 
     switch (_threadingModel) {
@@ -121,13 +219,16 @@ ServiceExecutor* ServiceExecutorContext::getServiceExecutor() const noexcept {
         return _sep->numOpenSessions() > _sep->maxOpenSessions();
     };
 
-    if (_canUseReserved && shouldUseReserved()) {
+    if (_canUseReserved && !_hasUsedSynchronous && shouldUseReserved()) {
         if (auto exec = transport::ServiceExecutorReserved::get(_client->getServiceContext())) {
-            // We are allowed to use the reserved executor, we should use it, and it exists.
+            // We are allowed to use the reserved, we have not used the synchronous, we should use
+            // the reserved, and the reserved exists.
             return exec;
         }
     }
 
+    // Once we use the ServiceExecutorSynchronous, we shouldn't use the ServiceExecutorReserved.
+    _hasUsedSynchronous = true;
     return transport::ServiceExecutorSynchronous::get(_client->getServiceContext());
 }
 
