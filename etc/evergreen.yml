@@ -242,7 +242,6 @@ variables:
   setup_group:
   - func: "kill processes"
   - func: "cleanup environment"
-  - func: "clear OOM messages"
   - command: manifest.load
   - func: "git get project"
   - func: "get all modified patch files"
@@ -259,7 +258,6 @@ variables:
   - func: "generate compile expansions"
   teardown_group:
   - func: "umount shared scons directory"
-  - func: "print OOM messages"
   - func: "cleanup environment"
   timeout:
   - func: "run hang analyzer"
@@ -2901,50 +2899,6 @@ functions:
     - *tar_local_client_logs
     - *archive_local_client_logs
 
-  ### Clear and print OOM messages ###
-  "clear OOM messages":
-      command: shell.exec
-      params:
-        system_log: true
-        script: |
-
-          ulimit -a
-          # Clear the dmesg ring buffer. The "post" phase will check dmesg for OOM messages.
-          ${set_sudo}
-          $sudo dmesg -c > /dev/null 2>&1
-          if [ $? -eq 0 ]; then
-            echo "Cleared the dmesg ring buffer"
-          else
-            echo "Could not clear the dmesg ring buffer"
-          fi
-
-  "print OOM messages":
-    # Print out any Out of Memory killed process messages.
-    command: shell.exec
-    params:
-      system_log: true
-      working_dir: src # Temporary files created in src will be cleaned up in "pre".
-      script: |
-        ${set_sudo}
-        # Use dmesg -T option, if supported, to display timestamps.
-        dmesg=dmesg
-        $sudo dmesg -T > /dev/null 2>&1
-        if [ $? -eq 0 ]; then
-          dmesg="dmesg -T"
-        fi
-        $sudo $dmesg 2> /dev/null > dmesg.txt
-        if [ $? -ne 0 ]; then
-          echo "Cannot check for OOM (Out of memory) killed processes on this platform"
-          exit 0
-        fi
-        grep -iE '(Out of memory|OOM[- ]killer|Killed process)' dmesg.txt > oom.txt
-        if [ -s oom.txt ]; then
-          echo "OOM (Out of memory) killed processes detected"
-          cat oom.txt
-        else
-          echo "No OOM (Out of memory) killed processes detected"
-        fi
-
   ### Cleanup after the watchdog FUSE testing ###
   "cleanup FUSE watchdog":
     command: shell.exec
@@ -3459,7 +3413,6 @@ pre:
   - func: "kill processes"
   - func: "cleanup environment"
   - func: "set task expansion macros"
-  - func: "clear OOM messages"
 
 # Post task steps
 post:
@@ -3478,7 +3431,6 @@ post:
   - func: "save disk statistics"
   - func: "save system resource information"
   - func: "save UndoDB recordings"
-  - func: "print OOM messages"
   - func: "umount shared scons directory"
   - func: "cleanup FUSE watchdog"
   - func: "cleanup environment"
