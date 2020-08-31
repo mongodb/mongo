@@ -512,17 +512,10 @@ StatusWithMatchExpression parseMOD(StringData name,
     if (iter.more())
         return {Status(ErrorCodes::BadValue, "malformed mod, too many elements")};
 
-    auto truncateToInt = [](const BSONElement& element) -> int {
-        if (element.type() == BSONType::NumberDecimal) {
-            return element.numberDecimal().toInt(Decimal128::kRoundTowardZero);
-        }
-        return element.numberInt();
-    };
-
     return {std::make_unique<ModMatchExpression>(
         name,
-        truncateToInt(divisor),
-        truncateToInt(remainder),
+        divisor.numberInt(),
+        remainder.numberInt(),
         doc_validation_error::createAnnotation(
             expCtx, elem.fieldNameStringData().toString(), BSON(name << elem.wrap())))};
 }
