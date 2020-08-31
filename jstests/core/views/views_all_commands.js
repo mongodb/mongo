@@ -339,6 +339,7 @@
         invalidateUserCache: {skip: isUnrelated},
         invalidateViewCatalog: {command: {invalidateViewCatalog: 1}},
         isdbgrid: {skip: isUnrelated},
+        isMaster: {skip: isUnrelated},
         journalLatencyTest: {skip: isUnrelated},
         killCursors: {
             setup: function(conn) {

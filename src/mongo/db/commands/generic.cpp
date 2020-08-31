@@ -32,6 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/commands.h"
@@ -51,6 +52,8 @@ namespace {
 using std::string;
 using std::stringstream;
 using std::vector;
+
+constexpr auto kIsMasterString = "isMaster"_sd;
 
 class PingCommand : public BasicCommand {
 public:
@@ -152,31 +155,35 @@ public:
                      const string& ns,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        // sort the commands before building the result BSON
-        std::vector<Command*> commands;
-        for (const auto command : globalCommandRegistry()->allCommands()) {
-            // don't show oldnames
-            if (command.first == command.second->getName())
-                commands.push_back(command.second);
+        // Sort the command names before building the result BSON.
+        std::vector<std::string> commandNames;
+        const auto commandRegistry = globalCommandRegistry();
+        for (const auto command : commandRegistry->allCommands()) {
+            // Don't show oldnames unless it's "isMaster". The output of the listCommands command
+            // must include "isMaster," even though it's an alias for the "hello" command, in order
+            // to preserve backwards compatibility with Ops Manager 4.4.
+            if (command.first == command.second->getName() || command.first == kIsMasterString)
+                commandNames.push_back(command.first);
         }
-        std::sort(commands.begin(), commands.end(), [](Command* lhs, Command* rhs) {
-            return (lhs->getName()) < (rhs->getName());
-        });
+        std::sort(commandNames.begin(), commandNames.end());
 
         BSONObjBuilder b(result.subobjStart("commands"));
-        for (const auto& c : commands) {
-            BSONObjBuilder temp(b.subobjStart(c->getName()));
-            temp.append("help", c->help());
+        for (const auto& c : commandNames) {
+            const auto command = commandRegistry->findCommand(c);
+            auto name = (c == kIsMasterString) ? kIsMasterString : command->getName();
+            BSONObjBuilder temp(b.subobjStart(name));
+            temp.append("help", command->help());
             temp.append("slaveOk",
-                        c->secondaryAllowed(opCtx->getServiceContext()) ==
+                        command->secondaryAllowed(opCtx->getServiceContext()) ==
                             Command::AllowedOnSecondary::kAlways);
-            temp.append("adminOnly", c->adminOnly());
-            // optionally indicates that the command can be forced to run on a slave/secondary
-            if (c->secondaryAllowed(opCtx->getServiceContext()) ==
+            temp.append("adminOnly", command->adminOnly());
+            // Optionally indicates that the command can be forced to run on a secondary.
+            if (command->secondaryAllowed(opCtx->getServiceContext()) ==
                 Command::AllowedOnSecondary::kOptIn)
                 temp.append("slaveOverrideOk", true);
             temp.done();
         }
+
         b.done();
 
         return 1;

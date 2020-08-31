@@ -22,6 +22,7 @@
     // Test that result contains basic commands.
     assert(commands.hasOwnProperty("commands"));
     assert(commands["commands"].hasOwnProperty("hello"));
+    assert(commands["commands"].hasOwnProperty("isMaster"));
     assert(commands["commands"].hasOwnProperty("insert"));
     assert(commands["commands"].hasOwnProperty("ping"));
 })();

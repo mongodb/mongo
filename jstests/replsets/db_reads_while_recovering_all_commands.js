@@ -208,6 +208,7 @@
         internalRenameIfOptionsAndIndexesMatch: {skip: isAnInternalCommand},
         invalidateUserCache: {skip: isNotAUserDataRead},
         invalidateViewCatalog: {skip: isNotAUserDataRead},
+        isMaster: {skip: isNotAUserDataRead},
         journalLatencyTest: {skip: isNotAUserDataRead},
         killAllSessions: {skip: isNotAUserDataRead},
         killAllSessionsByPattern: {skip: isNotAUserDataRead},
