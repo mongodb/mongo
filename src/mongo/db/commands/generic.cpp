@@ -34,6 +34,7 @@
 
 #include <time.h>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_rs.h"
@@ -71,6 +72,8 @@ namespace {
 using std::string;
 using std::stringstream;
 using std::vector;
+
+constexpr auto kIsMasterString = "isMaster"_sd;
 
 class CmdBuildInfo : public BasicCommand {
 public:
@@ -278,33 +281,35 @@ public:
                      const string& ns,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        // sort the commands before building the result BSON
-        std::vector<Command*> commands;
+        // Sort the command names before building the result BSON.
+        std::vector<std::string> commandNames;
         for (const auto command : allCommands()) {
-            // don't show oldnames
-            if (command.first == command.second->getName())
-                commands.push_back(command.second);
+            // Don't show oldnames unless it's "isMaster". The output of the listCommands command
+            // must include "isMaster," even though it's an alias for the "hello" command, in order
+            // to preserve backwards compatibility with Ops Manager 4.4.
+            if (command.first == command.second->getName() || command.first == kIsMasterString)
+                commandNames.push_back(command.first);
         }
-        std::sort(commands.begin(), commands.end(), [](Command* lhs, Command* rhs) {
-            return (lhs->getName()) < (rhs->getName());
-        });
+        std::sort(commandNames.begin(), commandNames.end());
 
         BSONObjBuilder b(result.subobjStart("commands"));
-        for (const auto& c : commands) {
-            BSONObjBuilder temp(b.subobjStart(c->getName()));
-
+        for (const auto& c : commandNames) {
+            const auto command = findCommand(c);
+            auto name = (c == kIsMasterString) ? kIsMasterString : command->getName();
+            BSONObjBuilder temp(b.subobjStart(name));
             {
                 stringstream help;
-                c->help(help);
+                command->help(help);
                 temp.append("help", help.str());
             }
-            temp.append("slaveOk", c->slaveOk());
-            temp.append("adminOnly", c->adminOnly());
+            temp.append("slaveOk", command->slaveOk());
+            temp.append("adminOnly", command->adminOnly());
             // optionally indicates that the command can be forced to run on a slave/secondary
-            if (c->slaveOverrideOk())
-                temp.append("slaveOverrideOk", c->slaveOverrideOk());
+            if (command->slaveOverrideOk())
+                temp.append("slaveOverrideOk", command->slaveOverrideOk());
             temp.done();
         }
+
         b.done();
 
         return 1;
