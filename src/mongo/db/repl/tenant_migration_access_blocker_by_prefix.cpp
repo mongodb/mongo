@@ -84,6 +84,8 @@ TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlocker(StringData
 }
 
 void TenantMigrationAccessBlockerByPrefix::appendInfoForServerStatus(BSONObjBuilder* builder) {
+    stdx::lock_guard<Latch> lg(_mutex);
+
     std::for_each(
         _tenantMigrationAccessBlockers.begin(),
         _tenantMigrationAccessBlockers.end(),
