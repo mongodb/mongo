@@ -23,10 +23,10 @@ const findCollectionInfo = function(nodeDB, collName) {
 };
 
 /**
- * Start a 1-node repl set to be used for the rest of the test.
+ * Start a 2-node repl set so that replication of the 'recordPreImages' field is tested.
  */
 
-let replTest = new ReplSetTest({nodes: 1});
+let replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();
 
@@ -35,7 +35,6 @@ let localDB = replTest.getPrimary().getDB("local");
 let testDB = replTest.getPrimary().getDB("test");
 const collName1 = "testColl1";
 const collName2 = "testColl2";
-const collName3 = "testColl3";
 
 // Check that we cannot set recordPreImages on the local or admin databases.
 assert.commandFailedWithCode(adminDB.runCommand({create: "preimagecoll", recordPreImages: true}),
@@ -43,36 +42,19 @@ assert.commandFailedWithCode(adminDB.runCommand({create: "preimagecoll", recordP
 assert.commandFailedWithCode(localDB.runCommand({create: "preimagecoll", recordPreImages: true}),
                              ErrorCodes.InvalidOptions);
 
-// Should not be able to set or unset recordPreImages in lastStableFCV 4.2. Creating oplog entries
-// with the new recordPreImages field would crash v4.2 secondaries to which the field is unknown.
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-
-// Check the create collection command in FCV 4.2 fails.
-// Note: recordPreImages: false can succeed, but has no effect because it sets nothing.
-assert.commandFailedWithCode(testDB.runCommand({create: collName1, recordPreImages: true}),
-                             ErrorCodes.InvalidOptions);
-
-// Check the collMod command in FCV 4.2 fails.
-assert.writeOK(testDB.getCollection(collName1).insert({_id: 1}));  // create the collection.
-assert.commandFailedWithCode(testDB.runCommand({collMod: collName1, recordPreImages: true}),
-                             ErrorCodes.InvalidOptions);
-// Check that failing to set the option doesn't accidentally set it anyways.
-assert.eq(findCollectionInfo(testDB, collName1).options, {});
-
-// Check the positive test cases. We should be able to set the recordPreImages field via create or
-// collMod in FCV 4.4.
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
-
 // Check the create collection command in FCV 4.4 succeeds.
-assert.commandWorked(testDB.runCommand({create: collName2, recordPreImages: true}));
-assert.eq(findCollectionInfo(testDB, collName2).options.recordPreImages, true);
+assert.commandWorked(
+    testDB.runCommand({create: collName1, recordPreImages: true, writeConcern: {w: 'majority'}}));
+assert.eq(findCollectionInfo(testDB, collName1).options.recordPreImages, true);
 
 // Check the collMod collection command in FCV 4.4 succeeds.
-assert.commandWorked(testDB.runCommand({create: collName3}));
-assert.commandWorked(testDB.runCommand({collMod: collName3, recordPreImages: true}));
-assert.eq(findCollectionInfo(testDB, collName3).options.recordPreImages, true);
-assert.commandWorked(testDB.runCommand({collMod: collName3, recordPreImages: false}));
-assert.eq(findCollectionInfo(testDB, collName3).options, {});
+assert.commandWorked(testDB.runCommand({create: collName2, writeConcern: {w: 'majority'}}));
+assert.commandWorked(
+    testDB.runCommand({collMod: collName2, recordPreImages: true, writeConcern: {w: 'majority'}}));
+assert.eq(findCollectionInfo(testDB, collName2).options.recordPreImages, true);
+assert.commandWorked(
+    testDB.runCommand({collMod: collName2, recordPreImages: false, writeConcern: {w: 'majority'}}));
+assert.eq(findCollectionInfo(testDB, collName2).options, {});
 
 // Restarting the server while in FCV 4.4 when recordPreImages flags are set should be successful.
 assert.doesNotThrow(() => {

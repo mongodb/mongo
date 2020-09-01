@@ -98,6 +98,12 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
     }
 }
 
+enum RecordPreImagesSetting {
+    True,
+    False,
+    Unset,
+};
+
 struct CollModRequest {
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
@@ -107,7 +113,7 @@ struct CollModRequest {
     boost::optional<Collection::Validator> collValidator;
     boost::optional<std::string> collValidationAction;
     boost::optional<std::string> collValidationLevel;
-    bool recordPreImages = false;
+    RecordPreImagesSetting recordPreImages = Unset;
 };
 
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
@@ -279,7 +285,11 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                         str::stream() << "option not supported on a view: " << fieldName};
             }
 
-            cmr.recordPreImages = e.trueValue();
+            if (e.trueValue()) {
+                cmr.recordPreImages = RecordPreImagesSetting::True;
+            } else {
+                cmr.recordPreImages = RecordPreImagesSetting::False;
+            }
         } else {
             if (isView) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -516,8 +526,9 @@ Status _collModInternal(OperationContext* opCtx,
                                        "Failed to set validationLevel");
         }
 
-        if (cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
-            coll->setRecordPreImages(opCtx, cmrNew.recordPreImages);
+        if (cmrNew.recordPreImages != RecordPreImagesSetting::Unset) {
+            coll->setRecordPreImages(
+                opCtx, cmrNew.recordPreImages == RecordPreImagesSetting::True ? true : false);
         }
 
         // Only observe non-view collMods, as view operations are observed as operations on the
