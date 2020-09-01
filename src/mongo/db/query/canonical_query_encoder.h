@@ -32,6 +32,13 @@
 #include "mongo/db/query/plan_cache.h"
 
 namespace mongo {
+
+/**
+ * Returns true if the query predicate involves a negation of a LTE or GTE comparison to 'null'.
+ */
+bool isQueryNegatingGTEorLTENull(const mongo::MatchExpression* tree);
+
+
 namespace canonical_query_encoder {
 /**
  * Encode the given CanonicalQuery into a string representation which represents the shape of the
