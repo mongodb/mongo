@@ -642,10 +642,16 @@ public:
     void visit(const RegexMatchExpression* expr) final {}
     void visit(const SizeMatchExpression* expr) final {}
     void visit(const TextMatchExpression* expr) final {
-        unsupportedExpression(expr);
+        // The QueryPlanner always converts a $text predicate into a query solution involving the
+        // 'TextNode' which is translated to an SBE plan elsewhere. Therefore, no $text predicates
+        // should remain in the MatchExpression tree when converting it to SBE.
+        MONGO_UNREACHABLE;
     }
     void visit(const TextNoOpMatchExpression* expr) final {
-        unsupportedExpression(expr);
+        // No-op $text match expressions exist as a crutch for parsing a $text predicate without
+        // having access to the FTS subsystem. We should never attempt to execute a MatchExpression
+        // containing such a no-op node.
+        MONGO_UNREACHABLE;
     }
     void visit(const TwoDPtInAnnulusExpression* expr) final {
         unsupportedExpression(expr);
