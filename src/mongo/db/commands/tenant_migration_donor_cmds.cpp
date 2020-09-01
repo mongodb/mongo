@@ -78,7 +78,7 @@ public:
                 TenantMigrationDonorService::Instance::getOrCreate(donorService, donorStateDoc);
             uassertStatusOK(donor->checkIfOptionsConflict(donorStateDoc));
 
-            donor->onCompletion().get();
+            donor->getCompletionFuture().get();
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const {}

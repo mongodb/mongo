@@ -92,7 +92,7 @@ public:
 
         virtual ~Instance() = default;
 
-        SharedSemiFuture<void> onCompletion() {
+        SharedSemiFuture<void> getCompletionFuture() {
             return _completionPromise.getFuture();
         }
 

@@ -325,10 +325,10 @@ TEST_F(PrimaryOnlyServiceTest, BasicCreateInstance) {
     ASSERT_EQ(1, instance2->getID());
     ASSERT_EQ(TestService::State::kInitializing, instance2->getInitialState());
 
-    instance->onCompletion().get();
+    instance->getCompletionFuture().get();
     ASSERT_EQ(TestService::State::kDone, instance->getState());
 
-    instance2->onCompletion().get();
+    instance2->getCompletionFuture().get();
     ASSERT_EQ(TestService::State::kDone, instance2->getState());
 }
 
@@ -344,7 +344,7 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstance) {
     ASSERT_EQ(instance.get(), instance2.get().get());
 
     TestServiceHangDuringCompletion.setMode(FailPoint::off);
-    instance->onCompletion().get();
+    instance->getCompletionFuture().get();
 
     // Shouldn't be able to look up instance after it has completed running.
     auto instance3 = TestService::Instance::lookup(_service, BSON("_id" << 0));
@@ -390,7 +390,7 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforePersisted) {
     stepDown();
     TestServiceHangDuringInitialization.setMode(FailPoint::off);
 
-    ASSERT_THROWS_CODE_AND_WHAT(instance->onCompletion().get(),
+    ASSERT_THROWS_CODE_AND_WHAT(instance->getCompletionFuture().get(),
                                 DBException,
                                 ErrorCodes::InterruptedDueToReplStateChange,
                                 "PrimaryOnlyService executor shut down due to stepDown");
@@ -436,7 +436,7 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstanceOnStepUp) {
     recreatedInstance = TestService::Instance::lookup(_service, BSON("_id" << 0)).get();
     ASSERT_EQ(TestService::State::kTwo, recreatedInstance->getInitialState());
     TestServiceHangDuringStateOne.setMode(FailPoint::off);
-    recreatedInstance->onCompletion().get();
+    recreatedInstance->getCompletionFuture().get();
     ASSERT_EQ(TestService::State::kDone, recreatedInstance->getState());
 
     auto nonExistentInstance = TestService::Instance::lookup(_service, BSON("_id" << 0));
@@ -497,7 +497,7 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforeRebuildingInstances) {
 
     TestServiceHangDuringStateOne.setMode(FailPoint::off);
 
-    instance->onCompletion().get();
+    instance->getCompletionFuture().get();
 }
 
 TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
@@ -550,7 +550,7 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
     ASSERT_EQ(TestService::State::kOne, instance->getInitialState());
     ASSERT_EQ(TestService::State::kOne, instance->getState());
     TestServiceHangDuringStateOne.setMode(FailPoint::off);
-    instance->onCompletion().get();
+    instance->getCompletionFuture().get();
     ASSERT_EQ(TestService::State::kDone, instance->getState());
 }
 
@@ -564,5 +564,5 @@ TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByStepdown) {
     stepDown();
     TestServiceHangBeforeWritingStateDoc.setMode(FailPoint::off);
 
-    ASSERT_EQ(ErrorCodes::NotMaster, instance->onCompletion().getNoThrow());
+    ASSERT_EQ(ErrorCodes::NotMaster, instance->getCompletionFuture().getNoThrow());
 }
