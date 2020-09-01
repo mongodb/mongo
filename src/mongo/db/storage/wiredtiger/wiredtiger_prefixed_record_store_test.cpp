@@ -87,6 +87,7 @@ public:
             getGlobalServiceContext(),
             std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
                 getGlobalServiceContext(), repl::ReplSettings())));
+        _engine->notifyStartupComplete();
     }
 
     PrefixedWiredTigerHarnessHelper(StringData extraStrings) : _dbpath("wt_test") {}

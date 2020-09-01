@@ -83,6 +83,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     IndexAccessMethodFactory::set(serviceContext, std::make_unique<IndexAccessMethodFactoryImpl>());
     Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
+    getServiceContext()->getStorageEngine()->notifyStartupComplete();
 }
 
 ServiceContextMongoDTest::~ServiceContextMongoDTest() {
