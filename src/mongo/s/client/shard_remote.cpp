@@ -116,7 +116,7 @@ bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) 
         } break;
 
         case RetryPolicy::kNotIdempotent: {
-            return ErrorCodes::isNotMasterError(code);
+            return ErrorCodes::isNotPrimaryError(code);
         } break;
     }
 
@@ -133,7 +133,7 @@ void ShardRemote::updateReplSetMonitor(const HostAndPort& remoteHost,
     if (remoteCommandStatus.isOK())
         return;
 
-    if (ErrorCodes::isNotMasterError(remoteCommandStatus.code())) {
+    if (ErrorCodes::isNotPrimaryError(remoteCommandStatus.code())) {
         _targeter->markHostNotMaster(remoteHost, remoteCommandStatus);
     } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
         _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);

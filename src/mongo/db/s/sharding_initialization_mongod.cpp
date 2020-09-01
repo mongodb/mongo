@@ -360,7 +360,7 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
         }
     } catch (const DBException& exception) {
         auto status = exception.toStatus();
-        if (!ErrorCodes::isNotMasterError(status.code())) {
+        if (!ErrorCodes::isNotPrimaryError(status.code())) {
             warning() << "Error encountered while trying to update config connection string to "
                       << newConnectionString.toString() << causedBy(redact(status));
         }

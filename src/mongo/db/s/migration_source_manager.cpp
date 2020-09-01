@@ -632,7 +632,7 @@ void MigrationSourceManager::cleanupOnError(OperationContext* opCtx) {
 
     try {
         _cleanup(opCtx);
-    } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
+    } catch (const ExceptionForCat<ErrorCategory::NotPrimaryError>& ex) {
         warning() << "Failed to clean up migration: " << redact(_args.toString())
                   << "due to: " << redact(ex);
     }

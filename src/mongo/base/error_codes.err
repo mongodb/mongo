@@ -334,10 +334,10 @@ error_class("Interruption", ["Interrupted",
                              "ClientDisconnect",
                              "ClientMarkedKilled"])
 
-# isNotMasterError() includes all codes that indicate that the node that received the request was
-# not master at some point during command processing, regardless of whether some write may have
+# isNotPrimaryError() includes all codes that indicate that the node that received the request was
+# not primary at some point during command processing, regardless of whether some write may have
 # happened. If you care about whether a write could have happened, check for individual codes.
-error_class("NotMasterError", [
+error_class("NotPrimaryError", [
     "NotWritablePrimary",
     "NotPrimaryNoSecondaryOk",
     "NotPrimaryOrSecondary",

@@ -372,7 +372,7 @@ ContinuousStepdown.configure = function(stepdownOptions,
                             try {
                                 collInfo = db.getCollectionInfos();
                             } catch (e) {
-                                if (ErrorCodes.isNotMasterError(e.code)) {
+                                if (ErrorCodes.isNotPrimaryError(e.code)) {
                                     return false;
                                 }
                                 throw e;
@@ -380,7 +380,7 @@ ContinuousStepdown.configure = function(stepdownOptions,
 
                             collInfo.forEach(collDoc => {
                                 const res = db.runCommand({collStats: collDoc["name"]});
-                                if (ErrorCodes.isNotMasterError(res.code)) {
+                                if (ErrorCodes.isNotPrimaryError(res.code)) {
                                     return false;
                                 }
                                 assert.commandWorked(res);
