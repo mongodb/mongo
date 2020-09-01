@@ -479,6 +479,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         LOGV2(20536, "Flow Control is enabled on this deployment");
     }
 
+    // Notify the storage engine that startup is completed before repair exits below, as repair sets
+    // the upgrade flag to true.
+    serviceContext->getStorageEngine()->notifyStartupComplete();
+
     if (storageGlobalParams.upgrade) {
         LOGV2(20537, "Finished checking dbs");
         exitCleanly(EXIT_CLEAN);

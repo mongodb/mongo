@@ -106,6 +106,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
     CollectionShardingStateFactory::set(
         getServiceContext(),
         std::make_unique<CollectionShardingStateFactoryShard>(getServiceContext()));
+    getServiceContext()->getStorageEngine()->notifyStartupComplete();
 }
 
 ServiceContextMongoDTest::~ServiceContextMongoDTest() {

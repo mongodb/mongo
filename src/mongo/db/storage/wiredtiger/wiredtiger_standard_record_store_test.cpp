@@ -86,6 +86,7 @@ public:
         repl::ReplicationCoordinator::set(serviceContext(),
                                           std::make_unique<repl::ReplicationCoordinatorMock>(
                                               serviceContext(), repl::ReplSettings()));
+        _engine.notifyStartupComplete();
     }
 
     ~WiredTigerHarnessHelper() {}

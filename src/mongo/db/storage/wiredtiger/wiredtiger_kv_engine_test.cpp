@@ -63,6 +63,7 @@ public:
         repl::ReplicationCoordinator::set(
             context,
             std::make_unique<repl::ReplicationCoordinatorMock>(context, repl::ReplSettings()));
+        _engine->notifyStartupComplete();
     }
 
     virtual KVEngine* restartEngine() override {
