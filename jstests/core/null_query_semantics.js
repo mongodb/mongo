@@ -260,6 +260,27 @@ function testNotEqualsNullSemantics() {
         assert(resultsEq(projectResults, extractAValues(expected)), tojson(projectResults));
     }());
 
+    // Test the semantics of the query {a: {$not: {$gte: null}}}.
+    (function testBasicNotEqualsGTENullQuery() {
+        const noProjectResults = coll.find({a: {$not: {$gte: null}}}).toArray();
+        const expected = [
+            {_id: "a_double_array", a: [[]]},
+            {_id: "a_empty_array", a: []},
+            {_id: "a_empty_subobject", a: {}},
+            {_id: "a_number", a: 4},
+            {_id: "a_object_array_all_b_nulls", a: [{b: null}, {b: undefined}, {b: null}, {}]},
+            {_id: "a_object_array_no_b_nulls", a: [{b: 1}, {b: 3}, {b: "string"}]},
+            {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
+            {_id: "a_object_array_some_b_undefined", a: [{b: undefined}, {b: 3}]},
+            {_id: "a_object_array_some_b_missing", a: [{b: 3}, {}]},
+            {_id: "a_subobject_b_not_null", a: {b: "hi"}},
+            {_id: "a_subobject_b_null", a: {b: null}},
+            {_id: "a_subobject_b_undefined", a: {b: undefined}},
+            {_id: "a_value_array_no_nulls", a: [1, "string", 4]},
+        ];
+        assert(resultsEq(noProjectResults, expected), tojson(noProjectResults));
+    }());
+
     // Test the semantics of the query {a: {$nin: [null, <number>]}}.
     (function testNotInNullQuery() {
         const query = {a: {$nin: [null, 75]}};

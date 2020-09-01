@@ -42,6 +42,27 @@
 #include "mongo/logv2/log.h"
 
 namespace mongo {
+
+bool isQueryNegatingGTEorLTENull(const mongo::MatchExpression* tree) {
+    // If the query predicate is null, do not reuse the plan since empty arrays ([]) are
+    // encoded as 'null' in the index. Thus we cannot safely invert the index bounds since 'null'
+    // has special comparison semantics.
+    if (tree->matchType() != MatchExpression::NOT) {
+        return false;
+    }
+
+    const MatchExpression* child = tree->getChild(0);
+    switch (child->matchType()) {
+        case MatchExpression::GTE:
+        case MatchExpression::LTE:
+            return static_cast<const ComparisonMatchExpression*>(child)->getData().type() ==
+                BSONType::jstNULL;
+
+        default:
+            return false;
+    }
+}
+
 namespace {
 
 // Delimiters for cache key encoding.
@@ -422,6 +443,12 @@ void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
         *keyBuilder << "min";
     else if (tree->isLTMaxKey())
         *keyBuilder << "max";
+
+    // If the query predicate involves comparison to null, do not reuse the plan since empty arrays
+    // ([]) are encoded as null in the index. Thus we cannot safely invert the index bounds.
+    if (isQueryNegatingGTEorLTENull(tree)) {
+        *keyBuilder << "not_gte_lte_null";
+    }
 
     // Traverse child nodes.
     // Enclose children in [].
