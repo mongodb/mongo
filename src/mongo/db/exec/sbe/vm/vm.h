@@ -149,6 +149,7 @@ struct Instruction {
         isString,
         isNumber,
         isBinData,
+        isDate,
         typeMatch,
 
         function,
@@ -259,6 +260,7 @@ public:
     void appendIsString();
     void appendIsNumber();
     void appendIsBinData();
+    void appendIsDate();
     void appendTypeMatch(uint32_t typeMask);
     void appendFunction(Builtin f, uint8_t arity);
     void appendJump(int jumpOffset);

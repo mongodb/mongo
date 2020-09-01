@@ -883,13 +883,103 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(absExpr)));
     }
+
     void visit(ExpressionAdd* expr) final {
-        _context->ensureArity(2);
-        auto rhs = _context->popExpr();
-        auto lhs = _context->popExpr();
-        _context->pushExpr(
-            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::add, std::move(lhs), std::move(rhs)));
+        size_t arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+        auto frameId = _context->frameIdGenerator->generate();
+
+
+        auto generateNotNumberOrDate = [frameId](const sbe::value::SlotId slotId) {
+            sbe::EVariable var{frameId, slotId};
+            return sbe::makeE<sbe::EPrimBinary>(
+                sbe::EPrimBinary::logicAnd,
+                sbe::makeE<sbe::EPrimUnary>(
+                    sbe::EPrimUnary::logicNot,
+                    sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(var.clone()))),
+                sbe::makeE<sbe::EPrimUnary>(
+                    sbe::EPrimUnary::logicNot,
+                    sbe::makeE<sbe::EFunction>("isDate", sbe::makeEs(var.clone()))));
+        };
+
+        if (arity == 2) {
+            auto rhs = _context->popExpr();
+            auto lhs = _context->popExpr();
+            auto binds = sbe::makeEs(std::move(lhs), std::move(rhs));
+            sbe::EVariable lhsVar{frameId, 0};
+            sbe::EVariable rhsVar{frameId, 1};
+
+            auto addExpr = sbe::makeE<sbe::EIf>(
+                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
+                                             generateNullOrMissing(frameId, 0),
+                                             generateNullOrMissing(frameId, 1)),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+                sbe::makeE<sbe::EIf>(
+                    sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
+                                                 generateNotNumberOrDate(0),
+                                                 generateNotNumberOrDate(1)),
+                    sbe::makeE<sbe::EFail>(
+                        ErrorCodes::Error{4974201},
+                        "only numbers and dates are allowed in an $add expression"),
+                    sbe::makeE<sbe::EIf>(
+                        sbe::makeE<sbe::EPrimBinary>(
+                            sbe::EPrimBinary::logicAnd,
+                            sbe::makeE<sbe::EFunction>("isDate", sbe::makeEs(lhsVar.clone())),
+                            sbe::makeE<sbe::EFunction>("isDate", sbe::makeEs(rhsVar.clone()))),
+                        sbe::makeE<sbe::EFail>(ErrorCodes::Error{4974202},
+                                               "only one date allowed in an $add expression"),
+                        sbe::makeE<sbe::EPrimBinary>(
+                            sbe::EPrimBinary::add, lhsVar.clone(), rhsVar.clone()))));
+
+            _context->pushExpr(
+                sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(addExpr)));
+        } else {
+            std::vector<std::unique_ptr<sbe::EExpression>> binds;
+            for (size_t i = 0; i < arity; i++) {
+                binds.push_back(_context->popExpr());
+            }
+            std::reverse(std::begin(binds), std::end(binds));
+
+            std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNull;
+            std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNotNumberOrDate;
+            std::vector<std::unique_ptr<sbe::EExpression>> argVars;
+            for (size_t idx = 0; idx < arity; idx++) {
+                checkExprsNull.push_back(generateNullOrMissing(frameId, idx));
+                checkExprsNotNumberOrDate.push_back(generateNotNumberOrDate(idx));
+                argVars.push_back(sbe::makeE<sbe::EVariable>(frameId, idx));
+            }
+
+            using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+            auto checkNullAllArguments =
+                std::accumulate(std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
+                                std::move_iterator<iter_t>(checkExprsNull.end()),
+                                std::move(checkExprsNull.front()),
+                                [](auto&& acc, auto&& ex) {
+                                    return sbe::makeE<sbe::EPrimBinary>(
+                                        sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                                });
+            auto checkNotNumberOrDateAllArguments =
+                std::accumulate(std::move_iterator<iter_t>(checkExprsNotNumberOrDate.begin() + 1),
+                                std::move_iterator<iter_t>(checkExprsNotNumberOrDate.end()),
+                                std::move(checkExprsNotNumberOrDate.front()),
+                                [](auto&& acc, auto&& ex) {
+                                    return sbe::makeE<sbe::EPrimBinary>(
+                                        sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                                });
+            auto addExpr = sbe::makeE<sbe::EIf>(
+                std::move(checkNullAllArguments),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+                sbe::makeE<sbe::EIf>(
+                    std::move(checkNotNumberOrDateAllArguments),
+                    sbe::makeE<sbe::EFail>(
+                        ErrorCodes::Error{4974203},
+                        "only numbers and dates are allowed in an $add expression"),
+                    sbe::makeE<sbe::EFunction>("doubleDoubleSum", std::move(argVars))));
+            _context->pushExpr(
+                sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(addExpr)));
+        }
     }
+
     void visit(ExpressionAllElementsTrue* expr) final {
         unsupportedExpression(expr->getOpName());
     }
