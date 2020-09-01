@@ -714,6 +714,13 @@ def __get_node_with_ixes(env, node, node_builder_type):
     except KeyError:
         prefix = node_builder.get_prefix(env)
         suffix = node_builder.get_suffix(env)
+
+        # TODO(SERVER-50681): Find a way to do this that doesn't hard
+        # code these extensions. See the code review for SERVER-27507
+        # for additional discussion.
+        if suffix == ".dll":
+            suffix = ".lib"
+
         __get_node_with_ixes.node_type_ixes[cache_key] = (prefix, suffix)
 
     node_with_ixes = SCons.Util.adjustixes(node, prefix, suffix)

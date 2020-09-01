@@ -268,12 +268,13 @@ def scan_for_transitive_install(node, env, _path):
         if base_base_entry.files:
             results.update(base_base_entry.files)
 
-    installed_children = [
+    installed_children = set(
         grandchild
         for child in node.children()
-        for grandchild in child.children()
-        if grandchild.has_builder()
-    ]
+        for direct_children in child.children()
+        for grandchild in direct_children.get_executor().get_all_targets()
+        if direct_children.get_executor() and grandchild.has_builder()
+    )
 
     for child in installed_children:
         auto_installed_files = get_auto_installed_files(env, child)

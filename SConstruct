@@ -537,6 +537,15 @@ add_option('libdeps-linting',
     type='choice',
 )
 
+add_option('experimental-visibility-support',
+    choices=['on', 'off'],
+    const='on',
+    default='off',
+    help='Enable visibility annotations (experimental)',
+    nargs='?',
+    type='choice',
+)
+
 try:
     with open("version.json", "r") as version_fp:
         version_data = json.load(version_fp)
@@ -1431,8 +1440,9 @@ if use_libunwind == True:
 
 # Windows can't currently support anything other than 'object' or 'static', until
 # we have annotated functions for export.
-if env.TargetOSIs('windows') and link_model not in ['object', 'static', 'dynamic-sdk']:
-    env.FatalError("Windows builds must use the 'object', 'dynamic-sdk', or 'static' link models")
+if env.TargetOSIs('windows') and get_option('experimental-visibility-support') != 'on':
+    if link_model not in ['object', 'static', 'dynamic-sdk']:
+        env.FatalError("Windows builds must use the 'object', 'dynamic-sdk', or 'static' link models")
 
 # The 'object' mode for libdeps is enabled by setting _LIBDEPS to $_LIBDEPS_OBJS. The other two
 # modes operate in library mode, enabled by setting _LIBDEPS to $_LIBDEPS_LIBS.
@@ -1452,6 +1462,39 @@ env['BUILDERS']['SharedArchive'] = SCons.Builder.Builder(
 )
 
 if link_model.startswith("dynamic"):
+
+    if link_model == "dynamic" and get_option('experimental-visibility-support') == 'on':
+
+        def visibility_cppdefines_generator(target, source, env, for_signature):
+            if not 'MONGO_API_NAME' in env:
+                return None
+            return "MONGO_API_${MONGO_API_NAME}"
+
+        env['MONGO_VISIBILITY_CPPDEFINES_GENERATOR'] = visibility_cppdefines_generator
+
+        def visibility_shccflags_generator(target, source, env, for_signature):
+            if env.get('MONGO_API_NAME'):
+                return "-fvisibility=hidden"
+            return None
+        if not env.TargetOSIs('windows'):
+            env['MONGO_VISIBILITY_SHCCFLAGS_GENERATOR'] = visibility_shccflags_generator
+
+        env.AppendUnique(
+            CPPDEFINES=[
+                'MONGO_USE_VISIBILITY',
+                '$MONGO_VISIBILITY_CPPDEFINES_GENERATOR',
+            ],
+            SHCCFLAGS=[
+                '$MONGO_VISIBILITY_SHCCFLAGS_GENERATOR',
+            ],
+            SHCXXFLAGS=[
+                # TODO: This has broader implications and seems not to
+                # work right now at least on macOS. We should
+                # investigate further in the future.
+                #
+                # '-fvisibility-inlines-hidden' if not env.TargetOSIs('windows') else [],
+            ],
+        )
 
     def library(env, target, source, *args, **kwargs):
         sharedLibrary = env.SharedLibrary(target, source, *args, **kwargs)
@@ -1872,6 +1915,12 @@ elif env.TargetOSIs('windows'):
         # have these, but we don't want to fix them up before we roll
         # over to C++17.
         "/wd5041",
+
+        # C4251: This warning attempts to prevent usage of CRT (C++
+        # standard library) types in DLL interfaces. That is a good
+        # idea for DLLs you ship to others, but in our case, we know
+        # that all DLLs are built consistently. Suppress the warning.
+        "/wd4251",
     ])
 
     # mozjs-60 requires the following
@@ -4646,6 +4695,13 @@ cachePrune = env.Command(
 
 env.AlwaysBuild(cachePrune)
 
+# Add a trivial Alias called `configure`. This makes it simple to run,
+# or re-run, the SConscript reading and conf tests, but not build any
+# real targets. This can be helpful when you are planning a dry-run
+# build, or simply want to validate your changes to SConstruct, tools,
+# and all the other setup that happens before we begin a real graph
+# walk.
+env.Alias('configure', None)
 
 # We have finished all SConscripts and targets, so we can ask
 # auto_install_binaries to finalize the installation setup.
