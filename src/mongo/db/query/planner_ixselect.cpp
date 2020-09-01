@@ -42,6 +42,7 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_expr_eq.h"
 #include "mongo/db/matcher/expression_text.h"
+#include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
@@ -459,6 +460,11 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                     return false;
                 }
             }
+        }
+
+        if (index.pathHasMultikeyComponent(keyPatternElt.fieldNameStringData()) && !index.sparse &&
+            isQueryNegatingGTEorLTENull(node)) {
+            return false;
         }
 
         // If this is an $elemMatch value, make sure _all_ of the children can use the index.
