@@ -1248,14 +1248,14 @@ std::vector<HostAndPort> SetState::getMatchingHosts(const ReadPreferenceSetting&
                     }
                 }
 
-                // Only consider nodes that satisfy the minOpTime
-                if (!criteria.minOpTime.isNull()) {
+                // Only consider nodes that satisfy the minClusterTime
+                if (!criteria.minClusterTime.isNull()) {
                     std::sort(matchingNodes.begin(), matchingNodes.end(), opTimeGreater);
                     for (size_t i = 0; i < matchingNodes.size(); i++) {
-                        if (matchingNodes[i]->opTime < criteria.minOpTime) {
+                        if (matchingNodes[i]->opTime.getTimestamp() < criteria.minClusterTime) {
                             if (i == 0) {
-                                // If no nodes satisfy the minOpTime criteria, we ignore the
-                                // minOpTime requirement.
+                                // If no nodes satisfy the minClusterTime criteria, we ignore the
+                                // minClusterTime requirement.
                                 break;
                             }
                             matchingNodes.erase(matchingNodes.begin() + i, matchingNodes.end());
@@ -1276,8 +1276,8 @@ std::vector<HostAndPort> SetState::getMatchingHosts(const ReadPreferenceSetting&
                 return {allMatchingNodes.front()->host};
             }
 
-            // If there are multiple nodes satisfying the minOpTime, next order by latency
-            // and don't consider hosts further than a threshold from the closest.
+            // If there are multiple nodes satisfying the minClusterTime, next order by latency and
+            // don't consider hosts further than a threshold from the closest.
             std::sort(allMatchingNodes.begin(), allMatchingNodes.end(), compareLatencies);
 
             if (!MONGO_unlikely(scanningServerSelectorIgnoreLatencyWindow.shouldFail())) {

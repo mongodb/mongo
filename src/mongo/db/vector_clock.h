@@ -124,6 +124,9 @@ public:
     static VectorClock* get(ServiceContext* service);
     static VectorClock* get(OperationContext* ctx);
 
+    static const VectorClock* get(const ServiceContext* service);
+    static const VectorClock* get(const OperationContext* ctx);
+
     static void registerVectorClockOnServiceContext(ServiceContext* service,
                                                     VectorClock* vectorClock);
 

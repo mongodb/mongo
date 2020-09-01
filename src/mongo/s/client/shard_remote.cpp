@@ -356,13 +356,10 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     invariant(isConfig());
     auto const grid = Grid::get(opCtx);
 
-    ReadPreferenceSetting readPrefWithMinOpTime(readPref);
-    readPrefWithMinOpTime.minOpTime = grid->configOpTime();
-
     BSONObj readConcernObj;
     {
         invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern);
-        const repl::ReadConcernArgs readConcern(grid->configOpTime(), readConcernLevel);
+        const auto readConcern = grid->readConcernWithConfigTime(readConcernLevel);
         BSONObjBuilder bob;
         readConcern.appendInfo(&bob);
         readConcernObj =
@@ -390,8 +387,11 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         qr.asFindCommand(&findCmdBuilder);
     }
 
-    return _runExhaustiveCursorCommand(
-        opCtx, readPrefWithMinOpTime, nss.db().toString(), maxTimeMS, findCmdBuilder.done());
+    return _runExhaustiveCursorCommand(opCtx,
+                                       grid->readPreferenceWithConfigTime(readPref),
+                                       nss.db().toString(),
+                                       maxTimeMS,
+                                       findCmdBuilder.done());
 }
 
 Status ShardRemote::createIndexOnConfig(OperationContext* opCtx,
@@ -422,13 +422,16 @@ StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
     Milliseconds maxTimeMSOverride,
     const BSONObj& cmdObj,
     const TaskExecutor::RemoteCommandCallbackFn& cb) {
-    ReadPreferenceSetting readPrefWithMinOpTime(readPref);
+    const auto readPrefWithConfigTime = [&]() -> ReadPreferenceSetting {
+        if (isConfig()) {
+            auto const grid = Grid::get(opCtx);
+            return grid->readPreferenceWithConfigTime(readPref);
+        } else {
+            return {readPref};
+        }
+    }();
 
-    if (isConfig()) {
-        readPrefWithMinOpTime.minOpTime = Grid::get(opCtx)->configOpTime();
-    }
-
-    const auto swHost = _targeter->findHost(opCtx, readPrefWithMinOpTime);
+    const auto swHost = _targeter->findHost(opCtx, readPrefWithConfigTime);
     if (!swHost.isOK()) {
         return swHost.getStatus();
     }
@@ -443,7 +446,7 @@ StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
         asyncHandle.hostTargetted,
         dbName.toString(),
         appendMaxTimeToCmdObj(requestTimeout, cmdObj),
-        _appendMetadataForCommand(opCtx, readPrefWithMinOpTime),
+        _appendMetadataForCommand(opCtx, readPrefWithConfigTime),
         opCtx,
         requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
 

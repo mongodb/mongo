@@ -151,11 +151,8 @@ void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss)
     // OK to use limit=1, since if any chunks exist, we will fail.
     countBuilder.append("limit", 1);
 
-    // Use readConcern local to guarantee we see any chunks that have been written and may
-    // become committed; readConcern majority will not see the chunks if they have not made it
-    // to the majority snapshot.
-    repl::ReadConcernArgs readConcern(Grid::get(opCtx)->configOpTime(),
-                                      repl::ReadConcernLevel::kMajorityReadConcern);
+    auto readConcern =
+        Grid::get(opCtx)->readConcernWithConfigTime(repl::ReadConcernLevel::kMajorityReadConcern);
     readConcern.appendInfo(&countBuilder);
 
     auto cmdResponse = uassertStatusOK(

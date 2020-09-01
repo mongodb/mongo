@@ -1289,20 +1289,20 @@ TEST_F(MaxStalenessMSTest, MaxStalenessMSZeroNoLastWrite) {
     ASSERT(!state->getMatchingHost(secondary).empty());
 }
 
-using MinOpTimeTest = ScanningReplicaSetMonitorTest;
+using MinClusterTimeTest = ScanningReplicaSetMonitorTest;
 /**
- * Success matching minOpTime
+ * Success matching minClusterTime
  */
-TEST_F(MinOpTimeTest, MinOpTimeMatched) {
+TEST_F(MinClusterTimeTest, MinClusterTimeMatched) {
     auto state = makeState(basicUri);
     Refresher refresher(state);
 
-    repl::OpTime minOpTimeSetting{Timestamp{10, 10}, 10};
-    repl::OpTime opTimeNonStale{Timestamp{10, 10}, 11};
-    repl::OpTime opTimeStale{Timestamp{10, 10}, 9};
+    Timestamp minClusterTimeSetting{10, 10};
+    repl::OpTime opTimeNonStale{Timestamp{10, 11}, 1};
+    repl::OpTime opTimeStale{Timestamp{10, 9}, 1};
 
     ReadPreferenceSetting readPref(ReadPreference::Nearest, TagSet());
-    readPref.minOpTime = minOpTimeSetting;
+    readPref.minClusterTime = minClusterTimeSetting;
     BSONArray hosts = BSON_ARRAY("a"
                                  << "b"
                                  << "c");
@@ -1330,18 +1330,18 @@ TEST_F(MinOpTimeTest, MinOpTimeMatched) {
 }
 
 /**
- * Failure matching minOpTime on primary for SecondaryOnly
+ * Failure matching minClusterTime on primary for SecondaryOnly
  */
-TEST_F(MinOpTimeTest, MinOpTimeNotMatched) {
+TEST_F(MinClusterTimeTest, MinClusterTimeNotMatched) {
     auto state = makeState(basicUri);
     Refresher refresher(state);
 
-    repl::OpTime minOpTimeSetting{Timestamp{10, 10}, 10};
-    repl::OpTime opTimeNonStale{Timestamp{10, 10}, 11};
-    repl::OpTime opTimeStale{Timestamp{10, 10}, 9};
+    Timestamp minClusterTimeSetting{10, 10};
+    repl::OpTime opTimeNonStale{Timestamp{10, 11}, 1};
+    repl::OpTime opTimeStale{Timestamp{10, 9}, 1};
 
     ReadPreferenceSetting readPref(ReadPreference::SecondaryOnly, TagSet());
-    readPref.minOpTime = minOpTimeSetting;
+    readPref.minClusterTime = minClusterTimeSetting;
     BSONArray hosts = BSON_ARRAY("a"
                                  << "b"
                                  << "c");
@@ -1369,20 +1369,20 @@ TEST_F(MinOpTimeTest, MinOpTimeNotMatched) {
 }
 
 /**
- * Ignore minOpTime if none is matched
+ * Ignore minClusterTime if none is matched
  */
-TEST_F(MinOpTimeTest, MinOpTimeIgnored) {
+TEST_F(MinClusterTimeTest, MinClusterTimeIgnored) {
     auto state = makeState(basicUri);
     Refresher refresher(state);
 
-    repl::OpTime minOpTimeSetting{Timestamp{10, 10}, 10};
-    repl::OpTime opTimeStale{Timestamp{10, 10}, 9};
+    Timestamp minClusterTimeSetting{10, 10};
+    repl::OpTime opTimeStale{Timestamp{10, 9}, 1};
 
     Date_t lastWriteDateStale = Date_t::now() - Seconds(1000);
     Date_t lastWriteDateNonStale = Date_t::now() - Seconds(100);
 
     ReadPreferenceSetting readPref(ReadPreference::SecondaryOnly, TagSet(), Seconds(200));
-    readPref.minOpTime = minOpTimeSetting;
+    readPref.minClusterTime = minClusterTimeSetting;
     BSONArray hosts = BSON_ARRAY("a"
                                  << "b"
                                  << "c");

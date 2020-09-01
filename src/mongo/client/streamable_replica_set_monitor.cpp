@@ -91,11 +91,11 @@ bool primaryOrSecondaryPredicate(const ServerDescriptionPtr& server) {
     return serverType == ServerType::kRSPrimary || serverType == ServerType::kRSSecondary;
 }
 
-std::string readPrefToStringWithMinOpTime(const ReadPreferenceSetting& readPref) {
+std::string readPrefToStringFull(const ReadPreferenceSetting& readPref) {
     BSONObjBuilder builder;
     readPref.toInnerBSON(&builder);
-    if (!readPref.minOpTime.isNull()) {
-        builder.append("minOpTime", readPref.minOpTime.toBSON());
+    if (!readPref.minClusterTime.isNull()) {
+        builder.append("minClusterTime", readPref.minClusterTime.toBSON());
     }
     return builder.obj().toString();
 }
@@ -275,7 +275,7 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::getHostsOrRefr
                 "RSM {replicaSet} start async getHosts with {readPref}",
                 "RSM start async getHosts",
                 "replicaSet"_attr = getName(),
-                "readPref"_attr = readPrefToStringWithMinOpTime(criteria));
+                "readPref"_attr = readPrefToStringFull(criteria));
 
     // fail fast on timeout
     const Date_t& now = _executor->now();
@@ -748,7 +748,7 @@ void StreamableReplicaSetMonitor::_processOutstanding(
                             "RSM {replicaSet} finished async getHosts: {readPref} ({duration})",
                             "RSM finished async getHosts",
                             "replicaSet"_attr = getName(),
-                            "readPref"_attr = readPrefToStringWithMinOpTime(query->criteria),
+                            "readPref"_attr = readPrefToStringFull(query->criteria),
                             "duration"_attr = Milliseconds(latency));
                 shouldRemove = true;
             }

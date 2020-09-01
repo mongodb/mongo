@@ -51,9 +51,7 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
     // when querying the primary we don't need to consider tags
     bool shouldTagFilter = true;
 
-    // TODO SERVER-46499: check to see if we want to enforce minOpTime at all since
-    // it was effectively optional in the original implementation.
-    if (!criteria.minOpTime.isNull()) {
+    if (!criteria.minClusterTime.isNull()) {
         auto eligibleServers = topologyDescription->findServers([](const ServerDescriptionPtr& s) {
             return (s->getType() == ServerType::kRSPrimary ||
                     s->getType() == ServerType::kRSSecondary);
@@ -69,8 +67,8 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
                                       });
         if (maxIt != endIt) {
             auto maxOpTime = (*maxIt)->getOpTime();
-            if (maxOpTime && maxOpTime < criteria.minOpTime) {
-                // ignore minOpTime
+            if (maxOpTime->getTimestamp() < criteria.minClusterTime) {
+                // ignore minClusterTime
                 const_cast<ReadPreferenceSetting&>(criteria) = ReadPreferenceSetting(criteria.pref);
             }
         }
@@ -256,10 +254,9 @@ bool SdamServerSelector::recencyFilter(const ReadPreferenceSetting& readPref,
                                        const ServerDescriptionPtr& s) {
     bool result = true;
 
-    // TODO SERVER-46499: check to see if we want to enforce minOpTime at all since
-    // it was effectively optional in the original implementation.
-    if (!readPref.minOpTime.isNull()) {
-        result = result && (s->getOpTime() >= readPref.minOpTime);
+    if (!readPref.minClusterTime.isNull()) {
+        result =
+            result && (s->getOpTime() && s->getOpTime()->getTimestamp() >= readPref.minClusterTime);
     }
 
     if (readPref.maxStalenessSeconds.count()) {

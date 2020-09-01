@@ -53,6 +53,14 @@ VectorClock* VectorClock::get(OperationContext* ctx) {
     return get(ctx->getClient()->getServiceContext());
 }
 
+const VectorClock* VectorClock::get(const ServiceContext* service) {
+    return vectorClockDecoration(service);
+}
+
+const VectorClock* VectorClock::get(const OperationContext* ctx) {
+    return get(ctx->getClient()->getServiceContext());
+}
+
 VectorClock::VectorClock() = default;
 
 VectorClock::~VectorClock() = default;
@@ -160,7 +168,7 @@ public:
              Component component) const override {
         if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                ServerGlobalParams::FeatureCompatibility::Version::kVersion47)) {
+                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To47)) {
             return ActualFormat::out(service, opCtx, permitRefresh, out, time, component);
         }
         return false;

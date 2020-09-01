@@ -35,6 +35,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
@@ -45,6 +46,13 @@
 namespace mongo {
 namespace {
 const auto grid = ServiceContext::declareDecoration<Grid>();
+
+// TODO SERVER-50675: Remove this FVC function when 5.0 becomes last-lts.
+bool fcvGreaterThanOrEqualTo47() {
+    auto& fcv = serverGlobalParams.featureCompatibility;
+    return fcv.isVersionInitialized() &&
+        fcv.isGreaterThanOrEqualTo(ServerGlobalParams::FeatureCompatibility::Version::kVersion47);
+}
 }  // namespace
 
 Grid::Grid() = default;
@@ -111,6 +119,37 @@ bool Grid::allowLocalHost() const {
 
 void Grid::setAllowLocalHost(bool allow) {
     _allowLocalShard = allow;
+}
+
+repl::ReadConcernArgs Grid::readConcernWithConfigTime(
+    repl::ReadConcernLevel readConcernLevel) const {
+    if (fcvGreaterThanOrEqualTo47()) {
+        auto now = VectorClock::get(grid.owner(this))->getTime();
+        if (auto configTime = now.configTime(); !configTime.asTimestamp().isNull()) {
+            // TODO SERVER-44097: investigate why not using a term (e.g. with a LogicalTime)
+            // can lead - upon CSRS stepdowns - to a last applied opTime lower than the
+            // previous primary's committed opTime
+            auto opTime = mongo::repl::OpTime(configTime.asTimestamp(),
+                                              mongo::repl::OpTime::kUninitializedTerm);
+            return ReadConcernArgs(opTime, readConcernLevel);
+        }
+    }
+    return ReadConcernArgs(configOpTime(), readConcernLevel);
+}
+
+ReadPreferenceSetting Grid::readPreferenceWithConfigTime(
+    const ReadPreferenceSetting& readPreference) const {
+    if (fcvGreaterThanOrEqualTo47()) {
+        auto now = VectorClock::get(grid.owner(this))->getTime();
+        if (auto configTime = now.configTime(); !configTime.asTimestamp().isNull()) {
+            ReadPreferenceSetting readPrefToReturn(readPreference);
+            readPrefToReturn.minClusterTime = configTime.asTimestamp();
+            return readPrefToReturn;
+        }
+    }
+    ReadPreferenceSetting readPrefToReturn(readPreference);
+    readPrefToReturn.minClusterTime = configOpTime().getTimestamp();
+    return readPrefToReturn;
 }
 
 repl::OpTime Grid::configOpTime() const {
