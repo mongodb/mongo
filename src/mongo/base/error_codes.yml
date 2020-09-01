@@ -3,11 +3,11 @@ error_categories:
     - NetworkError
     - NetworkTimeoutError
     - Interruption
-    # isNotMasterError() includes all codes that indicate that the node that received the request
+    # isNotPrimaryError() includes all codes that indicate that the node that received the request
     # was not master at some point during command processing,regardless of whether some write may
     # have happened. If you care about whether a write could have happened,check for individual
     # codes.
-    - NotMasterError
+    - NotPrimaryError
     - StaleShardVersionError
     - NeedRetargettingError
     - WriteConcernError
@@ -214,7 +214,7 @@ error_codes:
     - {code: 186,name: ClientMetadataCannotBeMutated}
     - {code: 187,name: LinearizableReadConcernError}
     - {code: 188,name: IncompatibleServerVersion}
-    - {code: 189,name: PrimarySteppedDown,categories: [NotMasterError,RetriableError]}
+    - {code: 189,name: PrimarySteppedDown,categories: [NotPrimaryError,RetriableError]}
     - {code: 190,name: MasterSlaveConnectionFailure}
     - {code: 191,name: OBSOLETE_BalancerLostDistributedLock}
     - {code: 192,name: FailPointEnabled}
@@ -376,12 +376,12 @@ error_codes:
     - {code: 9001,name: SocketException,categories: [NetworkError,RetriableError]}
     - {code: 9996,name: OBSOLETE_RecvStaleConfig}
     - {code: 10003,name: CannotGrowDocumentInCappedNamespace}
-    - {code: 10107,name: NotWritablePrimary,categories: [NotMasterError,RetriableError]}
+    - {code: 10107,name: NotWritablePrimary,categories: [NotPrimaryError,RetriableError]}
     - {code: 10334,name: BSONObjectTooLarge}
     - {code: 11000,name: DuplicateKey,extra: DuplicateKeyErrorInfo}
     - {code: 11600,name: InterruptedAtShutdown,categories: [Interruption,ShutdownError,CancelationError,RetriableError]}
     - {code: 11601,name: Interrupted,categories: [Interruption]}
-    - {code: 11602,name: InterruptedDueToReplStateChange,categories: [Interruption,NotMasterError,RetriableError]}
+    - {code: 11602,name: InterruptedDueToReplStateChange,categories: [Interruption,NotPrimaryError,RetriableError]}
     - {code: 12586,name: BackgroundOperationInProgressForDatabase}
     - {code: 12587,name: BackgroundOperationInProgressForNamespace}
     - {code: 13104,name: OBSOLETE_PrepareConfigsFailed}
@@ -390,8 +390,8 @@ error_codes:
     - {code: 13388,name: StaleConfig,
                     extra: StaleConfigInfo,
                     categories: [StaleShardVersionError,NeedRetargettingError]}
-    - {code: 13435,name: NotPrimaryNoSecondaryOk,categories: [NotMasterError,RetriableError]}
-    - {code: 13436,name: NotPrimaryOrSecondary,categories: [NotMasterError,RetriableError]}
+    - {code: 13435,name: NotPrimaryNoSecondaryOk,categories: [NotPrimaryError,RetriableError]}
+    - {code: 13436,name: NotPrimaryOrSecondary,categories: [NotPrimaryError,RetriableError]}
     - {code: 14031,name: OutOfDiskSpace}
     - {code: 17280,name: OSBELETE_KeyTooLong}
     - {code: 46841,name: ClientMarkedKilled,categories: [Interruption,CancelationError]}

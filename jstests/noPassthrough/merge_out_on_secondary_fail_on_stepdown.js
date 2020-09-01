@@ -48,7 +48,7 @@ let runTest = function(writeStage, failpoint) {
     });
     
     assert.commandFailed(cmdRes);
-    assert(ErrorCodes.isNotMasterError(cmdRes.code), cmdRes);
+    assert(ErrorCodes.isNotPrimaryError(cmdRes.code), cmdRes);
     `;
 
     // Enable the fail point to stop the aggregate.

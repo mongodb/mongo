@@ -38,7 +38,7 @@ var awaitShell = startParallelShell(command, master.port);
 
 print("getlasterror; should return an error");
 let result = master.getDB("test").runCommand({getLastError: 1, w: 2, wtimeout: 10 * 60 * 1000});
-assert(ErrorCodes.isNotMasterError(result.code));
+assert(ErrorCodes.isNotPrimaryError(result.code));
 print("result of gle:");
 printjson(result);
 

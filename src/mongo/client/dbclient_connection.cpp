@@ -808,7 +808,7 @@ void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
     const BSONElement codeElem = replyBody["code"];
 
     if (!isNotMasterErrorString(errorMsgElem) &&
-        !ErrorCodes::isNotMasterError(ErrorCodes::Error(codeElem.numberInt()))) {
+        !ErrorCodes::isNotPrimaryError(ErrorCodes::Error(codeElem.numberInt()))) {
         return;
     }
 

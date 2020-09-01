@@ -9,7 +9,7 @@ var RetryableWritesUtil = (function() {
      * src/mongo/shell/session.js and use it here.
      */
     function isRetryableCode(code) {
-        return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotMasterError(code) ||
+        return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotPrimaryError(code) ||
             ErrorCodes.isWriteConcernError(code) || ErrorCodes.isShutdownError(code) ||
             ErrorCodes.isInterruption(code);
     }

@@ -1141,7 +1141,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
                       "Automatic reconfig to increment the config term on stepup failed",
                       "error"_attr = reconfigStatus);
                 // If the node stepped down after we released the lock, we can just return.
-                if (ErrorCodes::isNotMasterError(reconfigStatus.code())) {
+                if (ErrorCodes::isNotPrimaryError(reconfigStatus.code())) {
                     return;
                 }
                 // Writing this new config with a new term is somewhat "best effort", and if we get

@@ -823,7 +823,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             // run the sharding onStepUp machinery. The onStepDown counterpart to these methods is
             // already idempotent, so the machinery will remain in the stepped down state.
             if (ErrorCodes::isShutdownError(status.code()) ||
-                ErrorCodes::isNotMasterError(status.code())) {
+                ErrorCodes::isNotPrimaryError(status.code())) {
                 return;
             }
             fassertFailedWithStatus(
@@ -870,7 +870,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // the sharding onStepUp machinery. The onStepDown counterpart to these methods is already
         // idempotent, so the machinery will remain in the stepped down state.
         if (ErrorCodes::isShutdownError(status.code()) ||
-            ErrorCodes::isNotMasterError(status.code())) {
+            ErrorCodes::isNotPrimaryError(status.code())) {
             return;
         }
         fassert(40107, status);

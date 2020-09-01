@@ -363,7 +363,7 @@ TEST_F(RemoteCommandRetrySchedulerTest,
 
 TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnNonRetryableErrorInResponse) {
     CallbackResponseSaver callback;
-    auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::NotMasterError>(
+    auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::NotPrimaryError>(
         10U, Milliseconds(1));
     auto request = makeRemoteCommandRequest();
 

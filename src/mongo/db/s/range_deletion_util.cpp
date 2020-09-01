@@ -344,7 +344,7 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                 swNumDeleted.getStatus() ==
                 ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist ||
                 ErrorCodes::isShutdownError(swNumDeleted.getStatus()) ||
-                ErrorCodes::isNotMasterError(swNumDeleted.getStatus());
+                ErrorCodes::isNotPrimaryError(swNumDeleted.getStatus());
         })
         .withDelayBetweenIterations(delayBetweenBatches)
         .on(executor)

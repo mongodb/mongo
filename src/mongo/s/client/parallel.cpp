@@ -401,7 +401,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
     } catch (const DBException& dbExcep) {
         auto errCode = dbExcep.code();
         if (allowShardVersionFailure &&
-            (ErrorCodes::isNotMasterError(errCode) || ErrorCodes::isNetworkError(errCode) ||
+            (ErrorCodes::isNotPrimaryError(errCode) || ErrorCodes::isNetworkError(errCode) ||
              errCode == ErrorCodes::FailedToSatisfyReadPreference)) {
             // It's okay if we don't set the version when talking to a secondary, we can
             // be stale in any case.

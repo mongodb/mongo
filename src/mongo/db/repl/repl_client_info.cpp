@@ -85,7 +85,7 @@ void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
             systemOpTime = replCoord->getMyLastAppliedOpTime();
             if (status == ErrorCodes::OplogOperationUnsupported ||
                 status == ErrorCodes::NamespaceNotFound ||
-                status == ErrorCodes::CollectionIsEmpty || ErrorCodes::isNotMasterError(status)) {
+                status == ErrorCodes::CollectionIsEmpty || ErrorCodes::isNotPrimaryError(status)) {
                 // It is ok if the storage engine does not support getLatestOplogTimestamp() or
                 // if the oplog is empty. If the node stepped down in between, it is correct to
                 // use lastAppliedOpTime as last OpTime.

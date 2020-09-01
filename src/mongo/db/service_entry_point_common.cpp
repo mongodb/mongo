@@ -504,18 +504,18 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
         getErrorLabels(opCtx, sessionOptions, commandName, code, wcCode, isInternalClient);
     commandBodyFieldsBob->appendElements(errorLabels);
 
-    auto isNotMasterError = false;
+    auto isNotPrimaryError = false;
     if (code) {
-        isNotMasterError = ErrorCodes::isA<ErrorCategory::NotMasterError>(*code);
+        isNotPrimaryError = ErrorCodes::isA<ErrorCategory::NotPrimaryError>(*code);
     }
 
-    if (!isNotMasterError && wcCode) {
-        isNotMasterError = ErrorCodes::isA<ErrorCategory::NotMasterError>(*wcCode);
+    if (!isNotPrimaryError && wcCode) {
+        isNotPrimaryError = ErrorCodes::isA<ErrorCategory::NotPrimaryError>(*wcCode);
     }
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-        !isNotMasterError) {
+        !isNotPrimaryError) {
         return;
     }
     const auto topologyVersion = replCoord->getTopologyVersion();
@@ -1414,7 +1414,7 @@ DbResponse receivedCommands(OperationContext* opCtx,
 
     if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
         // Close the connection to get client to go through server selection again.
-        if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
+        if (LastError::get(opCtx->getClient()).hadNotPrimaryError()) {
             if (c && c->getReadWriteType() == Command::ReadWriteType::kWrite)
                 notMasterUnackWrites.increment();
             uasserted(ErrorCodes::NotWritablePrimary,
@@ -1776,7 +1776,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         // receivedInsert/receivedUpdate/receivedDelete or within the AssertionException handler
         // above.  Either way, we want to throw an exception here, which will cause the client to be
         // disconnected.
-        if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
+        if (LastError::get(opCtx->getClient()).hadNotPrimaryError()) {
             notMasterLegacyUnackWrites.increment();
             uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream()
