@@ -38,6 +38,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_donor_util.h"
@@ -173,6 +174,34 @@ repl::OpTime TenantMigrationDonorService::Instance::_updateStateDocument(
     return updateOpTime.get();
 }
 
+repl::OpTime TenantMigrationDonorService::Instance::_markStateDocumentAsGarbageCollectable() {
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    DBDirectClient dbClient(opCtx);
+
+    _stateDoc.setExpireAt(_serviceContext->getFastClockSource()->now() +
+                          Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()});
+
+    auto commandResponse = dbClient.runCommand([&] {
+        write_ops::Update updateOp(_stateDocumentsNS);
+        auto updateModification =
+            write_ops::UpdateModification::parseFromClassicUpdate(_stateDoc.toBSON());
+        write_ops::UpdateOpEntry updateEntry(
+            BSON(TenantMigrationDonorDocument::kIdFieldName << _stateDoc.getId()),
+            updateModification);
+        updateEntry.setMulti(false);
+        updateEntry.setUpsert(false);
+        updateOp.setUpdates({updateEntry});
+
+        return updateOp.serialize({});
+    }());
+
+    const auto commandReply = commandResponse->getCommandReply();
+    uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+
+    return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+}
+
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWriteConcern(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, repl::OpTime opTime) {
     return WaitForMajorityService::get(_serviceContext)
@@ -180,27 +209,11 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
         .thenRunOn(**executor);
 }
 
-ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDataCommand(
+ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipient(
+    OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    RemoteCommandTargeter* recipientTargeter) {
-    if (skipSendingRecipientSyncDataCommand.shouldFail()) {
-        return ExecutorFuture<void>(**executor, Status::OK());
-    }
-
-    auto opCtxHolder = cc().makeOperationContext();
-    auto opCtx = opCtxHolder.get();
-
-    BSONObj cmdObj = BSONObj([&]() {
-        auto donorConnString =
-            repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
-        RecipientSyncData request(_stateDoc.getId(),
-                                  donorConnString.toString(),
-                                  _stateDoc.getDatabasePrefix().toString(),
-                                  _stateDoc.getReadPreference());
-        request.setReturnAfterReachingOpTime(_stateDoc.getBlockTimestamp());
-        return request.toBSON(BSONObj());
-    }());
-
+    RemoteCommandTargeter* recipientTargeter,
+    const BSONObj& cmdObj) {
     HostAndPort recipientHost =
         uassertStatusOK(recipientTargeter->findHost(opCtx, ReadPreferenceSetting()));
 
@@ -236,6 +249,42 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
             }
             return getStatusFromCommandResult(args.response.data);
         });
+}
+
+ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDataCommand(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    RemoteCommandTargeter* recipientTargeter) {
+    if (skipSendingRecipientSyncDataCommand.shouldFail()) {
+        return ExecutorFuture<void>(**executor, Status::OK());
+    }
+
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    BSONObj cmdObj = BSONObj([&]() {
+        auto donorConnString =
+            repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
+        RecipientSyncData request(_stateDoc.getId(),
+                                  donorConnString.toString(),
+                                  _stateDoc.getDatabasePrefix().toString(),
+                                  _stateDoc.getReadPreference());
+        request.setReturnAfterReachingOpTime(_stateDoc.getBlockTimestamp());
+        return request.toBSON(BSONObj());
+    }());
+
+    return _sendCommandToRecipient(opCtx, executor, recipientTargeter, cmdObj);
+}
+
+ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForgetMigrationCommand(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    RemoteCommandTargeter* recipientTargeter) {
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    return _sendCommandToRecipient(opCtx,
+                                   executor,
+                                   recipientTargeter,
+                                   RecipientForgetMigration(_stateDoc.getId()).toBSON(BSONObj()));
 }
 
 SemiFuture<void> TenantMigrationDonorService::Instance::run(
@@ -298,15 +347,6 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             // Wait for the migration to commit or abort.
             return _mtab->onCompletion();
         })
-        .onError([this](Status status) {
-            if (!status.isOK() && _abortReason) {
-                status.addContext(str::stream()
-                                  << "Tenant migration with id \"" << _stateDoc.getId()
-                                  << "\" and dbPrefix \"" << _stateDoc.getDatabasePrefix()
-                                  << "\" aborted due to " << _abortReason);
-            }
-            return status;
-        })
         .onCompletion([this](Status status) {
             LOGV2(5006601,
                   "Tenant migration completed",
@@ -314,6 +354,35 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "dbPrefix"_attr = _stateDoc.getDatabasePrefix(),
                   "status"_attr = status,
                   "abortReason"_attr = _abortReason);
+
+            if (status.isOK()) {
+                _decisionPromise.emplaceValue();
+            } else {
+                if (_abortReason) {
+                    status.addContext(str::stream()
+                                      << "Tenant migration with id \"" << _stateDoc.getId()
+                                      << "\" and dbPrefix \"" << _stateDoc.getDatabasePrefix()
+                                      << "\" aborted due to " << _abortReason);
+                }
+                _decisionPromise.setError(status);
+            }
+        })
+        .then([this, executor] {
+            // Wait for the donorForgetMigration command.
+            return _receivedDonorForgetMigrationPromise.getFuture();
+        })
+        .then([this, executor] {
+            const auto opTime = _markStateDocumentAsGarbageCollectable();
+            return _waitForMajorityWriteConcern(executor, std::move(opTime));
+        })
+        .then([this, executor, recipientTargeter] {
+            return _sendRecipientForgetMigrationCommand(executor, recipientTargeter.get());
+        })
+        .onCompletion([this, executor](Status status) {
+            LOGV2(4920400,
+                  "Marked migration state as garbage collectable",
+                  "migrationId"_attr = _stateDoc.getId(),
+                  "expireAt"_attr = _stateDoc.getExpireAt());
             return status;
         })
         .semi();

@@ -78,10 +78,10 @@ structs:
                 description:
                     "The opTime at which the donor's state document was set to 'committed' or 'aborted'."
                 optional: true
-            garbageCollect:
-                type: bool
-                description: "A boolean that determines whether the state machine should be deleted after a delay via the TTL monitor."
-                default: false
+            expireAt:
+                type: date
+                description: "The wall-clock time at which the state machine document should be removed by the TTL monitor."
+                optional: true
 
     tenantMigrationRecipientDocument:
         description: "Represents an in-progress tenant migration on the migration recipient."

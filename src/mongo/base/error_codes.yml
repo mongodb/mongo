@@ -399,6 +399,8 @@ error_codes:
 
     - {code: 326, name: OplogQueryMinTsMissing}
 
+    - {code: 327, name: NoSuchTenantMigration}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

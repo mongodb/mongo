@@ -49,10 +49,9 @@ namespace tenant_migration_donor {
 std::unique_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(ServiceContext* serviceContext);
 
 /**
- * Updates the TenantMigrationAccessBlocker for the tenant migration represented by the given
- * config.migrationDonors document.
+ * Updates the donor's in-memory migration state to reflect the given persisted state.
  */
-void onDonorStateTransition(OperationContext* opCtx, const BSONObj& doc);
+void onDonorStateDocUpdate(OperationContext* opCtx, const BSONObj& donorStateDocBson);
 
 /**
  * If the operation has read concern "snapshot" or includes afterClusterTime, and the database is

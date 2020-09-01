@@ -58,7 +58,8 @@ const char kNetName[] = "TenantMigrationWorkerNetwork";
  * Updates the TenantMigrationAccessBlocker when the tenant migration transitions to the blocking
  * state.
  */
-void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocument& donorStateDoc) {
+void onTransitionToBlocking(OperationContext* opCtx,
+                            const TenantMigrationDonorDocument& donorStateDoc) {
     invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kBlocking);
     invariant(donorStateDoc.getBlockTimestamp());
 
@@ -91,7 +92,8 @@ void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocumen
 /**
  * Transitions the TenantMigrationAccessBlocker to the committed state.
  */
-void onTransitionToCommitted(OperationContext* opCtx, TenantMigrationDonorDocument& donorStateDoc) {
+void onTransitionToCommitted(OperationContext* opCtx,
+                             const TenantMigrationDonorDocument& donorStateDoc) {
     invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kCommitted);
     invariant(donorStateDoc.getCommitOrAbortOpTime());
 
@@ -105,7 +107,8 @@ void onTransitionToCommitted(OperationContext* opCtx, TenantMigrationDonorDocume
 /**
  * Transitions the TenantMigrationAccessBlocker to the aborted state.
  */
-void onTransitionToAborted(OperationContext* opCtx, TenantMigrationDonorDocument& donorStateDoc) {
+void onTransitionToAborted(OperationContext* opCtx,
+                           const TenantMigrationDonorDocument& donorStateDoc) {
     invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted);
     invariant(donorStateDoc.getCommitOrAbortOpTime());
 
@@ -130,24 +133,28 @@ std::unique_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(
         executor::makeNetworkInterface(kNetName, nullptr, nullptr));
 }
 
-void onDonorStateTransition(OperationContext* opCtx, const BSONObj& donorStateDoc) {
-    auto parsedDonorStateDoc =
-        TenantMigrationDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), donorStateDoc);
-
-    switch (parsedDonorStateDoc.getState()) {
-        case TenantMigrationDonorStateEnum::kDataSync:
-            break;
-        case TenantMigrationDonorStateEnum::kBlocking:
-            onTransitionToBlocking(opCtx, parsedDonorStateDoc);
-            break;
-        case TenantMigrationDonorStateEnum::kCommitted:
-            onTransitionToCommitted(opCtx, parsedDonorStateDoc);
-            break;
-        case TenantMigrationDonorStateEnum::kAborted:
-            onTransitionToAborted(opCtx, parsedDonorStateDoc);
-            break;
-        default:
-            MONGO_UNREACHABLE;
+void onDonorStateDocUpdate(OperationContext* opCtx, const BSONObj& donorStateDocBson) {
+    auto donorStateDoc = TenantMigrationDonorDocument::parse(IDLParserErrorContext("donorStateDoc"),
+                                                             donorStateDocBson);
+    if (donorStateDoc.getExpireAt()) {
+        TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
+            .remove(donorStateDoc.getDatabasePrefix());
+    } else {
+        switch (donorStateDoc.getState()) {
+            case TenantMigrationDonorStateEnum::kDataSync:
+                break;
+            case TenantMigrationDonorStateEnum::kBlocking:
+                onTransitionToBlocking(opCtx, donorStateDoc);
+                break;
+            case TenantMigrationDonorStateEnum::kCommitted:
+                onTransitionToCommitted(opCtx, donorStateDoc);
+                break;
+            case TenantMigrationDonorStateEnum::kAborted:
+                onTransitionToAborted(opCtx, donorStateDoc);
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
     }
 }
 

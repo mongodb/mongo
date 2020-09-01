@@ -88,7 +88,7 @@ public:
                 TenantMigrationDonorService::Instance::getOrCreate(donorService, donorStateDoc);
             uassertStatusOK(donor->checkIfOptionsConflict(donorStateDoc));
 
-            donor->getCompletionFuture().get();
+            donor->getDecisionFuture().get();
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const {}
@@ -168,6 +168,21 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     "donorForgetMigration command not enabled",
                     repl::enableTenantMigrations);
+
+            const RequestType& requestBody = request();
+
+            auto donorService =
+                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                    ->lookupServiceByName(TenantMigrationDonorService::kServiceName);
+            auto donor = TenantMigrationDonorService::Instance::lookup(
+                donorService, BSON("_id" << requestBody.getMigrationId()));
+            uassert(ErrorCodes::NoSuchTenantMigration,
+                    str::stream() << "Could not find tenant migration with id "
+                                  << requestBody.getMigrationId(),
+                    donor);
+
+            donor.get().get()->onReceiveDonorForgetMigration();
+            donor.get().get()->getCompletionFuture().get();
         }
 
     private:

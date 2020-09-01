@@ -331,3 +331,14 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: enableTenantMigrations
         default: false
+
+    tenantMigrationGarbageCollectionDelayMS:
+        description: >-
+            The amount of time in milliseconds that the donor or recipient should wait before
+            removing the migration state document after receiving donorForgetMigration or
+            recipientForgetMigration.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: tenantMigrationGarbageCollectionDelayMS
+        default:
+            expr: 48 * 60 * 60 * 1000

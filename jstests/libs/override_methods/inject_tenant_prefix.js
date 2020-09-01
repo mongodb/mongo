@@ -30,7 +30,7 @@ function prependDbPrefixToDbNameIfApplicable(dbName) {
         // ignored.
         return dbName;
     }
-    return isBlacklistedDb(dbName) ? dbName : TestData.tenantMigrationDbPrefix + "_" + dbName;
+    return isBlacklistedDb(dbName) ? dbName : TestData.dbPrefix + "_" + dbName;
 }
 
 /**
@@ -51,7 +51,7 @@ function prependDbPrefixToNsIfApplicable(ns) {
  * If the given database name starts TestData.dbPrefix, removes the prefix.
  */
 function extractOriginalDbName(dbName) {
-    return dbName.replace(TestData.tenantMigrationDbPrefix + "_", "");
+    return dbName.replace(TestData.dbPrefix + "_", "");
 }
 
 /**
@@ -67,7 +67,7 @@ function extractOriginalNs(ns) {
  * Removes all occurrences of TestDatabase.dbPrefix in the string.
  */
 function removeDbPrefixFromString(string) {
-    return string.replace(new RegExp(TestData.tenantMigrationDbPrefix + "_", "g"), "");
+    return string.replace(new RegExp(TestData.dbPrefix + "_", "g"), "");
 }
 
 /**
