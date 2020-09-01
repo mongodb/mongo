@@ -56,7 +56,7 @@ def _update_builder(env, builder):
                     "$DSYMUTILCOMSTR"
                 ),
                 SCons.Action.Action(
-                    "$STRIP -Sx ${TARGET}",
+                    "$STRIP -S ${TARGET}",
                     "$DEBUGSTRIPCOMSTR"
                 ),
             ]
