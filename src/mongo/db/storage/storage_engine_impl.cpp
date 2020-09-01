@@ -546,6 +546,10 @@ void StorageEngineImpl::finishInit() {
     }
 }
 
+void StorageEngineImpl::notifyStartupComplete() {
+    _engine->notifyStartupComplete();
+}
+
 RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {
     if (!_engine) {
         // shutdown
