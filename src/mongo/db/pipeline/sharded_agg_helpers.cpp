@@ -306,7 +306,7 @@ boost::optional<long long> getPipelineLimit(Pipeline* pipeline) {
         // If this stage is one that can swap with a $limit stage, then we can look at the previous
         // stage to see if it includes a limit. Otherwise, we give up trying to find a limit on this
         // stage's output.
-        if (!source->constraints().canSwapWithLimitAndSample) {
+        if (!source->constraints().canSwapWithSkippingOrLimitingStage) {
             break;
         }
     }
@@ -357,7 +357,7 @@ void propagateDocLimitToShards(Pipeline* shardPipe, Pipeline* mergePipe) {
         // If there are any stages in the merge pipeline before the $skip and $limit stages, then we
         // cannot use the $limit to determine an upper bound, unless those stages could be swapped
         // with the $limit.
-        if (!source->constraints().canSwapWithLimitAndSample) {
+        if (!source->constraints().canSwapWithSkippingOrLimitingStage) {
             return;
         }
     }

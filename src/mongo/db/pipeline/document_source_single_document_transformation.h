@@ -74,7 +74,7 @@ public:
                                      UnionRequirement::kAllowed,
                                      ChangeStreamRequirement::kWhitelist);
         constraints.canSwapWithMatch = true;
-        constraints.canSwapWithLimitAndSample = true;
+        constraints.canSwapWithSkippingOrLimitingStage = true;
         constraints.isAllowedWithinUpdatePipeline = true;
         // This transformation could be part of a 'collectionless' change stream on an entire
         // database or cluster, mark as independent of any collection if so.

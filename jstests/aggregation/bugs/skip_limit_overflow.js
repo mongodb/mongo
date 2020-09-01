@@ -63,28 +63,36 @@ function testPipeline(pipeline, expectedResult, optimizedAwayStages) {
     assert.eq(coll.aggregate(pipeline).toArray(), []);
 }
 
-// Case where overflow of limit + skip prevents limit stage from being absorbed. Values
-// are specified as integrals > MAX_LONG. Note that we cannot specify this huge value as
-// a NumberLong, as we get a number conversion error (even if it's passed as a string).
-testPipeline([{$sort: {x: -1}}, {$skip: 18446744073709552000}, {$limit: 6}], {
-    $limit: {path: "$limit", expectedValue: [NumberLong(6)]},
-    $skip: {path: "$skip", expectedValue: [NumberLong("9223372036854775807")]}
-});
-testPipeline([{$sort: {x: -1}}, {$skip: 6}, {$limit: 18446744073709552000}], {
-    $limit: {path: "$limit", expectedValue: [NumberLong("9223372036854775807")]},
-    $skip: {path: "$skip", expectedValue: [NumberLong(6)]}
-});
+// Case where overflow of limit + skip prevents limit stage from being absorbed. Values are
+// specified as integrals > MAX_LONG. Note that we cannot specify this huge value as a NumberLong,
+// as we get a number conversion error (even if it's passed as a string).
+testPipeline([{$sort: {x: -1}}, {$skip: 18446744073709552000}, {$limit: 6}],
+             {
+                 $limit: {path: "$limit", expectedValue: [NumberLong(6)]},
+                 SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775807")]}
+             },
+             ["$skip"]);
+testPipeline([{$sort: {x: -1}}, {$skip: 6}, {$limit: 18446744073709552000}],
+             {
+                 $limit: {path: "$limit", expectedValue: [NumberLong("9223372036854775807")]},
+                 SKIP: {path: "skipAmount", expectedValue: [6]}
+             },
+             ["$skip"]);
 
 // Case where overflow of limit + skip prevents limit stage from being absorbed. One of the
 // values == MAX_LONG, another one is 1.
-testPipeline([{$sort: {x: -1}}, {$skip: NumberLong("9223372036854775807")}, {$limit: 1}], {
-    $limit: {path: "$limit", expectedValue: [NumberLong(1)]},
-    $skip: {path: "$skip", expectedValue: [NumberLong("9223372036854775807")]}
-});
-testPipeline([{$sort: {x: -1}}, {$skip: 1}, {$limit: NumberLong("9223372036854775807")}], {
-    $limit: {path: "$limit", expectedValue: [NumberLong("9223372036854775807")]},
-    $skip: {path: "$skip", expectedValue: [NumberLong(1)]}
-});
+testPipeline([{$sort: {x: -1}}, {$skip: NumberLong("9223372036854775807")}, {$limit: 1}],
+             {
+                 $limit: {path: "$limit", expectedValue: [NumberLong(1)]},
+                 SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775807")]}
+             },
+             ["$skip"]);
+testPipeline([{$sort: {x: -1}}, {$skip: 1}, {$limit: NumberLong("9223372036854775807")}],
+             {
+                 $limit: {path: "$limit", expectedValue: [NumberLong("9223372036854775807")]},
+                 SKIP: {path: "skipAmount", expectedValue: [1]}
+             },
+             ["$skip"]);
 
 // Case where limit + skip do not overflow. Limit == MAX_LONG and skip is 0. Should be able to
 // absorb the limit and skip stages.
@@ -98,15 +106,15 @@ testPipeline([{$sort: {x: -1}}, {$skip: 0}, {$limit: NumberLong("922337203685477
 testPipeline([{$sort: {x: -1}}, {$skip: NumberLong("9223372036854775806")}, {$limit: 1}],
              {
                  SORT: {path: "limitAmount", expectedValue: [NumberLong("9223372036854775807")]},
-                 $skip: {path: "$skip", expectedValue: [NumberLong("9223372036854775806")]}
+                 SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775806")]}
              },
-             ["$limit"]);
+             ["$skip", "$limit"]);
 testPipeline([{$sort: {x: -1}}, {$skip: 1}, {$limit: NumberLong("9223372036854775806")}],
              {
                  SORT: {path: "limitAmount", expectedValue: [NumberLong("9223372036854775807")]},
-                 $skip: {path: "$skip", expectedValue: [NumberLong(1)]}
+                 SKIP: {path: "skipAmount", expectedValue: [1]}
              },
-             ["$limit"]);
+             ["$skip", "$limit"]);
 
 // Case where the first $limit can be pushed down, but the second overflows and thus remains in
 // place.
@@ -120,6 +128,8 @@ testPipeline(
     ],
     {
         SORT: {path: "limitAmount", expectedValue: [NumberLong("9223372036854775807")]},
+        SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775800")]},
+        $skip: {path: "$skip", expectedValue: [NumberLong(10)]},
         $limit: {path: "$limit", expectedValue: [NumberLong(1)]}
     });
 
@@ -135,42 +145,69 @@ testPipeline(
     ],
     {
         SORT: {path: "limitAmount", expectedValue: [NumberLong("9223372036854775804")]},
-        $skip: {path: "$skip", expectedValue: [NumberLong("9223372036854775803")]}
-    });
+        SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775803")]}
+    },
+    ["$skip", "$limit"]);
 
 // Case where limit + skip do not overflow. Both values are < MAX_LONG.
 testPipeline([{$sort: {x: -1}}, {$skip: 674761616283}, {$limit: 35361718}],
              {
                  SORT: {path: "limitAmount", expectedValue: [NumberLong(674796978001)]},
-                 $skip: {path: "$skip", expectedValue: [NumberLong(674761616283)]}
+                 SKIP: {path: "skipAmount", expectedValue: [NumberLong(674761616283)]}
              },
-             ["$limit"]);
+             ["$skip", "$limit"]);
 testPipeline([{$sort: {x: -1}}, {$skip: 35361718}, {$limit: 674761616283}],
              {
                  SORT: {path: "limitAmount", expectedValue: [NumberLong(674796978001)]},
-                 $skip: {path: "$skip", expectedValue: [NumberLong(35361718)]}
+                 SKIP: {path: "skipAmount", expectedValue: [35361718]}
              },
-             ["$limit"]);
+             ["$skip", "$limit"]);
 
 // Case where where overflow of limit + skip + skip prevents limit stage from being absorbed.
-// One skip == MAX_LONG - 1, another one is 1. Should merge two skip stages into one.
+// One skip == MAX_LONG - 1, another one is 1. Should merge two skip stages into one and push down.
 testPipeline(
     [{$sort: {x: -1}}, {$skip: 1}, {$skip: NumberLong("9223372036854775806")}, {$limit: 1}],
     {
         $limit: {path: "$limit", expectedValue: [NumberLong(1)]},
-        $skip: {path: "$skip", expectedValue: [NumberLong("9223372036854775807")]}
+        SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775807")]}
     },
-    ["$sort"]);
+    ["$skip", "$sort"]);
 
-// Case where where overflow of limit + skip + skip prevents limit stage from being absorbed.
-// One skip == MAX_LONG, another one is 1. Should not absorb or merge any stages.
+// Case where where overflow of limit + skip + skip prevents limit stage and one of the skip stages
+// from being absorbed.  One skip == MAX_LONG, another one is 1. Should absorb the first skip.
 testPipeline(
     [{$sort: {x: -1}}, {$skip: 1}, {$skip: NumberLong("9223372036854775807")}, {$limit: 1}],
     {
         $limit: {path: "$limit", expectedValue: [NumberLong(1)]},
-        $skip: {path: "$skip", expectedValue: [NumberLong(1), NumberLong("9223372036854775807")]}
+        SKIP: {path: "skipAmount", expectedValue: [1]},
+        $skip: {path: "$skip", expectedValue: [NumberLong("9223372036854775807")]}
     },
     ["$sort"]);
+
+// Cases where both limit and skip == MAX_LONG.
+testPipeline(
+    [
+        {$sort: {x: -1}},
+        {$limit: NumberLong("9223372036854775807")},
+        {$skip: NumberLong("9223372036854775807")}
+    ],
+    {
+        SORT: {path: "limitAmount", expectedValue: [NumberLong("9223372036854775807")]},
+        SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775807")]}
+    },
+    ["$skip", "$limit", "$sort"]);
+
+testPipeline(
+    [
+        {$sort: {x: -1}},
+        {$skip: NumberLong("9223372036854775807")},
+        {$limit: NumberLong("9223372036854775807")}
+    ],
+    {
+        $limit: {path: "$limit", expectedValue: [NumberLong("9223372036854775807")]},
+        SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775807")]}
+    },
+    ["$skip", "$sort"]);
 
 // Case where sample size is > MAX_LONG.
 testPipeline([{$sample: {size: 18446744073709552000}}],
@@ -181,4 +218,21 @@ testPipeline([{$sample: {size: NumberLong("9223372036854775807")}}],
 // Case where sample size is == MAX_LONG - 1.
 testPipeline([{$sample: {size: NumberLong("9223372036854775806")}}],
              {$sample: {path: "$sample.size", expectedValue: [NumberLong("9223372036854775806")]}});
+
+// Case where we omit $skip stage causing overflow from the pushdown and continue to sum $skip
+// stages after it.
+testPipeline(
+    [
+        {$sort: {x: -1}},
+        {$skip: NumberLong("1")},
+        {$skip: NumberLong("2")},
+        {$skip: NumberLong("9223372036854775807")},
+        {$skip: NumberLong("3")},
+        {$skip: NumberLong("4")},
+    ],
+    {
+        $skip: {path: "$skip", expectedValue: [NumberLong("9223372036854775807")]},
+        SKIP: {path: "skipAmount", expectedValue: [10]}
+    },
+    ["$sort"]);
 })();

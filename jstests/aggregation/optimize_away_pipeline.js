@@ -215,14 +215,14 @@ assertPipelineDoesNotUseAggregation({
 });
 assert.commandWorked(coll.deleteOne({_id: 4}));
 
-// Pipelines which cannot be optimized away.
-
-// TODO SERVER-40909: $skip stage is not supported yet.
-assertPipelineUsesAggregation({
+assertPipelineDoesNotUseAggregation({
     pipeline: [{$match: {x: {$gte: 20}}}, {$skip: 1}],
-    expectedStages: ["COLLSCAN"],
+    expectedStages: ["COLLSCAN", "SKIP"],
     expectedResult: [{_id: 3, x: 30}]
 });
+
+// Pipelines which cannot be optimized away.
+
 // We cannot optimize away a pipeline if there are stages which have no equivalent in the
 // find command.
 assertPipelineUsesAggregation({
@@ -394,10 +394,7 @@ let limitStage = getAggPlanStage(explain, "LIMIT");
 assert.neq(null, limitStage, explain);
 assert.eq(1, limitStage.limitAmount, explain);
 
-// We can optimize away interleaved $limit and $skip after a project. The $limits can be collapsed
-// into a single $limit:35 prior to the $skip stages. We currently do not push down $skip into the
-// PlanStage layer (see SERVER-40909), which prevents this pipeline from being entirely optimized
-// away.
+// We can optimize away interleaved $limit and $skip after a project.
 pipeline = [
     {$match: {x: {$gte: 0}}},
     {$project: {_id: 0, x: 1}},
@@ -406,18 +403,20 @@ pipeline = [
     {$skip: 10},
     {$limit: 7}
 ];
-assertPipelineUsesAggregation({
+assertPipelineDoesNotUseAggregation({
     pipeline: pipeline,
-    expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
-    optimizedAwayStages: ["$match", "$limit"],
+    expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT", "SKIP"],
+    optimizedAwayStages: ["$match", "$limit", "$skip"],
 });
 explain = coll.explain().aggregate(pipeline);
+
+let skipStage = getAggPlanStage(explain, "SKIP");
+assert.neq(null, skipStage, explain);
+assert.eq(30, skipStage.skipAmount, explain);
+
 limitStage = getAggPlanStage(explain, "LIMIT");
 assert.neq(null, limitStage, explain);
-assert.eq(35, limitStage.limitAmount, explain);
-let skipStage = getAggPlanStage(explain, "$skip");
-assert.neq(null, skipStage, explain);
-assert.eq(30, skipStage.$skip, explain);
+assert.eq(5, limitStage.limitAmount, explain);
 
 assert.commandWorked(coll.dropIndexes());
 

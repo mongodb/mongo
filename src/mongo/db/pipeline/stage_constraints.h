@@ -315,12 +315,18 @@ struct StageConstraints {
     // $match predicates be swapped before itself.
     bool canSwapWithMatch = false;
 
-    // Neither a $sample nor a $limit can be moved before any stage which will possibly change the
-    // number of documents in the stream. Further, no stage which will change the order of documents
-    // can be swapped with a $limit or $sample, and no stage which will change behavior based on the
-    // order of documents can be swapped with a $sample because our implementation of sample will do
-    // a random sort which shuffles the order.
-    bool canSwapWithLimitAndSample = false;
+    // True if this stage can be safely swapped with a stage which alters the number of documents in
+    // the stream.
+    //
+    // For example, a $project can be safely swapped with a $skip, $limit, or $sample. But there are
+    // some cases when we cannot perform such swap:
+    // - $skip, $limit and $sample stages cannot be moved before any stage which will change the
+    //   number of documents
+    // - $skip, $limit and $sample stages cannot be swapped with any stage which will change the
+    //   order of documents
+    // - $sample cannot be swapped with stages which will change behavior based on the order of
+    //   documents because our implementation of $sample shuffles the order
+    bool canSwapWithSkippingOrLimitingStage = false;
 
     // Indicates that a stage is allowed within a pipeline-stlye update.
     bool isAllowedWithinUpdatePipeline = false;
@@ -335,7 +341,7 @@ struct StageConstraints {
             requiresInputDocSource == other.requiresInputDocSource &&
             isIndependentOfAnyCollection == other.isIndependentOfAnyCollection &&
             canSwapWithMatch == other.canSwapWithMatch &&
-            canSwapWithLimitAndSample == other.canSwapWithLimitAndSample &&
+            canSwapWithSkippingOrLimitingStage == other.canSwapWithSkippingOrLimitingStage &&
             isAllowedWithinUpdatePipeline == other.isAllowedWithinUpdatePipeline &&
             unionRequirement == other.unionRequirement;
     }

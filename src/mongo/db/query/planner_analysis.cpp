@@ -456,11 +456,21 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
         return root;
     }
 
-    if (!isSortStageType(projectNode->children[0]->getType())) {
+    // There could be a situation when there is a SKIP stage between PROJECT and SORT:
+    //   PROJECT => SKIP => SORT
+    // In this case we still want to push PROJECT beneath SORT.
+    bool hasSkipBetween = false;
+    auto sortNodeCandidate = projectNode->children[0];
+    if (sortNodeCandidate->getType() == STAGE_SKIP) {
+        hasSkipBetween = true;
+        sortNodeCandidate = sortNodeCandidate->children[0];
+    }
+
+    if (!isSortStageType(sortNodeCandidate->getType())) {
         return root;
     }
 
-    auto sortNode = static_cast<SortNode*>(root->children[0]);
+    auto sortNode = static_cast<SortNode*>(sortNodeCandidate);
 
     // Don't perform this optimization if the sort is a top-k sort. We would be wasting work
     // computing projections for documents that are discarded since they are not in the top-k set.
@@ -478,32 +488,52 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
 
     // Perform the swap. We are starting with the following structure:
     //   PROJECT => SORT => CHILD
+    // Or if there is a SKIP stage between PROJECT and SORT:
+    //   PROJECT => SKIP => SORT => CHILD
     //
     // This needs to be transformed to the following:
     //   SORT => PROJECT => CHILD
+    // Or to the following in case of SKIP:
+    //   SKIP => SORT => PROJECT => CHILD
     //
-    // First, detach the bottom of the tree.
+    // First, detach the bottom of the tree. This part is CHILD in the comment above.
     std::unique_ptr<QuerySolutionNode> restOfTree{sortNode->children[0]};
     invariant(sortNode->children.size() == 1u);
     sortNode->children.clear();
 
-    // Next, detach the sort from the projection and assume ownership of it.
-    std::unique_ptr<QuerySolutionNode> ownedSortNode{sortNode};
+    // Next, detach the input from the projection and assume ownership of it.
+    // The projection input is either this structure:
+    //   SORT
+    // Or this if we have SKIP:
+    //   SKIP => SORT
+    std::unique_ptr<QuerySolutionNode> ownedProjectionInput{projectNode->children[0]};
     sortNode = nullptr;
     invariant(projectNode->children.size() == 1u);
     projectNode->children.clear();
 
     // Attach the lower part of the tree as the child of the projection.
+    // We want to get the following structure:
+    //   PROJECT => CHILD
     std::unique_ptr<QuerySolutionNode> ownedProjectionNode = std::move(root);
     ownedProjectionNode->children.push_back(restOfTree.release());
 
     // Attach the projection as the child of the sort stage.
-    ownedSortNode->children.push_back(ownedProjectionNode.release());
+    if (hasSkipBetween) {
+        // In this case 'ownedProjectionInput' points to the structure:
+        //   SKIP => SORT
+        // And to attach PROJECT => CHILD to it, we need to access children of SORT stage.
+        ownedProjectionInput->children[0]->children.push_back(ownedProjectionNode.release());
+    } else {
+        // In this case 'ownedProjectionInput' points to the structure:
+        //   SORT
+        // And we can just add PROJECT => CHILD to its children.
+        ownedProjectionInput->children.push_back(ownedProjectionNode.release());
+    }
 
     // Re-compute properties so that they reflect the new structure of the tree.
-    ownedSortNode->computeProperties();
+    ownedProjectionInput->computeProperties();
 
-    return ownedSortNode;
+    return ownedProjectionInput;
 }
 
 bool canUseSimpleSort(const QuerySolutionNode& solnRoot,

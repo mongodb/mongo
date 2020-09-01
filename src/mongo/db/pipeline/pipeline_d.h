@@ -48,6 +48,7 @@ class DocumentSourceCursor;
 class DocumentSourceMatch;
 class DocumentSourceSort;
 class ExpressionContext;
+class SkipThenLimit;
 class OperationContext;
 class Pipeline;
 struct PlanSummaryStats;
@@ -182,7 +183,7 @@ private:
         std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
         QueryMetadataBitSet metadataAvailable,
         const BSONObj& queryObj,
-        boost::optional<long long> limit,
+        SkipThenLimit skipThenLimit,
         const AggregationRequest* aggRequest,
         const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
         bool* hasNoRequirements);

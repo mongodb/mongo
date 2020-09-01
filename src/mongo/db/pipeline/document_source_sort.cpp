@@ -33,15 +33,14 @@
 
 #include <algorithm>
 
-#include "mongo/base/exact_cast.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
@@ -122,53 +121,14 @@ boost::optional<long long> DocumentSourceSort::getLimit() const {
                                      : boost::none;
 }
 
-boost::optional<long long> DocumentSourceSort::extractLimitForPushdown(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    int64_t skipSum = 0;
-    boost::optional<long long> minLimit;
-    while (itr != container->end()) {
-        auto nextStage = (*itr).get();
-        auto nextSkip = exact_pointer_cast<DocumentSourceSkip*>(nextStage);
-        auto nextLimit = exact_pointer_cast<DocumentSourceLimit*>(nextStage);
-        int64_t safeSum = 0;
-
-        // The skip and limit values can be very large, so we need to make sure the sum doesn't
-        // overflow before applying an optimization to swap the $limit with the $skip.
-        if (nextSkip && !overflow::add(skipSum, nextSkip->getSkip(), &safeSum)) {
-            skipSum = safeSum;
-            ++itr;
-        } else if (nextLimit && !overflow::add(nextLimit->getLimit(), skipSum, &safeSum)) {
-            if (!minLimit) {
-                minLimit = safeSum;
-            } else {
-                minLimit = std::min(static_cast<long long>(safeSum), *minLimit);
-            }
-
-            itr = container->erase(itr);
-            // If the removed stage wasn't the last in the pipeline, make sure that the stage
-            // followed the erased stage has a valid pointer to the previous document source.
-            if (itr != container->end()) {
-                (*itr)->setSource(itr != container->begin() ? std::prev(itr)->get() : nullptr);
-            }
-        } else if (!nextStage->constraints().canSwapWithLimitAndSample) {
-            break;
-        } else {
-            ++itr;
-        }
-    }
-
-    return minLimit;
-}
-
 Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
     auto stageItr = std::next(itr);
     auto limit = extractLimitForPushdown(stageItr, container);
-    if (limit) {
+    if (limit)
         _sortExecutor->setLimit(*limit);
-    }
 
     auto nextStage = std::next(itr);
     if (nextStage == container->end()) {

@@ -250,6 +250,7 @@ pipelineEnv.Library(
         'pipeline.cpp',
         'semantic_analysis.cpp',
         'sequential_document_cache.cpp',
+        'skip_and_limit.cpp',
         'tee_buffer.cpp',
     ],
     LIBDEPS=[
@@ -401,6 +402,7 @@ env.CppUnitTest(
         'semantic_analysis_test.cpp',
         'sequential_document_cache_test.cpp',
         'sharded_union_test.cpp',
+        'skip_and_limit_test.cpp',
         'tee_buffer_test.cpp',
     ],
     LIBDEPS=[

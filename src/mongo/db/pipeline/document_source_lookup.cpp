@@ -266,7 +266,7 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState) const {
     }
 
     constraints.canSwapWithMatch = true;
-    constraints.canSwapWithLimitAndSample = !_unwindSrc;
+    constraints.canSwapWithSkippingOrLimitingStage = !_unwindSrc;
 
     return constraints;
 }
