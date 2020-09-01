@@ -64,7 +64,9 @@ ServiceExecutorFixed::ServiceExecutorFixed(ThreadPool::Options options)
     _options.onCreateThread =
         [this, onCreate = std::move(_options.onCreateThread)](const std::string& name) mutable {
             _executorContext = std::make_unique<ExecutorThreadContext>(this->weak_from_this());
-            onCreate(name);
+            if (onCreate) {
+                onCreate(name);
+            }
         };
     _threadPool = std::make_unique<ThreadPool>(_options);
 }
