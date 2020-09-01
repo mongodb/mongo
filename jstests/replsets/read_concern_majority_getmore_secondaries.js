@@ -10,6 +10,8 @@ if (!supportsMajorityReadConcern()) {
     return;
 }
 
+load("jstests/libs/write_concern_util.js");
+
 const name = "read_concern_majority_getmore_secondaries";
 const replSet = new ReplSetTest({
     name: name,
@@ -18,17 +20,6 @@ const replSet = new ReplSetTest({
 });
 replSet.startSet();
 replSet.initiate();
-
-function stopDataReplication(node) {
-    jsTest.log("Stop data replication on " + node.host);
-    assert.commandWorked(
-        node.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
-}
-
-function startDataReplication(node) {
-    jsTest.log("Start data replication on " + node.host);
-    assert.commandWorked(node.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
-}
 
 const dbName = "test";
 const collName = "coll";
@@ -50,8 +41,8 @@ replSet.awaitReplication();
 replSet.awaitLastOpCommitted();
 
 // Stop data replication on 2 secondaries to prevent writes being committed.
-stopDataReplication(secondaries[1]);
-stopDataReplication(secondaries[2]);
+stopServerReplication(secondaries[1]);
+stopServerReplication(secondaries[2]);
 
 // Write more data to primary.
 for (let i = 4; i < 8; i++) {
@@ -73,6 +64,6 @@ res = secondaryDB[collName].find().sort({_id: 1}).batchSize(2).readConcern("majo
 assert.docEq([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}], res.toArray());
 
 // Disable failpoints and shutdown.
-replSet.getSecondaries().forEach(startDataReplication);
+restartReplSetReplication(replSet);
 replSet.stopSet();
 }());
