@@ -71,6 +71,8 @@ public:
 
     virtual void finishInit() override;
 
+    virtual void notifyStartupComplete() override;
+
     virtual RecoveryUnit* newRecoveryUnit() override;
 
     virtual std::vector<std::string> listDatabases() const override;

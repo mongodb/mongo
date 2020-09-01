@@ -66,6 +66,7 @@ public:
             getGlobalServiceContext(),
             std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
                 getGlobalServiceContext(), repl::ReplSettings())));
+        _engine->notifyStartupComplete();
     }
 
     virtual KVEngine* restartEngine() override {

@@ -87,6 +87,8 @@ public:
 
     void startAsyncThreads() override;
 
+    void notifyStartupComplete() override;
+
     void setRecordStoreExtraOptions(const std::string& options);
     void setSortedDataInterfaceExtraOptions(const std::string& options);
 
