@@ -86,8 +86,8 @@ public:
         return _nPrev;
     }
 
-    bool hadNotMasterError() const {
-        return _hadNotMasterError;
+    bool hadNotPrimaryError() const {
+        return _hadNotPrimaryError;
     }
 
     class Disabled {
@@ -119,7 +119,7 @@ private:
     int _nPrev = 1;
     bool _valid = false;
     bool _disabled = false;
-    bool _hadNotMasterError = false;
+    bool _hadNotPrimaryError = false;
 };
 
 }  // namespace mongo

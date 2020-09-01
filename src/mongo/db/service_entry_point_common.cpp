@@ -521,8 +521,9 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
         getErrorLabels(opCtx, sessionOptions, commandName, code, wcCode, isInternalClient);
     commandBodyFieldsBob->appendElements(errorLabels);
 
-    const auto isNotMasterError = (code && ErrorCodes::isA<ErrorCategory::NotMasterError>(*code)) ||
-        (wcCode && ErrorCodes::isA<ErrorCategory::NotMasterError>(*wcCode));
+    const auto isNotPrimaryError =
+        (code && ErrorCodes::isA<ErrorCategory::NotPrimaryError>(*code)) ||
+        (wcCode && ErrorCodes::isA<ErrorCategory::NotPrimaryError>(*wcCode));
 
     const auto isShutdownError = (code && ErrorCodes::isA<ErrorCategory::ShutdownError>(*code)) ||
         (wcCode && ErrorCodes::isA<ErrorCategory::ShutdownError>(*wcCode));
@@ -534,7 +535,7 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
     // if the server enters quiesce mode.
     const auto shouldAppendTopologyVersion =
         (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-         isNotMasterError) ||
+         isNotPrimaryError) ||
         (isShutdownError && replCoord->inQuiesceMode());
 
     if (!shouldAppendTopologyVersion) {
@@ -1476,7 +1477,7 @@ DbResponse receivedCommands(OperationContext* opCtx,
 
     if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
         // Close the connection to get client to go through server selection again.
-        if (LastError::get(opCtx->getClient()).hadNotMasterError()) {
+        if (LastError::get(opCtx->getClient()).hadNotPrimaryError()) {
             if (c && c->getReadWriteType() == Command::ReadWriteType::kWrite)
                 notMasterUnackWrites.increment();
             uasserted(ErrorCodes::NotWritablePrimary,
@@ -1837,7 +1838,7 @@ DbResponse FireAndForgetOpRunner::run() {
     // receivedInsert/receivedUpdate/receivedDelete or within the AssertionException handler above.
     // Either way, we want to throw an exception here, which will cause the client to be
     // disconnected.
-    if (LastError::get(hr->client()).hadNotMasterError()) {
+    if (LastError::get(hr->client()).hadNotPrimaryError()) {
         notMasterLegacyUnackWrites.increment();
         uasserted(ErrorCodes::NotWritablePrimary,
                   str::stream() << "Not-master error while processing '"

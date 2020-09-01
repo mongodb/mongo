@@ -1367,7 +1367,7 @@ Future<void> HBStepdownAndReconfigTest::startReconfigCommand() {
             }
 
             if (!status.isOK()) {
-                ASSERT(ErrorCodes::isNotMasterError(status.code()));
+                ASSERT(ErrorCodes::isNotPrimaryError(status.code()));
                 LOGV2(463817,
                       "processReplSetReconfig threw expected error",
                       "errorCode"_attr = status.code(),

@@ -376,7 +376,7 @@ void MovePrimarySourceManager::cleanupOnError(OperationContext* opCtx) {
 
     try {
         _cleanup(opCtx);
-    } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
+    } catch (const ExceptionForCat<ErrorCategory::NotPrimaryError>& ex) {
         BSONObjBuilder requestArgsBSON;
         _requestArgs.serialize(&requestArgsBSON);
         LOGV2_WARNING(22046,

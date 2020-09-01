@@ -325,7 +325,7 @@ var {
          * source/retryable-writes/retryable-writes.rst#terms
          */
         function isRetryableCode(code) {
-            return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotMasterError(code) ||
+            return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotPrimaryError(code) ||
                 ErrorCodes.isShutdownError(code) || ErrorCodes.WriteConcernFailed === code;
         }
 

@@ -136,7 +136,7 @@ bool SdamErrorHandler::_isNotMasterOrNodeRecovering(const Status& status) const 
 }
 
 bool SdamErrorHandler::_isNotMaster(const Status& status) const {
-    return ErrorCodes::isA<ErrorCategory::NotMasterError>(status.code());
+    return ErrorCodes::isA<ErrorCategory::NotPrimaryError>(status.code());
 }
 
 int SdamErrorHandler::_getConsecutiveErrorsWithoutIsMasterOutcome(const HostAndPort& host) const {

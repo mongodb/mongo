@@ -643,7 +643,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 }
             }
             throw;
-        } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
+        } catch (const ExceptionForCat<ErrorCategory::NotPrimaryError>& ex) {
             LOGV2(20444,
                   "Index build: received interrupt signal due to change in replication state",
                   "buildUUID"_attr = buildUUID,

@@ -683,7 +683,7 @@ TEST_F(AsyncWorkSchedulerTest, DoesNotNotifyRemoteCommandTargeter_CmdResponseOth
     ASSERT_EQ(0UL, getShardTargeterMock(kShardIds[1])->getAndClearMarkedDownHosts().size());
 }
 
-TEST_F(AsyncWorkSchedulerTest, NotifiesRemoteCommandTargeter_WCNotMasterError) {
+TEST_F(AsyncWorkSchedulerTest, NotifiesRemoteCommandTargeter_WCNotPrimaryError) {
     ASSERT_EQ(0UL, getShardTargeterMock(kShardIds[1])->getAndClearMarkedDownHosts().size());
 
     scheduleAWSRemoteCommandWithResponse(
