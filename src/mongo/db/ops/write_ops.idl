@@ -33,7 +33,7 @@ global:
 
 imports:
     - "mongo/db/logical_session_id.idl"
-    - "mongo/db/pipeline/runtime_constants.idl"
+    - "mongo/db/pipeline/legacy_runtime_constants.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/db/query/hint.idl"
 
@@ -192,9 +192,10 @@ commands:
                 type: object
                 optional: true
             runtimeConstants:
-                description: "A collection of values that do not change once computed. These are
-                              used by pipeline-style update operations."
-                type: RuntimeConstants
+                description: "A legacy way to specify constant variables available during execution.
+                             'let' is now preferred."
+                cpp_name: legacyRuntimeConstants
+                type: LegacyRuntimeConstants
                 optional: true
 
     delete:
@@ -214,7 +215,8 @@ commands:
                 type: object
                 optional: true
             runtimeConstants:
-                description: "A collection of values that do not change once computed. These are 
-                              used by $expr."
-                type: RuntimeConstants
+                description: "A legacy way to specify constant variables available during execution.
+                             'let' is now preferred."
+                cpp_name: legacyRuntimeConstants
+                type: LegacyRuntimeConstants
                 optional: true

@@ -127,8 +127,8 @@ void makeUpdateRequest(OperationContext* opCtx,
     requestOut->setProj(args.getFields());
     invariant(args.getUpdate());
     requestOut->setUpdateModification(*args.getUpdate());
-    requestOut->setRuntimeConstants(
-        args.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
+    requestOut->setLegacyRuntimeConstants(
+        args.getLegacyRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
     requestOut->setLetParameters(args.getLetParameters());
     requestOut->setSort(args.getSort());
     requestOut->setHint(args.getHint());
@@ -151,8 +151,8 @@ void makeDeleteRequest(OperationContext* opCtx,
                        DeleteRequest* requestOut) {
     requestOut->setQuery(args.getQuery());
     requestOut->setProj(args.getFields());
-    requestOut->setRuntimeConstants(
-        args.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
+    requestOut->setLegacyRuntimeConstants(
+        args.getLegacyRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
     requestOut->setLet(args.getLetParameters());
     requestOut->setSort(args.getSort());
     requestOut->setHint(args.getHint());

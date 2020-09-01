@@ -415,7 +415,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
                                                                collation,
                                                                boost::none,  // explain
                                                                itemRef.getLet(),
-                                                               itemRef.getRuntimeConstants());
+                                                               itemRef.getLegacyRuntimeConstants());
 
     const auto updateExpr =
         getUpdateExprForTargeting(expCtx, shardKeyPattern, updateType, updateOp);
@@ -484,7 +484,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
                                                                collation,
                                                                boost::none,  // explain
                                                                itemRef.getLet(),
-                                                               itemRef.getRuntimeConstants());
+                                                               itemRef.getLegacyRuntimeConstants());
 
     BSONObj shardKey;
     if (_cm->isSharded()) {

@@ -59,15 +59,16 @@ namespace mongo {
 namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
-const char kRuntimeConstantsField[] = "runtimeConstants";
+const char kLegacyRuntimeConstantsField[] = "runtimeConstants";
 
-BSONObj appendRuntimeConstantsToCommandObject(OperationContext* opCtx, const BSONObj& origCmdObj) {
+BSONObj appendLegacyRuntimeConstantsToCommandObject(OperationContext* opCtx,
+                                                    const BSONObj& origCmdObj) {
     uassert(51196,
             "Cannot specify runtime constants option to a mongos",
-            !origCmdObj.getField(kRuntimeConstantsField));
+            !origCmdObj.getField(kLegacyRuntimeConstantsField));
     auto rtcBSON =
-        BSON(kRuntimeConstantsField << Variables::generateRuntimeConstants(opCtx).toBSON());
-    return origCmdObj.addField(rtcBSON.getField(kRuntimeConstantsField));
+        BSON(kLegacyRuntimeConstantsField << Variables::generateRuntimeConstants(opCtx).toBSON());
+    return origCmdObj.addField(rtcBSON.getField(kLegacyRuntimeConstantsField));
 }
 
 BSONObj getCollation(const BSONObj& cmdObj) {
@@ -91,10 +92,10 @@ boost::optional<BSONObj> getLet(const BSONObj& cmdObj) {
     return boost::none;
 }
 
-boost::optional<RuntimeConstants> getRuntimeConstants(const BSONObj& cmdObj) {
+boost::optional<LegacyRuntimeConstants> getLegacyRuntimeConstants(const BSONObj& cmdObj) {
     if (auto rcElem = cmdObj.getField("runtimeConstants"_sd); rcElem.type() == BSONType::Object) {
-        IDLParserErrorContext ctx("internalRuntimeConstants");
-        return RuntimeConstants::parse(ctx, rcElem.embeddedObject());
+        IDLParserErrorContext ctx("internalLegacyRuntimeConstants");
+        return LegacyRuntimeConstants::parse(ctx, rcElem.embeddedObject());
     }
     return boost::none;
 }
@@ -106,7 +107,7 @@ BSONObj getShardKey(OperationContext* opCtx,
                     const BSONObj& collation,
                     const boost::optional<ExplainOptions::Verbosity> verbosity,
                     const boost::optional<BSONObj>& let,
-                    const boost::optional<RuntimeConstants>& runtimeConstants) {
+                    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(
         opCtx, nss, collation, verbosity, let, runtimeConstants);
 
@@ -217,7 +218,7 @@ public:
             const BSONObj query = cmdObj.getObjectField("query");
             const BSONObj collation = getCollation(cmdObj);
             const auto let = getLet(cmdObj);
-            const auto rc = getRuntimeConstants(cmdObj);
+            const auto rc = getLegacyRuntimeConstants(cmdObj);
             const BSONObj shardKey =
                 getShardKey(opCtx, cm, nss, query, collation, verbosity, let, rc);
             const auto chunk = cm.findIntersectingChunk(shardKey, collation);
@@ -230,7 +231,7 @@ public:
         }
 
         const auto explainCmd = ClusterExplain::wrapAsExplain(
-            appendRuntimeConstantsToCommandObject(opCtx, cmdObj), verbosity);
+            appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj), verbosity);
 
         // Time how long it takes to run the explain command on the shard.
         Timer timer;
@@ -286,7 +287,7 @@ public:
         createShardDatabase(opCtx, nss.db());
 
         // Append mongoS' runtime constants to the command object before forwarding it to the shard.
-        auto cmdObjForShard = appendRuntimeConstantsToCommandObject(opCtx, cmdObj);
+        auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
 
         const auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
         if (!cm.isSharded()) {
@@ -303,7 +304,7 @@ public:
         const BSONObj query = cmdObjForShard.getObjectField("query");
         const BSONObj collation = getCollation(cmdObjForShard);
         const auto let = getLet(cmdObjForShard);
-        const auto rc = getRuntimeConstants(cmdObjForShard);
+        const auto rc = getLegacyRuntimeConstants(cmdObjForShard);
         const BSONObj shardKey =
             getShardKey(opCtx, cm, nss, query, collation, boost::none, let, rc);
 

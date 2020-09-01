@@ -67,8 +67,8 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
 
 }  // namespace
 
-const boost::optional<RuntimeConstants> BatchedCommandRequest::kEmptyRuntimeConstants =
-    boost::optional<RuntimeConstants>{};
+const boost::optional<LegacyRuntimeConstants> BatchedCommandRequest::kEmptyRuntimeConstants =
+    boost::optional<LegacyRuntimeConstants>{};
 const boost::optional<BSONObj> BatchedCommandRequest::kEmptyLet = boost::optional<BSONObj>{};
 
 BatchedCommandRequest BatchedCommandRequest::parseInsert(const OpMsgRequest& request) {
@@ -102,30 +102,31 @@ std::size_t BatchedCommandRequest::sizeWriteOps() const {
     return _visit(Visitor{});
 }
 
-bool BatchedCommandRequest::hasRuntimeConstants() const {
+bool BatchedCommandRequest::hasLegacyRuntimeConstants() const {
     return _visit(visit_helper::Overloaded{
         [](write_ops::Insert&) { return false; },
-        [&](write_ops::Update& op) { return op.getRuntimeConstants().has_value(); },
-        [&](write_ops::Delete& op) { return op.getRuntimeConstants().has_value(); }});
+        [&](write_ops::Update& op) { return op.getLegacyRuntimeConstants().has_value(); },
+        [&](write_ops::Delete& op) { return op.getLegacyRuntimeConstants().has_value(); }});
 }
 
-void BatchedCommandRequest::setRuntimeConstants(RuntimeConstants runtimeConstants) {
+void BatchedCommandRequest::setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants) {
     _visit(visit_helper::Overloaded{
         [](write_ops::Insert&) {},
-        [&](write_ops::Update& op) { op.setRuntimeConstants(std::move(runtimeConstants)); },
-        [&](write_ops::Delete& op) { op.setRuntimeConstants(std::move(runtimeConstants)); }});
+        [&](write_ops::Update& op) { op.setLegacyRuntimeConstants(std::move(runtimeConstants)); },
+        [&](write_ops::Delete& op) { op.setLegacyRuntimeConstants(std::move(runtimeConstants)); }});
 }
 
-const boost::optional<RuntimeConstants>& BatchedCommandRequest::getRuntimeConstants() const {
+const boost::optional<LegacyRuntimeConstants>& BatchedCommandRequest::getLegacyRuntimeConstants()
+    const {
     struct Visitor {
         auto& operator()(const write_ops::Insert& op) const {
             return kEmptyRuntimeConstants;
         }
         auto& operator()(const write_ops::Update& op) const {
-            return op.getRuntimeConstants();
+            return op.getLegacyRuntimeConstants();
         }
         auto& operator()(const write_ops::Delete& op) const {
-            return op.getRuntimeConstants();
+            return op.getLegacyRuntimeConstants();
         }
     };
     return _visit(Visitor{});

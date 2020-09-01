@@ -714,8 +714,8 @@ private:
 
             UpdateRequest updateRequest(_batch.getUpdates()[0]);
             updateRequest.setNamespaceString(_batch.getNamespace());
-            updateRequest.setRuntimeConstants(
-                _batch.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
+            updateRequest.setLegacyRuntimeConstants(_batch.getLegacyRuntimeConstants().value_or(
+                Variables::generateRuntimeConstants(opCtx)));
             updateRequest.setLetParameters(_batch.getLet());
             updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             updateRequest.setExplain(verbosity);
@@ -813,8 +813,8 @@ private:
 
             auto deleteRequest = DeleteRequest{};
             deleteRequest.setNsString(_batch.getNamespace());
-            deleteRequest.setRuntimeConstants(
-                _batch.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx)));
+            deleteRequest.setLegacyRuntimeConstants(_batch.getLegacyRuntimeConstants().value_or(
+                Variables::generateRuntimeConstants(opCtx)));
             deleteRequest.setLet(_batch.getLet());
             deleteRequest.setQuery(_batch.getDeletes()[0].getQ());
             deleteRequest.setCollation(write_ops::collationOf(_batch.getDeletes()[0]));

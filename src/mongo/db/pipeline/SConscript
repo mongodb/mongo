@@ -303,7 +303,7 @@ pipelineEnv.Library(
 env.Library(
     target='runtime_constants_idl',
     source=[
-        'runtime_constants.idl',
+        'legacy_runtime_constants.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/idl_parser',

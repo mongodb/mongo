@@ -31,7 +31,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/pipeline/runtime_constants_gen.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/unittest/unittest.h"
 
@@ -274,7 +274,7 @@ TEST(FindAndModifyRequest, UpdateWithWriteConcern) {
     ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON({}));
 }
 
-TEST(FindAndModifyRequest, UpdateWithRuntimeConstants) {
+TEST(FindAndModifyRequest, UpdateWithLegacyRuntimeConstants) {
     const BSONObj query(BSON("x" << 1));
     const BSONObj update(BSON("y" << 1));
 
@@ -282,7 +282,7 @@ TEST(FindAndModifyRequest, UpdateWithRuntimeConstants) {
         NamespaceString("test.user"),
         query,
         write_ops::UpdateModification::parseFromClassicUpdate(update));
-    request.setRuntimeConstants({Date_t(), Timestamp(1, 0)});
+    request.setLegacyRuntimeConstants({Date_t(), Timestamp(1, 0)});
 
     BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',
@@ -307,7 +307,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     const std::vector<BSONObj> arrayFilters{BSON("i" << 0)};
     const BSONObj field(BSON("x" << 1 << "y" << 1));
     const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
-    auto rtc = RuntimeConstants{Date_t(), Timestamp(1, 0)};
+    auto rtc = LegacyRuntimeConstants{Date_t(), Timestamp(1, 0)};
 
     auto request = FindAndModifyRequest::makeUpdate(
         NamespaceString("test.user"),
@@ -319,7 +319,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
     request.setHint(hint);
     request.setCollation(collation);
     request.setArrayFilters(arrayFilters);
-    request.setRuntimeConstants(rtc);
+    request.setLegacyRuntimeConstants(rtc);
     request.setWriteConcern(writeConcern);
     request.setBypassDocumentValidation(true);
     request.setUpsert(true);
@@ -435,14 +435,14 @@ TEST(FindAndModifyRequest, RemoveWithFullSpec) {
                                  << "en_US"));
     const BSONObj field(BSON("x" << 1 << "y" << 1));
     const WriteConcernOptions writeConcern(2, WriteConcernOptions::SyncMode::FSYNC, 150);
-    auto rtc = RuntimeConstants{Date_t(), Timestamp(1, 0)};
+    auto rtc = LegacyRuntimeConstants{Date_t(), Timestamp(1, 0)};
 
     auto request = FindAndModifyRequest::makeRemove(NamespaceString("test.user"), query);
     request.setFieldProjection(field);
     request.setSort(sort);
     request.setCollation(collation);
     request.setWriteConcern(writeConcern);
-    request.setRuntimeConstants(rtc);
+    request.setLegacyRuntimeConstants(rtc);
 
     BSONObj expectedObj(fromjson(R"json({
             findAndModify: 'user',

@@ -74,7 +74,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
     const BSONObj& collation,
     const boost::optional<ExplainOptions::Verbosity>& verbosity,
     const boost::optional<BSONObj>& letParameters,
-    const boost::optional<RuntimeConstants>& runtimeConstants);
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
 
 /**
  * Consults the routing info to build requests for:

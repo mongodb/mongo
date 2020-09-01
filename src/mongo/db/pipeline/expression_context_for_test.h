@@ -72,7 +72,7 @@ public:
                             false,        // bypassDocumentValidation,
                             false,        // isMapReduce
                             nss,
-                            RuntimeConstants(Date_t::now(), Timestamp(1, 0)),
+                            LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0)),
                             {},  // collator
                             std::make_shared<StubMongoProcessInterface>(),
                             {},    // resolvedNamespaces
@@ -123,7 +123,7 @@ public:
                             false,        // bypassDocumentValidation,
                             false,        // isMapReduce
                             nss,
-                            RuntimeConstants(Date_t::now(), Timestamp(1, 0)),
+                            LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0)),
                             {},  // collator
                             std::make_shared<StubMongoProcessInterface>(),
                             {},    // resolvedNamespaces
@@ -165,7 +165,7 @@ public:
                             false,        // bypassDocumentValidation,
                             false,        // isMapReduce
                             nss,
-                            RuntimeConstants(Date_t::now(), Timestamp(1, 0)),
+                            LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0)),
                             std::move(collator),
                             std::make_shared<StubMongoProcessInterface>(),
                             {},  // resolvedNamespaces

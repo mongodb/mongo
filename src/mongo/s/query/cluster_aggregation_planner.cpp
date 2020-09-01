@@ -126,8 +126,8 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     mergeCmd["pipeline"] = Value(pipelineForMerging->serialize());
     mergeCmd[AggregationRequest::kFromMongosName] = Value(true);
 
-    mergeCmd[AggregationRequest::kRuntimeConstantsName] =
-        Value(mergeCtx->getRuntimeConstants().toBSON());
+    mergeCmd[AggregationRequest::kLegacyRuntimeConstantsName] =
+        Value(mergeCtx->getLegacyRuntimeConstants().toBSON());
 
     // If the user didn't specify a collation already, make sure there's a collation attached to
     // the merge command, since the merging shard may not have the collection metadata.

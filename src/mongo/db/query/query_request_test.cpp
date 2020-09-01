@@ -507,7 +507,7 @@ TEST(QueryRequestTest, ParseFromCommandValidMinMax) {
 }
 
 TEST(QueryRequestTest, ParseFromCommandAllNonOptionFields) {
-    RuntimeConstants rtc{Date_t::now(), Timestamp(1, 1)};
+    LegacyRuntimeConstants rtc{Date_t::now(), Timestamp(1, 1)};
     BSONObj rtcObj = BSON("runtimeConstants" << rtc.toBSON());
     BSONObj cmdObj = fromjson(
                          "{find: 'testns',"
@@ -547,9 +547,9 @@ TEST(QueryRequestTest, ParseFromCommandAllNonOptionFields) {
     ASSERT_EQUALS(3, *qr->getLimit());
     ASSERT_EQUALS(5, *qr->getSkip());
     ASSERT_EQUALS(90, *qr->getBatchSize());
-    ASSERT(qr->getRuntimeConstants().has_value());
-    ASSERT_EQUALS(qr->getRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
-    ASSERT_EQUALS(qr->getRuntimeConstants()->getClusterTime(), rtc.getClusterTime());
+    ASSERT(qr->getLegacyRuntimeConstants().has_value());
+    ASSERT_EQUALS(qr->getLegacyRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
+    ASSERT_EQUALS(qr->getLegacyRuntimeConstants()->getClusterTime(), rtc.getClusterTime());
     ASSERT(qr->wantMore());
 }
 
@@ -842,7 +842,7 @@ TEST(QueryRequestTest, ParseFromCommandReadOnceWrongType) {
     ASSERT_EQ(ErrorCodes::FailedToParse, result.getStatus());
 }
 
-TEST(QueryRequestTest, ParseFromCommandRuntimeConstantsWrongType) {
+TEST(QueryRequestTest, ParseFromCommandLegacyRuntimeConstantsWrongType) {
     BSONObj cmdObj = BSON("find"
                           << "testns"
                           << "runtimeConstants"
@@ -853,7 +853,7 @@ TEST(QueryRequestTest, ParseFromCommandRuntimeConstantsWrongType) {
     ASSERT_EQ(ErrorCodes::FailedToParse, result.getStatus());
 }
 
-TEST(QueryRequestTest, ParseFromCommandRuntimeConstantsSubfieldsWrongType) {
+TEST(QueryRequestTest, ParseFromCommandLegacyRuntimeConstantsSubfieldsWrongType) {
     BSONObj cmdObj = BSON("find"
                           << "testns"
                           << "runtimeConstants"
@@ -1000,8 +1000,8 @@ TEST(QueryRequestTest, ParseFromCommandEmptyResumeToken) {
 //
 
 TEST(QueryRequestTest, AsFindCommandAllNonOptionFields) {
-    BSONObj rtcObj =
-        BSON("runtimeConstants" << (RuntimeConstants{Date_t::now(), Timestamp(1, 1)}.toBSON()));
+    BSONObj rtcObj = BSON("runtimeConstants"
+                          << (LegacyRuntimeConstants{Date_t::now(), Timestamp(1, 1)}.toBSON()));
     BSONObj cmdObj = fromjson(
                          "{find: 'testns',"
                          "filter: {a: 1},"
@@ -1023,8 +1023,8 @@ TEST(QueryRequestTest, AsFindCommandAllNonOptionFields) {
 }
 
 TEST(QueryRequestTest, AsFindCommandWithUuidAllNonOptionFields) {
-    BSONObj rtcObj =
-        BSON("runtimeConstants" << (RuntimeConstants{Date_t::now(), Timestamp(1, 1)}.toBSON()));
+    BSONObj rtcObj = BSON("runtimeConstants"
+                          << (LegacyRuntimeConstants{Date_t::now(), Timestamp(1, 1)}.toBSON()));
     BSONObj cmdObj =
         fromjson(
             // This binary value is UUID("01234567-89ab-cdef-edcb-a98765432101")
@@ -1201,7 +1201,7 @@ TEST(QueryRequestTest, DefaultQueryParametersCorrect) {
     ASSERT_EQUALS(false, qr->isTailableAndAwaitData());
     ASSERT_EQUALS(false, qr->isExhaust());
     ASSERT_EQUALS(false, qr->isAllowPartialResults());
-    ASSERT_EQUALS(false, qr->getRuntimeConstants().has_value());
+    ASSERT_EQUALS(false, qr->getLegacyRuntimeConstants().has_value());
     ASSERT_EQUALS(false, qr->allowDiskUse());
 }
 
@@ -1500,18 +1500,18 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowSpeculativeMajorityReadFails
     ASSERT_EQ(ErrorCodes::InvalidPipelineOperator, aggCmd.getStatus().code());
 }
 
-TEST(QueryRequestTest, ConvertToAggregationWithRuntimeConstantsSucceeds) {
-    RuntimeConstants rtc{Date_t::now(), Timestamp(1, 1)};
+TEST(QueryRequestTest, ConvertToAggregationWithLegacyRuntimeConstantsSucceeds) {
+    LegacyRuntimeConstants rtc{Date_t::now(), Timestamp(1, 1)};
     QueryRequest qr(testns);
-    qr.setRuntimeConstants(rtc);
+    qr.setLegacyRuntimeConstants(rtc);
     auto agg = qr.asAggregationCommand();
     ASSERT_OK(agg);
 
     auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
     ASSERT_OK(ar.getStatus());
-    ASSERT(ar.getValue().getRuntimeConstants().has_value());
-    ASSERT_EQ(ar.getValue().getRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
-    ASSERT_EQ(ar.getValue().getRuntimeConstants()->getClusterTime(), rtc.getClusterTime());
+    ASSERT(ar.getValue().getLegacyRuntimeConstants().has_value());
+    ASSERT_EQ(ar.getValue().getLegacyRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
+    ASSERT_EQ(ar.getValue().getLegacyRuntimeConstants()->getClusterTime(), rtc.getClusterTime());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseTrueSucceeds) {

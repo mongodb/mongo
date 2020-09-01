@@ -205,11 +205,11 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
 
             auto writeConcern = uassertStatusOK(WriteConcernOptions::parse(elem.embeddedObject()));
             request.setWriteConcern(writeConcern);
-        } else if (kRuntimeConstantsName == fieldName) {
+        } else if (kLegacyRuntimeConstantsName == fieldName) {
             // TODO SERVER-46384: Remove 'runtimeConstants' in 4.7 since it is redundant with 'let'
             try {
-                IDLParserErrorContext ctx("internalRuntimeConstants");
-                request.setRuntimeConstants(RuntimeConstants::parse(ctx, elem.Obj()));
+                IDLParserErrorContext ctx("internalLegacyRuntimeConstants");
+                request.setLegacyRuntimeConstants(LegacyRuntimeConstants::parse(ctx, elem.Obj()));
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
@@ -352,7 +352,8 @@ Document AggregationRequest::serializeToCommandObj() const {
         {WriteConcernOptions::kWriteConcernField,
          _writeConcern ? Value(_writeConcern->toBSON()) : Value()},
         // Only serialize runtime constants if any were specified.
-        {kRuntimeConstantsName, _runtimeConstants ? Value(_runtimeConstants->toBSON()) : Value()},
+        {kLegacyRuntimeConstantsName,
+         _legacyRuntimeConstants ? Value(_legacyRuntimeConstants->toBSON()) : Value()},
         {kIsMapReduceCommandName, _isMapReduceCommand ? Value(true) : Value()},
         {kLetName, !_letParameters.isEmpty() ? Value(_letParameters) : Value()},
         // Only serialize collection UUID if one was specified.

@@ -35,7 +35,7 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 structs:
-  RuntimeConstants:
+  LegacyRuntimeConstants:
       description: A collection of values that do not change once computed. It is shipped as part
                    of an aggregation request so all shards participating in a query see the same
                    values.

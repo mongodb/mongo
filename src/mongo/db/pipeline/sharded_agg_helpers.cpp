@@ -125,10 +125,11 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                   boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                  const boost::optional<RuntimeConstants>& constants,
+                                  const boost::optional<LegacyRuntimeConstants>& constants,
                                   BSONObj collationObj) {
     if (constants) {
-        cmdForShards[AggregationRequest::kRuntimeConstantsName] = Value(constants.get().toBSON());
+        cmdForShards[AggregationRequest::kLegacyRuntimeConstantsName] =
+            Value(constants.get().toBSON());
     }
 
     cmdForShards[AggregationRequest::kFromMongosName] = Value(expCtx->inMongos);
@@ -702,7 +703,7 @@ BSONObj createPassthroughCommandForShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    const boost::optional<RuntimeConstants>& constants,
+    const boost::optional<LegacyRuntimeConstants>& constants,
     Pipeline* pipeline,
     BSONObj collationObj) {
     // Create the command for the shards.
@@ -753,7 +754,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     return genericTransformForShards(std::move(targetedCmd),
                                      expCtx,
                                      expCtx->explain,
-                                     expCtx->getRuntimeConstants(),
+                                     expCtx->getLegacyRuntimeConstants(),
                                      expCtx->getCollatorBSON());
 }
 
@@ -837,7 +838,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                        : createPassthroughCommandForShard(expCtx,
                                                           serializedCommand,
                                                           expCtx->explain,
-                                                          expCtx->getRuntimeConstants(),
+                                                          expCtx->getLegacyRuntimeConstants(),
                                                           pipeline.get(),
                                                           collationObj));
 

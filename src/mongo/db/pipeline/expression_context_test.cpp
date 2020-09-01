@@ -87,7 +87,7 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
                                               false,  // bypassDocumentValidation
                                               false,  // isMapReduce
                                               NamespaceString{"test"_sd, "namespace"_sd},
-                                              RuntimeConstants{Date_t::now(), {}},
+                                              LegacyRuntimeConstants{Date_t::now(), {}},
                                               {},  // collator
                                               std::make_shared<StubMongoProcessInterface>(),
                                               {},  // resolvedNamespaces
@@ -107,7 +107,7 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
                                               false,  // bypassDocumentValidation
                                               false,  // isMapReduce
                                               NamespaceString{"test"_sd, "namespace"_sd},
-                                              RuntimeConstants{{}, Timestamp(1, 0)},
+                                              LegacyRuntimeConstants{{}, Timestamp(1, 0)},
                                               {},  // collator
                                               std::make_shared<StubMongoProcessInterface>(),
                                               {},  // resolvedNamespaces

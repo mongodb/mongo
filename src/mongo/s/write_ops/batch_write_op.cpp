@@ -512,7 +512,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                     updateOp.setUpdates(std::move(*updates));
                     // Each child batch inherits its let params/runtime constants from the parent
                     // batch.
-                    updateOp.setRuntimeConstants(_clientRequest.getRuntimeConstants());
+                    updateOp.setLegacyRuntimeConstants(_clientRequest.getLegacyRuntimeConstants());
                     updateOp.setLet(_clientRequest.getLet());
                     return updateOp;
                 }());
@@ -523,7 +523,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                     deleteOp.setDeletes(std::move(*deletes));
                     // Each child batch inherits its let params from the parent batch.
                     deleteOp.setLet(_clientRequest.getLet());
-                    deleteOp.setRuntimeConstants(_clientRequest.getRuntimeConstants());
+                    deleteOp.setLegacyRuntimeConstants(_clientRequest.getLegacyRuntimeConstants());
                     return deleteOp;
                 }());
         }

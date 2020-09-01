@@ -206,7 +206,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchangeSpec());
     uassert(51143,
             "Cannot specify runtime constants option to a mongos",
-            !request.getRuntimeConstants());
+            !request.getLegacyRuntimeConstants());
     uassert(51089,
             str::stream() << "Internal parameter(s) [" << AggregationRequest::kNeedsMergeName
                           << ", " << AggregationRequest::kFromMongosName

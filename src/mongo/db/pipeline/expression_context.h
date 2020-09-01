@@ -43,8 +43,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/javascript_execution.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/pipeline/runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -123,7 +123,7 @@ public:
                       bool bypassDocumentValidation,
                       bool isMapReduceCommand,
                       const NamespaceString& ns,
-                      const boost::optional<RuntimeConstants>& runtimeConstants,
+                      const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
                       std::unique_ptr<CollatorInterface> collator,
                       const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
@@ -140,7 +140,7 @@ public:
     ExpressionContext(OperationContext* opCtx,
                       std::unique_ptr<CollatorInterface> collator,
                       const NamespaceString& ns,
-                      const boost::optional<RuntimeConstants>& runtimeConstants = boost::none,
+                      const boost::optional<LegacyRuntimeConstants>& runtimeConstants = boost::none,
                       const boost::optional<BSONObj>& letParameters = boost::none,
                       bool mayDbProfile = true,
                       boost::optional<ExplainOptions::Verbosity> explain = boost::none);
@@ -266,8 +266,8 @@ public:
         _resolvedNamespaces = std::move(resolvedNamespaces);
     }
 
-    const RuntimeConstants& getRuntimeConstants() const {
-        return variables.getRuntimeConstants();
+    const LegacyRuntimeConstants& getLegacyRuntimeConstants() const {
+        return variables.getLegacyRuntimeConstants();
     }
 
     /**
@@ -282,7 +282,7 @@ public:
         uassert(31264,
                 "Cannot run server-side javascript without the javascript engine enabled",
                 getGlobalScriptEngine());
-        const auto& runtimeConstants = getRuntimeConstants();
+        const auto& runtimeConstants = getLegacyRuntimeConstants();
         const boost::optional<bool> isMapReduceCommand = runtimeConstants.getIsMapReduce();
         if (inMongos) {
             invariant(!forceLoadOfStoredProcedures);

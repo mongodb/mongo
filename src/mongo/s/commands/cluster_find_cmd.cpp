@@ -72,9 +72,10 @@ std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opC
             qr->setReadConcern(readConcernArgs.toBSONInner());
         }
     }
-    uassert(
-        51202, "Cannot specify runtime constants option to a mongos", !qr->getRuntimeConstants());
-    qr->setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+    uassert(51202,
+            "Cannot specify runtime constants option to a mongos",
+            !qr->getLegacyRuntimeConstants());
+    qr->setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
     return qr;
 }
 

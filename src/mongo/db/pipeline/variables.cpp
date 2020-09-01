@@ -158,13 +158,13 @@ Document Variables::getDocument(Id id, const Document& root) const {
     return Document();
 }
 
-const RuntimeConstants& Variables::getRuntimeConstants() const {
-    invariant(_runtimeConstants);
-    return *_runtimeConstants;
+const LegacyRuntimeConstants& Variables::getLegacyRuntimeConstants() const {
+    invariant(_legacyRuntimeConstants);
+    return *_legacyRuntimeConstants;
 }
 
-void Variables::setRuntimeConstants(const RuntimeConstants& constants) {
-    invariant(!_runtimeConstants);
+void Variables::setLegacyRuntimeConstants(const LegacyRuntimeConstants& constants) {
+    invariant(!_legacyRuntimeConstants);
     _runtimeConstantsMap[kNowId] = Value(constants.getLocalNow());
     // We use a null Timestamp to indicate that the clusterTime is not available; this can happen if
     // the logical clock is not running. We do not use boost::optional because this would allow the
@@ -179,11 +179,11 @@ void Variables::setRuntimeConstants(const RuntimeConstants& constants) {
     if (constants.getIsMapReduce()) {
         _runtimeConstantsMap[kIsMapReduceId] = Value(constants.getIsMapReduce().get());
     }
-    _runtimeConstants = constants;
+    _legacyRuntimeConstants = constants;
 }
 
 void Variables::setDefaultRuntimeConstants(OperationContext* opCtx) {
-    setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+    setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
 }
 
 void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
@@ -219,7 +219,7 @@ void Variables::seedVariablesWithLetParameters(ExpressionContext* const expCtx,
     }
 }
 
-RuntimeConstants Variables::generateRuntimeConstants(OperationContext* opCtx) {
+LegacyRuntimeConstants Variables::generateRuntimeConstants(OperationContext* opCtx) {
     // On a standalone, the clock may not be running and $$CLUSTER_TIME is unavailable. If the
     // logical clock is available, set the clusterTime in the runtime constants. Otherwise, the
     // clusterTime is set to the null Timestamp.

@@ -34,7 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_parsers.h"
-#include "mongo/db/pipeline/runtime_constants_gen.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {
@@ -173,15 +173,15 @@ public:
     /**
      * Sets any constant values which may be required by the query and/or update.
      */
-    void setRuntimeConstants(RuntimeConstants runtimeConstants) {
-        _runtimeConstants = std::move(runtimeConstants);
+    void setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants) {
+        _legacyRuntimeConstants = std::move(runtimeConstants);
     }
 
     /**
      * Returns the runtime constants associated with this findAndModify request, if present.
      */
-    const boost::optional<RuntimeConstants>& getRuntimeConstants() const {
-        return _runtimeConstants;
+    const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const {
+        return _legacyRuntimeConstants;
     }
 
     /**
@@ -224,7 +224,7 @@ private:
     boost::optional<BSONObj> _hint;
     boost::optional<BSONObj> _collation;
     boost::optional<std::vector<BSONObj>> _arrayFilters;
-    boost::optional<RuntimeConstants> _runtimeConstants;
+    boost::optional<LegacyRuntimeConstants> _legacyRuntimeConstants;
     boost::optional<BSONObj> _letParameters;
     bool _shouldReturnNew{false};
     boost::optional<WriteConcernOptions> _writeConcern;

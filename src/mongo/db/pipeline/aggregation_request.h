@@ -36,7 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/exchange_spec_gen.h"
-#include "mongo/db/pipeline/runtime_constants_gen.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/write_concern_options.h"
 
@@ -62,7 +62,7 @@ public:
     static constexpr StringData kAllowDiskUseName = "allowDiskUse"_sd;
     static constexpr StringData kHintName = "hint"_sd;
     static constexpr StringData kExchangeName = "exchange"_sd;
-    static constexpr StringData kRuntimeConstantsName = "runtimeConstants"_sd;
+    static constexpr StringData kLegacyRuntimeConstantsName = "runtimeConstants"_sd;
     static constexpr StringData kUse44SortKeysName = "use44SortKeys"_sd;
     static constexpr StringData kIsMapReduceCommandName = "isMapReduceCommand"_sd;
     static constexpr StringData kLetName = "let"_sd;
@@ -221,8 +221,8 @@ public:
         return _writeConcern;
     }
 
-    const auto& getRuntimeConstants() const {
-        return _runtimeConstants;
+    const auto& getLegacyRuntimeConstants() const {
+        return _legacyRuntimeConstants;
     }
 
     const auto& getLetParameters() const {
@@ -301,8 +301,8 @@ public:
         _writeConcern = writeConcern;
     }
 
-    void setRuntimeConstants(RuntimeConstants runtimeConstants) {
-        _runtimeConstants = std::move(runtimeConstants);
+    void setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants) {
+        _legacyRuntimeConstants = std::move(runtimeConstants);
     }
 
     void setLetParameters(BSONObj letParameters) {
@@ -366,7 +366,7 @@ private:
 
     // A document containing runtime constants; i.e. values that do not change once computed (e.g.
     // $$NOW).
-    boost::optional<RuntimeConstants> _runtimeConstants;
+    boost::optional<LegacyRuntimeConstants> _legacyRuntimeConstants;
 
     // The expected UUID of the namespace the aggregation executes on.
     boost::optional<UUID> _collectionUUID;

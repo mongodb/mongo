@@ -134,11 +134,11 @@ public:
         return *_dbVersion;
     }
 
-    void setRuntimeConstants(RuntimeConstants runtimeConstants);
+    void setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants);
 
-    bool hasRuntimeConstants() const;
+    bool hasLegacyRuntimeConstants() const;
 
-    const boost::optional<RuntimeConstants>& getRuntimeConstants() const;
+    const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const;
     const boost::optional<BSONObj>& getLet() const;
 
     const write_ops::WriteCommandBase& getWriteCommandBase() const;
@@ -162,9 +162,9 @@ public:
     static BatchedCommandRequest cloneInsertWithIds(BatchedCommandRequest origCmdRequest);
 
     /** These are used to return empty refs from Insert ops that don't carry runtimeConstants
-     * or let parameters in getLet and getRuntimeConstants.
+     * or let parameters in getLet and getLegacyRuntimeConstants.
      */
-    const static boost::optional<RuntimeConstants> kEmptyRuntimeConstants;
+    const static boost::optional<LegacyRuntimeConstants> kEmptyRuntimeConstants;
     const static boost::optional<BSONObj> kEmptyLet;
 
 private:
@@ -233,8 +233,8 @@ public:
         return _request.getLet();
     }
 
-    auto& getRuntimeConstants() const {
-        return _request.getRuntimeConstants();
+    auto& getLegacyRuntimeConstants() const {
+        return _request.getLegacyRuntimeConstants();
     }
 
 private:

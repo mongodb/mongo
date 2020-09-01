@@ -60,7 +60,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         request.shouldBypassDocumentValidation(),
                         request.getIsMapReduceCommand(),
                         request.getNamespaceString(),
-                        request.getRuntimeConstants(),
+                        request.getLegacyRuntimeConstants(),
                         std::move(collator),
                         std::move(processInterface),
                         std::move(resolvedNamespaces),
@@ -84,7 +84,7 @@ ExpressionContext::ExpressionContext(
     bool bypassDocumentValidation,
     bool isMapReduce,
     const NamespaceString& ns,
-    const boost::optional<RuntimeConstants>& runtimeConstants,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     std::unique_ptr<CollatorInterface> collator,
     const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
@@ -113,9 +113,9 @@ ExpressionContext::ExpressionContext(
         auto genConsts = variables.generateRuntimeConstants(opCtx);
         genConsts.setJsScope(runtimeConstants->getJsScope());
         genConsts.setIsMapReduce(runtimeConstants->getIsMapReduce());
-        variables.setRuntimeConstants(genConsts);
+        variables.setLegacyRuntimeConstants(genConsts);
     } else if (runtimeConstants) {
-        variables.setRuntimeConstants(*runtimeConstants);
+        variables.setLegacyRuntimeConstants(*runtimeConstants);
     } else {
         variables.setDefaultRuntimeConstants(opCtx);
     }
@@ -127,13 +127,14 @@ ExpressionContext::ExpressionContext(
         variables.seedVariablesWithLetParameters(this, *letParameters);
 }
 
-ExpressionContext::ExpressionContext(OperationContext* opCtx,
-                                     std::unique_ptr<CollatorInterface> collator,
-                                     const NamespaceString& nss,
-                                     const boost::optional<RuntimeConstants>& runtimeConstants,
-                                     const boost::optional<BSONObj>& letParameters,
-                                     bool mayDbProfile,
-                                     boost::optional<ExplainOptions::Verbosity> explain)
+ExpressionContext::ExpressionContext(
+    OperationContext* opCtx,
+    std::unique_ptr<CollatorInterface> collator,
+    const NamespaceString& nss,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
+    const boost::optional<BSONObj>& letParameters,
+    bool mayDbProfile,
+    boost::optional<ExplainOptions::Verbosity> explain)
     : explain(explain),
       ns(nss),
       opCtx(opCtx),
@@ -147,7 +148,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
       _documentComparator(_collator.get()),
       _valueComparator(_collator.get()) {
     if (runtimeConstants) {
-        variables.setRuntimeConstants(*runtimeConstants);
+        variables.setLegacyRuntimeConstants(*runtimeConstants);
     }
 
     jsHeapLimitMB = internalQueryJavaScriptHeapSizeLimitMB.load();

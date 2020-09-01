@@ -73,7 +73,7 @@ Status ParsedDelete::parseRequest() {
     _expCtx = make_intrusive<ExpressionContext>(_opCtx,
                                                 std::move(collator),
                                                 _request->getNsString(),
-                                                _request->getRuntimeConstants(),
+                                                _request->getLegacyRuntimeConstants(),
                                                 _request->getLet());
 
     if (CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
@@ -109,8 +109,8 @@ Status ParsedDelete::parseQueryToCQ() {
 
     // If the delete request has runtime constants or let parameters attached to it, pass them to
     // the QueryRequest.
-    if (auto& runtimeConstants = _request->getRuntimeConstants())
-        qr->setRuntimeConstants(*runtimeConstants);
+    if (auto& runtimeConstants = _request->getLegacyRuntimeConstants())
+        qr->setLegacyRuntimeConstants(*runtimeConstants);
     if (auto& letParams = _request->getLet())
         qr->setLetParameters(*letParams);
 

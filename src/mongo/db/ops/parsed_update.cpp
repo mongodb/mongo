@@ -46,7 +46,7 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
           opCtx,
           nullptr,
           _request->getNamespaceString(),
-          _request->getRuntimeConstants(),
+          _request->getLegacyRuntimeConstants(),
           _request->getLetParameters(),
           true,  // mayDbProfile. We pass 'true' here conservatively. In the future we may
           // change this.
@@ -152,8 +152,8 @@ Status ParsedUpdate::parseQueryToCQ() {
 
     // If the update request has runtime constants or let parameters attached to it, pass them to
     // the QueryRequest.
-    if (auto& runtimeConstants = _request->getRuntimeConstants()) {
-        qr->setRuntimeConstants(*runtimeConstants);
+    if (auto& runtimeConstants = _request->getLegacyRuntimeConstants()) {
+        qr->setLegacyRuntimeConstants(*runtimeConstants);
     }
     if (auto& letParams = _request->getLetParameters()) {
         qr->setLetParameters(*letParams);

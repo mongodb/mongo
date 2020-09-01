@@ -47,7 +47,7 @@ const char kSortField[] = "sort";
 const char kHintField[] = "hint";
 const char kCollationField[] = "collation";
 const char kArrayFiltersField[] = "arrayFilters";
-const char kRuntimeConstantsField[] = "runtimeConstants";
+const char kLegacyRuntimeConstantsField[] = "runtimeConstants";
 const char kLetField[] = "let";
 const char kRemoveField[] = "remove";
 const char kUpdateField[] = "update";
@@ -130,9 +130,9 @@ BSONObj FindAndModifyRequest::toBSON(const BSONObj& commandPassthroughFields) co
         arrayBuilder.doneFast();
     }
 
-    if (_runtimeConstants) {
-        BSONObjBuilder rtcBuilder(builder.subobjStart(kRuntimeConstantsField));
-        _runtimeConstants->serialize(&rtcBuilder);
+    if (_legacyRuntimeConstants) {
+        BSONObjBuilder rtcBuilder(builder.subobjStart(kLegacyRuntimeConstantsField));
+        _legacyRuntimeConstants->serialize(&rtcBuilder);
         rtcBuilder.doneFast();
     }
 
@@ -176,7 +176,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
     bool bypassDocumentValidation = false;
     bool arrayFiltersSet = false;
     std::vector<BSONObj> arrayFilters;
-    boost::optional<RuntimeConstants> runtimeConstants;
+    boost::optional<LegacyRuntimeConstants> runtimeConstants;
     BSONObj letParameters;
     bool writeConcernOptionsSet = false;
     WriteConcernOptions writeConcernOptions;
@@ -249,10 +249,10 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
                     arrayFilters.push_back(arrayFilter.embeddedObject());
                 }
             }
-        } else if (field == kRuntimeConstantsField) {
+        } else if (field == kLegacyRuntimeConstantsField) {
             runtimeConstants =
-                RuntimeConstants::parse(IDLParserErrorContext(kRuntimeConstantsField),
-                                        cmdObj.getObjectField(kRuntimeConstantsField));
+                LegacyRuntimeConstants::parse(IDLParserErrorContext(kLegacyRuntimeConstantsField),
+                                              cmdObj.getObjectField(kLegacyRuntimeConstantsField));
         } else if (field == kLetField) {
             BSONElement letElt;
             if (Status letEltStatus =
@@ -326,7 +326,7 @@ StatusWith<FindAndModifyRequest> FindAndModifyRequest::parseFromBSON(NamespaceSt
         request.setArrayFilters(std::move(arrayFilters));
     }
     if (runtimeConstants) {
-        request.setRuntimeConstants(*runtimeConstants);
+        request.setLegacyRuntimeConstants(*runtimeConstants);
     }
     if (writeConcernOptionsSet) {
         request.setWriteConcern(std::move(writeConcernOptions));

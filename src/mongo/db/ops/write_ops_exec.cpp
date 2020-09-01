@@ -732,7 +732,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     const NamespaceString& ns,
     StmtId stmtId,
     const write_ops::UpdateOpEntry& op,
-    RuntimeConstants runtimeConstants,
+    LegacyRuntimeConstants runtimeConstants,
     const boost::optional<BSONObj>& letParams) {
     globalOpCounters.gotUpdate();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(opCtx->getWriteConcern());
@@ -752,7 +752,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 
     UpdateRequest request(op);
     request.setNamespaceString(ns);
-    request.setRuntimeConstants(std::move(runtimeConstants));
+    request.setLegacyRuntimeConstants(std::move(runtimeConstants));
     if (letParams) {
         request.setLetParameters(std::move(letParams));
     }
@@ -815,7 +815,7 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
     // If the update command specified runtime constants, we adopt them. Otherwise, we set them to
     // the current local and cluster time. These constants are applied to each update in the batch.
     const auto& runtimeConstants =
-        wholeOp.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx));
+        wholeOp.getLegacyRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx));
 
     for (auto&& singleOp : wholeOp.getUpdates()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
@@ -864,7 +864,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                StmtId stmtId,
                                                const write_ops::DeleteOpEntry& op,
-                                               const RuntimeConstants& runtimeConstants,
+                                               const LegacyRuntimeConstants& runtimeConstants,
                                                const boost::optional<BSONObj>& letParams) {
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with limit=0",
@@ -884,7 +884,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     auto request = DeleteRequest{};
     request.setNsString(ns);
-    request.setRuntimeConstants(runtimeConstants);
+    request.setLegacyRuntimeConstants(runtimeConstants);
     if (letParams)
         request.setLet(letParams);
     request.setQuery(op.getQ());
@@ -978,7 +978,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     // If the delete command specified runtime constants, we adopt them. Otherwise, we set them to
     // the current local and cluster time. These constants are applied to each delete in the batch.
     const auto& runtimeConstants =
-        wholeOp.getRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx));
+        wholeOp.getLegacyRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx));
 
     for (auto&& singleOp : wholeOp.getDeletes()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);

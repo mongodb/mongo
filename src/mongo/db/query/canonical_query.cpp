@@ -104,7 +104,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         newExpCtx = make_intrusive<ExpressionContext>(opCtx,
                                                       std::move(collator),
                                                       qr->nss(),
-                                                      qr->getRuntimeConstants(),
+                                                      qr->getLegacyRuntimeConstants(),
                                                       qr->getLetParameters());
     } else {
         newExpCtx = expCtx;

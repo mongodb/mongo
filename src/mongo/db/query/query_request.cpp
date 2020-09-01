@@ -282,14 +282,14 @@ StatusWith<std::unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(
             }
 
             qr->_allowPartialResults = el.boolean();
-        } else if (fieldName == kRuntimeConstantsField) {
+        } else if (fieldName == kLegacyRuntimeConstantsField) {
             Status status = checkFieldType(el, Object);
             if (!status.isOK()) {
                 return status;
             }
-            qr->_runtimeConstants =
-                RuntimeConstants::parse(IDLParserErrorContext(kRuntimeConstantsField),
-                                        cmdObj.getObjectField(kRuntimeConstantsField));
+            qr->_legacyRuntimeConstants =
+                LegacyRuntimeConstants::parse(IDLParserErrorContext(kLegacyRuntimeConstantsField),
+                                              cmdObj.getObjectField(kLegacyRuntimeConstantsField));
         } else if (fieldName == kLetField) {
             if (auto status = checkFieldType(el, Object); !status.isOK())
                 return status;
@@ -516,9 +516,9 @@ void QueryRequest::asFindCommandInternal(BSONObjBuilder* cmdBuilder) const {
         cmdBuilder->append(kPartialResultsField, true);
     }
 
-    if (_runtimeConstants) {
-        BSONObjBuilder rtcBuilder(cmdBuilder->subobjStart(kRuntimeConstantsField));
-        _runtimeConstants->serialize(&rtcBuilder);
+    if (_legacyRuntimeConstants) {
+        BSONObjBuilder rtcBuilder(cmdBuilder->subobjStart(kLegacyRuntimeConstantsField));
+        _legacyRuntimeConstants->serialize(&rtcBuilder);
         rtcBuilder.doneFast();
     }
 
@@ -1062,9 +1062,9 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (_allowDiskUse) {
         aggregationBuilder.append(QueryRequest::kAllowDiskUseField, _allowDiskUse);
     }
-    if (_runtimeConstants) {
-        BSONObjBuilder rtcBuilder(aggregationBuilder.subobjStart(kRuntimeConstantsField));
-        _runtimeConstants->serialize(&rtcBuilder);
+    if (_legacyRuntimeConstants) {
+        BSONObjBuilder rtcBuilder(aggregationBuilder.subobjStart(kLegacyRuntimeConstantsField));
+        _legacyRuntimeConstants->serialize(&rtcBuilder);
         rtcBuilder.doneFast();
     }
     if (_letParameters) {

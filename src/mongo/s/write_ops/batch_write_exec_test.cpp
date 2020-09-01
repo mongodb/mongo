@@ -319,7 +319,7 @@ TEST_F(BatchWriteExecTest, SingleOpUnordered) {
 TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
     // Try to update the single doc where a let param is used in the shard key.
     const auto let = BSON("y" << 100);
-    const auto rtc = RuntimeConstants{Date_t::now(), Timestamp(1, 1)};
+    const auto rtc = LegacyRuntimeConstants{Date_t::now(), Timestamp(1, 1)};
     const auto q = BSON("x"
                         << "$$y");
     BatchedCommandRequest updateRequest([&] {
@@ -330,7 +330,7 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
             return writeCommandBase;
         }());
         updateOp.setLet(let);
-        updateOp.setRuntimeConstants(rtc);
+        updateOp.setLegacyRuntimeConstants(rtc);
         updateOp.setUpdates(std::vector{write_ops::UpdateOpEntry(
             q,
             write_ops::UpdateModification::parseFromClassicUpdate(BSON("Key"
@@ -371,29 +371,31 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
     });
 
     // The update will hit the first shard.
-    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-        ASSERT_EQ(kTestShardHost2, request.target);
+    onCommandForPoolExecutor(
+        [&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(kTestShardHost2, request.target);
 
-        BatchedCommandResponse response;
-        response.setStatus(Status::OK());
-        response.setNModified(1);
+            BatchedCommandResponse response;
+            response.setStatus(Status::OK());
+            response.setNModified(1);
 
-        // Check that let params and runtimeConstants are propigated to shards.
-        const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        const auto actualBatchedUpdate(BatchedCommandRequest::parseUpdate(opMsgRequest));
-        ASSERT_BSONOBJ_EQ(let, actualBatchedUpdate.getLet().value_or(BSONObj()));
-        ASSERT_EQUALS(actualBatchedUpdate.getRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
-        ASSERT_EQUALS(actualBatchedUpdate.getRuntimeConstants()->getClusterTime(),
-                      rtc.getClusterTime());
+            // Check that let params and runtimeConstants are propigated to shards.
+            const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto actualBatchedUpdate(BatchedCommandRequest::parseUpdate(opMsgRequest));
+            ASSERT_BSONOBJ_EQ(let, actualBatchedUpdate.getLet().value_or(BSONObj()));
+            ASSERT_EQUALS(actualBatchedUpdate.getLegacyRuntimeConstants()->getLocalNow(),
+                          rtc.getLocalNow());
+            ASSERT_EQUALS(actualBatchedUpdate.getLegacyRuntimeConstants()->getClusterTime(),
+                          rtc.getClusterTime());
 
-        // Check that let params are only forwarded and not evaluated.
-        auto expectedQ = BSON("x"
-                              << "$$y");
-        for (auto&& u : actualBatchedUpdate.getUpdateRequest().getUpdates())
-            ASSERT_BSONOBJ_EQ(expectedQ, u.getQ());
+            // Check that let params are only forwarded and not evaluated.
+            auto expectedQ = BSON("x"
+                                  << "$$y");
+            for (auto&& u : actualBatchedUpdate.getUpdateRequest().getUpdates())
+                ASSERT_BSONOBJ_EQ(expectedQ, u.getQ());
 
-        return response.toBSON();
-    });
+            return response.toBSON();
+        });
 
     auto response = future.default_timed_get();
     ASSERT_OK(response.getTopLevelStatus());
@@ -403,7 +405,7 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
 TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
     // Try to update the single doc where a let param is used in the shard key.
     const auto let = BSON("y" << 100);
-    const auto rtc = RuntimeConstants{Date_t::now(), Timestamp(1, 1)};
+    const auto rtc = LegacyRuntimeConstants{Date_t::now(), Timestamp(1, 1)};
     const auto q = BSON("x"
                         << "$$y");
     BatchedCommandRequest deleteRequest([&] {
@@ -414,7 +416,7 @@ TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
             return writeCommandBase;
         }());
         deleteOp.setLet(let);
-        deleteOp.setRuntimeConstants(rtc);
+        deleteOp.setLegacyRuntimeConstants(rtc);
         deleteOp.setDeletes(std::vector{write_ops::DeleteOpEntry(q, false)});
         return deleteOp;
     }());
@@ -453,28 +455,30 @@ TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
     });
 
     // The update will hit the first shard.
-    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-        ASSERT_EQ(kTestShardHost2, request.target);
+    onCommandForPoolExecutor(
+        [&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(kTestShardHost2, request.target);
 
-        BatchedCommandResponse response;
-        response.setStatus(Status::OK());
+            BatchedCommandResponse response;
+            response.setStatus(Status::OK());
 
-        // Check that let params are propigated to shards.
-        const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        const auto actualBatchedUpdate(BatchedCommandRequest::parseDelete(opMsgRequest));
-        ASSERT_BSONOBJ_EQ(let, actualBatchedUpdate.getLet().value_or(BSONObj()));
-        ASSERT_EQUALS(actualBatchedUpdate.getRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
-        ASSERT_EQUALS(actualBatchedUpdate.getRuntimeConstants()->getClusterTime(),
-                      rtc.getClusterTime());
+            // Check that let params are propigated to shards.
+            const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto actualBatchedUpdate(BatchedCommandRequest::parseDelete(opMsgRequest));
+            ASSERT_BSONOBJ_EQ(let, actualBatchedUpdate.getLet().value_or(BSONObj()));
+            ASSERT_EQUALS(actualBatchedUpdate.getLegacyRuntimeConstants()->getLocalNow(),
+                          rtc.getLocalNow());
+            ASSERT_EQUALS(actualBatchedUpdate.getLegacyRuntimeConstants()->getClusterTime(),
+                          rtc.getClusterTime());
 
-        // Check that let params are only forwarded and not evaluated.
-        auto expectedQ = BSON("x"
-                              << "$$y");
-        for (auto&& u : actualBatchedUpdate.getDeleteRequest().getDeletes())
-            ASSERT_BSONOBJ_EQ(expectedQ, u.getQ());
+            // Check that let params are only forwarded and not evaluated.
+            auto expectedQ = BSON("x"
+                                  << "$$y");
+            for (auto&& u : actualBatchedUpdate.getDeleteRequest().getDeletes())
+                ASSERT_BSONOBJ_EQ(expectedQ, u.getQ());
 
-        return response.toBSON();
-    });
+            return response.toBSON();
+        });
 
     auto response = future.default_timed_get();
     ASSERT_OK(response.getTopLevelStatus());

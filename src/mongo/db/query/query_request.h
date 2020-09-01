@@ -36,7 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/runtime_constants_gen.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/query/tailable_mode.h"
 
 namespace mongo {
@@ -72,7 +72,7 @@ public:
     static constexpr auto kNoCursorTimeoutField = "noCursorTimeout";
     static constexpr auto kAwaitDataField = "awaitData";
     static constexpr auto kPartialResultsField = "allowPartialResults";
-    static constexpr auto kRuntimeConstantsField = "runtimeConstants";
+    static constexpr auto kLegacyRuntimeConstantsField = "runtimeConstants";
     static constexpr auto kLetField = "let";
     static constexpr auto kTermField = "term";
     static constexpr auto kOptionsField = "options";
@@ -377,12 +377,12 @@ public:
         return _tailableMode;
     }
 
-    void setRuntimeConstants(RuntimeConstants runtimeConstants) {
-        _runtimeConstants = std::move(runtimeConstants);
+    void setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants) {
+        _legacyRuntimeConstants = std::move(runtimeConstants);
     }
 
-    const boost::optional<RuntimeConstants>& getRuntimeConstants() const {
-        return _runtimeConstants;
+    const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const {
+        return _legacyRuntimeConstants;
     }
 
     void setLetParameters(BSONObj letParams) {
@@ -585,7 +585,7 @@ private:
     bool _hasReadPref = false;
 
     // Runtime constants which may be referenced by $expr, if present.
-    boost::optional<RuntimeConstants> _runtimeConstants;
+    boost::optional<LegacyRuntimeConstants> _legacyRuntimeConstants;
 
     // A document containing user-specified constants. For a find query, these are accessed only
     // inside $expr.

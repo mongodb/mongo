@@ -33,7 +33,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/runtime_constants_gen.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/string_map.h"
 
@@ -53,7 +53,7 @@ public:
     /**
      * Generate runtime constants using the current local and cluster times.
      */
-    static RuntimeConstants generateRuntimeConstants(OperationContext* opCtx);
+    static LegacyRuntimeConstants generateRuntimeConstants(OperationContext* opCtx);
 
     /**
      * Generates Variables::Id and keeps track of the number of Ids handed out. Each successive Id
@@ -146,14 +146,14 @@ public:
     /**
      * Return a reference to an object which represents the variables which are considered "runtime
      * constants." It is a programming error to call this function without having called
-     * setRuntimeConstants().
+     * setLegacyRuntimeConstants().
      */
-    const RuntimeConstants& getRuntimeConstants() const;
+    const LegacyRuntimeConstants& getLegacyRuntimeConstants() const;
 
     /**
      * Set the runtime constants. It is a programming error to call this more than once.
      */
-    void setRuntimeConstants(const RuntimeConstants& constants);
+    void setLegacyRuntimeConstants(const LegacyRuntimeConstants& constants);
 
     /**
      * Set the runtime constants using the current local and cluster times.
@@ -211,7 +211,7 @@ private:
     stdx::unordered_map<Id, Value> _runtimeConstantsMap;
 
     // Populated after construction. Should not be set more than once.
-    boost::optional<RuntimeConstants> _runtimeConstants;
+    boost::optional<LegacyRuntimeConstants> _legacyRuntimeConstants;
 };
 
 /**
