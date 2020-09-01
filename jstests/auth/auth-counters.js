@@ -1,4 +1,5 @@
 // Test for auth counters in serverStatus.
+// @tags: [requires_replication]
 
 (function() {
 'use strict';
