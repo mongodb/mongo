@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/util/str.h"
@@ -176,7 +177,9 @@ Status userAllowedWriteNS(const NamespaceString& ns) {
     if (ns.isSystemDotProfile() ||
         (ns.isSystemDotViews() && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
          serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-             ServerGlobalParams::FeatureCompatibility::Version::kVersion47))) {
+             ServerGlobalParams::FeatureCompatibility::Version::kVersion47)) ||
+        (ns.isOplog() &&
+         repl::ReplicationCoordinator::get(getGlobalServiceContext())->isReplEnabled())) {
         return Status(ErrorCodes::InvalidNamespace, str::stream() << "cannot write to " << ns);
     }
     return userAllowedCreateNS(ns);
