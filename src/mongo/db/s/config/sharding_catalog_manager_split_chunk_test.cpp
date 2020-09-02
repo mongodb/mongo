@@ -296,7 +296,9 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
                                               ChunkRange(chunkMin, chunkMax),
                                               splitPoints,
                                               "shard0000");
-    ASSERT_EQ(ErrorCodes::IllegalOperation, splitStatus);
+    // TODO SERVER-50288 Return collection version on split and merge commands
+    // Check the returned shard version instead of the error code
+    ASSERT_EQ(50577, splitStatus.code());
 }
 
 TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {

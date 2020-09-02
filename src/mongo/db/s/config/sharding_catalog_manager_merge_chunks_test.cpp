@@ -371,7 +371,9 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
                                               chunkBoundaries,
                                               "shard0000",
                                               validAfter);
-    ASSERT_EQ(ErrorCodes::IllegalOperation, mergeStatus);
+    // TODO SERVER-50288 Return collection version on split and merge commands
+    // Check the returned shard version instead of the error code
+    ASSERT_EQ(50577, mergeStatus.code());
 }
 
 TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {

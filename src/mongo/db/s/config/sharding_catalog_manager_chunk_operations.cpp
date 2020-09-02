@@ -291,12 +291,69 @@ StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
 
     const auto& chunksVector = queryResponse.getValue().docs;
     if (chunksVector.empty()) {
-        return {ErrorCodes::IllegalOperation,
+        return {ErrorCodes::Error(50577),
                 str::stream() << "Collection '" << nss.ns()
                               << "' no longer either exists, is sharded, or has chunks"};
     }
 
     return ChunkVersion::parseLegacyWithField(chunksVector.front(), ChunkType::lastmod());
+}
+
+// Helper function to get collection version and donor shard version following a merge/move/split
+BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const ShardId& fromShard) {
+    BSONObjBuilder result;
+
+    auto swCollectionVersion = getMaxChunkVersionFromQueryResponse(
+        nss,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            BSON("ns" << nss.ns()),          // Query all chunks for this namespace.
+            BSON(ChunkType::lastmod << -1),  // Sort by version.
+            1));                             // Limit 1.
+
+    auto collectionVersion = uassertStatusOKWithContext(
+        std::move(swCollectionVersion), "Couldn't retrieve collection version from config server");
+
+    auto swDonorShardVersion = getMaxChunkVersionFromQueryResponse(
+        nss,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            BSON("ns" << nss.ns() << "shard"
+                      << fromShard),         // Query all chunks for this namespace and shard.
+            BSON(ChunkType::lastmod << -1),  // Sort by version.
+            1));
+
+    ChunkVersion shardVersion;
+
+    if (!swDonorShardVersion.isOK()) {
+        // The query to find 'nss' chunks belonging to the donor shard didn't return any, meaning
+        // the last chunk was donated
+        uassert(505770,
+                str::stream() << "Couldn't retrieve donor chunks from config server",
+                swDonorShardVersion.getStatus().code() == 50577);
+        shardVersion = ChunkVersion(0, 0, collectionVersion.epoch());
+    } else {
+        shardVersion = swDonorShardVersion.getValue();
+    }
+
+    uassert(4914701,
+            str::stream() << "Aborting due to metadata corruption. Collection version '"
+                          << collectionVersion.toString() << "' and shard version '"
+                          << shardVersion.toString() << "'.",
+            collectionVersion >= shardVersion);
+
+    collectionVersion.appendWithField(&result, "collectionVersion");
+    shardVersion.appendWithField(&result, "shardVersion");
+
+    return result.obj();
 }
 
 }  // namespace
@@ -622,52 +679,6 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
         opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
 
     return Status::OK();
-}
-
-BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const ShardId& fromShard) {
-    BSONObjBuilder result;
-
-    auto swCollectionVersion = getMaxChunkVersionFromQueryResponse(
-        nss,
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
-            ChunkType::ConfigNS,
-            BSON("ns" << nss.ns()),          // Query all chunks for this namespace.
-            BSON(ChunkType::lastmod << -1),  // Sort by version.
-            1));                             // Limit 1.
-
-    uassertStatusOKWithContext(swCollectionVersion,
-                               "Couldn't retrieve collection version from config server");
-
-    auto swDonorShardVersion = getMaxChunkVersionFromQueryResponse(
-        nss,
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
-            ChunkType::ConfigNS,
-            BSON("ns" << nss.ns() << "shard"
-                      << fromShard),         // Query all chunks for this namespace and shard.
-            BSON(ChunkType::lastmod << -1),  // Sort by version.
-            1));                             // Limit 1.
-
-    auto collectionVersion = swCollectionVersion.getValue();
-    auto shardVersion = swDonorShardVersion.isOK() ? swDonorShardVersion.getValue()
-                                                   : ChunkVersion(0, 0, collectionVersion.epoch());
-    uassert(4914701,
-            str::stream() << "Aborting due to metadata corruption. Collection version '"
-                          << collectionVersion.toString() << "' and shard version '"
-                          << shardVersion.toString() << "'.",
-            collectionVersion >= shardVersion);
-
-    collectionVersion.appendWithField(&result, "collectionVersion");
-    shardVersion.appendWithField(&result, "shardVersion");
-
-    return result.obj();
 }
 
 StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
