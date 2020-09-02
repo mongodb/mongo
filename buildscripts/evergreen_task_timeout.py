@@ -6,6 +6,9 @@ import sys
 
 import yaml
 
+COMMIT_QUEUE_ALIAS = "__commit_queue"
+
+COMMIT_QUEUE_TIMEOUT_SECS = 40 * 60
 DEFAULT_REQUIRED_BUILD_TIMEOUT_SECS = 30 * 60
 DEFAULT_NON_REQUIRED_BUILD_TIMEOUT_SECS = 2 * 60 * 60
 
@@ -20,11 +23,14 @@ REQUIRED_BUILD_VARIANTS = {
 }
 
 
-def determine_timeout(task_name, variant, timeout=0):
+def determine_timeout(task_name: str, variant: str, timeout: int = 0, evg_alias: str = '') -> int:
     """Determine what timeout should be used."""
 
     if timeout and timeout != 0:
         return timeout
+
+    if evg_alias == COMMIT_QUEUE_ALIAS:
+        return COMMIT_QUEUE_TIMEOUT_SECS
 
     if variant in SPECIFIC_TASK_OVERRIDES and task_name in SPECIFIC_TASK_OVERRIDES[variant]:
         return SPECIFIC_TASK_OVERRIDES[variant][task_name]
@@ -54,6 +60,8 @@ def main():
     parser.add_argument("--task-name", dest="task", required=True, help="Task being executed.")
     parser.add_argument("--build-variant", dest="variant", required=True,
                         help="Build variant task is being executed on.")
+    parser.add_argument("--evg-alias", dest="evg_alias", required=True,
+                        help="Evergreen alias used to trigger build.")
     parser.add_argument("--timeout", dest="timeout", type=int, help="Timeout to use.")
     parser.add_argument("--out-file", dest="outfile", help="File to write configuration to.")
 

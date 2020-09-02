@@ -1057,6 +1057,7 @@ functions:
         $python buildscripts/evergreen_task_timeout.py \
           --task-name ${task_name}                     \
           --build-variant ${build_variant}             \
+          --evg-alias '${alias|}'                      \
           --timeout ${timeout_secs|0}                  \
           --out-file task_timeout_expansions.yml
 
@@ -8316,6 +8317,7 @@ tasks:
   - func: "shared scons cache pruning"
 
 - name: validate_commit_message
+  exec_timeout_secs: 600 # 10 minute timeout
   commands:
   - command: manifest.load
   - func: "git get project"
