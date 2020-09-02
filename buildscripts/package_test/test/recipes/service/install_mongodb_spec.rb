@@ -111,6 +111,7 @@ if rpm
     end
   end
 
+
   describe user('mongod') do
     it { should exist }
     its('groups') { should include 'mongod' }
@@ -124,10 +125,19 @@ if deb
     it { should be_directory }
   end
 
-  describe user('mongodb') do
-    it { should exist }
-    its('groups') { should include 'mongodb' }
-    its('shell') { should eq '/bin/false' }
+  if os[:release] == '18.04'
+    describe user('mongodb') do
+      it { should exist }
+      its('groups') { should include 'mongodb' }
+      its('shell') { should eq '/usr/sbin/nologin' }
+    end
+  else
+    describe user('mongod') do
+      it { should exist }
+      its('groups') { should include 'mongod' }
+      its('home') { should eq '/var/lib/mongo' }
+      its('shell') { should eq '/bin/false' }
+    end
   end
 end
 

@@ -29,6 +29,8 @@ end
 
 if platform_family? 'debian'
 
+  ENV['DEBIAN_FRONTEND'] = 'noninteractive'
+
   execute 'apt-get update' do
     command 'apt-get update'
   end

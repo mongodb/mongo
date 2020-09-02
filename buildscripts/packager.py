@@ -255,6 +255,8 @@ class Distro(object):
                 return "trusty"
             elif build_os == 'ubuntu1604':
                 return "xenial"
+            elif build_os == 'ubuntu1804':
+                return "bionic"
             else:
                 raise Exception("unsupported build_os: %s" % build_os)
         elif self.n == 'debian':
@@ -289,7 +291,7 @@ class Distro(object):
         elif self.n == 'amazon':
             return [ "amazon" ]
         elif self.n == 'ubuntu':
-            return [ "ubuntu1204", "ubuntu1404", "ubuntu1604", ]
+            return [ "ubuntu1204", "ubuntu1404", "ubuntu1604", "ubuntu1804"]
         elif self.n == 'debian':
             return [ "debian81", "debian92" ]
         else:
