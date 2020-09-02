@@ -60,8 +60,15 @@ public:
      * returns the first TenantMigrationAccessBlocker it finds whose dbPrefix is a prefix for
      * dbName.
      */
-    std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlocker(
+    std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForDbName(
         StringData dbName);
+
+    /**
+     * Searches through TenantMigrationAccessBlockers and
+     * returns the TenantMigrationAccessBlocker that matches dbPrefix.
+     */
+    std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForDbPrefix(
+        StringData dbPrefix);
 
     /**
      * Iterates through each of the TenantMigrationAccessBlockers stored by the mapping

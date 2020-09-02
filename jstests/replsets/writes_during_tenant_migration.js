@@ -29,6 +29,7 @@ const primary = donorRst.getPrimary();
 const kRecipientConnString = recipientRst.getURL();
 const kCollName = "testColl";
 
+const kTenantDefinedDbName = "0";
 const kTestDoc = {
     x: -1
 };
@@ -50,11 +51,12 @@ const kMaxTimeMS = 1 * 1000;
 
 function startMigration(host, dbName, recipientConnString) {
     const primary = new Mongo(host);
+    const dbPrefix = dbName.split('_')[0];
     return primary.adminCommand({
         donorStartMigration: 1,
         migrationId: UUID(),
         recipientConnectionString: recipientConnString,
-        databasePrefix: dbName,
+        databasePrefix: dbPrefix,
         readPreference: {mode: "primary"}
     });
 }
@@ -229,11 +231,12 @@ function testWriteNoMigration(testCase, testOpts) {
  * Tests that the donor rejects writes after the migration commits.
  */
 function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts) {
+    const dbPrefix = testOpts.dbName.split('_')[0];
     assert.commandWorked(testOpts.primaryDB.adminCommand({
         donorStartMigration: 1,
         migrationId: UUID(),
         recipientConnectionString: kRecipientConnString,
-        databasePrefix: testOpts.dbName,
+        databasePrefix: dbPrefix,
         readPreference: {mode: "primary"}
     }));
 
@@ -246,11 +249,12 @@ function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts)
  */
 function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
     let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
+    const dbPrefix = testOpts.dbName.split('_')[0];
     assert.commandFailedWithCode(testOpts.primaryDB.adminCommand({
         donorStartMigration: 1,
         migrationId: UUID(),
         recipientConnectionString: kRecipientConnString,
-        databasePrefix: testOpts.dbName,
+        databasePrefix: dbPrefix,
         readPreference: {mode: "primary"}
     }),
                                  ErrorCodes.TenantMigrationAborted);
@@ -845,6 +849,7 @@ const testFuncs = {
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [commandName, testCase] of Object.entries(testCases)) {
+        // Database name is [tenant_id (database prefix)]_[tenant defined database name]
         let baseDbName = commandName + "-" + testName + "0";
 
         if (testCase.skip) {
@@ -852,7 +857,12 @@ for (const [testName, testFunc] of Object.entries(testFuncs)) {
             continue;
         }
 
-        runTest(primary, testCase, testFunc, baseDbName + "Basic", kCollName);
+        runTest(primary,
+                testCase,
+                testFunc,
+                baseDbName + "Basic" +
+                    "_" + kTenantDefinedDbName,
+                kCollName);
 
         // TODO (SERVER-49844): Test transactional writes during migration.
         if (testCase.isSupportedInTransaction && testName == "noMigration") {
@@ -861,9 +871,13 @@ for (const [testName, testFunc] of Object.entries(testFuncs)) {
         }
 
         if (testCase.isRetryableWriteCommand) {
-            runTest(primary, testCase, testFunc, baseDbName + "Retryable", kCollName, {
-                useRetryableWrite: true
-            });
+            runTest(primary,
+                    testCase,
+                    testFunc,
+                    baseDbName + "Retryable" +
+                        "_" + kTenantDefinedDbName,
+                    kCollName,
+                    {useRetryableWrite: true});
         }
     }
 }

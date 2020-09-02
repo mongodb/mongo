@@ -107,7 +107,7 @@ void migrationConflictHandler(OperationContext* opCtx,
         auto migrationConflictInfo = ex.extraInfo<TenantMigrationConflictInfo>();
         invariant(migrationConflictInfo);
 
-        if (auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(
+        if (auto mtab = mtabByPrefix.getTenantMigrationAccessBlockerForDbPrefix(
                 migrationConflictInfo->getDatabasePrefix())) {
             replyBuilder->getBodyBuilder().resetToEmpty();
             mtab->checkIfCanWriteOrBlock(opCtx);

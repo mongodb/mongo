@@ -63,7 +63,8 @@ void onTransitionToBlocking(OperationContext* opCtx, TenantMigrationDonorDocumen
     invariant(donorStateDoc.getBlockTimestamp());
 
     auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
-    auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(donorStateDoc.getDatabasePrefix());
+    auto mtab =
+        mtabByPrefix.getTenantMigrationAccessBlockerForDbPrefix(donorStateDoc.getDatabasePrefix());
 
     if (!opCtx->writesAreReplicated()) {
         // A primary must create the TenantMigrationAccessBlocker and call startBlockingWrites on it
@@ -95,7 +96,8 @@ void onTransitionToCommitted(OperationContext* opCtx, TenantMigrationDonorDocume
     invariant(donorStateDoc.getCommitOrAbortOpTime());
 
     auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
-    auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(donorStateDoc.getDatabasePrefix());
+    auto mtab =
+        mtabByPrefix.getTenantMigrationAccessBlockerForDbPrefix(donorStateDoc.getDatabasePrefix());
     invariant(mtab);
     mtab->commit(donorStateDoc.getCommitOrAbortOpTime().get());
 }
@@ -108,7 +110,8 @@ void onTransitionToAborted(OperationContext* opCtx, TenantMigrationDonorDocument
     invariant(donorStateDoc.getCommitOrAbortOpTime());
 
     auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
-    auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(donorStateDoc.getDatabasePrefix());
+    auto mtab =
+        mtabByPrefix.getTenantMigrationAccessBlockerForDbPrefix(donorStateDoc.getDatabasePrefix());
     invariant(mtab);
     mtab->abort(donorStateDoc.getCommitOrAbortOpTime().get());
 }
@@ -150,7 +153,7 @@ void onDonorStateTransition(OperationContext* opCtx, const BSONObj& donorStateDo
 
 void checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName) {
     auto mtab = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlocker(dbName);
+                    .getTenantMigrationAccessBlockerForDbName(dbName);
 
     if (!mtab) {
         return;
@@ -179,7 +182,7 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
     if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
         repl::ReadConcernLevel::kLinearizableReadConcern) {
         if (auto mtab = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
-                            .getTenantMigrationAccessBlocker(dbName)) {
+                            .getTenantMigrationAccessBlockerForDbName(dbName)) {
             mtab->checkIfLinearizableReadWasAllowedOrThrow(opCtx);
         }
     }
@@ -187,7 +190,7 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
 
 void onWriteToDatabase(OperationContext* opCtx, StringData dbName) {
     auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
-    auto mtab = mtabByPrefix.getTenantMigrationAccessBlocker(dbName);
+    auto mtab = mtabByPrefix.getTenantMigrationAccessBlockerForDbName(dbName);
 
     if (mtab) {
         mtab->checkIfCanWriteOrThrow();

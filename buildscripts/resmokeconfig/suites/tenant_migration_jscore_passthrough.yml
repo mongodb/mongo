@@ -67,7 +67,7 @@ executor:
         load('jstests/libs/override_methods/inject_tenant_prefix.js');
       global_vars:
         TestData: &TestData
-          dbPrefix: "tenantMigrationDbPrefix_"
+          dbPrefix: "tenantMigrationDbPrefix"
           # TODO (SERVER-50494): Implement proxy's retry logic for batch write commands.
           disableBatchWrites: true
       readMode: commands

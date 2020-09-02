@@ -63,23 +63,35 @@ void TenantMigrationAccessBlockerByPrefix::remove(StringData dbPrefix) {
 }
 
 std::shared_ptr<TenantMigrationAccessBlocker>
-TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlocker(StringData dbName) {
+TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlockerForDbName(StringData dbName) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    // TODO (SERVER-50440): Make TenantMigrationAccessBlockerByPrefix include '_' when doing lookup.
     auto it = std::find_if(
         _tenantMigrationAccessBlockers.begin(),
         _tenantMigrationAccessBlockers.end(),
         [dbName](
             const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
             StringData dbPrefix = blocker.first;
-            return dbName.startsWith(dbPrefix);
+            return dbName.startsWith(dbPrefix + "_");
         });
 
     if (it == _tenantMigrationAccessBlockers.end()) {
         return nullptr;
     } else {
         return it->second;
+    }
+}
+
+std::shared_ptr<TenantMigrationAccessBlocker>
+TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlockerForDbPrefix(
+    StringData dbPrefix) {
+    stdx::lock_guard<Latch> lg(_mutex);
+
+    auto it = _tenantMigrationAccessBlockers.find(dbPrefix);
+    if (it != _tenantMigrationAccessBlockers.end()) {
+        return it->second;
+    } else {
+        return nullptr;
     }
 }
 
