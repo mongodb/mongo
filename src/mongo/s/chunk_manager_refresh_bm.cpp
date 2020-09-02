@@ -102,7 +102,9 @@ MONGO_COMPILER_NOINLINE auto makeChunkManagerWithOptimalBalancedDistribution(int
 
 MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
                                                   const std::vector<ChunkType>& newChunks) {
-    auto rt = cm.getChunkManager()->getRoutingHistory()->makeUpdated(boost::none, newChunks);
+    auto rt =
+        cm.getChunkManager()->getRoutingTableHistory_ForTest().makeUpdated(boost::none, newChunks);
+
     return std::make_unique<CollectionMetadata>(
         ChunkManager(ShardId("shard0"), DatabaseVersion(UUID::gen(), 1), rt, boost::none),
         ShardId("shard0"));

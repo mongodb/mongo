@@ -64,10 +64,9 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
     auto shardKey = metadata.getShardKeyPattern().extractShardKeyFromDoc(doc);
 
     // We can assume the simple collation because shard keys do not support non-simple collations.
-    auto cm = metadata.getChunkManager();
-    ChunkManager chunkManagerAtClusterTime(
-        cm->dbPrimary(), cm->dbVersion(), cm->getRoutingHistory(), atClusterTime->asTimestamp());
-    auto chunk = chunkManagerAtClusterTime.findIntersectingChunkWithSimpleCollation(shardKey);
+    auto cmAtTimeOfWrite =
+        ChunkManager::makeAtTime(*metadata.getChunkManager(), atClusterTime->asTimestamp());
+    auto chunk = cmAtTimeOfWrite.findIntersectingChunkWithSimpleCollation(shardKey);
 
     // Throws if the chunk has moved since the timestamp of the running transaction's atClusterTime
     // read concern parameter.

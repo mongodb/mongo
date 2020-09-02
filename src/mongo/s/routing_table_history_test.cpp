@@ -361,55 +361,6 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
     ASSERT_EQ(v2, rt2->getVersion(kThisShard));
 }
 
-TEST_F(RoutingTableHistoryTest, TestReplaceChunk) {
-    const OID epoch = OID::gen();
-    ChunkVersion version{2, 2, epoch};
-
-    std::vector<ChunkType> initialChunks = {
-        ChunkType{kNss,
-                  ChunkRange{getShardKeyPattern().globalMin(), BSON("a" << 0)},
-                  ChunkVersion{2, 1, epoch},
-                  kThisShard},
-        ChunkType{kNss,
-                  ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion{2, 2, epoch},
-                  kThisShard}};
-
-    auto rt = RoutingTableHistory::makeNew(kNss,
-                                           UUID::gen(),
-                                           getShardKeyPattern(),
-                                           nullptr,
-                                           false,
-                                           epoch,
-                                           boost::none,
-                                           {initialChunks});
-
-    std::vector<ChunkType> changedChunks = {
-        ChunkType{kNss,
-                  ChunkRange{BSON("a" << 0), getShardKeyPattern().globalMax()},
-                  ChunkVersion{2, 2, epoch},
-                  kThisShard}};
-
-    auto rt1 = rt->makeUpdated(boost::none, changedChunks);
-    auto v1 = ChunkVersion{2, 2, epoch};
-    ASSERT_EQ(v1, rt1->getVersion(kThisShard));
-    ASSERT_EQ(rt1->numChunks(), 2);
-    ASSERT_EQ(rt.get(), rt1.get());
-
-    std::shared_ptr<ChunkInfo> found;
-
-    rt1->forEachChunk(
-        [&](auto& chunkInfo) {
-            if (chunkInfo->getShardIdAt(boost::none) == kThisShard) {
-                found = chunkInfo;
-                return false;
-            }
-            return true;
-        },
-        BSON("a" << 0));
-    ASSERT(found);
-}
-
 TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
     const OID epoch = OID::gen();
 

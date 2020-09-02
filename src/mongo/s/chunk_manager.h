@@ -113,7 +113,8 @@ public:
     std::shared_ptr<ChunkInfo> findIntersectingChunk(const BSONObj& shardKey) const;
 
     void appendChunk(const std::shared_ptr<ChunkInfo>& chunk);
-    ChunkMap createMerged(const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks);
+
+    ChunkMap createMerged(const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks) const;
 
     BSONObj toBSON() const;
 
@@ -133,7 +134,7 @@ private:
  * In-memory representation of the routing table for a single sharded collection at various points
  * in time.
  */
-class RoutingTableHistory : public std::enable_shared_from_this<RoutingTableHistory> {
+class RoutingTableHistory {
     RoutingTableHistory(const RoutingTableHistory&) = delete;
     RoutingTableHistory& operator=(const RoutingTableHistory&) = delete;
 
@@ -179,7 +180,7 @@ public:
      */
     std::shared_ptr<RoutingTableHistory> makeUpdated(
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
-        const std::vector<ChunkType>& changedChunks);
+        const std::vector<ChunkType>& changedChunks) const;
 
     const NamespaceString& nss() const {
         return _nss;
@@ -490,6 +491,12 @@ public:
     static IndexBounds collapseQuerySolution(const QuerySolutionNode* node);
 
     /**
+     * Constructs a new ChunkManager, which is a view of the underlying routing table at a different
+     * `clusterTime`.
+     */
+    static ChunkManager makeAtTime(const ChunkManager& cm, Timestamp clusterTime);
+
+    /**
      * Returns true if, for this shard, the chunks are identical in both chunk managers
      */
     bool compatibleWith(const ChunkManager& other, const ShardId& shard) const {
@@ -500,16 +507,16 @@ public:
         return _rt->uuidMatches(uuid);
     }
 
-    auto getRoutingHistory() const {
-        return _rt;
-    }
-
     boost::optional<UUID> getUUID() const {
         return _rt->getUUID();
     }
 
     const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
         return _rt->getReshardingFields();
+    }
+
+    const RoutingTableHistory& getRoutingTableHistory_ForTest() const {
+        return *_rt;
     }
 
 private:

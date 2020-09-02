@@ -129,7 +129,7 @@ protected:
         splitChunks.emplace_back(
             kNss, ChunkRange(maxKey, chunkToSplit.getMax()), chunkVersion, kOtherShard);
 
-        auto rt = cm->getRoutingHistory()->makeUpdated(boost::none, splitChunks);
+        auto rt = cm->getRoutingTableHistory_ForTest().makeUpdated(boost::none, splitChunks);
 
         return CollectionMetadata(ChunkManager(cm->dbPrimary(), cm->dbVersion(), rt, boost::none),
                                   kThisShard);
@@ -150,7 +150,7 @@ protected:
         auto chunkVersion = cm->getVersion();
         chunkVersion.incMajor();
 
-        auto rt = cm->getRoutingHistory()->makeUpdated(
+        auto rt = cm->getRoutingTableHistory_ForTest().makeUpdated(
             boost::none, {ChunkType(kNss, ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
 
         return CollectionMetadata(ChunkManager(cm->dbPrimary(), cm->dbVersion(), rt, boost::none),

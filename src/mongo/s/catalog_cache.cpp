@@ -106,10 +106,15 @@ std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
         // Otherwise, we're making a whole new routing table.
         if (existingRoutingInfo &&
             existingRoutingInfo->getVersion().epoch() == collectionAndChunks.epoch) {
+            if (collectionAndChunks.changedChunks.size() == 1 &&
+                collectionAndChunks.changedChunks[0].getVersion() ==
+                    existingRoutingInfo->getVersion())
+                return existingRoutingInfo;
 
             return existingRoutingInfo->makeUpdated(std::move(collectionAndChunks.reshardingFields),
                                                     collectionAndChunks.changedChunks);
         }
+
         auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
             if (!collectionAndChunks.defaultCollation.isEmpty()) {
                 // The collation should have been validated upon collection creation
@@ -118,6 +123,7 @@ std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
             }
             return nullptr;
         }();
+
         return RoutingTableHistory::makeNew(nss,
                                             collectionAndChunks.uuid,
                                             KeyPattern(collectionAndChunks.shardKeyPattern),

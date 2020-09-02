@@ -136,10 +136,6 @@ std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMet
             lg, shared_from_this(), std::move(activeMetadataTracker));
     }
 
-    auto cm = activeMetadata->getChunkManager();
-    ChunkManager chunkManagerAtClusterTime = ChunkManager(
-        cm->dbPrimary(), cm->dbVersion(), cm->getRoutingHistory(), atClusterTime->asTimestamp());
-
     class MetadataAtTimestamp : public ScopedCollectionDescription::Impl {
     public:
         MetadataAtTimestamp(CollectionMetadata metadata) : _metadata(std::move(metadata)) {}
@@ -152,8 +148,9 @@ std::shared_ptr<ScopedCollectionDescription::Impl> MetadataManager::getActiveMet
         CollectionMetadata _metadata;
     };
 
-    return std::make_shared<MetadataAtTimestamp>(
-        CollectionMetadata(chunkManagerAtClusterTime, activeMetadata->shardId()));
+    return std::make_shared<MetadataAtTimestamp>(CollectionMetadata(
+        ChunkManager::makeAtTime(*activeMetadata->getChunkManager(), atClusterTime->asTimestamp()),
+        activeMetadata->shardId()));
 }
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {

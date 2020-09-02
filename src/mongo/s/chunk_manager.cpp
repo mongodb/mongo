@@ -211,7 +211,8 @@ void validateChunk(const std::shared_ptr<ChunkInfo>& chunk, const ChunkVersion& 
     invariant(chunk->getLastmod() >= version);
 }
 
-ChunkMap ChunkMap::createMerged(const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks) {
+ChunkMap ChunkMap::createMerged(
+    const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks) const {
     size_t chunkMapIndex = 0;
     size_t changedChunkIndex = 0;
 
@@ -648,6 +649,10 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
     return bounds;
 }
 
+ChunkManager ChunkManager::makeAtTime(const ChunkManager& cm, Timestamp clusterTime) {
+    return ChunkManager(cm.dbPrimary(), cm.dbVersion(), cm._rt, clusterTime);
+}
+
 std::string ChunkManager::toString() const {
     return _rt ? _rt->toString() : "UNSHARDED";
 }
@@ -724,27 +729,13 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeNew(
 
 std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
-    const std::vector<ChunkType>& changedChunks) {
-
-    // It's possible for there to be one chunk in changedChunks without the routing table having
-    // changed. We skip copying the ChunkMap when this happens.
-    if (changedChunks.size() == 1 && changedChunks[0].getVersion() == getVersion()) {
-        return shared_from_this();
-    }
-
+    const std::vector<ChunkType>& changedChunks) const {
     auto changedChunkInfos = flatten(changedChunks);
     auto chunkMap = _chunkMap.createMerged(changedChunkInfos);
 
-    // If at least one diff was applied, the metadata is correct, but it might not have changed so
-    // in this case there is no need to recreate the chunk manager.
-    //
-    // NOTE: In addition to the above statement, it is also important that we return the same chunk
-    // manager object, because the write commands' code relies on changes of the chunk manager's
-    // sequence number to detect batch writes not making progress because of chunks moving across
-    // shards too frequently.
-    if (chunkMap.getVersion() == getVersion()) {
-        return shared_from_this();
-    }
+    // If at least one diff was applied, the collection's version must have advanced
+    invariant(getVersion().epoch() == chunkMap.getVersion().epoch());
+    invariant(getVersion().isOlderThan(chunkMap.getVersion()));
 
     return std::shared_ptr<RoutingTableHistory>(
         new RoutingTableHistory(_nss,
