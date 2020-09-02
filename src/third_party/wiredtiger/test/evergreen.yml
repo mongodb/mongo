@@ -1914,15 +1914,17 @@ tasks:
         vars:
           # Don't use diagnostic - this test looks for timing problems that are more likely to occur without it
           posix_configure_flags: --enable-strict
-      - func: "checkpoint test"
-        vars:
-          checkpoint_args: -t m -n 1000000 -k 5000000 -C cache_size=100MB
+      # Temporarily disable mix and column file type
+      # FIXME after WT-6608
+      #- func: "checkpoint test"
+      #  vars:
+      #    checkpoint_args: -t m -n 1000000 -k 5000000 -C cache_size=100MB
+      #- func: "checkpoint test"
+      #  vars:
+      #    checkpoint_args: -t c -n 1000000 -k 5000000 -C cache_size=100MB
       - func: "checkpoint test"
         vars:
           checkpoint_args: -t r -n 1000000 -k 5000000 -C cache_size=100MB
-      - func: "checkpoint test"
-        vars:
-          checkpoint_args: -t c -n 1000000 -k 5000000 -C cache_size=100MB
 
   - name: coverage-report
     commands:

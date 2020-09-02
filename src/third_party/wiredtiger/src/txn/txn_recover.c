@@ -558,6 +558,13 @@ __recovery_file_scan(WT_RECOVERY *r)
         WT_RET(__recovery_setup_file(r, uri, config));
     }
     WT_RET_NOTFOUND_OK(ret);
+
+    /*
+     * Set the connection level file id tracker, as such upon creation of a new file we'll begin
+     * from the latest file id.
+     */
+    S2C(r->session)->next_file_id = r->max_fileid;
+
     return (0);
 }
 
@@ -683,7 +690,6 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
          * the files.
          */
         metafile = &r.files[WT_METAFILE_ID];
-        conn->next_file_id = r.max_fileid;
 
         if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && WT_IS_MAX_LSN(&metafile->ckpt_lsn) &&
           !WT_IS_MAX_LSN(&r.max_ckpt_lsn))
@@ -813,8 +819,6 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
     if (F_ISSET(conn, WT_CONN_SALVAGE))
         ret = 0;
     WT_ERR(ret);
-
-    conn->next_file_id = r.max_fileid;
 
 done:
     WT_ERR(__recovery_set_checkpoint_timestamp(&r));

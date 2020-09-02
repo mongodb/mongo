@@ -440,8 +440,6 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
                 }
 
                 WT_ASSERT(session, upd->next == NULL || upd->next->txnid != WT_TXN_ABORTED);
-                if (upd->next == NULL)
-                    last_upd = upd;
                 upd_select->upd = upd = upd->next;
 
                 /*
@@ -475,9 +473,26 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
             /* The beginning of the validity window is the selected update's time point. */
             WT_TIME_WINDOW_SET_START(select_tw, upd);
         else if (select_tw->stop_ts != WT_TS_NONE || select_tw->stop_txn != WT_TXN_NONE) {
-            /* If we only have a tombstone in the update list, we must have an ondisk value. */
-            WT_ASSERT(session,
-              vpack != NULL && tombstone != NULL && !vpack->tw.prepare && last_upd->next == NULL);
+            /*
+             * We only have a tombstone on the update list or all the updates are from the same
+             * transaction.
+             */
+            WT_ASSERT(session, tombstone != NULL);
+
+            /* We must have an ondisk value and it can't be a prepared update. */
+            WT_ASSERT(session, vpack != NULL && vpack->type != WT_CELL_DEL && !vpack->tw.prepare);
+
+            /* Move the pointer to the last update on the update chain. */
+            for (last_upd = tombstone; last_upd->next != NULL; last_upd = last_upd->next)
+                /*
+                 * Tombstone is the only non-aborted update on the update chain or all the updates
+                 * are from the same transaction.
+                 */
+                WT_ASSERT(session,
+                  last_upd->next->txnid == WT_TXN_ABORTED ||
+                    (last_upd->next->txnid == tombstone->txnid &&
+                      last_upd->next->start_ts == tombstone->start_ts));
+
             /*
              * It's possible to have a tombstone as the only update in the update list. If we
              * reconciled before with only a single update and then read the page back into cache,
@@ -507,6 +522,10 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
                     WT_TIME_WINDOW_SET_START(select_tw, last_upd->next);
                 } else {
                     /*
+                     * It's possible that onpage value is not appended if the tombstone becomes
+                     * globally visible because the oldest transaction id or the oldest timestamp is
+                     * moved concurrently.
+                     *
                      * If the tombstone is aborted concurrently, we should still have appended the
                      * onpage value.
                      */
