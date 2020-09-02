@@ -49,8 +49,8 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
 replTest.stop(AID);
 
 // change the h value of the most recent entry on B
-master = replTest.getPrimary();
-assert(b_conn.host === master.host, "b_conn assumed to be master");
+replTest.stop(1, undefined /*signal*/, undefined /*opts*/, {forRestart: true});
+b_conn = replTest.start(1, {noReplSet: true, noCleanData: true});
 options = {
     writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS},
     upsert: true
@@ -60,8 +60,12 @@ oplog_entry["ts"].t++;
 oplog_entry["h"] = NumberLong(1);
 res = b_conn.getDB("local").oplog.rs.insert(oplog_entry);
 assert(res.nInserted > 0, tojson(res));
+replTest.stop(1, undefined /*signal*/, undefined /*opts*/, {forRestart: true});
+b_conn = replTest.start(1, {noCleanData: true});
 
 // another insert to set minvalid ahead
+master = replTest.getPrimary();
+assert(b_conn.host === master.host, "b_conn assumed to be master");
 assert.writeOK(b_conn.getDB(name).foo.insert({x: 123}));
 
 // shut down B and bring back the original master
