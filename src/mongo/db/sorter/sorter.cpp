@@ -179,39 +179,40 @@ public:
         Settings;
     typedef std::pair<Key, Value> Data;
 
-    FileIterator(const std::string& fileName,
+    FileIterator(const std::string& fileFullPath,
                  std::streampos fileStartOffset,
                  std::streampos fileEndOffset,
                  const Settings& settings,
                  const uint32_t checksum)
         : _settings(settings),
           _done(false),
-          _fileName(fileName),
+          _fileFullPath(fileFullPath),
           _fileStartOffset(fileStartOffset),
           _fileEndOffset(fileEndOffset),
           _originalChecksum(checksum) {
         uassert(16815,
-                str::stream() << "unexpected empty file: " << _fileName,
-                boost::filesystem::file_size(_fileName) != 0);
+                str::stream() << "unexpected empty file: " << _fileFullPath,
+                boost::filesystem::file_size(_fileFullPath) != 0);
     }
 
     void openSource() {
-        _file.open(_fileName.c_str(), std::ios::in | std::ios::binary);
+        _file.open(_fileFullPath.c_str(), std::ios::in | std::ios::binary);
         uassert(16814,
-                str::stream() << "error opening file \"" << _fileName
+                str::stream() << "error opening file \"" << _fileFullPath
                               << "\": " << myErrnoWithDescription(),
                 _file.good());
         _file.seekg(_fileStartOffset);
         uassert(50979,
                 str::stream() << "error seeking starting offset of '" << _fileStartOffset
-                              << "' in file \"" << _fileName << "\": " << myErrnoWithDescription(),
+                              << "' in file \"" << _fileFullPath
+                              << "\": " << myErrnoWithDescription(),
                 _file.good());
     }
 
     void closeSource() {
         _file.close();
         uassert(50969,
-                str::stream() << "error closing file \"" << _fileName
+                str::stream() << "error closing file \"" << _fileFullPath
                               << "\": " << myErrnoWithDescription(),
                 !_file.fail());
 
@@ -339,7 +340,7 @@ private:
 
         const std::streampos offset = _file.tellg();
         uassert(51049,
-                str::stream() << "error reading file \"" << _fileName
+                str::stream() << "error reading file \"" << _fileFullPath
                               << "\": " << myErrnoWithDescription(),
                 offset >= 0);
 
@@ -351,7 +352,7 @@ private:
 
         _file.read(reinterpret_cast<char*>(out), size);
         uassert(16817,
-                str::stream() << "error reading file \"" << _fileName
+                str::stream() << "error reading file \"" << _fileFullPath
                               << "\": " << myErrnoWithDescription(),
                 _file.good());
         verify(_file.gcount() == static_cast<std::streamsize>(size));
@@ -362,7 +363,7 @@ private:
 
     std::unique_ptr<char[]> _buffer;
     std::unique_ptr<BufReader> _bufferReader;
-    std::string _fileName;            // File containing the sorted data range.
+    std::string _fileFullPath;        // File containing the sorted data range.
     std::streampos _fileStartOffset;  // File offset at which the sorted data range starts.
     std::streampos _fileEndOffset;    // File offset at which the sorted data range ends.
     std::ifstream _file;
@@ -390,14 +391,14 @@ public:
     typedef std::pair<Key, Value> Data;
 
     MergeIterator(const std::vector<std::shared_ptr<Input>>& iters,
-                  const std::string& itersSourceFileName,
+                  const std::string& itersSourceFileFullPath,
                   const SortOptions& opts,
                   const Comparator& comp)
         : _opts(opts),
           _remaining(opts.limit ? opts.limit : std::numeric_limits<unsigned long long>::max()),
           _first(true),
           _greater(comp),
-          _itersSourceFileName(itersSourceFileName) {
+          _itersSourceFileFullPath(itersSourceFileFullPath) {
         for (size_t i = 0; i < iters.size(); i++) {
             iters[i]->openSource();
             if (iters[i]->more()) {
@@ -423,7 +424,7 @@ public:
         // file. Some systems will error closing the file if any file handles are still open.
         _current.reset();
         _heap.clear();
-        DESTRUCTOR_GUARD(boost::filesystem::remove(_itersSourceFileName));
+        DESTRUCTOR_GUARD(boost::filesystem::remove(_itersSourceFileFullPath));
     }
 
     void openSource() {}
@@ -524,7 +525,7 @@ private:
     std::shared_ptr<Stream> _current;
     std::vector<std::shared_ptr<Stream>> _heap;  // MinHeap
     STLComparator _greater;                      // named so calls make sense
-    std::string _itersSourceFileName;
+    std::string _itersSourceFileFullPath;
 };
 
 template <typename Key, typename Value, typename Comparator>
@@ -561,7 +562,7 @@ public:
                        std::back_inserter(this->_iters),
                        [this](const SorterRange& range) {
                            return std::make_shared<sorter::FileIterator<Key, Value>>(
-                               this->_fileName,
+                               this->_fileFullPath,
                                range.getStartOffset(),
                                range.getEndOffset(),
                                this->_settings,
@@ -573,7 +574,7 @@ public:
         if (!_done && !this->_shouldKeepFilesOnDestruction) {
             // If done() was never called to return a MergeIterator, then this Sorter still owns
             // file deletion.
-            DESTRUCTOR_GUARD(boost::filesystem::remove(this->_fileName));
+            DESTRUCTOR_GUARD(boost::filesystem::remove(this->_fileFullPath));
         }
     }
 
@@ -610,7 +611,7 @@ public:
         }
 
         spill();
-        Iterator* mergeIt = Iterator::merge(this->_iters, this->_fileName, this->_opts, _comp);
+        Iterator* mergeIt = Iterator::merge(this->_iters, this->_fileFullPath, this->_opts, _comp);
         _done = true;
         return mergeIt;
     }
@@ -658,7 +659,7 @@ private:
         sort();
 
         SortedFileWriter<Key, Value> writer(
-            this->_opts, this->_fileName, _nextSortedFileWriterOffset, _settings);
+            this->_opts, this->_fileFullPath, _nextSortedFileWriterOffset, _settings);
         for (; !_data->empty(); _data->pop_front()) {
             writer.addAlreadySorted(_data->front().first, _data->front().second);
         }
@@ -760,7 +761,7 @@ public:
         if (!_done && !this->_shouldKeepFilesOnDestruction) {
             // If done() was never called to return a MergeIterator, then this Sorter still owns
             // file deletion.
-            DESTRUCTOR_GUARD(boost::filesystem::remove(this->_fileName));
+            DESTRUCTOR_GUARD(boost::filesystem::remove(this->_fileFullPath));
         }
     }
 
@@ -816,7 +817,7 @@ public:
         }
 
         spill();
-        Iterator* iterator = Iterator::merge(this->_iters, this->_fileName, this->_opts, _comp);
+        Iterator* iterator = Iterator::merge(this->_iters, this->_fileFullPath, this->_opts, _comp);
         _done = true;
         return iterator;
     }
@@ -947,7 +948,7 @@ private:
         updateCutoff();
 
         SortedFileWriter<Key, Value> writer(
-            this->_opts, this->_fileName, _nextSortedFileWriterOffset, _settings);
+            this->_opts, this->_fileFullPath, _nextSortedFileWriterOffset, _settings);
         for (size_t i = 0; i < _data.size(); i++) {
             writer.addAlreadySorted(_data[i].first, _data[i].second);
         }
@@ -984,7 +985,17 @@ private:
 
 template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts)
-    : Sorter(opts, opts.extSortAllowed ? opts.tempDir + "/" + nextFileName() : "") {}
+    : _opts(opts),
+      _fileName(opts.extSortAllowed ? nextFileName() : ""),
+      _fileFullPath(opts.extSortAllowed ? opts.tempDir + "/" + _fileName : "") {}
+
+template <typename Key, typename Value>
+Sorter<Key, Value>::Sorter(const SortOptions& opts, const std::string& fileName)
+    : _opts(opts), _fileName(fileName), _fileFullPath(opts.tempDir + "/" + fileName) {
+    invariant(opts.extSortAllowed);
+    invariant(!opts.tempDir.empty());
+    invariant(!fileName.empty());
+}
 
 template <typename Key, typename Value>
 std::vector<SorterRange> Sorter<Key, Value>::_getRanges() const {
@@ -1010,10 +1021,15 @@ void Sorter<Key, Value>::persistDataForShutdown() {
 
 template <typename Key, typename Value>
 SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
-                                               const std::string& fileName,
+                                               const std::string& fileFullPath,
                                                const std::streampos fileStartOffset,
                                                const Settings& settings)
-    : _settings(settings) {
+    : _settings(settings),
+      _fileFullPath(fileFullPath),
+      // The file descriptor is positioned at the end of a file when opened in append mode, but
+      // _file.tellp() is not initialized on all systems to reflect this. Therefore, we must also
+      // pass in the expected offset to this constructor.
+      _fileStartOffset(fileStartOffset) {
 
     // This should be checked by consumers, but if we get here don't allow writes.
     uassert(
@@ -1025,20 +1041,14 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
 
     boost::filesystem::create_directories(opts.tempDir);
 
-    _fileName = fileName;
-
     // We open the provided file in append mode so that SortedFileWriter instances can share the
     // same file, used serially. We want to share files in order to stay below system open file
     // limits.
-    _file.open(_fileName.c_str(), std::ios::binary | std::ios::app | std::ios::out);
+    _file.open(_fileFullPath.c_str(), std::ios::binary | std::ios::app | std::ios::out);
     uassert(16818,
-            str::stream() << "error opening file \"" << _fileName
+            str::stream() << "error opening file \"" << _fileFullPath
                           << "\": " << sorter::myErrnoWithDescription(),
             _file.good());
-    // The file descriptor is positioned at the end of a file when opened in append mode, but
-    // _file.tellp() is not initialized on all systems to reflect this. Therefore, we must also pass
-    // in the expected offset to this constructor.
-    _fileStartOffset = fileStartOffset;
 
     // throw on failure
     _file.exceptions(std::ios::failbit | std::ios::badbit | std::ios::eofbit);
@@ -1106,7 +1116,7 @@ void SortedFileWriter<Key, Value>::spill() {
         _file.write(outBuffer, std::abs(size));
     } catch (const std::exception&) {
         msgasserted(16821,
-                    str::stream() << "error writing to file \"" << _fileName
+                    str::stream() << "error writing to file \"" << _fileFullPath
                                   << "\": " << sorter::myErrnoWithDescription());
     }
 
@@ -1118,8 +1128,8 @@ SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
     spill();
     std::streampos currentFileOffset = _file.tellp();
     uassert(50980,
-            str::stream() << "error fetching current file descriptor offset in file \"" << _fileName
-                          << "\": " << sorter::myErrnoWithDescription(),
+            str::stream() << "error fetching current file descriptor offset in file \""
+                          << _fileFullPath << "\": " << sorter::myErrnoWithDescription(),
             currentFileOffset >= 0);
 
     // In case nothing was written to disk, use _fileStartOffset because tellp() may not be
@@ -1128,7 +1138,7 @@ SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
     _file.close();
 
     return new sorter::FileIterator<Key, Value>(
-        _fileName, _fileStartOffset, _fileEndOffset, _settings, _checksum);
+        _fileFullPath, _fileStartOffset, _fileEndOffset, _settings, _checksum);
 }
 
 //
@@ -1139,10 +1149,10 @@ template <typename Key, typename Value>
 template <typename Comparator>
 SortIteratorInterface<Key, Value>* SortIteratorInterface<Key, Value>::merge(
     const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,
-    const std::string& fileName,
+    const std::string& fileFullPath,
     const SortOptions& opts,
     const Comparator& comp) {
-    return new sorter::MergeIterator<Key, Value, Comparator>(iters, fileName, opts, comp);
+    return new sorter::MergeIterator<Key, Value, Comparator>(iters, fileFullPath, opts, comp);
 }
 
 template <typename Key, typename Value>

@@ -84,6 +84,13 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
                        [](const MultikeyComponents& components) { return !components.empty(); });
 }
 
+SortOptions makeSortOptions(size_t maxMemoryUsageBytes) {
+    return SortOptions()
+        .TempDir(storageGlobalParams.dbpath + "/_tmp")
+        .ExtSortAllowed()
+        .MaxMemoryUsageBytes(maxMemoryUsageBytes);
+}
+
 }  // namespace
 
 struct BtreeExternalSortComparison {
@@ -495,10 +502,7 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> AbstractIndexAccessMethod::initi
 AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(IndexCatalogEntry* index,
                                                             size_t maxMemoryUsageBytes)
     : _indexCatalogEntry(index),
-      _sorter(Sorter::make(SortOptions()
-                               .TempDir(storageGlobalParams.dbpath + "/_tmp")
-                               .ExtSortAllowed()
-                               .MaxMemoryUsageBytes(maxMemoryUsageBytes),
+      _sorter(Sorter::make(makeSortOptions(maxMemoryUsageBytes),
                            BtreeExternalSortComparison(),
                            _makeSorterSettings())) {}
 
@@ -508,10 +512,7 @@ AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(IndexCatalogEntry* i
     : _indexCatalogEntry(index),
       _sorter(Sorter::makeFromExistingRanges(sorterInfo.getFileName()->toString(),
                                              *sorterInfo.getRanges(),
-                                             SortOptions()
-                                                 .TempDir(sorterInfo.getTempDir()->toString())
-                                                 .ExtSortAllowed()
-                                                 .MaxMemoryUsageBytes(maxMemoryUsageBytes),
+                                             makeSortOptions(maxMemoryUsageBytes),
                                              BtreeExternalSortComparison(),
                                              _makeSorterSettings())),
       _keysInserted(*sorterInfo.getNumKeys()) {}

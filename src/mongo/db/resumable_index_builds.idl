@@ -68,10 +68,6 @@ structs:
                               for this index build"
                 type: string
                 optional: true
-            tempDir:
-                description: "The directory into which we place a file when spilling data to disk"
-                type: string
-                optional: true
             fileName:
                 description: "The name of the file that sorted data is written to"
                 type: string

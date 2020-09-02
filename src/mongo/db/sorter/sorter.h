@@ -178,7 +178,7 @@ public:
     template <typename Comparator>
     static SortIteratorInterface* merge(
         const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,
-        const std::string& fileName,
+        const std::string& fileFullPath,
         const SortOptions& opts,
         const Comparator& comp);
 
@@ -223,15 +223,16 @@ public:
         Settings;
 
     struct PersistedState {
-        std::string tempDir;
         std::string fileName;
         std::vector<SorterRange> ranges;
     };
 
-    Sorter(const SortOptions& opts);
+    explicit Sorter(const SortOptions& opts);
 
-    Sorter(const SortOptions& opts, const std::string& fileName)
-        : _opts(opts), _fileName(fileName) {}
+    /**
+     * ExtSort-only constructor. fileName is the base name of a file in the temp directory.
+     */
+    Sorter(const SortOptions& opts, const std::string& fileName);
 
     template <typename Comparator>
     static Sorter* make(const SortOptions& opts,
@@ -263,7 +264,7 @@ public:
     }
 
     PersistedState getPersistedState() const {
-        return {_opts.tempDir, _fileName, _getRanges()};
+        return {_fileName, _getRanges()};
     }
 
     void persistDataForShutdown();
@@ -281,7 +282,12 @@ protected:
     bool _shouldKeepFilesOnDestruction = false;
 
     SortOptions _opts;
+
+    // Used by Sorter::getPersistedState() to return the base file name of the data persisted by
+    // this Sorter.
     std::string _fileName;
+
+    std::string _fileFullPath;
 
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 };
@@ -302,7 +308,7 @@ public:
         Settings;
 
     explicit SortedFileWriter(const SortOptions& opts,
-                              const std::string& fileName,
+                              const std::string& fileFullPath,
                               const std::streampos fileStartOffset,
                               const Settings& settings = Settings());
 
@@ -328,7 +334,7 @@ private:
     void spill();
 
     const Settings _settings;
-    std::string _fileName;
+    std::string _fileFullPath;
     std::ofstream _file;
     BufBuilder _buffer;
 
@@ -364,7 +370,7 @@ private:
     template ::mongo::SortIteratorInterface<Key, Value>* ::mongo::                             \
         SortIteratorInterface<Key, Value>::merge<Comparator>(                                  \
             const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,                  \
-            const std::string& fileName,                                                       \
+            const std::string& fileFullPath,                                                   \
             const SortOptions& opts,                                                           \
             const Comparator& comp);                                                           \
     template ::mongo::Sorter<Key, Value>* ::mongo::Sorter<Key, Value>::make<Comparator>(       \

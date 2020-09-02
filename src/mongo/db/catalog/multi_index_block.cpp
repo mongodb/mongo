@@ -922,9 +922,6 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
         if (_phase != IndexBuildPhaseEnum::kDrainWrites) {
             auto state = index.bulk->getPersistedSorterState();
 
-            // TODO (SERVER-50289): Consider not including tempDir in the persisted resumable index
-            // build state.
-            indexInfo.append("tempDir", state.tempDir);
             indexInfo.append("fileName", state.fileName);
             indexInfo.append("numKeys", index.bulk->getKeysInserted());
 

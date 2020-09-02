@@ -1579,12 +1579,14 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
                       "buildUUID"_attr = buildUUID);
 
                 boost::system::error_code ec;
-                boost::filesystem::remove(index.getFileName()->toString(), ec);
+                boost::filesystem::remove(
+                    storageGlobalParams.dbpath + "/_tmp/" + index.getFileName()->toString(), ec);
 
                 if (ec) {
                     LOGV2(5043101,
                           "Failed to remove resumable index build temp file",
                           "file"_attr = index.getFileName(),
+                          "buildUUID"_attr = buildUUID,
                           "error"_attr = ec.message());
                 }
             }

@@ -620,7 +620,8 @@ const ResumableIndexBuildTest = class {
         if (!failWhileParsing) {
             // Ensure that the persisted Sorter data was cleaned up after failing to resume. This
             // cleanup does not occur if parsing failed.
-            assert.eq(listFiles(primary.dbpath + "/_tmp").length, 0);
+            const files = listFiles(primary.dbpath + "/_tmp");
+            assert.eq(files.length, 0, files);
 
             // If we fail after parsing, any remaining internal idents will only be cleaned up
             // after another restart.
