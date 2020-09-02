@@ -152,6 +152,10 @@ public:
             return _valueHandle.isValid();
         }
 
+        const Time& getTime() const {
+            return _valueHandle.getTime();
+        }
+
         Value* get() {
             return &_valueHandle->value;
         }
@@ -302,12 +306,49 @@ public:
 
     /**
      * Invalidates the given 'key' and immediately replaces it with a new value.
+     *
+     * The 'time' parameter is mandatory for causally-consistent caches, but not needed otherwise
+     * (since the time never changes).
+     */
+    void insertOrAssign(const Key& key, Value&& newValue, Date_t updateWallClockTime) {
+        stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->invalidateAndCancelCurrentLookupRound(lg);
+        _cache.insertOrAssign(key, {std::move(newValue), updateWallClockTime});
+    }
+
+    void insertOrAssign(const Key& key,
+                        Value&& newValue,
+                        Date_t updateWallClockTime,
+                        const Time& time) {
+        stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->invalidateAndCancelCurrentLookupRound(lg);
+        _cache.insertOrAssign(key, {std::move(newValue), updateWallClockTime}, time);
+    }
+
+    /**
+     * Invalidates the given 'key' and immediately replaces it with a new value, returning a handle
+     * to the new value.
+     *
+     * The 'time' parameter is mandatory for causally-consistent caches, but not needed otherwise
+     * (since the time never changes).
      */
     ValueHandle insertOrAssignAndGet(const Key& key, Value&& newValue, Date_t updateWallClockTime) {
         stdx::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
             it->second->invalidateAndCancelCurrentLookupRound(lg);
         return _cache.insertOrAssignAndGet(key, {std::move(newValue), updateWallClockTime});
+    }
+
+    ValueHandle insertOrAssignAndGet(const Key& key,
+                                     Value&& newValue,
+                                     Date_t updateWallClockTime,
+                                     const Time& time) {
+        stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->invalidateAndCancelCurrentLookupRound(lg);
+        return _cache.insertOrAssignAndGet(key, {std::move(newValue), updateWallClockTime}, time);
     }
 
     /**
@@ -377,9 +418,8 @@ public:
         return _cache.getCacheInfo();
     }
 
-protected:
     /**
-     * ReadThroughCache constructor, to be called by sub-classes, which implement 'lookup'.
+     * ReadThroughCache constructor.
      *
      * The 'mutex' is for the exclusive usage of the ReadThroughCache and must not be used in any
      * way by the implementing class. Having the mutex stored by the sub-class allows latch

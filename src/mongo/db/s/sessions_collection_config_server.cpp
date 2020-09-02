@@ -61,7 +61,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
     uassert(ErrorCodes::ShardNotFound,
             str::stream() << "Failed to create " << NamespaceString::kLogicalSessionsNamespace
                           << ": cannot create the collection until there are shards",
-            Grid::get(opCtx)->shardRegistry()->getNumShards() != 0);
+            Grid::get(opCtx)->shardRegistry()->getNumShardsNoReload() != 0);
 
     // First, shard the sessions collection to create it.
     ConfigsvrShardCollectionRequest shardCollection;
