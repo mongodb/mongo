@@ -1091,28 +1091,17 @@ DB.prototype.printSecondaryReplicationInfo = function() {
         return null;
     }
 
-    function g(x) {
-        assert(x, "how could this be null (printSecondaryReplicationInfo gx)");
-        print("source: " + x.host);
-        if (x.syncedTo) {
-            var st = new Date(DB.tsToSeconds(x.syncedTo) * 1000);
-            getReplLag(st);
-        } else {
-            print("\tdoing initial sync");
-        }
-    }
-
-    function r(x) {
-        assert(x, "how could this be null (printSecondaryReplicationInfo rx)");
-        if (x.state == 1 || x.state == 7) {  // ignore primaries (1) and arbiters (7)
+    function printNodeReplicationInfo(node) {
+        assert(node);
+        if (node.state === 1 || node.state === 7) {  // ignore primaries (1) and arbiters (7)
             return;
         }
 
-        print("source: " + x.name);
-        if (x.optime) {
-            getReplLag(x.optimeDate);
+        print("source: " + node.name);
+        if (node.optime && node.health != 0) {
+            getReplLag(node.optimeDate);
         } else {
-            print("\tno replication info, yet.  State: " + x.stateStr);
+            print("\tno replication info, yet.  State: " + node.stateStr);
         }
     }
 
@@ -1136,7 +1125,7 @@ DB.prototype.printSecondaryReplicationInfo = function() {
         }
 
         for (i in status.members) {
-            r(status.members[i]);
+            printNodeReplicationInfo(status.members[i]);
         }
     }
 };
