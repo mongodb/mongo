@@ -341,7 +341,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
                 .firstElement(),
             expCtx),
         AssertionException,
-        16866);
+        ErrorCodes::FailedToParse);
 
     ASSERT_THROWS_CODE(
         DocumentSourceLookUp::createFromBson(
@@ -356,7 +356,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
                 .firstElement(),
             expCtx),
         AssertionException,
-        16867);
+        ErrorCodes::FailedToParse);
 
     ASSERT_THROWS_CODE(
         DocumentSourceLookUp::createFromBson(
@@ -371,7 +371,7 @@ TEST_F(DocumentSourceLookUpTest, RejectsInvalidLetVariableName) {
                 .firstElement(),
             expCtx),
         AssertionException,
-        16868);
+        ErrorCodes::FailedToParse);
 }
 
 TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStage) {

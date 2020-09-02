@@ -633,10 +633,11 @@ Update CommonMongodProcessInterface::buildUpdateOp(
         wcb.setBypassDocumentValidation(expCtx->bypassDocumentValidation);
         return wcb;
     }());
-    updateOp.setLegacyRuntimeConstants(expCtx->getLegacyRuntimeConstants());
-    if (auto letParams = expCtx->variablesParseState.serializeUserVariables(expCtx->variables);
-        !letParams.isEmpty()) {
-        updateOp.setLet(letParams);
+    auto [constants, letParams] =
+        expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);
+    updateOp.setLegacyRuntimeConstants(std::move(constants));
+    if (!letParams.isEmpty()) {
+        updateOp.setLet(std::move(letParams));
     }
     return updateOp;
 }

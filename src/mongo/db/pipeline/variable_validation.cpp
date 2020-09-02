@@ -28,42 +28,63 @@
  */
 
 #include "mongo/base/error_codes.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 
 namespace mongo::variableValidation {
+
+namespace {
+Status isValidName(StringData varName,
+                   std::function<bool(char)> prefixPred,
+                   std::function<bool(char)> suffixPred,
+                   int prefixLen) {
+    if (varName.empty()) {
+        return Status{ErrorCodes::FailedToParse, "empty variable names are not allowed"};
+    }
+    for (int i = 0; i < prefixLen; ++i)
+        if (!prefixPred(varName[i])) {
+            return Status{ErrorCodes::FailedToParse,
+                          str::stream()
+                              << "'" << varName
+                              << "' starts with an invalid character for a user variable name"};
+        }
+
+    for (size_t i = prefixLen; i < varName.size(); i++)
+        if (!suffixPred(varName[i])) {
+            return Status{ErrorCodes::FailedToParse,
+                          str::stream() << "'" << varName << "' contains an invalid character "
+                                        << "for a variable name: '" << varName[i] << "'"};
+        }
+    return Status::OK();
+}
+}  // namespace
+
 void validateName(StringData varName,
                   std::function<bool(char)> prefixPred,
                   std::function<bool(char)> suffixPred,
                   int prefixLen) {
-    uassert(16866, "empty variable names are not allowed", !varName.empty());
-    for (int i = 0; i < prefixLen; ++i)
-        if (!prefixPred(varName[i]))
-            uasserted(16867,
-                      str::stream()
-                          << "'" << varName
-                          << "' starts with an invalid character for a user variable name");
+    uassertStatusOK(isValidName(varName, prefixPred, suffixPred, prefixLen));
+}
 
-    for (size_t i = prefixLen; i < varName.size(); i++)
-        if (!suffixPred(varName[i]))
-            uasserted(16868,
-                      str::stream() << "'" << varName << "' contains an invalid character "
-                                    << "for a variable name: '" << varName[i] << "'");
+Status isValidNameForUserWrite(StringData varName) {
+    // System variables users allowed to write to (currently just one)
+    if (varName == "CURRENT") {
+        return Status::OK();
+    }
+    return isValidName(varName,
+                       [](char ch) -> bool {
+                           return (ch >= 'a' && ch <= 'z') || (ch & '\x80');  // non-ascii
+                       },
+                       [](char ch) -> bool {
+                           return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                               (ch >= '0' && ch <= '9') || (ch == '_') ||
+                               (ch & '\x80');  // non-ascii
+                       },
+                       1);
 }
 
 void validateNameForUserWrite(StringData varName) {
-    // System variables users allowed to write to (currently just one)
-    if (varName == "CURRENT") {
-        return;
-    }
-    validateName(varName,
-                 [](char ch) -> bool {
-                     return (ch >= 'a' && ch <= 'z') || (ch & '\x80');  // non-ascii
-                 },
-                 [](char ch) -> bool {
-                     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-                         (ch >= '0' && ch <= '9') || (ch == '_') || (ch & '\x80');  // non-ascii
-                 },
-                 1);
+    uassertStatusOK(isValidNameForUserWrite(varName));
 }
 
 void validateNameForUserRead(StringData varName) {

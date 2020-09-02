@@ -118,8 +118,8 @@ Document serializeToCommand(BSONObj originalCmd, const MapReduce& parsedMr, Pipe
         Value(Document{{"batchSize", std::numeric_limits<long long>::max()}});
     translatedCmd[AggregationRequest::kAllowDiskUseName] = Value(true);
     translatedCmd[AggregationRequest::kFromMongosName] = Value(true);
-    translatedCmd[AggregationRequest::kLegacyRuntimeConstantsName] =
-        Value(pipeline->getContext()->getLegacyRuntimeConstants().toBSON());
+    translatedCmd[AggregationRequest::kLetName] = Value(
+        pipeline->getContext()->variablesParseState.serialize(pipeline->getContext()->variables));
     translatedCmd[AggregationRequest::kIsMapReduceCommandName] = Value(true);
 
     if (shouldBypassDocumentValidationForCommand(originalCmd)) {

@@ -31,6 +31,7 @@
 
 
 namespace mongo::variableValidation {
+Status isValidNameForUserWrite(StringData varName);
 void validateNameForUserWrite(StringData varName);
 void validateNameForUserRead(StringData varName);
 void validateName(StringData varName,

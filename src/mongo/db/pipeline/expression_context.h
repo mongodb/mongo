@@ -266,10 +266,6 @@ public:
         _resolvedNamespaces = std::move(resolvedNamespaces);
     }
 
-    const LegacyRuntimeConstants& getLegacyRuntimeConstants() const {
-        return variables.getLegacyRuntimeConstants();
-    }
-
     /**
      * Retrieves the Javascript Scope for the current thread or creates a new one if it has not been
      * created yet. Initializes the Scope with the 'jsScope' variables from the runtimeConstants.
@@ -282,15 +278,17 @@ public:
         uassert(31264,
                 "Cannot run server-side javascript without the javascript engine enabled",
                 getGlobalScriptEngine());
-        const auto& runtimeConstants = getLegacyRuntimeConstants();
-        const boost::optional<bool> isMapReduceCommand = runtimeConstants.getIsMapReduce();
+        const auto isMapReduce =
+            (variables.hasValue(Variables::kIsMapReduceId) &&
+             variables.getValue(Variables::kIsMapReduceId).getType() == BSONType::Bool &&
+             variables.getValue(Variables::kIsMapReduceId).coerceToBool());
         if (inMongos) {
             invariant(!forceLoadOfStoredProcedures);
-            invariant(!isMapReduceCommand);
+            invariant(!isMapReduce);
         }
 
         // Stored procedures are only loaded for the $where expression and MapReduce command.
-        const bool loadStoredProcedures = forceLoadOfStoredProcedures || isMapReduceCommand;
+        const bool loadStoredProcedures = forceLoadOfStoredProcedures || isMapReduce;
 
         if (hasWhereClause && !loadStoredProcedures) {
             uasserted(4649200,
@@ -298,9 +296,13 @@ public:
                       "$where.");
         }
 
-        const boost::optional<mongo::BSONObj>& scope = runtimeConstants.getJsScope();
-        return JsExecution::get(
-            opCtx, scope.get_value_or(BSONObj()), ns.db(), loadStoredProcedures, jsHeapLimitMB);
+        auto scopeObj = BSONObj();
+        if (variables.hasValue(Variables::kJsScopeId)) {
+            auto scopeVar = variables.getValue(Variables::kJsScopeId);
+            invariant(scopeVar.isObject());
+            scopeObj = scopeVar.getDocument().toBson();
+        }
+        return JsExecution::get(opCtx, scopeObj, ns.db(), loadStoredProcedures, jsHeapLimitMB);
     }
 
     // The explain verbosity requested by the user, or boost::none if no explain was requested.

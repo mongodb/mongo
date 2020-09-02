@@ -2,7 +2,8 @@
 // @tags: [
 //   sbe_incompatible,
 // ]
-
+(function() {
+"use strict";
 load('jstests/aggregation/extras/utils.js');
 var t = db.server9841;
 t.drop();
@@ -32,7 +33,9 @@ test({$map: {input: "$mixed", as: "var", in : '$$var.a'}},
 test({$map: {input: "$null", as: "var", in : '$$var'}}, null);
 
 // can't set ROOT
-assertErrorCode(t, {$project: {a: {$map: {input: "$simple", as: "ROOT", in : '$$ROOT'}}}}, 16867);
+assertErrorCode(t,
+                {$project: {a: {$map: {input: "$simple", as: "ROOT", in : '$$ROOT'}}}},
+                ErrorCodes.FailedToParse);
 
 // error on non-array
 assertErrorCode(t, {$project: {a: {$map: {input: "$notArray", as: "var", in : '$$var'}}}}, 16883);
@@ -45,3 +48,4 @@ assertErrorCode(t, {$project: {a: {$map: {input: "$simple", as: "var"}}}}, 16882
 
 // 'in' uses undefined variable name.
 assertErrorCode(t, {$project: {a: {$map: {input: "$simple", in : '$$var'}}}}, 17276);
+}());

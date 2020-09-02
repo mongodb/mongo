@@ -351,15 +351,21 @@ TEST_F(PipelineExecutorTest, RejectsInvalidConstantNames) {
 
     // Empty name.
     auto constants = BSON("" << 10);
-    ASSERT_THROWS_CODE(PipelineExecutor(expCtx, pipeline, constants), AssertionException, 16866);
+    ASSERT_THROWS_CODE(PipelineExecutor(expCtx, pipeline, constants),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
 
     // Invalid first character.
     constants = BSON("^invalidFirstChar" << 10);
-    ASSERT_THROWS_CODE(PipelineExecutor(expCtx, pipeline, constants), AssertionException, 16867);
+    ASSERT_THROWS_CODE(PipelineExecutor(expCtx, pipeline, constants),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
 
     // Contains invalid character.
     constants = BSON("contains*InvalidChar" << 10);
-    ASSERT_THROWS_CODE(PipelineExecutor(expCtx, pipeline, constants), AssertionException, 16868);
+    ASSERT_THROWS_CODE(PipelineExecutor(expCtx, pipeline, constants),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
 }
 
 TEST_F(PipelineExecutorTest, CanUseConstants) {

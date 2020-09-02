@@ -193,6 +193,10 @@ public:
         return Date == getType() || bsonTimestamp == getType() || jstOID == getType();
     }
 
+    bool isObject() const {
+        return getType() == BSONType::Object;
+    }
+
     /// Get the BSON type of the field.
     BSONType getType() const {
         return _storage.bsonType();

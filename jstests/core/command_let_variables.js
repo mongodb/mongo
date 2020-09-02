@@ -290,31 +290,31 @@ assert.eq(result.length, 0);
 assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {Reserved: "failure"}}),
-    16867);
+    ErrorCodes.FailedToParse);
 assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {NOW: "failure"}}),
-    16867);
+    4738901);
 assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {CLUSTER_TIME: "failure"}}),
-    16867);
+    4738901);
 assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {IS_MR: "failure"}}),
-    16867);
+    4738901);
 assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {JS_SCOPE: "failure"}}),
-    16867);
+    4738901);
 assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {ROOT: "failure"}}),
-    16867);
+    ErrorCodes.FailedToParse);
 assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: coll.getName(), pipeline: [], cursor: {}, let : {REMOVE: "failure"}}),
-    16867);
+    ErrorCodes.FailedToParse);
 
 // Test that let variables can be used within views.
 assert.commandWorked(testDB.runCommand({

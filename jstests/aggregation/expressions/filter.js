@@ -238,7 +238,7 @@ assertErrorCode(coll, [{$project: {b: {$filter: filterDoc}}}], 28650);
 
 // 'as' is not a valid variable name.
 filterDoc = {input: '$a', as: '$x', cond: true};
-assertErrorCode(coll, [{$project: {b: {$filter: filterDoc}}}], 16867);
+assertErrorCode(coll, [{$project: {b: {$filter: filterDoc}}}], ErrorCodes.FailedToParse);
 
 // 'input' is not an array.
 filterDoc = {input: 'string', as: 'x', cond: true};

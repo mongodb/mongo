@@ -130,7 +130,6 @@ BSONObj createPassthroughCommandForShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    const boost::optional<LegacyRuntimeConstants>& constants,
     Pipeline* pipeline,
     BSONObj collationObj);
 

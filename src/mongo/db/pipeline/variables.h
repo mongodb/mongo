@@ -126,11 +126,8 @@ public:
      * Returns whether a constant value for 'id' has been defined using setConstantValue().
      */
     bool hasConstantValue(Variables::Id id) const {
-        if (auto it = _letParametersMap.find(id);
-            it != _letParametersMap.end() && it->second.isConstant) {
-            return true;
-        }
-        return false;
+        auto it = _definitions.find(id);
+        return (it != _definitions.end() && it->second.isConstant);
     }
 
     /**
@@ -142,13 +139,6 @@ public:
     IdGenerator* useIdGenerator() {
         return &_idGenerator;
     }
-
-    /**
-     * Return a reference to an object which represents the variables which are considered "runtime
-     * constants." It is a programming error to call this function without having called
-     * setLegacyRuntimeConstants().
-     */
-    const LegacyRuntimeConstants& getLegacyRuntimeConstants() const;
 
     /**
      * Set the runtime constants. It is a programming error to call this more than once.
@@ -167,12 +157,10 @@ public:
                                         const BSONObj letParameters);
 
     bool hasValue(Variables::Id id) const {
-        if (id < 0)  // system variables.
-            return true;
-        if (auto it = _letParametersMap.find(id); it != _letParametersMap.end())
-            return true;
-        return false;
+        return _definitions.find(id) != _definitions.end();
     };
+
+    void appendSystemVariables(BSONObjBuilder& bob) const;
 
     /**
      * Copies this Variables and 'vps' to the Variables and VariablesParseState objects in 'expCtx'.
@@ -184,6 +172,8 @@ public:
      * runtime.
      */
     void copyToExpCtx(const VariablesParseState& vps, ExpressionContext* expCtx) const;
+
+    LegacyRuntimeConstants transitionalExtractRuntimeConstants() const;
 
 private:
     struct ValueAndState {
@@ -207,11 +197,7 @@ private:
     }
 
     IdGenerator _idGenerator;
-    stdx::unordered_map<Id, ValueAndState> _letParametersMap;
-    stdx::unordered_map<Id, Value> _runtimeConstantsMap;
-
-    // Populated after construction. Should not be set more than once.
-    boost::optional<LegacyRuntimeConstants> _legacyRuntimeConstants;
+    stdx::unordered_map<Id, ValueAndState> _definitions;
 };
 
 /**
@@ -256,10 +242,16 @@ public:
     std::set<Variables::Id> getDefinedVariableIDs() const;
 
     /**
-     * Serializes the IDs and associated values of user-defined variables that are currently in
-     * scope.
+     * Serializes a map from name to values of defined variables.
      */
-    BSONObj serializeUserVariables(const Variables& vars) const;
+    BSONObj serialize(const Variables& vars) const;
+
+    /**
+     * Splits defined variables into runtime constants and "the rest" as a transitional tool while
+     * we phase out using LegacyRuntimeConstants.
+     */
+    std::pair<LegacyRuntimeConstants, BSONObj> transitionalCompatibilitySerialize(
+        const Variables& vars) const;
 
     /**
      * Return a copy of this VariablesParseState. Will replace the copy's '_idGenerator' pointer

@@ -125,11 +125,29 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                   boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                  const boost::optional<LegacyRuntimeConstants>& constants,
                                   BSONObj collationObj) {
-    if (constants) {
+    // Serialize the variables.
+    // Check whether we are in a mixed-version cluster and so must use the old serialization format.
+    // This is only tricky in the case we are sending an aggregate from shard to shard. For this
+    // scenario we can rely on feature compatibility version to detect when this is safe. Feature
+    // compatibility version is not generally accurate on mongos since it was intended to guard
+    // changes to data format and mongos has no persisted state. However, mongos is upgraded last
+    // after all the shards, so any recipient will understand the 'let' parameter.
+    // TODO SERVER-52900 This code can be remove when we branch for the next LTS release.
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+        !serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion49)) {
+        // A mixed version cluster. Use the old format to be sure it is understood.
+        auto [legacyRuntimeConstants, unusedSerializedVariables] =
+            expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);
+
         cmdForShards[AggregationRequest::kLegacyRuntimeConstantsName] =
-            Value(constants.get().toBSON());
+            Value(legacyRuntimeConstants.toBSON());
+    } else {
+        // Either this is a "modern" cluster or we are a mongos and can assume the shards are
+        // "modern" and will understand the 'let' parameter.
+        cmdForShards[AggregationRequest::kLetName] =
+            Value(expCtx->variablesParseState.serialize(expCtx->variables));
     }
 
     cmdForShards[AggregationRequest::kFromMongosName] = Value(expCtx->inMongos);
@@ -703,7 +721,6 @@ BSONObj createPassthroughCommandForShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    const boost::optional<LegacyRuntimeConstants>& constants,
     Pipeline* pipeline,
     BSONObj collationObj) {
     // Create the command for the shards.
@@ -713,7 +730,7 @@ BSONObj createPassthroughCommandForShard(
     }
 
     return genericTransformForShards(
-        std::move(targetedCmd), expCtx, explainVerbosity, constants, collationObj);
+        std::move(targetedCmd), expCtx, explainVerbosity, collationObj);
 }
 
 BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -751,11 +768,8 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     targetedCmd[AggregationRequest::kExchangeName] =
         exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();
 
-    return genericTransformForShards(std::move(targetedCmd),
-                                     expCtx,
-                                     expCtx->explain,
-                                     expCtx->getLegacyRuntimeConstants(),
-                                     expCtx->getCollatorBSON());
+    return genericTransformForShards(
+        std::move(targetedCmd), expCtx, expCtx->explain, expCtx->getCollatorBSON());
 }
 
 /**
@@ -833,14 +847,11 @@ DispatchShardPipelineResults dispatchShardPipeline(
         opCtx,
         true,             /* appendRC */
         !expCtx->explain, /* appendWC */
-        splitPipelines ? createCommandForTargetedShards(
-                             expCtx, serializedCommand, *splitPipelines, exchangeSpec, true)
-                       : createPassthroughCommandForShard(expCtx,
-                                                          serializedCommand,
-                                                          expCtx->explain,
-                                                          expCtx->getLegacyRuntimeConstants(),
-                                                          pipeline.get(),
-                                                          collationObj));
+        splitPipelines
+            ? createCommandForTargetedShards(
+                  expCtx, serializedCommand, *splitPipelines, exchangeSpec, true)
+            : createPassthroughCommandForShard(
+                  expCtx, serializedCommand, expCtx->explain, pipeline.get(), collationObj));
 
     // A $changeStream pipeline must run on all shards, and will also open an extra cursor on the
     // config server in order to monitor for new shards. To guarantee that we do not miss any

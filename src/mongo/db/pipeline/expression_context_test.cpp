@@ -229,7 +229,7 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfUppercase) {
                                             BSON("A" << 12),
                                             false}),
         DBException,
-        16867);
+        ErrorCodes::FailedToParse);
 }
 }  // namespace
 }  // namespace mongo
