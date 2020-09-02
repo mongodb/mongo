@@ -94,6 +94,9 @@ const NamespaceString NamespaceString::kConfigReshardingOperationsNamespace(
 const NamespaceString NamespaceString::kDonorReshardingOperationsNamespace(
     NamespaceString::kConfigDb, "localReshardingOperations.donor");
 
+const NamespaceString NamespaceString::kRecipientReshardingOperationsNamespace(
+    NamespaceString::kConfigDb, "localReshardingOperations.recipient");
+
 const NamespaceString NamespaceString::kConfigSettingsNamespace(NamespaceString::kConfigDb,
                                                                 "settings");
 const NamespaceString NamespaceString::kVectorClockNamespace(NamespaceString::kConfigDb,

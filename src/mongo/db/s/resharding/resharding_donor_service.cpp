@@ -43,7 +43,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::cons
 }
 
 DonorStateMachine::DonorStateMachine(const BSONObj& donorDoc)
-    : repl::PrimaryOnlyService::TypedInstance<Instance>(),
+    : repl::PrimaryOnlyService::TypedInstance<DonorStateMachine>(),
       _donorDoc(ReshardingDonorDocument::parse(IDLParserErrorContext("ReshardingDonorDocument"),
                                                donorDoc)),
       _id(_donorDoc.getCommonReshardingMetadata().get_id()) {}

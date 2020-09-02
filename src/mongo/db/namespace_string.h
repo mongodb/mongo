@@ -130,6 +130,9 @@ public:
     // Namespace for the donor shard's local resharding operation state.
     static const NamespaceString kDonorReshardingOperationsNamespace;
 
+    // Namespace for the recipient shard's local resharding operation state.
+    static const NamespaceString kRecipientReshardingOperationsNamespace;
+
     // Namespace for balancer settings and default read and write concerns.
     static const NamespaceString kConfigSettingsNamespace;
 

@@ -70,6 +70,7 @@ env.Library(
         'resharding/resharding_coordinator_observer.cpp',
         'resharding/resharding_coordinator_service.cpp',
         'resharding/resharding_donor_service.cpp',
+        'resharding/resharding_recipient_service.cpp',
         'scoped_operation_completion_sharding_actions.cpp',
         'session_catalog_migration_destination.cpp',
         'session_catalog_migration_source.cpp',

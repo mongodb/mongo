@@ -70,11 +70,13 @@ enums:
         values:
             kUnused: "unused"
             kInitializing: "initializing"
+            kInitialized: "initialized"
             kCloning: "cloning"
             kApplying: "applying"
             kSteadyState: "steady-state"
             kStrictConsistency: "strict-consistency"
             kRenaming: "renaming"
+            kDone: "done"
             kError: "error"
 
 structs:

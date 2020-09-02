@@ -30,28 +30,28 @@
 #pragma once
 
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/s/resharding/donor_document_gen.h"
+#include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 
 namespace mongo {
-constexpr StringData kReshardingDonorServiceName = "ReshardingDonorService"_sd;
+constexpr StringData kReshardingRecipientServiceName = "ReshardingRecipientService"_sd;
 
-class ReshardingDonorService final : public repl::PrimaryOnlyService {
+class ReshardingRecipientService final : public repl::PrimaryOnlyService {
 public:
-    explicit ReshardingDonorService(ServiceContext* serviceContext)
+    explicit ReshardingRecipientService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext) {}
-    ~ReshardingDonorService() = default;
+    ~ReshardingRecipientService() = default;
 
     StringData getServiceName() const override {
-        return kReshardingDonorServiceName;
+        return kReshardingRecipientServiceName;
     }
 
     NamespaceString getStateDocumentsNS() const override {
-        return NamespaceString::kDonorReshardingOperationsNamespace;
+        return NamespaceString::kRecipientReshardingOperationsNamespace;
     }
 
     ThreadPool::Limits getThreadPoolLimits() const override {
-        // TODO Limit the size of ReshardingDonorService thread pool.
+        // TODO Limit the size of ReshardingRecipientService thread pool.
         return ThreadPool::Limits();
     }
 
@@ -60,12 +60,13 @@ public:
 };
 
 /**
- * Represents the current state of a resharding donor operation on this shard. This class drives
- * state transitions and updates to underlying on-disk metadata.
+ * Represents the current state of a resharding recipient operation on this shard. This class
+ * drives state transitions and updates to underlying on-disk metadata.
  */
-class DonorStateMachine final : public repl::PrimaryOnlyService::TypedInstance<DonorStateMachine> {
+class RecipientStateMachine final
+    : public repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine> {
 public:
-    explicit DonorStateMachine(const BSONObj& donorDoc);
+    explicit RecipientStateMachine(const BSONObj& recipientDoc);
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
 
@@ -73,33 +74,42 @@ public:
         boost::optional<TypeCollectionReshardingFields> reshardingFields);
 
 private:
-    // The following functions correspond to the actions to take at a particular donor state.
-    void _onInitializingCalculateMinFetchTimestampThenBeginDonating();
+    // The following functions correspond to the actions to take at a particular recipient state.
+    void _createTemporaryReshardingCollectionThenTransitionToInitialized();
 
-    ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenStartMirroring(
+    ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCloning(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    ExecutorFuture<void> _awaitCoordinatorHasCommittedThenTransitionToDropping(
+    void _cloneThenTransitionToApplying();
+
+    void _applyThenTransitionToSteadyState();
+
+    ExecutorFuture<void> _awaitAllDonorsMirroringThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-    void _dropOriginalCollectionThenDeleteLocalState();
+    ExecutorFuture<void> _awaitCoordinatorHasCommittedThenTransitionToRenaming(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    void _renameTemporaryReshardingCollectionThenDeleteLocalState();
 
     // Transitions the state on-disk and in-memory to 'endState'.
-    void _transitionState(DonorStateEnum endState);
+    void _transitionState(RecipientStateEnum endState);
 
     // Transitions the state on-disk and in-memory to kError.
     void _transitionStateToError(const Status& status);
 
-    // Updates the donor document on-disk and in-memory with the 'replacementDoc.'
-    void _updateDonorDocument(ReshardingDonorDocument&& replacementDoc);
+    // Updates the recipient document on-disk and in-memory with the 'replacementDoc.'
+    void _updateRecipientDocument(ReshardingRecipientDocument&& replacementDoc);
 
     // The in-memory representation of the underlying document in
-    // config.localReshardingOperations.donor.
-    ReshardingDonorDocument _donorDoc;
+    // config.localReshardingOperations.recipient.
+    ReshardingRecipientDocument _recipientDoc;
 
-    // Each promise below corresponds to a state on the donor state machine. They are listed in
+    // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
-    SharedPromise<void> _allRecipientsDoneApplying;
+    SharedPromise<void> _allDonorsPreparedToDonate;
+
+    SharedPromise<void> _allDonorsMirroring;
 
     SharedPromise<void> _coordinatorHasCommitted;
 
