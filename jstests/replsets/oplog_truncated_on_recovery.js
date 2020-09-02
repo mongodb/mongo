@@ -72,7 +72,9 @@
                                                      {upsert: true, writeConcern: {w: 1}})));
 
     // Insert a diverged oplog entry that will be truncated after restart.
-    log(assert.writeOK(localDB.oplog.rs.insert({
+    replTest.stop(0);
+    master = replTest.start(0, {noReplSet: true, noCleanData: true});
+    log(assert.writeOK(master.getDB("local").oplog.rs.insert({
         _id: ObjectId(),
         ns: "",
         ts: divergedTS,
@@ -81,8 +83,7 @@
         t: NumberLong(-1),
         o: {}
     })));
-    log(localDB.oplog.rs.find().toArray());
-    log(assert.commandWorked(localDB.adminCommand("replSetGetStatus")));
+    log(master.getDB("local").oplog.rs.find().toArray());
     log("restart primary");
     replTest.restart(master);
     replTest.waitForState(master, ReplSetTest.State.RECOVERING);
