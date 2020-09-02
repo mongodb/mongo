@@ -249,6 +249,14 @@ public:
      */
     ExecutorFuture<T> thenRunOn(ExecutorPtr exec) && noexcept;
 
+    /**
+     * Returns an inline Future type from this SemiFuture.
+     *
+     * WARNING: Do not use this unless you're extremely sure of what you're doing, as callbacks
+     * chained to the resulting Future may run in unexpected places.
+     */
+    Future<T> unsafeToInlineFuture() && noexcept;
+
 private:
     friend class Promise<T>;
     friend class SharedPromise<T>;
@@ -261,7 +269,6 @@ private:
     template <typename>
     friend class SharedSemiFuture;
 
-    Future<T> unsafeToInlineFuture() && noexcept;
 
     explicit SemiFuture(future_details::SharedStateHolder<T_unless_void>&& impl)
         : _impl(std::move(impl)) {}
@@ -963,6 +970,16 @@ public:
         return SemiFuture<T>(toFutureImpl());
     }
 
+    /**
+     * Returns an inline Future type from this SharedSemiFuture.
+     *
+     * WARNING: Do not use this unless you're extremely sure of what you're doing, as callbacks
+     * chained to the resulting Future may run in unexpected places.
+     */
+    Future<T> unsafeToInlineFuture() const noexcept {
+        return Future<T>(toFutureImpl());
+    }
+
 private:
     template <typename>
     friend class SharedPromise;
@@ -986,10 +1003,6 @@ private:
     void propagateResultTo(U&& arg) const noexcept {
         toFutureImpl().propagateResultTo(std::forward<U>(arg));
     }
-    Future<T> unsafeToInlineFuture() const noexcept {
-        return Future<T>(toFutureImpl());
-    }
-
     explicit SharedSemiFuture(boost::intrusive_ptr<future_details::SharedState<T>> ptr)
         : _shared(std::move(ptr)) {}
     explicit SharedSemiFuture(future_details::SharedStateHolder<T>&& holder)

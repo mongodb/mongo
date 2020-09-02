@@ -615,6 +615,7 @@ icuEnv.CppUnitTest(
         'background_job_test.cpp',
         'background_thread_clock_source_test.cpp',
         'base64_test.cpp',
+        'cancelation_test.cpp',
         'clock_source_mock_test.cpp',
         'concepts_test.cpp',
         'container_size_helper_test.cpp',
