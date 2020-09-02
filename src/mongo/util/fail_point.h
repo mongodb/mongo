@@ -40,6 +40,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -202,10 +203,14 @@ public:
      */
     static StatusWith<ModeOptions> parseBSON(const BSONObj& obj);
 
-    FailPoint();
+    explicit FailPoint(std::string name);
 
     FailPoint(const FailPoint&) = delete;
     FailPoint& operator=(const FailPoint&) = delete;
+
+    const std::string& getName() const {
+        return _name;
+    }
 
     /**
      * Returns true if fail point is active.
@@ -423,6 +428,8 @@ private:
     AtomicWord<int> _timesOrPeriod{0};
     BSONObj _data;
 
+    const std::string _name;
+
     // protects _mode, _timesOrPeriod, _data
     mutable Mutex _modMutex = MONGO_MAKE_LATCH("FailPoint::_modMutex");
 };
@@ -439,12 +446,12 @@ public:
      *     51006 - if the given name already exists in this registry.
      *     CannotMutateObject - if this registry is already frozen.
      */
-    Status add(const std::string& name, FailPoint* failPoint);
+    Status add(FailPoint* failPoint);
 
     /**
      * @return a registered FailPoint, or nullptr if it was not registered.
      */
-    FailPoint* find(const std::string& name) const;
+    FailPoint* find(StringData name) const;
 
     /**
      * Freezes this registry from being modified.
@@ -460,7 +467,7 @@ public:
 
 private:
     bool _frozen;
-    stdx::unordered_map<std::string, FailPoint*> _fpMap;
+    StringMap<FailPoint*> _fpMap;
 };
 
 /**
@@ -468,9 +475,14 @@ private:
  */
 class FailPointEnableBlock {
 public:
-    explicit FailPointEnableBlock(std::string failPointName);
-    FailPointEnableBlock(std::string failPointName, BSONObj data);
+    explicit FailPointEnableBlock(StringData failPointName);
+    FailPointEnableBlock(StringData failPointName, BSONObj data);
+    explicit FailPointEnableBlock(FailPoint* failPoint);
+    FailPointEnableBlock(FailPoint* failPoint, BSONObj data);
     ~FailPointEnableBlock();
+
+    FailPointEnableBlock(const FailPointEnableBlock&) = delete;
+    FailPointEnableBlock& operator=(const FailPointEnableBlock&) = delete;
 
     // Const access to the underlying FailPoint
     const FailPoint* failPoint() const {
@@ -488,8 +500,7 @@ public:
     }
 
 private:
-    std::string _failPointName;
-    FailPoint* _failPoint;
+    FailPoint* const _failPoint;
     FailPoint::EntryCountT _initialTimesEntered;
 };
 
@@ -507,7 +518,7 @@ FailPoint::EntryCountT setGlobalFailPoint(const std::string& failPointName, cons
  */
 class FailPointRegisterer {
 public:
-    FailPointRegisterer(const std::string& name, FailPoint* fp);
+    explicit FailPointRegisterer(FailPoint* fp);
 };
 
 FailPointRegistry& globalFailPointRegistry();
@@ -518,8 +529,8 @@ FailPointRegistry& globalFailPointRegistry();
  * Never use in header files, only .cpp files.
  */
 #define MONGO_FAIL_POINT_DEFINE(fp) \
-    ::mongo::FailPoint fp;          \
-    ::mongo::FailPointRegisterer fp##failPointRegisterer(#fp, &fp);
+    ::mongo::FailPoint fp(#fp);     \
+    ::mongo::FailPointRegisterer fp##failPointRegisterer(&fp);
 
 
 }  // namespace mongo

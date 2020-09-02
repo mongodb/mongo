@@ -55,12 +55,12 @@ namespace stdx = mongo::stdx;
 
 namespace mongo_test {
 TEST(FailPoint, InitialState) {
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     ASSERT_FALSE(failPoint.shouldFail());
 }
 
 TEST(FailPoint, AlwaysOn) {
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::alwaysOn);
     ASSERT(failPoint.shouldFail());
 
@@ -74,7 +74,7 @@ TEST(FailPoint, AlwaysOn) {
 }
 
 TEST(FailPoint, NTimes) {
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::nTimes, 4);
     ASSERT(failPoint.shouldFail());
     ASSERT(failPoint.shouldFail());
@@ -87,14 +87,14 @@ TEST(FailPoint, NTimes) {
 }
 
 TEST(FailPoint, BlockOff) {
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     bool called = false;
     failPoint.execute([&](const BSONObj&) { called = true; });
     ASSERT_FALSE(called);
 }
 
 TEST(FailPoint, BlockAlwaysOn) {
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::alwaysOn);
     bool called = false;
 
@@ -104,7 +104,7 @@ TEST(FailPoint, BlockAlwaysOn) {
 }
 
 TEST(FailPoint, BlockNTimes) {
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::nTimes, 1);
     size_t counter = 0;
 
@@ -116,7 +116,7 @@ TEST(FailPoint, BlockNTimes) {
 }
 
 TEST(FailPoint, BlockWithException) {
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::alwaysOn);
     bool threw = false;
 
@@ -134,7 +134,7 @@ TEST(FailPoint, BlockWithException) {
 }
 
 TEST(FailPoint, SetGetParam) {
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::alwaysOn, 0, BSON("x" << 20));
 
     failPoint.execute([&](const BSONObj& data) { ASSERT_EQUALS(20, data["x"].numberInt()); });
@@ -143,12 +143,13 @@ TEST(FailPoint, SetGetParam) {
 class FailPointStress : public mongo::unittest::Test {
 public:
     void setUp() {
-        _fp.setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
+        _fp = std::make_unique<FailPoint>("testFP");
+        _fp->setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
     }
 
     void tearDown() {
         // Note: This can loop indefinitely if reference counter was off
-        _fp.setMode(FailPoint::off, 0, BSON("a" << 66));
+        _fp->setMode(FailPoint::off, 0, BSON("a" << 66));
     }
 
     void startTest() {
@@ -174,7 +175,7 @@ public:
 private:
     void blockTask() {
         while (true) {
-            _fp.execute([](const BSONObj& data) {
+            _fp->execute([](const BSONObj& data) {
                 // Expanded ASSERT_EQUALS since the error is not being
                 // printed out properly
                 if (data["a"].numberInt() != 44) {
@@ -196,7 +197,7 @@ private:
     void blockWithExceptionTask() {
         while (true) {
             try {
-                _fp.execute([](const BSONObj& data) {
+                _fp->execute([](const BSONObj& data) {
                     if (data["a"].numberInt() != 44) {
                         using namespace mongo::literals;
                         LOGV2_ERROR(24130,
@@ -219,7 +220,7 @@ private:
 
     void simpleTask() {
         while (true) {
-            static_cast<void>(MONGO_unlikely(_fp.shouldFail()));
+            static_cast<void>(MONGO_unlikely(_fp->shouldFail()));
             stdx::lock_guard<mongo::Latch> lk(_mutex);
             if (_inShutdown)
                 break;
@@ -228,10 +229,10 @@ private:
 
     void flipTask() {
         while (true) {
-            if (_fp.shouldFail()) {
-                _fp.setMode(FailPoint::off, 0);
+            if (_fp->shouldFail()) {
+                _fp->setMode(FailPoint::off, 0);
             } else {
-                _fp.setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
+                _fp->setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
             }
 
             stdx::lock_guard<mongo::Latch> lk(_mutex);
@@ -240,7 +241,7 @@ private:
         }
     }
 
-    FailPoint _fp;
+    std::unique_ptr<FailPoint> _fp;
     std::vector<stdx::thread> _tasks;
 
     mongo::Mutex _mutex = MONGO_MAKE_LATCH();
@@ -249,7 +250,7 @@ private:
 
 TEST_F(FailPointStress, Basic) {
     startTest();
-    mongo::sleepsecs(30);
+    mongo::sleepsecs(5);
     stopTest();
 }
 
@@ -277,7 +278,7 @@ static int64_t runParallelFailPointTest(FailPoint::Mode fpMode,
                                         const int32_t numEncountersPerThread) {
     ASSERT_GT(numThreads, 0);
     ASSERT_GT(numEncountersPerThread, 0);
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     failPoint.setMode(fpMode, fpVal);
     std::vector<stdx::thread*> tasks;
     std::vector<int64_t> counts(numThreads, 0);
@@ -398,7 +399,7 @@ TEST(FailPoint, parseBSONValidDataSucceeds) {
     ASSERT_TRUE(swTuple.isOK());
 }
 
-TEST(FailPoint, FailPointBlockBasicTest) {
+TEST(FailPoint, FailPointEnableBlockBasicTest) {
     auto failPoint = mongo::globalFailPointRegistry().find("dummy");
 
     ASSERT_FALSE(failPoint->shouldFail());
@@ -411,8 +412,21 @@ TEST(FailPoint, FailPointBlockBasicTest) {
     ASSERT_FALSE(failPoint->shouldFail());
 }
 
-TEST(FailPoint, FailPointBlockIfBasicTest) {
-    FailPoint failPoint;
+TEST(FailPoint, FailPointEnableBlockByPointer) {
+    auto failPoint = mongo::globalFailPointRegistry().find("dummy");
+
+    ASSERT_FALSE(failPoint->shouldFail());
+
+    {
+        FailPointEnableBlock dummyFp(failPoint);
+        ASSERT_TRUE(failPoint->shouldFail());
+    }
+
+    ASSERT_FALSE(failPoint->shouldFail());
+}
+
+TEST(FailPoint, ExecuteIfBasicTest) {
+    FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::nTimes, 1, BSON("skip" << true));
     {
         bool hit = false;
@@ -463,7 +477,7 @@ void assertFunctionInterruptable(std::function<void(Interruptible* interruptible
 }
 
 TEST(FailPoint, PauseWhileSetInterruptibility) {
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::alwaysOn);
 
     assertFunctionInterruptable(
@@ -473,7 +487,7 @@ TEST(FailPoint, PauseWhileSetInterruptibility) {
 }
 
 TEST(FailPoint, WaitForFailPointTimeout) {
-    FailPoint failPoint;
+    FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::alwaysOn);
 
     assertFunctionInterruptable([&failPoint](Interruptible* interruptible) {

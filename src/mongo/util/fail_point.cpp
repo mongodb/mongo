@@ -70,7 +70,7 @@ void FailPoint::setThreadPRNGSeed(int32_t seed) {
     threadPrng = PseudoRandom(seed);
 }
 
-FailPoint::FailPoint() = default;
+FailPoint::FailPoint(std::string name) : _name(std::move(name)) {}
 
 void FailPoint::_shouldFailCloseBlock() {
     _fpInfo.subtractAndFetch(1);
@@ -286,8 +286,8 @@ BSONObj FailPoint::toBSON() const {
     return builder.obj();
 }
 
-FailPointRegisterer::FailPointRegisterer(const std::string& name, FailPoint* fp) {
-    uassertStatusOK(globalFailPointRegistry().add(name, fp));
+FailPointRegisterer::FailPointRegisterer(FailPoint* fp) {
+    uassertStatusOK(globalFailPointRegistry().add(fp));
 }
 
 FailPointRegistry& globalFailPointRegistry() {
@@ -309,12 +309,18 @@ auto setGlobalFailPoint(const std::string& failPointName, const BSONObj& cmdObj)
     return timesEntered;
 }
 
-FailPointEnableBlock::FailPointEnableBlock(std::string failPointName)
-    : FailPointEnableBlock(std::move(failPointName), {}) {}
+FailPointEnableBlock::FailPointEnableBlock(StringData failPointName)
+    : FailPointEnableBlock(failPointName, {}) {}
 
-FailPointEnableBlock::FailPointEnableBlock(std::string failPointName, BSONObj data)
-    : _failPointName(std::move(failPointName)) {
-    _failPoint = globalFailPointRegistry().find(_failPointName);
+FailPointEnableBlock::FailPointEnableBlock(StringData failPointName, BSONObj data)
+    : FailPointEnableBlock(globalFailPointRegistry().find(failPointName), std::move(data)) {}
+
+FailPointEnableBlock::FailPointEnableBlock(FailPoint* failPoint)
+    : FailPointEnableBlock(failPoint, {}) {}
+
+FailPointEnableBlock::FailPointEnableBlock(FailPoint* failPoint, BSONObj data)
+    : _failPoint(failPoint) {
+
     invariant(_failPoint != nullptr);
 
     _initialTimesEntered = _failPoint->setMode(FailPoint::alwaysOn, 0, std::move(data));
@@ -322,7 +328,7 @@ FailPointEnableBlock::FailPointEnableBlock(std::string failPointName, BSONObj da
     LOGV2_WARNING(23830,
                   "Set failpoint {failPointName} to: {failPoint}",
                   "Set failpoint",
-                  "failPointName"_attr = _failPointName,
+                  "failPointName"_attr = _failPoint->getName(),
                   "failPoint"_attr = _failPoint->toBSON());
 }
 
@@ -331,24 +337,25 @@ FailPointEnableBlock::~FailPointEnableBlock() {
     LOGV2_WARNING(23831,
                   "Set failpoint {failPointName} to: {failPoint}",
                   "Set failpoint",
-                  "failPointName"_attr = _failPointName,
+                  "failPointName"_attr = _failPoint->getName(),
                   "failPoint"_attr = _failPoint->toBSON());
 }
 
 FailPointRegistry::FailPointRegistry() : _frozen(false) {}
 
-Status FailPointRegistry::add(const std::string& name, FailPoint* failPoint) {
+Status FailPointRegistry::add(FailPoint* failPoint) {
     if (_frozen) {
         return {ErrorCodes::CannotMutateObject, "Registry is already frozen"};
     }
-    auto [pos, ok] = _fpMap.insert({name, failPoint});
+    auto [pos, ok] = _fpMap.insert({failPoint->getName(), failPoint});
     if (!ok) {
-        return {ErrorCodes::Error(51006), "Fail point already registered: {}"_format(name)};
+        return {ErrorCodes::Error(51006),
+                "Fail point already registered: {}"_format(failPoint->getName())};
     }
     return Status::OK();
 }
 
-FailPoint* FailPointRegistry::find(const std::string& name) const {
+FailPoint* FailPointRegistry::find(StringData name) const {
     auto iter = _fpMap.find(name);
     return (iter == _fpMap.end()) ? nullptr : iter->second;
 }
