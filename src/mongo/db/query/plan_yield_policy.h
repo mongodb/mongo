@@ -135,6 +135,14 @@ public:
     }
 
     /**
+     * Hangs or waits if mandated by the 'setYieldAllLocksHang' and 'setYieldAllLocksWait'
+     * failpoints. Concrete implementations of 'PlanYieldPolicy' should call this during a yield in
+     * order to allow tests to take advantage of these failpoints.
+     */
+    static void handleDuringYieldFailpoints(OperationContext* opCtx,
+                                            const NamespaceString& planExecNs);
+
+    /**
      * Constructs a PlanYieldPolicy of the given 'policy' type. This class uses an ElapsedTracker
      * to keep track of elapsed time, which is initialized from the parameters 'cs',
      * 'yieldIterations' and 'yieldPeriod'.

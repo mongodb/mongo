@@ -1033,17 +1033,30 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     return nullptr;
 }
 
+std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(
+    OperationContext* opCtx,
+    PlanYieldPolicy::YieldPolicy requestedYieldPolicy,
+    NamespaceString nss) {
+    auto whileYieldingFn = [nss = std::move(nss)](OperationContext* yieldingOpCtx) {
+        CurOp::get(yieldingOpCtx)->yielded();
+        PlanYieldPolicy::handleDuringYieldFailpoints(yieldingOpCtx, nss);
+    };
+    return std::make_unique<PlanYieldPolicySBE>(requestedYieldPolicy,
+                                                opCtx->getServiceContext()->getFastClockSource(),
+                                                internalQueryExecYieldIterations.load(),
+                                                Milliseconds{internalQueryExecYieldPeriodMS.load()},
+                                                std::move(whileYieldingFn));
+}
+
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExecutor(
     OperationContext* opCtx,
     const Collection* collection,
     std::unique_ptr<CanonicalQuery> cq,
     PlanYieldPolicy::YieldPolicy requestedYieldPolicy,
     size_t plannerOptions) {
-    auto yieldPolicy =
-        std::make_unique<PlanYieldPolicySBE>(requestedYieldPolicy,
-                                             opCtx->getServiceContext()->getFastClockSource(),
-                                             internalQueryExecYieldIterations.load(),
-                                             Milliseconds{internalQueryExecYieldPeriodMS.load()});
+    invariant(cq);
+    auto nss = cq->nss();
+    auto yieldPolicy = makeSbeYieldPolicy(opCtx, requestedYieldPolicy, nss);
     SlotBasedPrepareExecutionHelper helper{
         opCtx, collection, cq.get(), yieldPolicy.get(), plannerOptions};
     auto executionResult = helper.prepare();
@@ -1069,14 +1082,18 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                            std::move(cq),
                                            {std::move(plan.root), std::move(plan.data)},
                                            collection,
-                                           {},
+                                           std::move(nss),
                                            std::move(plan.results),
                                            std::move(yieldPolicy));
     }
     // No need for runtime planning, just use the constructed plan stage tree.
     invariant(roots.size() == 1);
-    return plan_executor_factory::make(
-        opCtx, std::move(cq), std::move(roots[0]), collection, {}, std::move(yieldPolicy));
+    return plan_executor_factory::make(opCtx,
+                                       std::move(cq),
+                                       std::move(roots[0]),
+                                       collection,
+                                       std::move(nss),
+                                       std::move(yieldPolicy));
 }
 }  // namespace
 

@@ -91,9 +91,12 @@ function threadRoutine({connStr, dbName, collName, opKey}) {
     assert.commandFailedWithCode(ret, ErrorCodes.Interrupted);
 }
 
-function runTest(conn) {
+function runTest(conn, useSbe) {
     const db = conn.getDB(kDbName);
     const coll = db.getCollection(kCollName);
+
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: useSbe}));
 
     assert.commandWorked(db.dropDatabase());
     let bulk = coll.initializeUnorderedBulkOp();
@@ -178,11 +181,14 @@ function runTest(conn) {
                                  ErrorCodes.CursorNotFound);
 }
 
-// Test killOp against mongod.
-runTest(shardConn);
+// Run tests with the slot-based execution engine both disabled and enabled.
+for (const useSbe of [false, true]) {
+    // Test killOp against mongod.
+    runTest(shardConn, useSbe);
 
-// Test killOp against mongos.
-runTest(st.s);
+    // Test killOp against mongos.
+    runTest(st.s, useSbe);
+}
 
 st.stop();
 })();

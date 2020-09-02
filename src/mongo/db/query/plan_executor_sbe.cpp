@@ -56,6 +56,7 @@ PlanExecutorSBE::PlanExecutorSBE(
       _cq{std::move(cq)},
       _yieldPolicy(std::move(yieldPolicy)) {
     invariant(_root);
+    invariant(!_nss.isEmpty());
 
     auto&& data = root.second;
 
@@ -96,16 +97,6 @@ PlanExecutorSBE::PlanExecutorSBE(
         // PlanExecutor was created. All but one candidate plan ('_root') have since been discarded.
         _yieldPolicy->clearRegisteredPlans();
         _yieldPolicy->registerPlan(_root.get());
-    }
-
-    // We may still need to initialize _nss from either collection or _cq.
-    if (_nss.isEmpty()) {
-        if (collection) {
-            _nss = collection->ns();
-        } else {
-            invariant(_cq);
-            _nss = _cq->getQueryRequest().nss();
-        }
     }
 }
 

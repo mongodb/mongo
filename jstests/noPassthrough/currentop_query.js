@@ -90,17 +90,31 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
      * Captures currentOp() for a given test command/operation and confirms that namespace,
      * operation type and planSummary are correct.
      *
-     *  @param {Object} testObj - Contains test arguments.
-     *  @param {function} testObj.test - A function that runs the desired test op/cmd.
-     *  @param {string} testObj.planSummary - A string containing the expected planSummary.
-     *  @param {Object} testObj.currentOpFilter - A filter to be used to narrow currentOp()
-     *  output to only the relevant operation or command.
-     *  @param {string} [testObj.command] - The command to test against. Will look for this to
-     *  be a key in the currentOp().query object.
-     *  @param {string} [testObj.operation] - The operation to test against. Will look for this
-     *  to be the value of the currentOp().op field.
+     *  - 'testObj' - Contains test arguments.
+     *  - 'testObj.test' - A function that runs the desired test op/cmd.
+     *  - 'testObj.planSummary' - A string containing the expected planSummary.
+     *  - 'testObj.currentOpFilter' - A filter to be used to narrow currentOp() output to only the
+     *  relevant operation or command.
+     *  - 'testObj.command]' - The command to test against. Will look for this to be a key in the
+     *  currentOp().query object.
+     *  - 'testObj.operation' - The operation to test against. Will look for this to be the value
+     *  of the currentOp().op field.
+     *  - 'testObj.useSbe' - True if the server should be configured to use the slot-based execution
+     *  engine rather than the classic query execution engine.
      */
     function confirmCurrentOpContents(testObj) {
+        const useSbe = testObj.useSbe || false;
+        // TODO SERVER-50712: SBE is not currently expected to be able to run queries that require
+        // shard filtering. If the test asks for SBE and we are running against mongos, just skip
+        // this case.
+        if (useSbe && FixtureHelpers.isMongos(conn.getDB("admin"))) {
+            return;
+        }
+        FixtureHelpers.runCommandOnEachPrimary({
+            db: conn.getDB("admin"),
+            cmdObj: {setParameter: 1, internalQueryEnableSlotBasedExecutionEngine: useSbe}
+        });
+
         // Force queries to hang on yield to allow for currentOp capture.
         FixtureHelpers.runCommandOnEachPrimary({
             db: conn.getDB("admin"),
@@ -243,6 +257,20 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 command: "find",
                 planSummary: "COLLSCAN",
                 currentOpFilter: {"command.comment": "currentop_query"}
+            },
+            {
+                test: function(db) {
+                    assert.eq(
+                        db.currentop_query.find({a: 1}).comment("currentop_query_sbe").itcount(),
+                        1);
+                },
+                command: "find",
+                useSbe: true,
+                // TODO SERVER-50743: The slot-based execution engine does not yet generate real
+                // 'planSummary' strings.  Once it is improved to do so, this test should be
+                // adjusted accordingly.
+                planSummary: "unsupported",
+                currentOpFilter: {"command.comment": "currentop_query_sbe", numYields: {$gt: 0}}
             },
             {
                 test: function(db) {

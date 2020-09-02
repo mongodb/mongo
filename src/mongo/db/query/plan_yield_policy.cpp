@@ -37,6 +37,10 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+namespace {
+MONGO_FAIL_POINT_DEFINE(setYieldAllLocksHang);
+MONGO_FAIL_POINT_DEFINE(setYieldAllLocksWait);
+}  // namespace
 
 PlanYieldPolicy::PlanYieldPolicy(YieldPolicy policy,
                                  ClockSource* cs,
@@ -81,6 +85,29 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
     _forceYield = false;
 
     return yield(opCtx, whileYieldingFn);
+}
+
+void PlanYieldPolicy::handleDuringYieldFailpoints(OperationContext* opCtx,
+                                                  const NamespaceString& planExecNs) {
+    setYieldAllLocksHang.executeIf(
+        [opCtx](const BSONObj& config) {
+            setYieldAllLocksHang.pauseWhileSet();
+
+            if (config.getField("checkForInterruptAfterHang").trueValue()) {
+                // Throws.
+                opCtx->checkForInterrupt();
+            }
+        },
+        [&](const BSONObj& config) {
+            StringData ns = config.getStringField("namespace");
+            return ns.empty() || ns == planExecNs.ns();
+        });
+    setYieldAllLocksWait.executeIf(
+        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); },
+        [&](const BSONObj& config) {
+            BSONElement dataNs = config["namespace"];
+            return !dataNs || planExecNs.ns() == dataNs.str();
+        });
 }
 
 }  // namespace mongo

@@ -266,6 +266,7 @@ env.Library(
      LIBDEPS=[
          '$BUILD_DIR/mongo/base',
          '$BUILD_DIR/mongo/util/elapsed_tracker',
+         '$BUILD_DIR/mongo/util/fail_point',
      ],
  )
 

@@ -88,11 +88,6 @@ Status PlanYieldPolicyImpl::yield(OperationContext* opCtx, std::function<void()>
     }
 }
 
-namespace {
-MONGO_FAIL_POINT_DEFINE(setYieldAllLocksHang);
-MONGO_FAIL_POINT_DEFINE(setYieldAllLocksWait);
-}  // namespace
-
 void PlanYieldPolicyImpl::_yieldAllLocks(OperationContext* opCtx,
                                          std::function<void()> whileYieldingFn,
                                          const NamespaceString& planExecNS) {
@@ -126,25 +121,7 @@ void PlanYieldPolicyImpl::_yieldAllLocks(OperationContext* opCtx,
     // Track the number of yields in CurOp.
     CurOp::get(opCtx)->yielded();
 
-    setYieldAllLocksHang.executeIf(
-        [opCtx](const BSONObj& config) {
-            setYieldAllLocksHang.pauseWhileSet();
-
-            if (config.getField("checkForInterruptAfterHang").trueValue()) {
-                // Throws.
-                opCtx->checkForInterrupt();
-            }
-        },
-        [&](const BSONObj& config) {
-            StringData ns = config.getStringField("namespace");
-            return ns.empty() || ns == planExecNS.ns();
-        });
-    setYieldAllLocksWait.executeIf(
-        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); },
-        [&](const BSONObj& config) {
-            BSONElement dataNs = config["namespace"];
-            return !dataNs || planExecNS.ns() == dataNs.str();
-        });
+    handleDuringYieldFailpoints(opCtx, planExecNS);
 
     if (whileYieldingFn) {
         whileYieldingFn();
