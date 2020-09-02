@@ -21,24 +21,6 @@ const coll = rollbackTest.getPrimary().getDB(dbName).getCollection(jsTestName())
 
 assert.commandWorked(coll.insert([{a: 1}, {a: 2}, {a: 3}, {a: 4}, {a: 5}]));
 
-// TODO (SERVER-49774): Enable these test cases once resumable index builds are resilient to the
-// node going into rollback during the collection scan phase.
-if (true) {
-    rollbackTest.stop();
-    return;
-}
-
-// Rollback to earlier in the collection scan phase.
-RollbackResumableIndexBuildTest.run(rollbackTest,
-                                    dbName,
-                                    coll.getName(),
-                                    {a: 1},
-                                    rollbackStartFailPointName,
-                                    {fieldsToMatch: {a: 4}},
-                                    "hangIndexBuildDuringCollectionScanPhaseAfterInsertion",
-                                    {fieldsToMatch: {a: 2}},
-                                    insertsToBeRolledBack);
-
 // Rollback to before the index begins to be built.
 RollbackResumableIndexBuildTest.run(rollbackTest,
                                     dbName,
@@ -47,7 +29,19 @@ RollbackResumableIndexBuildTest.run(rollbackTest,
                                     rollbackStartFailPointName,
                                     {fieldsToMatch: {a: 2}},
                                     "hangAfterSettingUpIndexBuildUnlocked",
-                                    {});
+                                    {},
+                                    insertsToBeRolledBack);
+
+// Rollback to earlier in the collection scan phase.
+RollbackResumableIndexBuildTest.run(rollbackTest,
+                                    dbName,
+                                    coll.getName(),
+                                    {a: 1},
+                                    rollbackStartFailPointName,
+                                    {iteration: 4},
+                                    "hangIndexBuildDuringCollectionScanPhaseAfterInsertion",
+                                    {iteration: 2},
+                                    insertsToBeRolledBack);
 
 rollbackTest.stop();
 })();
