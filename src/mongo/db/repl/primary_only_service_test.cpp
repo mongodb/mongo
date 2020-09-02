@@ -333,17 +333,17 @@ TEST_F(PrimaryOnlyServiceTest, BasicCreateInstance) {
 }
 
 TEST_F(PrimaryOnlyServiceTest, LookupInstance) {
-    TestServiceHangDuringCompletion.setMode(FailPoint::alwaysOn);
+    // Make sure the instance doesn't complete before we try to look it up.
+    TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
     auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
     ASSERT(instance.get());
     ASSERT_EQ(0, instance->getID());
 
-    auto instance2 = TestService::Instance::lookup(_service, BSON("_id" << 0));
+    auto instance2 = TestService::Instance::lookup(_service, BSON("_id" << 0)).get();
 
-    ASSERT(instance2.get());
-    ASSERT_EQ(instance.get(), instance2.get().get());
+    ASSERT_EQ(instance.get(), instance2.get());
 
-    TestServiceHangDuringCompletion.setMode(FailPoint::off);
+    TestServiceHangDuringInitialization.setMode(FailPoint::off);
     instance->getCompletionFuture().get();
 
     // Shouldn't be able to look up instance after it has completed running.
