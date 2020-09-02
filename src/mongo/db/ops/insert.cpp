@@ -36,6 +36,7 @@
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/util/str.h"
 
@@ -184,6 +185,9 @@ Status userAllowedWriteNS(StringData db, StringData coll) {
     if (coll == "system.profile") {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "cannot write to '" << db << ".system.profile'");
+    } else if (db == "local" && coll == "oplog.rs" &&
+               repl::ReplicationCoordinator::get(getGlobalServiceContext())->isReplEnabled()) {
+        return Status(ErrorCodes::InvalidNamespace, "cannot write to 'local.oplog.rs'");
     }
     return userAllowedCreateNS(db, coll);
 }
