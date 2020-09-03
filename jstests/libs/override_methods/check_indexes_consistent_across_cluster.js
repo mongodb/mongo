@@ -42,21 +42,37 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
      */
     function makeGetIndexDocsFunc(ns) {
         return () => {
-            if (isMixedVersion) {
-                return mongos.getCollection(ns)
-                    .aggregate(
-                        [
-                            {$indexStats: {}},
-                            {
-                                $group:
-                                    {_id: "$host", indexes: {$push: {key: "$key", name: "$name"}}}
-                            },
-                            {$project: {_id: 0, host: "$_id", indexes: 1}}
-                        ],
-                        {readConcern: {level: "local"}})
-                    .toArray();
+            while (true) {
+                try {
+                    if (isMixedVersion) {
+                        return mongos.getCollection(ns)
+                            .aggregate(
+                                [
+                                    {$indexStats: {}},
+                                    {
+                                        $group: {
+                                            _id: "$host",
+                                            indexes: {$push: {key: "$key", name: "$name"}}
+                                        }
+                                    },
+                                    {$project: {_id: 0, host: "$_id", indexes: 1}}
+                                ],
+                                {readConcern: {level: "local"}})
+                            .toArray();
+                    }
+                    return ShardedIndexUtil.getPerShardIndexes(mongos.getCollection(ns));
+                } catch (e) {
+                    // Getting the indexes can fail with ShardNotFound if the router's ShardRegistry
+                    // reloads after choosing which shards to target and a chosen shard is no longer
+                    // in the cluster. This error should be transient, so it can be retried on.
+                    if (e.code === ErrorCodes.ShardNotFound) {
+                        print("Retrying $indexStats aggregation on ShardNotFound error: " +
+                              tojson(e));
+                        continue;
+                    }
+                    throw e;
+                }
             }
-            return ShardedIndexUtil.getPerShardIndexes(mongos.getCollection(ns));
         };
     }
 
