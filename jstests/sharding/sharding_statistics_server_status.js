@@ -63,7 +63,28 @@ function checkServerStatusAbortedMigrationCount(shardConn, count) {
 
 function runConcurrentMoveChunk(host, ns, toShard) {
     const mongos = new Mongo(host);
-    return mongos.adminCommand({moveChunk: ns, find: {_id: 1}, to: toShard});
+    // Helper function to run moveChunk, retrying on ConflictingOperationInProgress. We need to
+    // retry on ConflictingOperationInProgress to handle the following case:
+    // 1. One test case does a moveChunk, expecting it to fail. It fails and completes on the donor
+    // and returns to the test, while the recipient is still lagging for some reason and has not
+    // completed.
+    // 2. In the next test case, we attempt a moveChunk involving the same chunk and shards, but the
+    // previous moveChunk is still in progress on the recipient shard from the previous migration,
+    // causing this new moveChunk to return ConflictingOperationInProgress.
+    //
+    // This is expected behavior, so we retry until success or until some other unexpected error
+    // occurs.
+    function runMoveChunkUntilSuccessOrUnexpectedError() {
+        let result = mongos.adminCommand({moveChunk: ns, find: {_id: 1}, to: toShard});
+        let shouldRetry = (result.hasOwnProperty("code") &&
+                           result.code == ErrorCodes.ConflictingOperationInProgress);
+        if (shouldRetry) {
+            jsTestLog("Retrying moveChunk due to ConflictingOperationInProgress");
+        }
+        return shouldRetry ? runMoveChunkUntilSuccessOrUnexpectedError() : result;
+    }
+    // Kick off the recursive helper function.
+    return runMoveChunkUntilSuccessOrUnexpectedError();
 }
 
 function runConcurrentRead(host, dbName, collName) {
