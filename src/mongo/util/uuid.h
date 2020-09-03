@@ -90,6 +90,7 @@ class UUID {
     friend class repl::InitialSyncIdDocument;
     friend class RecipientForgetMigration;
     friend class RecipientSyncData;
+    friend class ReshardingDonorDocument;
     friend class ResumeIndexInfo;
     friend class ResumeTokenInternal;
     friend class ShardCollectionTypeBase;

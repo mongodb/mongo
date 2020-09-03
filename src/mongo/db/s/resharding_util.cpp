@@ -114,16 +114,21 @@ boost::optional<TypeCollectionDonorFields> getDonorFields(OperationContext* opCt
 
 }  // namespace
 
-NamespaceString constructTemporaryReshardingNss(const NamespaceString& originalNss,
-                                                const ChunkManager& cm) {
+UUID getCollectionUUIDFromChunkManger(const NamespaceString& originalNss, const ChunkManager& cm) {
     auto collectionUUID = cm.getUUID();
     uassert(ErrorCodes::InvalidUUID,
             "Cannot reshard collection {} due to missing UUID"_format(originalNss.ns()),
             collectionUUID);
+
+    return collectionUUID.get();
+}
+NamespaceString constructTemporaryReshardingNss(const NamespaceString& originalNss,
+                                                const ChunkManager& cm) {
+    auto collectionUUID = getCollectionUUIDFromChunkManger(originalNss, cm);
     NamespaceString tempReshardingNss(
         originalNss.db(),
         "{}{}"_format(NamespaceString::kTemporaryReshardingCollectionPrefix,
-                      collectionUUID->toString()));
+                      collectionUUID.toString()));
     return tempReshardingNss;
 }
 

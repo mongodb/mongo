@@ -57,7 +57,7 @@ enums:
         type: string
         values:
             kUnused: "unused"
-            kInitializing: "initializing"
+            kPreparingToDonate: "preparing-to-donate"
             kDonating: "donating"
             kMirroring: "mirroring"
             kDropping: "dropping"
@@ -91,6 +91,9 @@ structs:
             nss:
                 type: namespacestring
                 description: "The namespace of the collection being resharded."
+            existingUUID:
+                type: uuid
+                description: "The UUID of the original collection being resharded."
             reshardingKey:
                 type: object
                 description: "The index specification document to use as the new shard key."

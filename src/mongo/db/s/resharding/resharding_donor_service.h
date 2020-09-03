@@ -76,7 +76,7 @@ public:
 
 private:
     // The following functions correspond to the actions to take at a particular donor state.
-    void _onInitializingCalculateMinFetchTimestampThenBeginDonating();
+    void _onPreparingToDonateCalculateMinFetchTimestampThenBeginDonating();
 
     ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenStartMirroring(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
@@ -87,7 +87,8 @@ private:
     void _dropOriginalCollectionThenDeleteLocalState();
 
     // Transitions the state on-disk and in-memory to 'endState'.
-    void _transitionState(DonorStateEnum endState);
+    void _transitionState(DonorStateEnum endState,
+                          boost::optional<Timestamp> minFetchTimestamp = boost::none);
 
     // Transitions the state on-disk and in-memory to kError.
     void _transitionStateToError(const Status& status);

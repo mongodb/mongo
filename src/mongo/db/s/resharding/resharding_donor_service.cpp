@@ -31,11 +31,55 @@
 
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
+namespace {
+Timestamp generateMinFetchTimestamp(const ReshardingDonorDocument& donorDoc) {
+    auto opCtx = cc().makeOperationContext();
+
+    // Do a no-op write and use the OpTime as the minFetchTimestamp
+    {
+        AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
+        writeConflictRetry(
+            opCtx.get(),
+            "resharding donor minFetchTimestamp",
+            NamespaceString::kRsOplogNamespace.ns(),
+            [&] {
+                const std::string msg = str::stream()
+                    << "All future oplog entries on the namespace " << donorDoc.getNss().ns()
+                    << " must include a 'destinedRecipient' field";
+                WriteUnitOfWork wuow(opCtx.get());
+                opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
+                    opCtx.get(),
+                    donorDoc.getNss(),
+                    donorDoc.getExistingUUID(),
+                    {},
+                    BSON("msg" << msg),
+                    boost::none,
+                    boost::none,
+                    boost::none,
+                    boost::none);
+                wuow.commit();
+            });
+    }
+
+    auto generatedOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    WriteConcernResult result;
+    uassertStatusOK(waitForWriteConcern(
+        opCtx.get(), generatedOpTime, WriteConcerns::kMajorityWriteConcern, &result));
+
+    // TODO notify storage engine to pin the minFetchTimestamp
+
+    return generatedOpTime.getTimestamp();
+}
+}  // namespace
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::constructInstance(
     BSONObj initialState) const {
@@ -51,7 +95,8 @@ DonorStateMachine::DonorStateMachine(const BSONObj& donorDoc)
 SemiFuture<void> DonorStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then([this] { _onInitializingCalculateMinFetchTimestampThenBeginDonating(); })
+        .then([this] { _transitionState(DonorStateEnum::kPreparingToDonate); })
+        .then([this] { _onPreparingToDonateCalculateMinFetchTimestampThenBeginDonating(); })
         .then([this, executor] {
             return _awaitAllRecipientsDoneApplyingThenStartMirroring(executor);
         })
@@ -76,14 +121,14 @@ SemiFuture<void> DonorStateMachine::run(
 void DonorStateMachine::onReshardingFieldsChanges(
     boost::optional<TypeCollectionReshardingFields> reshardingFields) {}
 
-void DonorStateMachine::_onInitializingCalculateMinFetchTimestampThenBeginDonating() {
-    if (_donorDoc.getState() > DonorStateEnum::kInitializing) {
+void DonorStateMachine::_onPreparingToDonateCalculateMinFetchTimestampThenBeginDonating() {
+    if (_donorDoc.getState() > DonorStateEnum::kPreparingToDonate) {
+        invariant(_donorDoc.getMinFetchTimestamp());
         return;
     }
 
-    // TODO SERVER-50021 Calculate minFetchTimestamp and send to coordinator.
-
-    _transitionState(DonorStateEnum::kDonating);
+    auto minFetchTimestamp = generateMinFetchTimestamp(_donorDoc);
+    _transitionState(DonorStateEnum::kDonating, minFetchTimestamp);
 }
 
 ExecutorFuture<void> DonorStateMachine::_awaitAllRecipientsDoneApplyingThenStartMirroring(
@@ -116,9 +161,19 @@ void DonorStateMachine::_dropOriginalCollectionThenDeleteLocalState() {
     _transitionState(DonorStateEnum::kDone);
 }
 
-void DonorStateMachine::_transitionState(DonorStateEnum endState) {
+void DonorStateMachine::_transitionState(DonorStateEnum endState,
+                                         boost::optional<Timestamp> minFetchTimestamp) {
     ReshardingDonorDocument replacementDoc(_donorDoc);
     replacementDoc.setState(endState);
+    if (minFetchTimestamp) {
+        auto& minFetchTimestampStruct = replacementDoc.getMinFetchTimestampStruct();
+        if (minFetchTimestampStruct.getMinFetchTimestamp())
+            invariant(minFetchTimestampStruct.getMinFetchTimestamp().get() ==
+                      minFetchTimestamp.get());
+
+        minFetchTimestampStruct.setMinFetchTimestamp(std::move(minFetchTimestamp));
+    }
+
     _updateDonorDocument(std::move(replacementDoc));
 }
 

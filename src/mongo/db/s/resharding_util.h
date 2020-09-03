@@ -48,6 +48,13 @@ namespace mongo {
 constexpr auto kReshardingOplogPrePostImageOps = "prePostImageOps"_sd;
 
 /**
+ * Gets the UUID for 'nss' from the 'cm'
+ *
+ * Note: throws if the collection does not have a UUID.
+ */
+UUID getCollectionUUIDFromChunkManger(const NamespaceString& nss, const ChunkManager& cm);
+
+/**
  * Constructs the temporary resharding collection's namespace provided the original collection's
  * namespace and chunk manager.
  *

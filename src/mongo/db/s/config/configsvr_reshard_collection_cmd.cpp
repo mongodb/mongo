@@ -163,8 +163,9 @@ public:
 
             // Generate the resharding metadata for the ReshardingCoordinatorDocument.
             auto reshardingUUID = UUID::gen();
-            auto commonMetadata =
-                CommonReshardingMetadata(std::move(reshardingUUID), ns(), request().getKey());
+            auto existingUUID = getCollectionUUIDFromChunkManger(ns(), cm);
+            auto commonMetadata = CommonReshardingMetadata(
+                std::move(reshardingUUID), ns(), std::move(existingUUID), request().getKey());
             coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
