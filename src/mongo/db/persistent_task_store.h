@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <fmt/format.h>
+
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -38,6 +40,8 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
+
+using namespace fmt::literals;
 
 namespace WriteConcerns {
 
@@ -81,27 +85,19 @@ public:
     void update(OperationContext* opCtx,
                 Query query,
                 const BSONObj& update,
-                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern,
-                bool upsert = false) {
-        DBDirectClient dbClient(opCtx);
+                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+        _update(opCtx, std::move(query), update, /* upsert */ false, writeConcern);
+    }
 
-        auto commandResponse = dbClient.runCommand([&] {
-            write_ops::Update updateOp(_storageNss);
-            auto updateModification = write_ops::UpdateModification::parseFromClassicUpdate(update);
-            write_ops::UpdateOpEntry updateEntry(query.obj, updateModification);
-            updateEntry.setMulti(false);
-            updateEntry.setUpsert(upsert);
-            updateOp.setUpdates({updateEntry});
-
-            return updateOp.serialize({});
-        }());
-
-        const auto commandReply = commandResponse->getCommandReply();
-        uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
-
-        WriteConcernResult ignoreResult;
-        auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-        uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
+    /**
+     * Upserts a document that matches the given query using the update modifier specified. Even if
+     * multiple documents match, at most one document will be updated.
+     */
+    void upsert(OperationContext* opCtx,
+                Query query,
+                const BSONObj& update,
+                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+        _update(opCtx, std::move(query), update, /* upsert */ true, writeConcern);
     }
 
     /**
@@ -168,6 +164,36 @@ public:
     }
 
 private:
+    void _update(OperationContext* opCtx,
+                 Query query,
+                 const BSONObj& update,
+                 bool upsert,
+                 const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+        DBDirectClient dbClient(opCtx);
+
+        auto commandResponse = dbClient.runCommand([&] {
+            write_ops::Update updateOp(_storageNss);
+            auto updateModification = write_ops::UpdateModification::parseFromClassicUpdate(update);
+            write_ops::UpdateOpEntry updateEntry(query.obj, updateModification);
+            updateEntry.setMulti(false);
+            updateEntry.setUpsert(upsert);
+            updateOp.setUpdates({updateEntry});
+
+            return updateOp.serialize({});
+        }());
+
+        const auto commandReply = commandResponse->getCommandReply();
+        uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+
+        uassert(ErrorCodes::NoMatchingDocument,
+                "No matching document found for query {} on namespace {}"_format(
+                    query.toString(), _storageNss.toString()),
+                upsert || commandReply.getIntField("n") > 0);
+
+        WriteConcernResult ignoreResult;
+        auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+        uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
+    }
     NamespaceString _storageNss;
 };
 

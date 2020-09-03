@@ -219,7 +219,7 @@ TEST_F(PersistentTaskStoreTest, TestUpdateOnlyUpdatesOneMatchingDocument) {
     ASSERT_EQ(store.count(opCtx, QUERY("key" << keyToMatch << "min" << expectedUpdatedMin)), 1);
 }
 
-TEST_F(PersistentTaskStoreTest, TestUpdateWithUpsert) {
+TEST_F(PersistentTaskStoreTest, TestUpsert) {
     auto opCtx = operationContext();
 
     PersistentTaskStore<TestTask> store(kNss);
@@ -230,18 +230,15 @@ TEST_F(PersistentTaskStoreTest, TestUpdateWithUpsert) {
     TestTask task(keyToMatch, 0, 0);
     BSONObj taskBson = task.toBSON();
 
-    // Test that the document is not created (upsert == false by default)
-    store.update(opCtx, query, taskBson);
-
     ASSERT_EQ(store.count(opCtx, query), 0);
 
-    // Test that the document is not created with upsert == false
-    store.update(opCtx, query, taskBson, WriteConcerns::kMajorityWriteConcern, false);
+    // Test that an attempt to upsert from the update command throws an error.
+    ASSERT_THROWS_CODE(store.update(opCtx, query, taskBson, WriteConcerns::kMajorityWriteConcern),
+                       DBException,
+                       ErrorCodes::NoMatchingDocument);
 
-    ASSERT_EQ(store.count(opCtx, query), 0);
-
-    // Test that the document is created with upsert == true
-    store.update(opCtx, query, taskBson, WriteConcerns::kMajorityWriteConcern, true);
+    // Test that the document is created when upserted.
+    store.upsert(opCtx, query, taskBson, WriteConcerns::kMajorityWriteConcern);
 
     ASSERT_EQ(store.count(opCtx, query), 1);
 
@@ -251,19 +248,16 @@ TEST_F(PersistentTaskStoreTest, TestUpdateWithUpsert) {
         return true;
     });
 
-    // Verify that updates happen as normal with upsert == true and upsert == false
-    store.update(
-        opCtx, query, BSON("$inc" << BSON("min" << 1)), WriteConcerns::kMajorityWriteConcern, true);
+    // Verify that updates happen as expected with upsert and update
+    store.upsert(
+        opCtx, query, BSON("$inc" << BSON("min" << 1)), WriteConcerns::kMajorityWriteConcern);
     store.forEach(opCtx, query, [&](const TestTask& t) {
         ASSERT_EQ(t.min, 1);
         return true;
     });
 
-    store.update(opCtx,
-                 query,
-                 BSON("$inc" << BSON("min" << 1)),
-                 WriteConcerns::kMajorityWriteConcern,
-                 false);
+    store.update(
+        opCtx, query, BSON("$inc" << BSON("min" << 1)), WriteConcerns::kMajorityWriteConcern);
     store.forEach(opCtx, query, [&](const TestTask& t) {
         ASSERT_EQ(t.min, 2);
         return true;
