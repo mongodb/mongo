@@ -896,13 +896,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
 
             hangInRefreshFilteringMetadataUntilSuccessInterruptible.pauseWhileSet(opCtx);
 
-            CollectionMetadata currentMetadata;
-            try {
-                currentMetadata = forceGetCurrentMetadata(opCtx, doc.getNss());
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                // A filtering metadata refresh can throw NamespaceNotFound if the database was
-                // dropped from the cluster.
-            }
+            auto currentMetadata = forceGetCurrentMetadata(opCtx, doc.getNss());
 
             if (hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible
                     .shouldFail()) {

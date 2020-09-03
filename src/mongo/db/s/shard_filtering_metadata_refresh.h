@@ -64,8 +64,8 @@ void onShardVersionMismatch(OperationContext* opCtx,
                             boost::optional<ChunkVersion> shardVersionReceived);
 
 /**
- * Unconditionally get the shard's filtering metadata from the config server on the calling thread
- * and returns it or throw.
+ * Unconditionally get the shard's filtering metadata from the config server on the calling thread.
+ * Returns the metadata if the nss is sharded, otherwise default unsharded metadata.
  *
  * NOTE: Does network I/O, so it must not be called with a lock
  */
