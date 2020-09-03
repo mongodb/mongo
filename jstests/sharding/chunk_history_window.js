@@ -21,17 +21,29 @@
 
 load("jstests/sharding/libs/sharded_transactions_helpers.js");
 
-const configHistoryWindowSecs = 10;
+// The snapshot window is the max of minSnapshotHistoryWindowInSeconds and
+// transactionLifetimeLimitSeconds.
+const transactionLifetimeLimitSecs = 15;
+const minSnapshotHistoryWindowSecs = transactionLifetimeLimitSecs;
+const snapshotHistoryWindowSecs =
+    Math.max(minSnapshotHistoryWindowSecs, transactionLifetimeLimitSecs);
+
 const st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 2}},
     other: {
         configOptions: {
             setParameter: {
-                minSnapshotHistoryWindowInSeconds: configHistoryWindowSecs,
+                minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowSecs,
+                transactionLifetimeLimitSeconds: transactionLifetimeLimitSecs,
                 logComponentVerbosity: tojson({sharding: {verbosity: 2}})
             }
         },
-        rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: 600}}
+        rsOptions: {
+            setParameter: {
+                minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowSecs,
+                transactionLifetimeLimitSeconds: transactionLifetimeLimitSecs,
+            }
+        }
     }
 });
 
@@ -40,14 +52,14 @@ assert.eq(assert
               .commandWorked(
                   primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
               .minSnapshotHistoryWindowInSeconds,
-          600);
+          minSnapshotHistoryWindowSecs);
 
 const configAdmin = st.configRS.getPrimary().getDB("admin");
 assert.eq(assert
               .commandWorked(
                   configAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
               .minSnapshotHistoryWindowInSeconds,
-          10);
+          minSnapshotHistoryWindowSecs);
 
 const mongosDB = st.s.getDB(jsTestName());
 const mongosColl = mongosDB.test;
@@ -81,9 +93,9 @@ assert.eq(2, chunk.history.length, tojson(chunk));
 // Test history window with 1s margin.
 const testMarginMS = 1000;
 
-// Test that reading from a snapshot at insertTS is valid for up to configHistoryWindowSecs
+// Test that reading from a snapshot at insertTS is valid for up to snapshotHistoryWindowSecs
 // minus the testMarginMS (as a buffer).
-const testWindowMS = configHistoryWindowSecs * 1000 - testMarginMS;
+const testWindowMS = snapshotHistoryWindowSecs * 1000 - testMarginMS;
 while (Date.now() - 1000 * insertTS.getTime() < testWindowMS) {
     // Test that reading from a snapshot at insertTS is still valid.
     assert.commandWorked(mongosDB.runCommand(
@@ -95,7 +107,7 @@ while (Date.now() - 1000 * insertTS.getTime() < testWindowMS) {
 }
 
 // Sleep until our most recent chunk move is before the oldest history in our window.
-const chunkExpirationTime = postMoveChunkTime + configHistoryWindowSecs * 1000;
+const chunkExpirationTime = postMoveChunkTime + snapshotHistoryWindowSecs * 1000;
 sleep(chunkExpirationTime + testMarginMS - Date.now());
 
 jsTestLog("Move chunk back to shard 0 to trigger history cleanup");
