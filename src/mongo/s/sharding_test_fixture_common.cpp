@@ -47,6 +47,11 @@ ShardingTestFixtureCommon::ShardingTestFixtureCommon() {
 
 ShardingTestFixtureCommon::~ShardingTestFixtureCommon() = default;
 
+std::shared_ptr<RoutingTableHistory> ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
+    RoutingTableHistory rt) {
+    return std::make_shared<RoutingTableHistory>(std::move(rt));
+}
+
 void ShardingTestFixtureCommon::onCommand(NetworkTestEnv::OnCommandFunction func) {
     _networkTestEnv->onCommand(func);
 }

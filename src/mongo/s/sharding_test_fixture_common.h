@@ -49,6 +49,15 @@ class TaskExecutor;
  * Contains common functionality and tools, which apply to both mongos and mongod unit-tests.
  */
 class ShardingTestFixtureCommon : public virtual ServiceContextTest {
+public:
+    /**
+     * Constructs a standalone RoutingTableHistory object (i.e., not linked to any CatalogCache),
+     * which can be used to pass to ChunkManager for tests, which specifically target the behaviour
+     * of the ChunkManager.
+     */
+    static std::shared_ptr<RoutingTableHistory> makeStandaloneRoutingTableHistory(
+        RoutingTableHistory rt);
+
 protected:
     ShardingTestFixtureCommon();
     ~ShardingTestFixtureCommon();
@@ -115,7 +124,6 @@ protected:
                                       const std::string& ns,
                                       const BSONObj& detail);
 
-protected:
     /**
      * Base class returns nullptr.
      *

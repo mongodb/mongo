@@ -53,31 +53,35 @@ void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata 
     oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
 }
 
-/**
- * Constructs a CollectionMetadata suitable for refreshing a CollectionShardingState. The only
- * salient detail is the argument `keyPattern` which, defining the shard key, selects the fields
- * that DeleteState's constructor will extract from its `doc` argument into its member
- * DeleteState::documentKey.
- */
-CollectionMetadata makeAMetadata(BSONObj const& keyPattern) {
-    const OID epoch = OID::gen();
-    auto range = ChunkRange(BSON("key" << MINKEY), BSON("key" << MAXKEY));
-    auto chunk = ChunkType(kTestNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
-    auto rt = RoutingTableHistory::makeNew(kTestNss,
-                                           UUID::gen(),
-                                           KeyPattern(keyPattern),
-                                           nullptr,
-                                           false,
-                                           epoch,
-                                           boost::none,
-                                           {std::move(chunk)});
+class DeleteStateTest : public ShardServerTestFixture {
+protected:
+    /**
+     * Constructs a CollectionMetadata suitable for refreshing a CollectionShardingState. The only
+     * salient detail is the argument `keyPattern` which, defining the shard key, selects the fields
+     * that DeleteState's constructor will extract from its `doc` argument into its member
+     * DeleteState::documentKey.
+     */
+    static CollectionMetadata makeAMetadata(BSONObj const& keyPattern) {
+        const OID epoch = OID::gen();
+        auto range = ChunkRange(BSON("key" << MINKEY), BSON("key" << MAXKEY));
+        auto chunk =
+            ChunkType(kTestNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
+        auto rt = RoutingTableHistory::makeNew(kTestNss,
+                                               UUID::gen(),
+                                               KeyPattern(keyPattern),
+                                               nullptr,
+                                               false,
+                                               epoch,
+                                               boost::none,
+                                               {std::move(chunk)});
 
-    return CollectionMetadata(
-        ChunkManager(ShardId("this"), DatabaseVersion(UUID::gen(), 1), rt, Timestamp(100, 0)),
-        ShardId("this"));
-}
-
-class DeleteStateTest : public ShardServerTestFixture {};
+        return CollectionMetadata(ChunkManager(ShardId("this"),
+                                               DatabaseVersion(UUID::gen(), 1),
+                                               makeStandaloneRoutingTableHistory(std::move(rt)),
+                                               Timestamp(100, 0)),
+                                  ShardId("this"));
+    }
+};
 
 TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
     setCollectionFilteringMetadata(operationContext(), CollectionMetadata());

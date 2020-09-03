@@ -708,7 +708,7 @@ std::string RoutingTableHistory::toString() const {
     return sb.str();
 }
 
-std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeNew(
+RoutingTableHistory RoutingTableHistory::makeNew(
     NamespaceString nss,
     boost::optional<UUID> uuid,
     KeyPattern shardKeyPattern,
@@ -727,7 +727,7 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeNew(
         .makeUpdated(std::move(reshardingFields), chunks);
 }
 
-std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
+RoutingTableHistory RoutingTableHistory::makeUpdated(
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
     const std::vector<ChunkType>& changedChunks) const {
     auto changedChunkInfos = flatten(changedChunks);
@@ -737,14 +737,13 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
     invariant(getVersion().epoch() == chunkMap.getVersion().epoch());
     invariant(getVersion().isOlderThan(chunkMap.getVersion()));
 
-    return std::shared_ptr<RoutingTableHistory>(
-        new RoutingTableHistory(_nss,
-                                _uuid,
-                                KeyPattern(getShardKeyPattern().getKeyPattern()),
-                                CollatorInterface::cloneCollator(getDefaultCollator()),
-                                isUnique(),
-                                std::move(reshardingFields),
-                                std::move(chunkMap)));
+    return RoutingTableHistory(_nss,
+                               _uuid,
+                               getShardKeyPattern().getKeyPattern(),
+                               CollatorInterface::cloneCollator(getDefaultCollator()),
+                               isUnique(),
+                               std::move(reshardingFields),
+                               std::move(chunkMap));
 }
 
 }  // namespace mongo

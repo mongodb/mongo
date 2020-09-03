@@ -103,7 +103,10 @@ protected:
                 return std::vector<ChunkType>{chunk1, chunk2, chunk3, chunk4};
             }());
 
-        ChunkManager cm(ShardId("0"), DatabaseVersion(UUID::gen(), 1), rt, boost::none);
+        ChunkManager cm(ShardId("0"),
+                        DatabaseVersion(UUID::gen(), 1),
+                        makeStandaloneRoutingTableHistory(std::move(rt)),
+                        boost::none);
         ASSERT_EQ(4, cm.numChunks());
 
         {

@@ -156,7 +156,7 @@ public:
      * The existence of "reshardingFields" inside the optional implies that this field was present
      * inside the config.collections entry when refreshing.
      */
-    static std::shared_ptr<RoutingTableHistory> makeNew(
+    static RoutingTableHistory makeNew(
         NamespaceString nss,
         boost::optional<UUID>,
         KeyPattern shardKeyPattern,
@@ -178,7 +178,7 @@ public:
      * parameter implies that the field was not present, and will clear any currently held
      * resharding fields inside the resulting RoutingTableHistory.
      */
-    std::shared_ptr<RoutingTableHistory> makeUpdated(
+    RoutingTableHistory makeUpdated(
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
         const std::vector<ChunkType>& changedChunks) const;
 
@@ -310,7 +310,7 @@ private:
     // presence of the type inside the optional indicates that the collection is involved in a
     // resharding operation, and that these fields were present in the config.collections entry
     // for this collection.
-    const boost::optional<TypeCollectionReshardingFields> _reshardingFields;
+    boost::optional<TypeCollectionReshardingFields> _reshardingFields;
 
     // Map from the max for each chunk to an entry describing the chunk. The union of all chunks'
     // ranges must cover the complete space from [MinKey, MaxKey).

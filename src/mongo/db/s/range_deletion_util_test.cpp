@@ -105,12 +105,13 @@ public:
         AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
         CollectionShardingRuntime::get(operationContext(), kNss)
-            ->setFilteringMetadata(operationContext(),
-                                   CollectionMetadata(ChunkManager(ShardId("dummyShardId"),
-                                                                   DatabaseVersion(UUID::gen(), 1),
-                                                                   rt,
-                                                                   boost::none),
-                                                      ShardId("dummyShardId")));
+            ->setFilteringMetadata(
+                operationContext(),
+                CollectionMetadata(ChunkManager(ShardId("dummyShardId"),
+                                                DatabaseVersion(UUID::gen(), 1),
+                                                makeStandaloneRoutingTableHistory(std::move(rt)),
+                                                boost::none),
+                                   ShardId("dummyShardId")));
     }
 
     UUID uuid() const {

@@ -522,9 +522,11 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     chunk1.setHistory({ChunkHistory(Timestamp(20, 0), ShardId("0")),
                        ChunkHistory(Timestamp(1, 0), ShardId("1"))});
 
-    auto newRoutingTable = oldRoutingTable->makeUpdated(boost::none, {chunk1});
     ChunkManager chunkManager(
-        ShardId("0"), DatabaseVersion(UUID::gen(), 1), newRoutingTable, Timestamp(5, 0));
+        ShardId("0"),
+        DatabaseVersion(UUID::gen(), 1),
+        makeStandaloneRoutingTableHistory(oldRoutingTable.makeUpdated(boost::none, {chunk1})),
+        Timestamp(5, 0));
 
     std::set<ShardId> shardIds;
     chunkManager.getShardIdsForRange(BSON("x" << MINKEY), BSON("x" << MAXKEY), &shardIds);

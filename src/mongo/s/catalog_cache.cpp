@@ -111,8 +111,9 @@ std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
                     existingRoutingInfo->getVersion())
                 return existingRoutingInfo;
 
-            return existingRoutingInfo->makeUpdated(std::move(collectionAndChunks.reshardingFields),
-                                                    collectionAndChunks.changedChunks);
+            return std::make_shared<RoutingTableHistory>(
+                existingRoutingInfo->makeUpdated(std::move(collectionAndChunks.reshardingFields),
+                                                 collectionAndChunks.changedChunks));
         }
 
         auto defaultCollator = [&]() -> std::unique_ptr<CollatorInterface> {
@@ -124,14 +125,15 @@ std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
             return nullptr;
         }();
 
-        return RoutingTableHistory::makeNew(nss,
-                                            collectionAndChunks.uuid,
-                                            KeyPattern(collectionAndChunks.shardKeyPattern),
-                                            std::move(defaultCollator),
-                                            collectionAndChunks.shardKeyIsUnique,
-                                            collectionAndChunks.epoch,
-                                            std::move(collectionAndChunks.reshardingFields),
-                                            collectionAndChunks.changedChunks);
+        return std::make_shared<RoutingTableHistory>(
+            RoutingTableHistory::makeNew(nss,
+                                         collectionAndChunks.uuid,
+                                         KeyPattern(collectionAndChunks.shardKeyPattern),
+                                         std::move(defaultCollator),
+                                         collectionAndChunks.shardKeyIsUnique,
+                                         collectionAndChunks.epoch,
+                                         std::move(collectionAndChunks.reshardingFields),
+                                         collectionAndChunks.changedChunks));
     }();
 
     std::set<ShardId> shardIds;

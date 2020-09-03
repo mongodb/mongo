@@ -45,34 +45,39 @@ const NamespaceString kTestNss("TestDB", "TestColl");
 const std::string kShardKey = "_id";
 const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
 
-using CollectionShardingRuntimeTest = ShardServerTestFixture;
+class CollectionShardingRuntimeTest : public ShardServerTestFixture {
+protected:
+    static CollectionMetadata makeShardedMetadata(OperationContext* opCtx,
+                                                  UUID uuid = UUID::gen()) {
+        const OID epoch = OID::gen();
+        auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
+        auto chunk =
+            ChunkType(kTestNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
+        ChunkManager cm(
+            ShardId("0"),
+            DatabaseVersion(UUID::gen(), 1),
+            makeStandaloneRoutingTableHistory(RoutingTableHistory::makeNew(kTestNss,
+                                                                           uuid,
+                                                                           kShardKeyPattern,
+                                                                           nullptr,
+                                                                           false,
+                                                                           epoch,
+                                                                           boost::none,
+                                                                           {std::move(chunk)})),
+            boost::none);
 
-CollectionMetadata makeShardedMetadata(OperationContext* opCtx, UUID uuid = UUID::gen()) {
-    const OID epoch = OID::gen();
-    auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
-    auto chunk = ChunkType(kTestNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
-    ChunkManager cm(ShardId("0"),
-                    DatabaseVersion(UUID::gen(), 1),
-                    RoutingTableHistory::makeNew(kTestNss,
-                                                 uuid,
-                                                 kShardKeyPattern,
-                                                 nullptr,
-                                                 false,
-                                                 epoch,
-                                                 boost::none,
-                                                 {std::move(chunk)}),
-                    boost::none);
+        if (!OperationShardingState::isOperationVersioned(opCtx)) {
+            const auto version = cm.getVersion(ShardId("0"));
+            BSONObjBuilder builder;
+            version.appendToCommand(&builder);
 
-    if (!OperationShardingState::isOperationVersioned(opCtx)) {
-        const auto version = cm.getVersion(ShardId("0"));
-        BSONObjBuilder builder;
-        version.appendToCommand(&builder);
+            auto& oss = OperationShardingState::get(opCtx);
+            oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
+        }
 
-        auto& oss = OperationShardingState::get(opCtx);
-        oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
+        return CollectionMetadata(std::move(cm), ShardId("0"));
     }
-    return CollectionMetadata(std::move(cm), ShardId("0"));
-}
+};
 
 TEST_F(CollectionShardingRuntimeTest,
        GetCollectionDescriptionThrowsStaleConfigBeforeSetFilteringMetadataIsCalledAndNoOSSSet) {
@@ -175,7 +180,7 @@ TEST_F(CollectionShardingRuntimeTest,
 /**
  * Fixture for when range deletion functionality is required in CollectionShardingRuntime tests.
  */
-class CollectionShardingRuntimeWithRangeDeleterTest : public ShardServerTestFixture {
+class CollectionShardingRuntimeWithRangeDeleterTest : public CollectionShardingRuntimeTest {
 public:
     void setUp() override {
         ShardServerTestFixture::setUp();
