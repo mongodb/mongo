@@ -18,6 +18,9 @@ assert(sh.getBalancerState(), "Balancer should have been enabled during cluster 
 sh.setBalancerState(false);
 assert(!sh.getBalancerState(), "Failed to disable balancer");
 
+sh.enableAutoSplit();
+assert(!sh.getBalancerState(), "Autosplit-only should not classify the balancer as enabled");
+
 // Test that the balancer can be re-enabled
 sh.setBalancerState(true);
 assert(sh.getBalancerState(), "Failed to re-enable balancer");

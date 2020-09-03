@@ -156,13 +156,16 @@ sh.setBalancerState = function(isOn) {
     }
 };
 
-sh.getBalancerState = function(configDB) {
-    if (configDB === undefined)
+sh.getBalancerState = function(configDB, balancerStatus) {
+    if (configDB === undefined) {
         configDB = sh._getConfigDB();
-    var x = configDB.settings.findOne({_id: "balancer"});
-    if (x == null)
-        return true;
-    return !x.stopped;
+    }
+
+    if (balancerStatus === undefined) {
+        balancerStatus = assert.commandWorked(configDB.adminCommand({balancerStatus: 1}));
+    }
+
+    return balancerStatus.mode !== "off" && balancerStatus.mode !== "autoSplitOnly";
 };
 
 sh.isBalancerRunning = function(configDB) {
@@ -628,16 +631,28 @@ function printShardingStatus(configDB, verbose) {
 
     output(1, "balancer:");
 
+    let balancerEnabledString;
+    let balancerRunning;
+
+    const balancerStatus = configDB.adminCommand({balancerStatus: 1});
+    if (!balancerStatus.ok) {
+        // If the call to balancerStatus returns CommandNotFound, we indicate that the balancer
+        // being enabled is currently unknown, since CommandNotFound implies we're running this
+        // command on a standalone mongod. All other error statuses return "no" for historical
+        // reasons.
+        balancerEnabledString =
+            (balancerStatus.code == ErrorCodes.CommandNotFound) ? "unknown" : "no";
+        balancerRunning = false;
+    } else {
+        balancerEnabledString = sh.getBalancerState(configDB, balancerStatus) ? "yes" : "no";
+        balancerRunning = balancerStatus.inBalancerRound;
+    }
+
     // Is the balancer currently enabled
-    output(2, "Currently enabled:  " + (sh.getBalancerState(configDB) ? "yes" : "no"));
+    output(2, "Currently enabled:  " + balancerEnabledString);
 
     // Is the balancer currently active
-    var balancerRunning = "unknown";
-    var balancerStatus = configDB.adminCommand({balancerStatus: 1});
-    if (balancerStatus.code != ErrorCodes.CommandNotFound) {
-        balancerRunning = balancerStatus.inBalancerRound ? "yes" : "no";
-    }
-    output(2, "Currently running:  " + balancerRunning);
+    output(2, "Currently running:  " + balancerRunning ? "yes" : "no");
 
     // Output the balancer window
     var balSettings = sh.getBalancerWindow(configDB);
