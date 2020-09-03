@@ -1505,5 +1505,384 @@ TEST(CstPipelineTranslationTest, SinArrayTranslationTest) {
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$sin: [{$const: 0.927}]}")) ==
                                            expr->serialize(false)));
 }
+
+TEST(CstPipelineTranslationTest, TranslatesDateToPartsExpression) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::dateToParts,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+             {KeyFieldname::iso8601Arg, CNode{UserBoolean{false}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$dateToParts: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}, iso8601: {$const: false}}}")) ==
+        expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesDateFromPartsExpressionNonIso) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::dateFromParts,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::yearArg, CNode{AggregationPath{makeVector<std::string>("year")}}},
+             {KeyFieldname::monthArg, CNode{AggregationPath{makeVector<std::string>("month")}}},
+             {KeyFieldname::dayArg, CNode{AggregationPath{makeVector<std::string>("day")}}},
+             {KeyFieldname::hourArg, CNode{AggregationPath{makeVector<std::string>("hour")}}},
+             {KeyFieldname::minuteArg, CNode{AggregationPath{makeVector<std::string>("minute")}}},
+             {KeyFieldname::secondArg, CNode{AggregationPath{makeVector<std::string>("second")}}},
+             {KeyFieldname::millisecondArg,
+              CNode{AggregationPath{makeVector<std::string>("millisecond")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$dateFromParts: {year: \"$year\", month: \"$month\", day: \"$day\", "
+                       "hour: \"$hour\", minute: \"$minute\", second: \"$second\","
+                       "millisecond: \"$millisecond\",  timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesDateFromPartsExpressionIso) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::dateFromParts,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::isoWeekYearArg,
+              CNode{AggregationPath{makeVector<std::string>("isoWeekYear")}}},
+             {KeyFieldname::isoWeekArg, CNode{AggregationPath{makeVector<std::string>("isoWeek")}}},
+             {KeyFieldname::isoDayOfWeekArg,
+              CNode{AggregationPath{makeVector<std::string>("isoDayOfWeek")}}},
+             {KeyFieldname::hourArg, CNode{AggregationPath{makeVector<std::string>("hour")}}},
+             {KeyFieldname::minuteArg, CNode{AggregationPath{makeVector<std::string>("minute")}}},
+             {KeyFieldname::secondArg, CNode{AggregationPath{makeVector<std::string>("second")}}},
+             {KeyFieldname::millisecondArg,
+              CNode{AggregationPath{makeVector<std::string>("millisecond")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$dateFromParts: {hour: \"$hour\", minute: \"$minute\","
+                       "second: \"$second\", millisecond: \"$millisecond\","
+                       "isoWeekYear: \"$isoWeekYear\", isoWeek: \"$isoWeek\","
+                       "isoDayOfWeek: \"$isoDayOfWeek\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesDayOfMonthExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::dayOfMonth,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$dayOfMonth: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesDayOfMonthExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::dayOfMonth, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$dayOfMonth" << BSON(
+                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
+        expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesDayOfWeekExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::dayOfWeek,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$dayOfWeek: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesDayOfWeekExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::dayOfWeek, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$dayOfWeek" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                           12345678))))) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesDayOfYearExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::dayOfYear,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$dayOfYear: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesDayOfYearExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::dayOfYear, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$dayOfYear" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                           12345678))))) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesHourExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::hour,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$hour: {date: \"$date\", timezone: "
+                                                          "{$const: \"America/New_York\"}}}")) ==
+                                           expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesHourExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::hour, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$hour" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                      12345678))))) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesIsoDayOfWeekExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::isoDayOfWeek,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$isoDayOfWeek: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesIsoDayOfWeekExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::isoDayOfWeek, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$isoDayOfWeek"
+                   << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
+        expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesIsoWeekExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::isoWeek,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$isoWeek: {date: \"$date\", timezone: "
+                                                          "{$const: \"America/New_York\"}}}")) ==
+                                           expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesIsoWeekExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::isoWeek, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$isoWeek" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                         12345678))))) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesIsoWeekYearExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::isoWeekYear,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$isoWeekYear: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesIsoWeekYearExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::isoWeekYear, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$isoWeekYear" << BSON(
+                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
+        expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesMillisecondExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::millisecond,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$millisecond: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesMillisecondExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::millisecond, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$millisecond" << BSON(
+                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
+        expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesMinuteExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::minute,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$minute: {date: \"$date\", timezone: "
+                                                          "{$const: \"America/New_York\"}}}")) ==
+                                           expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesMinuteExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::minute, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$minute" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                        12345678))))) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesMonthExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::month,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$month: {date: \"$date\", timezone: "
+                                                          "{$const: \"America/New_York\"}}}")) ==
+                                           expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesMonthExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::month, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$month" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                       12345678))))) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesSecondExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::second,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$second: {date: \"$date\", timezone: "
+                                                          "{$const: \"America/New_York\"}}}")) ==
+                                           expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesSecondExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::second, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$second" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                        12345678))))) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesWeekExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::week,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$week: {date: \"$date\", timezone: "
+                                                          "{$const: \"America/New_York\"}}}")) ==
+                                           expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesWeekExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::week, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$week" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                      12345678))))) == expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesYearExpressionArgsDoc) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::year,
+         CNode{CNode::ObjectChildren{
+             {KeyFieldname::dateArg, CNode{AggregationPath{makeVector<std::string>("date")}}},
+             {KeyFieldname::timezoneArg, CNode{UserString{"America/New_York"}}},
+         }}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$year: {date: \"$date\", timezone: "
+                                                          "{$const: \"America/New_York\"}}}")) ==
+                                           expr->serialize(false)))
+        << expr->serialize(false);
+}
+
+TEST(CstPipelineTranslationTest, TranslatesYearExpressionArgsExpr) {
+    const auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::year, CNode{UserDate{Date_t::fromMillisSinceEpoch(12345678)}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(BSON("$year" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                      12345678))))) == expr->serialize(false)))
+        << expr->serialize(false);
+}
 }  // namespace
 }  // namespace mongo

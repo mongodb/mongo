@@ -57,10 +57,16 @@
     ENUMIFY(cos)                 \
     ENUMIFY(cosh)                \
     ENUMIFY(dateArg)             \
+    ENUMIFY(dateFromParts)       \
     ENUMIFY(dateFromString)      \
     ENUMIFY(dateStringArg)       \
+    ENUMIFY(dateToParts)         \
     ENUMIFY(dateToString)        \
     ENUMIFY(degreesToRadians)    \
+    ENUMIFY(dayArg)              \
+    ENUMIFY(dayOfMonth)          \
+    ENUMIFY(dayOfWeek)           \
+    ENUMIFY(dayOfYear)           \
     ENUMIFY(divide)              \
     ENUMIFY(eq)                  \
     ENUMIFY(existsExpr)          \
@@ -70,11 +76,20 @@
     ENUMIFY(formatArg)           \
     ENUMIFY(gt)                  \
     ENUMIFY(gte)                 \
+    ENUMIFY(hour)                \
+    ENUMIFY(hourArg)             \
     ENUMIFY(id)                  \
     ENUMIFY(indexOfBytes)        \
     ENUMIFY(indexOfCP)           \
     ENUMIFY(inhibitOptimization) \
     ENUMIFY(inputArg)            \
+    ENUMIFY(iso8601Arg)          \
+    ENUMIFY(isoDayOfWeek)        \
+    ENUMIFY(isoDayOfWeekArg)     \
+    ENUMIFY(isoWeek)             \
+    ENUMIFY(isoWeekArg)          \
+    ENUMIFY(isoWeekYear)         \
+    ENUMIFY(isoWeekYearArg)      \
     ENUMIFY(limit)               \
     ENUMIFY(literal)             \
     ENUMIFY(ln)                  \
@@ -85,7 +100,13 @@
     ENUMIFY(ltrim)               \
     ENUMIFY(match)               \
     ENUMIFY(meta)                \
+    ENUMIFY(millisecond)         \
+    ENUMIFY(millisecondArg)      \
+    ENUMIFY(minute)              \
+    ENUMIFY(minuteArg)           \
     ENUMIFY(mod)                 \
+    ENUMIFY(month)               \
+    ENUMIFY(monthArg)            \
     ENUMIFY(multiply)            \
     ENUMIFY(ne)                  \
     ENUMIFY(norExpr)             \
@@ -116,6 +137,8 @@
     ENUMIFY(setUnion)            \
     ENUMIFY(sin)                 \
     ENUMIFY(sinh)                \
+    ENUMIFY(second)              \
+    ENUMIFY(secondArg)           \
     ENUMIFY(sizeArg)             \
     ENUMIFY(skip)                \
     ENUMIFY(slice)               \
@@ -145,7 +168,10 @@
     ENUMIFY(trim)                \
     ENUMIFY(trunc)               \
     ENUMIFY(type)                \
-    ENUMIFY(unionWith)
+    ENUMIFY(unionWith)           \
+    ENUMIFY(week)                \
+    ENUMIFY(year)                \
+    ENUMIFY(yearArg)
 
 MAKE_PRINTABLE_ENUM(KeyFieldname, KEYFIELDNAMES);
 MAKE_PRINTABLE_ENUM_STRING_ARRAY(key_fieldname, KeyFieldname, KEYFIELDNAMES);

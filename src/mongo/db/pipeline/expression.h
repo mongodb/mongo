@@ -1138,6 +1138,19 @@ private:
 
 class ExpressionDateFromParts final : public Expression {
 public:
+    ExpressionDateFromParts(ExpressionContext* const expCtx,
+                            boost::intrusive_ptr<Expression> year,
+                            boost::intrusive_ptr<Expression> month,
+                            boost::intrusive_ptr<Expression> day,
+                            boost::intrusive_ptr<Expression> hour,
+                            boost::intrusive_ptr<Expression> minute,
+                            boost::intrusive_ptr<Expression> second,
+                            boost::intrusive_ptr<Expression> millisecond,
+                            boost::intrusive_ptr<Expression> isoWeekYear,
+                            boost::intrusive_ptr<Expression> isoWeek,
+                            boost::intrusive_ptr<Expression> isoDayOfWeek,
+                            boost::intrusive_ptr<Expression> timeZone);
+
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1154,19 +1167,6 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
-    ExpressionDateFromParts(ExpressionContext* const expCtx,
-                            boost::intrusive_ptr<Expression> year,
-                            boost::intrusive_ptr<Expression> month,
-                            boost::intrusive_ptr<Expression> day,
-                            boost::intrusive_ptr<Expression> hour,
-                            boost::intrusive_ptr<Expression> minute,
-                            boost::intrusive_ptr<Expression> second,
-                            boost::intrusive_ptr<Expression> millisecond,
-                            boost::intrusive_ptr<Expression> isoWeekYear,
-                            boost::intrusive_ptr<Expression> isoWeek,
-                            boost::intrusive_ptr<Expression> isoDayOfWeek,
-                            boost::intrusive_ptr<Expression> timeZone);
-
     /**
      * This function checks whether a field is a number.
      *
@@ -1219,6 +1219,14 @@ private:
 
 class ExpressionDateToParts final : public Expression {
 public:
+    /**
+     * The iso8601 argument controls whether to output ISO8601 elements or natural calendar.
+     */
+    ExpressionDateToParts(ExpressionContext* const expCtx,
+                          boost::intrusive_ptr<Expression> date,
+                          boost::intrusive_ptr<Expression> timeZone,
+                          boost::intrusive_ptr<Expression> iso8601);
+
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -1235,14 +1243,6 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
-    /**
-     * The iso8601 argument controls whether to output ISO8601 elements or natural calendar.
-     */
-    ExpressionDateToParts(ExpressionContext* const expCtx,
-                          boost::intrusive_ptr<Expression> date,
-                          boost::intrusive_ptr<Expression> timeZone,
-                          boost::intrusive_ptr<Expression> iso8601);
-
     boost::optional<int> evaluateIso8601Flag(const Document& root, Variables* variables) const;
 
     boost::intrusive_ptr<Expression>& _date;

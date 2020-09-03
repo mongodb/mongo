@@ -170,7 +170,32 @@ const StringMap<ParserGen::token_type> reservedKeyFieldnameLookup = {
     {"$setUnion", ParserGen::token::SET_UNION},
     {"timezone", ParserGen::token::ARG_TIMEZONE},
     {"to", ParserGen::token::ARG_TO},
-};
+    {"minute", ParserGen::token::ARG_MINUTE},
+    {"second", ParserGen::token::ARG_SECOND},
+    {"millisecond", ParserGen::token::ARG_MILLISECOND},
+    {"day", ParserGen::token::ARG_DAY},
+    {"isoDayOfWeek", ParserGen::token::ARG_ISO_DAY_OF_WEEK},
+    {"isoWeek", ParserGen::token::ARG_ISO_WEEK},
+    {"isoWeekYear", ParserGen::token::ARG_ISO_WEEK_YEAR},
+    {"iso8601", ParserGen::token::ARG_ISO_8601},
+    {"month", ParserGen::token::ARG_MONTH},
+    {"year", ParserGen::token::ARG_YEAR},
+    {"hour", ParserGen::token::ARG_HOUR},
+    {"$dateFromParts", ParserGen::token::DATE_FROM_PARTS},
+    {"$dateToParts", ParserGen::token::DATE_TO_PARTS},
+    {"$dayOfMonth", ParserGen::token::DAY_OF_MONTH},
+    {"$dayOfWeek", ParserGen::token::DAY_OF_WEEK},
+    {"$dayOfYear", ParserGen::token::DAY_OF_YEAR},
+    {"$hour", ParserGen::token::HOUR},
+    {"$isoDayOfWeek", ParserGen::token::ISO_DAY_OF_WEEK},
+    {"$isoWeek", ParserGen::token::ISO_WEEK},
+    {"$isoWeekYear", ParserGen::token::ISO_WEEK_YEAR},
+    {"$millisecond", ParserGen::token::MILLISECOND},
+    {"$minute", ParserGen::token::MINUTE},
+    {"$month", ParserGen::token::MONTH},
+    {"$second", ParserGen::token::SECOND},
+    {"$week", ParserGen::token::WEEK},
+    {"$year", ParserGen::token::YEAR}};
 
 // Mapping of reserved key values to BSON token. Any key which is not included in this map is
 // assumed to be a user value.
@@ -204,14 +229,17 @@ void BSONLexer::sortObjTokens() {
     };
 
     auto currentPosition = _position;
-    if (_tokens[currentPosition].type_get() != static_cast<int>(ParserGen::token::START_OBJECT)) {
+    // Ensure that we've just entered an object - i.e. that the previous token was a START_OBJECT.
+    // Otherwise, this function is a no-op.
+    if (currentPosition < 1 ||
+        _tokens[currentPosition - 1].type_get() !=
+            static_cast<int>(ParserGen::token::START_OBJECT)) {
         return;
     }
 
     std::list<TokenElement> sortedTokenPairs;
-    // Increment to get to the first token after the START_OBJECT. We will sort tokens until the
-    // matching END_OBJECT is found.
-    currentPosition++;
+    // We've just entered an object (i.e. the previous token was a start object). We will sort
+    // tokens until the matching END_OBJECT is found.
     while (_tokens[currentPosition].type_get() != static_cast<int>(ParserGen::token::END_OBJECT)) {
         invariant(size_t(currentPosition) < _tokens.size());
 
@@ -243,10 +271,10 @@ void BSONLexer::sortObjTokens() {
     }
     sortedTokenPairs.sort(TokenElementCompare());
 
-    // _position is at the initial START_OBJECT, and currentPosition is at its matching
-    // END_OBJECT. We need to flatten the sorted list of KV pairs to get the correct order of
-    // tokens.
-    auto replacePosition = _position + 1;
+    // _position is at the token immediately following the initial START_OBJECT, and currentPosition
+    // is at the matching END_OBJECT. We need to flatten the sorted list of KV pairs to get the
+    // correct order of tokens.
+    auto replacePosition = _position;
     for (auto&& [key, rhsTokens] : sortedTokenPairs) {
         _tokens[replacePosition].clear();
         _tokens[replacePosition++].move(key);

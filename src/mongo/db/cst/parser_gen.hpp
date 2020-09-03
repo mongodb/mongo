@@ -479,6 +479,22 @@ public:
             // lt
             // lte
             // ne
+            // dateExps
+            // dateFromParts
+            // dateToParts
+            // dayOfMonth
+            // dayOfWeek
+            // dayOfYear
+            // hour
+            // isoDayOfWeek
+            // isoWeek
+            // isoWeekYear
+            // millisecond
+            // minute
+            // month
+            // second
+            // week
+            // year
             // typeExpression
             // convert
             // toBool
@@ -534,6 +550,7 @@ public:
             // nonArrayNonObjCompoundExpression
             // expressionSingletonArray
             // singleArgExpression
+            // nonArrayNonObjExpression
             // match
             // predicates
             // compoundMatchExprs
@@ -605,6 +622,15 @@ public:
             // timezoneArg
             // charsArg
             // optionsArg
+            // hourArg
+            // minuteArg
+            // secondArg
+            // millisecondArg
+            // dayArg
+            // isoWeekArg
+            // iso8601Arg
+            // monthArg
+            // isoDayOfWeekArg
             // predicate
             // logicalExpr
             // operatorExpression
@@ -684,158 +710,185 @@ public:
             ARG_COLL = 11,                     // "coll argument"
             ARG_DATE = 12,                     // "date argument"
             ARG_DATE_STRING = 13,              // "dateString argument"
-            ARG_FIND = 14,                     // "find argument"
-            ARG_FORMAT = 15,                   // "format argument"
-            ARG_INPUT = 16,                    // "input argument"
-            ARG_ON_ERROR = 17,                 // "onError argument"
-            ARG_ON_NULL = 18,                  // "onNull argument"
-            ARG_OPTIONS = 19,                  // "options argument"
-            ARG_PIPELINE = 20,                 // "pipeline argument"
-            ARG_REGEX = 21,                    // "regex argument"
-            ARG_REPLACEMENT = 22,              // "replacement argument"
-            ARG_SIZE = 23,                     // "size argument"
-            ARG_TIMEZONE = 24,                 // "timezone argument"
-            ARG_TO = 25,                       // "to argument"
-            ASIN = 26,                         // ASIN
-            ASINH = 27,                        // ASINH
-            ATAN = 28,                         // ATAN
-            ATAN2 = 29,                        // ATAN2
-            ATANH = 30,                        // ATANH
-            BOOL_FALSE = 31,                   // "false"
-            BOOL_TRUE = 32,                    // "true"
-            CEIL = 33,                         // CEIL
-            COMMENT = 34,                      // COMMENT
-            CMP = 35,                          // CMP
-            CONCAT = 36,                       // CONCAT
-            CONST_EXPR = 37,                   // CONST_EXPR
-            CONVERT = 38,                      // CONVERT
-            COS = 39,                          // COS
-            COSH = 40,                         // COSH
-            DATE_FROM_STRING = 41,             // DATE_FROM_STRING
-            DATE_TO_STRING = 42,               // DATE_TO_STRING
-            DECIMAL_NEGATIVE_ONE = 43,         // "-1 (decimal)"
-            DECIMAL_ONE = 44,                  // "1 (decimal)"
-            DECIMAL_ZERO = 45,                 // "zero (decimal)"
-            DEGREES_TO_RADIANS = 46,           // DEGREES_TO_RADIANS
-            DIVIDE = 47,                       // DIVIDE
-            DOUBLE_NEGATIVE_ONE = 48,          // "-1 (double)"
-            DOUBLE_ONE = 49,                   // "1 (double)"
-            DOUBLE_ZERO = 50,                  // "zero (double)"
-            END_ARRAY = 51,                    // "end of array"
-            END_OBJECT = 52,                   // "end of object"
-            EQ = 53,                           // EQ
-            EXISTS = 54,                       // EXISTS
-            EXPONENT = 55,                     // EXPONENT
-            FLOOR = 56,                        // FLOOR
-            GEO_NEAR_DISTANCE = 57,            // "geoNearDistance"
-            GEO_NEAR_POINT = 58,               // "geoNearPoint"
-            GT = 59,                           // GT
-            GTE = 60,                          // GTE
-            ID = 61,                           // ID
-            INDEX_OF_BYTES = 62,               // INDEX_OF_BYTES
-            INDEX_OF_CP = 63,                  // INDEX_OF_CP
-            INDEX_KEY = 64,                    // "indexKey"
-            INT_NEGATIVE_ONE = 65,             // "-1 (int)"
-            INT_ONE = 66,                      // "1 (int)"
-            INT_ZERO = 67,                     // "zero (int)"
-            LITERAL = 68,                      // LITERAL
-            LN = 69,                           // LN
-            LOG = 70,                          // LOG
-            LOGTEN = 71,                       // LOGTEN
-            LONG_NEGATIVE_ONE = 72,            // "-1 (long)"
-            LONG_ONE = 73,                     // "1 (long)"
-            LONG_ZERO = 74,                    // "zero (long)"
-            LT = 75,                           // LT
-            LTE = 76,                          // LTE
-            LTRIM = 77,                        // LTRIM
-            META = 78,                         // META
-            MOD = 79,                          // MOD
-            MULTIPLY = 80,                     // MULTIPLY
-            NE = 81,                           // NE
-            NOR = 82,                          // NOR
-            NOT = 83,                          // NOT
-            OR = 84,                           // OR
-            POW = 85,                          // POW
-            RADIANS_TO_DEGREES = 86,           // RADIANS_TO_DEGREES
-            RAND_VAL = 87,                     // "randVal"
-            RECORD_ID = 88,                    // "recordId"
-            REGEX_FIND = 89,                   // REGEX_FIND
-            REGEX_FIND_ALL = 90,               // REGEX_FIND_ALL
-            REGEX_MATCH = 91,                  // REGEX_MATCH
-            REPLACE_ALL = 92,                  // REPLACE_ALL
-            REPLACE_ONE = 93,                  // REPLACE_ONE
-            ROUND = 94,                        // ROUND
-            RTRIM = 95,                        // RTRIM
-            SEARCH_HIGHLIGHTS = 96,            // "searchHighlights"
-            SEARCH_SCORE = 97,                 // "searchScore"
-            SET_DIFFERENCE = 98,               // "setDifference"
-            SET_EQUALS = 99,                   // "setEquals"
-            SET_INTERSECTION = 100,            // "setIntersection"
-            SET_IS_SUBSET = 101,               // "setIsSubset"
-            SET_UNION = 102,                   // "setUnion"
-            SLICE = 103,                       // "slice"
-            SORT_KEY = 104,                    // "sortKey"
-            SIN = 105,                         // SIN
-            SINH = 106,                        // SINH
-            SPLIT = 107,                       // SPLIT
-            SQRT = 108,                        // SQRT
-            STAGE_INHIBIT_OPTIMIZATION = 109,  // STAGE_INHIBIT_OPTIMIZATION
-            STAGE_LIMIT = 110,                 // STAGE_LIMIT
-            STAGE_PROJECT = 111,               // STAGE_PROJECT
-            STAGE_SAMPLE = 112,                // STAGE_SAMPLE
-            STAGE_SKIP = 113,                  // STAGE_SKIP
-            STAGE_UNION_WITH = 114,            // STAGE_UNION_WITH
-            START_ARRAY = 115,                 // "array"
-            START_OBJECT = 116,                // "object"
-            STR_CASE_CMP = 117,                // STR_CASE_CMP
-            STR_LEN_BYTES = 118,               // STR_LEN_BYTES
-            STR_LEN_CP = 119,                  // STR_LEN_CP
-            SUBSTR = 120,                      // SUBSTR
-            SUBSTR_BYTES = 121,                // SUBSTR_BYTES
-            SUBSTR_CP = 122,                   // SUBSTR_CP
-            SUBTRACT = 123,                    // SUBTRACT
-            TAN = 124,                         // TAN
-            TANH = 125,                        // TANH
-            TEXT_SCORE = 126,                  // "textScore"
-            TO_BOOL = 127,                     // TO_BOOL
-            TO_DATE = 128,                     // TO_DATE
-            TO_DECIMAL = 129,                  // TO_DECIMAL
-            TO_DOUBLE = 130,                   // TO_DOUBLE
-            TO_INT = 131,                      // TO_INT
-            TO_LONG = 132,                     // TO_LONG
-            TO_LOWER = 133,                    // TO_LOWER
-            TO_OBJECT_ID = 134,                // TO_OBJECT_ID
-            TO_STRING = 135,                   // TO_STRING
-            TO_UPPER = 136,                    // TO_UPPER
-            TRIM = 137,                        // TRIM
-            TRUNC = 138,                       // TRUNC
-            TYPE = 139,                        // TYPE
-            FIELDNAME = 140,                   // "fieldname"
-            DOTTED_FIELDNAME = 141,            // "fieldname containing dotted path"
-            DOLLAR_PREF_FIELDNAME = 142,       // "$-prefixed fieldname"
-            STRING = 143,                      // "string"
-            DOLLAR_STRING = 144,               // "$-prefixed string"
-            DOLLAR_DOLLAR_STRING = 145,        // "$$-prefixed string"
-            BINARY = 146,                      // "BinData"
-            UNDEFINED = 147,                   // "undefined"
-            OBJECT_ID = 148,                   // "ObjectID"
-            DATE_LITERAL = 149,                // "Date"
-            JSNULL = 150,                      // "null"
-            REGEX = 151,                       // "regex"
-            DB_POINTER = 152,                  // "dbPointer"
-            JAVASCRIPT = 153,                  // "Code"
-            SYMBOL = 154,                      // "Symbol"
-            JAVASCRIPT_W_SCOPE = 155,          // "CodeWScope"
-            INT_OTHER = 156,                   // "arbitrary integer"
-            LONG_OTHER = 157,                  // "arbitrary long"
-            DOUBLE_OTHER = 158,                // "arbitrary double"
-            DECIMAL_OTHER = 159,               // "arbitrary decimal"
-            TIMESTAMP = 160,                   // "Timestamp"
-            MIN_KEY = 161,                     // "minKey"
-            MAX_KEY = 162,                     // "maxKey"
-            START_PIPELINE = 163,              // START_PIPELINE
-            START_MATCH = 164,                 // START_MATCH
-            START_SORT = 165                   // START_SORT
+            ARG_DAY = 14,                      // "day argument"
+            ARG_FILTER = 15,                   // "filter"
+            ARG_FIND = 16,                     // "find argument"
+            ARG_FORMAT = 17,                   // "format argument"
+            ARG_HOUR = 18,                     // "hour argument"
+            ARG_INPUT = 19,                    // "input argument"
+            ARG_ISO_8601 = 20,                 // "ISO 8601 argument"
+            ARG_ISO_DAY_OF_WEEK = 21,          // "ISO day of week argument"
+            ARG_ISO_WEEK = 22,                 // "ISO week argument"
+            ARG_ISO_WEEK_YEAR = 23,            // "ISO week year argument"
+            ARG_MILLISECOND = 24,              // "millisecond argument"
+            ARG_MINUTE = 25,                   // "minute argument"
+            ARG_MONTH = 26,                    // "month argument"
+            ARG_ON_ERROR = 27,                 // "onError argument"
+            ARG_ON_NULL = 28,                  // "onNull argument"
+            ARG_OPTIONS = 29,                  // "options argument"
+            ARG_PIPELINE = 30,                 // "pipeline argument"
+            ARG_REGEX = 31,                    // "regex argument"
+            ARG_REPLACEMENT = 32,              // "replacement argument"
+            ARG_SECOND = 33,                   // "second argument"
+            ARG_SIZE = 34,                     // "size argument"
+            ARG_TIMEZONE = 35,                 // "timezone argument"
+            ARG_TO = 36,                       // "to argument"
+            ASIN = 37,                         // ASIN
+            ASINH = 38,                        // ASINH
+            ATAN = 39,                         // ATAN
+            ARG_YEAR = 40,                     // "year argument"
+            ATAN2 = 41,                        // ATAN2
+            ATANH = 42,                        // ATANH
+            BOOL_FALSE = 43,                   // "false"
+            BOOL_TRUE = 44,                    // "true"
+            CEIL = 45,                         // CEIL
+            COMMENT = 46,                      // COMMENT
+            CMP = 47,                          // CMP
+            CONCAT = 48,                       // CONCAT
+            CONST_EXPR = 49,                   // CONST_EXPR
+            CONVERT = 50,                      // CONVERT
+            COS = 51,                          // COS
+            COSH = 52,                         // COSH
+            DATE_FROM_PARTS = 53,              // DATE_FROM_PARTS
+            DATE_FROM_STRING = 54,             // DATE_FROM_STRING
+            DATE_TO_PARTS = 55,                // DATE_TO_PARTS
+            DATE_TO_STRING = 56,               // DATE_TO_STRING
+            DAY_OF_MONTH = 57,                 // DAY_OF_MONTH
+            DAY_OF_WEEK = 58,                  // DAY_OF_WEEK
+            DAY_OF_YEAR = 59,                  // DAY_OF_YEAR
+            DECIMAL_NEGATIVE_ONE = 60,         // "-1 (decimal)"
+            DECIMAL_ONE = 61,                  // "1 (decimal)"
+            DECIMAL_ZERO = 62,                 // "zero (decimal)"
+            DEGREES_TO_RADIANS = 63,           // DEGREES_TO_RADIANS
+            DIVIDE = 64,                       // DIVIDE
+            DOUBLE_NEGATIVE_ONE = 65,          // "-1 (double)"
+            DOUBLE_ONE = 66,                   // "1 (double)"
+            DOUBLE_ZERO = 67,                  // "zero (double)"
+            END_ARRAY = 68,                    // "end of array"
+            END_OBJECT = 69,                   // "end of object"
+            EQ = 70,                           // EQ
+            EXISTS = 71,                       // EXISTS
+            EXPONENT = 72,                     // EXPONENT
+            FLOOR = 73,                        // FLOOR
+            GEO_NEAR_DISTANCE = 74,            // "geoNearDistance"
+            GEO_NEAR_POINT = 75,               // "geoNearPoint"
+            GT = 76,                           // GT
+            GTE = 77,                          // GTE
+            HOUR = 78,                         // HOUR
+            ID = 79,                           // ID
+            INDEX_OF_BYTES = 80,               // INDEX_OF_BYTES
+            INDEX_OF_CP = 81,                  // INDEX_OF_CP
+            INDEX_KEY = 82,                    // "indexKey"
+            INT_NEGATIVE_ONE = 83,             // "-1 (int)"
+            INT_ONE = 84,                      // "1 (int)"
+            INT_ZERO = 85,                     // "zero (int)"
+            ISO_DAY_OF_WEEK = 86,              // ISO_DAY_OF_WEEK
+            ISO_WEEK = 87,                     // ISO_WEEK
+            ISO_WEEK_YEAR = 88,                // ISO_WEEK_YEAR
+            LITERAL = 89,                      // LITERAL
+            LN = 90,                           // LN
+            LOG = 91,                          // LOG
+            LOGTEN = 92,                       // LOGTEN
+            LONG_NEGATIVE_ONE = 93,            // "-1 (long)"
+            LONG_ONE = 94,                     // "1 (long)"
+            LONG_ZERO = 95,                    // "zero (long)"
+            LT = 96,                           // LT
+            LTE = 97,                          // LTE
+            LTRIM = 98,                        // LTRIM
+            META = 99,                         // META
+            MILLISECOND = 100,                 // MILLISECOND
+            MINUTE = 101,                      // MINUTE
+            MOD = 102,                         // MOD
+            MONTH = 103,                       // MONTH
+            MULTIPLY = 104,                    // MULTIPLY
+            NE = 105,                          // NE
+            NOR = 106,                         // NOR
+            NOT = 107,                         // NOT
+            OR = 108,                          // OR
+            POW = 109,                         // POW
+            RADIANS_TO_DEGREES = 110,          // RADIANS_TO_DEGREES
+            RAND_VAL = 111,                    // "randVal"
+            RECORD_ID = 112,                   // "recordId"
+            REGEX_FIND = 113,                  // REGEX_FIND
+            REGEX_FIND_ALL = 114,              // REGEX_FIND_ALL
+            REGEX_MATCH = 115,                 // REGEX_MATCH
+            REPLACE_ALL = 116,                 // REPLACE_ALL
+            REPLACE_ONE = 117,                 // REPLACE_ONE
+            ROUND = 118,                       // ROUND
+            RTRIM = 119,                       // RTRIM
+            SEARCH_HIGHLIGHTS = 120,           // "searchHighlights"
+            SEARCH_SCORE = 121,                // "searchScore"
+            SECOND = 122,                      // SECOND
+            SET_DIFFERENCE = 123,              // "setDifference"
+            SET_EQUALS = 124,                  // "setEquals"
+            SET_INTERSECTION = 125,            // "setIntersection"
+            SET_IS_SUBSET = 126,               // "setIsSubset"
+            SET_UNION = 127,                   // "setUnion"
+            SLICE = 128,                       // "slice"
+            SORT_KEY = 129,                    // "sortKey"
+            SIN = 130,                         // SIN
+            SINH = 131,                        // SINH
+            SPLIT = 132,                       // SPLIT
+            SQRT = 133,                        // SQRT
+            STAGE_INHIBIT_OPTIMIZATION = 134,  // STAGE_INHIBIT_OPTIMIZATION
+            STAGE_LIMIT = 135,                 // STAGE_LIMIT
+            STAGE_PROJECT = 136,               // STAGE_PROJECT
+            STAGE_SAMPLE = 137,                // STAGE_SAMPLE
+            STAGE_SKIP = 138,                  // STAGE_SKIP
+            STAGE_UNION_WITH = 139,            // STAGE_UNION_WITH
+            START_ARRAY = 140,                 // "array"
+            START_OBJECT = 141,                // "object"
+            STR_CASE_CMP = 142,                // STR_CASE_CMP
+            STR_LEN_BYTES = 143,               // STR_LEN_BYTES
+            STR_LEN_CP = 144,                  // STR_LEN_CP
+            SUBSTR = 145,                      // SUBSTR
+            SUBSTR_BYTES = 146,                // SUBSTR_BYTES
+            SUBSTR_CP = 147,                   // SUBSTR_CP
+            SUBTRACT = 148,                    // SUBTRACT
+            TAN = 149,                         // TAN
+            TANH = 150,                        // TANH
+            TEXT_SCORE = 151,                  // "textScore"
+            TO_BOOL = 152,                     // TO_BOOL
+            TO_DATE = 153,                     // TO_DATE
+            TO_DECIMAL = 154,                  // TO_DECIMAL
+            TO_DOUBLE = 155,                   // TO_DOUBLE
+            TO_INT = 156,                      // TO_INT
+            TO_LONG = 157,                     // TO_LONG
+            TO_LOWER = 158,                    // TO_LOWER
+            TO_OBJECT_ID = 159,                // TO_OBJECT_ID
+            TO_STRING = 160,                   // TO_STRING
+            TO_UPPER = 161,                    // TO_UPPER
+            TRIM = 162,                        // TRIM
+            TRUNC = 163,                       // TRUNC
+            TYPE = 164,                        // TYPE
+            WEEK = 165,                        // WEEK
+            YEAR = 166,                        // YEAR
+            FIELDNAME = 167,                   // "fieldname"
+            DOTTED_FIELDNAME = 168,            // "fieldname containing dotted path"
+            DOLLAR_PREF_FIELDNAME = 169,       // "$-prefixed fieldname"
+            STRING = 170,                      // "string"
+            DOLLAR_STRING = 171,               // "$-prefixed string"
+            DOLLAR_DOLLAR_STRING = 172,        // "$$-prefixed string"
+            BINARY = 173,                      // "BinData"
+            UNDEFINED = 174,                   // "undefined"
+            OBJECT_ID = 175,                   // "ObjectID"
+            DATE_LITERAL = 176,                // "Date"
+            JSNULL = 177,                      // "null"
+            REGEX = 178,                       // "regex"
+            DB_POINTER = 179,                  // "dbPointer"
+            JAVASCRIPT = 180,                  // "Code"
+            SYMBOL = 181,                      // "Symbol"
+            JAVASCRIPT_W_SCOPE = 182,          // "CodeWScope"
+            INT_OTHER = 183,                   // "arbitrary integer"
+            LONG_OTHER = 184,                  // "arbitrary long"
+            DOUBLE_OTHER = 185,                // "arbitrary double"
+            DECIMAL_OTHER = 186,               // "arbitrary decimal"
+            TIMESTAMP = 187,                   // "Timestamp"
+            MIN_KEY = 188,                     // "minKey"
+            MAX_KEY = 189,                     // "maxKey"
+            START_PIPELINE = 190,              // START_PIPELINE
+            START_MATCH = 191,                 // START_MATCH
+            START_SORT = 192                   // START_SORT
         };
         /// Backward compatibility alias (Bison 3.6).
         typedef token_kind_type yytokentype;
@@ -850,7 +903,7 @@ public:
     /// Symbol kinds.
     struct symbol_kind {
         enum symbol_kind_type {
-            YYNTOKENS = 166,  ///< Number of tokens.
+            YYNTOKENS = 193,  ///< Number of tokens.
             S_YYEMPTY = -2,
             S_YYEOF = 0,                               // "EOF"
             S_YYerror = 1,                             // error
@@ -866,359 +919,411 @@ public:
             S_ARG_COLL = 11,                           // "coll argument"
             S_ARG_DATE = 12,                           // "date argument"
             S_ARG_DATE_STRING = 13,                    // "dateString argument"
-            S_ARG_FIND = 14,                           // "find argument"
-            S_ARG_FORMAT = 15,                         // "format argument"
-            S_ARG_INPUT = 16,                          // "input argument"
-            S_ARG_ON_ERROR = 17,                       // "onError argument"
-            S_ARG_ON_NULL = 18,                        // "onNull argument"
-            S_ARG_OPTIONS = 19,                        // "options argument"
-            S_ARG_PIPELINE = 20,                       // "pipeline argument"
-            S_ARG_REGEX = 21,                          // "regex argument"
-            S_ARG_REPLACEMENT = 22,                    // "replacement argument"
-            S_ARG_SIZE = 23,                           // "size argument"
-            S_ARG_TIMEZONE = 24,                       // "timezone argument"
-            S_ARG_TO = 25,                             // "to argument"
-            S_ASIN = 26,                               // ASIN
-            S_ASINH = 27,                              // ASINH
-            S_ATAN = 28,                               // ATAN
-            S_ATAN2 = 29,                              // ATAN2
-            S_ATANH = 30,                              // ATANH
-            S_BOOL_FALSE = 31,                         // "false"
-            S_BOOL_TRUE = 32,                          // "true"
-            S_CEIL = 33,                               // CEIL
-            S_COMMENT = 34,                            // COMMENT
-            S_CMP = 35,                                // CMP
-            S_CONCAT = 36,                             // CONCAT
-            S_CONST_EXPR = 37,                         // CONST_EXPR
-            S_CONVERT = 38,                            // CONVERT
-            S_COS = 39,                                // COS
-            S_COSH = 40,                               // COSH
-            S_DATE_FROM_STRING = 41,                   // DATE_FROM_STRING
-            S_DATE_TO_STRING = 42,                     // DATE_TO_STRING
-            S_DECIMAL_NEGATIVE_ONE = 43,               // "-1 (decimal)"
-            S_DECIMAL_ONE = 44,                        // "1 (decimal)"
-            S_DECIMAL_ZERO = 45,                       // "zero (decimal)"
-            S_DEGREES_TO_RADIANS = 46,                 // DEGREES_TO_RADIANS
-            S_DIVIDE = 47,                             // DIVIDE
-            S_DOUBLE_NEGATIVE_ONE = 48,                // "-1 (double)"
-            S_DOUBLE_ONE = 49,                         // "1 (double)"
-            S_DOUBLE_ZERO = 50,                        // "zero (double)"
-            S_END_ARRAY = 51,                          // "end of array"
-            S_END_OBJECT = 52,                         // "end of object"
-            S_EQ = 53,                                 // EQ
-            S_EXISTS = 54,                             // EXISTS
-            S_EXPONENT = 55,                           // EXPONENT
-            S_FLOOR = 56,                              // FLOOR
-            S_GEO_NEAR_DISTANCE = 57,                  // "geoNearDistance"
-            S_GEO_NEAR_POINT = 58,                     // "geoNearPoint"
-            S_GT = 59,                                 // GT
-            S_GTE = 60,                                // GTE
-            S_ID = 61,                                 // ID
-            S_INDEX_OF_BYTES = 62,                     // INDEX_OF_BYTES
-            S_INDEX_OF_CP = 63,                        // INDEX_OF_CP
-            S_INDEX_KEY = 64,                          // "indexKey"
-            S_INT_NEGATIVE_ONE = 65,                   // "-1 (int)"
-            S_INT_ONE = 66,                            // "1 (int)"
-            S_INT_ZERO = 67,                           // "zero (int)"
-            S_LITERAL = 68,                            // LITERAL
-            S_LN = 69,                                 // LN
-            S_LOG = 70,                                // LOG
-            S_LOGTEN = 71,                             // LOGTEN
-            S_LONG_NEGATIVE_ONE = 72,                  // "-1 (long)"
-            S_LONG_ONE = 73,                           // "1 (long)"
-            S_LONG_ZERO = 74,                          // "zero (long)"
-            S_LT = 75,                                 // LT
-            S_LTE = 76,                                // LTE
-            S_LTRIM = 77,                              // LTRIM
-            S_META = 78,                               // META
-            S_MOD = 79,                                // MOD
-            S_MULTIPLY = 80,                           // MULTIPLY
-            S_NE = 81,                                 // NE
-            S_NOR = 82,                                // NOR
-            S_NOT = 83,                                // NOT
-            S_OR = 84,                                 // OR
-            S_POW = 85,                                // POW
-            S_RADIANS_TO_DEGREES = 86,                 // RADIANS_TO_DEGREES
-            S_RAND_VAL = 87,                           // "randVal"
-            S_RECORD_ID = 88,                          // "recordId"
-            S_REGEX_FIND = 89,                         // REGEX_FIND
-            S_REGEX_FIND_ALL = 90,                     // REGEX_FIND_ALL
-            S_REGEX_MATCH = 91,                        // REGEX_MATCH
-            S_REPLACE_ALL = 92,                        // REPLACE_ALL
-            S_REPLACE_ONE = 93,                        // REPLACE_ONE
-            S_ROUND = 94,                              // ROUND
-            S_RTRIM = 95,                              // RTRIM
-            S_SEARCH_HIGHLIGHTS = 96,                  // "searchHighlights"
-            S_SEARCH_SCORE = 97,                       // "searchScore"
-            S_SET_DIFFERENCE = 98,                     // "setDifference"
-            S_SET_EQUALS = 99,                         // "setEquals"
-            S_SET_INTERSECTION = 100,                  // "setIntersection"
-            S_SET_IS_SUBSET = 101,                     // "setIsSubset"
-            S_SET_UNION = 102,                         // "setUnion"
-            S_SLICE = 103,                             // "slice"
-            S_SORT_KEY = 104,                          // "sortKey"
-            S_SIN = 105,                               // SIN
-            S_SINH = 106,                              // SINH
-            S_SPLIT = 107,                             // SPLIT
-            S_SQRT = 108,                              // SQRT
-            S_STAGE_INHIBIT_OPTIMIZATION = 109,        // STAGE_INHIBIT_OPTIMIZATION
-            S_STAGE_LIMIT = 110,                       // STAGE_LIMIT
-            S_STAGE_PROJECT = 111,                     // STAGE_PROJECT
-            S_STAGE_SAMPLE = 112,                      // STAGE_SAMPLE
-            S_STAGE_SKIP = 113,                        // STAGE_SKIP
-            S_STAGE_UNION_WITH = 114,                  // STAGE_UNION_WITH
-            S_START_ARRAY = 115,                       // "array"
-            S_START_OBJECT = 116,                      // "object"
-            S_STR_CASE_CMP = 117,                      // STR_CASE_CMP
-            S_STR_LEN_BYTES = 118,                     // STR_LEN_BYTES
-            S_STR_LEN_CP = 119,                        // STR_LEN_CP
-            S_SUBSTR = 120,                            // SUBSTR
-            S_SUBSTR_BYTES = 121,                      // SUBSTR_BYTES
-            S_SUBSTR_CP = 122,                         // SUBSTR_CP
-            S_SUBTRACT = 123,                          // SUBTRACT
-            S_TAN = 124,                               // TAN
-            S_TANH = 125,                              // TANH
-            S_TEXT_SCORE = 126,                        // "textScore"
-            S_TO_BOOL = 127,                           // TO_BOOL
-            S_TO_DATE = 128,                           // TO_DATE
-            S_TO_DECIMAL = 129,                        // TO_DECIMAL
-            S_TO_DOUBLE = 130,                         // TO_DOUBLE
-            S_TO_INT = 131,                            // TO_INT
-            S_TO_LONG = 132,                           // TO_LONG
-            S_TO_LOWER = 133,                          // TO_LOWER
-            S_TO_OBJECT_ID = 134,                      // TO_OBJECT_ID
-            S_TO_STRING = 135,                         // TO_STRING
-            S_TO_UPPER = 136,                          // TO_UPPER
-            S_TRIM = 137,                              // TRIM
-            S_TRUNC = 138,                             // TRUNC
-            S_TYPE = 139,                              // TYPE
-            S_FIELDNAME = 140,                         // "fieldname"
-            S_DOTTED_FIELDNAME = 141,                  // "fieldname containing dotted path"
-            S_DOLLAR_PREF_FIELDNAME = 142,             // "$-prefixed fieldname"
-            S_STRING = 143,                            // "string"
-            S_DOLLAR_STRING = 144,                     // "$-prefixed string"
-            S_DOLLAR_DOLLAR_STRING = 145,              // "$$-prefixed string"
-            S_BINARY = 146,                            // "BinData"
-            S_UNDEFINED = 147,                         // "undefined"
-            S_OBJECT_ID = 148,                         // "ObjectID"
-            S_DATE_LITERAL = 149,                      // "Date"
-            S_JSNULL = 150,                            // "null"
-            S_REGEX = 151,                             // "regex"
-            S_DB_POINTER = 152,                        // "dbPointer"
-            S_JAVASCRIPT = 153,                        // "Code"
-            S_SYMBOL = 154,                            // "Symbol"
-            S_JAVASCRIPT_W_SCOPE = 155,                // "CodeWScope"
-            S_INT_OTHER = 156,                         // "arbitrary integer"
-            S_LONG_OTHER = 157,                        // "arbitrary long"
-            S_DOUBLE_OTHER = 158,                      // "arbitrary double"
-            S_DECIMAL_OTHER = 159,                     // "arbitrary decimal"
-            S_TIMESTAMP = 160,                         // "Timestamp"
-            S_MIN_KEY = 161,                           // "minKey"
-            S_MAX_KEY = 162,                           // "maxKey"
-            S_START_PIPELINE = 163,                    // START_PIPELINE
-            S_START_MATCH = 164,                       // START_MATCH
-            S_START_SORT = 165,                        // START_SORT
-            S_YYACCEPT = 166,                          // $accept
-            S_aggregationProjectionFieldname = 167,    // aggregationProjectionFieldname
-            S_projectionFieldname = 168,               // projectionFieldname
-            S_expressionFieldname = 169,               // expressionFieldname
-            S_stageAsUserFieldname = 170,              // stageAsUserFieldname
-            S_argAsUserFieldname = 171,                // argAsUserFieldname
-            S_argAsProjectionPath = 172,               // argAsProjectionPath
-            S_aggExprAsUserFieldname = 173,            // aggExprAsUserFieldname
-            S_invariableUserFieldname = 174,           // invariableUserFieldname
-            S_sortFieldname = 175,                     // sortFieldname
-            S_idAsUserFieldname = 176,                 // idAsUserFieldname
-            S_idAsProjectionPath = 177,                // idAsProjectionPath
-            S_valueFieldname = 178,                    // valueFieldname
-            S_predFieldname = 179,                     // predFieldname
-            S_projectField = 180,                      // projectField
-            S_projectionObjectField = 181,             // projectionObjectField
-            S_expressionField = 182,                   // expressionField
-            S_valueField = 183,                        // valueField
-            S_arg = 184,                               // arg
-            S_dbPointer = 185,                         // dbPointer
-            S_javascript = 186,                        // javascript
-            S_symbol = 187,                            // symbol
-            S_javascriptWScope = 188,                  // javascriptWScope
-            S_int = 189,                               // int
-            S_timestamp = 190,                         // timestamp
-            S_long = 191,                              // long
-            S_double = 192,                            // double
-            S_decimal = 193,                           // decimal
-            S_minKey = 194,                            // minKey
-            S_maxKey = 195,                            // maxKey
-            S_value = 196,                             // value
-            S_string = 197,                            // string
-            S_aggregationFieldPath = 198,              // aggregationFieldPath
-            S_binary = 199,                            // binary
-            S_undefined = 200,                         // undefined
-            S_objectId = 201,                          // objectId
-            S_bool = 202,                              // bool
-            S_date = 203,                              // date
-            S_null = 204,                              // null
-            S_regex = 205,                             // regex
-            S_simpleValue = 206,                       // simpleValue
-            S_compoundValue = 207,                     // compoundValue
-            S_valueArray = 208,                        // valueArray
-            S_valueObject = 209,                       // valueObject
-            S_valueFields = 210,                       // valueFields
-            S_variable = 211,                          // variable
-            S_typeArray = 212,                         // typeArray
-            S_typeValue = 213,                         // typeValue
-            S_pipeline = 214,                          // pipeline
-            S_stageList = 215,                         // stageList
-            S_stage = 216,                             // stage
-            S_inhibitOptimization = 217,               // inhibitOptimization
-            S_unionWith = 218,                         // unionWith
-            S_skip = 219,                              // skip
-            S_limit = 220,                             // limit
-            S_project = 221,                           // project
-            S_sample = 222,                            // sample
-            S_projectFields = 223,                     // projectFields
-            S_projectionObjectFields = 224,            // projectionObjectFields
-            S_topLevelProjection = 225,                // topLevelProjection
-            S_projection = 226,                        // projection
-            S_projectionObject = 227,                  // projectionObject
-            S_num = 228,                               // num
-            S_expression = 229,                        // expression
-            S_compoundNonObjectExpression = 230,       // compoundNonObjectExpression
-            S_exprFixedTwoArg = 231,                   // exprFixedTwoArg
-            S_exprFixedThreeArg = 232,                 // exprFixedThreeArg
-            S_arrayManipulation = 233,                 // arrayManipulation
-            S_slice = 234,                             // slice
-            S_expressionArray = 235,                   // expressionArray
-            S_expressionObject = 236,                  // expressionObject
-            S_expressionFields = 237,                  // expressionFields
-            S_maths = 238,                             // maths
-            S_meta = 239,                              // meta
-            S_add = 240,                               // add
-            S_boolExprs = 241,                         // boolExprs
-            S_and = 242,                               // and
-            S_or = 243,                                // or
-            S_not = 244,                               // not
-            S_literalEscapes = 245,                    // literalEscapes
-            S_const = 246,                             // const
-            S_literal = 247,                           // literal
-            S_stringExps = 248,                        // stringExps
-            S_concat = 249,                            // concat
-            S_dateFromString = 250,                    // dateFromString
-            S_dateToString = 251,                      // dateToString
-            S_indexOfBytes = 252,                      // indexOfBytes
-            S_indexOfCP = 253,                         // indexOfCP
-            S_ltrim = 254,                             // ltrim
-            S_regexFind = 255,                         // regexFind
-            S_regexFindAll = 256,                      // regexFindAll
-            S_regexMatch = 257,                        // regexMatch
-            S_regexArgs = 258,                         // regexArgs
-            S_replaceOne = 259,                        // replaceOne
-            S_replaceAll = 260,                        // replaceAll
-            S_rtrim = 261,                             // rtrim
-            S_split = 262,                             // split
-            S_strLenBytes = 263,                       // strLenBytes
-            S_strLenCP = 264,                          // strLenCP
-            S_strcasecmp = 265,                        // strcasecmp
-            S_substr = 266,                            // substr
-            S_substrBytes = 267,                       // substrBytes
-            S_substrCP = 268,                          // substrCP
-            S_toLower = 269,                           // toLower
-            S_toUpper = 270,                           // toUpper
-            S_trim = 271,                              // trim
-            S_compExprs = 272,                         // compExprs
-            S_cmp = 273,                               // cmp
-            S_eq = 274,                                // eq
-            S_gt = 275,                                // gt
-            S_gte = 276,                               // gte
-            S_lt = 277,                                // lt
-            S_lte = 278,                               // lte
-            S_ne = 279,                                // ne
-            S_typeExpression = 280,                    // typeExpression
-            S_convert = 281,                           // convert
-            S_toBool = 282,                            // toBool
-            S_toDate = 283,                            // toDate
-            S_toDecimal = 284,                         // toDecimal
-            S_toDouble = 285,                          // toDouble
-            S_toInt = 286,                             // toInt
-            S_toLong = 287,                            // toLong
-            S_toObjectId = 288,                        // toObjectId
-            S_toString = 289,                          // toString
-            S_type = 290,                              // type
-            S_abs = 291,                               // abs
-            S_ceil = 292,                              // ceil
-            S_divide = 293,                            // divide
-            S_exponent = 294,                          // exponent
-            S_floor = 295,                             // floor
-            S_ln = 296,                                // ln
-            S_log = 297,                               // log
-            S_logten = 298,                            // logten
-            S_mod = 299,                               // mod
-            S_multiply = 300,                          // multiply
-            S_pow = 301,                               // pow
-            S_round = 302,                             // round
-            S_sqrt = 303,                              // sqrt
-            S_subtract = 304,                          // subtract
-            S_trunc = 305,                             // trunc
-            S_onErrorArg = 306,                        // onErrorArg
-            S_onNullArg = 307,                         // onNullArg
-            S_formatArg = 308,                         // formatArg
-            S_timezoneArg = 309,                       // timezoneArg
-            S_charsArg = 310,                          // charsArg
-            S_optionsArg = 311,                        // optionsArg
-            S_expressions = 312,                       // expressions
-            S_values = 313,                            // values
-            S_exprZeroToTwo = 314,                     // exprZeroToTwo
-            S_setExpression = 315,                     // setExpression
-            S_allElementsTrue = 316,                   // allElementsTrue
-            S_anyElementTrue = 317,                    // anyElementTrue
-            S_setDifference = 318,                     // setDifference
-            S_setEquals = 319,                         // setEquals
-            S_setIntersection = 320,                   // setIntersection
-            S_setIsSubset = 321,                       // setIsSubset
-            S_setUnion = 322,                          // setUnion
-            S_trig = 323,                              // trig
-            S_sin = 324,                               // sin
-            S_cos = 325,                               // cos
-            S_tan = 326,                               // tan
-            S_sinh = 327,                              // sinh
-            S_cosh = 328,                              // cosh
-            S_tanh = 329,                              // tanh
-            S_asin = 330,                              // asin
-            S_acos = 331,                              // acos
-            S_atan = 332,                              // atan
-            S_asinh = 333,                             // asinh
-            S_acosh = 334,                             // acosh
-            S_atanh = 335,                             // atanh
-            S_atan2 = 336,                             // atan2
-            S_degreesToRadians = 337,                  // degreesToRadians
-            S_radiansToDegrees = 338,                  // radiansToDegrees
-            S_nonArrayExpression = 339,                // nonArrayExpression
-            S_nonArrayCompoundExpression = 340,        // nonArrayCompoundExpression
-            S_nonArrayNonObjCompoundExpression = 341,  // nonArrayNonObjCompoundExpression
-            S_expressionSingletonArray = 342,          // expressionSingletonArray
-            S_singleArgExpression = 343,               // singleArgExpression
-            S_match = 344,                             // match
-            S_predicates = 345,                        // predicates
-            S_compoundMatchExprs = 346,                // compoundMatchExprs
-            S_predValue = 347,                         // predValue
-            S_additionalExprs = 348,                   // additionalExprs
-            S_predicate = 349,                         // predicate
-            S_logicalExpr = 350,                       // logicalExpr
-            S_operatorExpression = 351,                // operatorExpression
-            S_notExpr = 352,                           // notExpr
-            S_existsExpr = 353,                        // existsExpr
-            S_typeExpr = 354,                          // typeExpr
-            S_commentExpr = 355,                       // commentExpr
-            S_logicalExprField = 356,                  // logicalExprField
-            S_typeValues = 357,                        // typeValues
-            S_sortSpecs = 358,                         // sortSpecs
-            S_specList = 359,                          // specList
-            S_metaSort = 360,                          // metaSort
-            S_oneOrNegOne = 361,                       // oneOrNegOne
-            S_metaSortKeyword = 362,                   // metaSortKeyword
-            S_sortSpec = 363,                          // sortSpec
-            S_start = 364,                             // start
-            S_START_ORDERED_OBJECT = 365,              // START_ORDERED_OBJECT
-            S_366_1 = 366                              // $@1
+            S_ARG_DAY = 14,                            // "day argument"
+            S_ARG_FILTER = 15,                         // "filter"
+            S_ARG_FIND = 16,                           // "find argument"
+            S_ARG_FORMAT = 17,                         // "format argument"
+            S_ARG_HOUR = 18,                           // "hour argument"
+            S_ARG_INPUT = 19,                          // "input argument"
+            S_ARG_ISO_8601 = 20,                       // "ISO 8601 argument"
+            S_ARG_ISO_DAY_OF_WEEK = 21,                // "ISO day of week argument"
+            S_ARG_ISO_WEEK = 22,                       // "ISO week argument"
+            S_ARG_ISO_WEEK_YEAR = 23,                  // "ISO week year argument"
+            S_ARG_MILLISECOND = 24,                    // "millisecond argument"
+            S_ARG_MINUTE = 25,                         // "minute argument"
+            S_ARG_MONTH = 26,                          // "month argument"
+            S_ARG_ON_ERROR = 27,                       // "onError argument"
+            S_ARG_ON_NULL = 28,                        // "onNull argument"
+            S_ARG_OPTIONS = 29,                        // "options argument"
+            S_ARG_PIPELINE = 30,                       // "pipeline argument"
+            S_ARG_REGEX = 31,                          // "regex argument"
+            S_ARG_REPLACEMENT = 32,                    // "replacement argument"
+            S_ARG_SECOND = 33,                         // "second argument"
+            S_ARG_SIZE = 34,                           // "size argument"
+            S_ARG_TIMEZONE = 35,                       // "timezone argument"
+            S_ARG_TO = 36,                             // "to argument"
+            S_ASIN = 37,                               // ASIN
+            S_ASINH = 38,                              // ASINH
+            S_ATAN = 39,                               // ATAN
+            S_ARG_YEAR = 40,                           // "year argument"
+            S_ATAN2 = 41,                              // ATAN2
+            S_ATANH = 42,                              // ATANH
+            S_BOOL_FALSE = 43,                         // "false"
+            S_BOOL_TRUE = 44,                          // "true"
+            S_CEIL = 45,                               // CEIL
+            S_COMMENT = 46,                            // COMMENT
+            S_CMP = 47,                                // CMP
+            S_CONCAT = 48,                             // CONCAT
+            S_CONST_EXPR = 49,                         // CONST_EXPR
+            S_CONVERT = 50,                            // CONVERT
+            S_COS = 51,                                // COS
+            S_COSH = 52,                               // COSH
+            S_DATE_FROM_PARTS = 53,                    // DATE_FROM_PARTS
+            S_DATE_FROM_STRING = 54,                   // DATE_FROM_STRING
+            S_DATE_TO_PARTS = 55,                      // DATE_TO_PARTS
+            S_DATE_TO_STRING = 56,                     // DATE_TO_STRING
+            S_DAY_OF_MONTH = 57,                       // DAY_OF_MONTH
+            S_DAY_OF_WEEK = 58,                        // DAY_OF_WEEK
+            S_DAY_OF_YEAR = 59,                        // DAY_OF_YEAR
+            S_DECIMAL_NEGATIVE_ONE = 60,               // "-1 (decimal)"
+            S_DECIMAL_ONE = 61,                        // "1 (decimal)"
+            S_DECIMAL_ZERO = 62,                       // "zero (decimal)"
+            S_DEGREES_TO_RADIANS = 63,                 // DEGREES_TO_RADIANS
+            S_DIVIDE = 64,                             // DIVIDE
+            S_DOUBLE_NEGATIVE_ONE = 65,                // "-1 (double)"
+            S_DOUBLE_ONE = 66,                         // "1 (double)"
+            S_DOUBLE_ZERO = 67,                        // "zero (double)"
+            S_END_ARRAY = 68,                          // "end of array"
+            S_END_OBJECT = 69,                         // "end of object"
+            S_EQ = 70,                                 // EQ
+            S_EXISTS = 71,                             // EXISTS
+            S_EXPONENT = 72,                           // EXPONENT
+            S_FLOOR = 73,                              // FLOOR
+            S_GEO_NEAR_DISTANCE = 74,                  // "geoNearDistance"
+            S_GEO_NEAR_POINT = 75,                     // "geoNearPoint"
+            S_GT = 76,                                 // GT
+            S_GTE = 77,                                // GTE
+            S_HOUR = 78,                               // HOUR
+            S_ID = 79,                                 // ID
+            S_INDEX_OF_BYTES = 80,                     // INDEX_OF_BYTES
+            S_INDEX_OF_CP = 81,                        // INDEX_OF_CP
+            S_INDEX_KEY = 82,                          // "indexKey"
+            S_INT_NEGATIVE_ONE = 83,                   // "-1 (int)"
+            S_INT_ONE = 84,                            // "1 (int)"
+            S_INT_ZERO = 85,                           // "zero (int)"
+            S_ISO_DAY_OF_WEEK = 86,                    // ISO_DAY_OF_WEEK
+            S_ISO_WEEK = 87,                           // ISO_WEEK
+            S_ISO_WEEK_YEAR = 88,                      // ISO_WEEK_YEAR
+            S_LITERAL = 89,                            // LITERAL
+            S_LN = 90,                                 // LN
+            S_LOG = 91,                                // LOG
+            S_LOGTEN = 92,                             // LOGTEN
+            S_LONG_NEGATIVE_ONE = 93,                  // "-1 (long)"
+            S_LONG_ONE = 94,                           // "1 (long)"
+            S_LONG_ZERO = 95,                          // "zero (long)"
+            S_LT = 96,                                 // LT
+            S_LTE = 97,                                // LTE
+            S_LTRIM = 98,                              // LTRIM
+            S_META = 99,                               // META
+            S_MILLISECOND = 100,                       // MILLISECOND
+            S_MINUTE = 101,                            // MINUTE
+            S_MOD = 102,                               // MOD
+            S_MONTH = 103,                             // MONTH
+            S_MULTIPLY = 104,                          // MULTIPLY
+            S_NE = 105,                                // NE
+            S_NOR = 106,                               // NOR
+            S_NOT = 107,                               // NOT
+            S_OR = 108,                                // OR
+            S_POW = 109,                               // POW
+            S_RADIANS_TO_DEGREES = 110,                // RADIANS_TO_DEGREES
+            S_RAND_VAL = 111,                          // "randVal"
+            S_RECORD_ID = 112,                         // "recordId"
+            S_REGEX_FIND = 113,                        // REGEX_FIND
+            S_REGEX_FIND_ALL = 114,                    // REGEX_FIND_ALL
+            S_REGEX_MATCH = 115,                       // REGEX_MATCH
+            S_REPLACE_ALL = 116,                       // REPLACE_ALL
+            S_REPLACE_ONE = 117,                       // REPLACE_ONE
+            S_ROUND = 118,                             // ROUND
+            S_RTRIM = 119,                             // RTRIM
+            S_SEARCH_HIGHLIGHTS = 120,                 // "searchHighlights"
+            S_SEARCH_SCORE = 121,                      // "searchScore"
+            S_SECOND = 122,                            // SECOND
+            S_SET_DIFFERENCE = 123,                    // "setDifference"
+            S_SET_EQUALS = 124,                        // "setEquals"
+            S_SET_INTERSECTION = 125,                  // "setIntersection"
+            S_SET_IS_SUBSET = 126,                     // "setIsSubset"
+            S_SET_UNION = 127,                         // "setUnion"
+            S_SLICE = 128,                             // "slice"
+            S_SORT_KEY = 129,                          // "sortKey"
+            S_SIN = 130,                               // SIN
+            S_SINH = 131,                              // SINH
+            S_SPLIT = 132,                             // SPLIT
+            S_SQRT = 133,                              // SQRT
+            S_STAGE_INHIBIT_OPTIMIZATION = 134,        // STAGE_INHIBIT_OPTIMIZATION
+            S_STAGE_LIMIT = 135,                       // STAGE_LIMIT
+            S_STAGE_PROJECT = 136,                     // STAGE_PROJECT
+            S_STAGE_SAMPLE = 137,                      // STAGE_SAMPLE
+            S_STAGE_SKIP = 138,                        // STAGE_SKIP
+            S_STAGE_UNION_WITH = 139,                  // STAGE_UNION_WITH
+            S_START_ARRAY = 140,                       // "array"
+            S_START_OBJECT = 141,                      // "object"
+            S_STR_CASE_CMP = 142,                      // STR_CASE_CMP
+            S_STR_LEN_BYTES = 143,                     // STR_LEN_BYTES
+            S_STR_LEN_CP = 144,                        // STR_LEN_CP
+            S_SUBSTR = 145,                            // SUBSTR
+            S_SUBSTR_BYTES = 146,                      // SUBSTR_BYTES
+            S_SUBSTR_CP = 147,                         // SUBSTR_CP
+            S_SUBTRACT = 148,                          // SUBTRACT
+            S_TAN = 149,                               // TAN
+            S_TANH = 150,                              // TANH
+            S_TEXT_SCORE = 151,                        // "textScore"
+            S_TO_BOOL = 152,                           // TO_BOOL
+            S_TO_DATE = 153,                           // TO_DATE
+            S_TO_DECIMAL = 154,                        // TO_DECIMAL
+            S_TO_DOUBLE = 155,                         // TO_DOUBLE
+            S_TO_INT = 156,                            // TO_INT
+            S_TO_LONG = 157,                           // TO_LONG
+            S_TO_LOWER = 158,                          // TO_LOWER
+            S_TO_OBJECT_ID = 159,                      // TO_OBJECT_ID
+            S_TO_STRING = 160,                         // TO_STRING
+            S_TO_UPPER = 161,                          // TO_UPPER
+            S_TRIM = 162,                              // TRIM
+            S_TRUNC = 163,                             // TRUNC
+            S_TYPE = 164,                              // TYPE
+            S_WEEK = 165,                              // WEEK
+            S_YEAR = 166,                              // YEAR
+            S_FIELDNAME = 167,                         // "fieldname"
+            S_DOTTED_FIELDNAME = 168,                  // "fieldname containing dotted path"
+            S_DOLLAR_PREF_FIELDNAME = 169,             // "$-prefixed fieldname"
+            S_STRING = 170,                            // "string"
+            S_DOLLAR_STRING = 171,                     // "$-prefixed string"
+            S_DOLLAR_DOLLAR_STRING = 172,              // "$$-prefixed string"
+            S_BINARY = 173,                            // "BinData"
+            S_UNDEFINED = 174,                         // "undefined"
+            S_OBJECT_ID = 175,                         // "ObjectID"
+            S_DATE_LITERAL = 176,                      // "Date"
+            S_JSNULL = 177,                            // "null"
+            S_REGEX = 178,                             // "regex"
+            S_DB_POINTER = 179,                        // "dbPointer"
+            S_JAVASCRIPT = 180,                        // "Code"
+            S_SYMBOL = 181,                            // "Symbol"
+            S_JAVASCRIPT_W_SCOPE = 182,                // "CodeWScope"
+            S_INT_OTHER = 183,                         // "arbitrary integer"
+            S_LONG_OTHER = 184,                        // "arbitrary long"
+            S_DOUBLE_OTHER = 185,                      // "arbitrary double"
+            S_DECIMAL_OTHER = 186,                     // "arbitrary decimal"
+            S_TIMESTAMP = 187,                         // "Timestamp"
+            S_MIN_KEY = 188,                           // "minKey"
+            S_MAX_KEY = 189,                           // "maxKey"
+            S_START_PIPELINE = 190,                    // START_PIPELINE
+            S_START_MATCH = 191,                       // START_MATCH
+            S_START_SORT = 192,                        // START_SORT
+            S_YYACCEPT = 193,                          // $accept
+            S_aggregationProjectionFieldname = 194,    // aggregationProjectionFieldname
+            S_projectionFieldname = 195,               // projectionFieldname
+            S_expressionFieldname = 196,               // expressionFieldname
+            S_stageAsUserFieldname = 197,              // stageAsUserFieldname
+            S_argAsUserFieldname = 198,                // argAsUserFieldname
+            S_argAsProjectionPath = 199,               // argAsProjectionPath
+            S_aggExprAsUserFieldname = 200,            // aggExprAsUserFieldname
+            S_invariableUserFieldname = 201,           // invariableUserFieldname
+            S_sortFieldname = 202,                     // sortFieldname
+            S_idAsUserFieldname = 203,                 // idAsUserFieldname
+            S_idAsProjectionPath = 204,                // idAsProjectionPath
+            S_valueFieldname = 205,                    // valueFieldname
+            S_predFieldname = 206,                     // predFieldname
+            S_projectField = 207,                      // projectField
+            S_projectionObjectField = 208,             // projectionObjectField
+            S_expressionField = 209,                   // expressionField
+            S_valueField = 210,                        // valueField
+            S_arg = 211,                               // arg
+            S_dbPointer = 212,                         // dbPointer
+            S_javascript = 213,                        // javascript
+            S_symbol = 214,                            // symbol
+            S_javascriptWScope = 215,                  // javascriptWScope
+            S_int = 216,                               // int
+            S_timestamp = 217,                         // timestamp
+            S_long = 218,                              // long
+            S_double = 219,                            // double
+            S_decimal = 220,                           // decimal
+            S_minKey = 221,                            // minKey
+            S_maxKey = 222,                            // maxKey
+            S_value = 223,                             // value
+            S_string = 224,                            // string
+            S_aggregationFieldPath = 225,              // aggregationFieldPath
+            S_binary = 226,                            // binary
+            S_undefined = 227,                         // undefined
+            S_objectId = 228,                          // objectId
+            S_bool = 229,                              // bool
+            S_date = 230,                              // date
+            S_null = 231,                              // null
+            S_regex = 232,                             // regex
+            S_simpleValue = 233,                       // simpleValue
+            S_compoundValue = 234,                     // compoundValue
+            S_valueArray = 235,                        // valueArray
+            S_valueObject = 236,                       // valueObject
+            S_valueFields = 237,                       // valueFields
+            S_variable = 238,                          // variable
+            S_typeArray = 239,                         // typeArray
+            S_typeValue = 240,                         // typeValue
+            S_pipeline = 241,                          // pipeline
+            S_stageList = 242,                         // stageList
+            S_stage = 243,                             // stage
+            S_inhibitOptimization = 244,               // inhibitOptimization
+            S_unionWith = 245,                         // unionWith
+            S_skip = 246,                              // skip
+            S_limit = 247,                             // limit
+            S_project = 248,                           // project
+            S_sample = 249,                            // sample
+            S_projectFields = 250,                     // projectFields
+            S_projectionObjectFields = 251,            // projectionObjectFields
+            S_topLevelProjection = 252,                // topLevelProjection
+            S_projection = 253,                        // projection
+            S_projectionObject = 254,                  // projectionObject
+            S_num = 255,                               // num
+            S_expression = 256,                        // expression
+            S_compoundNonObjectExpression = 257,       // compoundNonObjectExpression
+            S_exprFixedTwoArg = 258,                   // exprFixedTwoArg
+            S_exprFixedThreeArg = 259,                 // exprFixedThreeArg
+            S_arrayManipulation = 260,                 // arrayManipulation
+            S_slice = 261,                             // slice
+            S_expressionArray = 262,                   // expressionArray
+            S_expressionObject = 263,                  // expressionObject
+            S_expressionFields = 264,                  // expressionFields
+            S_maths = 265,                             // maths
+            S_meta = 266,                              // meta
+            S_add = 267,                               // add
+            S_boolExprs = 268,                         // boolExprs
+            S_and = 269,                               // and
+            S_or = 270,                                // or
+            S_not = 271,                               // not
+            S_literalEscapes = 272,                    // literalEscapes
+            S_const = 273,                             // const
+            S_literal = 274,                           // literal
+            S_stringExps = 275,                        // stringExps
+            S_concat = 276,                            // concat
+            S_dateFromString = 277,                    // dateFromString
+            S_dateToString = 278,                      // dateToString
+            S_indexOfBytes = 279,                      // indexOfBytes
+            S_indexOfCP = 280,                         // indexOfCP
+            S_ltrim = 281,                             // ltrim
+            S_regexFind = 282,                         // regexFind
+            S_regexFindAll = 283,                      // regexFindAll
+            S_regexMatch = 284,                        // regexMatch
+            S_regexArgs = 285,                         // regexArgs
+            S_replaceOne = 286,                        // replaceOne
+            S_replaceAll = 287,                        // replaceAll
+            S_rtrim = 288,                             // rtrim
+            S_split = 289,                             // split
+            S_strLenBytes = 290,                       // strLenBytes
+            S_strLenCP = 291,                          // strLenCP
+            S_strcasecmp = 292,                        // strcasecmp
+            S_substr = 293,                            // substr
+            S_substrBytes = 294,                       // substrBytes
+            S_substrCP = 295,                          // substrCP
+            S_toLower = 296,                           // toLower
+            S_toUpper = 297,                           // toUpper
+            S_trim = 298,                              // trim
+            S_compExprs = 299,                         // compExprs
+            S_cmp = 300,                               // cmp
+            S_eq = 301,                                // eq
+            S_gt = 302,                                // gt
+            S_gte = 303,                               // gte
+            S_lt = 304,                                // lt
+            S_lte = 305,                               // lte
+            S_ne = 306,                                // ne
+            S_dateExps = 307,                          // dateExps
+            S_dateFromParts = 308,                     // dateFromParts
+            S_dateToParts = 309,                       // dateToParts
+            S_dayOfMonth = 310,                        // dayOfMonth
+            S_dayOfWeek = 311,                         // dayOfWeek
+            S_dayOfYear = 312,                         // dayOfYear
+            S_hour = 313,                              // hour
+            S_isoDayOfWeek = 314,                      // isoDayOfWeek
+            S_isoWeek = 315,                           // isoWeek
+            S_isoWeekYear = 316,                       // isoWeekYear
+            S_millisecond = 317,                       // millisecond
+            S_minute = 318,                            // minute
+            S_month = 319,                             // month
+            S_second = 320,                            // second
+            S_week = 321,                              // week
+            S_year = 322,                              // year
+            S_typeExpression = 323,                    // typeExpression
+            S_convert = 324,                           // convert
+            S_toBool = 325,                            // toBool
+            S_toDate = 326,                            // toDate
+            S_toDecimal = 327,                         // toDecimal
+            S_toDouble = 328,                          // toDouble
+            S_toInt = 329,                             // toInt
+            S_toLong = 330,                            // toLong
+            S_toObjectId = 331,                        // toObjectId
+            S_toString = 332,                          // toString
+            S_type = 333,                              // type
+            S_abs = 334,                               // abs
+            S_ceil = 335,                              // ceil
+            S_divide = 336,                            // divide
+            S_exponent = 337,                          // exponent
+            S_floor = 338,                             // floor
+            S_ln = 339,                                // ln
+            S_log = 340,                               // log
+            S_logten = 341,                            // logten
+            S_mod = 342,                               // mod
+            S_multiply = 343,                          // multiply
+            S_pow = 344,                               // pow
+            S_round = 345,                             // round
+            S_sqrt = 346,                              // sqrt
+            S_subtract = 347,                          // subtract
+            S_trunc = 348,                             // trunc
+            S_onErrorArg = 349,                        // onErrorArg
+            S_onNullArg = 350,                         // onNullArg
+            S_formatArg = 351,                         // formatArg
+            S_timezoneArg = 352,                       // timezoneArg
+            S_charsArg = 353,                          // charsArg
+            S_optionsArg = 354,                        // optionsArg
+            S_hourArg = 355,                           // hourArg
+            S_minuteArg = 356,                         // minuteArg
+            S_secondArg = 357,                         // secondArg
+            S_millisecondArg = 358,                    // millisecondArg
+            S_dayArg = 359,                            // dayArg
+            S_isoWeekArg = 360,                        // isoWeekArg
+            S_iso8601Arg = 361,                        // iso8601Arg
+            S_monthArg = 362,                          // monthArg
+            S_isoDayOfWeekArg = 363,                   // isoDayOfWeekArg
+            S_expressions = 364,                       // expressions
+            S_values = 365,                            // values
+            S_exprZeroToTwo = 366,                     // exprZeroToTwo
+            S_setExpression = 367,                     // setExpression
+            S_allElementsTrue = 368,                   // allElementsTrue
+            S_anyElementTrue = 369,                    // anyElementTrue
+            S_setDifference = 370,                     // setDifference
+            S_setEquals = 371,                         // setEquals
+            S_setIntersection = 372,                   // setIntersection
+            S_setIsSubset = 373,                       // setIsSubset
+            S_setUnion = 374,                          // setUnion
+            S_trig = 375,                              // trig
+            S_sin = 376,                               // sin
+            S_cos = 377,                               // cos
+            S_tan = 378,                               // tan
+            S_sinh = 379,                              // sinh
+            S_cosh = 380,                              // cosh
+            S_tanh = 381,                              // tanh
+            S_asin = 382,                              // asin
+            S_acos = 383,                              // acos
+            S_atan = 384,                              // atan
+            S_asinh = 385,                             // asinh
+            S_acosh = 386,                             // acosh
+            S_atanh = 387,                             // atanh
+            S_atan2 = 388,                             // atan2
+            S_degreesToRadians = 389,                  // degreesToRadians
+            S_radiansToDegrees = 390,                  // radiansToDegrees
+            S_nonArrayExpression = 391,                // nonArrayExpression
+            S_nonArrayCompoundExpression = 392,        // nonArrayCompoundExpression
+            S_nonArrayNonObjCompoundExpression = 393,  // nonArrayNonObjCompoundExpression
+            S_expressionSingletonArray = 394,          // expressionSingletonArray
+            S_singleArgExpression = 395,               // singleArgExpression
+            S_nonArrayNonObjExpression = 396,          // nonArrayNonObjExpression
+            S_match = 397,                             // match
+            S_predicates = 398,                        // predicates
+            S_compoundMatchExprs = 399,                // compoundMatchExprs
+            S_predValue = 400,                         // predValue
+            S_additionalExprs = 401,                   // additionalExprs
+            S_predicate = 402,                         // predicate
+            S_logicalExpr = 403,                       // logicalExpr
+            S_operatorExpression = 404,                // operatorExpression
+            S_notExpr = 405,                           // notExpr
+            S_existsExpr = 406,                        // existsExpr
+            S_typeExpr = 407,                          // typeExpr
+            S_commentExpr = 408,                       // commentExpr
+            S_logicalExprField = 409,                  // logicalExprField
+            S_typeValues = 410,                        // typeValues
+            S_sortSpecs = 411,                         // sortSpecs
+            S_specList = 412,                          // specList
+            S_metaSort = 413,                          // metaSort
+            S_oneOrNegOne = 414,                       // oneOrNegOne
+            S_metaSortKeyword = 415,                   // metaSortKeyword
+            S_sortSpec = 416,                          // sortSpec
+            S_start = 417,                             // start
+            S_START_ORDERED_OBJECT = 418               // START_ORDERED_OBJECT
         };
     };
 
@@ -1366,6 +1471,22 @@ public:
                 case symbol_kind::S_lt:                           // lt
                 case symbol_kind::S_lte:                          // lte
                 case symbol_kind::S_ne:                           // ne
+                case symbol_kind::S_dateExps:                     // dateExps
+                case symbol_kind::S_dateFromParts:                // dateFromParts
+                case symbol_kind::S_dateToParts:                  // dateToParts
+                case symbol_kind::S_dayOfMonth:                   // dayOfMonth
+                case symbol_kind::S_dayOfWeek:                    // dayOfWeek
+                case symbol_kind::S_dayOfYear:                    // dayOfYear
+                case symbol_kind::S_hour:                         // hour
+                case symbol_kind::S_isoDayOfWeek:                 // isoDayOfWeek
+                case symbol_kind::S_isoWeek:                      // isoWeek
+                case symbol_kind::S_isoWeekYear:                  // isoWeekYear
+                case symbol_kind::S_millisecond:                  // millisecond
+                case symbol_kind::S_minute:                       // minute
+                case symbol_kind::S_month:                        // month
+                case symbol_kind::S_second:                       // second
+                case symbol_kind::S_week:                         // week
+                case symbol_kind::S_year:                         // year
                 case symbol_kind::S_typeExpression:               // typeExpression
                 case symbol_kind::S_convert:                      // convert
                 case symbol_kind::S_toBool:                       // toBool
@@ -1422,6 +1543,7 @@ public:
                     S_nonArrayNonObjCompoundExpression:        // nonArrayNonObjCompoundExpression
                 case symbol_kind::S_expressionSingletonArray:  // expressionSingletonArray
                 case symbol_kind::S_singleArgExpression:       // singleArgExpression
+                case symbol_kind::S_nonArrayNonObjExpression:  // nonArrayNonObjExpression
                 case symbol_kind::S_match:                     // match
                 case symbol_kind::S_predicates:                // predicates
                 case symbol_kind::S_compoundMatchExprs:        // compoundMatchExprs
@@ -1507,6 +1629,15 @@ public:
                 case symbol_kind::S_timezoneArg:            // timezoneArg
                 case symbol_kind::S_charsArg:               // charsArg
                 case symbol_kind::S_optionsArg:             // optionsArg
+                case symbol_kind::S_hourArg:                // hourArg
+                case symbol_kind::S_minuteArg:              // minuteArg
+                case symbol_kind::S_secondArg:              // secondArg
+                case symbol_kind::S_millisecondArg:         // millisecondArg
+                case symbol_kind::S_dayArg:                 // dayArg
+                case symbol_kind::S_isoWeekArg:             // isoWeekArg
+                case symbol_kind::S_iso8601Arg:             // iso8601Arg
+                case symbol_kind::S_monthArg:               // monthArg
+                case symbol_kind::S_isoDayOfWeekArg:        // isoDayOfWeekArg
                 case symbol_kind::S_predicate:              // predicate
                 case symbol_kind::S_logicalExpr:            // logicalExpr
                 case symbol_kind::S_operatorExpression:     // operatorExpression
@@ -1861,6 +1992,22 @@ public:
                 case symbol_kind::S_lt:                           // lt
                 case symbol_kind::S_lte:                          // lte
                 case symbol_kind::S_ne:                           // ne
+                case symbol_kind::S_dateExps:                     // dateExps
+                case symbol_kind::S_dateFromParts:                // dateFromParts
+                case symbol_kind::S_dateToParts:                  // dateToParts
+                case symbol_kind::S_dayOfMonth:                   // dayOfMonth
+                case symbol_kind::S_dayOfWeek:                    // dayOfWeek
+                case symbol_kind::S_dayOfYear:                    // dayOfYear
+                case symbol_kind::S_hour:                         // hour
+                case symbol_kind::S_isoDayOfWeek:                 // isoDayOfWeek
+                case symbol_kind::S_isoWeek:                      // isoWeek
+                case symbol_kind::S_isoWeekYear:                  // isoWeekYear
+                case symbol_kind::S_millisecond:                  // millisecond
+                case symbol_kind::S_minute:                       // minute
+                case symbol_kind::S_month:                        // month
+                case symbol_kind::S_second:                       // second
+                case symbol_kind::S_week:                         // week
+                case symbol_kind::S_year:                         // year
                 case symbol_kind::S_typeExpression:               // typeExpression
                 case symbol_kind::S_convert:                      // convert
                 case symbol_kind::S_toBool:                       // toBool
@@ -1917,6 +2064,7 @@ public:
                     S_nonArrayNonObjCompoundExpression:        // nonArrayNonObjCompoundExpression
                 case symbol_kind::S_expressionSingletonArray:  // expressionSingletonArray
                 case symbol_kind::S_singleArgExpression:       // singleArgExpression
+                case symbol_kind::S_nonArrayNonObjExpression:  // nonArrayNonObjExpression
                 case symbol_kind::S_match:                     // match
                 case symbol_kind::S_predicates:                // predicates
                 case symbol_kind::S_compoundMatchExprs:        // compoundMatchExprs
@@ -2002,6 +2150,15 @@ public:
                 case symbol_kind::S_timezoneArg:            // timezoneArg
                 case symbol_kind::S_charsArg:               // charsArg
                 case symbol_kind::S_optionsArg:             // optionsArg
+                case symbol_kind::S_hourArg:                // hourArg
+                case symbol_kind::S_minuteArg:              // minuteArg
+                case symbol_kind::S_secondArg:              // secondArg
+                case symbol_kind::S_millisecondArg:         // millisecondArg
+                case symbol_kind::S_dayArg:                 // dayArg
+                case symbol_kind::S_isoWeekArg:             // isoWeekArg
+                case symbol_kind::S_iso8601Arg:             // iso8601Arg
+                case symbol_kind::S_monthArg:               // monthArg
+                case symbol_kind::S_isoDayOfWeekArg:        // isoDayOfWeekArg
                 case symbol_kind::S_predicate:              // predicate
                 case symbol_kind::S_logicalExpr:            // logicalExpr
                 case symbol_kind::S_operatorExpression:     // operatorExpression
@@ -2124,17 +2281,25 @@ public:
                 tok == token::ADD || tok == token::ALL_ELEMENTS_TRUE || tok == token::AND ||
                 tok == token::ANY_ELEMENT_TRUE || tok == token::ARG_CHARS ||
                 tok == token::ARG_COLL || tok == token::ARG_DATE || tok == token::ARG_DATE_STRING ||
-                tok == token::ARG_FIND || tok == token::ARG_FORMAT || tok == token::ARG_INPUT ||
-                tok == token::ARG_ON_ERROR || tok == token::ARG_ON_NULL ||
-                tok == token::ARG_OPTIONS || tok == token::ARG_PIPELINE ||
-                tok == token::ARG_REGEX || tok == token::ARG_REPLACEMENT ||
+                tok == token::ARG_DAY || tok == token::ARG_FILTER || tok == token::ARG_FIND ||
+                tok == token::ARG_FORMAT || tok == token::ARG_HOUR || tok == token::ARG_INPUT ||
+                tok == token::ARG_ISO_8601 || tok == token::ARG_ISO_DAY_OF_WEEK ||
+                tok == token::ARG_ISO_WEEK || tok == token::ARG_ISO_WEEK_YEAR ||
+                tok == token::ARG_MILLISECOND || tok == token::ARG_MINUTE ||
+                tok == token::ARG_MONTH || tok == token::ARG_ON_ERROR ||
+                tok == token::ARG_ON_NULL || tok == token::ARG_OPTIONS ||
+                tok == token::ARG_PIPELINE || tok == token::ARG_REGEX ||
+                tok == token::ARG_REPLACEMENT || tok == token::ARG_SECOND ||
                 tok == token::ARG_SIZE || tok == token::ARG_TIMEZONE || tok == token::ARG_TO ||
                 tok == token::ASIN || tok == token::ASINH || tok == token::ATAN ||
-                tok == token::ATAN2 || tok == token::ATANH || tok == token::BOOL_FALSE ||
-                tok == token::BOOL_TRUE || tok == token::CEIL || tok == token::COMMENT ||
-                tok == token::CMP || tok == token::CONCAT || tok == token::CONST_EXPR ||
-                tok == token::CONVERT || tok == token::COS || tok == token::COSH ||
-                tok == token::DATE_FROM_STRING || tok == token::DATE_TO_STRING ||
+                tok == token::ARG_YEAR || tok == token::ATAN2 || tok == token::ATANH ||
+                tok == token::BOOL_FALSE || tok == token::BOOL_TRUE || tok == token::CEIL ||
+                tok == token::COMMENT || tok == token::CMP || tok == token::CONCAT ||
+                tok == token::CONST_EXPR || tok == token::CONVERT || tok == token::COS ||
+                tok == token::COSH || tok == token::DATE_FROM_PARTS ||
+                tok == token::DATE_FROM_STRING || tok == token::DATE_TO_PARTS ||
+                tok == token::DATE_TO_STRING || tok == token::DAY_OF_MONTH ||
+                tok == token::DAY_OF_WEEK || tok == token::DAY_OF_YEAR ||
                 tok == token::DECIMAL_NEGATIVE_ONE || tok == token::DECIMAL_ONE ||
                 tok == token::DECIMAL_ZERO || tok == token::DEGREES_TO_RADIANS ||
                 tok == token::DIVIDE || tok == token::DOUBLE_NEGATIVE_ONE ||
@@ -2142,37 +2307,40 @@ public:
                 tok == token::END_OBJECT || tok == token::EQ || tok == token::EXISTS ||
                 tok == token::EXPONENT || tok == token::FLOOR || tok == token::GEO_NEAR_DISTANCE ||
                 tok == token::GEO_NEAR_POINT || tok == token::GT || tok == token::GTE ||
-                tok == token::ID || tok == token::INDEX_OF_BYTES || tok == token::INDEX_OF_CP ||
-                tok == token::INDEX_KEY || tok == token::INT_NEGATIVE_ONE ||
-                tok == token::INT_ONE || tok == token::INT_ZERO || tok == token::LITERAL ||
-                tok == token::LN || tok == token::LOG || tok == token::LOGTEN ||
-                tok == token::LONG_NEGATIVE_ONE || tok == token::LONG_ONE ||
-                tok == token::LONG_ZERO || tok == token::LT || tok == token::LTE ||
-                tok == token::LTRIM || tok == token::META || tok == token::MOD ||
-                tok == token::MULTIPLY || tok == token::NE || tok == token::NOR ||
-                tok == token::NOT || tok == token::OR || tok == token::POW ||
+                tok == token::HOUR || tok == token::ID || tok == token::INDEX_OF_BYTES ||
+                tok == token::INDEX_OF_CP || tok == token::INDEX_KEY ||
+                tok == token::INT_NEGATIVE_ONE || tok == token::INT_ONE || tok == token::INT_ZERO ||
+                tok == token::ISO_DAY_OF_WEEK || tok == token::ISO_WEEK ||
+                tok == token::ISO_WEEK_YEAR || tok == token::LITERAL || tok == token::LN ||
+                tok == token::LOG || tok == token::LOGTEN || tok == token::LONG_NEGATIVE_ONE ||
+                tok == token::LONG_ONE || tok == token::LONG_ZERO || tok == token::LT ||
+                tok == token::LTE || tok == token::LTRIM || tok == token::META ||
+                tok == token::MILLISECOND || tok == token::MINUTE || tok == token::MOD ||
+                tok == token::MONTH || tok == token::MULTIPLY || tok == token::NE ||
+                tok == token::NOR || tok == token::NOT || tok == token::OR || tok == token::POW ||
                 tok == token::RADIANS_TO_DEGREES || tok == token::RAND_VAL ||
                 tok == token::RECORD_ID || tok == token::REGEX_FIND ||
                 tok == token::REGEX_FIND_ALL || tok == token::REGEX_MATCH ||
                 tok == token::REPLACE_ALL || tok == token::REPLACE_ONE || tok == token::ROUND ||
                 tok == token::RTRIM || tok == token::SEARCH_HIGHLIGHTS ||
-                tok == token::SEARCH_SCORE || tok == token::SET_DIFFERENCE ||
-                tok == token::SET_EQUALS || tok == token::SET_INTERSECTION ||
-                tok == token::SET_IS_SUBSET || tok == token::SET_UNION || tok == token::SLICE ||
-                tok == token::SORT_KEY || tok == token::SIN || tok == token::SINH ||
-                tok == token::SPLIT || tok == token::SQRT ||
-                tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_LIMIT ||
-                tok == token::STAGE_PROJECT || tok == token::STAGE_SAMPLE ||
-                tok == token::STAGE_SKIP || tok == token::STAGE_UNION_WITH ||
-                tok == token::START_ARRAY || tok == token::START_OBJECT ||
-                tok == token::STR_CASE_CMP || tok == token::STR_LEN_BYTES ||
-                tok == token::STR_LEN_CP || tok == token::SUBSTR || tok == token::SUBSTR_BYTES ||
-                tok == token::SUBSTR_CP || tok == token::SUBTRACT || tok == token::TAN ||
-                tok == token::TANH || tok == token::TEXT_SCORE || tok == token::TO_BOOL ||
-                tok == token::TO_DATE || tok == token::TO_DECIMAL || tok == token::TO_DOUBLE ||
-                tok == token::TO_INT || tok == token::TO_LONG || tok == token::TO_LOWER ||
-                tok == token::TO_OBJECT_ID || tok == token::TO_STRING || tok == token::TO_UPPER ||
-                tok == token::TRIM || tok == token::TRUNC || tok == token::TYPE ||
+                tok == token::SEARCH_SCORE || tok == token::SECOND ||
+                tok == token::SET_DIFFERENCE || tok == token::SET_EQUALS ||
+                tok == token::SET_INTERSECTION || tok == token::SET_IS_SUBSET ||
+                tok == token::SET_UNION || tok == token::SLICE || tok == token::SORT_KEY ||
+                tok == token::SIN || tok == token::SINH || tok == token::SPLIT ||
+                tok == token::SQRT || tok == token::STAGE_INHIBIT_OPTIMIZATION ||
+                tok == token::STAGE_LIMIT || tok == token::STAGE_PROJECT ||
+                tok == token::STAGE_SAMPLE || tok == token::STAGE_SKIP ||
+                tok == token::STAGE_UNION_WITH || tok == token::START_ARRAY ||
+                tok == token::START_OBJECT || tok == token::STR_CASE_CMP ||
+                tok == token::STR_LEN_BYTES || tok == token::STR_LEN_CP || tok == token::SUBSTR ||
+                tok == token::SUBSTR_BYTES || tok == token::SUBSTR_CP || tok == token::SUBTRACT ||
+                tok == token::TAN || tok == token::TANH || tok == token::TEXT_SCORE ||
+                tok == token::TO_BOOL || tok == token::TO_DATE || tok == token::TO_DECIMAL ||
+                tok == token::TO_DOUBLE || tok == token::TO_INT || tok == token::TO_LONG ||
+                tok == token::TO_LOWER || tok == token::TO_OBJECT_ID || tok == token::TO_STRING ||
+                tok == token::TO_UPPER || tok == token::TRIM || tok == token::TRUNC ||
+                tok == token::TYPE || tok == token::WEEK || tok == token::YEAR ||
                 tok == token::START_PIPELINE || tok == token::START_MATCH ||
                 tok == token::START_SORT);
         }
@@ -2184,17 +2352,25 @@ public:
                 tok == token::ADD || tok == token::ALL_ELEMENTS_TRUE || tok == token::AND ||
                 tok == token::ANY_ELEMENT_TRUE || tok == token::ARG_CHARS ||
                 tok == token::ARG_COLL || tok == token::ARG_DATE || tok == token::ARG_DATE_STRING ||
-                tok == token::ARG_FIND || tok == token::ARG_FORMAT || tok == token::ARG_INPUT ||
-                tok == token::ARG_ON_ERROR || tok == token::ARG_ON_NULL ||
-                tok == token::ARG_OPTIONS || tok == token::ARG_PIPELINE ||
-                tok == token::ARG_REGEX || tok == token::ARG_REPLACEMENT ||
+                tok == token::ARG_DAY || tok == token::ARG_FILTER || tok == token::ARG_FIND ||
+                tok == token::ARG_FORMAT || tok == token::ARG_HOUR || tok == token::ARG_INPUT ||
+                tok == token::ARG_ISO_8601 || tok == token::ARG_ISO_DAY_OF_WEEK ||
+                tok == token::ARG_ISO_WEEK || tok == token::ARG_ISO_WEEK_YEAR ||
+                tok == token::ARG_MILLISECOND || tok == token::ARG_MINUTE ||
+                tok == token::ARG_MONTH || tok == token::ARG_ON_ERROR ||
+                tok == token::ARG_ON_NULL || tok == token::ARG_OPTIONS ||
+                tok == token::ARG_PIPELINE || tok == token::ARG_REGEX ||
+                tok == token::ARG_REPLACEMENT || tok == token::ARG_SECOND ||
                 tok == token::ARG_SIZE || tok == token::ARG_TIMEZONE || tok == token::ARG_TO ||
                 tok == token::ASIN || tok == token::ASINH || tok == token::ATAN ||
-                tok == token::ATAN2 || tok == token::ATANH || tok == token::BOOL_FALSE ||
-                tok == token::BOOL_TRUE || tok == token::CEIL || tok == token::COMMENT ||
-                tok == token::CMP || tok == token::CONCAT || tok == token::CONST_EXPR ||
-                tok == token::CONVERT || tok == token::COS || tok == token::COSH ||
-                tok == token::DATE_FROM_STRING || tok == token::DATE_TO_STRING ||
+                tok == token::ARG_YEAR || tok == token::ATAN2 || tok == token::ATANH ||
+                tok == token::BOOL_FALSE || tok == token::BOOL_TRUE || tok == token::CEIL ||
+                tok == token::COMMENT || tok == token::CMP || tok == token::CONCAT ||
+                tok == token::CONST_EXPR || tok == token::CONVERT || tok == token::COS ||
+                tok == token::COSH || tok == token::DATE_FROM_PARTS ||
+                tok == token::DATE_FROM_STRING || tok == token::DATE_TO_PARTS ||
+                tok == token::DATE_TO_STRING || tok == token::DAY_OF_MONTH ||
+                tok == token::DAY_OF_WEEK || tok == token::DAY_OF_YEAR ||
                 tok == token::DECIMAL_NEGATIVE_ONE || tok == token::DECIMAL_ONE ||
                 tok == token::DECIMAL_ZERO || tok == token::DEGREES_TO_RADIANS ||
                 tok == token::DIVIDE || tok == token::DOUBLE_NEGATIVE_ONE ||
@@ -2202,37 +2378,40 @@ public:
                 tok == token::END_OBJECT || tok == token::EQ || tok == token::EXISTS ||
                 tok == token::EXPONENT || tok == token::FLOOR || tok == token::GEO_NEAR_DISTANCE ||
                 tok == token::GEO_NEAR_POINT || tok == token::GT || tok == token::GTE ||
-                tok == token::ID || tok == token::INDEX_OF_BYTES || tok == token::INDEX_OF_CP ||
-                tok == token::INDEX_KEY || tok == token::INT_NEGATIVE_ONE ||
-                tok == token::INT_ONE || tok == token::INT_ZERO || tok == token::LITERAL ||
-                tok == token::LN || tok == token::LOG || tok == token::LOGTEN ||
-                tok == token::LONG_NEGATIVE_ONE || tok == token::LONG_ONE ||
-                tok == token::LONG_ZERO || tok == token::LT || tok == token::LTE ||
-                tok == token::LTRIM || tok == token::META || tok == token::MOD ||
-                tok == token::MULTIPLY || tok == token::NE || tok == token::NOR ||
-                tok == token::NOT || tok == token::OR || tok == token::POW ||
+                tok == token::HOUR || tok == token::ID || tok == token::INDEX_OF_BYTES ||
+                tok == token::INDEX_OF_CP || tok == token::INDEX_KEY ||
+                tok == token::INT_NEGATIVE_ONE || tok == token::INT_ONE || tok == token::INT_ZERO ||
+                tok == token::ISO_DAY_OF_WEEK || tok == token::ISO_WEEK ||
+                tok == token::ISO_WEEK_YEAR || tok == token::LITERAL || tok == token::LN ||
+                tok == token::LOG || tok == token::LOGTEN || tok == token::LONG_NEGATIVE_ONE ||
+                tok == token::LONG_ONE || tok == token::LONG_ZERO || tok == token::LT ||
+                tok == token::LTE || tok == token::LTRIM || tok == token::META ||
+                tok == token::MILLISECOND || tok == token::MINUTE || tok == token::MOD ||
+                tok == token::MONTH || tok == token::MULTIPLY || tok == token::NE ||
+                tok == token::NOR || tok == token::NOT || tok == token::OR || tok == token::POW ||
                 tok == token::RADIANS_TO_DEGREES || tok == token::RAND_VAL ||
                 tok == token::RECORD_ID || tok == token::REGEX_FIND ||
                 tok == token::REGEX_FIND_ALL || tok == token::REGEX_MATCH ||
                 tok == token::REPLACE_ALL || tok == token::REPLACE_ONE || tok == token::ROUND ||
                 tok == token::RTRIM || tok == token::SEARCH_HIGHLIGHTS ||
-                tok == token::SEARCH_SCORE || tok == token::SET_DIFFERENCE ||
-                tok == token::SET_EQUALS || tok == token::SET_INTERSECTION ||
-                tok == token::SET_IS_SUBSET || tok == token::SET_UNION || tok == token::SLICE ||
-                tok == token::SORT_KEY || tok == token::SIN || tok == token::SINH ||
-                tok == token::SPLIT || tok == token::SQRT ||
-                tok == token::STAGE_INHIBIT_OPTIMIZATION || tok == token::STAGE_LIMIT ||
-                tok == token::STAGE_PROJECT || tok == token::STAGE_SAMPLE ||
-                tok == token::STAGE_SKIP || tok == token::STAGE_UNION_WITH ||
-                tok == token::START_ARRAY || tok == token::START_OBJECT ||
-                tok == token::STR_CASE_CMP || tok == token::STR_LEN_BYTES ||
-                tok == token::STR_LEN_CP || tok == token::SUBSTR || tok == token::SUBSTR_BYTES ||
-                tok == token::SUBSTR_CP || tok == token::SUBTRACT || tok == token::TAN ||
-                tok == token::TANH || tok == token::TEXT_SCORE || tok == token::TO_BOOL ||
-                tok == token::TO_DATE || tok == token::TO_DECIMAL || tok == token::TO_DOUBLE ||
-                tok == token::TO_INT || tok == token::TO_LONG || tok == token::TO_LOWER ||
-                tok == token::TO_OBJECT_ID || tok == token::TO_STRING || tok == token::TO_UPPER ||
-                tok == token::TRIM || tok == token::TRUNC || tok == token::TYPE ||
+                tok == token::SEARCH_SCORE || tok == token::SECOND ||
+                tok == token::SET_DIFFERENCE || tok == token::SET_EQUALS ||
+                tok == token::SET_INTERSECTION || tok == token::SET_IS_SUBSET ||
+                tok == token::SET_UNION || tok == token::SLICE || tok == token::SORT_KEY ||
+                tok == token::SIN || tok == token::SINH || tok == token::SPLIT ||
+                tok == token::SQRT || tok == token::STAGE_INHIBIT_OPTIMIZATION ||
+                tok == token::STAGE_LIMIT || tok == token::STAGE_PROJECT ||
+                tok == token::STAGE_SAMPLE || tok == token::STAGE_SKIP ||
+                tok == token::STAGE_UNION_WITH || tok == token::START_ARRAY ||
+                tok == token::START_OBJECT || tok == token::STR_CASE_CMP ||
+                tok == token::STR_LEN_BYTES || tok == token::STR_LEN_CP || tok == token::SUBSTR ||
+                tok == token::SUBSTR_BYTES || tok == token::SUBSTR_CP || tok == token::SUBTRACT ||
+                tok == token::TAN || tok == token::TANH || tok == token::TEXT_SCORE ||
+                tok == token::TO_BOOL || tok == token::TO_DATE || tok == token::TO_DECIMAL ||
+                tok == token::TO_DOUBLE || tok == token::TO_INT || tok == token::TO_LONG ||
+                tok == token::TO_LOWER || tok == token::TO_OBJECT_ID || tok == token::TO_STRING ||
+                tok == token::TO_UPPER || tok == token::TRIM || tok == token::TRUNC ||
+                tok == token::TYPE || tok == token::WEEK || tok == token::YEAR ||
                 tok == token::START_PIPELINE || tok == token::START_MATCH ||
                 tok == token::START_SORT);
         }
@@ -2625,6 +2804,24 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_DAY(location_type l) {
+        return symbol_type(token::ARG_DAY, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_DAY(const location_type& l) {
+        return symbol_type(token::ARG_DAY, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_FILTER(location_type l) {
+        return symbol_type(token::ARG_FILTER, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_FILTER(const location_type& l) {
+        return symbol_type(token::ARG_FILTER, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_ARG_FIND(location_type l) {
         return symbol_type(token::ARG_FIND, std::move(l));
     }
@@ -2643,12 +2840,84 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_HOUR(location_type l) {
+        return symbol_type(token::ARG_HOUR, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_HOUR(const location_type& l) {
+        return symbol_type(token::ARG_HOUR, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_ARG_INPUT(location_type l) {
         return symbol_type(token::ARG_INPUT, std::move(l));
     }
 #else
     static symbol_type make_ARG_INPUT(const location_type& l) {
         return symbol_type(token::ARG_INPUT, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_ISO_8601(location_type l) {
+        return symbol_type(token::ARG_ISO_8601, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_ISO_8601(const location_type& l) {
+        return symbol_type(token::ARG_ISO_8601, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_ISO_DAY_OF_WEEK(location_type l) {
+        return symbol_type(token::ARG_ISO_DAY_OF_WEEK, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_ISO_DAY_OF_WEEK(const location_type& l) {
+        return symbol_type(token::ARG_ISO_DAY_OF_WEEK, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_ISO_WEEK(location_type l) {
+        return symbol_type(token::ARG_ISO_WEEK, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_ISO_WEEK(const location_type& l) {
+        return symbol_type(token::ARG_ISO_WEEK, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_ISO_WEEK_YEAR(location_type l) {
+        return symbol_type(token::ARG_ISO_WEEK_YEAR, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_ISO_WEEK_YEAR(const location_type& l) {
+        return symbol_type(token::ARG_ISO_WEEK_YEAR, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_MILLISECOND(location_type l) {
+        return symbol_type(token::ARG_MILLISECOND, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_MILLISECOND(const location_type& l) {
+        return symbol_type(token::ARG_MILLISECOND, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_MINUTE(location_type l) {
+        return symbol_type(token::ARG_MINUTE, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_MINUTE(const location_type& l) {
+        return symbol_type(token::ARG_MINUTE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_MONTH(location_type l) {
+        return symbol_type(token::ARG_MONTH, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_MONTH(const location_type& l) {
+        return symbol_type(token::ARG_MONTH, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2706,6 +2975,15 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_SECOND(location_type l) {
+        return symbol_type(token::ARG_SECOND, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_SECOND(const location_type& l) {
+        return symbol_type(token::ARG_SECOND, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_ARG_SIZE(location_type l) {
         return symbol_type(token::ARG_SIZE, std::move(l));
     }
@@ -2757,6 +3035,15 @@ public:
 #else
     static symbol_type make_ATAN(const location_type& l) {
         return symbol_type(token::ATAN, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_YEAR(location_type l) {
+        return symbol_type(token::ARG_YEAR, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_YEAR(const location_type& l) {
+        return symbol_type(token::ARG_YEAR, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2868,6 +3155,15 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_DATE_FROM_PARTS(location_type l) {
+        return symbol_type(token::DATE_FROM_PARTS, std::move(l));
+    }
+#else
+    static symbol_type make_DATE_FROM_PARTS(const location_type& l) {
+        return symbol_type(token::DATE_FROM_PARTS, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_DATE_FROM_STRING(location_type l) {
         return symbol_type(token::DATE_FROM_STRING, std::move(l));
     }
@@ -2877,12 +3173,48 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_DATE_TO_PARTS(location_type l) {
+        return symbol_type(token::DATE_TO_PARTS, std::move(l));
+    }
+#else
+    static symbol_type make_DATE_TO_PARTS(const location_type& l) {
+        return symbol_type(token::DATE_TO_PARTS, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_DATE_TO_STRING(location_type l) {
         return symbol_type(token::DATE_TO_STRING, std::move(l));
     }
 #else
     static symbol_type make_DATE_TO_STRING(const location_type& l) {
         return symbol_type(token::DATE_TO_STRING, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_DAY_OF_MONTH(location_type l) {
+        return symbol_type(token::DAY_OF_MONTH, std::move(l));
+    }
+#else
+    static symbol_type make_DAY_OF_MONTH(const location_type& l) {
+        return symbol_type(token::DAY_OF_MONTH, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_DAY_OF_WEEK(location_type l) {
+        return symbol_type(token::DAY_OF_WEEK, std::move(l));
+    }
+#else
+    static symbol_type make_DAY_OF_WEEK(const location_type& l) {
+        return symbol_type(token::DAY_OF_WEEK, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_DAY_OF_YEAR(location_type l) {
+        return symbol_type(token::DAY_OF_YEAR, std::move(l));
+    }
+#else
+    static symbol_type make_DAY_OF_YEAR(const location_type& l) {
+        return symbol_type(token::DAY_OF_YEAR, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -3048,6 +3380,15 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_HOUR(location_type l) {
+        return symbol_type(token::HOUR, std::move(l));
+    }
+#else
+    static symbol_type make_HOUR(const location_type& l) {
+        return symbol_type(token::HOUR, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_ID(location_type l) {
         return symbol_type(token::ID, std::move(l));
     }
@@ -3108,6 +3449,33 @@ public:
 #else
     static symbol_type make_INT_ZERO(const location_type& l) {
         return symbol_type(token::INT_ZERO, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ISO_DAY_OF_WEEK(location_type l) {
+        return symbol_type(token::ISO_DAY_OF_WEEK, std::move(l));
+    }
+#else
+    static symbol_type make_ISO_DAY_OF_WEEK(const location_type& l) {
+        return symbol_type(token::ISO_DAY_OF_WEEK, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ISO_WEEK(location_type l) {
+        return symbol_type(token::ISO_WEEK, std::move(l));
+    }
+#else
+    static symbol_type make_ISO_WEEK(const location_type& l) {
+        return symbol_type(token::ISO_WEEK, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ISO_WEEK_YEAR(location_type l) {
+        return symbol_type(token::ISO_WEEK_YEAR, std::move(l));
+    }
+#else
+    static symbol_type make_ISO_WEEK_YEAR(const location_type& l) {
+        return symbol_type(token::ISO_WEEK_YEAR, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -3210,12 +3578,39 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_MILLISECOND(location_type l) {
+        return symbol_type(token::MILLISECOND, std::move(l));
+    }
+#else
+    static symbol_type make_MILLISECOND(const location_type& l) {
+        return symbol_type(token::MILLISECOND, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_MINUTE(location_type l) {
+        return symbol_type(token::MINUTE, std::move(l));
+    }
+#else
+    static symbol_type make_MINUTE(const location_type& l) {
+        return symbol_type(token::MINUTE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_MOD(location_type l) {
         return symbol_type(token::MOD, std::move(l));
     }
 #else
     static symbol_type make_MOD(const location_type& l) {
         return symbol_type(token::MOD, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_MONTH(location_type l) {
+        return symbol_type(token::MONTH, std::move(l));
+    }
+#else
+    static symbol_type make_MONTH(const location_type& l) {
+        return symbol_type(token::MONTH, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -3378,6 +3773,15 @@ public:
 #else
     static symbol_type make_SEARCH_SCORE(const location_type& l) {
         return symbol_type(token::SEARCH_SCORE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_SECOND(location_type l) {
+        return symbol_type(token::SECOND, std::move(l));
+    }
+#else
+    static symbol_type make_SECOND(const location_type& l) {
+        return symbol_type(token::SECOND, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -3759,6 +4163,24 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_WEEK(location_type l) {
+        return symbol_type(token::WEEK, std::move(l));
+    }
+#else
+    static symbol_type make_WEEK(const location_type& l) {
+        return symbol_type(token::WEEK, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_YEAR(location_type l) {
+        return symbol_type(token::YEAR, std::move(l));
+    }
+#else
+    static symbol_type make_YEAR(const location_type& l) {
+        return symbol_type(token::YEAR, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_FIELDNAME(std::string v, location_type l) {
         return symbol_type(token::FIELDNAME, std::move(v), std::move(l));
     }
@@ -4052,7 +4474,7 @@ private:
     static bool yy_table_value_is_error_(int yyvalue);
 
     static const short yypact_ninf_;
-    static const signed char yytable_ninf_;
+    static const short yytable_ninf_;
 
     /// Convert a scanner token kind \a t to a symbol kind.
     /// In theory \a t should be a token_kind_type, but character literals
@@ -4301,8 +4723,8 @@ private:
 
     /// Constants.
     enum {
-        yylast_ = 3340,  ///< Last index in yytable_.
-        yynnts_ = 201,   ///< Number of nonterminal symbols.
+        yylast_ = 3982,  ///< Last index in yytable_.
+        yynnts_ = 226,   ///< Number of nonterminal symbols.
         yyfinal_ = 11    ///< Termination state number.
     };
 
@@ -4440,6 +4862,22 @@ ParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
         case symbol_kind::S_lt:                                // lt
         case symbol_kind::S_lte:                               // lte
         case symbol_kind::S_ne:                                // ne
+        case symbol_kind::S_dateExps:                          // dateExps
+        case symbol_kind::S_dateFromParts:                     // dateFromParts
+        case symbol_kind::S_dateToParts:                       // dateToParts
+        case symbol_kind::S_dayOfMonth:                        // dayOfMonth
+        case symbol_kind::S_dayOfWeek:                         // dayOfWeek
+        case symbol_kind::S_dayOfYear:                         // dayOfYear
+        case symbol_kind::S_hour:                              // hour
+        case symbol_kind::S_isoDayOfWeek:                      // isoDayOfWeek
+        case symbol_kind::S_isoWeek:                           // isoWeek
+        case symbol_kind::S_isoWeekYear:                       // isoWeekYear
+        case symbol_kind::S_millisecond:                       // millisecond
+        case symbol_kind::S_minute:                            // minute
+        case symbol_kind::S_month:                             // month
+        case symbol_kind::S_second:                            // second
+        case symbol_kind::S_week:                              // week
+        case symbol_kind::S_year:                              // year
         case symbol_kind::S_typeExpression:                    // typeExpression
         case symbol_kind::S_convert:                           // convert
         case symbol_kind::S_toBool:                            // toBool
@@ -4495,6 +4933,7 @@ ParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
         case symbol_kind::S_nonArrayNonObjCompoundExpression:  // nonArrayNonObjCompoundExpression
         case symbol_kind::S_expressionSingletonArray:          // expressionSingletonArray
         case symbol_kind::S_singleArgExpression:               // singleArgExpression
+        case symbol_kind::S_nonArrayNonObjExpression:          // nonArrayNonObjExpression
         case symbol_kind::S_match:                             // match
         case symbol_kind::S_predicates:                        // predicates
         case symbol_kind::S_compoundMatchExprs:                // compoundMatchExprs
@@ -4579,6 +5018,15 @@ ParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
         case symbol_kind::S_timezoneArg:            // timezoneArg
         case symbol_kind::S_charsArg:               // charsArg
         case symbol_kind::S_optionsArg:             // optionsArg
+        case symbol_kind::S_hourArg:                // hourArg
+        case symbol_kind::S_minuteArg:              // minuteArg
+        case symbol_kind::S_secondArg:              // secondArg
+        case symbol_kind::S_millisecondArg:         // millisecondArg
+        case symbol_kind::S_dayArg:                 // dayArg
+        case symbol_kind::S_isoWeekArg:             // isoWeekArg
+        case symbol_kind::S_iso8601Arg:             // iso8601Arg
+        case symbol_kind::S_monthArg:               // monthArg
+        case symbol_kind::S_isoDayOfWeekArg:        // isoDayOfWeekArg
         case symbol_kind::S_predicate:              // predicate
         case symbol_kind::S_logicalExpr:            // logicalExpr
         case symbol_kind::S_operatorExpression:     // operatorExpression
@@ -4749,6 +5197,22 @@ void ParserGen::basic_symbol<Base>::move(basic_symbol& s) {
         case symbol_kind::S_lt:                                // lt
         case symbol_kind::S_lte:                               // lte
         case symbol_kind::S_ne:                                // ne
+        case symbol_kind::S_dateExps:                          // dateExps
+        case symbol_kind::S_dateFromParts:                     // dateFromParts
+        case symbol_kind::S_dateToParts:                       // dateToParts
+        case symbol_kind::S_dayOfMonth:                        // dayOfMonth
+        case symbol_kind::S_dayOfWeek:                         // dayOfWeek
+        case symbol_kind::S_dayOfYear:                         // dayOfYear
+        case symbol_kind::S_hour:                              // hour
+        case symbol_kind::S_isoDayOfWeek:                      // isoDayOfWeek
+        case symbol_kind::S_isoWeek:                           // isoWeek
+        case symbol_kind::S_isoWeekYear:                       // isoWeekYear
+        case symbol_kind::S_millisecond:                       // millisecond
+        case symbol_kind::S_minute:                            // minute
+        case symbol_kind::S_month:                             // month
+        case symbol_kind::S_second:                            // second
+        case symbol_kind::S_week:                              // week
+        case symbol_kind::S_year:                              // year
         case symbol_kind::S_typeExpression:                    // typeExpression
         case symbol_kind::S_convert:                           // convert
         case symbol_kind::S_toBool:                            // toBool
@@ -4804,6 +5268,7 @@ void ParserGen::basic_symbol<Base>::move(basic_symbol& s) {
         case symbol_kind::S_nonArrayNonObjCompoundExpression:  // nonArrayNonObjCompoundExpression
         case symbol_kind::S_expressionSingletonArray:          // expressionSingletonArray
         case symbol_kind::S_singleArgExpression:               // singleArgExpression
+        case symbol_kind::S_nonArrayNonObjExpression:          // nonArrayNonObjExpression
         case symbol_kind::S_match:                             // match
         case symbol_kind::S_predicates:                        // predicates
         case symbol_kind::S_compoundMatchExprs:                // compoundMatchExprs
@@ -4888,6 +5353,15 @@ void ParserGen::basic_symbol<Base>::move(basic_symbol& s) {
         case symbol_kind::S_timezoneArg:            // timezoneArg
         case symbol_kind::S_charsArg:               // charsArg
         case symbol_kind::S_optionsArg:             // optionsArg
+        case symbol_kind::S_hourArg:                // hourArg
+        case symbol_kind::S_minuteArg:              // minuteArg
+        case symbol_kind::S_secondArg:              // secondArg
+        case symbol_kind::S_millisecondArg:         // millisecondArg
+        case symbol_kind::S_dayArg:                 // dayArg
+        case symbol_kind::S_isoWeekArg:             // isoWeekArg
+        case symbol_kind::S_iso8601Arg:             // iso8601Arg
+        case symbol_kind::S_monthArg:               // monthArg
+        case symbol_kind::S_isoDayOfWeekArg:        // isoDayOfWeekArg
         case symbol_kind::S_predicate:              // predicate
         case symbol_kind::S_logicalExpr:            // logicalExpr
         case symbol_kind::S_operatorExpression:     // operatorExpression
@@ -4958,7 +5432,7 @@ inline ParserGen::symbol_kind_type ParserGen::by_kind::type_get() const YY_NOEXC
 
 #line 57 "grammar.yy"
 }  // namespace mongo
-#line 6147 "parser_gen.hpp"
+#line 6761 "parser_gen.hpp"
 
 
 #endif  // !YY_YY_PARSER_GEN_HPP_INCLUDED

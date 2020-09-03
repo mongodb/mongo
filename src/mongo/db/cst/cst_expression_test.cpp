@@ -512,5 +512,1042 @@ TEST(CstExpressionTest, FailsToParseInvalidVarName) {
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
 }
+
+TEST(CstExpressionTest, ParsesDateToParts) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "a: { $dateToParts: {date: '$date', 'timezone': 'America/New_York', 'iso8601': true}}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname dateToParts>: { "
+        "<KeyFieldname dateArg>: \"<AggregationPath date>\", <KeyFieldname timezoneArg>: "
+        "\"<UserString America/New_York>\", "
+        "<KeyFieldname iso8601Arg>: \"<UserBoolean true>\" } } } }");
+}
+
+TEST(CstExpressionTest, ParsesDateFromParts) {
+    {
+        // Non-iso formatted version:
+        CNode output;
+        auto input = fromjson(
+            "{pipeline: [{$project: { "
+            "a: { $dateFromParts: {year: '$year', month: '$month', day: '$day',"
+            "hour: '$hour', minute: '$minute', second: '$second', millisecond:"
+            " '$millisecs', timezone: 'America/New_York'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dateFromParts>: { "
+                  "<KeyFieldname yearArg>: \"<AggregationPath year>\", <KeyFieldname monthArg>: "
+                  "\"<AggregationPath month>\", "
+                  "<KeyFieldname dayArg>: \"<AggregationPath day>\", <KeyFieldname hourArg>: "
+                  "\"<AggregationPath hour>\", <KeyFieldname minuteArg>: "
+                  "\"<AggregationPath minute>\", <KeyFieldname secondArg>: \"<AggregationPath "
+                  "second>\", <KeyFieldname millisecondArg>: "
+                  "\"<AggregationPath millisecs>\", <KeyFieldname timezoneArg>: \"<UserString "
+                  "America/New_York>\" } } } "
+                  "}");
+    }
+    {
+        // Iso formatted version:
+        CNode output;
+        auto input = fromjson(
+            "{pipeline: [{$project: { "
+            "a: { $dateFromParts: {isoWeekYear: '$year', isoWeek: '$isowk', isoDayOfWeek: '$day',"
+            "hour: '$hour', minute: '$minute', second: '$second', millisecond:"
+            " '$millisecs', timezone: 'America/New_York'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dateFromParts>: { "
+                  "<KeyFieldname isoWeekYearArg>: \"<AggregationPath year>\", <KeyFieldname "
+                  "isoWeekArg>: \"<AggregationPath isowk>\", "
+                  "<KeyFieldname isoDayOfWeekArg>: \"<AggregationPath day>\", <KeyFieldname "
+                  "hourArg>: \"<AggregationPath hour>\", "
+                  "<KeyFieldname minuteArg>: "
+                  "\"<AggregationPath minute>\", <KeyFieldname secondArg>: \"<AggregationPath "
+                  "second>\", <KeyFieldname millisecondArg>: "
+                  "\"<AggregationPath millisecs>\", <KeyFieldname timezoneArg>: \"<UserString "
+                  "America/New_York>\" } } } "
+                  "}");
+    }
+}
+
+TEST(CstExpressionTest, ParsesDayOfDateExpressionsWithDocumentArgument) {
+    {
+        // $dayOfMonth
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfMonth: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dayOfMonth>: { <KeyFieldname dateArg>: \"<AggregationPath date>\", "
+                  "<KeyFieldname timezoneArg>: \"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // $dayOfWeek
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfWeek: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dayOfWeek>: { <KeyFieldname dateArg>: \"<AggregationPath date>\", "
+                  "<KeyFieldname timezoneArg>: \"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // $dayOfYear
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfYear: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dayOfYear>: { <KeyFieldname dateArg>: \"<AggregationPath date>\", "
+                  "<KeyFieldname timezoneArg>: \"<KeyValue absentKey>\" } } } }");
+    }
+}
+
+TEST(CstExpressionTest, FailsToParseDayOfDateExpressionsWithInvalidDocumentArgument) {
+    {
+        // $dayOfMonth
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfMonth: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        // $dayOfWeek
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfWeek: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        // $dayOfYear
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfYear: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesDayOfDateExpressionsWithExpressionArgument) {
+    {
+        // $dayOfMonth
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfMonth: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dayOfMonth>: \"<AggregationPath date>\" } } }");
+    }
+    {
+        // $dayOfWeek
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfWeek: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dayOfWeek>: \"<AggregationPath date>\" } } }");
+    }
+    {
+        // $dayOfYear
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfYear: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dayOfYear>: \"<AggregationPath date>\" } } }");
+    }
+}
+
+TEST(CstExpressionTest, ParsesDayOfMonthWithArrayArgument) {
+    // $dayOfMonth
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfMonth: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dayOfMonth>: [ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with non-singleton array argument.
+    {
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: { a: { $dayOfMonth: ['$date', '$timeZone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfMonth: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesDayOfWeekWithArrayArgument) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfWeek: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dayOfWeek>: [ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with non-singleton array argument.
+    {
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: { a: { $dayOfWeek: ['$date', '$timeZone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfWeek: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesDayOfYearWithArrayArgument) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfYear: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "dayOfYear>: [ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with non-singleton array argument.
+    {
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: { a: { $dayOfYear: ['$date', '$timeZone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $dayOfYear: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesIsoDateExpressionsWithDocumentArgument) {
+    {
+        // $isoDayOfWeek
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoDayOfWeek: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "isoDayOfWeek>: { <KeyFieldname dateArg>: \"<AggregationPath date>\", "
+                  "<KeyFieldname timezoneArg>: \"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // $isoWeek
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoWeek: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "isoWeek>: { <KeyFieldname dateArg>: \"<AggregationPath date>\", "
+                  "<KeyFieldname timezoneArg>: \"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // $isoWeekYear
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoWeekYear: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "isoWeekYear>: { <KeyFieldname dateArg>: \"<AggregationPath date>\", "
+                  "<KeyFieldname timezoneArg>: \"<KeyValue absentKey>\" } } } }");
+    }
+}
+
+TEST(CstExpressionTest, FailsToParseIsoDateExpressionsWithInvalidDocumentArgument) {
+    {
+        // $isoDayOfWeek
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: { a: { $isoDayOfWeek: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        // $isoWeek
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoWeek: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        // $isoWeekYear
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: { a: { $isoWeekYear: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesIsoDateExpressionsWithExpressionArgument) {
+    {
+        // $isoDayOfWeek
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoDayOfWeek: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "isoDayOfWeek>: \"<AggregationPath date>\" } } }");
+    }
+    {
+        // $isoWeek
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoWeek: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "isoWeek>: \"<AggregationPath date>\" } } }");
+    }
+    {
+        // $isoWeekYear
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoWeekYear: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "isoWeekYear>: \"<AggregationPath date>\" } } }");
+    }
+}
+
+TEST(CstExpressionTest, ParsesIsoDayOfWeekWithArrayArgument) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoDayOfWeek: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "isoDayOfWeek>: [ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with non-singleton array argument.
+    {
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: { a: { $isoDayOfWeek: ['$date', '$timeZone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoDayOfWeek: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesIsoWeekWithArrayArgument) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoWeek: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "isoWeek>: [ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with non-singleton array argument.
+    {
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: { a: { $isoWeek: ['$date', '$timeZone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoWeek: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesIsoWeekYearWithArrayArgument) {
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoWeekYear: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "isoWeekYear>: [ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with non-singleton array argument.
+    {
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: { a: { $isoWeekYear: ['$date', '$timeZone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $isoWeekYear: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesHourExpressionWithDocumentArgument) {
+    {
+        // $hour
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $hour: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(
+            stages[0].toBson().toString(),
+            "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname hour>: { "
+            "<KeyFieldname dateArg>: \"<AggregationPath date>\", <KeyFieldname timezoneArg>: "
+            "\"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // Ensure fails to parse with invalid argument-document.
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $hour: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesMillisecondExpressionWithDocumentArgument) {
+    {
+        // $millisecond
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $millisecond: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "millisecond>: { <KeyFieldname dateArg>: \"<AggregationPath date>\", "
+                  "<KeyFieldname timezoneArg>: \"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // Ensure fails to parse with invalid argument-document.
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: { a: { $millisecond: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesMinuteExpressionWithDocumentArgument) {
+    {
+        // $minute
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $minute: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(
+            stages[0].toBson().toString(),
+            "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname minute>: { "
+            "<KeyFieldname dateArg>: \"<AggregationPath date>\", "
+            "<KeyFieldname timezoneArg>: \"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // Ensure fails to parse with invalid argument-document.
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $minute: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesMonthExpressionWithDocumentArgument) {
+    {
+        // $month
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $month: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(
+            stages[0].toBson().toString(),
+            "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname month>: { "
+            "<KeyFieldname dateArg>: \"<AggregationPath date>\", "
+            "<KeyFieldname timezoneArg>: \"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // Ensure fails to parse with invalid argument-document.
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $month: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesSecondExpressionWithDocumentArgument) {
+    {
+        // $second
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $second: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(
+            stages[0].toBson().toString(),
+            "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname second>: { "
+            "<KeyFieldname dateArg>: \"<AggregationPath date>\", "
+            "<KeyFieldname timezoneArg>: \"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // Ensure fails to parse with invalid argument-document.
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $second: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesWeekExpressionWithDocumentArgument) {
+    {
+        // $week
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $week: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(
+            stages[0].toBson().toString(),
+            "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname week>: { "
+            "<KeyFieldname dateArg>: \"<AggregationPath date>\", <KeyFieldname timezoneArg>: "
+            "\"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // Ensure fails to parse with invalid argument-document.
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $week: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesYearExpressionWithDocumentArgument) {
+    {
+        // $year
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $year: {date: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(
+            stages[0].toBson().toString(),
+            "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname year>: { "
+            "<KeyFieldname dateArg>: \"<AggregationPath date>\", <KeyFieldname timezoneArg>: "
+            "\"<KeyValue absentKey>\" } } } }");
+    }
+    {
+        // Ensure fails to parse with invalid argument-document.
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $year: {notDate: '$date'}}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesHourExpressionWithExpressionArgument) {
+    // Test with argument as-is.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $hour: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname hour>: "
+                  "\"<AggregationPath date>\" } } }");
+    }
+    // Test with argument wrapped in array.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $hour: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname hour>: "
+                  "[ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with a non-singleton array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $hour: ['$date', '$timezone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $hour: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesMillisecondExpressionWithExpressionArgument) {
+    // Test with argument as-is.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $millisecond: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "millisecond>: \"<AggregationPath date>\" } } }");
+    }
+    // Test with argument wrapped in array.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $millisecond: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "millisecond>: [ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with a non-singleton array argument.
+    {
+        CNode output;
+        auto input =
+            fromjson("{pipeline: [{$project: { a: { $millisecond: ['$date', '$timezone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $millisecond: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesMinuteExpressionWithExpressionArgument) {
+    // Test with argument as-is.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $minute: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "minute>: \"<AggregationPath date>\" } } }");
+    }
+    // Test with argument wrapped in array.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $minute: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "minute>: [ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with a non-singleton array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $minute: ['$date', '$timezone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $minute: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesMonthExpressionWithExpressionArgument) {
+    // Test with argument as-is.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $month: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "month>: \"<AggregationPath date>\" } } }");
+    }
+    // Test with argument wrapped in array.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $month: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "month>: [ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with a non-singleton array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $month: ['$date', '$timezone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $month: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesSecondExpressionWithExpressionArgument) {
+    // Test with argument as-is.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $second: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "second>: \"<AggregationPath date>\" } } }");
+    }
+    // Test with argument wrapped in array.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $second: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "second>: [ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with a non-singleton array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $second: ['$date', '$timezone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $second: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesWeekExpressionWithExpressionArgument) {
+    // Test with argument as-is.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $week: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname week>: "
+                  "\"<AggregationPath date>\" } } }");
+    }
+    // Test with argument wrapped in array.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $week: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname week>: "
+                  "[ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with a non-singleton array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $week: ['$date', '$timezone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $week: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
+
+TEST(CstExpressionTest, ParsesYearExpressionWithExpressionArgument) {
+    // Test with argument as-is.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $year: '$date'}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname year>: "
+                  "\"<AggregationPath date>\" } } }");
+    }
+    // Test with argument wrapped in array.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $year: ['$date']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname year>: "
+                  "[ \"<AggregationPath date>\" ] } } }");
+    }
+    // Ensure fails to parse with a non-singleton array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $year: ['$date', '$timezone']}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Ensure fails to parse with an empty array argument.
+    {
+        CNode output;
+        auto input = fromjson("{pipeline: [{$project: { a: { $year: []}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
 }  // namespace
 }  // namespace mongo

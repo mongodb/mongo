@@ -485,7 +485,108 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
             return make_intrusive<ExpressionDegreesToRadians>(expCtx.get(), std::move(expressions));
         case KeyFieldname::radiansToDegrees:
             return make_intrusive<ExpressionRadiansToDegrees>(expCtx.get(), std::move(expressions));
-
+        case KeyFieldname::dateToParts:
+            dassert(verifyFieldnames(
+                {KeyFieldname::dateArg, KeyFieldname::timezoneArg, KeyFieldname::iso8601Arg},
+                object[0].second.objectChildren()));
+            return make_intrusive<ExpressionDateToParts>(expCtx.get(),
+                                                         std::move(expressions[0]),
+                                                         std::move(expressions[1]),
+                                                         std::move(expressions[2]));
+        case KeyFieldname::dateFromParts:
+            if (stdx::get<KeyFieldname>(object[0].second.objectChildren().front().first) ==
+                KeyFieldname::yearArg) {
+                return make_intrusive<ExpressionDateFromParts>(expCtx.get(),
+                                                               std::move(expressions[0]),
+                                                               std::move(expressions[1]),
+                                                               std::move(expressions[2]),
+                                                               std::move(expressions[3]),
+                                                               std::move(expressions[4]),
+                                                               std::move(expressions[5]),
+                                                               std::move(expressions[6]),
+                                                               nullptr,
+                                                               nullptr,
+                                                               nullptr,
+                                                               std::move(expressions[7]));
+            } else {
+                return make_intrusive<ExpressionDateFromParts>(expCtx.get(),
+                                                               nullptr,
+                                                               nullptr,
+                                                               nullptr,
+                                                               std::move(expressions[3]),
+                                                               std::move(expressions[4]),
+                                                               std::move(expressions[5]),
+                                                               std::move(expressions[6]),
+                                                               std::move(expressions[0]),
+                                                               std::move(expressions[1]),
+                                                               std::move(expressions[2]),
+                                                               std::move(expressions[7]));
+            }
+        case KeyFieldname::dayOfMonth:
+            return make_intrusive<ExpressionDayOfMonth>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::dayOfWeek:
+            return make_intrusive<ExpressionDayOfWeek>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::dayOfYear:
+            return make_intrusive<ExpressionDayOfYear>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::hour:
+            return make_intrusive<ExpressionHour>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::isoDayOfWeek:
+            return make_intrusive<ExpressionIsoDayOfWeek>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::isoWeek:
+            return make_intrusive<ExpressionIsoWeek>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::isoWeekYear:
+            return make_intrusive<ExpressionIsoWeekYear>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::minute:
+            return make_intrusive<ExpressionMinute>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::millisecond:
+            return make_intrusive<ExpressionMillisecond>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::month:
+            return make_intrusive<ExpressionMonth>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::second:
+            return make_intrusive<ExpressionSecond>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::week:
+            return make_intrusive<ExpressionWeek>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::year:
+            return make_intrusive<ExpressionYear>(
+                expCtx.get(),
+                std::move(expressions[0]),
+                (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
         default:
             MONGO_UNREACHABLE;
     }

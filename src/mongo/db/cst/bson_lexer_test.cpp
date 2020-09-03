@@ -94,11 +94,11 @@ TEST(BSONLexerTest, MidRuleActionToSortNestedObject) {
     // Iterate until the first object.
     ASSERT_EQ(ParserGen::token::START_PIPELINE, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
+    ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     // Kick the lexer to sort the object, which should move element 'coll' in front of 'pipeline'.
     // Not that this only works because these are reserved keywords recognized by the lexer,
     // arbitrary string field names with *not* get sorted.
     lexer.sortObjTokens();
-    ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::ARG_COLL, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STRING, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::ARG_PIPELINE, lexer.getNext().type_get());
@@ -117,8 +117,8 @@ TEST(BSONLexerTest, MidRuleActionToSortDoesNotSortNestedObjects) {
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STAGE_UNION_WITH, lexer.getNext().type_get());
-    lexer.sortObjTokens();
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
+    lexer.sortObjTokens();
     ASSERT_EQ(ParserGen::token::ARG_COLL, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STRING, lexer.getNext().type_get());  // coll: 'outer'
     ASSERT_EQ(ParserGen::token::ARG_PIPELINE,
@@ -147,8 +147,8 @@ TEST(BSONLexerTest, MultipleNestedObjectsAreReorderedCorrectly) {
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STAGE_UNION_WITH, lexer.getNext().type_get());
-    lexer.sortObjTokens();
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
+    lexer.sortObjTokens();
     ASSERT_EQ(ParserGen::token::ARG_COLL, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
@@ -186,8 +186,8 @@ TEST(BSONLexerTest, MultiLevelBSONDoesntSortChildren) {
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STAGE_UNION_WITH, lexer.getNext().type_get());
-    lexer.sortObjTokens();
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
+    lexer.sortObjTokens();
     ASSERT_EQ(ParserGen::token::ARG_COLL, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STRING, lexer.getNext().type_get());  // coll: 'outer'
     ASSERT_EQ(ParserGen::token::ARG_PIPELINE,

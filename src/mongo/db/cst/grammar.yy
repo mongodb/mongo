@@ -130,21 +130,33 @@
     ARG_COLL "coll argument"
     ARG_DATE "date argument"
     ARG_DATE_STRING "dateString argument"
+    ARG_DAY "day argument"
+    ARG_FILTER "filter"
     ARG_FIND "find argument"
     ARG_FORMAT "format argument"
+    ARG_HOUR "hour argument"
     ARG_INPUT "input argument"
+    ARG_ISO_8601 "ISO 8601 argument"
+    ARG_ISO_DAY_OF_WEEK "ISO day of week argument"
+    ARG_ISO_WEEK "ISO week argument"
+    ARG_ISO_WEEK_YEAR "ISO week year argument"
+    ARG_MILLISECOND "millisecond argument"
+    ARG_MINUTE "minute argument"
+    ARG_MONTH "month argument"
     ARG_ON_ERROR "onError argument"
     ARG_ON_NULL "onNull argument"
     ARG_OPTIONS "options argument"
     ARG_PIPELINE "pipeline argument"
     ARG_REGEX "regex argument"
     ARG_REPLACEMENT "replacement argument"
+    ARG_SECOND "second argument"
     ARG_SIZE "size argument"
     ARG_TIMEZONE "timezone argument"
     ARG_TO "to argument"
     ASIN
     ASINH
     ATAN
+    ARG_YEAR "year argument"
     ATAN2
     ATANH
     BOOL_FALSE "false"
@@ -157,8 +169,13 @@
     CONVERT
     COS
     COSH
+    DATE_FROM_PARTS
     DATE_FROM_STRING
+    DATE_TO_PARTS
     DATE_TO_STRING
+    DAY_OF_MONTH
+    DAY_OF_WEEK
+    DAY_OF_YEAR
     DECIMAL_NEGATIVE_ONE "-1 (decimal)"
     DECIMAL_ONE "1 (decimal)"
     DECIMAL_ZERO "zero (decimal)"
@@ -177,6 +194,7 @@
     GEO_NEAR_POINT "geoNearPoint"
     GT
     GTE
+    HOUR
     ID
     INDEX_OF_BYTES
     INDEX_OF_CP
@@ -184,6 +202,9 @@
     INT_NEGATIVE_ONE "-1 (int)"
     INT_ONE "1 (int)"
     INT_ZERO "zero (int)"
+    ISO_DAY_OF_WEEK
+    ISO_WEEK
+    ISO_WEEK_YEAR
     LITERAL
     LN
     LOG
@@ -195,7 +216,10 @@
     LTE
     LTRIM
     META
+    MILLISECOND
+    MINUTE
     MOD
+    MONTH
     MULTIPLY
     NE
     NOR
@@ -214,6 +238,7 @@
     RTRIM
     SEARCH_HIGHLIGHTS "searchHighlights"
     SEARCH_SCORE "searchScore"
+    SECOND
     SET_DIFFERENCE "setDifference"
     SET_EQUALS "setEquals"
     SET_INTERSECTION "setIntersection"
@@ -256,6 +281,8 @@
     TRIM
     TRUNC
     TYPE
+    WEEK
+    YEAR
 
     END_OF_FILE 0 "EOF"
 ;
@@ -317,11 +344,15 @@
 %nterm <CNode> regexMatch regexArgs replaceOne replaceAll rtrim split strLenBytes strLenCP
 %nterm <CNode> strcasecmp substr substrBytes substrCP toLower toUpper trim
 %nterm <CNode> compExprs cmp eq gt gte lt lte ne
+%nterm <CNode> dateExps dateFromParts dateToParts dayOfMonth dayOfWeek dayOfYear hour
+%nterm <CNode> isoDayOfWeek isoWeek isoWeekYear millisecond minute month second week year
 %nterm <CNode> typeExpression convert toBool toDate toDecimal toDouble toInt toLong
 %nterm <CNode> toObjectId toString type
 %nterm <CNode> abs ceil divide exponent floor ln log logten mod multiply pow round sqrt subtract trunc
 %nterm <std::pair<CNode::Fieldname, CNode>> onErrorArg onNullArg
 %nterm <std::pair<CNode::Fieldname, CNode>> formatArg timezoneArg charsArg optionsArg
+%nterm <std::pair<CNode::Fieldname, CNode>> hourArg minuteArg secondArg millisecondArg dayArg
+%nterm <std::pair<CNode::Fieldname, CNode>> isoWeekArg iso8601Arg monthArg isoDayOfWeekArg
 %nterm <std::vector<CNode>> expressions values exprZeroToTwo
 %nterm <CNode> setExpression allElementsTrue anyElementTrue setDifference setEquals
 %nterm <CNode> setIntersection setIsSubset setUnion
@@ -329,7 +360,7 @@
 %nterm <CNode> trig sin cos tan sinh cosh tanh asin acos atan asinh acosh atanh atan2
 %nterm <CNode> degreesToRadians radiansToDegrees
 %nterm <CNode> nonArrayExpression nonArrayCompoundExpression nonArrayNonObjCompoundExpression
-%nterm <CNode> expressionSingletonArray singleArgExpression
+%nterm <CNode> expressionSingletonArray singleArgExpression nonArrayNonObjExpression
 // Match expressions.
 %nterm <CNode> match predicates compoundMatchExprs predValue additionalExprs
 %nterm <std::pair<CNode::Fieldname, CNode>> predicate logicalExpr operatorExpression notExpr
@@ -379,7 +410,7 @@ stageList:
 // Special rule to hint to the lexer that the next set of tokens should be sorted. Note that the
 // sort order is not lexicographical, but rather based on the enum generated from the %token list
 // above.
-START_ORDERED_OBJECT: { lexer.sortObjTokens(); } START_OBJECT;
+START_ORDERED_OBJECT: START_OBJECT { lexer.sortObjTokens(); };
 
 stage:
     inhibitOptimization | unionWith | skip | limit | project | sample
@@ -858,6 +889,39 @@ arg:
     | ARG_REPLACEMENT {
         $$ = "replacement";
     }
+    | ARG_HOUR {
+        $$ = UserFieldname{"hour"};
+    }
+    | ARG_YEAR {
+        $$ = UserFieldname{"year"};
+    }
+    | ARG_MINUTE {
+        $$ = UserFieldname{"minute"};
+    }
+    | ARG_SECOND {
+        $$ = UserFieldname{"second"};
+    }
+    | ARG_MILLISECOND {
+        $$ = UserFieldname{"millisecond"};
+    }
+    | ARG_DAY {
+        $$ = UserFieldname{"day"};
+    }
+    | ARG_ISO_DAY_OF_WEEK {
+        $$ = UserFieldname{"isoDayOfWeek"};
+    }
+    | ARG_ISO_WEEK {
+        $$ = UserFieldname{"isoWeek"};
+    }
+    | ARG_ISO_WEEK_YEAR {
+        $$ = UserFieldname{"isoWeekYear"};
+    }
+    | ARG_ISO_8601 {
+        $$ = UserFieldname{"iso8601"};
+    }
+    | ARG_MONTH {
+        $$ = UserFieldname{"month"};
+    }
 ;
 
 aggExprAsUserFieldname:
@@ -985,6 +1049,51 @@ aggExprAsUserFieldname:
     }
     | CONCAT {
         $$ = UserFieldname{"$concat"};
+    }
+    | DATE_FROM_PARTS {
+       $$ = UserFieldname{"$dateFromParts"};
+    }
+    | DATE_TO_PARTS {
+       $$ = UserFieldname{"$dateToParts"};
+    }
+    | DAY_OF_MONTH {
+       $$ = UserFieldname{"$dayOfMonth"};
+    }
+    | DAY_OF_WEEK {
+       $$ = UserFieldname{"$dayOfWeek"};
+    }
+    | DAY_OF_YEAR {
+       $$ = UserFieldname{"$dayOfYear"};
+    }
+    | HOUR {
+       $$ = UserFieldname{"$hour"};
+    }
+    | ISO_DAY_OF_WEEK {
+       $$ = UserFieldname{"$isoDayOfWeek"};
+    }
+    | ISO_WEEK {
+       $$ = UserFieldname{"$isoWeek"};
+    }
+    | ISO_WEEK_YEAR {
+       $$ = UserFieldname{"$isoWeekYear"};
+    }
+    | MILLISECOND {
+       $$ = UserFieldname{"$millisecond"};
+    }
+    | MINUTE {
+       $$ = UserFieldname{"$minute"};
+    }
+    | MONTH {
+       $$ = UserFieldname{"$month"};
+    }
+    | SECOND {
+       $$ = UserFieldname{"$second"};
+    }
+    | WEEK {
+       $$ = UserFieldname{"$week"};
+    }
+    | YEAR {
+       $$ = UserFieldname{"$year"};
     }
     | DATE_FROM_STRING {
         $$ = UserFieldname{"$dateFromString"};
@@ -1371,13 +1480,17 @@ nonArrayExpression:
     simpleValue | nonArrayCompoundExpression
 ;
 
+nonArrayNonObjExpression:
+    simpleValue | nonArrayNonObjCompoundExpression
+;
+
 nonArrayCompoundExpression:
     expressionObject | nonArrayNonObjCompoundExpression
 ;
 
 nonArrayNonObjCompoundExpression:
     arrayManipulation | maths | meta | boolExprs | literalEscapes | compExprs | typeExpression
-    | stringExps | setExpression | trig
+    | stringExps | setExpression | trig | dateExps
 ;
 
 // Helper rule for expressions which take exactly two expression arguments.
@@ -1396,7 +1509,6 @@ exprFixedThreeArg:
 
 compoundNonObjectExpression:
     expressionArray | nonArrayNonObjCompoundExpression
-;
 
 arrayManipulation:
     slice
@@ -1739,6 +1851,7 @@ timezoneArg:
     }
 ;
 
+
 dateFromString:
     START_OBJECT DATE_FROM_STRING START_ORDERED_OBJECT ARG_DATE_STRING expression formatArg timezoneArg
             onErrorArg onNullArg END_OBJECT END_OBJECT {
@@ -1754,6 +1867,296 @@ dateToString:
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dateToString, CNode{CNode::ObjectChildren{
                                          {KeyFieldname::dateArg, $expression},
                                          $formatArg, $timezoneArg, $onNullArg}}}}};
+    }
+;
+
+dateExps:
+    dateFromParts | dateToParts | dayOfMonth | dayOfWeek | dayOfYear | hour | isoDayOfWeek | isoWeek | isoWeekYear |
+      millisecond | minute | month | second | week | year
+;
+
+hourArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::hourArg, CNode{KeyValue::absentKey}};
+    }
+    | ARG_HOUR expression {
+        $$ = std::pair{KeyFieldname::hourArg, $expression};
+    }
+;
+
+minuteArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::minuteArg, CNode{KeyValue::absentKey}};
+    }
+    | ARG_MINUTE expression {
+        $$ = std::pair{KeyFieldname::minuteArg, $expression};
+    }
+;
+
+secondArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::secondArg, CNode{KeyValue::absentKey}};
+    }
+    | ARG_SECOND expression {
+        $$ = std::pair{KeyFieldname::secondArg, $expression};
+    }
+;
+
+millisecondArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::millisecondArg, CNode{KeyValue::absentKey}};
+    }
+    | ARG_MILLISECOND expression {
+        $$ = std::pair{KeyFieldname::millisecondArg, $expression};
+    }
+;
+
+dayArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::dayArg, CNode{KeyValue::absentKey}};
+    }
+    | ARG_DAY expression {
+        $$ = std::pair{KeyFieldname::dayArg, $expression};
+    }
+;
+
+isoDayOfWeekArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::isoDayOfWeekArg, CNode{KeyValue::absentKey}};
+    }
+    | ARG_ISO_DAY_OF_WEEK expression {
+        $$ = std::pair{KeyFieldname::isoDayOfWeekArg, $expression};
+    }
+;
+
+isoWeekArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::isoWeekArg, CNode{KeyValue::absentKey}};
+    }
+    | ARG_ISO_WEEK expression {
+        $$ = std::pair{KeyFieldname::isoWeekArg, $expression};
+    }
+;
+
+iso8601Arg:
+    %empty {
+        $$ = std::pair{KeyFieldname::iso8601Arg, CNode{KeyValue::falseKey}};
+    }
+    | ARG_ISO_8601 bool {
+        $$ = std::pair{KeyFieldname::iso8601Arg, $bool};
+    }
+;
+
+monthArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::monthArg, CNode{KeyValue::absentKey}};
+    }
+    | ARG_MONTH expression {
+        $$ = std::pair{KeyFieldname::monthArg, $expression};
+    }
+;
+
+dateFromParts:
+    START_OBJECT DATE_FROM_PARTS START_ORDERED_OBJECT dayArg hourArg millisecondArg minuteArg monthArg secondArg timezoneArg ARG_YEAR expression
+            END_OBJECT END_OBJECT {
+            $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dateFromParts, CNode{CNode::ObjectChildren{
+                                             {KeyFieldname::yearArg, $expression},
+                                             $monthArg, $dayArg, $hourArg, $minuteArg, $secondArg, $millisecondArg, $timezoneArg}}}}};
+    }
+    | START_OBJECT DATE_FROM_PARTS START_ORDERED_OBJECT dayArg hourArg isoDayOfWeekArg isoWeekArg ARG_ISO_WEEK_YEAR expression
+        millisecondArg minuteArg monthArg secondArg timezoneArg END_OBJECT END_OBJECT {
+            $$ = CNode {CNode::ObjectChildren{{KeyFieldname::dateFromParts, CNode{CNode::ObjectChildren{
+                                              {KeyFieldname::isoWeekYearArg, $expression},
+                                              $isoWeekArg, $isoDayOfWeekArg, $hourArg, $minuteArg, $secondArg, $millisecondArg, $timezoneArg}}}}};
+    }
+;
+
+dateToParts:
+     START_OBJECT DATE_TO_PARTS START_ORDERED_OBJECT ARG_DATE expression iso8601Arg timezoneArg END_OBJECT END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dateToParts, CNode{CNode::ObjectChildren{
+                                         {KeyFieldname::dateArg, $expression},
+                                         $timezoneArg, $iso8601Arg}}}}};
+    }
+;
+
+dayOfMonth:
+    START_OBJECT DAY_OF_MONTH nonArrayNonObjExpression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dayOfMonth, $nonArrayNonObjExpression}}};
+    }
+    | START_OBJECT DAY_OF_MONTH START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dayOfMonth, CNode{CNode::ObjectChildren{
+                  {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT DAY_OF_MONTH expressionSingletonArray END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dayOfMonth, $expressionSingletonArray}}};
+    }
+;
+
+dayOfWeek:
+    START_OBJECT DAY_OF_WEEK nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dayOfWeek, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT DAY_OF_WEEK START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dayOfWeek, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT DAY_OF_WEEK expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dayOfWeek, $expressionSingletonArray}}};
+    }
+;
+
+isoDayOfWeek:
+    START_OBJECT ISO_DAY_OF_WEEK nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::isoDayOfWeek, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT ISO_DAY_OF_WEEK START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::isoDayOfWeek, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT ISO_DAY_OF_WEEK expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::isoDayOfWeek, $expressionSingletonArray}}};
+    }
+;
+
+dayOfYear:
+    START_OBJECT DAY_OF_YEAR nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dayOfYear, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT DAY_OF_YEAR START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dayOfYear, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT DAY_OF_YEAR expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::dayOfYear, $expressionSingletonArray}}};
+    }
+;
+
+hour:
+    START_OBJECT HOUR nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::hour, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT HOUR START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::hour, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT HOUR expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::hour, $expressionSingletonArray}}};
+    }
+;
+
+month:
+    START_OBJECT MONTH nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::month, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT MONTH START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::month, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT MONTH expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::month, $expressionSingletonArray}}};
+    }
+;
+
+week:
+    START_OBJECT WEEK nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::week, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT WEEK START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::week, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT WEEK expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::week, $expressionSingletonArray}}};
+    }
+;
+
+isoWeek:
+    START_OBJECT ISO_WEEK nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::isoWeek, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT ISO_WEEK START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::isoWeek, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT ISO_WEEK expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::isoWeek, $expressionSingletonArray}}};
+    }
+;
+
+isoWeekYear:
+    START_OBJECT ISO_WEEK_YEAR nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::isoWeekYear, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT ISO_WEEK_YEAR START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::isoWeekYear, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT ISO_WEEK_YEAR expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::isoWeekYear, $expressionSingletonArray}}};
+    }
+;
+
+year:
+    START_OBJECT YEAR nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::year, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT YEAR START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::year, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT YEAR expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::year, $expressionSingletonArray}}};
+    }
+;
+
+second:
+    START_OBJECT SECOND nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::second, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT SECOND START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::second, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT SECOND expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::second, $expressionSingletonArray}}};
+    }
+;
+
+millisecond:
+    START_OBJECT MILLISECOND nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::millisecond, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT MILLISECOND START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::millisecond, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT MILLISECOND expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::millisecond, $expressionSingletonArray}}};
+    }
+;
+
+minute:
+    START_OBJECT MINUTE nonArrayNonObjExpression END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::minute, $nonArrayNonObjExpression}}};
+
+    }
+    | START_OBJECT MINUTE START_ORDERED_OBJECT ARG_DATE expression timezoneArg END_OBJECT END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::minute, CNode{CNode::ObjectChildren{
+                {KeyFieldname::dateArg, $expression}, $timezoneArg}}}}};
+    }
+    | START_OBJECT MINUTE expressionSingletonArray END_OBJECT {
+       $$ = CNode{CNode::ObjectChildren{{KeyFieldname::minute, $expressionSingletonArray}}};
     }
 ;
 

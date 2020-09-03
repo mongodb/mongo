@@ -51,8 +51,9 @@ public:
     }
 
     /**
-     * Sorts the object that starts at the current position, based on the enum for each of the field
-     * name tokens.
+     * Sorts the object that the lexer just entered (i.e., a START_OBJECT token was just emitted,
+     * and currentPosition is now one past the start of the object), based on the enum for each of
+     * the field name tokens.
      */
     void sortObjTokens();
 
