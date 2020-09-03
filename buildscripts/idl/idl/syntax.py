@@ -67,6 +67,7 @@ class IDLSpec(object):
         self.imports = None  # type: Optional[Import]
         self.server_parameters = []  # type: List[ServerParameter]
         self.configs = []  # type: List[ConfigOption]
+        self.feature_flags = []  # type: List[FeatureFlag]
 
 
 def parse_array_type(name):
@@ -525,6 +526,22 @@ class ServerParameter(common.SourceLocation):
         self.on_update = None  # type: str
 
         super(ServerParameter, self).__init__(file_name, line, column)
+
+
+class FeatureFlag(common.SourceLocation):
+    """IDL FeatureFlag information."""
+
+    # pylint: disable=too-many-instance-attributes
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct a FeatureFlag."""
+        self.name = None  # type: str
+        self.description = None  # type: str
+        self.cpp_varname = None  # type: str
+        self.default = None  # type: Expression
+
+        super(FeatureFlag, self).__init__(file_name, line, column)
 
 
 class GlobalInitializer(common.SourceLocation):

@@ -608,6 +608,25 @@ def _parse_server_parameter(ctxt, spec, name, node):
     spec.server_parameters.append(param)
 
 
+def _parse_feature_flag(ctxt, spec, name, node):
+    # type: (errors.ParserContext, syntax.IDLSpec, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
+    """Parse a feature_flags section in the IDL file."""
+    if not ctxt.is_mapping_node(node, "feature_flags"):
+        return
+
+    param = syntax.FeatureFlag(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+    param.name = name
+
+    _generic_parser(
+        ctxt, node, "feature_flags", param, {
+            "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "cpp_varname": _RuleDesc('scalar'),
+            "default": _RuleDesc('scalar_or_mapping', mapping_parser_func=_parse_expression),
+        })
+
+    spec.feature_flags.append(param)
+
+
 def _parse_config_option(ctxt, spec, name, node):
     # type: (errors.ParserContext, syntax.IDLSpec, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse a configs section in the IDL file."""
@@ -727,6 +746,8 @@ def _parse(stream, error_file_name):
             _parse_mapping(ctxt, spec, second_node, "server_parameters", _parse_server_parameter)
         elif first_name == "configs":
             _parse_mapping(ctxt, spec, second_node, "configs", _parse_config_option)
+        elif first_name == "feature_flags":
+            _parse_mapping(ctxt, spec, second_node, "feature_flags", _parse_feature_flag)
         else:
             ctxt.add_unknown_root_node_error(first_node)
 

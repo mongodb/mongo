@@ -32,11 +32,13 @@ env.CppUnitTest(
     target='idl_test',
     source=[
         'config_option_test.cpp',
+        'feature_flag_test.cpp',
         'idl_test.cpp',
         'server_parameter_specialized_test.cpp',
         'server_parameter_with_storage_test.cpp',
         env.Idlc('config_option_no_init_test.idl')[0],
         env.Idlc('config_option_test.idl')[0],
+        env.Idlc('feature_flag_test.idl')[0],
         env.Idlc('server_parameter_specialized_test.idl')[0],
         env.Idlc('server_parameter_with_storage_test.idl')[0],
         env.Idlc('unittest.idl')[0],
