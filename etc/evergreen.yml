@@ -1375,6 +1375,19 @@ functions:
         # activate the virtualenv if it has been set up
         ${activate_virtualenv}
 
+        # on *SAN builds, extract the debug symbols so they're available
+        # to the symbolizer
+        if [[ -n "${san_options}" ]]; then
+          # the debug symbols archive isn't always available (not every *SAN
+          # task requires compile)
+          if [[ -f "mongo-debugsymbols.tgz" ]]; then
+            tar xf mongo-debugsymbols.tgz
+          else
+            echo "mongo-debugsymbols.tgz is not available. If you're seeing this message in a task that uses mongod or mongos binaries, please ensure debug symbols have been generated, otherwise the llvm-symbolizer may not correctly symbolize the sanitizer output."
+          fi
+        fi
+
+
         # Set the TMPDIR environment variable to be a directory in the task's working
         # directory so that temporary files created by processes spawned by resmoke.py get
         # cleaned up after the task completes. This also ensures the spawned processes
