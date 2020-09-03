@@ -380,4 +380,103 @@ SemiFuture<void> whenAllSucceed(std::vector<FutureLike>&& futures) {
     return std::move(future).semi();
 }
 
+/**
+ * Given a vector of input Futures or ExecutorFutures, returns a SemiFuture that contains the
+ * results of each input future wrapped in a StatusWith to indicate whether it resolved with success
+ * or failure and will be resolved when all of the input futures have resolved.
+ */
+template <typename FutureT,
+          typename Value = typename FutureT::value_type,
+          typename ResultVector = std::vector<StatusOrStatusWith<Value>>>
+SemiFuture<ResultVector> whenAll(std::vector<FutureT>&& futures) {
+    invariant(futures.size() > 0);
+
+    /**
+     * A structure used to share state between the input futures.
+     */
+    struct SharedBlock {
+        SharedBlock(size_t numFuturesToWaitFor, Promise<ResultVector> result)
+            : numFuturesToWaitFor(numFuturesToWaitFor),
+              intermediateResult(numFuturesToWaitFor, {ErrorCodes::InternalError, ""}),
+              resultPromise(std::move(result)) {}
+        // Total number of input futures.
+        const size_t numFuturesToWaitFor;
+        // Tracks the number of input futures which have resolved so far.
+        AtomicWord<size_t> numReady{0};
+        // A vector containing the results of each input future.
+        ResultVector intermediateResult;
+        // The promise corresponding to the resulting SemiFuture returned by this function.
+        Promise<ResultVector> resultPromise;
+    };
+
+    auto [promise, future] = makePromiseFuture<ResultVector>();
+    auto sharedBlock = std::make_shared<SharedBlock>(futures.size(), std::move(promise));
+
+    for (size_t i = 0; i < futures.size(); ++i) {
+        std::move(futures[i])
+            .getAsync([sharedBlock, myIndex = i](StatusOrStatusWith<Value> value) mutable {
+                sharedBlock->intermediateResult[myIndex] = std::move(value);
+
+                auto numReady = sharedBlock->numReady.addAndFetch(1);
+                invariant(numReady <= sharedBlock->numFuturesToWaitFor);
+
+                if (numReady == sharedBlock->numFuturesToWaitFor) {
+                    // All results are ready.
+                    sharedBlock->resultPromise.emplaceValue(
+                        std::move(sharedBlock->intermediateResult));
+                }
+            });
+    }
+
+    return std::move(future).semi();
+}
+
+/**
+ * Result type for the whenAny function.
+ */
+template <typename T>
+struct WhenAnyResult {
+    // The result of the future that resolved first.
+    StatusOrStatusWith<T> result;
+    // The index of the future that resolved first.
+    size_t index;
+};
+
+/**
+ * Given a vector of input Futures or ExecutorFutures, returns a SemiFuture which will contain a
+ * struct containing the first of those futures to resolve along with its index in the input array.
+ */
+template <typename FutureT,
+          typename Value = typename FutureT::value_type,
+          typename Result = WhenAnyResult<Value>>
+SemiFuture<Result> whenAny(std::vector<FutureT>&& futures) {
+    invariant(futures.size() > 0);
+
+    /**
+     * A structure used to share state between the input futures.
+     */
+    struct SharedBlock {
+        SharedBlock(Promise<Result> result) : resultPromise(std::move(result)) {}
+        // Tracks whether or not the resultPromise has been set.
+        AtomicWord<bool> done{false};
+        // The promise corresponding to the resulting SemiFuture returned by this function.
+        Promise<Result> resultPromise;
+    };
+
+    auto [promise, future] = makePromiseFuture<Result>();
+    auto sharedBlock = std::make_shared<SharedBlock>(std::move(promise));
+
+    for (size_t i = 0; i < futures.size(); ++i) {
+        std::move(futures[i])
+            .getAsync([sharedBlock, myIndex = i](StatusOrStatusWith<Value> value) mutable {
+                // If this is the first input future to complete, change done to true and set the
+                // value on the promise.
+                if (!sharedBlock->done.swap(true)) {
+                    sharedBlock->resultPromise.emplaceValue(Result{std::move(value), myIndex});
+                }
+            });
+    }
+
+    return std::move(future).semi();
+}
 }  // namespace mongo

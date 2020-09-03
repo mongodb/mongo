@@ -163,21 +163,19 @@ TEST_F(AsyncTryUntilTest, LoopBodyPropagatesErrorToConditionAndCaller) {
     ASSERT_EQ(resultFut.getNoThrow(), ErrorCodes::InternalError);
 }
 
-class WhenAllSucceedTest : public FutureUtilTest {
-public:
-    template <typename T>
-    static std::pair<std::vector<Promise<T>>, std::vector<Future<T>>> makePromisesAndFutures(
-        size_t size) {
-        std::vector<Future<T>> inputFutures;
-        std::vector<Promise<T>> inputPromises;
-        for (size_t i = 0; i < size; ++i) {
-            auto [inputPromise, inputFuture] = makePromiseFuture<T>();
-            inputFutures.emplace_back(std::move(inputFuture));
-            inputPromises.emplace_back(std::move(inputPromise));
-        }
-        return std::make_pair(std::move(inputPromises), std::move(inputFutures));
+template <typename T>
+std::pair<std::vector<Promise<T>>, std::vector<Future<T>>> makePromisesAndFutures(size_t size) {
+    std::vector<Future<T>> inputFutures;
+    std::vector<Promise<T>> inputPromises;
+    for (size_t i = 0; i < size; ++i) {
+        auto [inputPromise, inputFuture] = makePromiseFuture<T>();
+        inputFutures.emplace_back(std::move(inputFuture));
+        inputPromises.emplace_back(std::move(inputPromise));
     }
-};
+    return std::make_pair(std::move(inputPromises), std::move(inputFutures));
+}
+
+class WhenAllSucceedTest : public FutureUtilTest {};
 
 static const Status kErrorStatus = {ErrorCodes::InternalError, ""};
 
@@ -461,6 +459,338 @@ TEST_F(WhenAllSucceedVoidTest, WhenAllSucceedWorksWithExecutorFutures) {
 
     ASSERT_EQ(result.getNoThrow(), Status::OK());
 }
+
+class WhenAllTest : public FutureUtilTest {};
+
+TEST_F(WhenAllTest, ReturnsOnceAllInputsResolveWithSuccess) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<int>(kNumInputs);
+
+    auto result = whenAll(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kValue = 10;
+    for (auto i = 0; i < kNumInputs; ++i) {
+        ASSERT_FALSE(result.isReady());
+        inputPromises[i].emplaceValue(kValue);
+    }
+
+    auto output = result.get();
+    ASSERT_EQ(output.size(), kNumInputs);
+    for (auto& swValue : output) {
+        ASSERT_TRUE(swValue.isOK());
+        ASSERT_EQ(swValue.getValue(), kValue);
+    }
+}
+
+TEST_F(WhenAllTest, ReturnsOnceAllInputsResolveWithError) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<int>(kNumInputs);
+
+    auto result = whenAll(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    for (auto i = 0; i < kNumInputs; ++i) {
+        ASSERT_FALSE(result.isReady());
+        inputPromises[i].setError(kErrorStatus);
+    }
+
+    auto output = result.get();
+    ASSERT_EQ(output.size(), kNumInputs);
+    for (auto& swValue : output) {
+        ASSERT_EQ(swValue.getStatus(), kErrorStatus);
+    }
+}
+
+TEST_F(WhenAllTest, ReturnsOnceAllInputsResolveWithSuccessWithVoidInputs) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<void>(kNumInputs);
+
+    auto result = whenAll(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    for (auto i = 0; i < kNumInputs; ++i) {
+        ASSERT_FALSE(result.isReady());
+        inputPromises[i].emplaceValue();
+    }
+
+    auto output = result.get();
+    ASSERT_EQ(output.size(), kNumInputs);
+    for (auto& status : output) {
+        ASSERT_OK(status);
+    }
+}
+
+TEST_F(WhenAllTest, ReturnsOnceAllInputsResolveWithErrorWithVoidInputs) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<void>(kNumInputs);
+
+    auto result = whenAll(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    for (auto i = 0; i < kNumInputs; ++i) {
+        ASSERT_FALSE(result.isReady());
+        inputPromises[i].setError(kErrorStatus);
+    }
+
+    auto output = result.get();
+    ASSERT_EQ(output.size(), kNumInputs);
+    for (auto& status : output) {
+        ASSERT_EQ(status, kErrorStatus);
+    }
+}
+
+
+TEST_F(WhenAllTest, ReturnsOnceAllInputsResolveWithMixOfSuccessAndError) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<int>(kNumInputs);
+
+    auto result = whenAll(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kValue = 10;
+    const auto kNumSuccesses = 3;
+    for (auto i = 0; i < kNumInputs; ++i) {
+        ASSERT_FALSE(result.isReady());
+        if (i < kNumSuccesses) {
+            inputPromises[i].emplaceValue(kValue);
+        } else {
+            inputPromises[i].setError(kErrorStatus);
+        }
+    }
+
+    auto output = result.get();
+    ASSERT_EQ(output.size(), kNumInputs);
+    for (auto i = 0; i < kNumInputs; ++i) {
+        auto swValue = output[i];
+        if (i < kNumSuccesses) {
+            ASSERT_TRUE(swValue.isOK());
+            ASSERT_EQ(swValue.getValue(), kValue);
+        } else {
+            ASSERT_EQ(swValue.getStatus(), kErrorStatus);
+        }
+    }
+}
+
+TEST_F(WhenAllTest, ReturnsOnceAllInputsResolveWithMixOfSuccessAndErrorInReverseOrder) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<int>(kNumInputs);
+
+    auto result = whenAll(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kValue = 10;
+    const auto kNumSuccesses = 3;
+    // Iterate over inputs backwards, resolving them one at a time.
+    for (auto i = kNumInputs - 1; i >= 0; --i) {
+        ASSERT_FALSE(result.isReady());
+        if (i < kNumSuccesses) {
+            inputPromises[i].emplaceValue(kValue);
+        } else {
+            inputPromises[i].setError(kErrorStatus);
+        }
+    }
+
+    auto output = result.get();
+    ASSERT_EQ(output.size(), kNumInputs);
+    for (auto i = kNumInputs - 1; i >= 0; --i) {
+        auto swValue = output[i];
+        if (i < kNumSuccesses) {
+            ASSERT_TRUE(swValue.isOK());
+            ASSERT_EQ(swValue.getValue(), kValue);
+        } else {
+            ASSERT_EQ(swValue.getStatus(), kErrorStatus);
+        }
+    }
+}
+
+TEST_F(WhenAllTest, WorksWithExecutorFutures) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, rawInputFutures] = makePromisesAndFutures<int>(kNumInputs);
+
+    // Turn raw input Futures into ExecutorFutures.
+    std::vector<ExecutorFuture<int>> inputFutures;
+    for (auto i = 0; i < kNumInputs; ++i) {
+        inputFutures.emplace_back(std::move(rawInputFutures[i]).thenRunOn(executor()));
+    }
+
+    auto result = whenAll(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kValue = 10;
+    for (auto i = 0; i < kNumInputs; ++i) {
+        ASSERT_FALSE(result.isReady());
+        inputPromises[i].emplaceValue(kValue);
+    }
+
+    auto output = result.get();
+    ASSERT_EQ(output.size(), kNumInputs);
+    for (auto& swValue : output) {
+        ASSERT_TRUE(swValue.isOK());
+        ASSERT_EQ(swValue.getValue(), kValue);
+    }
+}
+
+class WhenAnyTest : public FutureUtilTest {};
+
+TEST_F(WhenAnyTest, ReturnsTheFirstFutureToResolveWhenThatFutureContainsSuccessAndOnlyOneInput) {
+    std::vector<Future<int>> inputFutures;
+    auto [promise, future] = makePromiseFuture<int>();
+    inputFutures.emplace_back(std::move(future));
+    auto result = whenAny(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kValue = 10;
+    promise.emplaceValue(kValue);
+    auto [swVal, idx] = result.get();
+    ASSERT_TRUE(swVal.isOK());
+    ASSERT_EQ(swVal.getValue(), kValue);
+    ASSERT_EQ(idx, 0);
+}
+
+TEST_F(WhenAnyTest, ReturnsTheFirstFutureToResolveWhenThatFutureContainsSuccessAndMultipleInputs) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<int>(kNumInputs);
+
+    auto result = whenAny(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kWhichIdxWillBeFirst = 3;
+    const auto kValue = 10;
+    inputPromises[kWhichIdxWillBeFirst].emplaceValue(kValue);
+    auto [swVal, idx] = result.get();
+    ASSERT_TRUE(swVal.isOK());
+    ASSERT_EQ(swVal.getValue(), kValue);
+    ASSERT_EQ(idx, kWhichIdxWillBeFirst);
+}
+
+TEST_F(WhenAnyTest,
+       ReturnsTheFirstFutureToResolveWhenThatFutureContainsSuccessAndMultipleInputsWithVoidInputs) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<void>(kNumInputs);
+
+    auto result = whenAny(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kWhichIdxWillBeFirst = 3;
+    inputPromises[kWhichIdxWillBeFirst].emplaceValue();
+    auto [status, idx] = result.get();
+    ASSERT_OK(status);
+    ASSERT_EQ(idx, kWhichIdxWillBeFirst);
+}
+
+TEST_F(
+    WhenAnyTest,
+    ReturnsTheFirstFutureToResolveWhenThatFutureContainsSuccessAndMultipleInputsAndOthersSucceedAfter) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<int>(kNumInputs);
+
+    auto result = whenAny(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kWhichIdxWillBeFirst = 3;
+    const auto kValue = 10;
+    inputPromises[kWhichIdxWillBeFirst].emplaceValue(kValue);
+    auto [swVal, idx] = result.get();
+    ASSERT_TRUE(swVal.isOK());
+    ASSERT_EQ(swVal.getValue(), kValue);
+    ASSERT_EQ(idx, kWhichIdxWillBeFirst);
+
+    // Make sure there's no problem when these resolve after whenAny has resolved due to an error.
+    for (auto i = 0; i < kNumInputs; ++i) {
+        if (i != kWhichIdxWillBeFirst) {
+            inputPromises[i].emplaceValue(5);
+        }
+    }
+}
+
+TEST_F(WhenAnyTest, ReturnsTheFirstFutureToResolveWhenThatFutureContainsAnErrorAndOnlyOneInput) {
+    std::vector<Future<int>> inputFutures;
+    auto [promise, future] = makePromiseFuture<int>();
+    inputFutures.emplace_back(std::move(future));
+    auto result = whenAny(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    promise.setError(kErrorStatus);
+    auto [swVal, idx] = result.get();
+    ASSERT_EQ(swVal.getStatus(), kErrorStatus);
+    ASSERT_EQ(idx, 0);
+}
+
+TEST_F(WhenAnyTest, ReturnsTheFirstFutureToResolveWhenThatFutureContainsAnErrorAndMultipleInputs) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<int>(kNumInputs);
+
+    auto result = whenAny(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kWhichIdxWillBeFirst = 3;
+    inputPromises[kWhichIdxWillBeFirst].setError(kErrorStatus);
+    auto [swVal, idx] = result.get();
+    ASSERT_EQ(swVal.getStatus(), kErrorStatus);
+    ASSERT_EQ(idx, kWhichIdxWillBeFirst);
+}
+
+TEST_F(WhenAnyTest,
+       ReturnsTheFirstFutureToResolveWhenThatFutureContainsAnErrorAndMultipleInputsWithVoidInputs) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<void>(kNumInputs);
+
+    auto result = whenAny(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kWhichIdxWillBeFirst = 3;
+    inputPromises[kWhichIdxWillBeFirst].setError(kErrorStatus);
+    auto [status, idx] = result.get();
+    ASSERT_EQ(status, kErrorStatus);
+    ASSERT_EQ(idx, kWhichIdxWillBeFirst);
+}
+
+TEST_F(
+    WhenAnyTest,
+    ReturnsTheFirstFutureToResolveWhenThatFutureContainsAnErrorAndMultipleInputsAndOthersSucceedAfter) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, inputFutures] = makePromisesAndFutures<int>(kNumInputs);
+
+    auto result = whenAny(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kWhichIdxWillBeFirst = 3;
+    inputPromises[kWhichIdxWillBeFirst].setError(kErrorStatus);
+    auto [swVal, idx] = result.get();
+    ASSERT_EQ(swVal.getStatus(), kErrorStatus);
+    ASSERT_EQ(idx, kWhichIdxWillBeFirst);
+
+    // Make sure there's no problem when these resolve after whenAny has resolved due to an error.
+    for (auto i = 0; i < kNumInputs; ++i) {
+        if (i != kWhichIdxWillBeFirst) {
+            inputPromises[i].emplaceValue(5);
+        }
+    }
+}
+
+TEST_F(WhenAnyTest, WorksWithExecutorFutures) {
+    const auto kNumInputs = 5;
+    auto [inputPromises, rawInputFutures] = makePromisesAndFutures<int>(kNumInputs);
+
+    // Turn raw input Futures into ExecutorFutures.
+    std::vector<ExecutorFuture<int>> inputFutures;
+    for (auto i = 0; i < kNumInputs; ++i) {
+        inputFutures.emplace_back(std::move(rawInputFutures[i]).thenRunOn(executor()));
+    }
+
+    auto result = whenAny(std::move(inputFutures));
+    ASSERT_FALSE(result.isReady());
+
+    const auto kWhichIdxWillBeFirst = 3;
+    const auto kValue = 10;
+    inputPromises[kWhichIdxWillBeFirst].emplaceValue(kValue);
+    auto [swVal, idx] = result.get();
+    ASSERT_TRUE(swVal.isOK());
+    ASSERT_EQ(swVal.getValue(), kValue);
+    ASSERT_EQ(idx, kWhichIdxWillBeFirst);
+}
+
 
 }  // namespace
 }  // namespace mongo
