@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,7 +48,9 @@ namespace {
 
 class ExtensionsCallbackRealTest : public unittest::Test {
 public:
-    ExtensionsCallbackRealTest() : _nss("unittests.extensions_callback_real_test") {}
+    ExtensionsCallbackRealTest() : _nss("unittests.extensions_callback_real_test") {
+        _isDesugarWhereToFunctionOn = internalQueryDesugarWhereToFunction.load();
+    }
 
     void setUp() final {
         AutoGetOrCreateDb autoDb(&_opCtx, _nss.db(), MODE_X);
@@ -76,6 +79,7 @@ protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
     const NamespaceString _nss;
+    bool _isDesugarWhereToFunctionOn{false};
 };
 
 TEST_F(ExtensionsCallbackRealTest, TextNoIndex) {
@@ -242,25 +246,24 @@ TEST_F(ExtensionsCallbackRealTest, TextDiacriticSensitiveAndCaseSensitiveTrue) {
 //
 const NamespaceString kTestNss = NamespaceString("db.dummy");
 
-// TODO SERVER-46494: Re-enable this test.
-/**
 TEST_F(ExtensionsCallbackRealTest, WhereExpressionDesugarsToExprAndInternalJs) {
-    auto query1 = fromjson("{$where: 'function() { return this.x == 10; }'}");
-    boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(&_opCtx, nullptr, kTestNss));
+    if (_isDesugarWhereToFunctionOn) {
+        auto query1 = fromjson("{$where: 'function() { return this.x == 10; }'}");
+        boost::intrusive_ptr<ExpressionContext> expCtx(
+            new ExpressionContext(&_opCtx, nullptr, kTestNss));
 
-    auto expr1 = unittest::assertGet(
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(expCtx, query1.firstElement()));
+        auto expr1 = unittest::assertGet(
+            ExtensionsCallbackReal(&_opCtx, &_nss).parseWhere(expCtx, query1.firstElement()));
 
-    BSONObjBuilder gotMatch;
-    expr1->serialize(&gotMatch);
+        BSONObjBuilder gotMatch;
+        expr1->serialize(&gotMatch);
 
-    auto expectedMatch = fromjson(
-        "{$expr: {$function: {'body': 'function() { return this.x == 10; }', 'args': "
-        "['$$CURRENT'], 'lang': 'js', '_internalSetObjToThis': true}}}");
-    ASSERT_BSONOBJ_EQ(gotMatch.obj(), expectedMatch);
+        auto expectedMatch = fromjson(
+            "{$expr: {$function: {'body': 'function() { return this.x == 10; }', 'args': "
+            "['$$CURRENT'], 'lang': 'js', '_internalSetObjToThis': true}}}");
+        ASSERT_BSONOBJ_EQ(gotMatch.obj(), expectedMatch);
+    }
 }
-*/
 
 }  // namespace
 }  // namespace mongo
