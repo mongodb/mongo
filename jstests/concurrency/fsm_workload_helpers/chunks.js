@@ -95,7 +95,11 @@ var ChunkHelper = (function() {
                     // The chunk migration has surely been aborted if there was another active
                     // chunk migration on the donor.
                     (runningWithStepdowns && res.code === ErrorCodes.OperationFailed &&
-                     res.errmsg.includes("does not match active session id"))));
+                     res.errmsg.includes("does not match active session id")) ||
+                    // A stepdown may cause the collection's lock to become temporarily unreleasable
+                    // and cause the chunk migration to timeout.  The migration may still succeed
+                    // after the lock's lease expires.
+                    (runningWithStepdowns && res.code === ErrorCodes.LockBusy)));
     }
 
     function mergeChunks(db, collName, bounds) {
