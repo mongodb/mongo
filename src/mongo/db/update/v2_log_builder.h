@@ -59,9 +59,9 @@ struct Node {
  * 'DocumentInsertionNode' also repesent an insert for the cases where an object is created
  * implicity.
  */
-struct InsertElement : public Node {
-    InsertElement(mutablebson::Element el) : elt(el) {}
-    InsertElement(BSONElement el) : elt(el) {}
+struct InsertNode : public Node {
+    InsertNode(mutablebson::Element el) : elt(el) {}
+    InsertNode(BSONElement el) : elt(el) {}
 
     NodeType type() const override {
         return NodeType::kInsert;

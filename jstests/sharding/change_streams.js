@@ -132,14 +132,14 @@ function runTest(collName, shardKey) {
         operationType: "update",
         ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
         documentKey: makeShardKeyDocument(-10),
-        updateDescription: {updatedFields: {b: 2}, removedFields: []},
+        updateDescription: {updatedFields: {b: 2}, removedFields: [], truncatedArrays: []},
     };
 
     const expectedEvent2 = {
         operationType: "update",
         ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
         documentKey: makeShardKeyDocument(10),
-        updateDescription: {updatedFields: {b: 2}, removedFields: []},
+        updateDescription: {updatedFields: {b: 2}, removedFields: [], truncatedArrays: []},
     };
 
     // The multi-update events can be observed in any order, depending on the clusterTime at which
@@ -150,7 +150,7 @@ function runTest(collName, shardKey) {
     for (let expectedEvent of expectedEvents) {
         assert.soon(() => changeStream.hasNext());
         const actualEvent = changeStream.next();
-        actualEvents.push(pruneOptionalFields(actualEvent, expectedEvent));
+        actualEvents.push(canonicalizeEventForTesting(actualEvent, expectedEvent));
     }
     changeStream.close();
 

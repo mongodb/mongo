@@ -33,6 +33,7 @@
 
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_serialization.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 
 namespace mongo {
 
@@ -45,7 +46,9 @@ public:
     /**
      * Initializes the executor with the diff to apply.
      */
-    explicit DeltaExecutor(doc_diff::Diff diff) : _diff(std::move(diff)) {}
+    explicit DeltaExecutor(doc_diff::Diff diff)
+        : _diff(std::move(diff)),
+          _outputOplogEntry(update_oplog_entry::makeDeltaOplogEntry(_diff)) {}
 
     ApplyResult applyUpdate(ApplyParams applyParams) const final;
 
@@ -57,6 +60,11 @@ public:
 
 private:
     doc_diff::Diff _diff;
+
+    // Although the delta executor is only used for applying $v:2 oplog entries on secondaries, it
+    // still needs to produce an oplog entry from the applyUpdate() method so that OpObservers may
+    // handle the event appropriately.
+    BSONObj _outputOplogEntry;
 };
 
 }  // namespace mongo

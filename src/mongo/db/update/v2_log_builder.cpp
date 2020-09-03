@@ -29,6 +29,8 @@
 
 #include "mongo/db/update/v2_log_builder.h"
 
+#include <stack>
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -86,7 +88,7 @@ Status V2LogBuilder::logUpdatedField(const RuntimeUpdatePath& path, mutablebson:
 Status V2LogBuilder::logCreatedField(const RuntimeUpdatePath& path,
                                      int idxOfFirstNewComponent,
                                      mutablebson::Element elt) {
-    auto newNode = std::make_unique<InsertElement>(elt);
+    auto newNode = std::make_unique<InsertNode>(elt);
     addNodeAtPath(path, &_root, std::move(newNode), idxOfFirstNewComponent);
     return Status::OK();
 }
@@ -94,7 +96,7 @@ Status V2LogBuilder::logCreatedField(const RuntimeUpdatePath& path,
 Status V2LogBuilder::logCreatedField(const RuntimeUpdatePath& path,
                                      int idxOfFirstNewComponent,
                                      BSONElement elt) {
-    auto newNode = std::make_unique<InsertElement>(elt);
+    auto newNode = std::make_unique<InsertNode>(elt);
     addNodeAtPath(path, &_root, std::move(newNode), idxOfFirstNewComponent);
     return Status::OK();
 }
@@ -179,126 +181,245 @@ void appendElementToBuilder(stdx::variant<mutablebson::Element, BSONElement> ele
             [&](BSONElement element) { builder->appendAs(element, fieldName); }},
         elem);
 }
-void serializeNewlyCreatedDocument(DocumentNode* const node, BSONObjBuilder* out) {
-    for (auto&& [fieldName, child] : node->inserts) {
-        if (child->type() == NodeType::kInsert) {
-            appendElementToBuilder(checked_cast<InsertElement*>(child)->elt, fieldName, out);
-            continue;
+
+// Construction of the $v:2 diff needs to handle the same number of levels of recursion as the
+// maximum permitted BSON depth. In order to avoid the possibility of stack overflow, which has
+// been observed in configurations that use small stack sizes(such as 'dbg=on'), we use an explicit
+// stack data structure stored on the heap instead.
+//
+// The Frame class represents one "frame" of this explicit stack.
+class Frame {
+public:
+    virtual ~Frame() {}
+
+    // When execute() is called, the Frame may either return a new Frame to be placed on top of the
+    // stack, or return nullptr, indicating that the frame has finished and can be destroyed.
+    //
+    // If a Frame returns a new stack frame, it must be able to pick up where it left off when
+    // execute() is called on it again.
+    virtual std::unique_ptr<Frame> execute() = 0;
+};
+using UniqueFrame = std::unique_ptr<Frame>;
+
+// Helper used for creating a new frame from a sub-diff node. Definition depends on some of the
+// *Frame constructors.
+UniqueFrame makeSubNodeFrameHelper(InternalNode* node, BSONObjBuilder builder);
+// Given a 'node' stored in the 'inserts' section of an InternalNode, will either append that
+// node's value to the given builder, or return a new stack frame which will build the object to be
+// inserted. 'node' must be an InsertionNode or a DocumentInsertNode.
+UniqueFrame handleInsertHelper(StringData fieldName, Node* node, BSONObjBuilder* bob);
+
+// Stack frame used to maintain state while serializing DocumentInsertionNodes.
+class DocumentInsertFrame final : public Frame {
+public:
+    DocumentInsertFrame(const DocumentInsertionNode& node, BSONObjBuilder bob)
+        : _node(node), _bob(std::move(bob)) {}
+
+    UniqueFrame execute() override {
+        for (; _insertIdx < _node.children.size(); ++_insertIdx) {
+            auto&& [fieldName, child] = _node.inserts[_insertIdx];
+
+            if (auto newFrame = handleInsertHelper(fieldName, child, &_bob)) {
+                ++_insertIdx;
+                return newFrame;
+            }
         }
 
-        BSONObjBuilder childBuilder(out->subobjStart(fieldName));
-        serializeNewlyCreatedDocument(checked_cast<DocumentNode* const>(child), &childBuilder);
+        return nullptr;
     }
+
+private:
+    size_t _insertIdx = 0;
+    const DocumentInsertionNode& _node;
+    BSONObjBuilder _bob;
+};
+
+// Stack frame used to maintain state while serializing DocumentSubDiffNodes.
+class DocumentSubDiffFrame final : public Frame {
+public:
+    DocumentSubDiffFrame(const DocumentSubDiffNode& node, BSONObjBuilder bob)
+        : _node(node), _bob(std::move(bob)) {}
+
+    UniqueFrame execute() override {
+        if (!_wroteDeletesAndUpdates) {
+            if (!_node.deletes.empty()) {
+                BSONObjBuilder subBob(_bob.subobjStart(doc_diff::kDeleteSectionFieldName));
+                for (auto&& [fieldName, node] : _node.deletes) {
+                    // The deletes are logged in the form {fieldName: false} in $v:2 format.
+                    subBob.append(fieldName, false);
+                }
+            }
+            if (!_node.updates.empty()) {
+                BSONObjBuilder subBob(_bob.subobjStart(doc_diff::kUpdateSectionFieldName));
+                for (auto&& [fieldName, node] : _node.updates) {
+                    appendElementToBuilder(node->elt, fieldName, &subBob);
+                }
+            }
+            _wroteDeletesAndUpdates = true;
+        }
+
+        for (; _insertIdx < _node.inserts.size(); ++_insertIdx) {
+            if (!_insertBob) {
+                _insertBob.emplace(_bob.subobjStart(doc_diff::kInsertSectionFieldName));
+            }
+
+            auto&& [fieldName, child] = _node.inserts[_insertIdx];
+
+            if (auto newFrame = handleInsertHelper(fieldName, child, _insertBob.get_ptr())) {
+                ++_insertIdx;
+                return newFrame;
+            }
+        }
+
+        if (_insertBob) {
+            // All inserts have been written so we destroy the insert builder now.
+            _insertBob = boost::none;
+        }
+
+        if (_subDiffIdx != _node.subDiffs.size()) {
+            auto&& [fieldName, child] = _node.subDiffs[_subDiffIdx];
+
+            BSONObjBuilder childBuilder =
+                _bob.subobjStart(std::string(1, doc_diff::kSubDiffSectionFieldPrefix) + fieldName);
+            ++_subDiffIdx;
+            return makeSubNodeFrameHelper(child, std::move(childBuilder));
+        }
+
+        return nullptr;
+    }
+
+    BSONObjBuilder& bob() {
+        return _bob;
+    }
+
+private:
+    const DocumentSubDiffNode& _node;
+    BSONObjBuilder _bob;
+
+    // Indicates whether or not we've written deletes and updates yet. Since deletes and updates
+    // are always leaf nodes, they are always written in the first call to execute().
+    bool _wroteDeletesAndUpdates = false;
+
+    // Keeps track of which insertion or subDiff is being serialized.
+    size_t _insertIdx = 0;
+    size_t _subDiffIdx = 0;
+
+    boost::optional<BSONObjBuilder> _insertBob;
+};
+
+// Stack frame used to maintain state while serializing ArrayNodes.
+class ArrayFrame final : public Frame {
+public:
+    ArrayFrame(const ArrayNode& node, BSONObjBuilder bob)
+        : _node(node), _bob(std::move(bob)), _childIt(node.children.begin()) {}
+
+    UniqueFrame execute() override {
+        invariant(!_node.children.empty());
+        if (_childIt == _node.children.begin()) {
+            _bob.append(doc_diff::kArrayHeader, true);
+        }
+
+        for (; _childIt != _node.children.end(); ++_childIt) {
+
+            auto&& [idx, child] = *_childIt;
+            auto idxAsStr = std::to_string(idx);
+
+            switch (child->type()) {
+                case (NodeType::kUpdate): {
+                    const auto& valueNode = checked_cast<const UpdateNode&>(*child);
+                    appendElementToBuilder(
+                        valueNode.elt, doc_diff::kUpdateSectionFieldName + idxAsStr, &_bob);
+                    break;
+                }
+                case (NodeType::kInsert): {
+                    const auto& valueNode = checked_cast<const InsertNode&>(*child);
+                    appendElementToBuilder(
+                        valueNode.elt, doc_diff::kUpdateSectionFieldName + idxAsStr, &_bob);
+                    break;
+                }
+                case (NodeType::kDocumentInsert): {
+                    // This represents an array element that is being created with a sub object.
+                    //
+                    // For example {$set: {"a.0.c": 1}} when the input document is {a: []}. Here we
+                    // need to create the array element at '0', then sub document 'c'.
+
+                    ++_childIt;
+                    return std::make_unique<DocumentInsertFrame>(
+                        *checked_cast<DocumentInsertionNode*>(child.get()),
+                        BSONObjBuilder(
+                            _bob.subobjStart(doc_diff::kUpdateSectionFieldName + idxAsStr)));
+                }
+                case (NodeType::kDocumentSubDiff):
+                case (NodeType::kArray): {
+                    InternalNode* subNode = checked_cast<InternalNode*>(child.get());
+                    BSONObjBuilder childBuilder = _bob.subobjStart(
+                        std::string(1, doc_diff::kSubDiffSectionFieldPrefix) + idxAsStr);
+
+                    ++_childIt;
+                    return makeSubNodeFrameHelper(subNode, std::move(childBuilder));
+                }
+                case (NodeType::kDelete): {
+                    MONGO_UNREACHABLE;
+                }
+            }
+        }
+
+        return nullptr;
+    }
+
+private:
+    const ArrayNode& _node;
+    BSONObjBuilder _bob;
+    decltype(ArrayNode::children)::const_iterator _childIt;
+};
+
+BSONObj writeDiff(const DocumentSubDiffNode& root) {
+    std::stack<UniqueFrame> stack;
+    stack.push(std::make_unique<DocumentSubDiffFrame>(root, BSONObjBuilder{}));
+
+    // Iterate until the stack size is one and there is no more work to be done.
+    while (true) {
+        auto nextFrame = stack.top()->execute();
+        if (nextFrame) {
+            stack.push(std::move(nextFrame));
+        } else if (stack.size() == 1) {
+            break;
+        } else {
+            stack.pop();
+        }
+    }
+
+    invariant(stack.size() == 1);
+
+    auto& topFrame = checked_cast<DocumentSubDiffFrame&>(*stack.top());
+    return topFrame.bob().obj();
 }
 
-// Mutually recursive with writeArrayDiff().
-void writeSubNodeHelper(InternalNode* node, BSONObjBuilder* builder);
-
-void writeArrayDiff(const ArrayNode& node, BSONObjBuilder* builder) {
-    builder->append(doc_diff::kArrayHeader, true);
-    for (auto&& [idx, child] : node.children) {
-        auto idxAsStr = std::to_string(idx);
-        switch (child->type()) {
-            case (NodeType::kUpdate): {
-                const auto& valueNode = checked_cast<const UpdateNode&>(*child);
-                appendElementToBuilder(
-                    valueNode.elt, doc_diff::kUpdateSectionFieldName + idxAsStr, builder);
-                break;
-            }
-            case (NodeType::kInsert): {
-                const auto& valueNode = checked_cast<const InsertElement&>(*child);
-                appendElementToBuilder(
-                    valueNode.elt, doc_diff::kUpdateSectionFieldName + idxAsStr, builder);
-                break;
-            }
-            case (NodeType::kDocumentInsert): {
-                // This represents that the array element is being created which has a sub-object.
-                //
-                // For example {$set: {"a.0.c": 1}} when the input document is {a: []}. Here we need
-                // to create the array element at '0', then sub document 'c'.
-                BSONObjBuilder childBuilder =
-                    builder->subobjStart(doc_diff::kUpdateSectionFieldName + idxAsStr);
-                serializeNewlyCreatedDocument(checked_cast<DocumentNode*>(child.get()),
-                                              &childBuilder);
-                break;
-            }
-            case (NodeType::kDocumentSubDiff):
-            case (NodeType::kArray): {
-                InternalNode* subNode = checked_cast<InternalNode*>(child.get());
-                BSONObjBuilder childBuilder = builder->subobjStart(
-                    std::string(1, doc_diff::kSubDiffSectionFieldPrefix) + idxAsStr);
-                writeSubNodeHelper(subNode, &childBuilder);
-                break;
-            }
-            case (NodeType::kDelete): {
-                MONGO_UNREACHABLE;
-            }
-        }
-    }
-}
-
-void writeDocumentDiff(const DocumentNode& node, BSONObjBuilder* builder) {
-    if (!node.deletes.empty()) {
-        BSONObjBuilder subBob(builder->subobjStart(doc_diff::kDeleteSectionFieldName));
-        for (auto&& [fieldName, node] : node.deletes) {
-            // The deletes are logged in the form {fieldName: false} in $v:2 format.
-            subBob.append(fieldName, false);
-        }
-    }
-    if (!node.updates.empty()) {
-        BSONObjBuilder subBob(builder->subobjStart(doc_diff::kUpdateSectionFieldName));
-        for (auto&& [fieldName, node] : node.updates) {
-            appendElementToBuilder(node->elt, fieldName, &subBob);
-        }
-    }
-
-    if (!node.inserts.empty()) {
-        BSONObjBuilder insertBob(builder->subobjStart(doc_diff::kInsertSectionFieldName));
-        for (auto&& [fieldName, child] : node.inserts) {
-            if (child->type() == NodeType::kInsert) {
-                appendElementToBuilder(
-                    checked_cast<InsertElement*>(child)->elt, fieldName, &insertBob);
-                continue;
-            }
-            // This represents a new document. While the modifier-style update system
-            // was capable of writing paths which would implicitly create new
-            // documents, there is no equivalent in $v: 2 updates.
-            //
-            // For example {$set: {"a.b.c": 1}} would create document 'a' and 'a.b' if
-            // necessary.
-            //
-            // Since $v:2 entries don't have this capability, we instead build the new
-            // object and log it as an insert. For example, applying the above $set on
-            // document {a: {}} will be logged as an insert of the value {b: {c: 1}} on
-            // document 'a'.
-            invariant(child->type() == NodeType::kDocumentInsert);
-            BSONObjBuilder subBob = insertBob.subobjStart(fieldName);
-            serializeNewlyCreatedDocument(checked_cast<DocumentNode*>(child), &subBob);
-        }
-    }
-
-    for (auto&& [fieldName, child] : node.subDiffs) {
-        BSONObjBuilder childBuilder =
-            builder->subobjStart(std::string(1, doc_diff::kSubDiffSectionFieldPrefix) + fieldName);
-        writeSubNodeHelper(child, &childBuilder);
-    }
-}
-
-void writeSubNodeHelper(InternalNode* node, BSONObjBuilder* builder) {
+UniqueFrame makeSubNodeFrameHelper(InternalNode* node, BSONObjBuilder builder) {
     if (node->type() == NodeType::kArray) {
-        writeArrayDiff(*checked_cast<ArrayNode*>(node), builder);
+        return std::make_unique<ArrayFrame>(*checked_cast<ArrayNode*>(node), std::move(builder));
     } else {
-        invariant(node->type() == NodeType::kDocumentSubDiff ||
-                  node->type() == NodeType::kDocumentInsert);
-        writeDocumentDiff(*checked_cast<DocumentNode*>(node), builder);
+        // We never expect to see a DocumentInsertionNode under the 'subDiffs' section of an
+        // internal node.
+        invariant(node->type() == NodeType::kDocumentSubDiff);
+        return std::make_unique<DocumentSubDiffFrame>(*checked_cast<DocumentSubDiffNode*>(node),
+                                                      std::move(builder));
     }
+}
+
+UniqueFrame handleInsertHelper(StringData fieldName, Node* node, BSONObjBuilder* bob) {
+    if (node->type() == NodeType::kInsert) {
+        appendElementToBuilder(checked_cast<InsertNode*>(node)->elt, fieldName, bob);
+        return nullptr;
+    }
+    invariant(node->type() == NodeType::kDocumentInsert);
+    return std::make_unique<DocumentInsertFrame>(*checked_cast<DocumentInsertionNode*>(node),
+                                                 BSONObjBuilder(bob->subobjStart(fieldName)));
 }
 }  // namespace
 
-
 BSONObj V2LogBuilder::serialize() const {
-    BSONObjBuilder topBuilder;
-    writeDocumentDiff(_root, &topBuilder);
-    return update_oplog_entry::makeDeltaOplogEntry(topBuilder.obj());
+    auto diff = writeDiff(_root);
+    return update_oplog_entry::makeDeltaOplogEntry(diff);
 }
 }  // namespace mongo::v2_log_builder

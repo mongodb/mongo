@@ -62,18 +62,24 @@ assert.docEq(latestChange, cst.getOneChange(csPreImageRequiredCursor));
 
 // Test pre-image lookup for an op-style update operation.
 assert.commandWorked(coll.update({_id: "x"}, {$set: {foo: "baz"}}));
-latestChange = cst.getOneChange(csNoPreImages);
-assert.eq(latestChange.operationType, "update");
-assert(!latestChange.hasOwnProperty("fullDocumentBeforeChange"));
-assert.docEq(latestChange.fullDocument, {_id: "x", foo: "baz"});
-assert.docEq(latestChange.updateDescription, {updatedFields: {foo: "baz"}, removedFields: []});
+latestChange = cst.assertNextChangesEqual({
+    cursor: csNoPreImages,
+    expectedChanges: [{
+        documentKey: {_id: "x"},
+        fullDocument: {_id: "x", foo: "baz"},
+        ns: {db: coll.getDB().getName(), coll: coll.getName()},
+        operationType: "update",
+        updateDescription: {updatedFields: {foo: "baz"}, removedFields: [], truncatedArrays: []}
+    }]
+})[0];
+
 // Add the expected "fullDocumentBeforeChange" and confirm that both pre-image cursors see it.
 latestChange.fullDocumentBeforeChange = {
     _id: "x",
     foo: "bar"
 };
-assert.docEq(latestChange, cst.getOneChange(csPreImageWhenAvailableCursor));
-assert.docEq(latestChange, cst.getOneChange(csPreImageRequiredCursor));
+assertChangeStreamEventEq(cst.getOneChange(csPreImageWhenAvailableCursor), latestChange);
+assertChangeStreamEventEq(cst.getOneChange(csPreImageRequiredCursor), latestChange);
 
 // Test pre-image lookup for a delete operation.
 assert.commandWorked(coll.remove({_id: "x"}));
@@ -115,13 +121,20 @@ assert.eq(csErr.code, 51770);
 
 // Test pre-image lookup for an op-style update operation.
 assert.commandWorked(coll.update({_id: "y"}, {$set: {foo: "baz"}}));
-latestChange = cst.getOneChange(csNoPreImages);
-assert.eq(latestChange.operationType, "update");
-assert(!latestChange.hasOwnProperty("fullDocumentBeforeChange"));
-assert.docEq(latestChange.fullDocument, {_id: "y", foo: "baz"});
-assert.docEq(latestChange.updateDescription, {updatedFields: {foo: "baz"}, removedFields: []});
+
+latestChange = cst.assertNextChangesEqual({
+    cursor: csNoPreImages,
+    expectedChanges: [{
+        documentKey: {_id: "y"},
+        fullDocument: {_id: "y", foo: "baz"},
+        ns: {db: coll.getDB().getName(), coll: coll.getName()},
+        operationType: "update",
+        updateDescription: {updatedFields: {foo: "baz"}, removedFields: [], truncatedArrays: []}
+    }]
+})[0];
+
 // The "whenAvailable" cursor returns an event without the pre-image.
-assert.docEq(latestChange, cst.getOneChange(csPreImageWhenAvailableCursor));
+assertChangeStreamEventEq(cst.getOneChange(csPreImageWhenAvailableCursor), latestChange);
 
 // Test pre-image lookup for a delete operation.
 assert.commandWorked(coll.remove({_id: "y"}));

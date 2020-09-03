@@ -133,7 +133,7 @@ cst.assertNextChangesEqual({
         fullDocument: {_id: 1, a: 1, b: 1},
         ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
         operationType: "update",
-        updateDescription: {removedFields: [], updatedFields: {b: 1}}
+        updateDescription: {removedFields: [], updatedFields: {b: 1}, truncatedArrays: []}
     }]
 });
 mongos1ChangeDoc = cstMongos1.getOneChange(cursorMongos1);

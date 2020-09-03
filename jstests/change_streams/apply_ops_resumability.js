@@ -113,7 +113,7 @@ let expectedChanges = [
         documentKey: {_id: 1},
         ns: {db: db.getName(), coll: coll.getName()},
         operationType: "update",
-        updateDescription: {removedFields: [], updatedFields: {a: 1}},
+        updateDescription: {removedFields: [], updatedFields: {a: 1}, truncatedArrays: []},
         lsid: session.getSessionId(),
         txnNumber: session.getTxnNumber_forTesting(),
     },

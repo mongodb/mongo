@@ -66,7 +66,7 @@ const expectedChanges = [
     {
         documentKey: {_id: 1},
         ns: {db: testDB.getName(), coll: collName},
-        updateDescription: {removedFields: [], updatedFields: {updated: true}},
+        updateDescription: {removedFields: [], updatedFields: {updated: true}, truncatedArrays: []},
         operationType: "update"
     },
     {documentKey: {_id: 2}, ns: {db: testDB.getName(), coll: collName}, operationType: "delete"},

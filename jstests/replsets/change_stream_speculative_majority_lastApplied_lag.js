@@ -86,7 +86,7 @@ cst.assertNextChangesEqual({
             documentKey: {_id: 1},
             fullDocument: {_id: 1, v: 1},
             ns: {db: dbName, coll: collName},
-            updateDescription: {removedFields: [], updatedFields: {v: 1}},
+            updateDescription: {removedFields: [], updatedFields: {v: 1}, truncatedArrays: []},
             operationType: "update",
         }
     ]

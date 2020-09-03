@@ -102,7 +102,7 @@ const kTests = [
         checkPostImage: function(doc) {
             assert.eq(doc, {_id: "modifierUpdate0", a: 1, b: 4});
         },
-        oplogEntryVersion: 1
+        oplogEntryVersion: 2
     },
     {
         initialDoc: {_id: "modifierUpdate1", x: 0},
@@ -117,7 +117,7 @@ const kTests = [
         checkPostImage: function(doc) {
             assert.eq(doc, {_id: "modifierUpdate1", b: {c: 4}});
         },
-        oplogEntryVersion: 1
+        oplogEntryVersion: 2
     },
 ];
 

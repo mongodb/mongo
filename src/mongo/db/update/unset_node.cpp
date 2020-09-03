@@ -86,7 +86,14 @@ void UnsetNode::logUpdate(LogBuilderInterface* logBuilder,
     invariant(logBuilder);
     invariant(modifyResult == ModifyResult::kNormalUpdate);
     invariant(!createdFieldIdx);
-    uassertStatusOK(logBuilder->logDeletedField(pathTaken));
+
+    if (pathTaken.types().back() == RuntimeUpdatePath::ComponentType::kArrayIndex) {
+        // If $unset is applied to an array index, the value was set to null.
+        invariant(element.getType() == BSONType::jstNULL);
+        uassertStatusOK(logBuilder->logUpdatedField(pathTaken, element));
+    } else {
+        uassertStatusOK(logBuilder->logDeletedField(pathTaken));
+    }
 }
 
 }  // namespace mongo

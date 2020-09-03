@@ -1774,7 +1774,8 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateField) {
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: 5, b: 6}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {b: 6}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {b: 6}}"), fromjson("{$v: 2, diff: {i: {b: 6}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{b}");
 }
 
@@ -1798,7 +1799,8 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingField) {
     ASSERT_FALSE(result.noop);
     ASSERT_EQUALS(fromjson("{a: 6}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: 6}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: 6}}"), fromjson("{$v: 2, diff: {u: {a: 6}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -1840,7 +1842,9 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingAndNonexistingFields) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, c: 7, b: 6, d: 8}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {a: 5, b: 6, c: 7, d: 8}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {a: 5, b: 6, c: 7, d: 8}}"),
+                     fromjson("{$v: 2, diff: {u: {a: 5, c: 7}, i: {b: 6, d: 8}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a, b, c, d}");
 }
 
@@ -1882,8 +1886,9 @@ TEST_F(UpdateObjectNodeTest, ApplyExistingNestedPaths) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: 6, c: 7}, b: {d: 8, e: 9}}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}"),
-                      getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: 6, c: 7}}, sb: {u: {d: 8, e: 9}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.b, a.c, b.d, b.e}");
 }
 
@@ -1925,8 +1930,9 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateNestedPaths) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{z: 0, a: {b: 6, c: 7}, b: {d: 8, e: 9}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}"),
-                      getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': 6, 'a.c': 7, 'b.d': 8, 'b.e': 9}}"),
+                     fromjson("{$v: 2, diff: {i: {a: {b: 6, c: 7}, b: {d: 8, e: 9}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.b, a.c, b.d, b.e}");
 }
 
@@ -1962,8 +1968,9 @@ TEST_F(UpdateObjectNodeTest, ApplyCreateDeeplyNestedPaths) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{z: 0, a: {b: {c: {d: 6, e: 7}}, f: 8}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b.c.d': 6, 'a.b.c.e': 7, 'a.f': 8}}"),
-                      getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.b.c.d': 6, 'a.b.c.e': 7, 'a.f': 8}}"),
+                     fromjson("{$v: 2, diff: {i: {a: {b: {c: {d: 6, e: 7}}, f: 8}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.b.c.d, a.b.c.e, a.f}");
 }
 
@@ -2011,7 +2018,9 @@ TEST_F(UpdateObjectNodeTest, ChildrenShouldBeAppliedInAlphabeticalOrder) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{z: 9, a: 5, b: 8, c: 7, d: 6}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {a: 5, b: 8, c: 7, d: 6, z: 9}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {a: 5, b: 8, c: 7, d: 6, z: 9}}"),
+                     fromjson("{$v: 2, diff: {u: {a: 5, z: 9}, i: {b: 8, c: 7, d: 6}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a, b, c, d, z}");
 }
 
@@ -2044,7 +2053,9 @@ TEST_F(UpdateObjectNodeTest, CollatorShouldNotAffectUpdateOrder) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{abc: 5, cba: 6}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {abc: 5, cba: 6}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {abc: 5, cba: 6}}"),
+                     fromjson("{$v: 2, diff: {i: {abc: 5, cba: 6}}}"));
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyNoop) {
@@ -2081,7 +2092,8 @@ TEST_F(UpdateObjectNodeTest, ApplyNoop) {
     ASSERT_TRUE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, b: 6, c: 7}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{}"), getLogDoc().getObject());
+
+    assertOplogEntryIsNoop();
     ASSERT_EQUALS(getModifiedPaths(), "{a, b, c}");
 }
 
@@ -2119,7 +2131,8 @@ TEST_F(UpdateObjectNodeTest, ApplySomeChildrenNoops) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: 5, b: 6, c: 7}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {b: 6}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {b: 6}}"), fromjson("{$v: 2, diff: {u: {b: 6}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a, b, c}");
 }
 
@@ -2172,7 +2185,8 @@ TEST_F(UpdateObjectNodeTest, ApplyBlockingElementFromReplication) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: 0, b: 6}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {b: 6}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {b: 6}}"), fromjson("{$v: 2, diff: {i: {b: 6}}}"));
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyPositionalMissingMatchedField) {
@@ -2225,7 +2239,9 @@ TEST_F(UpdateObjectNodeTest, ApplyMergePositionalChild) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"),
+                     fromjson("{$v: 2, diff: {sa: {a: true, s0: {u: {b: 5, c: 6}}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.0.b, a.0.c}");
 }
 
@@ -2268,8 +2284,9 @@ TEST_F(UpdateObjectNodeTest, ApplyOrderMergedPositionalChild) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 7, '1': {b: 6, c: 8}, '2': 5}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0': 7, 'a.1.b': 6, 'a.1.c': 8, 'a.2': 5}}"),
-                      getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.0': 7, 'a.1.b': 6, 'a.1.c': 8, 'a.2': 5}}"),
+                     fromjson("{$v: 2, diff: {i: {a: {'0': 7, '1': {b: 6, c: 8}, '2': 5}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.0, a.1.b, a.1.c, a.2}");
 }
 
@@ -2335,7 +2352,9 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotMergePositionalChild) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 5, '1': 7, '2': 6}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0': 5, 'a.1': 7, 'a.2': 6}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.0': 5, 'a.1': 7, 'a.2': 6}}"),
+                     fromjson("{$v: 2, diff: {i: {a: {'0': 5, '1': 7, '2': 6}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.0, a.1, a.2}");
 }
 
@@ -2372,7 +2391,9 @@ TEST_F(UpdateObjectNodeTest, ApplyPositionalChildLast) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {'0': 6, '1': 7, '2': 5}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0': 6, 'a.1': 7, 'a.2': 5}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.0': 6, 'a.1': 7, 'a.2': 5}}"),
+                     fromjson("{$v: 2, diff: {i: {a: {'0': 6, '1': 7, '2': 5}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.0, a.1, a.2}");
 }
 
@@ -2403,7 +2424,9 @@ TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"),
+                     fromjson("{$v: 2, diff: {sa: {a: true, s0: {u: {b: 5, c: 6}}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.0.b, a.0.c}");
 
     mutablebson::Document doc2(fromjson("{a: [{b: 0, c: 0}]}"));
@@ -2415,7 +2438,9 @@ TEST_F(UpdateObjectNodeTest, ApplyUseStoredMergedPositional) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}]}"), doc2.getObject());
     ASSERT_TRUE(doc2.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6}}"),
+                     fromjson("{$v: 2, diff: {sa: {a: true, s0: {u: {b: 5, c: 6}}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.0.b, a.0.c}");
 }
 
@@ -2452,8 +2477,10 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 6}, {c: 0, d: 7}]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6, 'a.1.d': 7}}"),
-                      getLogDoc().getObject());
+
+    assertOplogEntry(
+        fromjson("{$set: {'a.0.b': 5, 'a.0.c': 6, 'a.1.d': 7}}"),
+        fromjson("{$v: 2, diff: {sa: {a: true, s0: {u: {b: 5, c: 6}}, s1: {u: {d: 7}}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.0.b, a.0.c, a.1.d}");
 
     mutablebson::Document doc2(fromjson("{a: [{b: 0, c: 0}, {c: 0, d: 0}]}"));
@@ -2465,8 +2492,10 @@ TEST_F(UpdateObjectNodeTest, ApplyDoNotUseStoredMergedPositional) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [{b: 5, c: 0}, {c: 6, d: 7}]}"), doc2.getObject());
     ASSERT_TRUE(doc2.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.0.b': 5, 'a.1.c': 6, 'a.1.d': 7}}"),
-                      getLogDoc().getObject());
+
+    assertOplogEntry(
+        fromjson("{$set: {'a.0.b': 5, 'a.1.c': 6, 'a.1.d': 7}}"),
+        fromjson("{$v: 2, diff: {sa: {a: true, s0: {u: {b: 5}}, s1: {u: {c: 6, d: 7}}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.0.b, a.1.c, a.1.d}");
 }
 
@@ -2495,7 +2524,9 @@ TEST_F(UpdateObjectNodeTest, ApplyToArrayByIndexWithLeadingZero) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [0, 0, 2, 0, 0]}"), doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.02': 2}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.02': 2}}"),
+                     fromjson("{$v: 2, diff: {sa: {a: true, u2: 2}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.02}");
 }
 
@@ -2533,7 +2564,9 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
         fromjson("{a: [null, null, 2, null, null, null, null, null, null, null, 10]}"),
         doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.10': 10, 'a.2': 2}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.10': 10, 'a.2': 2}}"),
+                     fromjson("{$v: 2, diff: {sa: {a: true, u2: 2, u10: 10}}}"));
 }
 
 TEST_F(UpdateObjectNodeTest, ApplyMultipleUpdatesToDocumentInArray) {
@@ -2562,7 +2595,9 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleUpdatesToDocumentInArray) {
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: [null, null, {b: 1, c: 1}]}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.2.b': 1, 'a.2.c': 1}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.2.b': 1, 'a.2.c': 1}}"),
+                     fromjson("{$v: 2, diff: {sa: {a: true, u2: {b: 1, c: 1}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
 }
 
@@ -2612,7 +2647,9 @@ TEST_F(UpdateObjectNodeTest, SetAndPopModifiersWithCommonPrefixApplySuccessfully
     ASSERT_FALSE(result.noop);
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: 5, c: [2, 3, 4]}}"), doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.b': 5, 'a.c': [2, 3, 4]}}"), getLogDoc().getObject());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': 5, 'a.c': [2, 3, 4]}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: 5, c: [ 2, 3, 4 ]}}}}"));
     ASSERT_EQUALS(getModifiedPaths(), "{a.b, a.c}");
 }
 

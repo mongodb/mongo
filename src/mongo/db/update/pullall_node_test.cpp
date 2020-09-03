@@ -97,7 +97,8 @@ TEST_F(PullAllNodeTest, TargetNotFound) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
 }
 
 TEST_F(PullAllNodeTest, TargetArrayElementNotFound) {
@@ -115,7 +116,8 @@ TEST_F(PullAllNodeTest, TargetArrayElementNotFound) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [1, 2]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
 }
 
 TEST_F(PullAllNodeTest, ApplyToNonArrayFails) {
@@ -148,7 +150,9 @@ TEST_F(PullAllNodeTest, ApplyWithSingleNumber) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['a', {r: 1, b: 2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: ['a', {r: 1, b: 2}]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: ['a', {r: 1, b: 2}]}}"),
+                     fromjson("{$v: 2, diff: {u: {a: [\"a\", {r: 1, b: 2}]}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyNoIndexDataNoLogBuilder) {
@@ -181,7 +185,8 @@ TEST_F(PullAllNodeTest, ApplyWithElementNotPresentInArray) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [1, 'a', {r: 1, b: 2}]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
 }
 
 TEST_F(PullAllNodeTest, ApplyWithWithTwoElements) {
@@ -198,7 +203,9 @@ TEST_F(PullAllNodeTest, ApplyWithWithTwoElements) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{r: 1, b: 2}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: [{r: 1, b: 2}]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: [{r: 1, b: 2}]}}"),
+                     fromjson("{$v: 2, diff: {u: {a: [{r: 1, b: 2}]}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyWithAllArrayElements) {
@@ -215,7 +222,8 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElements) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: []}}"), fromjson("{$v: 2, diff: {u: {a: []}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
@@ -232,7 +240,8 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsButOutOfOrder) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: []}}"), fromjson("{$v: 2, diff: {u: {a: []}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
@@ -249,7 +258,8 @@ TEST_F(PullAllNodeTest, ApplyWithAllArrayElementsAndThenSome) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: []}}"), fromjson("{$v: 2, diff: {u: {a: []}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyWithCollator) {
@@ -269,7 +279,9 @@ TEST_F(PullAllNodeTest, ApplyWithCollator) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['baz']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: ['baz']}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: ['baz']}}"),
+                     fromjson("{$v: 2, diff: {u: {a: ['baz']}}}"));
 }
 
 TEST_F(PullAllNodeTest, ApplyAfterSetCollator) {

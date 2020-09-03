@@ -116,7 +116,7 @@ expected = {
     fullDocument: {_id: 0, x: 10},
     ns: {db: "test", coll: coll.getName()},
     operationType: "update",
-    updateDescription: {removedFields: [], updatedFields: {x: 10}},
+    updateDescription: {removedFields: [], updatedFields: {x: 10}, truncatedArrays: []},
 };
 checkNextChange(changeStreamCursor, expected);
 

@@ -34,6 +34,7 @@
 #include "mongo/db/update/update_node.h"
 #include "mongo/db/update/update_object_node.h"
 #include "mongo/db/update/v1_log_builder.h"
+#include "mongo/db/update/v2_log_builder.h"
 
 namespace mongo {
 
@@ -44,11 +45,12 @@ public:
 
     ApplyResult applyUpdate(ApplyParams applyParams) const final {
         mutablebson::Document logDocument;
-        boost::optional<V1LogBuilder> optLogBuilder;
+        boost::optional<V1LogBuilder> optV1LogBuilder;
+        boost::optional<v2_log_builder::V2LogBuilder> optV2LogBuilder;
 
         UpdateNode::UpdateNodeApplyParams updateNodeApplyParams;
 
-        if (applyParams.logMode != ApplyParams::LogMode::kDoNotGenerateOplogEntry) {
+        if (applyParams.logMode == ApplyParams::LogMode::kGenerateOnlyV1OplogEntry) {
             // In versions since 3.6, the absence of a $v field indicates either a
             // replacement-style update or a "classic" modifier-style update.
             //
@@ -61,8 +63,11 @@ public:
             // (b) It is easy to distinguish from $v: 2 delta-style oplog entries.
             const bool includeVersionField = true;
 
-            optLogBuilder.emplace(logDocument.root(), includeVersionField);
-            updateNodeApplyParams.logBuilder = optLogBuilder.get_ptr();
+            optV1LogBuilder.emplace(logDocument.root(), includeVersionField);
+            updateNodeApplyParams.logBuilder = optV1LogBuilder.get_ptr();
+        } else if (applyParams.logMode == ApplyParams::LogMode::kGenerateOplogEntry) {
+            optV2LogBuilder.emplace();
+            updateNodeApplyParams.logBuilder = optV2LogBuilder.get_ptr();
         }
 
         auto ret = _updateTree->apply(applyParams, updateNodeApplyParams);

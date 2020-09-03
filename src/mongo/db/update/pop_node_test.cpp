@@ -115,7 +115,8 @@ TEST_F(PopNodeTest, NoopWhenFirstPathComponentDoesNotExist) {
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: [1, 2, 3]}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
@@ -133,7 +134,8 @@ TEST_F(PopNodeTest, NoopWhenPathPartiallyExists) {
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {}}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
     ASSERT_EQUALS("{a.b.c}", getModifiedPaths());
 }
 
@@ -151,7 +153,8 @@ TEST_F(PopNodeTest, NoopWhenNumericalPathComponentExceedsArrayLength) {
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
     ASSERT_EQUALS("{a.0}", getModifiedPaths());
 }
 
@@ -215,7 +218,7 @@ TEST_F(PopNodeTest, NoopWhenPathContainsAnEmptyArray) {
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+    assertOplogEntryIsNoop();
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
@@ -233,7 +236,9 @@ TEST_F(PopNodeTest, PopsSingleElementFromTheBack) {
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': []}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': []}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: []}}}}"));
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
@@ -251,7 +256,9 @@ TEST_F(PopNodeTest, PopsSingleElementFromTheFront) {
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': []}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': []}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: []}}}}"));
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
@@ -269,7 +276,9 @@ TEST_F(PopNodeTest, PopsFromTheBackOfMultiElementArray) {
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [1, 2]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': [1, 2]}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: [1, 2]}}}}"));
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
@@ -287,7 +296,9 @@ TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArray) {
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [2, 3]}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [2, 3]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': [2, 3]}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: [2, 3]}}}}"));
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
@@ -305,7 +316,9 @@ TEST_F(PopNodeTest, PopsFromTheFrontOfMultiElementArrayWithoutAffectingIndexes) 
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [2, 3]}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [2, 3]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': [2, 3]}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: [2, 3]}}}}"));
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
@@ -322,7 +335,9 @@ TEST_F(PopNodeTest, SucceedsWithNullUpdateIndexData) {
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [1, 2]}}"), doc);
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [1, 2]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': [1, 2]}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: [1, 2]}}}}"));
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 
@@ -414,7 +429,8 @@ TEST_F(PopNodeTest, NoopOnImmutablePathSucceeds) {
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
     ASSERT_EQUALS("{a.b}", getModifiedPaths());
 }
 

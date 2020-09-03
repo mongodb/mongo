@@ -144,7 +144,8 @@ TEST_F(PullNodeTest, TargetNotFound) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
 }
 
 TEST_F(PullNodeTest, ApplyToStringFails) {
@@ -211,7 +212,8 @@ TEST_F(PullNodeTest, ApplyToMissingElement) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: {c: {}}}}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
 }
 
 TEST_F(PullNodeTest, ApplyToEmptyArray) {
@@ -228,7 +230,8 @@ TEST_F(PullNodeTest, ApplyToEmptyArray) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
 }
 
 TEST_F(PullNodeTest, ApplyToArrayMatchingNone) {
@@ -245,7 +248,8 @@ TEST_F(PullNodeTest, ApplyToArrayMatchingNone) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [2, 3, 4, 5]}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{}"), getLogDoc());
+
+    assertOplogEntryIsNoop();
 }
 
 TEST_F(PullNodeTest, ApplyToArrayMatchingOne) {
@@ -262,7 +266,9 @@ TEST_F(PullNodeTest, ApplyToArrayMatchingOne) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [1, 2, 3]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: [1, 2, 3]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: [1, 2, 3]}}"),
+                     fromjson("{$v: 2, diff: {u: {a: [1, 2, 3]}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyToArrayMatchingSeveral) {
@@ -279,7 +285,9 @@ TEST_F(PullNodeTest, ApplyToArrayMatchingSeveral) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [1, 2, 3, 4, 5]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: [1, 2, 3, 4, 5]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: [1, 2, 3, 4, 5]}}"),
+                     fromjson("{$v: 2, diff: {u: {a: [1, 2, 3, 4, 5]}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyToArrayMatchingAll) {
@@ -296,7 +304,8 @@ TEST_F(PullNodeTest, ApplyToArrayMatchingAll) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: []}}"), fromjson("{$v: 2, diff: {u: {a: []}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyNoIndexDataNoLogBuilder) {
@@ -334,7 +343,9 @@ TEST_F(PullNodeTest, ApplyWithCollation) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['zaa', 'zbb']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: ['zaa', 'zbb']}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: ['zaa', 'zbb']}}"),
+                     fromjson("{$v: 2, diff: {u: {a: ['zaa', 'zbb']}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyWithCollationDoesNotAffectNonStringMatches) {
@@ -354,7 +365,8 @@ TEST_F(PullNodeTest, ApplyWithCollationDoesNotAffectNonStringMatches) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [2, 1]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: [2, 1]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: [2, 1]}}"), fromjson("{$v: 2, diff: {u: {a: [2, 1]}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyWithCollationDoesNotAffectRegexMatches) {
@@ -374,7 +386,9 @@ TEST_F(PullNodeTest, ApplyWithCollationDoesNotAffectRegexMatches) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['b', 'cb']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: ['b', 'cb']}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: ['b', 'cb']}}"),
+                     fromjson("{$v: 2, diff: {u: {a: ['b', 'cb']}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyStringLiteralMatchWithCollation) {
@@ -394,7 +408,8 @@ TEST_F(PullNodeTest, ApplyStringLiteralMatchWithCollation) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: []}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: []}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: []}}"), fromjson("{$v: 2, diff: {u: {a: []}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyCollationDoesNotAffectNumberLiteralMatches) {
@@ -414,7 +429,9 @@ TEST_F(PullNodeTest, ApplyCollationDoesNotAffectNumberLiteralMatches) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: ['a', 'b', 2, 'c', 'd']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: ['a', 'b', 2, 'c', 'd']}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: ['a', 'b', 2, 'c', 'd']}}"),
+                     fromjson("{$v: 2, diff: {u: {a: ['a', 'b', 2, 'c', 'd']}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyStringMatchAfterSetCollator) {
@@ -550,7 +567,9 @@ TEST_F(PullNodeTest, ApplyComplexDocAndMatching1) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [{x: 1}, {x: 2}]}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [{x: 1}, {x: 2}]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': [{x: 1}, {x: 2}]}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: [{x: 1}, {x: 2}]}}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyComplexDocAndMatching2) {
@@ -567,7 +586,9 @@ TEST_F(PullNodeTest, ApplyComplexDocAndMatching2) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [{x: 1}, {x: 2}, {z: 'z'}]}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [{x: 1}, {x: 2}, {z: 'z'}]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': [{x: 1}, {x: 2}, {z: 'z'}]}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: [{x: 1}, {x: 2}, {z: 'z'}]}}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyComplexDocAndMatching3) {
@@ -584,7 +605,9 @@ TEST_F(PullNodeTest, ApplyComplexDocAndMatching3) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: [{x: 2}, {z: 'z'}]}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': [{x: 2}, {z: 'z'}]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': [{x: 2}, {z: 'z'}]}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: [{x: 2}, {z: 'z'}]}}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyFullPredicateWithCollation) {
@@ -605,7 +628,9 @@ TEST_F(PullNodeTest, ApplyFullPredicateWithCollation) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: {b: []}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {'a.b': []}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {'a.b': []}}"),
+                     fromjson("{$v: 2, diff: {sa: {u: {b: []}}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyScalarValueMod) {
@@ -622,7 +647,9 @@ TEST_F(PullNodeTest, ApplyScalarValueMod) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [2, 2, 2]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: [2, 2, 2]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: [2, 2, 2]}}"),
+                     fromjson("{$v: 2, diff: {u: {a: [2, 2, 2]}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyObjectValueMod) {
@@ -639,7 +666,9 @@ TEST_F(PullNodeTest, ApplyObjectValueMod) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{x: 1}, {x: 1}]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: [{x: 1}, {x: 1}]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: [{x: 1}, {x: 1}]}}"),
+                     fromjson("{$v: 2, diff: {u: {a: [{x: 1}, {x: 1}]}}}"));
 }
 
 TEST_F(PullNodeTest, DocumentationExample1) {
@@ -657,8 +686,10 @@ TEST_F(PullNodeTest, DocumentationExample1) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{flags: ['vme', 'de', 'pse', 'tsc', 'pae', 'mce']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {flags: ['vme', 'de', 'pse', 'tsc', 'pae', 'mce']}}"),
-                  getLogDoc());
+
+    assertOplogEntry(
+        fromjson("{$set: {flags: ['vme', 'de', 'pse', 'tsc', 'pae', 'mce']}}"),
+        fromjson("{$v: 2, diff: {u: {flags: ['vme', 'de', 'pse', 'tsc', 'pae', 'mce']}}}"));
 }
 
 TEST_F(PullNodeTest, DocumentationExample2a) {
@@ -675,7 +706,9 @@ TEST_F(PullNodeTest, DocumentationExample2a) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{votes: [3, 5, 6, 8]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {votes: [3, 5, 6, 8]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {votes: [3, 5, 6, 8]}}"),
+                     fromjson("{$v: 2, diff: {u: {votes: [3, 5, 6, 8]}}}"));
 }
 
 TEST_F(PullNodeTest, DocumentationExample2b) {
@@ -692,7 +725,9 @@ TEST_F(PullNodeTest, DocumentationExample2b) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{votes: [3, 5, 6]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {votes: [3, 5, 6]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {votes: [3, 5, 6]}}"),
+                     fromjson("{$v: 2, diff: {u: {votes: [3, 5, 6]}}}"));
 }
 
 TEST_F(PullNodeTest, ApplyPullWithObjectValueToArrayWithNonObjectValue) {
@@ -709,7 +744,8 @@ TEST_F(PullNodeTest, ApplyPullWithObjectValueToArrayWithNonObjectValue) {
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [2]}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {a: [2]}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {a: [2]}}"), fromjson("{$v: 2, diff: {u: {a: [2]}}}"));
 }
 
 TEST_F(PullNodeTest, CannotModifyImmutableField) {
@@ -742,7 +778,9 @@ TEST_F(PullNodeTest, SERVER_3988) {
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{x: 1, y: [2, 3, 4, 'abc']}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_EQUALS(fromjson("{$set: {y: [2, 3, 4, 'abc']}}"), getLogDoc());
+
+    assertOplogEntry(fromjson("{$set: {y: [2, 3, 4, 'abc']}}"),
+                     fromjson("{$v: 2, diff: {u: {y: [2, 3, 4, 'abc']}}}"));
 }
 
 }  // namespace
