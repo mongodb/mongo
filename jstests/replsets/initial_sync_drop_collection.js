@@ -94,9 +94,9 @@ function finishTest({failPoint, expectedLog, waitForDrop, createNew}) {
     assert.commandWorked(secondary.adminCommand({configureFailPoint: failPoint, mode: 'off'}));
 
     if (expectedLog) {
-        expectedLog = eval(expectedLog);
-        jsTestLog(expectedLog);
-        checkLog.contains(secondary, expectedLog);
+        let expectedLogDict = eval('(' + expectedLog + ')');
+        jsTestLog(expectedLogDict);
+        checkLog.containsJson(secondary, expectedLogDict.code, expectedLogDict.attr);
     }
 
     jsTestLog("Waiting for initial sync to complete.");
@@ -134,26 +134,15 @@ runDropTest({
 });
 
 let expectedLogFor3and4 =
-    "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`";
-
-if (isJsonLogNoConn()) {
-    // Double escape the backslash as eval will do unescaping
-    expectedLogFor3and4 =
-        '`CollectionCloner stopped because collection was dropped on source","attr":{"namespace":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`';
-}
+    '{code: 21132, attr: { namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid)}}';
 
 // We don't support 4.2 style two-phase drops with EMRC=false - in that configuration, the
 // collection will instead be renamed to a <db>.system.drop.* namespace before being dropped. Since
 // the cloner queries collection by UUID, it will observe the first drop phase as a rename.
 // We still want to check that initial sync succeeds in such a case.
 if (TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replTest)) {
-    if (isJsonLogNoConn()) {
-        expectedLogFor3and4 =
-            '`Initial Sync retrying cloner stage due to error","attr":{"cloner":"CollectionCloner","stage":"query","error":{"code":175,"codeName":"QueryPlanKilled","errmsg":"collection renamed from \'${nss}\' to \'${rnss}\'. UUID ${uuid}`';
-    } else {
-        expectedLogFor3and4 =
-            "`Initial Sync retrying CollectionCloner stage query due to QueryPlanKilled: collection renamed from '${nss}' to '${rnss}'. UUID ${uuid}`";
-    }
+    expectedLogFor3and4 =
+        '{code: 21075, attr: { cloner: "CollectionCloner", stage: "query","error": (x)=>(x.code===175 && x.codeName==="QueryPlanKilled" && x.errmsg=="collection renamed from \'" + nss + "\' to \'" + rnss + "\'. UUID " + uuid)}}';
 }
 
 jsTestLog("[3] Testing drop-pending between getMore calls.");
@@ -182,10 +171,7 @@ runDropTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
     waitForDrop: true,
-    // Double escape the backslash as eval will do unescaping
-    expectedLog: isJsonLogNoConn()
-        ? '`CollectionCloner stopped because collection was dropped on source","attr":{"namespace":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`'
-        : "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`"
+    expectedLog: '{code: 21132, attr:{namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid)}}',
 });
 
 jsTestLog(
@@ -194,10 +180,7 @@ runDropTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
     waitForDrop: true,
-    // Double escape the backslash as eval will do unescaping
-    expectedLog: isJsonLogNoConn()
-        ? '`CollectionCloner stopped because collection was dropped on source","attr":{"namespace":"${nss}","uuid":{"uuid":{"$uuid":"${uuid}"}}}}`'
-        : "`CollectionCloner ns: '${nss}' uuid: UUID(\"${uuid}\") stopped because collection was dropped on source.`",
+    expectedLog: '{code: 21132, attr:{namespace: nss, uuid: (x)=>(x.uuid.$uuid === uuid)}}',
     createNew: true
 });
 
