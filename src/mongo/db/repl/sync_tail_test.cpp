@@ -448,7 +448,8 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
 
 class MultiOplogEntrySyncTailTest : public SyncTailTest {
 public:
-    MultiOplogEntrySyncTailTest() : _nss1("test.preptxn1"), _nss2("test.preptxn2"), _txnNum(1) {}
+    MultiOplogEntrySyncTailTest()
+        : SyncTailTest("wiredTiger"), _nss1("test.preptxn1"), _nss2("test.preptxn2"), _txnNum(1) {}
 
 protected:
     void setUp() override {
@@ -499,9 +500,15 @@ protected:
         _opObserver->onInsertsFn =
             [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
                 stdx::lock_guard<Latch> lock(_insertMutex);
-                if (nss.isOplog() || nss == _nss1 || nss == _nss2 ||
-                    nss == NamespaceString::kSessionTransactionsTableNamespace) {
-                    _insertedDocs[nss].insert(_insertedDocs[nss].end(), docs.begin(), docs.end());
+                if (nss.isOplog()) {
+                    _insertedOplogDocs.insert(_insertedOplogDocs.end(), docs.begin(), docs.end());
+                } else if (nss == _nss1 || nss == _nss2 ||
+                           nss == NamespaceString::kSessionTransactionsTableNamespace) {
+                    // Storing the inserted documents in a sorted data structure to make checking
+                    // for valid results easier. On a document level locking storage engine the
+                    // inserts will be performed by different threads and there's no guarantee of
+                    // the order.
+                    _insertedDocs[nss].insert(docs.begin(), docs.end());
                 } else
                     FAIL("Unexpected insert") << " into " << nss << " first doc: " << docs.front();
             };
@@ -529,7 +536,7 @@ protected:
     }
 
     std::vector<BSONObj>& oplogDocs() {
-        return _insertedDocs[NamespaceString::kRsOplogNamespace];
+        return _insertedOplogDocs;
     }
 
 protected:
@@ -541,7 +548,8 @@ protected:
     TxnNumber _txnNum;
     boost::optional<OplogEntry> _insertOp1, _insertOp2;
     boost::optional<OplogEntry> _commitOp;
-    std::map<NamespaceString, std::vector<BSONObj>> _insertedDocs;
+    std::map<NamespaceString, SimpleBSONObjSet> _insertedDocs;
+    std::vector<BSONObj> _insertedOplogDocs;
     std::unique_ptr<ThreadPool> _writerPool;
 
 private:
@@ -697,12 +705,12 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyUnpreparedTransactionTwoBatches) {
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 
-    // Check docs and ordering of docs in nss1.
-    // The insert into nss2 is unordered with respect to those.
-    ASSERT_BSONOBJ_EQ(insertDocs[0], _insertedDocs[_nss1][0]);
-    ASSERT_BSONOBJ_EQ(insertDocs[1], _insertedDocs[_nss2].front());
-    ASSERT_BSONOBJ_EQ(insertDocs[2], _insertedDocs[_nss1][1]);
-    ASSERT_BSONOBJ_EQ(insertDocs[3], _insertedDocs[_nss1][2]);
+    // Check that we inserted the expected documents
+    auto nss1It = _insertedDocs[_nss1].begin();
+    ASSERT_BSONOBJ_EQ(insertDocs[0], *(nss1It++));
+    ASSERT_BSONOBJ_EQ(insertDocs[1], *_insertedDocs[_nss2].begin());
+    ASSERT_BSONOBJ_EQ(insertDocs[2], *(nss1It++));
+    ASSERT_BSONOBJ_EQ(insertDocs[3], *(nss1It++));
 }
 
 TEST_F(MultiOplogEntrySyncTailTest, MultiApplyTwoTransactionsOneBatch) {
@@ -804,11 +812,12 @@ TEST_F(MultiOplogEntrySyncTailTest, MultiApplyTwoTransactionsOneBatch) {
                   boost::none,
                   DurableTxnStateEnum::kCommitted);
 
-    // Check docs and ordering of docs in nss1.
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), _insertedDocs[_nss1][0]);
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), _insertedDocs[_nss1][1]);
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 3), _insertedDocs[_nss1][2]);
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 4), _insertedDocs[_nss1][3]);
+    // Check docs in nss1.
+    auto nss1It = _insertedDocs[_nss1].begin();
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), *(nss1It++));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), *(nss1It++));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 3), *(nss1It++));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 4), *(nss1It++));
 }
 
 

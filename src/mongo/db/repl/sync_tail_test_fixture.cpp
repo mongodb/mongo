@@ -35,6 +35,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/query/internal_plans.h"
@@ -112,8 +113,12 @@ void SyncTailTest::setUp() {
     serviceContext = getServiceContext();
     _opCtx = cc().makeOperationContext();
 
-    ReplicationCoordinator::set(serviceContext,
-                                stdx::make_unique<ReplicationCoordinatorMock>(serviceContext));
+    repl::ReplSettings replSettings;
+    replSettings.setReplSetString("rs0");
+    setGlobalReplSettings(replSettings);
+    ReplicationCoordinator::set(
+        serviceContext,
+        stdx::make_unique<ReplicationCoordinatorMock>(serviceContext, replSettings));
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
 
     StorageInterface::set(serviceContext, stdx::make_unique<StorageInterfaceImpl>());
