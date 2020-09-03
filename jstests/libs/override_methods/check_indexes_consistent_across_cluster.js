@@ -39,7 +39,21 @@ ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
      */
     function makeGetIndexDocsFunc(ns) {
         return () => {
-            return ShardedIndexUtil.getPerShardIndexes(mongos.getCollection(ns));
+            while (true) {
+                try {
+                    return ShardedIndexUtil.getPerShardIndexes(mongos.getCollection(ns));
+                } catch (e) {
+                    // Getting the indexes can fail with ShardNotFound if the router's ShardRegistry
+                    // reloads after choosing which shards to target and a chosen shard is no longer
+                    // in the cluster. This error should be transient, so it can be retried on.
+                    if (e.code === ErrorCodes.ShardNotFound) {
+                        print("Retrying $indexStats aggregation on ShardNotFound error: " +
+                              tojson(e));
+                        continue;
+                    }
+                    throw e;
+                }
+            }
         };
     }
 
