@@ -61,13 +61,13 @@ rs.add({'shardsvr': ""});
 try {
     rs.reInitiate();
 } catch (e) {
-    // this os ok as rs's may close connections on a change of master
+    // this os ok as rs's may close connections on a change of primary
     print(e);
 }
 
 assert.soon(function() {
     try {
-        printjson(rs.getPrimary().getDB("admin").runCommand("isMaster"));
+        printjson(rs.getPrimary().getDB("admin").runCommand("hello"));
         s.config.shards.find().forEach(printjsononeline);
         return countNodes() == 3;
     } catch (e) {
@@ -93,7 +93,7 @@ jsTest.log("Awaiting secondary status of all nodes");
 rs.waitForState(rs.getSecondaries(), ReplSetTest.State.SECONDARY, 180 * 1000);
 
 // -------------------------------------------------------------------------------------------
-// ---------- test routing to slaves ----------------
+// ---------- test routing to secondaries ----------------
 // -------------------------------------------------------------------------------------------
 
 // --- not sharded ----
@@ -107,7 +107,7 @@ for (var i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne().x, "B1");
 }
 
-m.setSlaveOk();
+m.setSecondaryOk();
 
 for (var i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne().x, "B2");
@@ -132,7 +132,7 @@ for (var i = 0; i < 100; i++) {
 }
 assert.commandWorked(bulk.execute({w: 3}));
 
-// Counts pass the options of the connection - which is slaveOk'd, so we need to wait for
+// Counts pass the options of the connection - which is secondaryOk'd, so we need to wait for
 // replication for this and future tests to pass
 rs.awaitReplication();
 
@@ -167,6 +167,7 @@ assert.commandWorked(s.getDB('admin').runCommand({
     writeConcern: {w: 2},
     _waitForDelete: true
 }));
+rs.awaitReplication();
 assert.eq(100, t.count(), "C3");
 
 assert.eq(50, rs.getPrimary().getDB("test").foo.count(), "C4");
@@ -182,7 +183,7 @@ for (var i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne({_id: 5}).x, "D1");
 }
 
-m.setSlaveOk();
+m.setSecondaryOk();
 for (var i = 0; i < 10; i++) {
     assert.eq(17, ts.findOne({_id: 5}).x, "D2");
 }
@@ -206,7 +207,7 @@ for (var i = 0; i < 10; i++) {
     assert.eq(57, ts.findOne({x: 57}).x, "E1");
 }
 
-m.setSlaveOk();
+m.setSecondaryOk();
 for (var i = 0; i < 10; i++) {
     assert.eq(57, ts.findOne({x: 57}).x, "E2");
 }
@@ -215,6 +216,7 @@ after = rs.getPrimary().adminCommand("serverStatus").opcounters;
 
 assert.lte(before.query + 10, after.query, "E3");
 
+rs.awaitReplication();
 assert.eq(100, ts.count(), "E4");
 assert.eq(100, ts.find().itcount(), "E5");
 printjson(ts.find().batchSize(5).explain());
@@ -237,9 +239,10 @@ rs.getSecondaries().forEach(function(secondary) {
 // Clean up the data
 assert.commandWorked(ts.remove({primaryOnly: true, x: 60}, {writeConcern: {w: 3}}));
 
+rs.awaitReplication();
 for (var i = 0; i < 10; i++) {
     m = new Mongo(s.s.name);
-    m.setSlaveOk();
+    m.setSecondaryOk();
     ts = m.getDB("test").foo;
     assert.eq(100, ts.find().batchSize(5).itcount(), "F2." + i);
 }
