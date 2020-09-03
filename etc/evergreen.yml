@@ -12519,11 +12519,6 @@ buildvariants:
   - name: dbtest_parallel_TG
   - name: jsCore
   - name: jsCore_txns
-  # Note: {A,UB}SAN has a runtime component that is not fed into Jepsen.
-  # We don't actually run jepsen with {A,UB}SAN.  This task is on this BV because
-  # Jepsen uses Java and Leiningen which is available on this distro
-  # and requires a static build, so this is the only suitable build variant for it.
-  - name: jepsen-smoke
   - name: unittest_shell_hang_analyzer_gen
 
 - name: ubuntu1804-debug-aubsan-lite_fuzzer
