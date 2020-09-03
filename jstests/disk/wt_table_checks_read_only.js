@@ -30,7 +30,7 @@ MongoRunner.stopMongod(conn);
 // only mode.
 let files = listFiles(dbpath);
 for (f in files) {
-    assert.neq(files[f].name, dbpath + "/_wt_table_checks");
+    assert(!files[f].name.includes("_wt_table_checks"));
 }
 
 writeFile(dbpath + "/_wt_table_checks", "");
@@ -42,7 +42,7 @@ MongoRunner.stopMongod(conn);
 let hasWTTableChecksFile = false;
 files = listFiles(dbpath);
 for (f in files) {
-    if (files[f].name == dbpath + "/_wt_table_checks") {
+    if (files[f].name.includes("_wt_table_checks")) {
         hasWTTableChecksFile = true;
     }
 }

@@ -47,7 +47,7 @@ jsTest.log("Test 3.");
 
 let files = listFiles(dbpath);
 for (f in files) {
-    assert.neq(files[f].name, dbpath + "/_wt_table_checks");
+    assert(!files[f].name.includes("_wt_table_checks"));
 }
 
 writeFile(dbpath + "/_wt_table_checks", "");
