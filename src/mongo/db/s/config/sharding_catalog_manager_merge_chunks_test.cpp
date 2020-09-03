@@ -38,6 +38,7 @@
 
 namespace mongo {
 namespace {
+using unittest::assertGet;
 
 const NamespaceString kNamespace("TestDB.TestColl");
 
@@ -72,13 +73,24 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
 
     Timestamp validAfter{100, 0};
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunkMerge(operationContext(),
-                                     kNamespace,
-                                     origVersion.epoch(),
-                                     chunkBoundaries,
-                                     "shard0000",
-                                     validAfter));
+    auto versions = assertGet(ShardingCatalogManager::get(operationContext())
+                                  ->commitChunkMerge(operationContext(),
+                                                     kNamespace,
+                                                     origVersion.epoch(),
+                                                     chunkBoundaries,
+                                                     "shard0000",
+                                                     validAfter));
+
+    auto collVersion = assertGet(ChunkVersion::parseWithField(versions, "collectionVersion"));
+    auto shardVersion = assertGet(ChunkVersion::parseWithField(versions, "shardVersion"));
+
+    ASSERT_GT(shardVersion, origVersion);
+    ASSERT_EQ(collVersion, shardVersion);
+
+    // Check for increment on mergedChunk's minor version
+    auto expectedShardVersion = ChunkVersion(
+        origVersion.majorVersion(), origVersion.minorVersion() + 1, origVersion.epoch());
+    ASSERT_EQ(expectedShardVersion, shardVersion);
 
     auto findResponse = uassertStatusOK(
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
@@ -99,11 +111,8 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
     ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 
-    {
-        // Check for increment on mergedChunk's minor version
-        ASSERT_EQ(origVersion.majorVersion(), mergedChunk.getVersion().majorVersion());
-        ASSERT_EQ(origVersion.minorVersion() + 1, mergedChunk.getVersion().minorVersion());
-    }
+    // Check that the shard version returned by the merge matches the CSRS one
+    ASSERT_EQ(shardVersion, mergedChunk.getVersion());
 
     // Make sure history is there
     ASSERT_EQ(1UL, mergedChunk.getHistory().size());
@@ -371,9 +380,7 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
                                               chunkBoundaries,
                                               "shard0000",
                                               validAfter);
-    // TODO SERVER-50288 Return collection version on split and merge commands
-    // Check the returned shard version instead of the error code
-    ASSERT_EQ(50577, mergeStatus.code());
+    ASSERT_NOT_OK(mergeStatus);
 }
 
 TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {

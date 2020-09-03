@@ -189,26 +189,34 @@ public:
     /**
      * Updates metadata in the config.chunks collection to show the given chunk as split into
      * smaller chunks at the specified split points.
+     *
+     * Returns a BSON object with the newly produced chunk versions after the migration:
+     *   - shardVersion - The new shard version of the source shard
+     *   - collectionVersion - The new collection version after the commit
      */
-    Status commitChunkSplit(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            const OID& requestEpoch,
-                            const ChunkRange& range,
-                            const std::vector<BSONObj>& splitPoints,
-                            const std::string& shardName);
+    StatusWith<BSONObj> commitChunkSplit(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const OID& requestEpoch,
+                                         const ChunkRange& range,
+                                         const std::vector<BSONObj>& splitPoints,
+                                         const std::string& shardName);
 
     /**
      * Updates metadata in the config.chunks collection so the chunks with given boundaries are seen
      * merged into a single larger chunk.
      * If 'validAfter' is not set, this means the commit request came from an older server version,
      * which is not history-aware.
+     *
+     * Returns a BSON object with the newly produced chunk versions after the migration:
+     *   - shardVersion - The new shard version of the source shard
+     *   - collectionVersion - The new collection version after the commit
      */
-    Status commitChunkMerge(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            const OID& requestEpoch,
-                            const std::vector<BSONObj>& chunkBoundaries,
-                            const std::string& shardName,
-                            const boost::optional<Timestamp>& validAfter);
+    StatusWith<BSONObj> commitChunkMerge(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const OID& requestEpoch,
+                                         const std::vector<BSONObj>& chunkBoundaries,
+                                         const std::string& shardName,
+                                         const boost::optional<Timestamp>& validAfter);
 
     /**
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.

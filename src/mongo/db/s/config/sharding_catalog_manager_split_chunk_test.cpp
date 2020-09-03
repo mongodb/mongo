@@ -37,6 +37,7 @@
 
 namespace mongo {
 namespace {
+using unittest::assertGet;
 
 const NamespaceString kNamespace("TestDB", "TestColl");
 
@@ -63,13 +64,24 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
 
     setupChunks({chunk});
 
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->commitChunkSplit(operationContext(),
-                                     kNamespace,
-                                     origVersion.epoch(),
-                                     ChunkRange(chunkMin, chunkMax),
-                                     splitPoints,
-                                     "shard0000"));
+    auto versions = assertGet(ShardingCatalogManager::get(operationContext())
+                                  ->commitChunkSplit(operationContext(),
+                                                     kNamespace,
+                                                     origVersion.epoch(),
+                                                     ChunkRange(chunkMin, chunkMax),
+                                                     splitPoints,
+                                                     "shard0000"));
+    auto collVersion = assertGet(ChunkVersion::parseWithField(versions, "collectionVersion"));
+    auto shardVersion = assertGet(ChunkVersion::parseWithField(versions, "shardVersion"));
+
+    ASSERT_GT(shardVersion, origVersion);
+    ASSERT_EQ(collVersion, shardVersion);
+
+    // Check for increment on mergedChunk's minor version
+    auto expectedShardVersion = ChunkVersion(
+        origVersion.majorVersion(), origVersion.minorVersion() + 2, origVersion.epoch());
+    ASSERT_EQ(expectedShardVersion, shardVersion);
+    ASSERT_EQ(shardVersion, collVersion);
 
     // First chunkDoc should have range [chunkMin, chunkSplitPoint]
     auto chunkDocStatus = getChunkDoc(operationContext(), chunkMin);
@@ -296,9 +308,7 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
                                               ChunkRange(chunkMin, chunkMax),
                                               splitPoints,
                                               "shard0000");
-    // TODO SERVER-50288 Return collection version on split and merge commands
-    // Check the returned shard version instead of the error code
-    ASSERT_EQ(50577, splitStatus.code());
+    ASSERT_NOT_OK(splitStatus);
 }
 
 TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
