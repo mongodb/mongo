@@ -16,6 +16,9 @@ bool verbose = false; /* Verbose flag */
 
 static const char *command; /* Command name */
 
+/* Give users a hint in the help output for if they're trying to read MongoDB data files */
+static const char *mongodb_config = "log=(enabled=true,path=journal,compressor=snappy)";
+
 #define READONLY "readonly=true"
 #define REC_ERROR "log=(recover=error)"
 #define REC_LOGOFF "log=(enabled=false)"
@@ -49,6 +52,7 @@ usage(void)
 
     fprintf(stderr, "WiredTiger Data Engine (version %d.%d)\n", WIREDTIGER_VERSION_MAJOR,
       WIREDTIGER_VERSION_MINOR);
+    fprintf(stderr, "MongoDB wiredtiger_open configuration: \"%s\"\n", mongodb_config);
     util_usage(NULL, "global_options:", options);
     util_usage(NULL, "commands:", commands);
 }

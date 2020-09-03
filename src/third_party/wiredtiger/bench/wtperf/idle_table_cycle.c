@@ -29,16 +29,16 @@
 #include "wtperf.h"
 
 static int
-check_timing(WTPERF *wtperf, const char *name, struct timespec start, struct timespec *stop)
+check_timing(WTPERF *wtperf, const char *name, uint64_t start, uint64_t *stop)
 {
     CONFIG_OPTS *opts;
     uint64_t last_interval;
 
     opts = wtperf->opts;
 
-    __wt_epoch(NULL, stop);
+    *stop = __wt_clock(NULL);
 
-    last_interval = (uint64_t)(WT_TIMEDIFF_SEC(*stop, start));
+    last_interval = WT_CLOCKDIFF_SEC(*stop, start);
 
     if (last_interval > opts->idle_table_cycle) {
         lprintf(wtperf, ETIMEDOUT, 0,
@@ -57,11 +57,11 @@ check_timing(WTPERF *wtperf, const char *name, struct timespec start, struct tim
 static WT_THREAD_RET
 cycle_idle_tables(void *arg)
 {
-    struct timespec start, stop;
     CONFIG_OPTS *opts;
     WTPERF *wtperf;
     WT_CURSOR *cursor;
     WT_SESSION *session;
+    uint64_t start, stop;
     int cycle_count, ret;
     char uri[512];
 
@@ -81,7 +81,7 @@ cycle_idle_tables(void *arg)
         __wt_sleep(1, 0);
 
         /* Setup a start timer. */
-        __wt_epoch(NULL, &start);
+        start = __wt_clock(NULL);
 
         /* Create a table. */
         if ((ret = session->create(session, uri, opts->table_config)) != 0) {

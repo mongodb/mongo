@@ -50,6 +50,12 @@ workgen_atomic_add64(uint64_t *vp, uint64_t v)
 }
 
 void
+workgen_clock(uint64_t *clockp)
+{
+    *clockp = __wt_clock(NULL);
+}
+
+void
 workgen_epoch(struct timespec *tsp)
 {
     __wt_epoch(NULL, tsp);

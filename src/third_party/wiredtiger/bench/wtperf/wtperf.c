@@ -499,7 +499,6 @@ pre_load_data(WTPERF *wtperf)
 static WT_THREAD_RET
 worker(void *arg)
 {
-    struct timespec start, stop;
     CONFIG_OPTS *opts;
     TRACK *trk;
     WORKLOAD *workload;
@@ -512,7 +511,7 @@ worker(void *arg)
     WT_SESSION *session;
     size_t i, iter, modify_offset, modify_size, total_modify_size, value_len;
     int64_t delta, ops, ops_per_txn;
-    uint64_t log_id, next_val, usecs;
+    uint64_t log_id, next_val, start, stop, usecs;
     uint32_t rand_val, total_table_count;
     uint8_t *op, *op_end;
     int measure_latency, nmodify, ret, truncated;
@@ -654,7 +653,7 @@ worker(void *arg)
          */
         measure_latency = opts->sample_interval != 0 && trk != NULL && trk->ops != 0 &&
           (trk->ops % opts->sample_rate == 0);
-        __wt_epoch(NULL, &start); /* [-Werror=maybe-uninitialized] */
+        start = __wt_clock(NULL);
 
         cursor->set_key(cursor, key_buf);
         switch (*op) {
@@ -891,9 +890,9 @@ op_err:
         /* Gather statistics */
         if (!wtperf->in_warmup) {
             if (measure_latency) {
-                __wt_epoch(NULL, &stop);
+                stop = __wt_clock(NULL);
                 ++trk->latency_ops;
-                usecs = WT_TIMEDIFF_US(stop, start);
+                usecs = WT_CLOCKDIFF_US(stop, start);
                 track_operation(trk, usecs);
             }
             /* Increment operation count */
@@ -1061,7 +1060,6 @@ run_mix_schedule(WTPERF *wtperf, WORKLOAD *workp)
 static WT_THREAD_RET
 populate_thread(void *arg)
 {
-    struct timespec start, stop;
     CONFIG_OPTS *opts;
     TRACK *trk;
     WTPERF *wtperf;
@@ -1070,7 +1068,7 @@ populate_thread(void *arg)
     WT_CURSOR **cursors, *cursor;
     WT_SESSION *session;
     size_t i;
-    uint64_t op, usecs;
+    uint64_t op, start, stop, usecs;
     uint32_t opcount, total_table_count;
     int intxn, measure_latency, ret, stress_checkpoint_due;
     char *value_buf, *key_buf;
@@ -1083,6 +1081,7 @@ populate_thread(void *arg)
     session = NULL;
     cursors = NULL;
     ret = stress_checkpoint_due = 0;
+    start = 0;
     trk = &thread->insert;
     total_table_count = opts->table_count + opts->scan_table_count;
 
@@ -1127,7 +1126,7 @@ populate_thread(void *arg)
         measure_latency =
           opts->sample_interval != 0 && trk->ops != 0 && (trk->ops % opts->sample_rate == 0);
         if (measure_latency)
-            __wt_epoch(NULL, &start);
+            start = __wt_clock(NULL);
         cursor->set_key(cursor, key_buf);
         if (opts->random_value)
             randomize_value(thread, value_buf, 0);
@@ -1149,9 +1148,9 @@ populate_thread(void *arg)
          * multiple tables, it is the time for insertion into all of them.
          */
         if (measure_latency) {
-            __wt_epoch(NULL, &stop);
+            stop = __wt_clock(NULL);
             ++trk->latency_ops;
-            usecs = WT_TIMEDIFF_US(stop, start);
+            usecs = WT_CLOCKDIFF_US(stop, start);
             track_operation(trk, usecs);
         }
         ++thread->insert.ops; /* Same as trk->ops */
@@ -1197,7 +1196,6 @@ err:
 static WT_THREAD_RET
 populate_async(void *arg)
 {
-    struct timespec start, stop;
     CONFIG_OPTS *opts;
     TRACK *trk;
     WTPERF *wtperf;
@@ -1205,7 +1203,7 @@ populate_async(void *arg)
     WT_ASYNC_OP *asyncop;
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    uint64_t op, usecs;
+    uint64_t op, start, stop, usecs;
     int measure_latency, ret;
     char *value_buf, *key_buf;
 
@@ -1215,6 +1213,7 @@ populate_async(void *arg)
     conn = wtperf->conn;
     session = NULL;
     ret = 0;
+    start = 0;
     trk = &thread->insert;
 
     key_buf = thread->key_buf;
@@ -1232,7 +1231,7 @@ populate_async(void *arg)
     measure_latency =
       opts->sample_interval != 0 && trk->ops != 0 && (trk->ops % opts->sample_rate == 0);
     if (measure_latency)
-        __wt_epoch(NULL, &start);
+        start = __wt_clock(NULL);
 
     /* Populate the databases. */
     for (;;) {
@@ -1273,9 +1272,9 @@ populate_async(void *arg)
         goto err;
     }
     if (measure_latency) {
-        __wt_epoch(NULL, &stop);
+        stop = __wt_clock(NULL);
         ++trk->latency_ops;
-        usecs = WT_TIMEDIFF_US(stop, start);
+        usecs = WT_CLOCKDIFF_US(stop, start);
         track_operation(trk, usecs);
     }
     if ((ret = session->close(session, NULL)) != 0) {
@@ -1508,7 +1507,6 @@ checkpoint_worker(void *arg)
     WTPERF_THREAD *thread;
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    struct timespec e, s;
     uint32_t i;
     int ret;
 
@@ -1534,8 +1532,6 @@ checkpoint_worker(void *arg)
         if (wtperf->stop)
             break;
 
-        __wt_epoch(NULL, &s);
-
         wtperf->ckpt = true;
         if ((ret = session->checkpoint(session, NULL)) != 0) {
             lprintf(wtperf, ret, 0, "Checkpoint failed.");
@@ -1543,8 +1539,6 @@ checkpoint_worker(void *arg)
         }
         wtperf->ckpt = false;
         ++thread->ckpt.ops;
-
-        __wt_epoch(NULL, &e);
     }
 
     if (session != NULL && ((ret = session->close(session, NULL)) != 0)) {
@@ -1571,7 +1565,6 @@ scan_worker(void *arg)
     WT_CURSOR *cursor, **cursors;
     WT_SESSION *session;
     char *key_buf;
-    struct timespec e, s;
     uint32_t i, ntables, pct, table_start;
     uint64_t cur_id, end_id, incr, items, start_id, tot_items;
     int ret;
@@ -1634,8 +1627,6 @@ scan_worker(void *arg)
         if (wtperf->stop)
             break;
 
-        __wt_epoch(NULL, &s);
-
         wtperf->scan = true;
         items = 0;
         while (items < tot_items && !wtperf->stop) {
@@ -1660,7 +1651,6 @@ scan_worker(void *arg)
         }
         wtperf->scan = false;
         ++thread->scan.ops;
-        __wt_epoch(NULL, &e);
     }
 
     if (session != NULL && ((ret = session->close(session, NULL)) != 0)) {
@@ -1680,13 +1670,12 @@ err:
 static int
 execute_populate(WTPERF *wtperf)
 {
-    struct timespec start, stop;
     CONFIG_OPTS *opts;
     WT_ASYNC_OP *asyncop;
     WTPERF_THREAD *popth;
     WT_THREAD_CALLBACK (*pfunc)(void *);
     size_t i;
-    uint64_t last_ops, msecs, print_ops_sec, max_key;
+    uint64_t last_ops, max_key, msecs, print_ops_sec, start, stop;
     uint32_t interval, tables;
     wt_thread_t idle_table_cycle_thread;
     double print_secs;
@@ -1711,7 +1700,7 @@ execute_populate(WTPERF *wtperf)
         pfunc = populate_thread;
     start_threads(wtperf, NULL, wtperf->popthreads, opts->populate_threads, pfunc);
 
-    __wt_epoch(NULL, &start);
+    start = __wt_clock(NULL);
     for (elapsed = 0, interval = 0, last_ops = 0; wtperf->insert_key < max_key && !wtperf->error;) {
         /*
          * Sleep for 100th of a second, report_interval is in second granularity, each 100th
@@ -1733,7 +1722,7 @@ execute_populate(WTPERF *wtperf)
           wtperf->totalsec);
         last_ops = wtperf->insert_ops;
     }
-    __wt_epoch(NULL, &stop);
+    stop = __wt_clock(NULL);
 
     /*
      * Move popthreads aside to narrow possible race with the monitor thread. The latency tracking
@@ -1752,7 +1741,7 @@ execute_populate(WTPERF *wtperf)
     }
 
     lprintf(wtperf, 0, 1, "Finished load of %" PRIu32 " items", opts->icount);
-    msecs = WT_TIMEDIFF_MS(stop, start);
+    msecs = WT_CLOCKDIFF_MS(stop, start);
 
     /*
      * This is needed as the divisions will fail if the insert takes no time which will only be the
@@ -1777,7 +1766,7 @@ execute_populate(WTPERF *wtperf)
     if (opts->compact) {
         assert(opts->async_threads > 0);
         lprintf(wtperf, 0, 1, "Compact after populate");
-        __wt_epoch(NULL, &start);
+        start = __wt_clock(NULL);
         tables = opts->table_count;
         for (i = 0; i < opts->table_count; i++) {
             /*
@@ -1799,9 +1788,9 @@ execute_populate(WTPERF *wtperf)
             lprintf(wtperf, ret, 0, "Populate async flush failed.");
             return (ret);
         }
-        __wt_epoch(NULL, &stop);
+        stop = __wt_clock(NULL);
         lprintf(wtperf, 0, 1, "Compact completed in %" PRIu64 " seconds",
-          (uint64_t)(WT_TIMEDIFF_SEC(stop, start)));
+          (uint64_t)(WT_CLOCKDIFF_SEC(stop, start)));
         assert(tables == 0);
     }
 
@@ -2897,12 +2886,11 @@ recreate_dir(const char *name)
 static int
 drop_all_tables(WTPERF *wtperf)
 {
-    struct timespec start, stop;
     CONFIG_OPTS *opts;
     WT_SESSION *session;
     size_t i;
     uint32_t total_table_count;
-    uint64_t msecs;
+    uint64_t msecs, start, stop;
     int ret, t_ret;
 
     opts = wtperf->opts;
@@ -2913,15 +2901,15 @@ drop_all_tables(WTPERF *wtperf)
         lprintf(wtperf, ret, 0, "Error opening a session on %s", wtperf->home);
         return (ret);
     }
-    __wt_epoch(NULL, &start);
+    start = __wt_clock(NULL);
     for (i = 0; i < total_table_count; i++) {
         if ((ret = session->drop(session, wtperf->uris[i], NULL)) != 0) {
             lprintf(wtperf, ret, 0, "Error dropping table %s", wtperf->uris[i]);
             goto err;
         }
     }
-    __wt_epoch(NULL, &stop);
-    msecs = WT_TIMEDIFF_MS(stop, start);
+    stop = __wt_clock(NULL);
+    msecs = WT_CLOCKDIFF_MS(stop, start);
     lprintf(wtperf, 0, 1, "Executed %" PRIu32 " drop operations average time %" PRIu64 "ms",
       total_table_count, msecs / total_table_count);
 
