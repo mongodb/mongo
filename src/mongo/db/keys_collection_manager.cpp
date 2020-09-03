@@ -264,6 +264,10 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
                 if (nextWakeup > kMaxRefreshWaitTime) {
                     nextWakeup = kMaxRefreshWaitTime;
                 }
+                LOGV2(4939300,
+                      "Failed to refresh key cache",
+                      "error"_attr = latestKeyStatusWith.getStatus(),
+                      "nextWakeup"_attr = nextWakeup);
             }
 
             // Notify all waiters that the refresh has finished and they can move on
