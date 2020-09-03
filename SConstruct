@@ -4100,9 +4100,9 @@ if get_option('ninja') != 'disabled':
     )
 
     def get_idlc_command(env, node, action, targets, sources, executor=None):
-        _, variables, _ = env.NinjaGetGenericShellCommand(node, action, targets, sources, executor=executor)
+        _, variables = env.NinjaGetShellCommand(node, action, targets, sources, executor=executor)
         variables["msvc_deps_prefix"] = "import file:"
-        return "IDLC", variables, env.subst(env['IDLC']).split()
+        return "IDLC", variables
 
     env.NinjaRuleMapping("$IDLCCOM", get_idlc_command)
     env.NinjaRuleMapping(env["IDLCCOM"], get_idlc_command)
