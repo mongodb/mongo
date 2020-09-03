@@ -83,7 +83,7 @@ jsTestLog('node 1 is now primary, but cannot accept writes');
 
 // Confirm that the most up-to-date node becomes primary
 // after the default catchup delay.
-replSet.waitForState(0, ReplSetTest.State.PRIMARY, 60 * 1000);
+replSet.waitForState(0, ReplSetTest.State.PRIMARY, replSet.kDefaultTimeoutMS);
 jsTestLog('node 0 performed catchup takeover and is now primary');
 
 // Wait until the old primary steps down.
@@ -96,7 +96,7 @@ replSet.awaitReplication();
 
 // Confirm that the highest priority node becomes primary
 // after catching up.
-replSet.waitForState(2, ReplSetTest.State.PRIMARY, 30 * 1000);
+replSet.waitForState(2, ReplSetTest.State.PRIMARY, replSet.kDefaultTimeoutMS);
 jsTestLog('node 2 performed priority takeover and is now primary');
 
 // Wait until the old primary steps down so the connections won't be closed during stopSet().
