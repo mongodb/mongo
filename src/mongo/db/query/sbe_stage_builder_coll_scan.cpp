@@ -121,6 +121,7 @@ generateOptimizedOplogScan(OperationContext* opCtx,
                            const Collection* collection,
                            const CollectionScanNode* csn,
                            sbe::value::SlotIdGenerator* slotIdGenerator,
+                           sbe::value::FrameIdGenerator* frameIdGenerator,
                            PlanYieldPolicy* yieldPolicy,
                            sbe::RuntimeEnvironment* env,
                            bool isTailableResumeBranch,
@@ -216,10 +217,13 @@ generateOptimizedOplogScan(OperationContext* opCtx,
             relevantSlots.push_back(*tsSlot);
         }
 
-        stage = generateFilter(csn->filter.get(),
+        stage = generateFilter(opCtx,
+                               csn->filter.get(),
                                std::move(stage),
                                slotIdGenerator,
+                               frameIdGenerator,
                                resultSlot,
+                               env,
                                std::move(relevantSlots));
 
         // We may be requested to stop applying the filter after the first match. This can happen
@@ -287,9 +291,11 @@ std::tuple<sbe::value::SlotId,
            sbe::value::SlotId,
            boost::optional<sbe::value::SlotId>,
            std::unique_ptr<sbe::PlanStage>>
-generateGenericCollScan(const Collection* collection,
+generateGenericCollScan(OperationContext* opCtx,
+                        const Collection* collection,
                         const CollectionScanNode* csn,
                         sbe::value::SlotIdGenerator* slotIdGenerator,
+                        sbe::value::FrameIdGenerator* frameIdGenerator,
                         PlanYieldPolicy* yieldPolicy,
                         sbe::RuntimeEnvironment* env,
                         bool isTailableResumeBranch,
@@ -405,10 +411,13 @@ generateGenericCollScan(const Collection* collection,
             relevantSlots.push_back(*tsSlot);
         }
 
-        stage = generateFilter(csn->filter.get(),
+        stage = generateFilter(opCtx,
+                               csn->filter.get(),
                                std::move(stage),
                                slotIdGenerator,
+                               frameIdGenerator,
                                resultSlot,
+                               env,
                                std::move(relevantSlots));
     }
 
@@ -424,6 +433,7 @@ generateCollScan(OperationContext* opCtx,
                  const Collection* collection,
                  const CollectionScanNode* csn,
                  sbe::value::SlotIdGenerator* slotIdGenerator,
+                 sbe::value::FrameIdGenerator* frameIdGenerator,
                  PlanYieldPolicy* yieldPolicy,
                  sbe::RuntimeEnvironment* env,
                  bool isTailableResumeBranch,
@@ -435,14 +445,17 @@ generateCollScan(OperationContext* opCtx,
                                               collection,
                                               csn,
                                               slotIdGenerator,
+                                              frameIdGenerator,
                                               yieldPolicy,
                                               env,
                                               isTailableResumeBranch,
                                               tracker);
         } else {
-            return generateGenericCollScan(collection,
+            return generateGenericCollScan(opCtx,
+                                           collection,
                                            csn,
                                            slotIdGenerator,
+                                           frameIdGenerator,
                                            yieldPolicy,
                                            env,
                                            isTailableResumeBranch,

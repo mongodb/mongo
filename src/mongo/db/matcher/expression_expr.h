@@ -87,11 +87,11 @@ public:
         return boost::none;
     }
 
-    boost::intrusive_ptr<ExpressionContext> getExpressionContext() {
+    boost::intrusive_ptr<ExpressionContext> getExpressionContext() const {
         return _expCtx;
     }
 
-    boost::intrusive_ptr<Expression> getExpression() {
+    boost::intrusive_ptr<Expression> getExpression() const {
         return _expression;
     }
 

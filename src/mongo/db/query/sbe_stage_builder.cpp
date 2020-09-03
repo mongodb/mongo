@@ -76,6 +76,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildCollScan(
                          _collection,
                          csn,
                          &_slotIdGenerator,
+                         &_frameIdGenerator,
                          _yieldPolicy,
                          _data.env,
                          _isTailableCollScanResumeBranch,
@@ -157,10 +158,13 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildFetch(const QuerySol
             relevantSlots.push_back(*_returnKeySlot);
         }
 
-        stage = generateFilter(fn->filter.get(),
+        stage = generateFilter(_opCtx,
+                               fn->filter.get(),
                                std::move(stage),
                                &_slotIdGenerator,
+                               &_frameIdGenerator,
                                *_data.resultSlot,
+                               _data.env,
                                std::move(relevantSlots));
     }
 
@@ -374,10 +378,13 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildOr(const QuerySoluti
 
     if (orn->filter) {
         auto relevantSlots = sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot);
-        stage = generateFilter(orn->filter.get(),
+        stage = generateFilter(_opCtx,
+                               orn->filter.get(),
                                std::move(stage),
                                &_slotIdGenerator,
+                               &_frameIdGenerator,
                                *_data.resultSlot,
+                               _data.env,
                                std::move(relevantSlots));
     }
 

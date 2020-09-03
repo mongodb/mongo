@@ -142,22 +142,15 @@ struct ExpressionVisitorContext {
         // operator.
         *relevantSlots = std::move(logicalExpressionEvalFrame.savedRelevantSlots);
 
-        // Get a list of slots that are used by $let expressions. These slots need to be available
-        // to the inner side of the LoopJoinStage, in case any of the branches want to reference one
-        // of the variables bound by the $let.
-        sbe::value::SlotVector letBindings;
-        for (auto&& [_, slot] : environment) {
-            letBindings.push_back(slot);
-        }
-
         // The LoopJoinStage we are creating here will not expose any of the slots from its outer
         // side except for the ones we explicity ask for. For that reason, we maintain the
         // 'relevantSlots' list of slots that may still be referenced above this stage. All of the
         // slots in 'letBindings' are relevant by this definition, but we track them separately,
         // which is why we need to add them in now.
         auto relevantSlotsWithLetBindings(*relevantSlots);
-        relevantSlotsWithLetBindings.insert(
-            relevantSlotsWithLetBindings.end(), letBindings.begin(), letBindings.end());
+        for (auto&& [_, slot] : environment) {
+            relevantSlotsWithLetBindings.push_back(slot);
+        }
 
         // Put the union into a nested loop. The inner side of the nested loop will execute exactly
         // once, trying each branch of the union until one of them short circuits or until it
@@ -166,8 +159,8 @@ struct ExpressionVisitorContext {
         auto stage = sbe::makeS<sbe::LoopJoinStage>(
             std::move(logicalExpressionEvalFrame.savedTraverseStage),
             sbe::makeS<sbe::LimitSkipStage>(std::move(unionOfBranches), 1, boost::none),
-            std::move(relevantSlotsWithLetBindings),
-            std::move(letBindings),
+            relevantSlotsWithLetBindings,
+            relevantSlotsWithLetBindings,
             nullptr /* predicate */);
 
         // We've already restored all necessary state from the top 'logicalExpressionEvalFrameStack'
@@ -735,7 +728,7 @@ private:
         invariant(logicOp == sbe::EPrimBinary::logicOr || logicOp == sbe::EPrimBinary::logicAnd);
 
         auto frameId = _context->frameIdGenerator->generate();
-        auto branchExpr = generateExpressionForLogicBranch(sbe::EVariable{frameId, 0});
+        auto branchExpr = generateCoerceToBoolExpression(sbe::EVariable{frameId, 0});
         std::unique_ptr<sbe::EExpression> shortCircuitCondition;
         if (logicOp == sbe::EPrimBinary::logicAnd) {
             // The filter should take the short circuit path when the branch resolves to _false_, so
@@ -782,7 +775,7 @@ private:
         if (switchBranchConditionalStage == boost::none) {
             // Here, _context->popExpr() represents the $switch branch's "case" child.
             auto frameId = _context->frameIdGenerator->generate();
-            auto branchExpr = generateExpressionForLogicBranch(sbe::EVariable{frameId, 0});
+            auto branchExpr = generateCoerceToBoolExpression(sbe::EVariable{frameId, 0});
             auto conditionExpr = sbe::makeE<sbe::ELocalBind>(
                 frameId, sbe::makeEs(_context->popExpr()), std::move(branchExpr));
 
@@ -1534,7 +1527,7 @@ public:
         auto binds = sbe::makeEs(_context->popExpr());
 
         auto notExpr = sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                                   generateExpressionForLogicBranch({frameId, 0}));
+                                                   generateCoerceToBoolExpression({frameId, 0}));
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(notExpr)));
@@ -1806,7 +1799,7 @@ private:
             _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
                 frameId,
                 sbe::makeEs(_context->popExpr()),
-                generateExpressionForLogicBranch(sbe::EVariable{frameId, 0})));
+                generateCoerceToBoolExpression(sbe::EVariable{frameId, 0})));
 
             return;
         }
@@ -1816,10 +1809,10 @@ private:
         // The last branch works differently from the others. It just uses a project stage to
         // produce a true or false value for the branch result.
         auto frameId = _context->frameIdGenerator->generate();
-        auto lastBranchExpr = sbe::makeE<sbe::ELocalBind>(
-            frameId,
-            sbe::makeEs(_context->popExpr()),
-            generateExpressionForLogicBranch(sbe::EVariable{frameId, 0}));
+        auto lastBranchExpr =
+            sbe::makeE<sbe::ELocalBind>(frameId,
+                                        sbe::makeEs(_context->popExpr()),
+                                        generateCoerceToBoolExpression(sbe::EVariable{frameId, 0}));
         auto lastBranchResultSlot = _context->slotIdGenerator->generate();
         auto lastBranch = sbe::makeProjectStage(
             std::move(_context->traverseStage), lastBranchResultSlot, std::move(lastBranchExpr));
@@ -1895,7 +1888,7 @@ private:
 };
 }  // namespace
 
-std::unique_ptr<sbe::EExpression> generateExpressionForLogicBranch(sbe::EVariable branchRef) {
+std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable branchRef) {
     // Make an expression that compares the value in 'branchRef' to the result of evaluating the
     // 'valExpr' expression. The comparison uses cmp3w, so that can handle comparisons between
     // values with different types.

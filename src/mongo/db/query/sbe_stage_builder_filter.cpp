@@ -173,15 +173,21 @@ struct EvalFrame {
  * A struct for storing context across calls to visit() methods in MatchExpressionVisitor's.
  */
 struct MatchExpressionVisitorContext {
-    MatchExpressionVisitorContext(sbe::value::SlotIdGenerator* slotIdGenerator,
+    MatchExpressionVisitorContext(OperationContext* opCtx,
+                                  sbe::value::SlotIdGenerator* slotIdGenerator,
+                                  sbe::value::FrameIdGenerator* frameIdGenerator,
                                   std::unique_ptr<sbe::PlanStage> inputStage,
                                   sbe::value::SlotId inputSlotIn,
                                   sbe::value::SlotVector relevantSlotsIn,
-                                  const MatchExpression* root)
-        : inputSlot{inputSlotIn},
+                                  const MatchExpression* root,
+                                  sbe::RuntimeEnvironment* env)
+        : opCtx{opCtx},
+          inputSlot{inputSlotIn},
           relevantSlots{std::move(relevantSlotsIn)},
           slotIdGenerator{slotIdGenerator},
-          topLevelAnd{nullptr} {
+          frameIdGenerator{frameIdGenerator},
+          topLevelAnd{nullptr},
+          env{env} {
         // If 'inputSlot' is not present within 'relevantSlots', add it now.
         if (!std::count(relevantSlots.begin(), relevantSlots.end(), inputSlot)) {
             relevantSlots.push_back(inputSlot);
@@ -210,11 +216,14 @@ struct MatchExpressionVisitorContext {
         return std::move(frame.stage);
     }
 
+    OperationContext* opCtx;
     std::vector<EvalFrame> evalStack;
     sbe::value::SlotId inputSlot;
     sbe::value::SlotVector relevantSlots;
     sbe::value::SlotIdGenerator* slotIdGenerator;
+    sbe::value::FrameIdGenerator* frameIdGenerator;
     const MatchExpression* topLevelAnd;
+    sbe::RuntimeEnvironment* env;
 };
 
 /**
@@ -713,9 +722,7 @@ public:
     }
     void visit(const EqualityMatchExpression* expr) final {}
     void visit(const ExistsMatchExpression* expr) final {}
-    void visit(const ExprMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
+    void visit(const ExprMatchExpression* expr) final {}
     void visit(const GTEMatchExpression* expr) final {}
     void visit(const GTMatchExpression* expr) final {}
     void visit(const GeoMatchExpression* expr) final {
@@ -727,9 +734,7 @@ public:
     void visit(const InMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
-    void visit(const InternalExprEqMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
+    void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
@@ -942,7 +947,32 @@ public:
         generateTraverse(_context, expr, std::move(makeEExprFn));
     }
 
-    void visit(const ExprMatchExpression* expr) final {}
+    void visit(const ExprMatchExpression* matchExpr) final {
+        auto& frame = _context->evalStack.back();
+
+        // The $expr expression must by applied to the current $$ROOT document, so make sure that
+        // an input slot associated with the current frame is the same slot as the input slot for
+        // the entire match expression we're translating.
+        invariant(frame.inputSlot == _context->inputSlot);
+
+        auto&& [_, expr, stage] = generateExpression(_context->opCtx,
+                                                     matchExpr->getExpression().get(),
+                                                     std::move(frame.stage),
+                                                     _context->slotIdGenerator,
+                                                     _context->frameIdGenerator,
+                                                     frame.inputSlot,
+                                                     _context->env,
+                                                     &frame.relevantSlots);
+        auto frameId = _context->frameIdGenerator->generate();
+
+        // We will need to convert the result of $expr to a boolean value, so we'll wrap it into an
+        // expression which does exactly that.
+        auto logicExpr = generateCoerceToBoolExpression(sbe::EVariable{frameId, 0});
+
+        frame.output = sbe::makeE<sbe::ELocalBind>(
+            frameId, sbe::makeEs(std::move(expr)), std::move(logicExpr));
+        frame.stage = std::move(stage);
+    }
 
     void visit(const GTEMatchExpression* expr) final {
         generateTraverseForComparisonPredicate(_context, expr, sbe::EPrimBinary::greaterEq);
@@ -955,7 +985,14 @@ public:
     void visit(const GeoMatchExpression* expr) final {}
     void visit(const GeoNearMatchExpression* expr) final {}
     void visit(const InMatchExpression* expr) final {}
-    void visit(const InternalExprEqMatchExpression* expr) final {}
+    void visit(const InternalExprEqMatchExpression* expr) final {
+        // This is a no-op. The $_internalExprEq match expression is produced internally by
+        // rewriting an $expr expression to an AND($expr, $_internalExprEq), which can later be
+        // eliminated by via a conversion into EXACT index bounds, or remains present. In the latter
+        // case we can simply ignore it, as the result of AND($expr, $_internalExprEq) is equal to
+        // just $expr.
+        generateAlwaysBoolean(_context, true);
+    }
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
@@ -1188,10 +1225,13 @@ private:
 };
 }  // namespace
 
-std::unique_ptr<sbe::PlanStage> generateFilter(const MatchExpression* root,
+std::unique_ptr<sbe::PlanStage> generateFilter(OperationContext* opCtx,
+                                               const MatchExpression* root,
                                                std::unique_ptr<sbe::PlanStage> stage,
                                                sbe::value::SlotIdGenerator* slotIdGenerator,
+                                               sbe::value::FrameIdGenerator* frameIdGenerator,
                                                sbe::value::SlotId inputSlot,
+                                               sbe::RuntimeEnvironment* env,
                                                sbe::value::SlotVector relevantSlots) {
     // The planner adds an $and expression without the operands if the query was empty. We can bail
     // out early without generating the filter plan stage if this is the case.
@@ -1199,8 +1239,14 @@ std::unique_ptr<sbe::PlanStage> generateFilter(const MatchExpression* root,
         return stage;
     }
 
-    MatchExpressionVisitorContext context{
-        slotIdGenerator, std::move(stage), inputSlot, relevantSlots, root};
+    MatchExpressionVisitorContext context{opCtx,
+                                          slotIdGenerator,
+                                          frameIdGenerator,
+                                          std::move(stage),
+                                          inputSlot,
+                                          relevantSlots,
+                                          root,
+                                          env};
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};
     MatchExpressionPostVisitor postVisitor{&context};
