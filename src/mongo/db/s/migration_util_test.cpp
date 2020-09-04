@@ -314,8 +314,10 @@ TEST_F(MigrationUtilsTest, TestInvalidUUID) {
     ASSERT_FALSE(migrationutil::checkForConflictingDeletions(opCtx, range, wrongUuid));
 }
 
-// Fixture that uses a mocked CatalogCacheLoader and CatalogClient to allow metadata refreshes
-// without using the mock network.
+/**
+ * Fixture that uses a mocked CatalogCacheLoader and CatalogClient to allow metadata refreshes
+ * without using the mock network.
+ */
 class SubmitRangeDeletionTaskTest : public ShardServerTestFixture {
 public:
     const HostAndPort kConfigHostAndPort{"dummy", 123};
@@ -362,9 +364,8 @@ public:
 
     void tearDown() override {
         WaitForMajorityService::get(getServiceContext()).shutDown();
-        CatalogCacheLoader::clearForTests(getServiceContext());
-        ShardingMongodTestFixture::tearDown();
-        CollectionShardingStateFactory::clear(getServiceContext());
+
+        ShardServerTestFixture::tearDown();
     }
 
     // Mock for the ShardingCatalogClient used to satisfy loading all shards for the ShardRegistry

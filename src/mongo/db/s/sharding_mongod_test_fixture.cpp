@@ -292,6 +292,7 @@ void ShardingMongodTestFixture::tearDown() {
         Grid::get(operationContext())->shardRegistry()->shutdown();
     }
 
+    CollectionShardingStateFactory::clear(getServiceContext());
     Grid::get(operationContext())->clearForUnitTests();
 
     ServiceContextMongoDTest::tearDown();
