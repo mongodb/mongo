@@ -23,7 +23,7 @@ load('jstests/libs/parallelTester.js');
 var $config = (function() {
     var data = {
         oldShardKeyField: 'a',
-        newShardKeyField: ['a', 'b'],
+        newShardKeyFields: ['a', 'b'],
         oldShardKey: {a: 1},
         newShardKey: {a: 1, b: 1},
         docCount: 100,
@@ -212,12 +212,13 @@ var $config = (function() {
                 // During the process of attempting to swap the zone range, the collection may
                 // become refined. Retrying swapping the zone range will allow us to target the
                 // shard key in its refined state.
-                if (e.message.includes('"b"') && e.message.includes('are not equal')) {
+                const newShardKeyField = this.newShardKeyFields[1];
+                if (e.message.includes(newShardKeyField) && e.message.includes('are not equal')) {
                     jsTestLog("Retrying swapZoneRange on collection " + latchCollName +
                               " due to refineCollectionShardKey conflict");
                     for (let zoneRange of Object.values(currentZoneRangeMap)) {
-                        zoneRange.min.b = MinKey;
-                        zoneRange.max.b = MinKey;
+                        zoneRange.min[newShardKeyField] = MinKey;
+                        zoneRange.max[newShardKeyField] = MinKey;
                     }
                     // Try swapping the zone range only once more.
                     attemptSwapZoneRange(db, latchCollName, currentZoneRangeMap);

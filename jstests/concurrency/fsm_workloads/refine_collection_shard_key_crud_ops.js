@@ -23,7 +23,8 @@ var $config = (function() {
         let bulk = coll.initializeUnorderedBulkOp();
 
         for (let i = 0; i < nDocsToInsert; ++i) {
-            bulk.insert({tid: data.tid, a: i, b: i});
+            bulk.insert(data.usingNestedKey ? {tid: data.tid, a: i, b: {c: i}}
+                                            : {tid: data.tid, a: i, b: i});
         }
 
         const res = bulk.execute();
@@ -56,7 +57,9 @@ var $config = (function() {
                 : Math.min(this.latch.getCount() + 1, this.latchCount);
 
             const coll = db.getCollection(collName + '_' + collectionNumber);
-            const res = coll.insert({tid: this.tid, a: this.insertIdx, b: this.insertIdx});
+            const res = this.usingNestedKey
+                ? coll.insert({tid: this.tid, a: this.insertIdx, b: {c: this.insertIdx}})
+                : coll.insert({tid: this.tid, a: this.insertIdx, b: this.insertIdx});
 
             assertAlways.commandWorked(res);
             assertAlways.eq(res.nInserted, 1);
@@ -72,7 +75,9 @@ var $config = (function() {
 
             const idx = Random.randInt(this.latchCount);
             const coll = db.getCollection(collName + '_' + collectionNumber);
-            const nFound = coll.find({tid: this.tid, a: idx, b: idx}).itcount();
+            const nFound = this.usingNestedKey
+                ? coll.find({tid: this.tid, a: idx, b: {c: idx}}).itcount()
+                : coll.find({tid: this.tid, a: idx, b: idx}).itcount();
 
             assertAlways.eq(nFound, 1);
         },
@@ -85,8 +90,11 @@ var $config = (function() {
                 : Math.min(this.latch.getCount() + 1, this.latchCount);
 
             const coll = this.sessionDB.getCollection(collName + '_' + collectionNumber);
-            const res = coll.update({tid: this.tid, a: this.updateIdx, b: this.updateIdx},
-                                    {tid: this.tid, a: this.insertIdx, b: this.insertIdx});
+            const res = this.usingNestedKey
+                ? coll.update({tid: this.tid, a: this.updateIdx, b: {c: this.updateIdx}},
+                              {tid: this.tid, a: this.insertIdx, b: {c: this.insertIdx}})
+                : coll.update({tid: this.tid, a: this.updateIdx, b: this.updateIdx},
+                              {tid: this.tid, a: this.insertIdx, b: this.insertIdx});
 
             assertAlways.commandWorked(res);
             assertAlways.eq(res.nMatched, 1);
@@ -104,8 +112,11 @@ var $config = (function() {
                 : Math.min(this.latch.getCount() + 1, this.latchCount);
 
             const coll = db.getCollection(collName + '_' + collectionNumber);
-            const res =
-                coll.remove({tid: this.tid, a: this.removeIdx, b: this.removeIdx}, {justOne: true});
+            const res = this.usingNestedKey
+                ? coll.remove({tid: this.tid, a: this.removeIdx, b: {c: this.removeIdx}},
+                              {justOne: true})
+                : coll.remove({tid: this.tid, a: this.removeIdx, b: this.removeIdx},
+                              {justOne: true});
 
             assertAlways.commandWorked(res);
             assertAlways.eq(res.nRemoved, 1);
@@ -130,17 +141,59 @@ var $config = (function() {
             }
 
             this.latch.countDown();
+        },
+
+        // Occasionally flush the router's cached metadata to verify the metadata for the refined
+        // collections can be successfully loaded.
+        flushRouterConfig: function flushRouterConfig(db, collName) {
+            assert.commandWorked(db.adminCommand({flushRouterConfig: db.getName()}));
         }
     };
 
     const transitions = {
         init: {insert: 0.2, find: 0.2, update: 0.2, remove: 0.2, refineCollectionShardKey: 0.2},
-        insert: {insert: 0.2, find: 0.2, update: 0.2, remove: 0.2, refineCollectionShardKey: 0.2},
-        find: {insert: 0.2, find: 0.2, update: 0.2, remove: 0.2, refineCollectionShardKey: 0.2},
-        update: {insert: 0.2, find: 0.2, update: 0.2, remove: 0.2, refineCollectionShardKey: 0.2},
-        remove: {insert: 0.2, find: 0.2, update: 0.2, remove: 0.2, refineCollectionShardKey: 0.2},
-        refineCollectionShardKey:
-            {insert: 0.2, find: 0.2, update: 0.2, remove: 0.2, refineCollectionShardKey: 0.2}
+        insert: {
+            insert: 0.18,
+            find: 0.18,
+            update: 0.18,
+            remove: 0.18,
+            refineCollectionShardKey: 0.18,
+            flushRouterConfig: 0.1
+        },
+        find: {
+            insert: 0.18,
+            find: 0.18,
+            update: 0.18,
+            remove: 0.18,
+            refineCollectionShardKey: 0.18,
+            flushRouterConfig: 0.1
+        },
+        update: {
+            insert: 0.18,
+            find: 0.18,
+            update: 0.18,
+            remove: 0.18,
+            refineCollectionShardKey: 0.18,
+            flushRouterConfig: 0.1
+        },
+        remove: {
+            insert: 0.18,
+            find: 0.18,
+            update: 0.18,
+            remove: 0.18,
+            refineCollectionShardKey: 0.18,
+            flushRouterConfig: 0.1
+        },
+        refineCollectionShardKey: {
+            insert: 0.18,
+            find: 0.18,
+            update: 0.18,
+            remove: 0.18,
+            refineCollectionShardKey: 0.18,
+            flushRouterConfig: 0.1
+        },
+        flushRouterConfig:
+            {insert: 0.2, find: 0.2, update: 0.2, remove: 0.2, refineCollectionShardKey: 0.2},
     };
 
     function setup(db, collName, cluster) {
@@ -173,6 +226,10 @@ var $config = (function() {
         states: states,
         transitions: transitions,
         setup: setup,
-        data: {oldShardKey: {a: 1}, newShardKey: {a: 1, b: 1}}
+        data: {
+            newShardKey: {a: 1, b: 1},
+            oldShardKey: {a: 1},
+            usingNestedKey: false,
+        }
     };
 })();
