@@ -481,12 +481,38 @@ validateConfigCollections({_id: 1, aKey: 1}, oldEpoch);
 // Should work because a 'useful' index exists for new shard key {a: 1, b.c: 1}. NOTE: We are
 // explicitly verifying that refineCollectionShardKey works with a dotted field.
 dropAndReshardColl({a: 1});
+assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 0}}));
 assert.commandWorked(mongos.getCollection(kNsName).createIndex({a: 1, 'b.c': 1}));
 oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).lastmodEpoch;
 
 assert.commandWorked(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {a: 1, 'b.c': 1}}));
+assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 0, 'b.c': 0}}));
 validateConfigCollections({a: 1, 'b.c': 1}, oldEpoch);
+
+// Refining a shard key with a dotted field to include more dotted fields should work.
+dropAndReshardColl({a: 1, 'b.c': 1});
+assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 0, 'b.c': 0}}));
+assert.commandWorked(
+    mongos.getCollection(kNsName).createIndex({a: 1, 'b.c': 1, d: 1, 'e.f.g': 1, h: 1}));
+oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).lastmodEpoch;
+
+assert.commandWorked(mongos.adminCommand(
+    {refineCollectionShardKey: kNsName, key: {a: 1, 'b.c': 1, d: 1, 'e.f.g': 1, h: 1}}));
+assert.commandWorked(
+    mongos.adminCommand({split: kNsName, middle: {a: 0, 'b.c': 0, d: 0, 'e.f.g': 0, h: 0}}));
+validateConfigCollections({a: 1, 'b.c': 1, d: 1, 'e.f.g': 1, h: 1}, oldEpoch);
+
+// Refining a shard key with a dotted field to include a non-dotted field should work.
+dropAndReshardColl({'a.b': 1});
+assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {'a.b': 0}}));
+assert.commandWorked(mongos.getCollection(kNsName).createIndex({'a.b': 1, c: 1}));
+oldEpoch = mongos.getCollection(kConfigCollections).findOne({_id: kNsName}).lastmodEpoch;
+
+assert.commandWorked(
+    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {'a.b': 1, c: 1}}));
+assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {'a.b': 0, c: 0}}));
+validateConfigCollections({'a.b': 1, c: 1}, oldEpoch);
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
@@ -727,6 +753,121 @@ assert.soon(() => oldSecondaryEpoch ===
 
     // The refresh should succeed now.
     assert.commandWorked(st.s.adminCommand({refineCollectionShardKey: ns, key: {x: 1, y: 1}}));
+})();
+
+// Assumes the given arrays are sorted by the max field.
+function compareMinAndMaxFields(shardedArr, refinedArr) {
+    assert(shardedArr.length && refinedArr.length, tojson(shardedArr) + ", " + tojson(refinedArr));
+    assert.eq(shardedArr.length, refinedArr.length, tojson(shardedArr) + ", " + tojson(refinedArr));
+
+    const shardedMinAndMax = shardedArr.map(obj => {
+        return {min: obj.min, max: obj.max};
+    });
+    const refinedMinAndMax = refinedArr.map(obj => {
+        return {min: obj.min, max: obj.max};
+    });
+    assert.eq(shardedMinAndMax, refinedMinAndMax);
+}
+
+// Verifies the min and max fields are the same for the chunks and tags in the given collections.
+function compareBoundaries(conn, shardedNs, refinedNs) {
+    // Compare chunks.
+    const shardedChunks =
+        conn.getDB("config").chunks.find({ns: shardedNs}).sort({max: 1}).toArray();
+    const refinedChunks =
+        conn.getDB("config").chunks.find({ns: refinedNs}).sort({max: 1}).toArray();
+    compareMinAndMaxFields(shardedChunks, refinedChunks);
+
+    // Compare tags.
+    const shardedTags = conn.getDB("config").tags.find({ns: shardedNs}).sort({max: 1}).toArray();
+    const refinedTags = conn.getDB("config").tags.find({ns: refinedNs}).sort({max: 1}).toArray();
+    compareMinAndMaxFields(shardedTags, refinedTags);
+}
+
+//
+// Verify the chunk and tag boundaries are the same for a collection sharded to a certain shard key
+// and a collection refined to that same shard key.
+//
+
+// For a shard key without nested fields.
+(() => {
+    const dbName = "compareDB";
+    const shardedNs = dbName + ".shardedColl";
+    const refinedNs = dbName + ".refinedColl";
+
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: 'zone_1'}));
+
+    assert.commandWorked(st.s.adminCommand({shardCollection: shardedNs, key: {a: 1, b: 1, c: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({split: shardedNs, middle: {a: 0, b: MinKey, c: MinKey}}));
+    assert.commandWorked(st.s.adminCommand({
+        updateZoneKeyRange: shardedNs,
+        min: {a: MinKey, b: MinKey, c: MinKey},
+        max: {a: 0, b: MinKey, c: MinKey},
+        zone: 'zone_1'
+    }));
+    assert.commandWorked(st.s.adminCommand({
+        updateZoneKeyRange: shardedNs,
+        min: {a: 10, b: MinKey, c: MinKey},
+        max: {a: MaxKey, b: MaxKey, c: MaxKey},
+        zone: 'zone_1'
+    }));
+
+    assert.commandWorked(st.s.adminCommand({shardCollection: refinedNs, key: {a: 1}}));
+    assert.commandWorked(st.s.adminCommand({split: refinedNs, middle: {a: 0}}));
+    assert.commandWorked(st.s.adminCommand(
+        {updateZoneKeyRange: refinedNs, min: {a: MinKey}, max: {a: 0}, zone: 'zone_1'}));
+    assert.commandWorked(st.s.adminCommand(
+        {updateZoneKeyRange: refinedNs, min: {a: 10}, max: {a: MaxKey}, zone: 'zone_1'}));
+
+    assert.commandWorked(st.s.getCollection(refinedNs).createIndex({a: 1, b: 1, c: 1}));
+    assert.commandWorked(
+        st.s.adminCommand({refineCollectionShardKey: refinedNs, key: {a: 1, b: 1, c: 1}}));
+
+    compareBoundaries(st.s, shardedNs, refinedNs);
+})();
+
+// For a shard key with nested fields.
+(() => {
+    const dbName = "compareDBNested";
+    const shardedNs = dbName + ".shardedColl";
+    const refinedNs = dbName + ".refinedColl";
+
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: 'zone_1'}));
+
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: shardedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({split: shardedNs, middle: {"a.b": 0, "c.d.e": MinKey, f: MinKey}}));
+    assert.commandWorked(st.s.adminCommand({
+        updateZoneKeyRange: shardedNs,
+        min: {"a.b": MinKey, "c.d.e": MinKey, f: MinKey},
+        max: {"a.b": 0, "c.d.e": MinKey, f: MinKey},
+        zone: 'zone_1'
+    }));
+    assert.commandWorked(st.s.adminCommand({
+        updateZoneKeyRange: shardedNs,
+        min: {"a.b": 10, "c.d.e": MinKey, f: MinKey},
+        max: {"a.b": MaxKey, "c.d.e": MaxKey, f: MaxKey},
+        zone: 'zone_1'
+    }));
+
+    assert.commandWorked(st.s.adminCommand({shardCollection: refinedNs, key: {"a.b": 1}}));
+    assert.commandWorked(st.s.adminCommand({split: refinedNs, middle: {"a.b": 0}}));
+    assert.commandWorked(st.s.adminCommand(
+        {updateZoneKeyRange: refinedNs, min: {"a.b": MinKey}, max: {"a.b": 0}, zone: 'zone_1'}));
+    assert.commandWorked(st.s.adminCommand(
+        {updateZoneKeyRange: refinedNs, min: {"a.b": 10}, max: {"a.b": MaxKey}, zone: 'zone_1'}));
+
+    assert.commandWorked(st.s.getCollection(refinedNs).createIndex({"a.b": 1, "c.d.e": 1, f: 1}));
+    assert.commandWorked(st.s.adminCommand(
+        {refineCollectionShardKey: refinedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}));
+
+    compareBoundaries(st.s, shardedNs, refinedNs);
 })();
 
 st.stop();
