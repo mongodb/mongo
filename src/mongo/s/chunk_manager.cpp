@@ -735,7 +735,6 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
 
     // If at least one diff was applied, the collection's version must have advanced
     invariant(getVersion().epoch() == chunkMap.getVersion().epoch());
-    invariant(getVersion().isOlderThan(chunkMap.getVersion()));
 
     return RoutingTableHistory(_nss,
                                _uuid,
