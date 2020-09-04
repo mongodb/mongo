@@ -126,7 +126,7 @@ private:
     };
 
     using Frames =
-        typename std::conditional<precise, std::vector<Frame>, std::array<Frame, 16>>::type;
+        typename std::conditional<precise, std::vector<Frame>, std::array<Frame, 32>>::type;
 
     struct Cursor {
         void skip(size_t len) {
@@ -305,7 +305,7 @@ private:
 
 Status validateBSON(const char* originalBuffer, uint64_t maxLength) noexcept {
     // First try validating using the fast but less precise version. That version will return
-    // a not-OK status for objects with CodeWScope or nesting exceeding 16 levels. These cases and
+    // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases and
     // actual failures will rerun the precise version that gives a detailed error context.
     if (MONGO_likely(ValidateBuffer<false>(originalBuffer, maxLength).validate().isOK()))
         return Status::OK();
