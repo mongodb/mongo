@@ -1148,6 +1148,7 @@ void OpDebug::append(OperationContext* opCtx,
     OPDEBUG_APPEND_OPTIONAL(b, "nModified", additiveMetrics.nModified);
     OPDEBUG_APPEND_OPTIONAL(b, "ninserted", additiveMetrics.ninserted);
     OPDEBUG_APPEND_OPTIONAL(b, "ndeleted", additiveMetrics.ndeleted);
+    OPDEBUG_APPEND_OPTIONAL(b, "nUpserted", additiveMetrics.nUpserted);
     OPDEBUG_APPEND_BOOL(b, cursorExhausted);
 
     OPDEBUG_APPEND_OPTIONAL(b, "keysInserted", additiveMetrics.keysInserted);
