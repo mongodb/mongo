@@ -1,5 +1,7 @@
 /*
  * Test the usage and behavior of the 'filter' profiler option.
+ *
+ * @tags: [requires_sharding, requires_replication]
  */
 (function() {
 
