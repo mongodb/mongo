@@ -52,6 +52,7 @@ let testSplit = () => {
     const mongosCollectionVersion = getMongosCollVersion(ns);
 
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: -500}}));
+    assert.eq(mongosCollectionVersion, getMongosCollVersion(ns));
 
     testColl.findOne({x: 0});
     testColl.findOne({x: 1000});

@@ -96,7 +96,7 @@ public:
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         // Steps
-        // 1. Set the `authoritative` and `forceRefresh` variables from the command object.
+        // 1. Set the `authoritative` variable from the command object.
         //
         // 2. Validate all command parameters against the info in our ShardingState, and return an
         //    error if they do not match.
@@ -117,12 +117,6 @@ public:
         LastError::get(client).disable();
 
         const bool authoritative = cmdObj.getBoolField("authoritative");
-        // A flag that specifies whether the set shard version catalog refresh
-        // is allowed to join an in-progress refresh triggered by an other
-        // thread, or whether it's required to either a) trigger its own
-        // refresh or b) wait for a refresh to be started after it has entered the
-        // getCollectionRoutingInfoWithRefresh function
-        const bool forceRefresh = cmdObj.getBoolField("forceRefresh");
 
         // Step 2
 
@@ -241,11 +235,9 @@ public:
 
         const auto status = [&] {
             try {
-                // TODO SERVER-48990 remove this if-else: just call onShardVersionMismatch
+                // TODO (SERVER-50812) remove this if-else: just call onShardVersionMismatch
                 if (requestedVersion == requestedVersion.DROPPED()) {
-                    // Note: The forceRefresh flag controls whether we make sure to do our own
-                    // refresh or if we're okay with joining another thread
-                    forceShardFilteringMetadataRefresh(opCtx, nss, forceRefresh);
+                    forceShardFilteringMetadataRefresh(opCtx, nss);
                 } else {
                     onShardVersionMismatch(opCtx, nss, requestedVersion);
                 }

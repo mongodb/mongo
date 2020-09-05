@@ -440,7 +440,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithLowestVersion) {
 
     ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
-    auto future = scheduleRoutingInfoForcedRefresh(kNss);
+    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     const auto incompleteChunks = [&]() {
         ChunkVersion version(1, 0, epoch);
@@ -497,7 +497,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithHighestVersion) {
 
     ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
-    auto future = scheduleRoutingInfoForcedRefresh(kNss);
+    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     const auto incompleteChunks = [&]() {
         ChunkVersion version(1, 0, epoch);
@@ -551,7 +551,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoad) {
     auto initialRoutingInfo(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
     ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
-    auto future = scheduleRoutingInfoForcedRefresh(kNss);
+    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     ChunkVersion version = initialRoutingInfo.getVersion();
 
@@ -598,7 +598,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
 
     setupNShards(2);
 
-    auto future = scheduleRoutingInfoForcedRefresh(kNss);
+    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     ChunkVersion oldVersion = initialRoutingInfo.getVersion();
     const OID newEpoch = OID::gen();
@@ -683,7 +683,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
 
     setupNShards(2);
 
-    auto future = scheduleRoutingInfoForcedRefresh(kNss);
+    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     ChunkVersion newVersion(1, 0, OID::gen());
 
@@ -730,7 +730,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
 
     ChunkVersion version = initialRoutingInfo.getVersion();
 
-    auto future = scheduleRoutingInfoForcedRefresh(kNss);
+    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     expectGetCollection(version.epoch(), shardKeyPattern);
 
@@ -776,7 +776,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdde
 
     ChunkVersion version = initialRoutingInfo.getVersion();
 
-    auto future = scheduleRoutingInfoForcedRefresh(kNss);
+    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     ChunkVersion expectedDestShardVersion;
 
@@ -824,7 +824,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
 
     ChunkVersion version = initialRoutingInfo.getVersion();
 
-    auto future = scheduleRoutingInfoForcedRefresh(kNss);
+    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
 
     // The collection type won't have resharding fields this time.
     expectGetCollection(version.epoch(), shardKeyPattern);

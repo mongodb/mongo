@@ -123,8 +123,6 @@ void SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* 
     const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
             opCtx, NamespaceString::kLogicalSessionsNamespace));
-
-    uassert(ErrorCodes::NamespaceNotFound, "config.system.sessions does not exist", cm.isSharded());
 }
 
 void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,

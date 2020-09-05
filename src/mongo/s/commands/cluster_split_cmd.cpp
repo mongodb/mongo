@@ -270,8 +270,10 @@ public:
                                                   ChunkRange(chunk->getMin(), chunk->getMax()),
                                                   {splitPoint}));
 
-        Grid::get(opCtx)->catalogCache()->invalidateShardForShardedCollection(nss,
-                                                                              chunk->getShardId());
+        Grid::get(opCtx)
+            ->catalogCache()
+            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                nss, boost::none, chunk->getShardId());
 
         return true;
     }

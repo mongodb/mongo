@@ -98,6 +98,7 @@ private:
     SetShardVersionRequest();
 
     bool _isAuthoritative{false};
+    // TODO (SERVER-50812) remove this flag that isn't used anymore
     bool _forceRefresh{false};
 
     boost::optional<NamespaceString> _nss;

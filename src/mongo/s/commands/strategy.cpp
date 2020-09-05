@@ -722,16 +722,12 @@ void runCommand(OperationContext* opCtx,
                 auto catalogCache = Grid::get(opCtx)->catalogCache();
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
                     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                        opCtx,
-                        staleNs,
-                        staleInfo->getVersionWanted(),
-                        staleInfo->getVersionReceived(),
-                        staleInfo->getShardId());
+                        staleNs, staleInfo->getVersionWanted(), staleInfo->getShardId());
                 } else {
                     // If we don't have the stale config info and therefore don't know the shard's
                     // id, we have to force all further targetting requests for the namespace to
                     // block on a refresh.
-                    catalogCache->onEpochChange(staleNs);
+                    catalogCache->invalidateCollectionEntry_LINEARIZABLE(staleNs);
                 }
 
 
@@ -1301,16 +1297,12 @@ void Strategy::explainFind(OperationContext* opCtx,
                 Grid::get(opCtx)
                     ->catalogCache()
                     ->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                        opCtx,
-                        staleNs,
-                        staleInfo->getVersionWanted(),
-                        staleInfo->getVersionReceived(),
-                        staleInfo->getShardId());
+                        staleNs, staleInfo->getVersionWanted(), staleInfo->getShardId());
             } else {
                 // If we don't have the stale config info and therefore don't know the shard's id,
                 // we have to force all further targetting requests for the namespace to block on
                 // a refresh.
-                Grid::get(opCtx)->catalogCache()->onEpochChange(staleNs);
+                Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(staleNs);
             }
 
             if (canRetry) {

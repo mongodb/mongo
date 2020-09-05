@@ -466,7 +466,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
                             "Starting post-migration commit refresh on the shard",
                             "migrationId"_attr = _coordinator->getMigrationId());
 
-        forceShardFilteringMetadataRefresh(_opCtx, getNss(), true);
+        forceShardFilteringMetadataRefresh(_opCtx, getNss());
 
         LOGV2_DEBUG_OPTIONS(4817405,
                             2,

@@ -67,11 +67,14 @@ TEST(InvalidatingLRUCacheTest, ValueHandleOperators) {
     TestValueCache cache(1);
     cache.insertOrAssign(100, {"Test value"});
 
+    // Test non-const operators
     {
         auto valueHandle = cache.get(100);
         ASSERT_EQ("Test value", valueHandle->value);
         ASSERT_EQ("Test value", (*valueHandle).value);
     }
+
+    // Test const operators
     {
         const auto valueHandle = cache.get(100);
         ASSERT_EQ("Test value", valueHandle->value);
@@ -473,7 +476,7 @@ void parallelTest(size_t cacheSize, TestFunc doTest) {
 }
 
 TEST(InvalidatingLRUCacheParallelTest, InsertOrAssignThenGet) {
-    parallelTest<TestValueCache>(1, [](auto& cache) mutable {
+    parallelTest<TestValueCache>(1, [](auto& cache) {
         const int key = 100;
         cache.insertOrAssign(key, TestValue{"Parallel tester value"});
 
@@ -501,7 +504,7 @@ TEST(InvalidatingLRUCacheParallelTest, InsertOrAssignAndGet) {
 }
 
 TEST(InvalidatingLRUCacheParallelTest, CacheSizeZeroInsertOrAssignAndGet) {
-    parallelTest<TestValueCache>(0, [](auto& cache) mutable {
+    parallelTest<TestValueCache>(0, [](auto& cache) {
         const int key = 300;
         auto cachedItem = cache.insertOrAssignAndGet(key, TestValue{"Parallel tester value"});
         ASSERT(cachedItem);
@@ -511,12 +514,18 @@ TEST(InvalidatingLRUCacheParallelTest, CacheSizeZeroInsertOrAssignAndGet) {
 }
 
 TEST(InvalidatingLRUCacheParallelTest, AdvanceTime) {
-    AtomicWord<uint64_t> counter{0};
+    AtomicWord<uint64_t> counter{1};
+    Mutex insertOrAssignMutex = MONGO_MAKE_LATCH("ReadThroughCacheBase::_cancelTokenMutex");
 
-    parallelTest<TestValueCacheCausallyConsistent>(0, [&counter](auto& cache) mutable {
+    parallelTest<TestValueCacheCausallyConsistent>(0, [&](auto& cache) {
         const int key = 300;
-        cache.insertOrAssign(
-            key, TestValue{"Parallel tester value"}, Timestamp(counter.fetchAndAdd(1)));
+        {
+            // The calls to insertOrAssign must always pass strictly incrementing time
+            stdx::lock_guard lg(insertOrAssignMutex);
+            cache.insertOrAssign(
+                key, TestValue{"Parallel tester value"}, Timestamp(counter.fetchAndAdd(1)));
+        }
+
         auto latestCached = cache.get(key, CacheCausalConsistency::kLatestCached);
         auto latestKnown = cache.get(key, CacheCausalConsistency::kLatestKnown);
 

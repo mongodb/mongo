@@ -174,8 +174,10 @@ public:
             Shard::RetryPolicy::kNotIdempotent));
         uassertStatusOK(response.commandStatus);
 
-        Grid::get(opCtx)->catalogCache()->invalidateShardForShardedCollection(
-            nss, firstChunk.getShardId());
+        Grid::get(opCtx)
+            ->catalogCache()
+            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                nss, boost::none, firstChunk.getShardId());
 
         CommandHelpers::filterCommandReplyForPassthrough(response.response, &result);
         return true;

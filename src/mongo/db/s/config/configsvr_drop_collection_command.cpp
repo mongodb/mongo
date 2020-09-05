@@ -129,7 +129,9 @@ public:
         auto collDistLock = uassertStatusOK(
             catalogClient->getDistLockManager()->lock(opCtx, nss.ns(), "dropCollection", waitFor));
 
-        ON_BLOCK_EXIT([opCtx, nss] { Grid::get(opCtx)->catalogCache()->onEpochChange(nss); });
+        ON_BLOCK_EXIT([opCtx, nss] {
+            Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
+        });
 
         _dropCollection(opCtx, nss);
 

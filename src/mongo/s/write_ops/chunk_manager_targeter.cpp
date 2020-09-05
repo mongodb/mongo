@@ -791,7 +791,7 @@ int ChunkManagerTargeter::getNShardsOwningChunks() const {
 
 void ChunkManagerTargeter::_refreshShardVersionNow(OperationContext* opCtx) {
     uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss, true));
+        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, _nss));
 
     _init(opCtx);
 }

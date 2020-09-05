@@ -284,7 +284,7 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
         migrationutil::recoverMigrationCoordinations(_opCtx, _nss);
     }
 
-    forceShardFilteringMetadataRefresh(_opCtx, _nss, true);
+    forceShardFilteringMetadataRefresh(_opCtx, _nss);
 }
 
 ScopedShardVersionCriticalSection::~ScopedShardVersionCriticalSection() {
@@ -334,9 +334,8 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
     invariant(shardingState->canAcceptShardedCommands());
 
     try {
-        const auto cm =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
-                opCtx, nss, true));
+        const auto cm = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
 
         if (!cm.isSharded()) {
             return CollectionMetadata();
@@ -354,8 +353,7 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
 }
 
 ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                bool forceRefreshFromThisThread) {
+                                                const NamespaceString& nss) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
@@ -366,9 +364,8 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     auto* const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->canAcceptShardedCommands());
 
-    const auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
-            opCtx, nss, forceRefreshFromThisThread));
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
 
     if (!cm.isSharded()) {
         // The collection is not sharded. Avoid using AutoGetCollection() as it returns the

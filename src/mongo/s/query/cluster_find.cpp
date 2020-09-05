@@ -504,18 +504,18 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
     for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
-        auto routingInfoStatus = getCollectionRoutingInfoForTxnCmd(opCtx, query.nss());
-        if (routingInfoStatus == ErrorCodes::NamespaceNotFound) {
+        auto swCM = getCollectionRoutingInfoForTxnCmd(opCtx, query.nss());
+        if (swCM == ErrorCodes::NamespaceNotFound) {
             // If the database doesn't exist, we successfully return an empty result set without
             // creating a cursor.
             return CursorId(0);
         }
 
-        auto routingInfo = uassertStatusOK(routingInfoStatus);
+        const auto cm = uassertStatusOK(std::move(swCM));
 
         try {
             return runQueryWithoutRetrying(
-                opCtx, query, readPref, routingInfo, results, partialResultsReturned);
+                opCtx, query, readPref, cm, results, partialResultsReturned);
         } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
             if (retries >= kMaxRetries) {
                 // Check if there are no retries remaining, so the last received error can be
@@ -577,13 +577,9 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             if (ex.code() != ErrorCodes::ShardInvalidatedForTargeting) {
                 if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
                     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                        opCtx,
-                        query.nss(),
-                        staleInfo->getVersionWanted(),
-                        staleInfo->getVersionReceived(),
-                        staleInfo->getShardId());
+                        query.nss(), staleInfo->getVersionWanted(), staleInfo->getShardId());
                 } else {
-                    catalogCache->onEpochChange(query.nss());
+                    catalogCache->invalidateCollectionEntry_LINEARIZABLE(query.nss());
                 }
             }
 

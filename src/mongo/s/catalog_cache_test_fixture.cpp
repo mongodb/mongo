@@ -81,6 +81,26 @@ CatalogCacheTestFixture::scheduleRoutingInfoUnforcedRefresh(const NamespaceStrin
     });
 }
 
+executor::NetworkTestEnv::FutureHandle<boost::optional<ChunkManager>>
+CatalogCacheTestFixture::scheduleRoutingInfoIncrementalRefresh(const NamespaceString& nss) {
+    auto catalogCache = Grid::get(getServiceContext())->catalogCache();
+    const auto cm =
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss));
+    ASSERT(cm.isSharded());
+
+    // Simulates the shard wanting a higher version than the one sent by the router.
+    catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+        nss, boost::none, cm.dbPrimary());
+
+    return launchAsync([this, nss] {
+        auto client = getServiceContext()->makeClient("Test");
+        auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
+
+        return boost::make_optional(
+            uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss)));
+    });
+}
+
 std::vector<ShardType> CatalogCacheTestFixture::setupNShards(int numShards) {
     std::vector<ShardType> shards;
     for (int i = 0; i < numShards; i++) {

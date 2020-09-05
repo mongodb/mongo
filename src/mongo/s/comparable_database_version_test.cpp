@@ -82,9 +82,15 @@ TEST(ComparableDatabaseVersionTest, VersionLessSameUuid) {
     ASSERT_FALSE(version1 > version2);
 }
 
+TEST(ComparableDatabaseVersionTest, DefaultConstructedVersionsAreEqual) {
+    const ComparableDatabaseVersion defaultVersion1{}, defaultVersion2{};
+    ASSERT(defaultVersion1 == defaultVersion2);
+    ASSERT_FALSE(defaultVersion1 < defaultVersion2);
+    ASSERT_FALSE(defaultVersion1 > defaultVersion2);
+}
+
 TEST(ComparableDatabaseVersionTest, DefaultConstructedVersionIsAlwaysLess) {
     const ComparableDatabaseVersion defaultVersion{};
-    ASSERT_EQ(defaultVersion.getLocalSequenceNum(), 0);
     const auto version1 =
         ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(UUID::gen(), 0));
     ASSERT(defaultVersion != version1);

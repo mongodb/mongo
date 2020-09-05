@@ -88,7 +88,9 @@ public:
         // Invalidate the routing table cache entry for this collection so that we reload it the
         // next time it is accessed, even if sending the command to the config server fails due
         // to e.g. a NetworkError.
-        ON_BLOCK_EXIT([opCtx, nss] { Grid::get(opCtx)->catalogCache()->onEpochChange(nss); });
+        ON_BLOCK_EXIT([opCtx, nss] {
+            Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss);
+        });
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(

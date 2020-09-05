@@ -196,9 +196,9 @@ public:
      */
     class ValueHandle {
     public:
-        // The two constructors below are present in order to offset the fact that the cache doesn't
-        // support pinning items. Their only usage must be in the authorization mananager for the
-        // internal authentication user.
+        // The three constructors below are present in order to offset the fact that the cache
+        // doesn't support pinning items. Their only usage must be in the authorization mananager
+        // for the internal authentication user.
         explicit ValueHandle(Value&& value)
             : _value(std::make_shared<StoredValue>(nullptr,
                                                    0,
@@ -206,6 +206,10 @@ public:
                                                    std::move(value),
                                                    CacheNotCausallyConsistent(),
                                                    CacheNotCausallyConsistent())) {}
+
+        explicit ValueHandle(Value&& value, const Time& t)
+            : _value(
+                  std::make_shared<StoredValue>(nullptr, 0, boost::none, std::move(value), t, t)) {}
 
         ValueHandle() = default;
 
@@ -264,15 +268,16 @@ public:
                         Value&& value,
                         const Time& time = CacheNotCausallyConsistent()) {
         LockGuardWithPostUnlockDestructor guard(_mutex);
-        Time timeInStore;
-        _invalidate(&guard, key, _cache.find(key), &timeInStore);
-        if (auto evicted = _cache.add(key,
-                                      std::make_shared<StoredValue>(this,
-                                                                    ++_epoch,
-                                                                    key,
-                                                                    std::forward<Value>(value),
-                                                                    time,
-                                                                    std::max(time, timeInStore)))) {
+        Time currentTime, currentTimeInStore;
+        _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
+        if (auto evicted =
+                _cache.add(key,
+                           std::make_shared<StoredValue>(this,
+                                                         ++_epoch,
+                                                         key,
+                                                         std::forward<Value>(value),
+                                                         time,
+                                                         std::max(time, currentTimeInStore)))) {
             const auto& evictedKey = evicted->first;
             auto& evictedValue = evicted->second;
 
@@ -310,15 +315,16 @@ public:
                                      Value&& value,
                                      const Time& time = CacheNotCausallyConsistent()) {
         LockGuardWithPostUnlockDestructor guard(_mutex);
-        Time timeInStore;
-        _invalidate(&guard, key, _cache.find(key), &timeInStore);
-        if (auto evicted = _cache.add(key,
-                                      std::make_shared<StoredValue>(this,
-                                                                    ++_epoch,
-                                                                    key,
-                                                                    std::forward<Value>(value),
-                                                                    time,
-                                                                    std::max(time, timeInStore)))) {
+        Time currentTime, currentTimeInStore;
+        _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
+        if (auto evicted =
+                _cache.add(key,
+                           std::make_shared<StoredValue>(this,
+                                                         ++_epoch,
+                                                         key,
+                                                         std::forward<Value>(value),
+                                                         time,
+                                                         std::max(time, currentTimeInStore)))) {
             const auto& evictedKey = evicted->first;
             auto& evictedValue = evicted->second;
 
@@ -526,10 +532,13 @@ private:
     void _invalidate(LockGuardWithPostUnlockDestructor* guard,
                      const Key& key,
                      typename Cache::iterator it,
+                     Time* outTime = nullptr,
                      Time* outTimeInStore = nullptr) {
         if (it != _cache.end()) {
             auto& storedValue = it->second;
             storedValue->isValid.store(false);
+            if (outTime)
+                *outTime = storedValue->time;
             if (outTimeInStore)
                 *outTimeInStore = storedValue->timeInStore;
             guard->releasePtr(std::move(storedValue));
@@ -545,6 +554,8 @@ private:
         // released and drops to zero
         if (auto evictedValue = itEvicted->second.lock()) {
             evictedValue->isValid.store(false);
+            if (outTime)
+                *outTime = evictedValue->time;
             if (outTimeInStore)
                 *outTimeInStore = evictedValue->timeInStore;
             guard->releasePtr(std::move(evictedValue));

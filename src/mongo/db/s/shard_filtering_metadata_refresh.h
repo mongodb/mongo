@@ -79,8 +79,7 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
  * called with a lock
  */
 ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                bool forceRefreshFromThisThread = false);
+                                                const NamespaceString& nss);
 
 /**
  * Should be called when any client request on this shard generates a StaleDbVersion exception.

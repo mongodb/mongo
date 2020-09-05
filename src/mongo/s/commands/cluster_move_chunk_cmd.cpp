@@ -198,9 +198,14 @@ public:
                                                         cmdObj["waitForDelete"].trueValue(),
                                                     forceJumbo));
 
-        Grid::get(opCtx)->catalogCache()->invalidateShardForShardedCollection(nss,
-                                                                              chunk->getShardId());
-        Grid::get(opCtx)->catalogCache()->invalidateShardForShardedCollection(nss, to->getId());
+        Grid::get(opCtx)
+            ->catalogCache()
+            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                nss, boost::none, chunk->getShardId());
+        Grid::get(opCtx)
+            ->catalogCache()
+            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                nss, boost::none, to->getId());
 
         result.append("millis", t.millis());
         return true;

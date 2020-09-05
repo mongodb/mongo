@@ -84,6 +84,17 @@ protected:
     scheduleRoutingInfoUnforcedRefresh(const NamespaceString& nss);
 
     /**
+     * Advance the time in the cache for 'kNss' and schedules a thread to make an incremental
+     * refresh.
+     *
+     * NOTE: The returned value is always set. The reason to use optional is a deficiency of
+     * std::future with the MSVC STL library, which requires the templated type to be default
+     * constructible.
+     */
+    executor::NetworkTestEnv::FutureHandle<boost::optional<ChunkManager>>
+    scheduleRoutingInfoIncrementalRefresh(const NamespaceString& nss);
+
+    /**
      * Ensures that there are 'numShards' available in the shard registry. The shard ids are
      * generated as "0", "1", etc.
      *

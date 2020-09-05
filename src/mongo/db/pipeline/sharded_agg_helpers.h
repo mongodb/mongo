@@ -245,13 +245,9 @@ auto shardVersionRetry(OperationContext* opCtx,
                           str::stream() << "StaleConfig error on unexpected namespace. Expected "
                                         << nss << ", received " << staleInfo->getNss());
                 catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                    opCtx,
-                    nss,
-                    staleInfo->getVersionWanted(),
-                    staleInfo->getVersionReceived(),
-                    staleInfo->getShardId());
+                    nss, staleInfo->getVersionWanted(), staleInfo->getShardId());
             } else {
-                catalogCache->onEpochChange(nss);
+                catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
             }
             if (!logAndTestMaxRetries(e)) {
                 throw;

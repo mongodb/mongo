@@ -55,8 +55,7 @@ public:
      * which can be used to pass to ChunkManager for tests, which specifically target the behaviour
      * of the ChunkManager.
      */
-    static std::shared_ptr<RoutingTableHistory> makeStandaloneRoutingTableHistory(
-        RoutingTableHistory rt);
+    static RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt);
 
 protected:
     ShardingTestFixtureCommon();

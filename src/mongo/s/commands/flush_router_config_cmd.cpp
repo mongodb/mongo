@@ -102,7 +102,7 @@ public:
                       "Routing metadata flushed for collection {namespace}",
                       "Routing metadata flushed for collection",
                       "namespace"_attr = nss);
-                catalogCache->purgeCollection(nss);
+                catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
             }
         }
 

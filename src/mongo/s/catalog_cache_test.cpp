@@ -35,6 +35,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/s/stale_exception.h"
 
 namespace mongo {
 namespace {
@@ -72,7 +73,54 @@ protected:
         _catalogCacheLoader->setDatabaseRefreshReturnValue(kErrorStatus);
     }
 
+    void loadCollection(const ChunkVersion& version) {
+        const auto coll = makeCollectionType(version);
+        _catalogCacheLoader->setCollectionRefreshReturnValue(coll);
+        _catalogCacheLoader->setChunkRefreshReturnValue(makeChunks(version));
+
+        const auto swChunkManager =
+            _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNs());
+        ASSERT_OK(swChunkManager.getStatus());
+
+        // Reset the loader return values to avoid false positive results
+        _catalogCacheLoader->setCollectionRefreshReturnValue(kErrorStatus);
+        _catalogCacheLoader->setChunkRefreshReturnValue(kErrorStatus);
+    }
+
+    void loadUnshardedCollection(const NamespaceString& nss) {
+        _catalogCacheLoader->setCollectionRefreshReturnValue(
+            Status(ErrorCodes::NamespaceNotFound, "collection not found"));
+
+        const auto swChunkManager =
+            _catalogCache->getCollectionRoutingInfo(operationContext(), nss);
+        ASSERT_OK(swChunkManager.getStatus());
+
+        // Reset the loader return value to avoid false positive results
+        _catalogCacheLoader->setCollectionRefreshReturnValue(kErrorStatus);
+    }
+
+    std::vector<ChunkType> makeChunks(ChunkVersion version) {
+        ChunkType chunk(kNss,
+                        {kShardKeyPattern.getKeyPattern().globalMin(),
+                         kShardKeyPattern.getKeyPattern().globalMax()},
+                        version,
+                        {"0"});
+        chunk.setName(OID::gen());
+        return {chunk};
+    }
+
+    CollectionType makeCollectionType(const ChunkVersion& collVersion) {
+        CollectionType coll;
+        coll.setNs(kNss);
+        coll.setEpoch(collVersion.epoch());
+        coll.setKeyPattern(kShardKeyPattern.getKeyPattern());
+        coll.setUnique(false);
+        return coll;
+    }
+
     const NamespaceString kNss{"catalgoCacheTestDB.foo"};
+    const std::string kPattern{"_id"};
+    const ShardKeyPattern kShardKeyPattern{BSON(kPattern << 1)};
     const int kDummyPort{12345};
     const HostAndPort kConfigHostAndPort{"DummyConfig", kDummyPort};
     const std::vector<ShardId> kShards{{"0"}, {"1"}};
@@ -127,6 +175,87 @@ TEST_F(CatalogCacheTest, InvalidateSingleDbOnShardRemoval) {
     ASSERT_OK(swDatabase.getStatus());
     auto cachedDb = swDatabase.getValue();
     ASSERT_EQ(cachedDb.primaryId(), kShards[1]);
+}
+
+TEST_F(CatalogCacheTest, CheckEpochNoDatabase) {
+    const auto collVersion = ChunkVersion(1, 0, OID::gen());
+    ASSERT_THROWS_WITH_CHECK(_catalogCache->checkEpochOrThrow(kNss, collVersion, kShards[0]),
+                             StaleConfigException,
+                             [&](const StaleConfigException& ex) {
+                                 const auto staleInfo = ex.extraInfo<StaleConfigInfo>();
+                                 ASSERT(staleInfo);
+                                 ASSERT_EQ(staleInfo->getNss(), kNss);
+                                 ASSERT_EQ(staleInfo->getVersionReceived(), collVersion);
+                                 ASSERT_EQ(staleInfo->getShardId(), kShards[0]);
+                                 ASSERT(staleInfo->getVersionWanted() == boost::none);
+                             });
+}
+
+TEST_F(CatalogCacheTest, CheckEpochNoCollection) {
+    const auto dbVersion = DatabaseVersion();
+    const auto collVersion = ChunkVersion(1, 0, OID::gen());
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+    ASSERT_THROWS_WITH_CHECK(_catalogCache->checkEpochOrThrow(kNss, collVersion, kShards[0]),
+                             StaleConfigException,
+                             [&](const StaleConfigException& ex) {
+                                 const auto staleInfo = ex.extraInfo<StaleConfigInfo>();
+                                 ASSERT(staleInfo);
+                                 ASSERT_EQ(staleInfo->getNss(), kNss);
+                                 ASSERT_EQ(staleInfo->getVersionReceived(), collVersion);
+                                 ASSERT_EQ(staleInfo->getShardId(), kShards[0]);
+                                 ASSERT(staleInfo->getVersionWanted() == boost::none);
+                             });
+}
+
+TEST_F(CatalogCacheTest, CheckEpochUnshardedCollection) {
+    const auto dbVersion = DatabaseVersion();
+    const auto collVersion = ChunkVersion(1, 0, OID::gen());
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+    loadUnshardedCollection(kNss);
+    ASSERT_THROWS_WITH_CHECK(_catalogCache->checkEpochOrThrow(kNss, collVersion, kShards[0]),
+                             StaleConfigException,
+                             [&](const StaleConfigException& ex) {
+                                 const auto staleInfo = ex.extraInfo<StaleConfigInfo>();
+                                 ASSERT(staleInfo);
+                                 ASSERT_EQ(staleInfo->getNss(), kNss);
+                                 ASSERT_EQ(staleInfo->getVersionReceived(), collVersion);
+                                 ASSERT_EQ(staleInfo->getShardId(), kShards[0]);
+                                 ASSERT(staleInfo->getVersionWanted() == boost::none);
+                             });
+}
+
+TEST_F(CatalogCacheTest, CheckEpochWithMismatch) {
+    const auto dbVersion = DatabaseVersion();
+    const auto wantedCollVersion = ChunkVersion(1, 0, OID::gen());
+    const auto receivedCollVersion = ChunkVersion(1, 0, OID::gen());
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+    loadCollection(wantedCollVersion);
+
+    ASSERT_THROWS_WITH_CHECK(
+        _catalogCache->checkEpochOrThrow(kNss, receivedCollVersion, kShards[0]),
+        StaleConfigException,
+        [&](const StaleConfigException& ex) {
+            const auto staleInfo = ex.extraInfo<StaleConfigInfo>();
+            ASSERT(staleInfo);
+            ASSERT_EQ(staleInfo->getNss(), kNss);
+            ASSERT_EQ(staleInfo->getVersionReceived(), receivedCollVersion);
+            ASSERT(staleInfo->getVersionWanted() != boost::none);
+            ASSERT_EQ(*(staleInfo->getVersionWanted()), wantedCollVersion);
+            ASSERT_EQ(staleInfo->getShardId(), kShards[0]);
+        });
+}
+
+TEST_F(CatalogCacheTest, CheckEpochWithMatch) {
+    const auto dbVersion = DatabaseVersion();
+    const auto collVersion = ChunkVersion(1, 0, OID::gen());
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+    loadCollection(collVersion);
+
+    _catalogCache->checkEpochOrThrow(kNss, collVersion, kShards[0]);
 }
 
 }  // namespace

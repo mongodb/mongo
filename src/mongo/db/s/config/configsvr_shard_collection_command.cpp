@@ -357,7 +357,7 @@ public:
             result << "collectionUUID" << *uuid;
         }
 
-        catalogCache->onEpochChange(nss);
+        catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
 
         return true;
     }

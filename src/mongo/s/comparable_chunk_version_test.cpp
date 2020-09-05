@@ -29,8 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_version.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -95,14 +94,142 @@ TEST(ComparableChunkVersionTest, VersionLessSameEpoch) {
     ASSERT_FALSE(version2 > version3);
 }
 
+TEST(ComparableChunkVersionTest, DefaultConstructedVersionsAreEqual) {
+    const ComparableChunkVersion defaultVersion1{}, defaultVersion2{};
+    ASSERT(defaultVersion1 == defaultVersion2);
+    ASSERT_FALSE(defaultVersion1 < defaultVersion2);
+    ASSERT_FALSE(defaultVersion1 > defaultVersion2);
+}
+
 TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLess) {
     const ComparableChunkVersion defaultVersion{};
-    ASSERT_EQ(defaultVersion.getLocalSequenceNum(), 0);
     const auto version1 =
         ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, OID::gen()));
     ASSERT(defaultVersion != version1);
     ASSERT(defaultVersion < version1);
     ASSERT_FALSE(defaultVersion > version1);
+}
+
+TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanUnsharded) {
+    const ComparableChunkVersion defaultVersion{};
+    const auto version1 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
+    ASSERT(defaultVersion != version1);
+    ASSERT(defaultVersion < version1);
+    ASSERT_FALSE(defaultVersion > version1);
+}
+
+TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanDropped) {
+    const ComparableChunkVersion defaultVersion{};
+    const auto version1 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::DROPPED());
+    ASSERT(defaultVersion != version1);
+    ASSERT(defaultVersion < version1);
+    ASSERT_FALSE(defaultVersion > version1);
+}
+
+TEST(ComparableChunkVersionTest, UnshardedAndDroppedAreEqual) {
+    const auto version1 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
+    const auto version2 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::DROPPED());
+    const auto version3 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
+    const auto version4 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::DROPPED());
+    ASSERT(version1 == version2);
+    ASSERT(version1 == version3);
+    ASSERT(version2 == version4);
+}
+
+TEST(ComparableChunkVersionTest, NoChunksAreDifferent) {
+    const auto oid = OID::gen();
+    const auto version1 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, oid));
+    const auto version2 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, oid));
+    ASSERT(version1 != version2);
+    ASSERT(version1 < version2);
+    ASSERT_FALSE(version1 > version2);
+}
+
+TEST(ComparableChunkVersionTest, NoChunksCompareBySequenceNum) {
+    const auto oid = OID::gen();
+    const auto version1 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(1, 0, oid));
+    const auto noChunkSV1 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, oid));
+
+    ASSERT(version1 != noChunkSV1);
+    ASSERT(noChunkSV1 > version1);
+
+    const auto noChunkSV2 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, oid));
+
+    ASSERT(noChunkSV1 != noChunkSV2);
+    ASSERT_FALSE(noChunkSV1 > noChunkSV2);
+    ASSERT(noChunkSV2 > noChunkSV1);
+
+    const auto version2 =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(2, 0, oid));
+
+    ASSERT(version2 != noChunkSV2);
+    ASSERT(version2 > noChunkSV2);
+}
+
+TEST(ComparableChunkVersionTest, NoChunksGreaterThanUnshardedBySequenceNum) {
+    const auto unsharded =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
+    const auto noChunkSV =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, OID::gen()));
+
+    ASSERT(noChunkSV != unsharded);
+    ASSERT(noChunkSV > unsharded);
+}
+
+TEST(ComparableChunkVersionTest, UnshardedGreaterThanNoChunksBySequenceNum) {
+    const auto noChunkSV =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, OID::gen()));
+    const auto unsharded =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
+
+    ASSERT(noChunkSV != unsharded);
+    ASSERT(unsharded > noChunkSV);
+}
+
+TEST(ComparableChunkVersionTest, NoChunksGreaterThanDefault) {
+    const auto noChunkSV =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, OID::gen()));
+    const ComparableChunkVersion defaultVersion{};
+
+    ASSERT(noChunkSV != defaultVersion);
+    ASSERT(noChunkSV > defaultVersion);
+}
+
+TEST(ComparableChunkVersionTest, ForcedRefreshSequenceNumber) {
+    auto oid = OID::gen();
+    const ComparableChunkVersion defaultVersionBeforeForce;
+    const auto versionBeforeForce =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(100, 0, oid));
+
+    const auto forcedRefreshVersion =
+        ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh();
+
+    const auto versionAfterForce =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(100, 0, oid));
+    const ComparableChunkVersion defaultVersionAfterForce;
+
+    ASSERT(defaultVersionBeforeForce != forcedRefreshVersion);
+    ASSERT(defaultVersionBeforeForce < forcedRefreshVersion);
+
+    ASSERT(versionBeforeForce != forcedRefreshVersion);
+    ASSERT(versionBeforeForce < forcedRefreshVersion);
+
+    ASSERT(versionAfterForce != forcedRefreshVersion);
+    ASSERT(versionAfterForce > forcedRefreshVersion);
+
+    ASSERT(defaultVersionAfterForce != forcedRefreshVersion);
+    ASSERT(defaultVersionAfterForce < forcedRefreshVersion);
 }
 
 }  // namespace

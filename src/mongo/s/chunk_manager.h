@@ -43,6 +43,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/read_through_cache.h"
 
 namespace mongo {
 
@@ -324,13 +325,128 @@ private:
 };
 
 /**
+ * Constructed to be used exclusively by the CatalogCache as a vector clock (Time) to drive
+ * CollectionCache's lookups.
+ *
+ * The ChunkVersion class contains a non comparable epoch, which makes impossible to compare two
+ * ChunkVersions when their epochs's differ.
+ *
+ * This class wraps a ChunkVersion object with a node-local sequence number
+ * (_epochDisambiguatingSequenceNum) that allows the comparision.
+ *
+ * This class should go away once a cluster-wide comparable ChunkVersion is implemented.
+ */
+class ComparableChunkVersion {
+public:
+    /**
+     * Creates a ComparableChunkVersion that wraps the given ChunkVersion.
+     * Each object created through this method will have a local sequence number greater than the
+     * previously created ones.
+     */
+    static ComparableChunkVersion makeComparableChunkVersion(const ChunkVersion& version);
+
+    /**
+     * Creates a ComparableChunkVersion object, which will artificially be greater than any that
+     * were previously created by `makeComparableChunkVersion`. Used as means to cause the
+     * collections cache to attempt a refresh in situations where causal consistency cannot be
+     * inferred.
+     */
+    static ComparableChunkVersion makeComparableChunkVersionForForcedRefresh();
+
+    /**
+     * Empty constructor needed by the ReadThroughCache.
+     *
+     * Instances created through this constructor will be always less then the ones created through
+     * the two static constructors, but they do not carry any meaningful value and can only be used
+     * for comparison purposes.
+     */
+    ComparableChunkVersion() = default;
+
+    const ChunkVersion& getVersion() const {
+        return *_chunkVersion;
+    }
+
+    std::string toString() const;
+
+    bool sameEpoch(const ComparableChunkVersion& other) const {
+        return _chunkVersion->epoch() == other._chunkVersion->epoch();
+    }
+
+    bool operator==(const ComparableChunkVersion& other) const;
+
+    bool operator!=(const ComparableChunkVersion& other) const {
+        return !(*this == other);
+    }
+
+    /**
+     * In case the two compared instances have different epochs, the most recently created one will
+     * be greater, otherwise the comparision will be driven by the major/minor versions of the
+     * underlying ChunkVersion.
+     */
+    bool operator<(const ComparableChunkVersion& other) const;
+
+    bool operator>(const ComparableChunkVersion& other) const {
+        return other < *this;
+    }
+
+    bool operator<=(const ComparableChunkVersion& other) const {
+        return !(*this > other);
+    }
+
+    bool operator>=(const ComparableChunkVersion& other) const {
+        return !(*this < other);
+    }
+
+private:
+    static AtomicWord<uint64_t> _epochDisambiguatingSequenceNumSource;
+    static AtomicWord<uint64_t> _forcedRefreshSequenceNumSource;
+
+    ComparableChunkVersion(uint64_t forcedRefreshSequenceNum,
+                           boost::optional<ChunkVersion> version,
+                           uint64_t epochDisambiguatingSequenceNum)
+        : _forcedRefreshSequenceNum(forcedRefreshSequenceNum),
+          _chunkVersion(std::move(version)),
+          _epochDisambiguatingSequenceNum(epochDisambiguatingSequenceNum) {}
+
+    uint64_t _forcedRefreshSequenceNum{0};
+
+    boost::optional<ChunkVersion> _chunkVersion;
+
+    // Locally incremented sequence number that allows to compare two colection versions with
+    // different epochs. Each new comparableChunkVersion will have a greater sequence number than
+    // the ones created before.
+    uint64_t _epochDisambiguatingSequenceNum{0};
+};
+
+/**
+ * This intermediate structure is necessary to be able to store UNSHARDED collections in the routing
+ * table history cache below. The reason is that currently the RoutingTableHistory class only
+ * supports sharded collections (i.e., collections which have entries in config.collections and
+ * config.chunks).
+ */
+struct OptionalRoutingTableHistory {
+    // UNSHARDED collection constructor
+    OptionalRoutingTableHistory() = default;
+
+    // SHARDED collection constructor
+    OptionalRoutingTableHistory(RoutingTableHistory&& rt) : optRt(std::move(rt)) {}
+
+    // If boost::none, the collection is UNSHARDED, otherwise it is SHARDED
+    boost::optional<RoutingTableHistory> optRt;
+};
+
+using RoutingTableHistoryCache =
+    ReadThroughCache<NamespaceString, OptionalRoutingTableHistory, ComparableChunkVersion>;
+using RoutingTableHistoryValueHandle = RoutingTableHistoryCache::ValueHandle;
+
+/**
  * Wrapper around a RoutingTableHistory, which pins it to a particular point in time.
  */
 class ChunkManager {
 public:
     ChunkManager(ShardId dbPrimary,
                  DatabaseVersion dbVersion,
-                 std::shared_ptr<RoutingTableHistory> rt,
+                 RoutingTableHistoryValueHandle rt,
                  boost::optional<Timestamp> clusterTime)
         : _dbPrimary(std::move(dbPrimary)),
           _dbVersion(std::move(dbVersion)),
@@ -340,7 +456,7 @@ public:
     // Methods supported on both sharded and unsharded collections
 
     bool isSharded() const {
-        return bool(_rt);
+        return bool(_rt->optRt);
     }
 
     const ShardId& dbPrimary() const {
@@ -352,7 +468,7 @@ public:
     }
 
     int numChunks() const {
-        return _rt ? _rt->numChunks() : 1;
+        return _rt->optRt ? _rt->optRt->numChunks() : 1;
     }
 
     std::string toString() const;
@@ -360,32 +476,32 @@ public:
     // Methods only supported on sharded collections (caller must check isSharded())
 
     const ShardKeyPattern& getShardKeyPattern() const {
-        return _rt->getShardKeyPattern();
+        return _rt->optRt->getShardKeyPattern();
     }
 
     const CollatorInterface* getDefaultCollator() const {
-        return _rt->getDefaultCollator();
+        return _rt->optRt->getDefaultCollator();
     }
 
     bool isUnique() const {
-        return _rt->isUnique();
+        return _rt->optRt->isUnique();
     }
 
     ChunkVersion getVersion() const {
-        return _rt->getVersion();
+        return _rt->optRt->getVersion();
     }
 
     ChunkVersion getVersion(const ShardId& shardId) const {
-        return _rt->getVersion(shardId);
+        return _rt->optRt->getVersion(shardId);
     }
 
     ChunkVersion getVersionForLogging(const ShardId& shardId) const {
-        return _rt->getVersionForLogging(shardId);
+        return _rt->optRt->getVersionForLogging(shardId);
     }
 
     template <typename Callable>
     void forEachChunk(Callable&& handler) const {
-        _rt->forEachChunk(
+        _rt->optRt->forEachChunk(
             [this, handler = std::forward<Callable>(handler)](const auto& chunkInfo) mutable {
                 if (!handler(Chunk{*chunkInfo, _clusterTime}))
                     return false;
@@ -461,14 +577,14 @@ public:
      * Returns the ids of all shards on which the collection has any chunks.
      */
     void getAllShardIds(std::set<ShardId>* all) const {
-        _rt->getAllShardIds(all);
+        _rt->optRt->getAllShardIds(all);
     }
 
     /**
      * Returns the number of shards on which the collection has any chunks
      */
     int getNShardsOwningChunks() const {
-        return _rt->getNShardsOwningChunks();
+        return _rt->optRt->getNShardsOwningChunks();
     }
 
     // Transforms query into bounds for each field in the shard key
@@ -500,30 +616,30 @@ public:
      * Returns true if, for this shard, the chunks are identical in both chunk managers
      */
     bool compatibleWith(const ChunkManager& other, const ShardId& shard) const {
-        return _rt->compatibleWith(*other._rt, shard);
+        return _rt->optRt->compatibleWith(*other._rt->optRt, shard);
     }
 
     bool uuidMatches(UUID uuid) const {
-        return _rt->uuidMatches(uuid);
+        return _rt->optRt->uuidMatches(uuid);
     }
 
     boost::optional<UUID> getUUID() const {
-        return _rt->getUUID();
+        return _rt->optRt->getUUID();
     }
 
     const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
-        return _rt->getReshardingFields();
+        return _rt->optRt->getReshardingFields();
     }
 
     const RoutingTableHistory& getRoutingTableHistory_ForTest() const {
-        return *_rt;
+        return *_rt->optRt;
     }
 
 private:
     ShardId _dbPrimary;
     DatabaseVersion _dbVersion;
 
-    std::shared_ptr<RoutingTableHistory> _rt;
+    RoutingTableHistoryValueHandle _rt;
 
     boost::optional<Timestamp> _clusterTime;
 };
