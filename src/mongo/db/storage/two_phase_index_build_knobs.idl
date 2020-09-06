@@ -69,8 +69,9 @@ server_parameters:
     default: 10000
 
   enableResumableIndexBuilds:
+    # TODO(SERVER-50745): Remove this feature flag.
     description: "Support for using resumable index builds."
     set_at: startup
     cpp_vartype: bool
     cpp_varname: "enableResumableIndexBuilds"
-    default: false
+    default: true
