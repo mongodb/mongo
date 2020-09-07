@@ -227,8 +227,20 @@ void PrimaryOnlyServiceRegistry::onStepDown() {
     }
 }
 
+void PrimaryOnlyServiceRegistry::reportServiceInfo(BSONObjBuilder* result) {
+    BSONObjBuilder subBuilder(result->subobjStart("primaryOnlyServices"));
+    for (auto& service : _servicesByName) {
+        subBuilder.appendNumber(service.first, service.second->getNumberOfInstances());
+    }
+}
+
 PrimaryOnlyService::PrimaryOnlyService(ServiceContext* serviceContext)
     : _serviceContext(serviceContext) {}
+
+size_t PrimaryOnlyService::getNumberOfInstances() {
+    stdx::lock_guard lk(_mutex);
+    return _instances.size();
+}
 
 bool PrimaryOnlyService::isRunning() const {
     stdx::lock_guard lk(_mutex);

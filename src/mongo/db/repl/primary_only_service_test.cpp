@@ -367,6 +367,40 @@ TEST_F(PrimaryOnlyServiceTest, DoubleCreateInstance) {
     TestServiceHangDuringInitialization.setMode(FailPoint::off);
 }
 
+TEST_F(PrimaryOnlyServiceTest, ReportServiceInfo) {
+    {
+        BSONObjBuilder resultBuilder;
+        _registry->reportServiceInfo(&resultBuilder);
+
+        ASSERT_BSONOBJ_EQ(BSON("primaryOnlyServices" << BSON("TestService" << 0)),
+                          resultBuilder.obj());
+    }
+
+    // Make sure the instance doesn't complete.
+    TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+
+    {
+        BSONObjBuilder resultBuilder;
+        _registry->reportServiceInfo(&resultBuilder);
+
+        ASSERT_BSONOBJ_EQ(BSON("primaryOnlyServices" << BSON("TestService" << 1)),
+                          resultBuilder.obj());
+    }
+
+    auto instance2 = TestService::Instance::getOrCreate(_service, BSON("_id" << 1 << "state" << 0));
+
+    {
+        BSONObjBuilder resultBuilder;
+        _registry->reportServiceInfo(&resultBuilder);
+
+        ASSERT_BSONOBJ_EQ(BSON("primaryOnlyServices" << BSON("TestService" << 2)),
+                          resultBuilder.obj());
+    }
+
+    TestServiceHangDuringInitialization.setMode(FailPoint::off);
+}
+
 TEST_F(PrimaryOnlyServiceTest, CreateWhenNotPrimary) {
     _registry->onStepDown();
 

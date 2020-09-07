@@ -1232,6 +1232,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/speculative_authenticate',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/transport/message_compressor',
+        'primary_only_service',
         'replication_auth',
         'split_horizon',
     ],

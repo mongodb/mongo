@@ -50,6 +50,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master_response.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
@@ -86,12 +87,17 @@ constexpr auto kHelloString = "hello"_sd;
 constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
 constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
 
+void appendPrimaryOnlyServiceInfo(ServiceContext* serviceContext, BSONObjBuilder* result) {
+    auto registry = PrimaryOnlyServiceRegistry::get(serviceContext);
+    registry->reportServiceInfo(result);
+}
+
 /**
  * Appends replication-related fields to the isMaster response. Returns the topology version that
  * was included in the response.
  */
 TopologyVersion appendReplicationInfo(OperationContext* opCtx,
-                                      BSONObjBuilder& result,
+                                      BSONObjBuilder* result,
                                       bool appendReplicationProcess,
                                       bool useLegacyResponseFields,
                                       boost::optional<TopologyVersion> clientTopologyVersion,
@@ -108,9 +114,9 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
         }
         auto isMasterResponse =
             replCoord->awaitIsMasterResponse(opCtx, horizonParams, clientTopologyVersion, deadline);
-        result.appendElements(isMasterResponse->toBSON(useLegacyResponseFields));
+        result->appendElements(isMasterResponse->toBSON(useLegacyResponseFields));
         if (appendReplicationProcess) {
-            replCoord->appendSlaveInfoData(&result);
+            replCoord->appendSlaveInfoData(result);
         }
         invariant(isMasterResponse->getTopologyVersion());
         return isMasterResponse->getTopologyVersion().get();
@@ -142,10 +148,10 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
         opCtx->sleepFor(Milliseconds(*maxAwaitTimeMS));
     }
 
-    result.appendBool((useLegacyResponseFields ? "ismaster" : "isWritablePrimary"),
-                      ReplicationCoordinator::get(opCtx)->isMasterForReportingPurposes());
+    result->appendBool((useLegacyResponseFields ? "ismaster" : "isWritablePrimary"),
+                       ReplicationCoordinator::get(opCtx)->isMasterForReportingPurposes());
 
-    BSONObjBuilder topologyVersionBuilder(result.subobjStart("topologyVersion"));
+    BSONObjBuilder topologyVersionBuilder(result->subobjStart("topologyVersion"));
     currentTopologyVersion.serialize(&topologyVersionBuilder);
 
     return currentTopologyVersion;
@@ -171,11 +177,13 @@ public:
         // TODO SERVER-50219: Change useLegacyResponseFields to false once the serverStatus changes
         // to remove master-slave terminology are merged.
         appendReplicationInfo(opCtx,
-                              result,
+                              &result,
                               appendReplicationProcess,
                               true /* useLegacyResponseFields */,
                               boost::none /* clientTopologyVersion */,
                               boost::none /* maxAwaitTimeMS */);
+
+        appendPrimaryOnlyServiceInfo(opCtx->getServiceContext(), &result);
 
         auto rbid = ReplicationProcess::get(opCtx)->getRollbackID();
         if (ReplicationProcess::kUninitializedRollbackId != rbid) {
@@ -426,7 +434,7 @@ public:
 
         auto result = replyBuilder->getBodyBuilder();
         auto currentTopologyVersion = appendReplicationInfo(
-            opCtx, result, 0, useLegacyResponseFields, clientTopologyVersion, maxAwaitTimeMS);
+            opCtx, &result, 0, useLegacyResponseFields, clientTopologyVersion, maxAwaitTimeMS);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             const int configServerModeNumber = 2;
