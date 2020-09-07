@@ -40,6 +40,11 @@ namespace vm {
 using namespace value;
 
 namespace {
+
+static constexpr double kDoublePi = 3.141592653589793;
+static constexpr double kDoublePiOver180 = kDoublePi / 180.0;
+static constexpr double kDouble180OverPi = 180.0 / kDoublePi;
+
 /**
  * The addition operation used by genericArithmeticOp.
  */
@@ -116,7 +121,7 @@ struct Multiplication {
 };
 
 /**
- * This is a simple arithemtic operation templated by the Op parameter. It support operations on
+ * This is a simple arithmetic operation templated by the Op parameter. It supports operations on
  * standard numeric types and also operations on the Date type.
  */
 template <typename Op>
@@ -187,6 +192,176 @@ std::tuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeT
         uasserted(ErrorCodes::Overflow, "date overflow");
     }
 
+    return {false, value::TypeTags::Nothing, 0};
+}
+
+// Structures defining trigonometric functions computation.
+struct Acos {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.acos();
+        } else {
+            result = std::acos(arg);
+        }
+    }
+};
+
+struct Acosh {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.acosh();
+        } else {
+            result = std::acosh(arg);
+        }
+    }
+};
+
+struct Asin {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.asin();
+        } else {
+            result = std::asin(arg);
+        }
+    }
+};
+
+struct Asinh {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.asinh();
+        } else {
+            result = std::asinh(arg);
+        }
+    }
+};
+
+struct Atan {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.atan();
+        } else {
+            result = std::atan(arg);
+        }
+    }
+};
+
+struct Atanh {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.atanh();
+        } else {
+            result = std::atanh(arg);
+        }
+    }
+};
+
+struct Cos {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.cos();
+        } else {
+            result = std::cos(arg);
+        }
+    }
+};
+
+struct Cosh {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.cosh();
+        } else {
+            result = std::cosh(arg);
+        }
+    }
+};
+
+struct Sin {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.sin();
+        } else {
+            result = std::sin(arg);
+        }
+    }
+};
+
+struct Sinh {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.sinh();
+        } else {
+            result = std::sinh(arg);
+        }
+    }
+};
+
+struct Tan {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.tan();
+        } else {
+            result = std::tan(arg);
+        }
+    }
+};
+
+struct Tanh {
+    template <typename ArgT, typename ResT>
+    static void computeFunction(const ArgT& arg, ResT& result) {
+        if constexpr (std::is_same_v<ArgT, Decimal128>) {
+            result = arg.tanh();
+        } else {
+            result = std::tanh(arg);
+        }
+    }
+};
+
+/**
+ * Template for generic trigonometric function. The type in the template is a structure defining the
+ * computation of the respective trigonometric function.
+ */
+template <typename TrigFunction>
+std::tuple<bool, value::TypeTags, value::Value> genericTrigonometricFun(value::TypeTags argTag,
+                                                                        value::Value argValue) {
+    if (value::isNumber(argTag)) {
+        switch (argTag) {
+            case value::TypeTags::NumberInt32: {
+                double result;
+                TrigFunction::computeFunction(numericCast<int32_t>(argTag, argValue), result);
+                return {false, value::TypeTags::NumberDouble, value::bitcastFrom(result)};
+            }
+            case value::TypeTags::NumberInt64: {
+                double result;
+                TrigFunction::computeFunction(numericCast<int64_t>(argTag, argValue), result);
+                return {false, value::TypeTags::NumberDouble, value::bitcastFrom(result)};
+            }
+            case value::TypeTags::NumberDouble: {
+                double result;
+                TrigFunction::computeFunction(numericCast<double>(argTag, argValue), result);
+                return {false, value::TypeTags::NumberDouble, value::bitcastFrom(result)};
+            }
+            case value::TypeTags::NumberDecimal: {
+                Decimal128 result;
+                TrigFunction::computeFunction(numericCast<Decimal128>(argTag, argValue), result);
+                auto [resTag, resValue] = value::makeCopyDecimal(result);
+                return {true, resTag, resValue};
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
     return {false, value::TypeTags::Nothing, 0};
 }
 }  // namespace
@@ -491,6 +666,139 @@ std::pair<value::TypeTags, value::Value> ByteCode::compare3way(value::TypeTags l
 
     return value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue);
 }
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAcos(value::TypeTags argTag,
+                                                                      value::Value argValue) {
+    return genericTrigonometricFun<Acos>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAcosh(value::TypeTags argTag,
+                                                                       value::Value argValue) {
+    return genericTrigonometricFun<Acosh>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAsin(value::TypeTags argTag,
+                                                                      value::Value argValue) {
+    return genericTrigonometricFun<Asin>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAsinh(value::TypeTags argTag,
+                                                                       value::Value argValue) {
+    return genericTrigonometricFun<Asinh>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAtan(value::TypeTags argTag,
+                                                                      value::Value argValue) {
+    return genericTrigonometricFun<Atan>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAtanh(value::TypeTags argTag,
+                                                                       value::Value argValue) {
+    return genericTrigonometricFun<Atanh>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericAtan2(value::TypeTags argTag1,
+                                                                       value::Value argValue1,
+                                                                       value::TypeTags argTag2,
+                                                                       value::Value argValue2) {
+    if (value::isNumber(argTag1) && value::isNumber(argTag2)) {
+        switch (getWidestNumericalType(argTag1, argTag2)) {
+            case value::TypeTags::NumberInt32:
+            case value::TypeTags::NumberInt64:
+            case value::TypeTags::NumberDouble: {
+                auto result = std::atan2(numericCast<double>(argTag1, argValue1),
+                                         numericCast<double>(argTag2, argValue2));
+                return {false, value::TypeTags::NumberDouble, value::bitcastFrom(result)};
+            }
+            case value::TypeTags::NumberDecimal: {
+                auto result = numericCast<Decimal128>(argTag1, argValue1)
+                                  .atan2(numericCast<Decimal128>(argTag2, argValue2));
+                auto [resTag, resValue] = value::makeCopyDecimal(result);
+                return {true, resTag, resValue};
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericCos(value::TypeTags argTag,
+                                                                     value::Value argValue) {
+    return genericTrigonometricFun<Cos>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericCosh(value::TypeTags argTag,
+                                                                      value::Value argValue) {
+    return genericTrigonometricFun<Cosh>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericDegreesToRadians(
+    value::TypeTags argTag, value::Value argValue) {
+    if (value::isNumber(argTag)) {
+        switch (argTag) {
+            case value::TypeTags::NumberInt32:
+            case value::TypeTags::NumberInt64:
+            case value::TypeTags::NumberDouble: {
+                auto result = numericCast<double>(argTag, argValue) * kDoublePiOver180;
+                return {false, value::TypeTags::NumberDouble, value::bitcastFrom(result)};
+            }
+            case value::TypeTags::NumberDecimal: {
+                auto result =
+                    numericCast<Decimal128>(argTag, argValue).multiply(Decimal128::kPiOver180);
+                auto [resTag, resValue] = value::makeCopyDecimal(result);
+                return {true, resTag, resValue};
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericRadiansToDegrees(
+    value::TypeTags argTag, value::Value argValue) {
+    if (value::isNumber(argTag)) {
+        switch (argTag) {
+            case value::TypeTags::NumberInt32:
+            case value::TypeTags::NumberInt64:
+            case value::TypeTags::NumberDouble: {
+                auto result = numericCast<double>(argTag, argValue) * kDouble180OverPi;
+                return {false, value::TypeTags::NumberDouble, value::bitcastFrom(result)};
+            }
+            case value::TypeTags::NumberDecimal: {
+                auto result =
+                    numericCast<Decimal128>(argTag, argValue).multiply(Decimal128::k180OverPi);
+                auto [resTag, resValue] = value::makeCopyDecimal(result);
+                return {true, resTag, resValue};
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericSin(value::TypeTags argTag,
+                                                                     value::Value argValue) {
+    return genericTrigonometricFun<Sin>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericSinh(value::TypeTags argTag,
+                                                                      value::Value argValue) {
+    return genericTrigonometricFun<Sinh>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericTan(value::TypeTags argTag,
+                                                                     value::Value argValue) {
+    return genericTrigonometricFun<Tan>(argTag, argValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericTanh(value::TypeTags argTag,
+                                                                      value::Value argValue) {
+    return genericTrigonometricFun<Tanh>(argTag, argValue);
+}
+
 }  // namespace vm
 }  // namespace sbe
 }  // namespace mongo

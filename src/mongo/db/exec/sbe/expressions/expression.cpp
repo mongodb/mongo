@@ -369,6 +369,23 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"toUpper", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::toUpper, false}},
     {"coerceToString",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::coerceToString, false}},
+    {"acos", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::acos, false}},
+    {"acosh", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::acosh, false}},
+    {"asin", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::asin, false}},
+    {"asinh", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::asinh, false}},
+    {"atan", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::atan, false}},
+    {"atanh", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::atanh, false}},
+    {"atan2", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::atan2, false}},
+    {"cos", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::cos, false}},
+    {"cosh", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::cosh, false}},
+    {"degreesToRadians",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::degreesToRadians, false}},
+    {"radiansToDegrees",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::radiansToDegrees, false}},
+    {"sin", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::sin, false}},
+    {"sinh", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::sinh, false}},
+    {"tan", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tan, false}},
+    {"tanh", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tanh, false}},
 };
 
 /**

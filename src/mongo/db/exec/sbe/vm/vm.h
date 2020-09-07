@@ -190,6 +190,21 @@ enum class Builtin : uint8_t {
     toUpper,
     toLower,
     coerceToString,
+    acos,
+    acosh,
+    asin,
+    asinh,
+    atan,
+    atanh,
+    atan2,
+    cos,
+    cosh,
+    degreesToRadians,
+    radiansToDegrees,
+    sin,
+    sinh,
+    tan,
+    tanh,
 };
 
 class CodeFragment {
@@ -412,6 +427,38 @@ private:
                                                                         value::Value maskValue,
                                                                         value::TypeTags valueTag,
                                                                         value::Value value);
+    std::tuple<bool, value::TypeTags, value::Value> genericAcos(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericAcosh(value::TypeTags operandTag,
+                                                                 value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericAsin(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericAsinh(value::TypeTags operandTag,
+                                                                 value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericAtan(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericAtanh(value::TypeTags operandTag,
+                                                                 value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericAtan2(value::TypeTags operandTag1,
+                                                                 value::Value operandValue1,
+                                                                 value::TypeTags operandTag2,
+                                                                 value::Value operandValue2);
+    std::tuple<bool, value::TypeTags, value::Value> genericCos(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericCosh(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericDegreesToRadians(
+        value::TypeTags operandTag, value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericRadiansToDegrees(
+        value::TypeTags operandTag, value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericSin(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericSinh(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericTan(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericTanh(value::TypeTags operandTag,
+                                                                value::Value operandValue);
 
     std::tuple<bool, value::TypeTags, value::Value> builtinSplit(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDate(uint8_t arity);
@@ -432,6 +479,22 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinToUpper(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinToLower(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCoerceToString(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAcos(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAcosh(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAsin(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAsinh(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAtan(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAtanh(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAtan2(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCos(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCosh(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinDegreesToRadians(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinRadiansToDegrees(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinSin(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinSinh(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinTan(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinTanh(uint8_t arity);
+
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> getFromStack(size_t offset) {

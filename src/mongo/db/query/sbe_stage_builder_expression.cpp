@@ -886,6 +886,26 @@ private:
     ExpressionVisitorContext* _context;
 };
 
+
+struct DoubleBound {
+    DoubleBound(double b, bool isInclusive) : bound(b), inclusive(isInclusive) {}
+
+    static DoubleBound minInfinity() {
+        return DoubleBound(-std::numeric_limits<double>::infinity(), false);
+    }
+    static DoubleBound plusInfinity() {
+        return DoubleBound(std::numeric_limits<double>::infinity(), false);
+    }
+    std::string printLowerBound() const {
+        return str::stream() << (inclusive ? "[" : "(") << bound;
+    }
+    std::string printUpperBound() const {
+        return str::stream() << bound << (inclusive ? "]" : ")");
+    }
+    double bound;
+    bool inclusive;
+};
+
 class ExpressionPostVisitor final : public ExpressionVisitor {
 public:
     ExpressionPostVisitor(ExpressionVisitorContext* context) : _context{context} {}
@@ -1696,49 +1716,56 @@ public:
         unsupportedExpression("$regexFind");
     }
     void visit(ExpressionCosine* expr) final {
-        unsupportedExpression("$cos");
+        generateTrigonometricExpressionWithBounds(
+            "cos", DoubleBound::minInfinity(), DoubleBound::plusInfinity());
     }
     void visit(ExpressionSine* expr) final {
-        unsupportedExpression("$sin");
+        generateTrigonometricExpressionWithBounds(
+            "sin", DoubleBound::minInfinity(), DoubleBound::plusInfinity());
     }
     void visit(ExpressionTangent* expr) final {
-        unsupportedExpression("$tan");
+        generateTrigonometricExpressionWithBounds(
+            "tan", DoubleBound::minInfinity(), DoubleBound::plusInfinity());
     }
     void visit(ExpressionArcCosine* expr) final {
-        unsupportedExpression("$acos");
+        generateTrigonometricExpressionWithBounds(
+            "acos", DoubleBound(-1.0, true), DoubleBound(1.0, true));
     }
     void visit(ExpressionArcSine* expr) final {
-        unsupportedExpression("$asin");
+        generateTrigonometricExpressionWithBounds(
+            "asin", DoubleBound(-1.0, true), DoubleBound(1.0, true));
     }
     void visit(ExpressionArcTangent* expr) final {
-        unsupportedExpression("$atan");
+        generateTrigonometricExpression("atan");
     }
     void visit(ExpressionArcTangent2* expr) final {
-        unsupportedExpression("$atan2");
+        generateTrigonometricExpression("atan2");
     }
     void visit(ExpressionHyperbolicArcTangent* expr) final {
-        unsupportedExpression("$atanh");
+        generateTrigonometricExpressionWithBounds(
+            "atanh", DoubleBound(-1.0, true), DoubleBound(1.0, true));
     }
     void visit(ExpressionHyperbolicArcCosine* expr) final {
-        unsupportedExpression("$acosh");
+        generateTrigonometricExpressionWithBounds(
+            "acosh", DoubleBound(1.0, true), DoubleBound::plusInfinity());
     }
     void visit(ExpressionHyperbolicArcSine* expr) final {
-        unsupportedExpression("$asinh");
-    }
-    void visit(ExpressionHyperbolicTangent* expr) final {
-        unsupportedExpression("$tanh");
+        generateTrigonometricExpression("asinh");
     }
     void visit(ExpressionHyperbolicCosine* expr) final {
-        unsupportedExpression("$cosh");
+        generateTrigonometricExpression("cosh");
     }
     void visit(ExpressionHyperbolicSine* expr) final {
-        unsupportedExpression("$sinh");
+        generateTrigonometricExpression("sinh");
+    }
+    void visit(ExpressionHyperbolicTangent* expr) final {
+        generateTrigonometricExpression("tanh");
     }
     void visit(ExpressionDegreesToRadians* expr) final {
-        unsupportedExpression("$degreesToRadians");
+        generateTrigonometricExpression("degreesToRadians");
     }
     void visit(ExpressionRadiansToDegrees* expr) final {
-        unsupportedExpression("$radiansToDegrees");
+        generateTrigonometricExpression("radiansToDegrees");
     }
     void visit(ExpressionDayOfMonth* expr) final {
         unsupportedExpression("$dayOfMonth");
@@ -1904,6 +1931,80 @@ private:
             logicalExpressionEvalFrame.nextBranchResultSlot, std::move(defaultBranchStage)));
 
         _context->generateSubTreeForSelectiveExecution();
+    }
+
+    /**
+     * Shared expression building logic for trignometric expressions to make sure the operand
+     * is numeric and is not null.
+     */
+    void generateTrigonometricExpression(StringData exprName) {
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
+
+        auto genericTrignomentricExpr = sbe::makeE<sbe::EIf>(
+            generateNullOrMissing(frameId, 0),
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+            sbe::makeE<sbe::EIf>(
+                sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(inputRef.clone())),
+                sbe::makeE<sbe::EFunction>(exprName.toString(), sbe::makeEs(inputRef.clone())),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4995501},
+                                       str::stream() << "$" << exprName.toString()
+                                                     << " supports only numeric types")));
+
+        _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
+            frameId, std::move(binds), std::move(genericTrignomentricExpr)));
+    }
+
+    /**
+     * Shared expression building logic for trignometric expressions with bounds for the valid
+     * values of the argument.
+     */
+    void generateTrigonometricExpressionWithBounds(StringData exprName,
+                                                   const DoubleBound& lowerBound,
+                                                   const DoubleBound& upperBound) {
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
+
+        sbe::EPrimBinary::Op lowerCmp =
+            lowerBound.inclusive ? sbe::EPrimBinary::greaterEq : sbe::EPrimBinary::greater;
+        sbe::EPrimBinary::Op upperCmp =
+            upperBound.inclusive ? sbe::EPrimBinary::lessEq : sbe::EPrimBinary::less;
+        auto checkBounds = sbe::makeE<sbe::EPrimBinary>(
+            sbe::EPrimBinary::logicAnd,
+            sbe::makeE<sbe::EPrimBinary>(
+                lowerCmp,
+                inputRef.clone(),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble,
+                                           sbe::value::bitcastFrom(lowerBound.bound))),
+            sbe::makeE<sbe::EPrimBinary>(
+                upperCmp,
+                inputRef.clone(),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble,
+                                           sbe::value::bitcastFrom(upperBound.bound))));
+
+        auto genericTrignomentricExpr = sbe::makeE<sbe::EIf>(
+            generateNullOrMissing(frameId, 0),
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+            sbe::makeE<sbe::EIf>(
+                sbe::makeE<sbe::EPrimUnary>(
+                    sbe::EPrimUnary::logicNot,
+                    sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(inputRef.clone()))),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4995502},
+                                       str::stream() << "$" << exprName.toString()
+                                                     << " supports only numeric types"),
+                sbe::makeE<sbe::EIf>(
+                    std::move(checkBounds),
+                    sbe::makeE<sbe::EFunction>(exprName.toString(), sbe::makeEs(inputRef.clone())),
+                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{4995503},
+                                           str::stream() << "Cannot apply $" << exprName.toString()
+                                                         << ", value must be in "
+                                                         << lowerBound.printLowerBound() << ", "
+                                                         << upperBound.printUpperBound()))));
+
+        _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
+            frameId, std::move(binds), std::move(genericTrignomentricExpr)));
     }
 
     void unsupportedExpression(const char* op) const {

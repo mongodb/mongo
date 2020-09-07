@@ -87,8 +87,10 @@ env.Library(
 env.CppUnitTest(
     target='db_sbe_test',
     source=[
+        'expressions/sbe_bson_size_test.cpp',
         'expressions/sbe_coerce_to_string_test.cpp',
         'expressions/sbe_to_upper_to_lower_test.cpp',
+        'expressions/sbe_trigonometric_expressions_test.cpp',
         'sbe_filter_test.cpp',
         'sbe_key_string_test.cpp',
         'sbe_limit_skip_test.cpp',
@@ -96,7 +98,6 @@ env.CppUnitTest(
         'sbe_plan_stage_test.cpp',
         'sbe_sort_test.cpp',
         'sbe_test.cpp',
-        'expressions/sbe_bson_size_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',

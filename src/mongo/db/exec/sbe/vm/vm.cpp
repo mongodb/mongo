@@ -1296,6 +1296,81 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(
     return {false, value::TypeTags::Nothing, 0};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAcos(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericAcos(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAcosh(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericAcosh(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAsin(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericAsin(operandTag, operandValue);
+}
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAsinh(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericAsinh(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAtan(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericAtan(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAtanh(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericAtanh(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAtan2(uint8_t arity) {
+    auto [owned1, operandTag1, operandValue1] = getFromStack(0);
+    auto [owned2, operandTag2, operandValue2] = getFromStack(1);
+    return genericAtan2(operandTag1, operandValue1, operandTag2, operandValue2);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCos(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericCos(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCosh(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericCosh(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDegreesToRadians(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericDegreesToRadians(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRadiansToDegrees(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericRadiansToDegrees(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSin(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericSin(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSinh(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericSinh(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinTan(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericTan(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinTanh(uint8_t arity) {
+    auto [_, operandTag, operandValue] = getFromStack(0);
+    return genericTanh(operandTag, operandValue);
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
@@ -1337,6 +1412,36 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinToLower(arity);
         case Builtin::coerceToString:
             return builtinCoerceToString(arity);
+        case Builtin::acos:
+            return builtinAcos(arity);
+        case Builtin::acosh:
+            return builtinAcosh(arity);
+        case Builtin::asin:
+            return builtinAsin(arity);
+        case Builtin::asinh:
+            return builtinAsinh(arity);
+        case Builtin::atan:
+            return builtinAtan(arity);
+        case Builtin::atanh:
+            return builtinAtanh(arity);
+        case Builtin::atan2:
+            return builtinAtan2(arity);
+        case Builtin::cos:
+            return builtinCos(arity);
+        case Builtin::cosh:
+            return builtinCosh(arity);
+        case Builtin::degreesToRadians:
+            return builtinDegreesToRadians(arity);
+        case Builtin::radiansToDegrees:
+            return builtinRadiansToDegrees(arity);
+        case Builtin::sin:
+            return builtinSin(arity);
+        case Builtin::sinh:
+            return builtinSinh(arity);
+        case Builtin::tan:
+            return builtinTan(arity);
+        case Builtin::tanh:
+            return builtinTanh(arity);
     }
 
     MONGO_UNREACHABLE;
