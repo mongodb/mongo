@@ -51,15 +51,15 @@ BSONElement withFieldName(BSONElement elem, StringData fieldName) {
 }
 
 TEST(DiffSerializationTest, DeleteSimple) {
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
     StringData fieldName1 = "f1";
     StringData fieldName2 = "f2";
     StringData fieldName3 = "f3";
-    builder.addDelete(fieldName1);
-    builder.addDelete(fieldName2);
-    builder.addDelete(fieldName3);
+    diffNode.addDelete(fieldName1);
+    diffNode.addDelete(fieldName2);
+    diffNode.addDelete(fieldName3);
 
-    auto out = builder.serialize();
+    auto out = diffNode.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(fromjson("{d: {f1: false, f2: false, f3: false}}"), out);
 
     DocumentDiffReader reader(out);
@@ -77,11 +77,11 @@ TEST(DiffSerializationTest, InsertSimple) {
     const BSONObj kDummyObj(BSON("a" << 1 << "b"
                                      << "foo"));
 
-    DocumentDiffBuilder builder;
-    builder.addInsert("f1", kDummyObj["a"]);
-    builder.addInsert("f2", kDummyObj["b"]);
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addInsert("f1", kDummyObj["a"]);
+    diffNode.addInsert("f2", kDummyObj["b"]);
 
-    auto out = builder.serialize();
+    auto out = diffNode.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(out, fromjson("{'i': {f1: 1, f2: 'foo' }}"));
 
     DocumentDiffReader reader(out);
@@ -98,11 +98,11 @@ TEST(DiffSerializationTest, UpdateSimple) {
     const BSONObj kDummyObj(BSON("a" << 1 << "b"
                                      << "foo"));
 
-    DocumentDiffBuilder builder;
-    builder.addUpdate("f1", kDummyObj["a"]);
-    builder.addUpdate("f2", kDummyObj["b"]);
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addUpdate("f1", kDummyObj["a"]);
+    diffNode.addUpdate("f2", kDummyObj["b"]);
 
-    auto out = builder.serialize();
+    auto out = diffNode.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(out, fromjson("{'u': { f1: 1, f2: 'foo'}}"));
 
     DocumentDiffReader reader(out);
@@ -119,16 +119,14 @@ TEST(DiffSerializationTest, SubDiff) {
     const BSONObj kDummyObj(BSON("a" << 1 << "b"
                                      << "foo"));
 
-    DocumentDiffBuilder builder;
-    {
-        auto subBuilderGuard = builder.startSubObjDiff("obj");
+    diff_tree::DocumentSubDiffNode diffNode;
+    auto subDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
 
-        subBuilderGuard.builder()->addInsert("iField", kDummyObj["a"]);
-        subBuilderGuard.builder()->addUpdate("uField", kDummyObj["b"]);
-        subBuilderGuard.builder()->addDelete("dField");
-    }
-
-    auto out = builder.serialize();
+    subDiffNode->addInsert("iField", kDummyObj["a"]);
+    subDiffNode->addUpdate("uField", kDummyObj["b"]);
+    subDiffNode->addDelete("dField");
+    diffNode.addChild("obj", std::move(subDiffNode));
+    auto out = diffNode.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(
         out, fromjson("{sobj: {d : { dField: false }, u : { uField: 'foo' }, i : { iField: 1}}}"));
 
@@ -159,20 +157,22 @@ TEST(DiffSerializationTest, SubArrayWithSubDiff) {
     const BSONObj kDummyObj(BSON("a" << 1 << "b"
                                      << BSON("foo"
                                              << "bar")));
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
     {
-        auto subBuilderGuard = builder.startSubArrDiff("arr");
-        subBuilderGuard.builder()->addUpdate(0, kDummyObj["b"]);
+        auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();
+        subDiffNode->addUpdate(0, kDummyObj["b"]);
         {
-            auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(2);
-            subSubBuilderGuard.builder()->addDelete("dField");
+            auto subSubDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+            subSubDiffNode->addDelete("dField");
+            subDiffNode->addChild(2, std::move(subSubDiffNode));
         }
 
-        subBuilderGuard.builder()->addUpdate(5, kDummyObj["a"]);
-        subBuilderGuard.builder()->setResize(6);
+        subDiffNode->addUpdate(5, kDummyObj["a"]);
+        subDiffNode->setResize(6);
+        diffNode.addChild("arr", std::move(subDiffNode));
     }
 
-    auto out = builder.serialize();
+    auto out = diffNode.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(out,
                              fromjson("{sarr: {a: true, l: 6,"
                                       "'u0': {foo: 'bar'}, "
@@ -224,31 +224,32 @@ TEST(DiffSerializationTest, SubArrayWithSubDiff) {
 
 TEST(DiffSerializationTest, SubArrayNestedObject) {
     BSONObj storage(BSON("a" << 1 << "b" << 2 << "c" << 3));
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
     {
-        auto subArrBuilderGuard = builder.startSubArrDiff("subArray");
+        auto subArrDiffNode = std::make_unique<diff_tree::ArrayNode>();
         {
             {
-                auto subBuilderGuard = subArrBuilderGuard.builder()->startSubObjDiff(1);
-                subBuilderGuard.builder()->addUpdate(storage["a"].fieldNameStringData(),
-                                                     storage["a"]);
+                auto subDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+                subDiffNode->addUpdate(storage["a"].fieldNameStringData(), storage["a"]);
+                subArrDiffNode->addChild(1, std::move(subDiffNode));
             }
 
             {
-                auto subBuilderGuard = subArrBuilderGuard.builder()->startSubObjDiff(2);
-                subBuilderGuard.builder()->addUpdate(storage["b"].fieldNameStringData(),
-                                                     storage["b"]);
+                auto subDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+                subDiffNode->addUpdate(storage["b"].fieldNameStringData(), storage["b"]);
+                subArrDiffNode->addChild(2, std::move(subDiffNode));
             }
 
             {
-                auto subBuilderGuard = subArrBuilderGuard.builder()->startSubObjDiff(3);
-                subBuilderGuard.builder()->addUpdate(storage["c"].fieldNameStringData(),
-                                                     storage["c"]);
+                auto subDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+                subDiffNode->addUpdate(storage["c"].fieldNameStringData(), storage["c"]);
+                subArrDiffNode->addChild(3, std::move(subDiffNode));
             }
         }
+        diffNode.addChild("subArray", std::move(subArrDiffNode));
     }
 
-    const auto out = builder.serialize();
+    const auto out = diffNode.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(
         out,
         fromjson(
@@ -258,14 +259,15 @@ TEST(DiffSerializationTest, SubArrayNestedObject) {
 TEST(DiffSerializationTest, SubArrayHighIndex) {
     const BSONObj kDummyObj(BSON("a" << 1 << "b"
                                      << "foo"));
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
 
     {
-        auto subBuilderGuard = builder.startSubArrDiff("subArray");
-        subBuilderGuard.builder()->addUpdate(254, kDummyObj["b"]);
+        auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();
+        subDiffNode->addUpdate(254, kDummyObj["b"]);
+        diffNode.addChild("subArray", std::move(subDiffNode));
     }
 
-    auto out = builder.serialize();
+    auto out = diffNode.serialize();
     ASSERT_BSONOBJ_BINARY_EQ(out, fromjson("{ssubArray: {a: true, 'u254': 'foo'}}"));
 
     DocumentDiffReader reader(out);
@@ -290,63 +292,8 @@ TEST(DiffSerializationTest, SubArrayHighIndex) {
     }
 }
 
-TEST(DiffSerializationTest, SubDiffAbandon) {
-    const BSONObj kDummyObj(BSON("a" << 1));
-
-    DocumentDiffBuilder builder;
-    builder.addDelete("dField1");
-    builder.addUpdate("uField", kDummyObj["a"]);
-
-    {
-
-        auto subBuilderGuard = builder.startSubObjDiff("obj");
-        subBuilderGuard.builder()->addDelete("dField3");
-        subBuilderGuard.abandon();
-    }
-
-    // Make sure that after we abandon something we can still use the parent builder.
-    builder.addDelete("dField2");
-
-    {
-        auto subBuilderGuard = builder.startSubObjDiff("obj2");
-        subBuilderGuard.builder()->addDelete("dField2");
-    }
-
-    auto out = builder.serialize();
-    ASSERT_BSONOBJ_BINARY_EQ(
-        out,
-        fromjson("{d: {dField1: false, dField2: false}, u: {uField: 1}, sobj2: {d: "
-                 "{dField2: false}}}"));
-}
-
-TEST(DiffSerializationTest, SubArrayDiffAbandon) {
-    const BSONObj kDummyObj(BSON("a" << 1));
-
-    DocumentDiffBuilder builder;
-    builder.addDelete("dField1");
-    builder.addUpdate("uField", kDummyObj["a"]);
-
-    {
-        auto subBuilderGuard = builder.startSubArrDiff("subArray");
-        subBuilderGuard.builder()->addUpdate(4, kDummyObj.firstElement());
-        subBuilderGuard.abandon();
-    }
-
-    // Make sure that after we abandon something we can still use the parent builder.
-    builder.addDelete("dField2");
-
-    {
-        auto subBuilderGuard = builder.startSubArrDiff("arr2");
-        subBuilderGuard.builder()->setResize(5);
-    }
-    auto out = builder.serialize();
-    ASSERT_BSONOBJ_BINARY_EQ(
-        out,
-        fromjson("{d : {dField1: false, dField2: false}, u: {uField: 1}, sarr2: {a: true, l: 5}}"));
-}
-
 TEST(DiffSerializationTest, ValidateComputeApproxSize) {
-    const size_t padding = 20;
+    const size_t padding = 25;
     const auto storage = BSON("num" << 4 << "str"
                                     << "val"
                                     << "emptyStr"
@@ -358,67 +305,63 @@ TEST(DiffSerializationTest, ValidateComputeApproxSize) {
                                     << BSON(""
                                             << "update"));
 
-    DocumentDiffBuilder builder(padding);
-    builder.addDelete("deleteField");
-    builder.addInsert("insert", storage["num"]);
-    builder.addUpdate("update1", storage["subObj"]);
-    builder.addDelete("");
+    diff_tree::DocumentSubDiffNode diffNode(padding);
+    diffNode.addDelete("deleteField");
+    diffNode.addInsert("insert", storage["num"]);
+    diffNode.addUpdate("update1", storage["subObj"]);
+    diffNode.addDelete("");
+
+    // Ensure size of the sub-array diff is included.
+    auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();
+    subDiffNode->setResize(5);
+    subDiffNode->addUpdate(2, storage["num"]);
+    subDiffNode->addUpdate(3, storage["str"]);
     {
-        // Ensure size of the sub-array diff is included.
-        auto subBuilderGuard = builder.startSubArrDiff("subArray");
-        subBuilderGuard.builder()->setResize(5);
-        subBuilderGuard.builder()->addUpdate(2, storage["num"]);
-        subBuilderGuard.builder()->addUpdate(2, storage["str"]);
-        {
-            auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(2);
-            subSubBuilderGuard.builder()->addInsert("insert2", storage["emptyStr"]);
-            subSubBuilderGuard.builder()->addUpdate("update3", storage["null"]);
-        }
-        {
-            auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(234);
-            subSubBuilderGuard.builder()->addInsert("subObj", storage["subObj"]);
-            subSubBuilderGuard.builder()->addUpdate("update3", storage["null"]);
-        }
-        {
-            auto subSubArrayBuilderGuard = subBuilderGuard.builder()->startSubArrDiff(2456);
-            subSubArrayBuilderGuard.builder()->addUpdate(0, storage["num"]);
-            subSubArrayBuilderGuard.abandon();
-        }
-        {
-            auto subSubArrayBuilderGuard = subBuilderGuard.builder()->startSubArrDiff(2456);
-            subSubArrayBuilderGuard.builder()->setResize(10000);
-            subSubArrayBuilderGuard.builder()->addUpdate(0, storage["array"]);
-        }
+        auto subSubDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+        subSubDiffNode->addInsert("insert2", storage["emptyStr"]);
+        subSubDiffNode->addUpdate("update3", storage["null"]);
+        subDiffNode->addChild(5, std::move(subSubDiffNode));
     }
     {
-        auto subArrayBuilderGuard = builder.startSubArrDiff("subArray2");
-        subArrayBuilderGuard.builder()->addUpdate(2, storage["str"]);
+        auto subSubDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+        subSubDiffNode->addInsert("subObj", storage["subObj"]);
+        subSubDiffNode->addUpdate("update3", storage["null"]);
+        subDiffNode->addChild(234, std::move(subSubDiffNode));
+    }
+    {
+        auto subSubArrayBuilder = std::make_unique<diff_tree::ArrayNode>();
+        subSubArrayBuilder->setResize(10000);
+        subSubArrayBuilder->addUpdate(0, storage["array"]);
+        subDiffNode->addChild(2456, std::move(subSubArrayBuilder));
+    }
+    {
+        auto subArrayBuilder = std::make_unique<diff_tree::ArrayNode>();
+
+        subArrayBuilder->addUpdate(2, storage["str"]);
+        diffNode.addChild("subArray2", std::move(subArrayBuilder));
     }
     {
         // Ensure size of the sub-object diff is included.
-        auto subBuilderGuard = builder.startSubObjDiff("subObj");
-        subBuilderGuard.builder()->addUpdate("setArray", storage["array"]);
+        auto subsubDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+        subsubDiffNode->addUpdate("setArray", storage["array"]);
+        diffNode.addChild("subObj", std::move(subsubDiffNode));
     }
-    {
-        // Ensure size of the abandoned sub-object diff is non included.
-        auto subBuilderGuard = builder.startSubObjDiff("subObj1");
-        subBuilderGuard.builder()->addUpdate("setArray2", storage["array"]);
-        subBuilderGuard.abandon();
-    }
+    diffNode.addChild("subArray", std::move(subDiffNode));
     // Update with a sub-object.
-    builder.addUpdate("update2", storage["subObj"]);
+    diffNode.addUpdate("update2", storage["subObj"]);
 
-    auto computedSize = builder.getObjSize();
-    auto out = builder.serialize();
+    auto computedSize = diffNode.getObjSize();
+    auto out = diffNode.serialize();
     ASSERT_EQ(computedSize, out.objsize() + padding);
 }
 
 TEST(DiffSerializationTest, ExecptionsWhileDiffBuildingDoesNotLeakMemory) {
     try {
-        DocumentDiffBuilder builder;
-        auto subBuilderGuard = builder.startSubArrDiff("subArray");
-        subBuilderGuard.builder()->setResize(4);
-        auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(5);
+        diff_tree::DocumentSubDiffNode diffNode;
+        auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();
+        subDiffNode->setResize(4);
+        auto subSubDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+        diffNode.addChild("asdf", std::move(subSubDiffNode));
         throw std::exception();
     } catch (const std::exception&) {
     }

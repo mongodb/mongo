@@ -35,118 +35,9 @@
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/log_builder_interface.h"
 #include "mongo/db/update/runtime_update_path.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace v2_log_builder {
-/**
- * These are structs for a "diff tree" that is constructed while the update is applied. There are
- * two types of internal nodes: Document nodes and Array nodes. All other node types are always
- * leaves.
- *
- * When the update is complete, the diff tree is converted into a $v: 2 oplog entry.
- */
-enum class NodeType { kDocumentSubDiff, kDocumentInsert, kArray, kDelete, kUpdate, kInsert };
-
-struct Node {
-    virtual ~Node(){};
-    virtual NodeType type() const = 0;
-};
-
-
-/**
- * This class represents insertion of a BSONElement or mutablebson Element. Note that
- * 'DocumentInsertionNode' also repesent an insert for the cases where an object is created
- * implicity.
- */
-struct InsertNode : public Node {
-    InsertNode(mutablebson::Element el) : elt(el) {}
-    InsertNode(BSONElement el) : elt(el) {}
-
-    NodeType type() const override {
-        return NodeType::kInsert;
-    }
-    stdx::variant<mutablebson::Element, BSONElement> elt;
-};
-
-struct UpdateNode : public Node {
-    UpdateNode(mutablebson::Element el) : elt(el) {}
-
-    NodeType type() const override {
-        return NodeType::kUpdate;
-    }
-    mutablebson::Element elt;
-};
-
-struct DeleteNode : public Node {
-    NodeType type() const override {
-        return NodeType::kDelete;
-    }
-};
-
-// Struct representing non-leaf node.
-struct InternalNode : public Node {
-    virtual Node* addChild(StringData fieldName, std::unique_ptr<Node> node) = 0;
-    virtual Node* getChild(StringData fieldName) const = 0;
-};
-
-struct DocumentNode : public InternalNode {
-    Node* addChild(StringData fieldName, std::unique_ptr<Node> node) override;
-
-    Node* getChild(StringData fieldName) const override {
-        auto it = children.find(fieldName.toString());
-        return (it != children.end()) ? it->second.get() : nullptr;
-    }
-
-    // We store the raw pointer to each of the child node so that we don't have to look up in
-    // 'children' map every time. Note that the field names of these modifications will reference
-    // the field name stored in 'children'.
-    std::vector<std::pair<StringData, UpdateNode*>> updates;
-    std::vector<std::pair<StringData, DeleteNode*>> deletes;
-    std::vector<std::pair<StringData, Node*>> inserts;
-    std::vector<std::pair<StringData, InternalNode*>> subDiffs;
-
-    // We use std::unordered_map here for pointer stability on keys (field names) when a rehash
-    // happens.
-    stdx::unordered_map<std::string, std::unique_ptr<Node>, StringMapHasher, StringMapEq> children;
-};
-
-// Indicates that the document this node represents was created as part of the update.
-//
-// E.g. applying the update {$set: {"a.b.c": "foo"}} on document {} will create sub-documents
-// at paths "a" and "a.b".
-struct DocumentInsertionNode : public DocumentNode {
-    NodeType type() const override {
-        return NodeType::kDocumentInsert;
-    }
-};
-
-// Indicates a Document internal node which is already in the pre-image document.
-struct DocumentSubDiffNode : public DocumentNode {
-    NodeType type() const override {
-        return NodeType::kDocumentSubDiff;
-    }
-};
-
-struct ArrayNode : public InternalNode {
-    Node* addChild(StringData fieldName, std::unique_ptr<Node> node) override;
-
-    virtual Node* getChild(StringData fieldName) const override {
-        auto idx = str::parseUnsignedBase10Integer(fieldName);
-        invariant(idx);
-        auto it = children.find(*idx);
-        return (it != children.end()) ? it->second.get() : nullptr;
-    }
-
-    NodeType type() const override {
-        return NodeType::kArray;
-    }
-
-    // The ordering of this map is significant. We are expected to serialize array indexes in
-    // numeric ascending order (as opposed to "stringified" order where "11" < "8").
-    std::map<size_t, std::unique_ptr<Node>> children;
-};
-
 /**
  * A log builder which can produce $v:2 oplog entries.
  *
@@ -175,26 +66,26 @@ public:
 
 private:
     // Helpers for maintaining/updating the tree.
-    Node* createInternalNode(InternalNode* parent,
-                             const RuntimeUpdatePath& fullPath,
-                             size_t pathIdx,
-                             bool newPath);
+    diff_tree::Node* createInternalNode(diff_tree::InternalNode* parent,
+                                        const RuntimeUpdatePath& fullPath,
+                                        size_t pathIdx,
+                                        bool newPath);
 
     // Helpers for adding nodes at a certain path. Returns false if the path was invalid/did
     // not exist.
     void addNodeAtPathHelper(const RuntimeUpdatePath& path,
                              size_t pathIdx,
-                             Node* root,
-                             std::unique_ptr<Node> nodeToAdd,
+                             diff_tree::Node* root,
+                             std::unique_ptr<diff_tree::Node> nodeToAdd,
                              boost::optional<size_t> idxOfFirstNewComponent);
 
     void addNodeAtPath(const RuntimeUpdatePath& path,
-                       Node* root,
-                       std::unique_ptr<Node> nodeToAdd,
+                       diff_tree::Node* root,
+                       std::unique_ptr<diff_tree::Node> nodeToAdd,
                        boost::optional<size_t> idxOfFirstNewComponent);
 
     // Root of the tree.
-    DocumentSubDiffNode _root;
+    diff_tree::DocumentSubDiffNode _root;
 };
 }  // namespace v2_log_builder
 }  // namespace mongo

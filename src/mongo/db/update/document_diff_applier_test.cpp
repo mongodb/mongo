@@ -58,12 +58,12 @@ void checkDiff(const BSONObj& preImage, const BSONObj& expectedPost, const Diff&
 TEST(DiffApplierTest, DeleteSimple) {
     const BSONObj preImage(BSON("f1" << 1 << "foo" << 2 << "f2" << 3));
 
-    DocumentDiffBuilder builder;
-    builder.addDelete("f1");
-    builder.addDelete("f2");
-    builder.addDelete("f3");
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addDelete("f1");
+    diffNode.addDelete("f2");
+    diffNode.addDelete("f3");
 
-    auto diff = builder.serialize();
+    auto diff = diffNode.serialize();
 
     checkDiff(preImage, BSON("foo" << 2), diff);
 }
@@ -74,11 +74,11 @@ TEST(DiffApplierTest, InsertSimple) {
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
     StringData newField = "newField";
 
-    DocumentDiffBuilder builder;
-    builder.addInsert("f1", storage["a"]);
-    builder.addInsert(newField, storage["b"]);
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addInsert("f1", storage["a"]);
+    diffNode.addInsert(newField, storage["b"]);
 
-    auto diff = builder.serialize();
+    auto diff = diffNode.serialize();
     checkDiff(preImage, BSON("foo" << 2 << "f2" << 3 << "f1" << 1 << "newField" << 2), diff);
 }
 
@@ -88,11 +88,11 @@ TEST(DiffApplierTest, UpdateSimple) {
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
     StringData newField = "newField";
 
-    DocumentDiffBuilder builder;
-    builder.addUpdate("f1", storage["a"]);
-    builder.addUpdate(newField, storage["b"]);
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addUpdate("f1", storage["a"]);
+    diffNode.addUpdate(newField, storage["b"]);
 
-    auto diff = builder.serialize();
+    auto diff = diffNode.serialize();
     checkDiff(preImage, BSON("f1" << 1 << "foo" << 2 << "f2" << 3 << "newField" << 2), diff);
 }
 
@@ -101,15 +101,16 @@ TEST(DiffApplierTest, SubObjDiffSimple) {
         BSON("obj" << BSON("dField" << 0 << "iField" << 0 << "uField" << 0) << "otherField" << 0));
 
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
     {
-        auto subBuilderGuard = builder.startSubObjDiff("obj");
-        subBuilderGuard.builder()->addDelete("dField");
-        subBuilderGuard.builder()->addInsert("iField", storage["a"]);
-        subBuilderGuard.builder()->addUpdate("uField", storage["b"]);
+        auto subDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+        subDiffNode->addDelete("dField");
+        subDiffNode->addInsert("iField", storage["a"]);
+        subDiffNode->addUpdate("uField", storage["b"]);
+        diffNode.addChild("obj", std::move(subDiffNode));
     }
 
-    auto diff = builder.serialize();
+    auto diff = diffNode.serialize();
     checkDiff(
         preImage, BSON("obj" << BSON("uField" << 2 << "iField" << 1) << "otherField" << 0), diff);
 }
@@ -120,14 +121,15 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithAppend) {
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
     StringData arr = "arr";
 
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
     {
-        auto subBuilderGuard = builder.startSubArrDiff(arr);
-        subBuilderGuard.builder()->addUpdate(1, storage["a"]);
-        subBuilderGuard.builder()->addUpdate(4, storage["b"]);
+        auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();
+        subDiffNode->addUpdate(1, storage["a"]);
+        subDiffNode->addUpdate(4, storage["b"]);
+        diffNode.addChild(arr, std::move(subDiffNode));
     }
 
-    auto diff = builder.serialize();
+    auto diff = diffNode.serialize();
 
     checkDiff(preImage, BSON("arr" << BSON_ARRAY(999 << 1 << 999 << 999 << 2)), diff);
 }
@@ -138,14 +140,15 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithTruncate) {
     const BSONObj storage(BSON("a" << 1 << "b" << 2));
     StringData arr = "arr";
 
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
     {
-        auto subBuilderGuard = builder.startSubArrDiff(arr);
-        subBuilderGuard.builder()->addUpdate(1, storage["a"]);
-        subBuilderGuard.builder()->setResize(3);
+        auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();
+        subDiffNode->addUpdate(1, storage["a"]);
+        subDiffNode->setResize(3);
+        diffNode.addChild(arr, std::move(subDiffNode));
     }
 
-    auto diff = builder.serialize();
+    auto diff = diffNode.serialize();
     checkDiff(preImage, BSON("arr" << BSON_ARRAY(999 << 1 << 999)), diff);
 }
 
@@ -155,13 +158,14 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithNullPadding) {
     BSONObj storage(BSON("a" << 1));
     StringData arr = "arr";
 
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
     {
-        auto subBuilderGuard = builder.startSubArrDiff(arr);
-        subBuilderGuard.builder()->addUpdate(3, storage["a"]);
+        auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();
+        subDiffNode->addUpdate(3, storage["a"]);
+        diffNode.addChild(arr, std::move(subDiffNode));
     }
 
-    auto diff = builder.serialize();
+    auto diff = diffNode.serialize();
 
     checkDiff(preImage, BSON("arr" << BSON_ARRAY(0 << NullLabeler{} << NullLabeler{} << 1)), diff);
 }
@@ -169,16 +173,18 @@ TEST(DiffApplierTest, SubArrayDiffSimpleWithNullPadding) {
 TEST(DiffApplierTest, NestedSubObjUpdateScalar) {
     BSONObj storage(BSON("a" << 1));
     StringData subObj = "subObj";
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
     {
-        auto subBuilderGuard = builder.startSubObjDiff(subObj);
+        auto subDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
         {
-            auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(subObj);
-            subSubBuilderGuard.builder()->addUpdate("a", storage["a"]);
-        }
-    }
+            auto subSubDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
 
-    auto diff = builder.serialize();
+            subSubDiffNode->addUpdate("a", storage["a"]);
+            subDiffNode->addChild(subObj, std::move(subSubDiffNode));
+        }
+        diffNode.addChild(subObj, std::move(subDiffNode));
+    }
+    auto diff = diffNode.serialize();
 
     // Check the case where the object matches the structure we expect.
     BSONObj preImage(fromjson("{subObj: {subObj: {a: 0}}}"));
@@ -217,33 +223,31 @@ TEST(DiffApplierTest, UpdateArrayOfObjectsSubDiff) {
     StringData dFieldB = "dFieldB";
     StringData uField = "uField";
 
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addDelete(dFieldA);
+    diffNode.addDelete(dFieldB);
+    diffNode.addUpdate(uField, storage["uFieldNew"]);
+
+    auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();
     {
-        builder.addDelete(dFieldA);
-        builder.addDelete(dFieldB);
-        builder.addUpdate(uField, storage["uFieldNew"]);
-
-        auto subBuilderGuard = builder.startSubArrDiff(arr);
-        {
-            {
-                auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(1);
-                subSubBuilderGuard.builder()->addUpdate("a", storage["a"]);
-            }
-
-            {
-                auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(2);
-                subSubBuilderGuard.builder()->addUpdate("b", storage["b"]);
-            }
-
-            {
-                auto subSubBuilderGuard = subBuilderGuard.builder()->startSubObjDiff(3);
-                subSubBuilderGuard.builder()->addUpdate("c", storage["c"]);
-            }
-            subBuilderGuard.builder()->addUpdate(4, storage["newObj"]);
-        }
+        auto subSubDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+        subSubDiffNode->addUpdate("a", storage["a"]);
+        subDiffNode->addChild(1, std::move(subSubDiffNode));
     }
+    {
+        auto subSubDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+        subSubDiffNode->addUpdate("b", storage["b"]);
+        subDiffNode->addChild(2, std::move(subSubDiffNode));
+    }
+    {
+        auto subSubDiffNode = std::make_unique<diff_tree::DocumentSubDiffNode>();
+        subSubDiffNode->addUpdate("c", storage["c"]);
+        subDiffNode->addChild(3, std::move(subSubDiffNode));
+    }
+    subDiffNode->addUpdate(4, storage["newObj"]);
+    diffNode.addChild(arr, std::move(subDiffNode));
 
-    auto diff = builder.serialize();
+    auto diff = diffNode.serialize();
 
     // Case where the object matches the structure we expect.
     BSONObj preImage(
@@ -292,17 +296,16 @@ TEST(DiffApplierTest, UpdateArrayOfObjectsSubDiff) {
 TEST(DiffApplierTest, UpdateArrayOfObjectsWithUpdateOperationNonContiguous) {
     BSONObj storage(BSON("dummyA" << 997 << "dummyB" << BSON("newVal" << 998) << "dummyC" << 999));
     StringData arr = "arr";
-    DocumentDiffBuilder builder;
+    diff_tree::DocumentSubDiffNode diffNode;
     {
-        auto subBuilderGuard = builder.startSubArrDiff(arr);
-        {
-            subBuilderGuard.builder()->addUpdate(1, storage["dummyA"]);
-            subBuilderGuard.builder()->addUpdate(2, storage["dummyB"]);
-            subBuilderGuard.builder()->addUpdate(5, storage["dummyC"]);
-        }
+        auto subDiffNode = std::make_unique<diff_tree::ArrayNode>();
+        subDiffNode->addUpdate(1, storage["dummyA"]);
+        subDiffNode->addUpdate(2, storage["dummyB"]);
+        subDiffNode->addUpdate(5, storage["dummyC"]);
+        diffNode.addChild(arr, std::move(subDiffNode));
     }
 
-    auto diff = builder.serialize();
+    auto diff = diffNode.serialize();
 
     // Case where the object matches the structure we expect.
     BSONObj preImage(fromjson("{arr: [null, {}, {}, {}, {}, {}]}"));
