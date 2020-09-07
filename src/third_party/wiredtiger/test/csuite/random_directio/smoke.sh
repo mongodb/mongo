@@ -23,7 +23,7 @@ for threads in $TEST_THREADS; do
     for method in $TEST_METHODS; do
         RUN_TEST="$RUN_TEST_CMD -t 5 -m $method"
         $RUN_TEST -T $threads                              || exit 1
-        $RUN_TEST -T $threads -S create,drop,verbose       || exit 1
+        $RUN_TEST -f 20 -T $threads -S create,drop,verbose       || exit 1
 
         # Here are successively tougher schema tests that do not yet
         # reliably pass.  'verbose' can be added to any.
