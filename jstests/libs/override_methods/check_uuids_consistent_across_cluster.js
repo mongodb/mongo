@@ -151,10 +151,17 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
                     assert.commandWorked(shardConn.adminCommand(
                         {_flushRoutingTableCacheUpdates: ns, syncFromConfig: false}));
 
-                    const actualConfigMetadata =
-                        shardConn.getDB("config").getCollection("cache.collections").find({
-                            "_id": ns
-                        })[0];
+                    let actualConfigMetadata = shardConn.getDB("config")
+                                                   .getCollection("cache.collections")
+                                                   .find({"_id": ns})
+                                                   .toArray();
+                    assert.eq(
+                        actualConfigMetadata.length,
+                        1,
+                        "Incorrect number of entries in 'cache.collections' have been found for collection '" +
+                            ns + "' on node " + shardConn);
+                    actualConfigMetadata = actualConfigMetadata[0];
+
                     assert.eq(authoritativeCollMetadata.collInfo.uuid,
                               actualConfigMetadata.uuid,
                               "authoritative collection info on config server: " +
