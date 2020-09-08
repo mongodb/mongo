@@ -57,8 +57,7 @@ public:
 private:
     // Set of variables coming from the outer side.
     const value::SlotVector _outerProjects;
-    // Set of correlated variables from the outer side that are visible on the inner side. They must
-    // be also present in the _outerProjects.
+    // Set of correlated variables from the outer side that are visible on the inner side.
     const value::SlotVector _outerCorrelated;
     // If not set then this is a cross product.
     const std::unique_ptr<EExpression> _predicate;
