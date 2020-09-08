@@ -544,7 +544,11 @@ public:
                 if constexpr (std::is_same_v<Time, CacheNotCausallyConsistent>) {
                     return _cache._lookupFn(opCtx, _key, _cachedValue);
                 } else {
-                    return _cache._lookupFn(opCtx, _key, _cachedValue, _minTimeInStore);
+                    auto minTimeInStore = [&] {
+                        stdx::lock_guard lg(_cache._mutex);
+                        return _minTimeInStore;
+                    }();
+                    return _cache._lookupFn(opCtx, _key, _cachedValue, minTimeInStore);
                 }
             });
         }));
