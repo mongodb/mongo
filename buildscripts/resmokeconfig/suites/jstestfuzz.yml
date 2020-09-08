@@ -12,6 +12,7 @@ executor:
     shell_options:
       readMode: commands
   hooks:
+  - class: FuzzerRestoreSettings
   - class: ValidateCollections
     shell_options:
       global_vars:

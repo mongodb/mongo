@@ -18,7 +18,7 @@ executor:
           runningWithCausalConsistency: true
           usingReplicaSetShards: true
   hooks:
-  - class: FuzzerRestoreClusterSettings
+  - class: FuzzerRestoreSettings
   - class: CheckReplDBHash
     shell_options:
       global_vars:

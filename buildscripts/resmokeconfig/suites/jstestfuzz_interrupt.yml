@@ -16,6 +16,7 @@ executor:
       eval: load('jstests/libs/jstestfuzz/check_for_interrupt_hook.js')
       readMode: commands
   hooks:
+  - class: FuzzerRestoreSettings
   - class: ValidateCollections
     shell_options:
       global_vars:

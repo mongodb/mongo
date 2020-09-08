@@ -21,6 +21,7 @@ executor:
       global_vars:
         TestData:
           skipValidationOnInvalidViewDefinitions: true
+  - class: FuzzerRestoreSettings
   fixture:
     class: ReplicaSetFixture
     mongod_options:
