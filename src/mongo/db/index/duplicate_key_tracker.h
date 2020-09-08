@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/temporary_record_store.h"
 
 namespace mongo {
@@ -63,9 +64,9 @@ public:
     void deleteTemporaryTable(OperationContext* opCtx);
 
     /**
-     * Given a set of duplicate keys, insert them into the key constraint table.
+     * Given a duplicate key, insert it into the key constraint table.
      */
-    Status recordKeys(OperationContext* opCtx, const std::vector<BSONObj>& keys);
+    Status recordKey(OperationContext* opCtx, const KeyString::Value& key);
 
     /**
      * Returns Status::OK if all previously recorded duplicate key constraint violations have been

@@ -58,44 +58,34 @@ void DuplicateKeyTracker::deleteTemporaryTable(OperationContext* opCtx) {
     _keyConstraintsTable->deleteTemporaryTable(opCtx);
 }
 
-Status DuplicateKeyTracker::recordKeys(OperationContext* opCtx, const std::vector<BSONObj>& keys) {
-    if (keys.size() == 0)
-        return Status::OK();
-
-    std::vector<BSONObj> toInsert;
-    toInsert.reserve(keys.size());
-    for (auto&& key : keys) {
-        BSONObjBuilder builder;
-        builder.append(kKeyField, key);
-
-        BSONObj obj = builder.obj();
-
-        toInsert.emplace_back(std::move(obj));
-    }
-
-    std::vector<Record> records;
-    records.reserve(keys.size());
-    for (auto&& obj : toInsert) {
-        records.emplace_back(Record{RecordId(), RecordData(obj.objdata(), obj.objsize())});
-    }
+Status DuplicateKeyTracker::recordKey(OperationContext* opCtx, const KeyString::Value& key) {
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     LOGV2_DEBUG(20676,
                 1,
-                "recording {records_size} duplicate key conflicts on unique index: "
-                "{indexCatalogEntry_descriptor_indexName}",
-                "records_size"_attr = records.size(),
-                "indexCatalogEntry_descriptor_indexName"_attr =
-                    _indexCatalogEntry->descriptor()->indexName());
+                "Recording duplicate key conflict on unique index",
+                "index"_attr = _indexCatalogEntry->descriptor()->indexName());
 
-    WriteUnitOfWork wuow(opCtx);
-    std::vector<Timestamp> timestamps(records.size());
-    Status s = _keyConstraintsTable->rs()->insertRecords(opCtx, &records, timestamps);
-    if (!s.isOK())
-        return s;
+    // The KeyString::Value will be serialized in the format [KeyString][TypeBits]. We need to
+    // store the TypeBits for error reporting later on. The RecordId does not need to be stored, so
+    // we exclude it from the serialization.
+    BufBuilder builder;
+    key.serializeWithoutRecordId(builder);
 
-    wuow.commit();
+    auto status =
+        _keyConstraintsTable->rs()->insertRecord(opCtx, builder.buf(), builder.len(), Timestamp());
+    if (!status.isOK())
+        return status.getStatus();
 
-    _duplicateCounter.fetchAndAdd(records.size());
+    auto numDuplicates = _duplicateCounter.addAndFetch(1);
+    opCtx->recoveryUnit()->onRollback([this]() { _duplicateCounter.fetchAndAdd(-1); });
+
+    if (numDuplicates % 1000 == 0) {
+        LOGV2_INFO(4806700,
+                   "Index build: high number of duplicate keys on unique index",
+                   "index"_attr = _indexCatalogEntry->descriptor()->indexName(),
+                   "numDuplicateKeys"_attr = numDuplicates);
+    }
 
     return Status::OK();
 }
@@ -116,15 +106,14 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx) const {
             CurOp::get(opCtx)->setProgress_inlock(curopMessage, _duplicateCounter.load(), 1));
     }
 
-
     int resolved = 0;
     while (record) {
         resolved++;
-        BSONObj conflict = record->data.toBson();
-        BSONObj keyObj = conflict[kKeyField].Obj();
 
-        KeyString::Builder keyString(index->getKeyStringVersion(), keyObj, index->getOrdering());
-        auto status = index->dupKeyCheck(opCtx, keyString.getValueCopy());
+        BufReader reader(record->data.data(), record->data.size());
+        auto key = KeyString::Value::deserialize(reader, index->getKeyStringVersion());
+
+        auto status = index->dupKeyCheck(opCtx, key);
         if (!status.isOK())
             return status;
 

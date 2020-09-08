@@ -48,7 +48,6 @@ namespace mongo {
 class BSONObjBuilder;
 class MatchExpression;
 struct UpdateTicket;
-struct InsertResult;
 struct InsertDeleteOptions;
 
 /**
@@ -66,6 +65,8 @@ class IndexAccessMethod {
     IndexAccessMethod& operator=(const IndexAccessMethod&) = delete;
 
 public:
+    using KeyHandlerFn = std::function<Status(const KeyString::Value&)>;
+
     IndexAccessMethod() = default;
     virtual ~IndexAccessMethod() = default;
 
@@ -88,7 +89,8 @@ public:
                           const BSONObj& obj,
                           const RecordId& loc,
                           const InsertDeleteOptions& options,
-                          InsertResult* result) = 0;
+                          KeyHandlerFn&& onDuplicateKey,
+                          int64_t* numInserted) = 0;
 
     virtual Status insertKeys(OperationContext* opCtx,
                               const std::vector<KeyString::Value>& keys,
@@ -96,7 +98,8 @@ public:
                               const MultikeyPaths& multikeyPaths,
                               const RecordId& loc,
                               const InsertDeleteOptions& options,
-                              InsertResult* result) = 0;
+                              KeyHandlerFn&& onDuplicateKey,
+                              int64_t* numInserted) = 0;
 
     /**
      * Analogous to insertKeys above, but remove the keys instead of inserting them.
@@ -245,22 +248,14 @@ public:
      * @param mayInterrupt - Is this commit interruptible (will cancel)
      * @param dupsAllowed - If false and 'dupRecords' is not null, append with the RecordIds of
      *                      the uninserted duplicates.
-     *                      If true and 'dupKeys' is not null, append with the keys of the inserted
-     *                      duplicates.
+     * @param onDuplicateKey - Will be called for each duplicate key inserted into the index.
      * @param dupRecords - If not null, is filled with the RecordIds of uninserted duplicate keys.
-     *                     If null, duplicate keys will return errors.
-     * @param dupKeys - If not null and 'dupsAllowed' is true, is filled with the keys of inserted
-     *                  duplicates.
-     *                  If null, duplicates are inserted but not recorded.
-     *
-     * It is invalid and contradictory to pass both 'dupRecords' and 'dupKeys'.
      */
-
     virtual Status commitBulk(OperationContext* opCtx,
                               BulkBuilder* bulk,
                               bool dupsAllowed,
-                              std::set<RecordId>* dupRecords,
-                              std::vector<BSONObj>* dupKeys) = 0;
+                              KeyHandlerFn&& onDuplicateKey,
+                              std::set<RecordId>* dupRecords) = 0;
 
     /**
      * Specifies whether getKeys should relax the index constraints or not, in order of most
@@ -371,15 +366,6 @@ public:
 };
 
 /**
- * Records number of keys inserted and duplicate keys inserted, if applicable.
- */
-struct InsertResult {
-public:
-    std::int64_t numInserted{0};
-    std::vector<BSONObj> dupsInserted;
-};
-
-/**
  * Updates are two steps: verify that it's a valid update, and perform it.
  * prepareUpdate fills out the UpdateStatus and update actually applies it.
  */
@@ -453,7 +439,8 @@ public:
                   const BSONObj& obj,
                   const RecordId& loc,
                   const InsertDeleteOptions& options,
-                  InsertResult* result) final;
+                  KeyHandlerFn&& onDuplicateKey,
+                  int64_t* numInserted) final;
 
     Status insertKeys(OperationContext* opCtx,
                       const std::vector<KeyString::Value>& keys,
@@ -461,7 +448,8 @@ public:
                       const MultikeyPaths& multikeyPaths,
                       const RecordId& loc,
                       const InsertDeleteOptions& options,
-                      InsertResult* result) final;
+                      KeyHandlerFn&& onDuplicateKey,
+                      int64_t* numInserted) final;
 
     Status removeKeys(OperationContext* opCtx,
                       const std::vector<KeyString::Value>& keys,
@@ -509,8 +497,8 @@ public:
     Status commitBulk(OperationContext* opCtx,
                       BulkBuilder* bulk,
                       bool dupsAllowed,
-                      std::set<RecordId>* dupRecords,
-                      std::vector<BSONObj>* dupKeys) final;
+                      KeyHandlerFn&& onDuplicateKey,
+                      std::set<RecordId>* dupRecords) final;
 
     void getKeys(const BSONObj& obj,
                  GetKeysMode mode,

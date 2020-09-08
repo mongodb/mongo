@@ -2564,6 +2564,15 @@ int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t r
     return leftSize < rightSize ? -1 : 1;
 }
 
+void Value::serializeWithoutRecordId(BufBuilder& buf) const {
+    dassert(decodeRecordIdAtEnd(_buffer.get(), _ksSize).isValid());
+
+    const int32_t sizeWithoutRecordId = sizeWithoutRecordIdAtEnd(_buffer.get(), _ksSize);
+    buf.appendNum(sizeWithoutRecordId);                          // Serialize size of KeyString
+    buf.appendBuf(_buffer.get(), sizeWithoutRecordId);           // Serialize KeyString
+    buf.appendBuf(_buffer.get() + _ksSize, _bufSize - _ksSize);  // Serialize TypeBits
+}
+
 template class BuilderBase<BufBuilder>;
 template class BuilderBase<StackBufBuilder>;
 

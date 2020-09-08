@@ -94,10 +94,10 @@ public:
                      int64_t* const numKeysOut);
 
     /**
-     * Given a set of duplicate keys, record the keys for later verification by a call to
+     * Given a duplicate key, record the key for later verification by a call to
      * checkDuplicateKeyConstraints();
      */
-    Status recordDuplicateKeys(OperationContext* opCtx, const std::vector<BSONObj>& keys);
+    Status recordDuplicateKey(OperationContext* opCtx, const KeyString::Value& key);
 
     /**
      * Returns Status::OK if all previously recorded duplicate key constraint violations have been
