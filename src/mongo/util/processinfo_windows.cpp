@@ -367,9 +367,11 @@ bool ProcessInfo::blockInMemory(const void* start) {
         if (bstat) {
             for (int i=0; i<30; i++) {
                 if (wiex[i].BasicInfo.FaultingPc == 0) break;
-                cout << "faulting pc = " << wiex[i].BasicInfo.FaultingPc <<
-                    " address = " << wiex[i].BasicInfo.FaultingVa <<
-                    " thread id = " << wiex[i].FaultingThreadId << endl;
+                LOGV2(677707,
+                      "Encountered a page fault",
+                      "faulting_pc"_attr = wiex[i].BasicInfo.FaultingPcm,
+                      "address"_attr = wiex[i].BasicInfo.FaultingVa,
+                      "thread_id"_attr = wiex[i].FaultingThreadId);
             }
         }
 #endif

@@ -135,7 +135,7 @@ public:
                            */
         );
         if (found == 0) {
-            std::cout << "system error: reading proc info" << std::endl;
+            LOGV2(677701, "system error: reading proc info");
         }
         fclose(f);
     }
