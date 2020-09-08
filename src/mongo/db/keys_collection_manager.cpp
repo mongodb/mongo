@@ -266,7 +266,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
                 }
                 LOGV2(4939300,
                       "Failed to refresh key cache",
-                      "error"_attr = latestKeyStatusWith.getStatus(),
+                      "error"_attr = redact(latestKeyStatusWith.getStatus()),
                       "nextWakeup"_attr = nextWakeup);
             }
 
