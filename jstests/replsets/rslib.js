@@ -24,6 +24,8 @@ var isMemberNewlyAdded;
 var replConfigHasNewlyAddedMembers;
 var waitForNewlyAddedRemovalForNodeToBeCommitted;
 var assertVoteCount;
+var disconnectSecondaries;
+var reconnectSecondaries;
 
 (function() {
 "use strict";
@@ -811,5 +813,25 @@ assertVoteCount = function(node, {
     assert.eq(status["writableVotingMembersCount"], writableVotingMembersCount, status);
     assert.eq(status["writeMajorityCount"], writeMajorityCount, status);
     assert.eq(status["members"].length, totalMembersCount, status);
+};
+
+disconnectSecondaries = function(rst, secondariesDown) {
+    for (let i = 1; i <= secondariesDown; i++) {
+        for (const node of rst.nodes) {
+            if (node !== rst.nodes[i]) {
+                node.disconnect(rst.nodes[i]);
+            }
+        }
+    }
+};
+
+reconnectSecondaries = function(rst) {
+    for (const node of rst.nodes) {
+        for (const node2 of rst.nodes) {
+            if (node2 !== node) {
+                node2.reconnect(node);
+            }
+        }
+    }
 };
 }());

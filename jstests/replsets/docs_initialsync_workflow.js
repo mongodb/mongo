@@ -1,5 +1,5 @@
 /**
- * This test simulates initial sync workflows which are performed by the Atlas automation agent.
+ * This test simulates workflows for adding a new node and resyncing a node recommended by docs.
  */
 (function() {
 "use strict";
@@ -7,8 +7,6 @@
 load('jstests/replsets/rslib.js');  // waitForState.
 
 const testName = TestData.testName;
-// Set up a standard 3-node replica set.  Note the two secondaries are priority 0; this is
-// different than the real Atlas configuration where the secondaries would be electable.
 const rst = new ReplSetTest({
     name: testName,
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
@@ -27,15 +25,14 @@ rst.awaitReplication();
 
 function testAddWithInitialSync(secondariesDown) {
     let config = rst.getReplSetConfigFromNode();
-    secondariesDown = secondariesDown || 0;
     disconnectSecondaries(rst, secondariesDown);
     const majorityDown = secondariesDown > 1;
     if (majorityDown) {
         // Wait for the set to become unhealthy.
         rst.waitForState(primary, ReplSetTest.State.SECONDARY);
     }
-    // Atlas always adds nodes with 0 votes and priority
-    const newNode = rst.add({rsConfig: {votes: 0, priority: 0}});
+    // Add a new, voting node.
+    const newNode = rst.add({rsConfig: {priority: 0}});
     // The second disconnect ensures we can't reach the new node from the 'down' nodes.
     disconnectSecondaries(rst, secondariesDown);
     const newConfig = rst.getReplSetConfig();
@@ -48,24 +45,13 @@ function testAddWithInitialSync(secondariesDown) {
     jsTestLog("Waiting for node to sync.");
     rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
 
-    jsTestLog("Reconfiguring added node to have votes");
-    config = rst.getReplSetConfigFromNode(primary.nodeId);
-    config.version += 1;
-    config.members[3].votes = 1;
-    assert.commandWorked(primary.adminCommand(
-        {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}));
-    if (!majorityDown) {
-        // Make sure we can replicate to it.  This only works if the set was healthy, otherwise we
-        // can't.
-        assert.commandWorked(
-            testDb[testName].insert({addWithInitialSync: secondariesDown}, {writeConcern: {w: 1}}));
-        rst.awaitReplication(undefined, undefined, [newNode]);
-    }
-
     // Make sure the set is still consistent after adding the node.
     reconnectSecondaries(rst);
     // If we were in a majority-down scenario, wait for the primary to be re-elected.
     assert.soon(() => primary == rst.getPrimary());
+    // Wait for the automatic reconfig to complete.
+    rst.waitForAllNewlyAddedRemovals();
+
     rst.checkOplogs();
     rst.checkReplicatedDataHashes();
 
@@ -79,16 +65,27 @@ function testReplaceWithInitialSync(secondariesDown) {
     // Wait for existing reconfigs to complete.
     rst.waitForAllNewlyAddedRemovals();
 
-    const node = rst.getSecondaries()[2];
+    const nodeToBeReplaced = rst.getSecondaries()[2];
     const majorityDown = secondariesDown > 1;
+    let config = rst.getReplSetConfigFromNode(primary.nodeId);
     disconnectSecondaries(rst, secondariesDown);
     if (majorityDown) {
         // Wait for the set to become unhealthy.
         rst.waitForState(primary, ReplSetTest.State.SECONDARY);
     }
 
-    jsTestLog("Stopping node for replacement of data");
-    rst.stop(node, undefined, {skipValidation: true}, {forRestart: true});
+    let nodeId = rst.getNodeId(nodeToBeReplaced);
+    const highestMemberId = config.members[nodeId]._id;
+
+    jsTestLog("Reconfiguring to remove the node.");
+    config.version += 1;
+    config.members.splice(nodeId, 1);
+    assert.commandWorked(primary.adminCommand(
+        {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}));
+
+    jsTestLog("Stopping node for replacement");
+    rst.stop(nodeToBeReplaced, undefined, {skipValidation: true}, {forRestart: true});
+    rst.remove(nodeToBeReplaced);
     if (!majorityDown) {
         // Add some data.  This can't work in a majority-down situation, so we don't do it then.
         assert.commandWorked(testDb[testName].insert({replaceWithInitialSync: secondariesDown},
@@ -96,13 +93,27 @@ function testReplaceWithInitialSync(secondariesDown) {
     }
 
     jsTestLog("Starting a new replacement node with empty data directory.");
-    rst.start(node, {startClean: true}, true /* restart */);
-    // We can't use awaitSecondaryNodes because the set might not be healthy.
-    assert.soonNoExcept(() => node.adminCommand({isMaster: 1}).secondary);
+    const replacementNode = rst.add({rsConfig: {priority: 0}});
+    // The second disconnect ensures we can't reach the replacement node from the 'down' nodes.
+    disconnectSecondaries(rst, secondariesDown);
+
+    nodeId = rst.getNodeId(replacementNode);
+    config = rst.getReplSetConfigFromNode(primary.nodeId);
+    const newConfig = rst.getReplSetConfig();
+    config.members = newConfig.members;
+    // Don't recycle the member id.
+    config.members[nodeId]._id = highestMemberId + 1;
+    config.version += 1;
+    jsTestLog("Reconfiguring set to add the replacement node.");
+    assert.commandWorked(primary.adminCommand(
+        {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS, force: majorityDown}));
+
+    jsTestLog("Waiting for the replacement node to sync.");
+    rst.waitForState(replacementNode, ReplSetTest.State.SECONDARY);
 
     if (!majorityDown) {
         // Make sure we can replicate to it, if the set is otherwise healthy.
-        rst.awaitReplication(undefined, undefined, [node]);
+        rst.awaitReplication(undefined, undefined, [replacementNode]);
     }
     // Make sure the set is still consistent after resyncing the node.
     reconnectSecondaries(rst);
