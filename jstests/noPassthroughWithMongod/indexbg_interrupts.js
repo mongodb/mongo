@@ -32,7 +32,8 @@ var checkOp = function(checkDB) {
 
 var dbname = 'bgIndexSec';
 var collection = 'jstests_feh';
-var size = 100000;
+// Reduce the amount of data on live-record buildvariant
+var size = (TestData.undoRecorderPath ? 10000 : 100000);
 
 // Set up replica set
 var replTest = new ReplSetTest({name: 'bgIndex', nodes: 3});

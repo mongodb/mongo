@@ -12751,6 +12751,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     record_with: --recordWith /opt/undodb5/bin/live-record
     exec_timeout_secs: 14400 # 4 hours
+    test_flags: --excludeWithAnyTags=requires_fast_memory
   tasks:
   - name: compile_without_package_TG
   - name: .jscore .common
@@ -12764,6 +12765,24 @@ buildvariants:
   - name: sharded_jscore_txns_sharded_collections
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_op_query_passthrough
+  - name: aggregation
+  - name: aggregation_auth
+  - name: aggregation_disabled_optimization
+  - name: aggregation_ese
+  - name: aggregation_ese_gcm
+  - name: aggregation_facet_unwind_passthrough
+  - name: aggregation_slot_based_execution
+  - name: .auth .gle
+  - name: .jscore .encrypt
+  - name: noPassthroughWithMongod_gen
+  - name: parallel_compatibility
+  - name: serial_run
+  - name: session_jscore_passthrough
+  - name: .aggfuzzer
+  - name: query_fuzzer_standalone_gen
+  - name: update_fuzzer_gen
+  - name: jstestfuzz_gen
+  - name: jstestfuzz_interrupt_gen
 
 - <<: *enterprise-rhel-62-64-bit-dynamic-required-template
   name: rhel-62-64-bit-dynamic-visibility-test

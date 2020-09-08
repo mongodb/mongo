@@ -128,7 +128,7 @@ class Process(object):
                     logger=self.logger.name.replace('/', '-'),
                     process=os.path.basename(self.args[0]), pid=self.pid, t=now_str)
                 recorder_args = [
-                    _config.UNDO_RECORDER_PATH, "--thread-fuzzing", "-p",
+                    _config.UNDO_RECORDER_PATH, "-p",
                     str(self.pid), "-o", recorder_output_file
                 ]
                 self._recorder = subprocess.Popen(recorder_args, bufsize=buffer_size, env=self.env,

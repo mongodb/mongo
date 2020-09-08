@@ -78,7 +78,9 @@ st.waitForBalancer(true, 60000);
 var lastMigration = sh._lastMigration(collB);
 
 var bulk = collB.initializeUnorderedBulkOp();
-for (var i = 0; i < 1000000; i++) {
+// Reduce the amount of data on live-record buildvariant
+var n = (TestData.undoRecorderPath ? 100000 : 1000000);
+for (var i = 0; i < n; i++) {
     bulk.insert({_id: i, hello: "world"});
 }
 assert.commandWorked(bulk.execute());
