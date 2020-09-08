@@ -691,8 +691,8 @@ static void edit(const std::string& whatToEdit) {
 namespace {
 bool mechanismRequiresPassword(const MongoURI& uri) {
     if (const auto authMechanisms = uri.getOption("authMechanism")) {
-        constexpr std::array<StringData, 3> passwordlessMechanisms{
-            auth::kMechanismGSSAPI, auth::kMechanismMongoX509, auth::kMechanismMongoAWS};
+        constexpr std::array<StringData, 3> passwordlessMechanisms{auth::kMechanismGSSAPI,
+                                                                   auth::kMechanismMongoX509};
         const std::string& authMechanism = authMechanisms.get();
         for (const auto& mechanism : passwordlessMechanisms) {
             if (mechanism.toString() == authMechanism) {
