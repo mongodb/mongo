@@ -1041,6 +1041,21 @@ void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
     bb.done();
 }
 
+/**
+ * Table of MongoDB<->WiredTiger<->Log version numbers:
+ *
+ * |                MongoDB | WiredTiger | Log |
+ * |------------------------+------------+-----|
+ * |                 3.0.15 |      2.5.3 |   1 |
+ * |                 3.2.20 |      2.9.2 |   1 |
+ * |                 3.4.15 |      2.9.2 |   1 |
+ * |                  3.6.4 |      3.0.1 |   2 |
+ * |                 4.0.16 |      3.1.1 |   3 |
+ * |                  4.2.1 |      3.2.2 |   3 |
+ * |                  4.2.6 |      3.3.0 |   3 |
+ * | 4.2.6 (blessed by 4.4) |      3.3.0 |   4 |
+ * |                  4.4.0 |     10.0.0 |   5 |
+ */
 void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::string& wtOpenConfig) {
     // MongoDB 4.4 will always run in compatibility version 10.0.
     std::string configStr = wtOpenConfig + ",compatibility=(require_min=\"10.0.0\")";
