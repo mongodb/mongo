@@ -35,6 +35,8 @@
 #include "mongo/db/repl/tenant_migration_donor_util.h"
 
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
@@ -45,6 +47,9 @@
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
+
+// Failpoint that will cause recoverTenantMigrationAccessBlockers to return early.
+MONGO_FAIL_POINT_DEFINE(skipRecoverTenantMigrationAccessBlockers);
 
 namespace tenant_migration_donor {
 
@@ -138,6 +143,15 @@ std::unique_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(
 }
 
 void onWriteToDonorStateDoc(OperationContext* opCtx, const BSONObj& donorStateDocBson) {
+    // Disable the OpObserver during startup recovery, initial sync and rollback since the in-memory
+    // state will be recovered by recoverTenantMigrationAccessBlockers.
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->isReplEnabled()) {
+        if (replCoord->getMemberState().startup() || replCoord->getMemberState().startup2() ||
+            replCoord->getMemberState().rollback()) {
+            return;
+        }
+    }
     auto donorStateDoc = TenantMigrationDonorDocument::parse(IDLParserErrorContext("donorStateDoc"),
                                                              donorStateDocBson);
     if (donorStateDoc.getExpireAt()) {
@@ -207,6 +221,51 @@ void onWriteToDatabase(OperationContext* opCtx, StringData dbName) {
     if (mtab) {
         mtab->checkIfCanWriteOrThrow();
     }
+}
+
+void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
+    if (MONGO_unlikely(skipRecoverTenantMigrationAccessBlockers.shouldFail())) {
+        LOGV2(48941, "Hit skipRecoverTenantMigrationAccessBlockers failpoint");
+        return;
+    }
+    PersistentTaskStore<TenantMigrationDonorDocument> store(
+        NamespaceString::kTenantMigrationDonorsNamespace);
+    Query query;
+    store.forEach(opCtx, query, [&](const TenantMigrationDonorDocument& doc) {
+        auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
+            opCtx->getServiceContext(),
+            makeTenantMigrationExecutor(opCtx->getServiceContext()),
+            doc.getDatabasePrefix().toString());
+
+        TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
+            .add(doc.getDatabasePrefix(), mtab);
+
+        switch (doc.getState()) {
+            case TenantMigrationDonorStateEnum::kDataSync:
+                break;
+            case TenantMigrationDonorStateEnum::kBlocking:
+                invariant(doc.getBlockTimestamp());
+                mtab->startBlockingWrites();
+                mtab->startBlockingReadsAfter(doc.getBlockTimestamp().get());
+                break;
+            case TenantMigrationDonorStateEnum::kCommitted:
+                invariant(doc.getBlockTimestamp());
+                mtab->startBlockingWrites();
+                mtab->startBlockingReadsAfter(doc.getBlockTimestamp().get());
+                mtab->commit(doc.getCommitOrAbortOpTime().get());
+                break;
+            case TenantMigrationDonorStateEnum::kAborted:
+                if (doc.getBlockTimestamp()) {
+                    mtab->startBlockingWrites();
+                    mtab->startBlockingReadsAfter(doc.getBlockTimestamp().get());
+                }
+                mtab->abort(doc.getCommitOrAbortOpTime().get());
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+        return true;
+    });
 }
 
 }  // namespace tenant_migration_donor

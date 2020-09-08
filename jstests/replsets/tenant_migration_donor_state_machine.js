@@ -169,7 +169,7 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
         mtab = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
         return mtab[kDBPrefix].access === TenantMigrationUtil.accessState.kAllow;
     });
-    assert(!mtab[kDBPrefix].commitOrAbortOpTime);
+    assert(mtab[kDBPrefix].commitOrAbortOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =

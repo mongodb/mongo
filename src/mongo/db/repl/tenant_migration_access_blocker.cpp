@@ -198,9 +198,6 @@ void TenantMigrationAccessBlocker::abort(repl::OpTime abortOpTime) {
         invariant(_waitForCommitOrAbortToMajorityCommitOpCtx);
 
         _access = Access::kAllow;
-        _blockTimestamp.reset();
-        _commitOrAbortOpTime.reset();
-        _waitForCommitOrAbortToMajorityCommitOpCtx = nullptr;
         _transitionOutOfBlockingCV.notify_all();
         _completionPromise.setError(
             {ErrorCodes::TenantMigrationAborted, "tenant migration aborted"});

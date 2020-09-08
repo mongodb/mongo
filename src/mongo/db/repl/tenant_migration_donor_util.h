@@ -73,6 +73,12 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
 void onWriteToDatabase(OperationContext* opCtx, StringData dbName);
 
 /**
+ * Scan config.tenantMigrationDonors and creates the necessary TenantMigrationAccessBlockers for
+ * unfinished migrations.
+ */
+void recoverTenantMigrationAccessBlockers(OperationContext* opCtx);
+
+/**
  * Runs the argument function 'callable'. If it throws a TenantMigrationConflict error (as indicated
  * in 'replyBuilder'), clears 'replyBuilder' and blocks until the migration commits or aborts, then
  * throws TenantMigrationCommitted or TenantMigrationAborted.
