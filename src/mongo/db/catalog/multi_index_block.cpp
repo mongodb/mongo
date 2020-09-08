@@ -872,7 +872,9 @@ boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(Operation
 
 void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) const {
     auto obj = _constructStateObject();
-    auto rs = opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx);
+    auto rs = opCtx->getServiceContext()
+                  ->getStorageEngine()
+                  ->makeTemporaryRecordStoreForResumableIndexBuild(opCtx);
 
     WriteUnitOfWork wuow(opCtx);
 

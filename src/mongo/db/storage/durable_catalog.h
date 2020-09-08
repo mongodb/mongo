@@ -128,6 +128,11 @@ public:
     virtual std::string newInternalIdent() = 0;
 
     /**
+     * Generate an internal resumable index build ident name.
+     */
+    virtual std::string newInternalResumableIndexBuildIdent() = 0;
+
+    /**
      * On success, returns the RecordId which identifies the new record store in the durable catalog
      * in addition to ownership of the new RecordStore.
      */

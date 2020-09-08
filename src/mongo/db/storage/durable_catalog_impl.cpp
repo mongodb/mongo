@@ -65,6 +65,7 @@ const char kNamespaceFieldName[] = "ns";
 const char kNonRepairableFeaturesFieldName[] = "nonRepairable";
 const char kRepairableFeaturesFieldName[] = "repairable";
 const char kInternalIdentPrefix[] = "internal-";
+const char kResumableIndexBuildIdentStem[] = "resumable-index-build-";
 
 void appendPositionsOfBitsSet(uint64_t value, StringBuilder* sb) {
     invariant(sb);
@@ -427,8 +428,17 @@ bool DurableCatalogImpl::_hasEntryCollidingWithRand() const {
 }
 
 std::string DurableCatalogImpl::newInternalIdent() {
+    return _newInternalIdent("");
+}
+
+std::string DurableCatalogImpl::newInternalResumableIndexBuildIdent() {
+    return _newInternalIdent(kResumableIndexBuildIdentStem);
+}
+
+std::string DurableCatalogImpl::_newInternalIdent(StringData identStem) {
     StringBuilder buf;
     buf << kInternalIdentPrefix;
+    buf << identStem;
     buf << _next.fetchAndAdd(1) << '-' << _rand;
     return buf.str();
 }
@@ -763,6 +773,11 @@ bool DurableCatalogImpl::isUserDataIdent(StringData ident) const {
 
 bool DurableCatalogImpl::isInternalIdent(StringData ident) const {
     return ident.find(kInternalIdentPrefix) != std::string::npos;
+}
+
+bool DurableCatalogImpl::isResumableIndexBuildIdent(StringData ident) const {
+    invariant(isInternalIdent(ident), ident.toString());
+    return ident.find(kResumableIndexBuildIdentStem) != std::string::npos;
 }
 
 bool DurableCatalogImpl::isCollectionIdent(StringData ident) const {

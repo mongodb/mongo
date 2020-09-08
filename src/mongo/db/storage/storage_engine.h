@@ -376,6 +376,14 @@ public:
         OperationContext* opCtx) = 0;
 
     /**
+     * Creates a temporary RecordStore on the storage engine for a resumable index build. On
+     * startup after an unclean shutdown, the storage engine will drop any un-dropped temporary
+     * record stores.
+     */
+    virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreForResumableIndexBuild(
+        OperationContext* opCtx) = 0;
+
+    /**
      * Creates a temporary RecordStore on the storage engine from an existing ident on disk. On
      * startup after an unclean shutdown, the storage engine will drop any un-dropped temporary
      * record stores.

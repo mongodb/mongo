@@ -113,6 +113,9 @@ public:
     virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(
         OperationContext* opCtx) override;
 
+    virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreForResumableIndexBuild(
+        OperationContext* opCtx) override;
+
     virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
         OperationContext* opCtx, StringData ident) override;
 
@@ -386,12 +389,12 @@ private:
      * Returns whether the given ident is an internal ident and if it should be dropped or used to
      * resume an index build.
      */
-    bool _handleInternalIdents(OperationContext* opCtx,
-                               const std::string& ident,
-                               InternalIdentReconcilePolicy internalIdentReconcilePolicy,
-                               ReconcileResult* reconcileResult,
-                               std::set<std::string>* internalIdentsToDrop,
-                               std::set<std::string>* allInternalIdents);
+    bool _handleInternalIdent(OperationContext* opCtx,
+                              const std::string& ident,
+                              InternalIdentReconcilePolicy internalIdentReconcilePolicy,
+                              ReconcileResult* reconcileResult,
+                              std::set<std::string>* internalIdentsToDrop,
+                              std::set<std::string>* allInternalIdents);
 
     class RemoveDBChange;
 

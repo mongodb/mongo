@@ -92,6 +92,8 @@ public:
 
     bool isInternalIdent(StringData ident) const;
 
+    bool isResumableIndexBuildIdent(StringData ident) const;
+
     bool isCollectionIdent(StringData ident) const;
 
     FeatureTracker* getFeatureTracker() const {
@@ -108,6 +110,7 @@ public:
     std::string getFilesystemPathForDb(const std::string& dbName) const;
 
     std::string newInternalIdent();
+    std::string newInternalResumableIndexBuildIdent();
 
     StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
         OperationContext* opCtx,
@@ -228,6 +231,8 @@ private:
      * @param kind - what this "thing" is, likely collection or index
      */
     std::string _newUniqueIdent(NamespaceString nss, const char* kind);
+
+    std::string _newInternalIdent(StringData identStem);
 
     // Helpers only used by constructor and init(). Don't call from elsewhere.
     static std::string _newRand();
