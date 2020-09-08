@@ -445,13 +445,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     startWatchdog(serviceContext);
 
-    // When starting up after an unclean shutdown, we do not attempt to use any of the temporary
-    // files left from the previous run. Thus, we remove them in this case.
-    if (!storageGlobalParams.readOnly &&
-        LastStorageEngineShutdownState::kUnclean == lastStorageEngineShutdownState) {
-        boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
-    }
-
     if (mongodGlobalParams.scriptingEnabled) {
         ScriptEngine::setup();
     }

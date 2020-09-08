@@ -347,6 +347,20 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
     auto reconcileResult =
         fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx, reconcilePolicy));
 
+    // If we did not find any index builds to resume or we are starting up after an unclean
+    // shutdown, nothing in the temp directory will be used. Thus, we can clear it.
+    if (reconcileResult.indexBuildsToResume.empty() ||
+        lastStorageEngineShutdownState == LastStorageEngineShutdownState::kUnclean) {
+        LOGV2(5071100, "Clearing temp directory");
+
+        boost::system::error_code ec;
+        boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/", ec);
+
+        if (ec) {
+            LOGV2(5071101, "Failed to clear temp directory", "error"_attr = ec.message());
+        }
+    }
+
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
     StringMap<IndexNameObjs> nsToIndexNameObjMap;

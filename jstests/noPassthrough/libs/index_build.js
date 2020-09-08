@@ -617,18 +617,36 @@ const ResumableIndexBuildTest = class {
         ResumableIndexBuildTest.checkIndexes(
             rst, dbName, collName, indexName, postIndexBuildInserts);
 
-        if (!failWhileParsing) {
-            // Ensure that the persisted Sorter data was cleaned up after failing to resume. This
-            // cleanup does not occur if parsing failed.
-            const files = listFiles(primary.dbpath + "/_tmp");
+        const checkLogIdAfterRestart = function(primary, id) {
+            rst.stop(primary);
+            rst.start(primary, {noCleanData: true});
+            checkLog.containsJson(primary, id);
+        };
+
+        const checkTempDirectoryCleared = function(primary) {
+            const tempDir = primary.dbpath + "/_tmp";
+
+            // If the index build was interrupted for shutdown before anything was inserted into
+            // the Sorter, the temp directory may not exist.
+            if (!fileExists(tempDir))
+                return;
+
+            // Ensure that the persisted Sorter data was cleaned up after failing to resume.
+            const files = listFiles(tempDir);
             assert.eq(files.length, 0, files);
+        };
+
+        if (failWhileParsing) {
+            // If we fail while parsing, the persisted Sorter data will only be cleaned up after
+            // another restart.
+            checkLogIdAfterRestart(primary, 5071100);
+            checkTempDirectoryCleared(primary);
+        } else {
+            checkTempDirectoryCleared(primary);
 
             // If we fail after parsing, any remaining internal idents will only be cleaned up
             // after another restart.
-            clearRawMongoProgramOutput();
-            rst.stop(primary);
-            rst.start(primary, {noCleanData: true});
-            assert(RegExp("22257.*").test(rawMongoProgramOutput()));
+            checkLogIdAfterRestart(primary, 22257);
         }
     }
 };
