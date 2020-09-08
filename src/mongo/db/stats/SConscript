@@ -73,6 +73,20 @@ env.Library(
 )
 
 env.Library(
+    target='resource_consumption_metrics',
+    source=[
+        env.Idlc('operation_resource_consumption.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ],
+)
+
+env.Library(
     target="transaction_stats",
     source=[
         "single_transaction_stats.cpp"
