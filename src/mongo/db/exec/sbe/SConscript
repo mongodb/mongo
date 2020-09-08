@@ -87,6 +87,8 @@ env.Library(
 env.CppUnitTest(
     target='db_sbe_test',
     source=[
+        'expressions/sbe_coerce_to_string_test.cpp',
+        'expressions/sbe_to_upper_to_lower_test.cpp',
         'sbe_filter_test.cpp',
         'sbe_key_string_test.cpp',
         'sbe_limit_skip_test.cpp',

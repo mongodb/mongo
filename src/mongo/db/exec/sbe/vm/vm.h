@@ -187,6 +187,9 @@ enum class Builtin : uint8_t {
     bitTestMask,      // test bitwise mask & value is mask
     bitTestPosition,  // test BinData with a bit position list
     bsonSize,         // implements $bsonSize
+    toUpper,
+    toLower,
+    coerceToString,
 };
 
 class CodeFragment {
@@ -426,7 +429,9 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestMask(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBitTestPosition(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinBsonSize(uint8_t arity);
-
+    std::tuple<bool, value::TypeTags, value::Value> builtinToUpper(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinToLower(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCoerceToString(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> getFromStack(size_t offset) {

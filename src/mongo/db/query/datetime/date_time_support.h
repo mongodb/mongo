@@ -46,6 +46,7 @@ struct _timelib_tzinfo;
 namespace mongo {
 
 using namespace std::string_literals;
+static constexpr StringData kISOFormatString = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
 
 /**
  * A TimeZone object represents one way of formatting/reading dates to compute things like the day

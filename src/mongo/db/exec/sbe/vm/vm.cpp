@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
+#include <boost/algorithm/string.hpp>
 #include <pcrecpp.h>
 
 #include "mongo/db/exec/sbe/values/bson.h"
@@ -1217,6 +1218,84 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBsonSize(uint8_
     return {false, value::TypeTags::Nothing, 0};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinToUpper(uint8_t arity) {
+    auto [_, operandTag, operandVal] = getFromStack(0);
+
+    if (value::isString(operandTag)) {
+        auto strView = value::getStringView(operandTag, operandVal);
+        auto [strTag, strVal] = value::makeNewString(strView);
+        char* str = value::getRawStringView(strTag, strVal);
+        boost::to_upper(str);
+        return {true, strTag, strVal};
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinToLower(uint8_t arity) {
+    auto [_, operandTag, operandVal] = getFromStack(0);
+
+    if (value::isString(operandTag)) {
+        auto strView = value::getStringView(operandTag, operandVal);
+        auto [strTag, strVal] = value::makeNewString(strView);
+        char* str = value::getRawStringView(strTag, strVal);
+        boost::to_lower(str);
+        return {true, strTag, strVal};
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(uint8_t arity) {
+    auto [operandOwn, operandTag, operandVal] = getFromStack(0);
+
+    if (value::isString(operandTag)) {
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {operandOwn, operandTag, operandVal};
+    }
+
+    switch (operandTag) {
+        case value::TypeTags::NumberInt32: {
+            std::string str = str::stream() << value::bitcastTo<int32_t>(operandVal);
+            auto [strTag, strVal] = value::makeNewString(str);
+            return {true, strTag, strVal};
+        }
+        case value::TypeTags::NumberInt64: {
+            std::string str = str::stream() << value::bitcastTo<int64_t>(operandVal);
+            auto [strTag, strVal] = value::makeNewString(str);
+            return {true, strTag, strVal};
+        }
+        case value::TypeTags::NumberDouble: {
+            std::string str = str::stream() << value::bitcastTo<double>(operandVal);
+            auto [strTag, strVal] = value::makeNewString(str);
+            return {true, strTag, strVal};
+        }
+        case value::TypeTags::NumberDecimal: {
+            std::string str = value::bitcastTo<Decimal128>(operandVal).toString();
+            auto [strTag, strVal] = value::makeNewString(str);
+            return {true, strTag, strVal};
+        }
+        case value::TypeTags::Date: {
+            std::string str = str::stream()
+                << TimeZoneDatabase::utcZone().formatDate(
+                       kISOFormatString,
+                       Date_t::fromMillisSinceEpoch(value::bitcastTo<uint64_t>(operandVal)));
+            auto [strTag, strVal] = value::makeNewString(str);
+            return {true, strTag, strVal};
+        }
+        case value::TypeTags::Timestamp: {
+            Timestamp ts{value::bitcastTo<uint64_t>(operandVal)};
+            auto [strTag, strVal] = value::makeNewString(ts.toString());
+            return {true, strTag, strVal};
+        }
+        case value::TypeTags::Null: {
+            auto [strTag, strVal] = value::makeNewString("");
+            return {true, strTag, strVal};
+        }
+        default:
+            break;
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
@@ -1252,6 +1331,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinBitTestPosition(arity);
         case Builtin::bsonSize:
             return builtinBsonSize(arity);
+        case Builtin::toUpper:
+            return builtinToUpper(arity);
+        case Builtin::toLower:
+            return builtinToLower(arity);
+        case Builtin::coerceToString:
+            return builtinCoerceToString(arity);
     }
 
     MONGO_UNREACHABLE;

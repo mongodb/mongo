@@ -431,6 +431,17 @@ inline char* getRawPointerView(Value val) noexcept {
     return reinterpret_cast<char*>(val);
 }
 
+inline char* getRawStringView(TypeTags tag, Value& val) noexcept {
+    if (tag == TypeTags::StringSmall) {
+        return getSmallStringView(val);
+    } else if (tag == TypeTags::StringBig) {
+        return getBigStringView(val);
+    } else if (tag == TypeTags::bsonString) {
+        return getRawPointerView(val) + 4;
+    }
+    MONGO_UNREACHABLE;
+}
+
 template <typename T>
 T readFromMemory(const char* memory) noexcept {
     T val;

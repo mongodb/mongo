@@ -389,6 +389,44 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frame
         sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(var.clone())));
 }
 
+/**
+ * Generates an EExpression that converts the input to upper or lower case.
+ */
+void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
+                                            const std::string& caseConversionFunction) {
+    auto frameId = _context->frameIdGenerator->generate();
+    auto str = sbe::makeEs(_context->popExpr());
+    sbe::EVariable inputRef(frameId, 0);
+    uint32_t typeMask = (getBSONTypeMask(sbe::value::TypeTags::StringSmall) |
+                         getBSONTypeMask(sbe::value::TypeTags::StringBig) |
+                         getBSONTypeMask(sbe::value::TypeTags::bsonString) |
+                         getBSONTypeMask(sbe::value::TypeTags::NumberInt32) |
+                         getBSONTypeMask(sbe::value::TypeTags::NumberInt64) |
+                         getBSONTypeMask(sbe::value::TypeTags::NumberDouble) |
+                         getBSONTypeMask(sbe::value::TypeTags::NumberDecimal) |
+                         getBSONTypeMask(sbe::value::TypeTags::Date) |
+                         getBSONTypeMask(sbe::value::TypeTags::Timestamp));
+    auto checkValidTypeExpr = sbe::makeE<sbe::ETypeMatch>(inputRef.clone(), typeMask);
+    auto checkNullorMissing = generateNullOrMissing(frameId, 0);
+    auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
+
+    auto caseConversionExpr = sbe::makeE<sbe::EIf>(
+        std::move(checkValidTypeExpr),
+        sbe::makeE<sbe::EFunction>(caseConversionFunction,
+                                   sbe::makeEs(sbe::makeE<sbe::EFunction>(
+                                       "coerceToString", sbe::makeEs(inputRef.clone())))),
+        sbe::makeE<sbe::EFail>(ErrorCodes::Error{5066300},
+                               str::stream() << "$" << caseConversionFunction
+                                             << " input type is not supported"));
+
+    auto totalCaseConversionExpr =
+        sbe::makeE<sbe::EIf>(std::move(checkNullorMissing),
+                             sbe::makeE<sbe::EConstant>(emptyStrTag, emptyStrVal),
+                             std::move(caseConversionExpr));
+    _context->pushExpr(
+        sbe::makeE<sbe::ELocalBind>(frameId, std::move(str), std::move(totalCaseConversionExpr)));
+}
+
 class ExpressionPreVisitor final : public ExpressionVisitor {
 public:
     ExpressionPreVisitor(ExpressionVisitorContext* context) : _context{context} {}
@@ -1628,10 +1666,10 @@ public:
         visitConditionalExpression(expr);
     }
     void visit(ExpressionToLower* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateStringCaseConversionExpression(_context, "toLower");
     }
     void visit(ExpressionToUpper* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateStringCaseConversionExpression(_context, "toUpper");
     }
     void visit(ExpressionTrim* expr) final {
         unsupportedExpression("$trim");

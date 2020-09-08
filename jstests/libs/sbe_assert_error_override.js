@@ -21,6 +21,8 @@
 // Below is the list of known equivalent error code groups. As new groups of equivalent error codes
 // are discovered, they should be added to this list.
 const equivalentErrorCodesList = [
+    [16020, 5066300],
+    [16007, 5066300],
     [28765, 4822870],
     [31034, 4848972],
     [31095, 4848972],
