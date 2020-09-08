@@ -1018,9 +1018,22 @@ Status BSONElement::tryCoerce(T* out) const {
             if (!std::isfinite(d)) {
                 return {ErrorCodes::BadValue, "Unable to coerce NaN/Inf to integral type"};
             }
+
+            #if defined(__clang__)
+            // This branch is executed only when the type is double, but it gives the Clang compile warning
+            // when T is long long.
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+            #endif
+
             if ((d > std::numeric_limits<T>::max()) || (d < std::numeric_limits<T>::lowest())) {
                 return {ErrorCodes::BadValue, "Out of bounds coercing to integral value"};
             }
+
+            #if defined(__clang__)
+            #pragma clang diagnostic pop
+            #endif
+
         } else if (type() == NumberDecimal) {
             Decimal128 d = numberDecimal();
             if (!d.isFinite()) {
