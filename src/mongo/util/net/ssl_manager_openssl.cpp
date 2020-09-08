@@ -522,6 +522,7 @@ private:
      * Callbacks for SSL functions.
      */
     static int password_cb(char* buf, int num, int rwflag, void* userdata);
+    static int servername_cb(SSL* s, int* al, void* arg);
     static int verify_cb(int ok, X509_STORE_CTX* ctx);
 };
 
@@ -718,6 +719,12 @@ int SSLManagerOpenSSL::password_cb(char* buf, int num, int rwflag, void* userdat
     return copied;
 }
 
+int SSLManagerOpenSSL::servername_cb(SSL* s, int* al, void* arg) {
+    // Unconditionally accept the SNI presented by the client. This will ensure that if the client
+    // later performs session resumption, subsequent connections will still have access to the SNI.
+    return SSL_TLSEXT_ERR_OK;
+}
+
 int SSLManagerOpenSSL::verify_cb(int ok, X509_STORE_CTX* ctx) {
     return 1;  // always succeed; we will catch the error in our get_verify_result() call
 }
@@ -803,6 +810,13 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
                  context, reinterpret_cast<unsigned char*>(&context), sizeof(context))) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       str::stream() << "Can not store ssl session id context: "
+                                    << getSSLErrorMessage(ERR_get_error()));
+    }
+
+    // We should accept all SNI extensions advertised by clients
+    if (1 != SSL_CTX_set_tlsext_servername_callback(context, &SSLManagerOpenSSL::servername_cb)) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "Can not set servername callback: "
                                     << getSSLErrorMessage(ERR_get_error()));
     }
 
