@@ -311,8 +311,8 @@ public:
 
             if (_shuttingDown) {
                 LOGV2_DEBUG(22306, 1, "stopping {name} thread", "name"_attr = name());
-                _nextSharedPromise->setError(
-                    Status(ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."));
+                invariant(!_shutdownReason.isOK());
+                _nextSharedPromise->setError(_shutdownReason);
                 stdx::lock_guard<Latch> lk(_opCtxMutex);
                 _uniqueCtx.reset();
                 return;
@@ -325,12 +325,14 @@ public:
     }
 
     /**
-     * Signals the thread to quit and then waits until it does.
+     * Signals the thread to quit and then waits until it does. The given 'reason' is returned to
+     * any operations that were waiting for the journal to flush.
      */
-    void shutdown() {
+    void shutdown(const Status& reason) {
         {
             stdx::lock_guard<Latch> lk(_stateMutex);
             _shuttingDown = true;
+            _shutdownReason = reason;
             _flushJournalNowCV.notify_one();
         }
         wait();
@@ -397,6 +399,7 @@ private:
 
     bool _flushJournalNow = false;
     bool _shuttingDown = false;
+    Status _shutdownReason = Status::OK();
 
     // New callers get a future from nextSharedPromise. The JournalFlusher thread will swap that to
     // currentSharedPromise at the start of every round of flushing, and reset nextSharedPromise
@@ -1147,7 +1150,8 @@ void WiredTigerKVEngine::cleanShutdown() {
     }
     if (_journalFlusher) {
         LOGV2(22320, "Shutting down journal flusher thread");
-        _journalFlusher->shutdown();
+        _journalFlusher->shutdown(
+            {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."});
         LOGV2(22321, "Finished shutting down journal flusher thread");
     }
     if (_checkpointThread) {
@@ -2271,7 +2275,8 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
             "WiredTiger::RecoverToStableTimestamp shutting down journal and checkpoint threads.");
         // Shutdown WiredTigerKVEngine owned accesses into the storage engine.
         if (_durable) {
-            _journalFlusher->shutdown();
+            _journalFlusher->shutdown(
+                {ErrorCodes::InterruptedDueToReplStateChange, "Rollback in progress."});
         }
         _checkpointThread->shutdown();
     }
