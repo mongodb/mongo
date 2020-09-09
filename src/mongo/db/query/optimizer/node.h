@@ -51,8 +51,6 @@ using NodePtr = std::unique_ptr<Node>;
 class AbstractVisitor;
 
 class Node {
-    friend class AbstractVisitor;
-
 protected:
     explicit Node(Context& ctx);
     explicit Node(Context& ctx, NodePtr child);
