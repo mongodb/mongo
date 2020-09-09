@@ -130,8 +130,8 @@ static constexpr auto kSyntax = R"(
                                        IDENT # input of traverse
                                        ('{' EXPR '}')? # optional fold expression
                                        ('{' EXPR '}')? # optional final expression
-                                       'in' OPERATOR
                                        'from' OPERATOR
+                                       'in' OPERATOR
                 EXCHANGE <- 'exchange' IDENT_LIST NUMBER IDENT OPERATOR
                 SORT <- 'sort' IDENT_LIST IDENT_LIST OPERATOR
                 UNWIND <- 'unwind' IDENT IDENT IDENT UNWIND_FLAG OPERATOR
@@ -926,17 +926,17 @@ void Parser::walkTraverse(AstQuery& ast) {
     size_t finalPos = 0;
 
     if (ast.nodes.size() == 5) {
-        inPos = 3;
-        fromPos = 4;
+        fromPos = 3;
+        inPos = 4;
     } else if (ast.nodes.size() == 6) {
         foldPos = 3;
-        inPos = 4;
-        fromPos = 5;
+        fromPos = 4;
+        inPos = 5;
     } else {
         foldPos = 3;
         finalPos = 4;
-        inPos = 5;
-        fromPos = 6;
+        fromPos = 5;
+        inPos = 6;
     }
     ast.stage = makeS<TraverseStage>(std::move(ast.nodes[fromPos]->stage),
                                      std::move(ast.nodes[inPos]->stage),

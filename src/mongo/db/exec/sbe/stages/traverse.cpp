@@ -300,14 +300,14 @@ std::vector<DebugPrinter::Block> TraverseStage::debugPrint() const {
     }
 
     DebugPrinter::addNewLine(ret);
-    DebugPrinter::addIdentifier(ret, "in");
-    ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, _children[1]->debugPrint());
-    ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
-
     DebugPrinter::addIdentifier(ret, "from");
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+    ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
+
+    DebugPrinter::addIdentifier(ret, "in");
+    ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
+    DebugPrinter::addBlocks(ret, _children[1]->debugPrint());
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     return ret;
