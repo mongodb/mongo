@@ -335,12 +335,14 @@ BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
     ChunkVersion shardVersion;
 
     if (!swDonorShardVersion.isOK()) {
-        // The query to find 'nss' chunks belonging to the donor shard didn't return any, meaning
-        // the last chunk was donated
-        uassert(505770,
-                str::stream() << "Couldn't retrieve donor chunks from config server",
-                swDonorShardVersion.getStatus().code() == 50577);
-        shardVersion = ChunkVersion(0, 0, collectionVersion.epoch());
+        if (swDonorShardVersion.getStatus().code() == 50577) {
+            // The query to find 'nss' chunks belonging to the donor shard didn't return any chunks,
+            // meaning the last chunk for fromShard was donated. Gracefully handle the error.
+            shardVersion = ChunkVersion(0, 0, collectionVersion.epoch());
+        } else {
+            // Bubble up any other error
+            uassertStatusOK(swDonorShardVersion);
+        }
     } else {
         shardVersion = swDonorShardVersion.getValue();
     }
