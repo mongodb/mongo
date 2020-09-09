@@ -1,8 +1,6 @@
 /*
  * Test that aggregation log lines include remoteOpWaitMillis: the amount of time the merger spent
  * waiting for results from shards.
- *
- * @tags: [requires_fcv_42]
  */
 (function() {
 
