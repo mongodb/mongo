@@ -378,7 +378,6 @@ variables:
   - enterprise-windows-inmem
   - enterprise-windows-nopush-template
   - enterprise-windows-required
-  - enterprise-windows-wtdevelop
   - ubuntu1804-debug-asan
   - ubuntu1804-debug-ubsan
   - ubuntu1804-debug-aubsan-lite
@@ -508,7 +507,6 @@ functions:
       directory: ${git_project_directory|src}
       revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
         enterprise: ${enterprise_rev}
-        wtdevelop: ${wtdevelop_rev}
 
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -8573,11 +8571,6 @@ modules:
   prefix: src/mongo/db/modules
   branch: v4.7
 
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
-
 #######################################
 #            Buildvariants            #
 #######################################
@@ -8671,18 +8664,6 @@ buildvariants:
   - name: .stitch
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
-
-- <<: *linux-64-debug-template
-  name: linux-64-debug-wtdevelop
-  display_name: "~ Linux DEBUG WiredTiger develop"
-  batchtime: 240 # 4 hours
-  modules:
-  - wtdevelop
-  expansions:
-    use_wt_develop: true
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=off --enable-http-client=off
-    test_flags: --excludeWithAnyTags=requires_http_client
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -9760,17 +9741,6 @@ buildvariants:
     distros:
     - windows-64-vs2019-large
   - name: .benchmarks
-
-- <<: *enterprise-windows-nopush-template
-  name: enterprise-windows-wtdevelop
-  display_name: "~ Enterprise Windows WiredTiger develop"
-  batchtime: 240 # 4 hours
-  modules:
-  - enterprise
-  - wtdevelop
-  expansions:
-    <<: *enterprise-windows-nopush-expansions-template
-    use_wt_develop: true
 
 - name: enterprise-windows-inmem
   display_name: Enterprise Windows (inMemory)

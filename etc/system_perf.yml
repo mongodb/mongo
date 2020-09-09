@@ -46,7 +46,6 @@ variables:
   _modules: &modules
     - enterprise
     - mongo-tools
-    - wtdevelop
 
     - dsi
     - signal-processing
@@ -74,10 +73,6 @@ modules:
   repo: git@github.com:10gen/workloads.git
   prefix: workloads
   branch: master
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
 - name: linkbench
   repo: git@github.com:10gen/linkbench.git
   prefix: linkbench
@@ -915,17 +910,6 @@ buildvariants:
     - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
 
-
-- <<: *compile-amazon2
-  name: wtdevelop-compile-amazon2
-  display_name: WT Develop Compile
-  modules: *modules
-  expansions:
-    <<: *compile-expansions
-    compile-variant: -wtdevelop
-  tasks:
-    - name: compile
-
 - name: compile-rhel70
   display_name: Compile for Atlas-like
   modules: *modules
@@ -944,7 +928,7 @@ buildvariants:
   - rhel70-small
   tasks:
   - name: compile
-
+       
 - name: linux-1-node-replSet
   display_name: Linux 1-Node ReplSet
   batchtime: 10080 # 7 days
@@ -1500,54 +1484,3 @@ buildvariants:
     - name: linkbench
     - name: genny_patch_tasks
     - name: genny_auto_tasks
-
-- name: wtdevelop-1-node-replSet
-  display_name: WT Develop 1-Node ReplSet
-  batchtime: 10080 # 7 days
-  modules: *modules
-  expansions:
-    mongodb_setup: single-replica
-    infrastructure_provisioning: single
-    platform: linux
-    project_dir: *project_dir
-    compile-variant: -wtdevelop
-    authentication: enabled
-    storageEngine: wiredTiger
-  run_on:
-      - "rhel70-perf-single"
-  depends_on: *_compile_wtdevelop_amazon2
-  tasks: *1nodetasks
-
-- name: wtdevelop-standalone
-  display_name: WT Develop Standalone
-  batchtime: 10080 # 7 days
-  modules: *modules
-  expansions:
-    mongodb_setup: standalone
-    infrastructure_provisioning: single
-    platform: linux
-    project_dir: *project_dir
-    compile-variant: -wtdevelop
-    authentication: enabled
-    storageEngine: wiredTiger
-  run_on:
-      - "rhel70-perf-single"
-  depends_on: *_compile_wtdevelop_amazon2
-  tasks: *standalonetasks
-
-- name: wtdevelop-3-node-replSet
-  display_name: WT Develop 3-Node ReplSet
-  batchtime: 10080 # 7 days
-  modules: *modules
-  expansions:
-    mongodb_setup: replica
-    infrastructure_provisioning: replica
-    platform: linux
-    project_dir: *project_dir
-    compile-variant: -wtdevelop
-    authentication: enabled
-    storageEngine: wiredTiger
-  run_on:
-      - "rhel70-perf-replset"
-  depends_on: *_compile_wtdevelop_amazon2
-  tasks: *3nodetasks
