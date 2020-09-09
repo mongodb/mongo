@@ -41,6 +41,9 @@ TEST(Optimizer, Basic) {
     v.push_back(std::move(ptrScan));
     NodePtr ptrJoin = MultiJoinNode::create(ctx, {}, {}, std::move(v));
     ASSERT_EQ("NodeId: 1\nMultiJoin\nNodeId: 0\nScan\n", ptrJoin->generateMemo());
+
+    NodePtr cloned = ptrJoin->clone(ctx);
+    ASSERT_EQ("NodeId: 3\nMultiJoin\nNodeId: 2\nScan\n", cloned->generateMemo());
 }
 
 }  // namespace
