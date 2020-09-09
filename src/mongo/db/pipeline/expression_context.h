@@ -328,10 +328,6 @@ public:
     // 'jsHeapLimitMB' server parameter.
     boost::optional<int> jsHeapLimitMB;
 
-    // When set this timeout limits the allowed execution time for a JavaScript function invocation
-    // under any Scope returned by getJsExecWithScope().
-    int jsFnTimeoutMillis;
-
     // An interface for accessing information or performing operations that have different
     // implementations on mongod and mongos, or that only make sense on one of the two.
     // Additionally, putting some of this functionality behind an interface prevents aggregation
