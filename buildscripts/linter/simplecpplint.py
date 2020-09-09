@@ -69,6 +69,8 @@ GENERIC_FCV = [
     r'::kDowngradingFromLatestToLastLTS',
     r'::kDowngradingFromLatestToLastContinuous',
     r'\.isUpgradingOrDowngrading',
+    r'::kDowngradingFromLatestToLastContinuous',
+    r'::kUpgradingFromLastLTSToLastContinuous',
 ]
 _RE_GENERIC_FCV_REF = re.compile(r'(' + '|'.join(GENERIC_FCV) + r')\b')
 

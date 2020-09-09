@@ -98,6 +98,10 @@ function runTest(oldVersion) {
 // 'last-lts'.
 if (lastContinuousFCV !== lastLTSFCV) {
     runTest(lastContinuousFCV);
+
+    // Upgrading from last-lts to last-continuous. This FCV transition is allowed through the
+    // setFeatureCompatibilityVersion command with fromConfigServer: true.
+    testFCVChange({fcvDoc: {version: lastLTSFCV, targetVersion: lastContinuousFCV}});
 }
 
 // Test upgrade/downgrade between 'latest' and 'last-lts'.

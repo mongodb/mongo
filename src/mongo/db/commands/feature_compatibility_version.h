@@ -67,12 +67,13 @@ public:
     static void fassertInitializedAfterStartup(OperationContext* opCtx);
 
     /**
-     * Records intent to perform a currentVersion -> kLatest upgrade by updating the on-disk
+     * Records intent to perform a fromVersion -> newVersion upgrade by updating the on-disk
      * feature compatibility version document to have 'version'=currentVersion,
-     * 'targetVersion'=kLatest. Should be called before schemas are modified.
+     * 'targetVersion'=newVersion. Should be called before schemas are modified.
      */
     static void setTargetUpgradeFrom(OperationContext* opCtx,
-                                     ServerGlobalParams::FeatureCompatibility::Version fromVersion);
+                                     ServerGlobalParams::FeatureCompatibility::Version fromVersion,
+                                     ServerGlobalParams::FeatureCompatibility::Version newVersion);
 
     /**
      * Records intent to perform a downgrade from the latest version by updating the on-disk feature

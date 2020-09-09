@@ -20,7 +20,7 @@ for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
                                                        {$set: {version: oldVersion}}));
     checkFCV(adminDB, oldVersion);
 
-    // Upgrading to lastest.
+    // Upgrading to latest.
     assert.commandWorked(
         adminDB.system.version.update({_id: "featureCompatibilityVersion"},
                                       {$set: {version: oldVersion, targetVersion: latestFCV}}));
@@ -43,6 +43,22 @@ for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
                                                             {$unset: {previousVersion: true}}),
                               4926902);
     checkFCV(adminDB, oldVersion, oldVersion);
+
+    // Reset to latestFCV.
+    assert.commandWorked(adminDB.system.version.update(
+        {_id: "featureCompatibilityVersion"},
+        {$set: {version: latestFCV}, $unset: {targetVersion: true, previousVersion: true}}));
+    checkFCV(adminDB, latestFCV);
+}
+
+if (lastLTSFCV !== lastContinuousFCV) {
+    // Test that we can update from last-lts to last-continuous when the two versions are not equal.
+    // This upgrade path is exposed to users through the setFeatureCompatibilityVersion command with
+    // fromConfigServer: true.
+    assert.commandWorked(adminDB.system.version.update(
+        {_id: "featureCompatibilityVersion"},
+        {$set: {version: lastLTSFCV, targetVersion: lastContinuousFCV}}));
+    checkFCV(adminDB, lastLTSFCV, lastContinuousFCV);
 
     // Reset to latestFCV.
     assert.commandWorked(adminDB.system.version.update(

@@ -118,17 +118,64 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
     client.runCommand(nss.db().toString(), updateCmd.obj(), updateResult);
     uassertStatusOK(getStatusFromWriteCommandReply(updateResult));
 }
+
+/**
+ * Returns the expected value of the 'targetVersion' field in the FCV document based on the
+ * in-memory FCV value. Returns boost::none if current FCV is not currently upgrading or
+ * downgrading.
+ */
+boost::optional<FeatureCompatibilityParams::Version> getFcvDocTargetVersionField() {
+    if (!serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        return boost::none;
+    }
+    const auto currentFcv = serverGlobalParams.featureCompatibility.getVersion();
+    if (currentFcv == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest ||
+        currentFcv == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest) {
+        return FeatureCompatibilityParams::kLatest;
+    } else if (currentFcv == FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous ||
+               currentFcv == FeatureCompatibilityParams::kDowngradingFromLatestToLastContinuous) {
+        return FeatureCompatibilityParams::kLastContinuous;
+    } else {
+        invariant(currentFcv == FeatureCompatibilityParams::kDowngradingFromLatestToLastLTS);
+        return FeatureCompatibilityParams::kLastLTS;
+    }
+}
+
+/**
+ * Returns the expected value of the 'version' field in the FCV document based on the in-memory FCV
+ * value.
+ */
+FeatureCompatibilityParams::Version getFcvDocVersionField() {
+    if (!serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        return serverGlobalParams.featureCompatibility.getVersion();
+    }
+    const auto currentFcv = serverGlobalParams.featureCompatibility.getVersion();
+    if (currentFcv == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest ||
+        currentFcv == FeatureCompatibilityParams::kDowngradingFromLatestToLastContinuous) {
+        return FeatureCompatibilityParams::kLastContinuous;
+    } else {
+        invariant(currentFcv == FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous ||
+                  currentFcv == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest ||
+                  currentFcv == FeatureCompatibilityParams::kDowngradingFromLatestToLastLTS);
+        return FeatureCompatibilityParams::kLastLTS;
+    }
+}
 }  // namespace
 
 void FeatureCompatibilityVersion::setTargetUpgradeFrom(
-    OperationContext* opCtx, FeatureCompatibilityParams::Version fromVersion) {
+    OperationContext* opCtx,
+    FeatureCompatibilityParams::Version fromVersion,
+    FeatureCompatibilityParams::Version newVersion) {
+    invariant(fromVersion < newVersion);
+
     FeatureCompatibilityParams::Version version;
     // It is possible that we did not fully complete a previous upgrade. In that case, we
     // must set the source version to be the fully downgraded version as the FCV document
     // serializer does not recognize upgrading/downgrading states.
     if (fromVersion == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest) {
         version = FeatureCompatibilityParams::kLastContinuous;
-    } else if (fromVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest) {
+    } else if (fromVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest ||
+               fromVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous) {
         version = FeatureCompatibilityParams::kLastLTS;
     } else {
         version = fromVersion;
@@ -136,9 +183,9 @@ void FeatureCompatibilityVersion::setTargetUpgradeFrom(
     // Sets both 'version' and 'targetVersion' fields.
     FeatureCompatibilityVersionDocument fcvDoc;
     fcvDoc.setVersion(version);
-    fcvDoc.setTargetVersion(FeatureCompatibilityParams::kLatest);
+    fcvDoc.setTargetVersion(newVersion);
     runUpdateCommand(opCtx, fcvDoc);
-}
+}  // namespace mongo
 
 void FeatureCompatibilityVersion::setTargetDowngrade(OperationContext* opCtx,
                                                      FeatureCompatibilityParams::Version version) {
@@ -211,25 +258,24 @@ bool FeatureCompatibilityVersion::isCleanStartUp() {
 
 void FeatureCompatibilityVersion::updateMinWireVersion() {
     WireSpec& wireSpec = WireSpec::instance();
-
-    if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            FeatureCompatibilityParams::kLatest) ||
-        serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
-        // FCV == kLatest or FCV is upgrading/downgrading.
+    const auto currentFcv = serverGlobalParams.featureCompatibility.getVersion();
+    if (currentFcv == FeatureCompatibilityParams::kLatest ||
+        (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading() &&
+         currentFcv != FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous)) {
+        // FCV == kLatest or FCV is upgrading/downgrading to or from kLatest.
         WireSpec::Specification newSpec = *wireSpec.get();
         newSpec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
         newSpec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
         wireSpec.reset(std::move(newSpec));
-    } else if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                   FeatureCompatibilityParams::kLastContinuous)) {
-        // FCV == kLastContinuous
+    } else if (currentFcv == FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous ||
+               currentFcv == FeatureCompatibilityParams::kLastContinuous) {
+        // FCV == kLastContinuous or upgrading to kLastContinuous.
         WireSpec::Specification newSpec = *wireSpec.get();
         newSpec.incomingInternalClient.minWireVersion = LAST_CONT_WIRE_VERSION;
         newSpec.outgoing.minWireVersion = LAST_CONT_WIRE_VERSION;
         wireSpec.reset(std::move(newSpec));
     } else {
-        // FCV == kLastLTS
-        invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
+        invariant(currentFcv == FeatureCompatibilityParams::kLastLTS);
         WireSpec::Specification newSpec = *wireSpec.get();
         newSpec.incomingInternalClient.minWireVersion = LAST_LTS_WIRE_VERSION;
         newSpec.outgoing.minWireVersion = LAST_LTS_WIRE_VERSION;
@@ -337,23 +383,16 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
     FeatureCompatibilityVersionDocument fcvDoc;
     BSONObjBuilder featureCompatibilityVersionBuilder(b.subobjStart(name));
     auto version = serverGlobalParams.featureCompatibility.getVersion();
-    switch (version) {
-        case ServerGlobalParams::FeatureCompatibility::kLatest:
-        case ServerGlobalParams::FeatureCompatibility::kLastLTS:
-            fcvDoc.setVersion(version);
-            break;
-        case ServerGlobalParams::FeatureCompatibility::kUpgradingFromLastLTSToLatest:
-            fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
-            fcvDoc.setTargetVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
-            break;
-        case ServerGlobalParams::FeatureCompatibility::kDowngradingFromLatestToLastLTS:
-            fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
-            fcvDoc.setTargetVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
-            fcvDoc.setPreviousVersion(ServerGlobalParams::FeatureCompatibility::kLatest);
-            break;
-        case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault44Behavior:
-            // getVersion() does not return this value.
-            MONGO_UNREACHABLE;
+    if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        fcvDoc.setVersion(getFcvDocVersionField());
+        fcvDoc.setTargetVersion(getFcvDocTargetVersionField());
+        if (version == FeatureCompatibilityParams::kDowngradingFromLatestToLastContinuous ||
+            version == FeatureCompatibilityParams::kDowngradingFromLatestToLastLTS) {
+            // We only support downgrading from the latest FCV.
+            fcvDoc.setPreviousVersion(FeatureCompatibilityParams::kLatest);
+        }
+    } else {
+        fcvDoc.setVersion(version);
     }
     featureCompatibilityVersionBuilder.appendElements(fcvDoc.toBSON().removeField("_id"));
 }

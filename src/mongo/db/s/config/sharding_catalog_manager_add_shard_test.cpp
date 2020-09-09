@@ -37,6 +37,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
@@ -134,13 +135,16 @@ protected:
     void expectSetFeatureCompatibilityVersion(const HostAndPort& target,
                                               StatusWith<BSONObj> response,
                                               BSONObj writeConcern) {
+        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+        SetFeatureCompatibilityVersion fcvCmd(ServerGlobalParams::FeatureCompatibility::kLatest);
+        fcvCmd.setFromConfigServer(true);
+        fcvCmd.setDbName(NamespaceString::kAdminDb);
+        const auto setFcvObj = fcvCmd.toBSON(BSON("writeConcern" << writeConcern));
+
         onCommandForAddShard([&, target, response](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname, "admin");
-            ASSERT_BSONOBJ_EQ(request.cmdObj,
-                              BSON("setFeatureCompatibilityVersion"
-                                   << "4.7"
-                                   << "writeConcern" << writeConcern));
+            ASSERT_BSONOBJ_EQ(request.cmdObj, setFcvObj);
 
             return response;
         });

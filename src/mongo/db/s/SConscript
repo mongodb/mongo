@@ -531,6 +531,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/commands/set_feature_compatibility_version_idl',
         '$BUILD_DIR/mongo/db/pipeline/document_source_mock',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         '$BUILD_DIR/mongo/db/repl/replication_info',

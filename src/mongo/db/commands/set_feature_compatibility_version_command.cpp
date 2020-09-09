@@ -135,16 +135,42 @@ Status validateDowngradeRequest(FeatureCompatibilityParams::Version actualVersio
 }
 
 Status validateUpgradeRequest(FeatureCompatibilityParams::Version actualVersion,
-                              FeatureCompatibilityParams::Version requestedVersion) {
+                              FeatureCompatibilityParams::Version requestedVersion,
+                              boost::optional<bool> fromConfigServer) {
+    invariant(actualVersion < requestedVersion);
+
     if (actualVersion == FeatureCompatibilityParams::kDowngradingFromLatestToLastLTS ||
         actualVersion == FeatureCompatibilityParams::kDowngradingFromLatestToLastContinuous) {
         return Status(ErrorCodes::IllegalOperation,
                       str::stream() << "cannot initiate featureCompatibilityVersion upgrade to "
-                                    << FCVP::kLatest
+                                    << FCVP::toString(requestedVersion)
                                     << " while a previous featureCompatibilityVersion downgrade to "
                                     << FCVP::kLastLTS << " or " << FCVP::kLastContinuous
                                     << " has not completed. Finish downgrade then upgrade to "
                                     << FCVP::kLatest);
+    }
+
+    if ((actualVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest &&
+         requestedVersion == FeatureCompatibilityParams::kLastContinuous) ||
+        (actualVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous &&
+         requestedVersion == FeatureCompatibilityParams::kLatest)) {
+        auto incompleteUpgradeVersionString =
+            actualVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest
+            ? FCVP::kLatest
+            : FCVP::kLastContinuous;
+        return Status(ErrorCodes::Error(5070602),
+                      str::stream()
+                          << "cannot initiate featureCompatibilityVersion upgrade to "
+                          << FCVP::toString(requestedVersion) << " while a previous upgrade to "
+                          << incompleteUpgradeVersionString
+                          << " has not yet completed. Finish upgrade then try again.");
+    }
+
+    if (requestedVersion == FeatureCompatibilityParams::kLastContinuous &&
+        !fromConfigServer.get_value_or(false)) {
+        return Status(ErrorCodes::Error(5070603),
+                      str::stream() << "cannot initiate featureCompatibilityVersion upgrade from "
+                                    << FCVP::kLastLTS << " to " << FCVP::kLastContinuous << ".");
     }
 
     return Status::OK();
@@ -243,9 +269,9 @@ public:
         const auto requestedVersionString = FCVP::serializeVersion(requestedVersion);
         FeatureCompatibilityParams::Version actualVersion =
             serverGlobalParams.featureCompatibility.getVersion();
-
         if (request.getDowngradeOnDiskChanges() &&
-            requestedVersion != FeatureCompatibilityParams::kLastContinuous) {
+            (requestedVersion != FeatureCompatibilityParams::kLastContinuous ||
+             actualVersion < requestedVersion)) {
             std::stringstream downgradeOnDiskErrorSS;
             downgradeOnDiskErrorSS
                 << "cannot set featureCompatibilityVersion to " << requestedVersionString
@@ -255,18 +281,19 @@ public:
             uasserted(ErrorCodes::IllegalOperation, downgradeOnDiskErrorSS.str());
         }
 
-        if (requestedVersion == FeatureCompatibilityParams::kLatest) {
-            uassertStatusOK(validateUpgradeRequest(actualVersion, requestedVersion));
-            if (actualVersion == FeatureCompatibilityParams::kLatest) {
-                // Set the client's last opTime to the system last opTime so no-ops wait for
-                // writeConcern.
-                repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
-                return true;
-            }
+        if (actualVersion == requestedVersion) {
+            // Set the client's last opTime to the system last opTime so no-ops wait for
+            // writeConcern.
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            return true;
+        }
 
-            FeatureCompatibilityVersion::setTargetUpgradeFrom(opCtx, actualVersion);
+        if (actualVersion < requestedVersion) {
+            uassertStatusOK(validateUpgradeRequest(
+                actualVersion, requestedVersion, request.getFromConfigServer()));
 
+            FeatureCompatibilityVersion::setTargetUpgradeFrom(
+                opCtx, actualVersion, requestedVersion);
             {
                 // Take the global lock in S mode to create a barrier for operations taking the
                 // global IX or X locks. This ensures that either
@@ -298,18 +325,8 @@ public:
 
             hangWhileUpgrading.pauseWhileSet(opCtx);
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
-        } else if (requestedVersion == FeatureCompatibilityParams::kLastLTS ||
-                   requestedVersion == FeatureCompatibilityParams::kLastContinuous) {
+        } else {
             uassertStatusOK(validateDowngradeRequest(actualVersion, requestedVersion));
-
-            if (actualVersion == FeatureCompatibilityParams::kLastLTS ||
-                actualVersion == FeatureCompatibilityParams::kLastContinuous) {
-                // Set the client's last opTime to the system last opTime so no-ops wait for
-                // writeConcern.
-                repl::ReplClientInfo::forClient(opCtx->getClient())
-                    .setLastOpToSystemLastOpTime(opCtx);
-                return true;
-            }
 
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             const bool isReplSet =
