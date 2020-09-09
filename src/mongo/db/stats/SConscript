@@ -75,6 +75,7 @@ env.Library(
 env.Library(
     target='resource_consumption_metrics',
     source=[
+        'resource_consumption_metrics.cpp',
         env.Idlc('operation_resource_consumption.idl')[0],
     ],
     LIBDEPS=[
@@ -133,6 +134,7 @@ env.CppUnitTest(
         'api_version_metrics_test.cpp',
         'fill_locker_info_test.cpp',
         'operation_latency_histogram_test.cpp',
+        'resource_consumption_metrics_test.cpp',
         'timer_stats_test.cpp',
         'top_test.cpp',
     ],
@@ -143,6 +145,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'api_version_metrics',
         'fill_locker_info',
+        'resource_consumption_metrics',
         'timer_stats',
         'top',
     ],
