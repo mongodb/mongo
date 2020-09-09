@@ -62,7 +62,7 @@ function getRemoteOpWait(logLine) {
 }
 
 function getDuration(logLine) {
-    const pattern = / ([0-9]+)ms$/;
+    const pattern = / ([0-9]+)ms\s*$/;
     const match = logLine.match(pattern);
     assert(match, `pattern ${pattern} did not match line: ${logLine}`);
     const millis = parseInt(match[1]);
