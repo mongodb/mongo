@@ -928,7 +928,7 @@ buildvariants:
   - rhel70-small
   tasks:
   - name: compile
-       
+
 - name: linux-1-node-replSet
   display_name: Linux 1-Node ReplSet
   batchtime: 10080 # 7 days
