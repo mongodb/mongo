@@ -68,6 +68,8 @@ protected:
     void onBecomeArbiter() override {
         numCallsOnBecomeArbiter++;
     }
+
+    void onShutdown() override {}
 };
 
 /**

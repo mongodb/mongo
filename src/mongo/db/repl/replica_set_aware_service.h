@@ -75,6 +75,9 @@ namespace mongo {
  *     void onStartup(OperationContext* opCtx) final {
  *         // ...
  *     }
+ *     void onShutdown() final {
+ *         // ...
+ *     }
  *     void onStepUpBegin(OperationContext* opCtx) final {
  *         // ...
  *     }
@@ -113,6 +116,11 @@ public:
      * reads and writes to unreplicated collections are permitted.
      */
     virtual void onStartup(OperationContext* opCtx) = 0;
+
+    /**
+     * Called as part of ReplicationCoordinator shutdown.
+     */
+    virtual void onShutdown() = 0;
 
     /**
      * Called prior to stepping up as PRIMARY, i.e. after drain mode has completed.
@@ -182,6 +190,7 @@ public:
     static ReplicaSetAwareServiceRegistry& get(ServiceContext* serviceContext);
 
     void onStartup(OperationContext* opCtx) final;
+    void onShutdown() final;
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;
     void onStepDown() final;

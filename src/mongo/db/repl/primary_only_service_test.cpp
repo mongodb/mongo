@@ -248,7 +248,7 @@ public:
         _testExecutor->join();
         _testExecutor.reset();
 
-        _registry->shutdown();
+        _registry->onShutdown();
         _service = nullptr;
 
         ServiceContextMongoDTest::tearDown();
@@ -310,7 +310,7 @@ DEATH_TEST_F(PrimaryOnlyServiceTest,
 }
 
 TEST_F(PrimaryOnlyServiceTest, StepUpAfterShutdown) {
-    _registry->shutdown();
+    _registry->onShutdown();
     stepUp();
 }
 

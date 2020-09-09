@@ -92,7 +92,7 @@ public:
     void tearDown() override {
         WaitForMajorityService::get(getServiceContext()).shutDown();
 
-        _registry->shutdown();
+        _registry->onShutdown();
         _service = nullptr;
 
         ServiceContextMongoDTest::tearDown();

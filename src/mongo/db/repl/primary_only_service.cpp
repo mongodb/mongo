@@ -36,7 +36,9 @@
 #include <utility>
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/ops/write_ops.h"
@@ -195,6 +197,12 @@ void PrimaryOnlyServiceRegistry::onStartup(OperationContext* opCtx) {
     }
 }
 
+void PrimaryOnlyServiceRegistry::onShutdown() {
+    for (auto& service : _servicesByName) {
+        service.second->shutdown();
+    }
+}
+
 void PrimaryOnlyServiceRegistry::onStepUpComplete(OperationContext* opCtx, long long term) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
 
@@ -216,12 +224,6 @@ void PrimaryOnlyServiceRegistry::onStepUpComplete(OperationContext* opCtx, long 
 void PrimaryOnlyServiceRegistry::onStepDown() {
     for (auto& service : _servicesByName) {
         service.second->onStepDown();
-    }
-}
-
-void PrimaryOnlyServiceRegistry::shutdown() {
-    for (auto& service : _servicesByName) {
-        service.second->shutdown();
     }
 }
 

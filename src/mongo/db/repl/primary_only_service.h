@@ -328,12 +328,8 @@ public:
      */
     PrimaryOnlyService* lookupServiceByNamespace(const NamespaceString& ns);
 
-    /**
-     * Shuts down all registered services.
-     */
-    void shutdown();
-
     void onStartup(OperationContext*) final;
+    void onShutdown() final;
     void onStepUpBegin(OperationContext*, long long term) final {}
     void onBecomeArbiter() final {}
     void onStepUpComplete(OperationContext*, long long term) final;

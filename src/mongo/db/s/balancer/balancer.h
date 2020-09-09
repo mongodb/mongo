@@ -168,6 +168,7 @@ private:
      * ReplicaSetAwareService entry points.
      */
     void onStartup(OperationContext* opCtx) final {}
+    void onShutdown() final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) final;
     void onStepUpComplete(OperationContext* opCtx, long long term) final;
     void onStepDown() final;

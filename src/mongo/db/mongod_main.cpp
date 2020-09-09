@@ -1111,10 +1111,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     LOGV2_OPTIONS(4784902, {LogComponent::kSharding}, "Shutting down the WaitForMajorityService");
     WaitForMajorityService::get(serviceContext).shutDown();
 
-    LOGV2_OPTIONS(
-        5006600, {LogComponent::kReplication}, "Shutting down the PrimaryOnlyServiceRegistry");
-    repl::PrimaryOnlyServiceRegistry::get(serviceContext)->shutdown();
-
     // Join the logical session cache before the transport layer.
     if (auto lsc = LogicalSessionCache::get(serviceContext)) {
         LOGV2(4784903, "Shutting down the LogicalSessionCache");

@@ -938,6 +938,9 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
         return;
     }
 
+    LOGV2_DEBUG(5074000, 1, "Shutting down the replica set aware services.");
+    ReplicaSetAwareServiceRegistry::get(_service).onShutdown();
+
     LOGV2(21328, "Shutting down replication subsystems");
 
     // Used to shut down outside of the lock.
