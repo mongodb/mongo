@@ -154,9 +154,6 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
     jsTest.log("Test the case where the migration aborts");
     const migrationId = UUID();
 
-    let configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
-    configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
-
     let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
     assert.commandFailedWithCode(donorPrimary.adminCommand({
         donorStartMigration: 1,
@@ -185,6 +182,29 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
     assert.eq(recipientSyncDataMetrics.total, expectedNumRecipientSyncDataCmdSent);
 
     testDonorForgetMigration(donorRst, recipientRst, migrationId, kDBPrefix);
+})();
+
+// Drop the TTL index to make sure that the migration state is still available when the
+// donorForgetMigration command is retried.
+configDonorsColl.dropIndex({expireAt: 1});
+
+(() => {
+    jsTest.log("Test that donorForgetMigration can be run multiple times");
+    const migrationId = UUID();
+
+    assert.commandWorked(donorPrimary.adminCommand({
+        donorStartMigration: 1,
+        migrationId: migrationId,
+        recipientConnectionString: kRecipientConnString,
+        databasePrefix: kDBPrefix,
+        readPreference: {mode: "primary"}
+    }));
+
+    assert.commandWorked(
+        donorPrimary.adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
+
+    assert.commandWorked(
+        donorPrimary.adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
 })();
 
 donorRst.stopSet();

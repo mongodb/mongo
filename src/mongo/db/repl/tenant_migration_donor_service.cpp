@@ -90,6 +90,13 @@ Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(BSONObj opt
     return Status::OK();
 }
 
+void TenantMigrationDonorService::Instance::onReceiveDonorForgetMigration() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (!_receivedDonorForgetMigrationPromise.getFuture().isReady()) {
+        _receivedDonorForgetMigrationPromise.emplaceValue();
+    }
+}
+
 repl::OpTime TenantMigrationDonorService::Instance::_insertStateDocument() {
     const auto stateDocBson = _stateDoc.toBSON();
 

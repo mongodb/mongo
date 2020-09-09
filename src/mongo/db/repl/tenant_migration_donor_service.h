@@ -87,9 +87,7 @@ public:
             return _decisionPromise.getFuture();
         }
 
-        void onReceiveDonorForgetMigration() {
-            _receivedDonorForgetMigrationPromise.emplaceValue();
-        }
+        void onReceiveDonorForgetMigration();
 
     private:
         const NamespaceString _stateDocumentsNS = NamespaceString::kTenantMigrationDonorsNamespace;
@@ -141,6 +139,8 @@ public:
         ExecutorFuture<void> _sendRecipientForgetMigrationCommand(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
             RemoteCommandTargeter* recipientTargeter);
+
+        mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationDonorService::_mutex");
 
         ServiceContext* _serviceContext;
 
