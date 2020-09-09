@@ -78,8 +78,19 @@ all:
     test_file: jstests/replsets/read_operations_during_rollback.js
   - ticket: SERVER-51262
     test_file: jstests/replsets/transactions_on_secondaries_not_allowed.js
+<<<<<<< HEAD
   - ticket: SERVER-50416
     test_file: jstests/replsets/disconnect_on_legacy_write_to_secondary.js
+=======
+  - ticket: SERVER-50417
+    test_file: jstests/replsets/no_disconnect_on_stepdown.js
+  - ticket: SERVER-50417
+    test_file: jstests/replsets/not_master_unacknowledged_write.js
+  - ticket: SERVER-50417
+    test_file: jstests/replsets/read_operations_during_step_down.js
+  - ticket: SERVER-50417
+    test_file: jstests/replsets/read_operations_during_step_up.js
+>>>>>>> SERVER-50417 Change notMasterUnacknowledgedWrites to notPrimaryUnacknowledgedWrites in serverStatus
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

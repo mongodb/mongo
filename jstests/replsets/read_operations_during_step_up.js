@@ -123,7 +123,7 @@ assert.eq(replMetrics.stateTransition.lastStateTransition, "stepUp");
 assert.eq(replMetrics.stateTransition.userOperationsKilled, 0);
 // Should account for find and getmore commands issued before step up.
 assert.gte(replMetrics.stateTransition.userOperationsRunning, 2);
-assert.eq(replMetrics.network.notMasterUnacknowledgedWrites, 0);
+assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, 0);
 
 rst.stopSet();
 })();

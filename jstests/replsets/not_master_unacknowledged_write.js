@@ -5,12 +5,12 @@
 (function() {
 "use strict";
 
-function getNotMasterUnackWritesCounter() {
+function getNotPrimaryUnackWritesCounter() {
     return assert.commandWorked(primaryDB.adminCommand({serverStatus: 1}))
-        .metrics.repl.network.notMasterUnacknowledgedWrites;
+        .metrics.repl.network.notPrimaryUnacknowledgedWrites;
 }
 
-const collName = "not_master_unacknowledged_write";
+const collName = "not_primary_unacknowledged_write";
 
 var rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
@@ -58,7 +58,7 @@ var command =
 
 var awaitShell = startParallelShell(command, primary.port);
 
-let failedUnackWritesBefore = getNotMasterUnackWritesCounter();
+let failedUnackWritesBefore = getNotPrimaryUnackWritesCounter();
 
 jsTestLog("Beginning unacknowledged insert");
 primaryColl.insertOne({}, {writeConcern: {w: 0}});
@@ -74,7 +74,7 @@ assert.includes(result.toString(), "network error while attempting to run comman
 
 // Validate the number of unacknowledged writes failed due to step down resulted in network
 // disconnection.
-let failedUnackWritesAfter = getNotMasterUnackWritesCounter();
+let failedUnackWritesAfter = getNotPrimaryUnackWritesCounter();
 assert.eq(failedUnackWritesAfter, failedUnackWritesBefore + 1);
 
 rst.stopSet();

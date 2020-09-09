@@ -110,11 +110,11 @@ Counter64 notPrimaryLegacyUnackWrites;
 ServerStatusMetricField<Counter64> displayNotPrimaryLegacyUnackWrites(
     "repl.network.notPrimaryLegacyUnacknowledgedWrites", &notPrimaryLegacyUnackWrites);
 
-// Tracks the number of times an unacknowledged write failed due to not master error
+// Tracks the number of times an unacknowledged write failed due to not primary error
 // resulted in network disconnection.
-Counter64 notMasterUnackWrites;
-ServerStatusMetricField<Counter64> displayNotMasterUnackWrites(
-    "repl.network.notMasterUnacknowledgedWrites", &notMasterUnackWrites);
+Counter64 notPrimaryUnackWrites;
+ServerStatusMetricField<Counter64> displayNotPrimaryUnackWrites(
+    "repl.network.notPrimaryUnacknowledgedWrites", &notPrimaryUnackWrites);
 
 namespace {
 using logger::LogComponent;
@@ -1070,7 +1070,7 @@ DbResponse receivedCommands(OperationContext* opCtx,
     if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
         // Close the connection to get client to go through server selection again.
         if (LastError::get(opCtx->getClient()).hadNotPrimaryError()) {
-            notMasterUnackWrites.increment();
+            notPrimaryUnackWrites.increment();
             uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream()
                           << "Not-master error while processing '" << request.getCommandName()
