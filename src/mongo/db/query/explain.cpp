@@ -642,11 +642,11 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     }
 
     if (queryHash) {
-        plannerBob.append("queryHash", unsignedIntToFixedLengthHex(*queryHash));
+        plannerBob.append("queryHash", zeroPaddedHex(*queryHash));
     }
 
     if (planCacheKeyHash) {
-        plannerBob.append("planCacheKey", unsignedIntToFixedLengthHex(*planCacheKeyHash));
+        plannerBob.append("planCacheKey", zeroPaddedHex(*planCacheKeyHash));
     }
 
     if (!extraInfo.isEmpty()) {
@@ -910,8 +910,8 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
         shapeBuilder.append("collation", entry.collation);
     }
     shapeBuilder.doneFast();
-    out->append("queryHash", unsignedIntToFixedLengthHex(entry.queryHash));
-    out->append("planCacheKey", unsignedIntToFixedLengthHex(entry.planCacheKey));
+    out->append("queryHash", zeroPaddedHex(entry.queryHash));
+    out->append("planCacheKey", zeroPaddedHex(entry.planCacheKey));
 
     // Append whether or not the entry is active.
     out->append("isActive", entry.isActive);

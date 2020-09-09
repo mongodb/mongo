@@ -121,7 +121,7 @@ void processNoteSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
         }
         const char* const noteDescBegin =
             noteNameBegin + roundUpToElfWordAlignment(noteHeader.n_namesz);
-        soInfo->append("buildId", toHex(noteDescBegin, noteHeader.n_descsz));
+        soInfo->append("buildId", hexblob::encode(noteDescBegin, noteHeader.n_descsz));
     }
 #endif
 }
@@ -197,7 +197,7 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
             return;
     }
 
-    soInfo->append("b", integerToHex(phdr.p_vaddr));
+    soInfo->append("b", unsignedHex(phdr.p_vaddr));
 }
 
 /**
@@ -219,7 +219,7 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
 int outputSOInfo(dl_phdr_info* info, size_t sz, void* data) {
     BSONObjBuilder soInfo(reinterpret_cast<BSONArrayBuilder*>(data)->subobjStart());
     if (info->dlpi_addr)
-        soInfo.append("b", integerToHex(ElfW(Addr)(info->dlpi_addr)));
+        soInfo.append("b", unsignedHex(ElfW(Addr)(info->dlpi_addr)));
     if (info->dlpi_name && *info->dlpi_name)
         soInfo.append("path", info->dlpi_name);
 
@@ -262,7 +262,7 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
         if (StringData(SEG_TEXT) != segmentCommand->segname) {
             return false;
         }
-        *soInfo << "vmaddr" << integerToHex(segmentCommand->vmaddr);
+        *soInfo << "vmaddr" << unsignedHex(segmentCommand->vmaddr);
         return true;
     };
     const uint32_t numImages = _dyld_image_count();
@@ -284,7 +284,7 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
             continue;
         }
         soInfo << "machType" << static_cast<int32_t>(header->filetype);
-        soInfo << "b" << integerToHex(reinterpret_cast<intptr_t>(header));
+        soInfo << "b" << unsignedHex(reinterpret_cast<uintptr_t>(header));
         const char* const loadCommandsBegin = reinterpret_cast<const char*>(header) + headerSize;
         const char* const loadCommandsEnd = loadCommandsBegin + header->sizeofcmds;
 
@@ -300,7 +300,7 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap) {
             switch (lcType(lcCurr)) {
                 case LC_UUID: {
                     const auto uuidCmd = reinterpret_cast<const uuid_command*>(lcCurr);
-                    soInfo << "buildId" << toHex(uuidCmd->uuid, 16);
+                    soInfo << "buildId" << hexblob::encode(uuidCmd->uuid, 16);
                     break;
                 }
                 case LC_SEGMENT_64:

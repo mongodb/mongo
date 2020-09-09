@@ -310,7 +310,7 @@ Message OpMsgBuilder::finish() {
     const auto size = _buf.len();
     uassert(ErrorCodes::BSONObjectTooLarge,
             str::stream() << "BSON size limit hit while building Message. Size: " << size << " (0x"
-                          << integerToHex(size) << "); maxSize: " << BSONObjMaxInternalSize << "("
+                          << unsignedHex(size) << "); maxSize: " << BSONObjMaxInternalSize << "("
                           << (BSONObjMaxInternalSize / (1024 * 1024)) << "MB)",
             size <= BSONObjMaxInternalSize);
 

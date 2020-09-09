@@ -1203,8 +1203,7 @@ ostream& operator<<(ostream& out, const Value& val) {
 
         case BinData:
             return out << "BinData(" << val._storage.binDataType() << ", \""
-                       << toHex(val._storage.getString().rawData(), val._storage.getString().size())
-                       << "\")";
+                       << hexblob::encode(val._storage.getString()) << "\")";
 
         case DBRef:
             return out << "DBRef(\"" << val._storage.getDBRef()->ns << "\", "

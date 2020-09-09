@@ -2447,9 +2447,9 @@ std::string TopologyCoordinator::_getUnelectableReasonString(const UnelectableRe
         LOGV2_FATAL(26011,
                     "Invalid UnelectableReasonMask value 0x{value}",
                     "Invalid UnelectableReasonMask value",
-                    "value"_attr = integerToHex(ur));
+                    "value"_attr = unsignedHex(ur));
     }
-    ss << " (mask 0x" << integerToHex(ur) << ")";
+    ss << " (mask 0x" << unsignedHex(ur) << ")";
     return ss;
 }
 

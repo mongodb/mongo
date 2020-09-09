@@ -52,22 +52,19 @@ using std::string;
 SSLParams sslGlobalParams;
 
 namespace {
-StatusWith<std::vector<uint8_t>> hexToVector(StringData hex) {
-    if (std::any_of(hex.begin(), hex.end(), [](char c) { return !isxdigit(c); })) {
-        return {ErrorCodes::BadValue, "Not a valid hex string"};
+std::vector<uint8_t> hexToVector(StringData hex) {
+    try {
+        std::string data = hexblob::decode(hex);
+        return std::vector<uint8_t>(data.begin(), data.end());
+    } catch (const ExceptionFor<ErrorCodes::FailedToParse>&) {
+        if (std::any_of(hex.begin(), hex.end(), [](unsigned char c) { return !isxdigit(c); })) {
+            uasserted(ErrorCodes::BadValue, "Not a valid hex string");
+        }
+        if (hex.size() % 2) {
+            uasserted(ErrorCodes::BadValue, "Not an even number of hexits");
+        }
+        throw;
     }
-    if (hex.size() % 2) {
-        return {ErrorCodes::BadValue, "Not an even number of hexits"};
-    }
-
-    std::vector<uint8_t> ret;
-    ret.resize(hex.size() >> 1);
-    int idx = -2;
-    std::generate(ret.begin(), ret.end(), [&hex, &idx] {
-        idx += 2;
-        return (uassertStatusOK(fromHex(hex[idx])) << 4) | uassertStatusOK(fromHex(hex[idx + 1]));
-    });
-    return ret;
 }
 }  // namespace
 
@@ -145,15 +142,13 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
                               << key << "'"};
     }
 
-    auto swHex = hexToVector(value.substr(delim + 1));
-    if (!swHex.isOK()) {
+    try {
+        selector->thumbprint = hexToVector(value.substr(delim + 1));
+    } catch (const DBException& ex) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Invalid certificate selector value for '" << name
-                              << "': " << swHex.getStatus().reason()};
+                              << "': " << ex.reason()};
     }
-
-    selector->thumbprint = std::move(swHex.getValue());
-
     return Status::OK();
 }
 

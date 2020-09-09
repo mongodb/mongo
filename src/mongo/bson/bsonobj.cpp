@@ -90,9 +90,8 @@ int compareObjects(const BSONObj& firstObj,
 void BSONObj::_assertInvalid(int maxSize) const {
     StringBuilder ss;
     int os = objsize();
-    ss << "BSONObj size: " << os << " (0x" << integerToHex(os) << ") is invalid. "
-       << "Size must be between 0 and " << BSONObjMaxInternalSize << "("
-       << (maxSize / (1024 * 1024)) << "MB)";
+    ss << "BSONObj size: " << os << " (0x" << unsignedHex(os) << ") is invalid. "
+       << "Size must be between 0 and " << maxSize << "(" << (maxSize / (1024 * 1024)) << "MB)";
     try {
         BSONElement e = firstElement();
         ss << " First element: " << e.toString();

@@ -214,7 +214,7 @@ std::string escape(StringData sd, bool escape_slash) {
             default:
                 if (c >= 0 && c <= 0x1f) {
                     // For c < 0x7f, ASCII value == Unicode code point.
-                    ret << "\\u00" << toHexLower(&c, 1);
+                    ret << "\\u00" << hexblob::encodeLower(&c, 1);
                 } else {
                     ret << c;
                 }

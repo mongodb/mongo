@@ -229,10 +229,8 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
 
         if (shouldHexEncode) {
             auto stringToEncode = keyValueElem.valueStringData();
-            builderForErrmsg.append(
-                keyNameElem.fieldName(),
-                str::stream() << "0x"
-                              << toHexLower(stringToEncode.rawData(), stringToEncode.size()));
+            builderForErrmsg.append(keyNameElem.fieldName(),
+                                    "0x" + hexblob::encodeLower(stringToEncode));
         } else {
             builderForErrmsg.appendAs(keyValueElem, keyNameElem.fieldName());
         }

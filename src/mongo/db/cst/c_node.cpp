@@ -96,7 +96,7 @@ auto printValue(const T& payload) {
             },
             [](const UserBinary& userBinary) {
                 return "<UserBinary "s + typeName(userBinary.type) + ", " +
-                    toHex(userBinary.data, userBinary.length) + ">";
+                    hexblob::encode(userBinary.data, userBinary.length) + ">";
             },
             [](const UserUndefined& userUndefined) { return "<UserUndefined>"s; },
             [](const UserObjectId& userObjectId) {

@@ -180,25 +180,25 @@ TEST(StringUtilsTest, Substring1) {
     assertCmp(0, StringData("0001", 3), StringData("0000", 3), false);
 }
 
-TEST(StringUtilsTest, VariousConversions) {
-    ASSERT_EQUALS(std::string("0"), integerToHex(0));
-    ASSERT_EQUALS(std::string("1"), integerToHex(1));
-    ASSERT_EQUALS(std::string("1337"), integerToHex(0x1337));
-    ASSERT_EQUALS(std::string("FFFFD499"), integerToHex(-11111));
-    ASSERT_EQUALS(std::string("F1FE60C4"), integerToHex(-234987324));
-    ASSERT_EQUALS(std::string("80000000"), integerToHex(std::numeric_limits<int>::min()));
-    ASSERT_EQUALS(std::string("7FFFFFFF"), integerToHex(std::numeric_limits<int>::max()));
-    ASSERT_EQUALS(std::string("7FFFFFFFFFFFFFFF"),
-                  integerToHex(std::numeric_limits<long long>::max()));
-    ASSERT_EQUALS(std::string("8000000000000000"),
-                  integerToHex(std::numeric_limits<long long>::min()));
+TEST(StringUtilsTest, UnsignedHex) {
+    ASSERT_EQUALS(unsignedHex(0), "0");
+    ASSERT_EQUALS(unsignedHex(1), "1");
+    ASSERT_EQUALS(unsignedHex(0x1337), "1337");
+    ASSERT_EQUALS(unsignedHex(-11111), "FFFFD499");
+    ASSERT_EQUALS(unsignedHex(-234987324), "F1FE60C4");
+    ASSERT_EQUALS(unsignedHex(std::numeric_limits<int>::min()), "80000000");
+    ASSERT_EQUALS(unsignedHex(std::numeric_limits<int>::max()), "7FFFFFFF");
+    ASSERT_EQUALS(unsignedHex(std::numeric_limits<long long>::max()), "7FFFFFFFFFFFFFFF");
+    ASSERT_EQUALS(unsignedHex(std::numeric_limits<long long>::min()), "8000000000000000");
 }
 
-TEST(StringUtilsTest, unsignedFixedLengthHex) {
-    ASSERT_EQUALS(unsignedIntToFixedLengthHex(std::numeric_limits<uint32_t>::max()),
-                  std::string("FFFFFFFF"));
-    ASSERT_EQUALS(unsignedIntToFixedLengthHex(0), std::string("00000000"));
-    ASSERT_EQUALS(unsignedIntToFixedLengthHex(123), std::string("0000007B"));
+TEST(StringUtilsTest, ZeroPaddedHex) {
+    ASSERT_EQUALS(zeroPaddedHex(std::numeric_limits<uint32_t>::max()), "FFFFFFFF");
+    ASSERT_EQUALS(zeroPaddedHex(uint32_t{123}), "0000007B");
+    ASSERT_EQUALS(zeroPaddedHex(uint8_t{0}), "00");
+    ASSERT_EQUALS(zeroPaddedHex(uint16_t{0}), "0000");
+    ASSERT_EQUALS(zeroPaddedHex(uint32_t{0}), "00000000");
+    ASSERT_EQUALS(zeroPaddedHex(uint64_t{0}), "0000000000000000");
 }
 
 TEST(StringUtilsTest, CanParseZero) {

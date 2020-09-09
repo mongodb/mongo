@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <memory>
@@ -54,15 +55,9 @@ const std::string testData = initTestData();
 using namespace mongo;
 
 BSONObj convertHexStringToBsonObj(StringData hexString) {
-    const char* p = hexString.rawData();
-    size_t bufferSize = hexString.size() / 2;
-    auto buffer = SharedBuffer::allocate(bufferSize);
-
-    for (unsigned int i = 0; i < bufferSize; i++) {
-        buffer.get()[i] = uassertStatusOK(fromHex(p));
-        p += 2;
-    }
-
+    std::string data = hexblob::decode(hexString);
+    auto buffer = SharedBuffer::allocate(data.size());
+    std::copy(data.begin(), data.end(), buffer.get());
     return BSONObj(std::move(buffer));
 }
 

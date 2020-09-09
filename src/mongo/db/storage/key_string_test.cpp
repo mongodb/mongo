@@ -139,7 +139,7 @@ void checkSizeWhileAppendingTypeBits(int numOfBitsUsedForType, T&& appendBitsFun
 // patterns, so including it here specifically.
 TEST(InvalidKeyStringTest, FuzzedCodeWithScopeNesting) {
     BufBuilder keyData;
-    fromHexString(
+    hexblob::decode(
         "aa00aa4200aafa00aa0200aa0a01aa02aa00aa4200aafa00aa0200aa0a01aa0200aa00aa4200aafa00aa0200aa"
         "0a01aa0200aa4200aafa00aa0200aa00aaaa00aa00aafa00aa0200aa3900aafa00aa0200aa00aa004200aafa00"
         "aaaafa00aa0200aa0a01aa0200aa4200aafa00aa0200aa00aaaa00aa00aafa00aa0200aa00aafa00aa0200aa00"
@@ -358,7 +358,7 @@ TEST_F(KeyStringBuilderTest, ActualBytesDouble) {
           "[{toHex_ks_getBuffer_ks_getSize}]",
           "keyStringVersionToString_version"_attr = keyStringVersionToString(version),
           "ks_getSize"_attr = ks.getSize(),
-          "toHex_ks_getBuffer_ks_getSize"_attr = toHex(ks.getBuffer(), ks.getSize()));
+          "toHex_ks_getBuffer_ks_getSize"_attr = hexblob::encode(ks.getBuffer(), ks.getSize()));
 
     ASSERT_EQUALS(10U, ks.getSize());
 
@@ -371,7 +371,7 @@ TEST_F(KeyStringBuilderTest, ActualBytesDouble) {
                                                      "80000000000000"  // fractional bytes
                                                      "04";             // kEnd
 
-    ASSERT_EQUALS(hex, toHex(ks.getBuffer(), ks.getSize()));
+    ASSERT_EQUALS(hex, hexblob::encode(ks.getBuffer(), ks.getSize()));
 
     ks.resetToKey(a, Ordering::make(BSON("a" << -1)));
 
@@ -381,13 +381,13 @@ TEST_F(KeyStringBuilderTest, ActualBytesDouble) {
     // last byte (kEnd) doesn't get flipped
     string hexFlipped;
     for (size_t i = 0; i < hex.size() - 2; i += 2) {
-        char c = uassertStatusOK(fromHex(hex.c_str() + i));
+        char c = hexblob::decodePair(StringData(hex).substr(i, 2));
         c = ~c;
-        hexFlipped += toHex(&c, 1);
+        hexFlipped += hexblob::encode(StringData(&c, 1));
     }
     hexFlipped += hex.substr(hex.size() - 2);
 
-    ASSERT_EQUALS(hexFlipped, toHex(ks.getBuffer(), ks.getSize()));
+    ASSERT_EQUALS(hexFlipped, hexblob::encode(ks.getBuffer(), ks.getSize()));
 }
 
 TEST_F(KeyStringBuilderTest, AllTypesSimple) {
@@ -1642,8 +1642,8 @@ void checkKeyWithNByteOfTypeBits(KeyString::Version version, size_t n, bool allZ
     // Also test TypeBits::fromBuffer()
     BufReader bufReader(ks.getTypeBits().getBuffer(), typeBitsSize);
     KeyString::TypeBits newTypeBits = KeyString::TypeBits::fromBuffer(version, &bufReader);
-    ASSERT_EQ(toHex(newTypeBits.getBuffer(), newTypeBits.getSize()),
-              toHex(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize()));
+    ASSERT_EQ(hexblob::encode(newTypeBits.getBuffer(), newTypeBits.getSize()),
+              hexblob::encode(ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize()));
 }
 
 TEST_F(KeyStringBuilderTest, KeysWithNBytesTypeBits) {

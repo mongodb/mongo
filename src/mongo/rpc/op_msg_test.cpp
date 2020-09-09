@@ -656,15 +656,15 @@ void testSerializer(const Message& fromSerializer, OpMsgBytes&& expected) {
     LOGV2(22636, "Mismatch after {commonLength} bytes.", "commonLength"_attr = commonLength);
     LOGV2(22637,
           "Common prefix: {hexdump_gotSD_rawData_commonLength}",
-          "hexdump_gotSD_rawData_commonLength"_attr = hexdump(gotSD.rawData(), commonLength));
+          "hexdump_gotSD_rawData_commonLength"_attr = hexdump(gotSD.substr(0, commonLength)));
     LOGV2(22638,
           "Got suffix     : {hexdump_gotSD_rawData_commonLength_gotSD_size_commonLength}",
           "hexdump_gotSD_rawData_commonLength_gotSD_size_commonLength"_attr =
-              hexdump(gotSD.rawData() + commonLength, gotSD.size() - commonLength));
+              hexdump(gotSD.substr(commonLength)));
     LOGV2(22639,
           "Expected suffix: {hexdump_expectedSD_rawData_commonLength_expectedSD_size_commonLength}",
           "hexdump_expectedSD_rawData_commonLength_expectedSD_size_commonLength"_attr =
-              hexdump(expectedSD.rawData() + commonLength, expectedSD.size() - commonLength));
+              hexdump(expectedSD.substr(commonLength)));
     FAIL("Serialization didn't match expected data. See above for details.");
 }
 

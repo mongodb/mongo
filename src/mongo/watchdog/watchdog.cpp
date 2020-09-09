@@ -430,10 +430,9 @@ void checkFile(OperationContext* opCtx, const boost::filesystem::path& file) {
                 "'{toHexLower_readBuffer_get_bytesRead}'",
                 "file_generic_string"_attr = file.generic_string(),
                 "nowStr_size"_attr = nowStr.size(),
-                "toHexLower_nowStr_c_str_nowStr_size"_attr =
-                    toHexLower(nowStr.c_str(), nowStr.size()),
+                "toHexLower_nowStr_c_str_nowStr_size"_attr = hexblob::encodeLower(nowStr),
                 "toHexLower_readBuffer_get_bytesRead"_attr =
-                    toHexLower(readBuffer.get(), bytesRead));
+                    hexblob::encodeLower(readBuffer.get(), bytesRead));
         }
     }
 
@@ -562,9 +561,9 @@ void checkFile(OperationContext* opCtx, const boost::filesystem::path& file) {
             "'{toHexLower_readBuffer_get_bytesReadTotal}'",
             "file_generic_string"_attr = file.generic_string(),
             "nowStr_size"_attr = nowStr.size(),
-            "toHexLower_nowStr_c_str_nowStr_size"_attr = toHexLower(nowStr.c_str(), nowStr.size()),
+            "toHexLower_nowStr_c_str_nowStr_size"_attr = hexblob::encodeLower(nowStr),
             "toHexLower_readBuffer_get_bytesReadTotal"_attr =
-                toHexLower(readBuffer.get(), bytesReadTotal));
+                hexblob::encodeLower(readBuffer.get(), bytesReadTotal));
     }
 
     if (close(fd)) {

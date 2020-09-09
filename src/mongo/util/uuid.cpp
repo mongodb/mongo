@@ -31,6 +31,7 @@
 
 #include "mongo/util/uuid.h"
 
+#include <fmt/format.h>
 #include <pcrecpp.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -42,6 +43,8 @@
 namespace mongo {
 
 namespace {
+
+using namespace fmt::literals;
 
 Mutex uuidGenMutex;
 SecureRandom uuidGen;
@@ -58,7 +61,7 @@ StatusWith<UUID> UUID::parse(BSONElement from) {
 
 StatusWith<UUID> UUID::parse(const std::string& s) {
     if (!isUUIDString(s)) {
-        return {ErrorCodes::InvalidUUID, "Invalid UUID string: " + s};
+        return {ErrorCodes::InvalidUUID, "Invalid UUID string: {}"_format(s)};
     }
 
     UUIDStorage uuid;
@@ -70,10 +73,8 @@ StatusWith<UUID> UUID::parse(const std::string& s) {
         if (s[j] == '-')
             j++;
 
-        char high = s[j++];
-        char low = s[j++];
-
-        uuid[i] = ((uassertStatusOK(fromHex(high)) << 4) | uassertStatusOK(fromHex(low)));
+        uuid[i] = hexblob::decodePair(StringData(s).substr(j, 2));
+        j += 2;
     }
 
     return UUID{std::move(uuid)};
@@ -132,20 +133,11 @@ BSONObj UUID::toBSON() const {
 }
 
 std::string UUID::toString() const {
-    StringBuilder ss;
-
-    // 4 Octets - 2 Octets - 2 Octets - 2 Octets - 6 Octets
-    ss << toHexLower(&_uuid[0], 4);
-    ss << "-";
-    ss << toHexLower(&_uuid[4], 2);
-    ss << "-";
-    ss << toHexLower(&_uuid[6], 2);
-    ss << "-";
-    ss << toHexLower(&_uuid[8], 2);
-    ss << "-";
-    ss << toHexLower(&_uuid[10], 6);
-
-    return ss.str();
+    return "{}-{}-{}-{}-{}"_format(hexblob::encodeLower(&_uuid[0], 4),
+                                   hexblob::encodeLower(&_uuid[4], 2),
+                                   hexblob::encodeLower(&_uuid[6], 2),
+                                   hexblob::encodeLower(&_uuid[8], 2),
+                                   hexblob::encodeLower(&_uuid[10], 6));
 }
 
 template <>

@@ -201,7 +201,7 @@ void FTSIndexFormat::_appendIndexKey(KeyStringBuilder& keyString,
             } t;
             uint32_t seed = 0;
             MurmurHash3_x64_128(term.data(), term.size(), seed, t.hash);
-            string keySuffix = mongo::toHexLower(t.data, sizeof(t.data));
+            string keySuffix = hexblob::encodeLower(t.data, sizeof(t.data));
             invariant(termKeySuffixLengthV2 == keySuffix.size());
             keyString.appendString(term.substr(0, termKeyPrefixLengthV2) + keySuffix);
         }

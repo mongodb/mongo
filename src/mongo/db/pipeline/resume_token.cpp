@@ -119,7 +119,7 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
     data.documentKey.addToBsonObj(&builder, "");
     auto keyObj = builder.obj();
     KeyString::Builder encodedToken(KeyString::Version::V1, keyObj, Ordering::make(BSONObj()));
-    _hexKeyString = toHex(encodedToken.getBuffer(), encodedToken.getSize());
+    _hexKeyString = hexblob::encode(encodedToken.getBuffer(), encodedToken.getSize());
     const auto& typeBits = encodedToken.getTypeBits();
     if (!typeBits.isAllZeros())
         _typeBits = Value(
@@ -146,10 +146,10 @@ ResumeTokenData ResumeToken::getData() const {
 
     uassert(ErrorCodes::FailedToParse,
             "resume token string was not a valid hex string",
-            isValidHex(_hexKeyString));
+            hexblob::validate(_hexKeyString));
 
     BufBuilder hexDecodeBuf;  // Keep this in scope until we've decoded the bytes.
-    fromHexString(_hexKeyString, &hexDecodeBuf);
+    hexblob::decode(_hexKeyString, &hexDecodeBuf);
     BSONBinData keyStringBinData =
         BSONBinData(hexDecodeBuf.buf(), hexDecodeBuf.len(), BinDataType::BinDataGeneral);
     auto internalBson = KeyString::toBsonSafe(static_cast<const char*>(keyStringBinData.data),

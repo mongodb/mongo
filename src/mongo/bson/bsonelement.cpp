@@ -859,25 +859,21 @@ void BSONElement::toString(
             const char* data = binDataClean(len);
             // If the BinData is a correctly sized newUUID, display it as such.
             if (binDataType() == newUUID && len == 16) {
+                using namespace fmt::literals;
+                StringData sd(data, len);
                 // 4 Octets - 2 Octets - 2 Octets - 2 Octets - 6 Octets
-                s << "UUID(\"";
-                s << toHexLower(&data[0], 4);
-                s << "-";
-                s << toHexLower(&data[4], 2);
-                s << "-";
-                s << toHexLower(&data[6], 2);
-                s << "-";
-                s << toHexLower(&data[8], 2);
-                s << "-";
-                s << toHexLower(&data[10], 6);
-                s << "\")";
+                s << "UUID(\"{}-{}-{}-{}-{}\")"_format(hexblob::encodeLower(sd.substr(0, 4)),
+                                                       hexblob::encodeLower(sd.substr(4, 2)),
+                                                       hexblob::encodeLower(sd.substr(6, 2)),
+                                                       hexblob::encodeLower(sd.substr(8, 2)),
+                                                       hexblob::encodeLower(sd.substr(10, 6)));
                 break;
             }
             s << "BinData(" << binDataType() << ", ";
             if (!full && len > 80) {
-                s << toHex(data, 70) << "...)";
+                s << hexblob::encode(data, 70) << "...)";
             } else {
-                s << toHex(data, len) << ")";
+                s << hexblob::encode(data, len) << ")";
             }
         } break;
 

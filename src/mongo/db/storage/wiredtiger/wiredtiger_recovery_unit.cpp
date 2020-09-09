@@ -230,7 +230,7 @@ void WiredTigerRecoveryUnit::prepareUnitOfWork() {
                 "preparing transaction at time: {prepareTimestamp}",
                 "prepareTimestamp"_attr = _prepareTimestamp);
 
-    const std::string conf = "prepare_timestamp=" + integerToHex(_prepareTimestamp.asULL());
+    const std::string conf = "prepare_timestamp=" + unsignedHex(_prepareTimestamp.asULL());
     // Prepare the transaction.
     invariantWTOK(s->prepare_transaction(s, conf.c_str()));
 }
@@ -360,13 +360,13 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             invariant(_readAtTimestamp.isNull() || _commitTimestamp >= _readAtTimestamp);
 
             if (MONGO_likely(!doUntimestampedWritesForIdempotencyTests.shouldFail())) {
-                conf << "commit_timestamp=" << integerToHex(_commitTimestamp.asULL()) << ",";
+                conf << "commit_timestamp=" << unsignedHex(_commitTimestamp.asULL()) << ",";
             }
             _isTimestamped = true;
         }
 
         if (!_durableTimestamp.isNull()) {
-            conf << "durable_timestamp=" << integerToHex(_durableTimestamp.asULL());
+            conf << "durable_timestamp=" << unsignedHex(_durableTimestamp.asULL());
         }
 
         if (_mustBeTimestamped) {
@@ -709,7 +709,7 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
         return Status::OK();
     }
 
-    const std::string conf = "commit_timestamp=" + integerToHex(timestamp.asULL());
+    const std::string conf = "commit_timestamp=" + unsignedHex(timestamp.asULL());
     auto rc = session->timestamp_transaction(session, conf.c_str());
     if (rc == 0) {
         _isTimestamped = true;

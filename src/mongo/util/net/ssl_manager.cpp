@@ -221,7 +221,7 @@ std::pair<std::string, RFC4514Parser::ValueTerminator> RFC4514Parser::extractVal
                         str::stream() << "Escaped hex value contains invalid character \'"
                                       << hexValStr[1] << "\'",
                         isHex(hexValStr[1]));
-                const char hexVal = uassertStatusOK(fromHex(StringData(hexValStr.data(), 2)));
+                const char hexVal = hexblob::decodePair(StringData(hexValStr.data(), 2));
                 sb << hexVal;
                 if (hexVal != ' ') {
                     trailingSpaces = 0;
@@ -353,8 +353,7 @@ void logCert(const CertInformationToLog& cert, StringData certType, const int lo
           "type"_attr = certType,
           "subject"_attr = cert.subject.toString(),
           "issuer"_attr = cert.issuer.toString(),
-          "thumbprint"_attr =
-              toHex(static_cast<const void*>(cert.thumbprint.data()), cert.thumbprint.size()),
+          "thumbprint"_attr = hexblob::encode(cert.thumbprint.data(), cert.thumbprint.size()),
           "notValidBefore"_attr = cert.validityNotBefore.toString(),
           "notValidAfter"_attr = cert.validityNotAfter.toString());
 }
@@ -362,8 +361,7 @@ void logCert(const CertInformationToLog& cert, StringData certType, const int lo
 void logCRL(const CRLInformationToLog& crl, const int logNum) {
     LOGV2(logNum,
           "CRL information",
-          "thumbprint"_attr =
-              toHex(static_cast<const void*>(crl.thumbprint.data()), crl.thumbprint.size()),
+          "thumbprint"_attr = hexblob::encode(crl.thumbprint.data(), crl.thumbprint.size()),
           "notValidBefore"_attr = crl.validityNotBefore.toString(),
           "notValidAfter"_attr = crl.validityNotAfter.toString());
 }
@@ -1212,7 +1210,7 @@ std::string escapeRfc2253(StringData str) {
         while (pos < str.size()) {
             if (static_cast<signed char>(str[pos]) < 0) {
                 ret += '\\';
-                ret += integerToHex(str[pos]);
+                ret += unsignedHex(str[pos]);
             } else {
                 if (std::find(rfc2253EscapeChars.cbegin(), rfc2253EscapeChars.cend(), str[pos]) !=
                     rfc2253EscapeChars.cend()) {

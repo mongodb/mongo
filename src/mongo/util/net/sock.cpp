@@ -34,6 +34,7 @@
 #include "mongo/util/net/sock.h"
 
 #include <algorithm>
+#include <fmt/format.h>
 
 #if !defined(_WIN32)
 #include <arpa/inet.h>
@@ -750,11 +751,10 @@ bool Socket::isStillConnected() {
                         "idleTimeSecs"_attr = idleTimeSecs,
                         "remoteHost"_attr = remoteString());
             if (kDebugBuild) {
-                std::string hex = hexdump(testBuf, recvd);
                 LOGV2_ERROR(23198,
                             "Hex dump of stale log data: {hex}",
                             "Hex dump of stale log data",
-                            "hex"_attr = hex);
+                            "hex"_attr = hexdump(testBuf, recvd));
             }
             dassert(false);
         } else {

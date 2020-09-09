@@ -125,12 +125,12 @@ public:
     }
 
     static StatusWith<HashBlock> fromHexStringNoThrow(StringData hex) {
-        if (!isValidHex(hex)) {
+        if (!hexblob::validate(hex)) {
             return {ErrorCodes::BadValue, "Hash input is not a hex string"};
         }
 
         BufBuilder buf;
-        mongo::fromHexString(hex, &buf);
+        hexblob::decode(hex, &buf);
         return fromBuffer(reinterpret_cast<const uint8_t*>(buf.buf()), buf.len());
     }
 
@@ -274,7 +274,7 @@ public:
      * Hex encoded hash block.
      */
     std::string toHexString() const {
-        return toHex(_hash.data(), _hash.size());
+        return hexblob::encode(_hash.data(), _hash.size());
     }
 
     bool operator==(const HashBlock& other) const {

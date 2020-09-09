@@ -46,6 +46,7 @@
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/utility.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/dns_name.h"
 #include "mongo/util/dns_query.h"
 #include "mongo/util/hex.h"
@@ -85,24 +86,22 @@ void mongo::uriEncode(std::ostream& ss, StringData toEncode, StringData passthro
 mongo::StatusWith<std::string> mongo::uriDecode(StringData toDecode) {
     StringBuilder out;
     for (size_t i = 0; i < toDecode.size(); ++i) {
-        const char c = toDecode[i];
+        char c = toDecode[i];
         if (c == '%') {
             if (i + 2 >= toDecode.size()) {
                 return Status(ErrorCodes::FailedToParse,
                               "Encountered partial escape sequence at end of string");
             }
-            auto swHex = fromHex(toDecode.substr(i + 1, 2));
-            if (swHex.isOK()) {
-                out << swHex.getValue();
-            } else {
+            try {
+                c = hexblob::decodePair(toDecode.substr(i + 1, 2));
+            } catch (const ExceptionFor<ErrorCodes::FailedToParse>&) {
                 return Status(ErrorCodes::Error(51040),
                               "The characters after the % do not form a hex value. Please escape "
                               "the % or pass a valid hex value. ");
             }
             i += 2;
-        } else {
-            out << c;
         }
+        out << c;
     }
     return out.str();
 }

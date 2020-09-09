@@ -79,8 +79,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorMessageIncludesCollationAndHexEncoded
     ASSERT(dupKeyStatus.reason().find("collation:") != std::string::npos);
 
     // Verify that the collation key is hex encoded in the error message.
-    std::string expectedHexEncoding =
-        "0x" + toHexLower(mockCollationKey.rawData(), mockCollationKey.size());
+    std::string expectedHexEncoding = "0x" + hexblob::encodeLower(mockCollationKey);
     ASSERT(dupKeyStatus.reason().find(expectedHexEncoding) != std::string::npos);
 
     // But no hex encoding should have taken place inside the key attached to the extra error info.

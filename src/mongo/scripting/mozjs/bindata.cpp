@@ -79,18 +79,8 @@ void hexToBinData(JSContext* cx,
 
     uassert(
         ErrorCodes::BadValue, "BinData hex string must be an even length", hexstr.size() % 2 == 0);
-    auto len = hexstr.size() / 2;
 
-    std::unique_ptr<char[]> data(new char[len]);
-    const char* src = hexstr.c_str();
-    for (size_t i = 0; i < len; i++) {
-        int src_index = i * 2;
-        if (!std::isxdigit(src[src_index]) || !std::isxdigit(src[src_index + 1]))
-            uasserted(ErrorCodes::BadValue, "Invalid hex character in string");
-        data[i] = uassertStatusOK(fromHex(src + src_index));
-    }
-
-    std::string encoded = base64::encode(StringData(data.get(), len));
+    std::string encoded = base64::encode(hexblob::decode(hexstr));
     JS::AutoValueArray<2> args(cx);
 
     args[0].setInt32(type);

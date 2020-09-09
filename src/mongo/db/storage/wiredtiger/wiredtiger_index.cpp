@@ -1169,7 +1169,7 @@ protected:
                       "WTIndex::updatePosition -- the new key ({newKey}) is less than the previous "
                       "key ({prevKey}), which is a bug.",
                       "WTIndex::updatePosition -- new key is less than previous key",
-                      "newKey"_attr = redact(toHex(item.data, item.size)),
+                      "newKey"_attr = redact(hexblob::encode(item.data, item.size)),
                       "prevKey"_attr = redact(_key.toString()));
 
                 // Crash when testing diagnostics are enabled.

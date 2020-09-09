@@ -1183,7 +1183,8 @@ StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream()
                               << "CertFindCertificateInStore failed to find cert with thumbprint '"
-                              << toHex(selector.thumbprint.data(), selector.thumbprint.size())
+                              << hexblob::encode(selector.thumbprint.data(),
+                                                 selector.thumbprint.size())
                               << "' in 'My' store in '" << storeName
                               << "': " << errnoWithDescription(gle));
         }
@@ -1873,7 +1874,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
                 LOGV2_WARNING(23274,
                               "SSL peer certificate validation failed ({errorCode}): {error}",
                               "SSL peer certificate validation failed",
-                              "errorCode"_attr = integerToHex(certChainPolicyStatus.dwError),
+                              "errorCode"_attr = unsignedHex(certChainPolicyStatus.dwError),
                               "error"_attr = errnoWithDescription(certChainPolicyStatus.dwError));
 
                 if (certChainPolicyStatus.dwError == CERT_E_CN_NO_MATCH) {
@@ -1901,14 +1902,14 @@ Status validatePeerCertificate(const std::string& remoteHost,
         } else {
             str::stream msg;
             msg << "SSL peer certificate validation failed: ("
-                << integerToHex(certChainPolicyStatus.dwError) << ")"
+                << unsignedHex(certChainPolicyStatus.dwError) << ")"
                 << errnoWithDescription(certChainPolicyStatus.dwError);
 
 
             LOGV2_ERROR(23279,
                         "SSL peer certificate validation failed: ({errorCode}){error}",
                         "SSL peer certificate validation failed",
-                        "errorCode"_attr = integerToHex(certChainPolicyStatus.dwError),
+                        "errorCode"_attr = unsignedHex(certChainPolicyStatus.dwError),
                         "error"_attr = errnoWithDescription(certChainPolicyStatus.dwError));
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }

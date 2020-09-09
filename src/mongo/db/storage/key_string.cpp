@@ -2174,11 +2174,11 @@ Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num) {
 
 template <class BufferT>
 std::string BuilderBase<BufferT>::toString() const {
-    return toHex(getBuffer(), getSize());
+    return hexblob::encode(getBuffer(), getSize());
 }
 
 std::string Value::toString() const {
-    return toHex(getBuffer(), getSize());
+    return hexblob::encode(getBuffer(), getSize());
 }
 
 TypeBits& TypeBits::operator=(const TypeBits& tb) {

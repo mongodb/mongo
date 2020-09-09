@@ -461,8 +461,8 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
                     1,
                     "Creating inactive cache entry for query",
                     "query"_attr = redact(query.toStringShort()),
-                    "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
-                    "planCacheKey"_attr = unsignedIntToFixedLengthHex(planCacheKey),
+                    "queryHash"_attr = zeroPaddedHex(queryHash),
+                    "planCacheKey"_attr = zeroPaddedHex(planCacheKey),
                     "newWorks"_attr = newWorks);
         res.shouldBeCreated = true;
         res.shouldBeActive = false;
@@ -477,8 +477,8 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
                     1,
                     "Replacing active cache entry for query",
                     "query"_attr = redact(query.toStringShort()),
-                    "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
-                    "planCacheKey"_attr = unsignedIntToFixedLengthHex(planCacheKey),
+                    "queryHash"_attr = zeroPaddedHex(queryHash),
+                    "planCacheKey"_attr = zeroPaddedHex(planCacheKey),
                     "oldWorks"_attr = oldEntry->works,
                     "newWorks"_attr = newWorks);
         res.shouldBeCreated = true;
@@ -489,8 +489,8 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
                     "Attempt to write to the planCache resulted in a noop, since there's already "
                     "an active cache entry with a lower works value",
                     "query"_attr = redact(query.toStringShort()),
-                    "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
-                    "planCacheKey"_attr = unsignedIntToFixedLengthHex(planCacheKey),
+                    "queryHash"_attr = zeroPaddedHex(queryHash),
+                    "planCacheKey"_attr = zeroPaddedHex(planCacheKey),
                     "newWorks"_attr = newWorks,
                     "oldWorks"_attr = oldEntry->works);
         // There is already an active cache entry with a lower works value.
@@ -512,8 +512,8 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
                     1,
                     "Increasing work value associated with cache entry",
                     "query"_attr = redact(query.toStringShort()),
-                    "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
-                    "planCacheKey"_attr = unsignedIntToFixedLengthHex(planCacheKey),
+                    "queryHash"_attr = zeroPaddedHex(queryHash),
+                    "planCacheKey"_attr = zeroPaddedHex(planCacheKey),
                     "oldWorks"_attr = oldEntry->works,
                     "increasedWorks"_attr = increasedWorks);
         oldEntry->works = increasedWorks;
@@ -528,8 +528,8 @@ PlanCache::NewEntryState PlanCache::getNewEntryState(const CanonicalQuery& query
                     1,
                     "Inactive cache entry for query is being promoted to active entry",
                     "query"_attr = redact(query.toStringShort()),
-                    "queryHash"_attr = unsignedIntToFixedLengthHex(queryHash),
-                    "planCacheKey"_attr = unsignedIntToFixedLengthHex(planCacheKey),
+                    "queryHash"_attr = zeroPaddedHex(queryHash),
+                    "planCacheKey"_attr = zeroPaddedHex(planCacheKey),
                     "oldWorks"_attr = oldEntry->works,
                     "newWorks"_attr = newWorks);
         // We'll replace the old inactive entry with an active entry.

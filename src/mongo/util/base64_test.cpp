@@ -89,7 +89,7 @@ TEST(Base64Test, encodeAllPossibleGroups) {
             if (kSuperVerbose) {
                 LOGV2(23509,
                       "buf=[{buf}] s=`{s}`",
-                      "buf"_attr = mongo::toHex(buf.data(), sz),
+                      "buf"_attr = mongo::hexblob::encode(buf),
                       "s"_attr = s);
             }
             std::string recovered = base64::decode(s);

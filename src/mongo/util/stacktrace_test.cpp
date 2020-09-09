@@ -394,7 +394,8 @@ public:
               "tid"_attr = ostr(stdx::this_thread::get_id()),
               "sig"_attr = sig);
         char storage;
-        LOGV2(23388, "Local var", "var"_attr = integerToHex(reinterpret_cast<uintptr_t>(&storage)));
+        LOGV2(
+            23388, "Local var", "var"_attr = "{:X}"_format(reinterpret_cast<uintptr_t>(&storage)));
     }
 
     static void tryHandler(void (*handler)(int, siginfo_t*, void*)) {
@@ -405,8 +406,8 @@ public:
         std::fill(buf->begin(), buf->end(), kSentinel);
         LOGV2(24157,
               "sigaltstack buf",
-              "size"_attr = integerToHex(buf->size()),
-              "data"_attr = integerToHex(reinterpret_cast<uintptr_t>(buf->data())));
+              "size"_attr = "{:X}"_format(buf->size()),
+              "data"_attr = "{:X}"_format(reinterpret_cast<uintptr_t>(buf->data())));
         stdx::thread thr([&] {
             LOGV2(23389, "Thread running", "tid"_attr = ostr(stdx::this_thread::get_id()));
             {
@@ -661,7 +662,7 @@ TEST(StackTrace, BacktraceThroughLibc) {
         LOGV2(23392,
               "Frame",
               "i"_attr = i,
-              "frame"_attr = integerToHex(reinterpret_cast<uintptr_t>(capture.arr[i])));
+              "frame"_attr = "{:X}"_format(reinterpret_cast<uintptr_t>(capture.arr[i])));
     }
 }
 #endif  // mongo stacktrace backend

@@ -29,104 +29,96 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cctype>
+#include <fmt/format.h>
 #include <string>
+#include <type_traits>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
-// can't use hex namespace because it conflicts with hex iostream function
-inline StatusWith<char> fromHex(char c) {
-    if ('0' <= c && c <= '9')
-        return c - '0';
-    if ('a' <= c && c <= 'f')
-        return c - 'a' + 10;
-    if ('A' <= c && c <= 'F')
-        return c - 'A' + 10;
-    return Status(ErrorCodes::FailedToParse,
-                  str::stream() << "The character " << c << " failed to parse from hex.");
+
+/**
+ * A hex blob is a data interchange format, not meant to be
+ * convenient to read. The functions in the hexblob namespace are
+ * specifically to support it, rather than to serve more general
+ * hexadecimal encoding for diagnostics.
+ *
+ * A hex blob is a packed run of hex digit pairs with no punctuation
+ * or breaks between the encoded bytes. Upper case is produced by
+ * encoders, but upper or lower case digits are accepted by the
+ * decoders.
+ */
+namespace hexblob {
+
+/**
+ * Decodes hex digit `c` (upper or lower case).
+ * Throws `FailedToParse` on failure.
+ */
+unsigned char decodeDigit(unsigned char c);
+
+/**
+ * Decodes hex digit pair `c` (upper or lower case).
+ * Throws `FailedToParse` on failure.
+ */
+unsigned char decodePair(StringData c);
+
+/**
+ * Returns true if `s` is a valid encoded hex blob.
+ */
+bool validate(StringData s);
+
+/**
+ * Returns `data` rendered as a concatenation of uppercase hex digit pairs,
+ * with no separation between bytes.
+ */
+std::string encode(StringData data);
+
+/** Raw memory `encode` */
+inline std::string encode(const void* data, size_t len) {
+    return encode(StringData(reinterpret_cast<const char*>(data), len));
 }
-inline StatusWith<char> fromHex(const char* c) {
-    if (fromHex(c[0]).isOK() && fromHex(c[1]).isOK()) {
-        return (char)((fromHex(c[0]).getValue() << 4) | fromHex(c[1]).getValue());
-    }
-    return Status(ErrorCodes::FailedToParse,
-                  str::stream() << "The character " << c[0] << c[1]
-                                << " failed to parse from hex.");
-}
-inline StatusWith<char> fromHex(StringData c) {
-    if (fromHex(c[0]).isOK() && fromHex(c[1]).isOK()) {
-        return (char)((fromHex(c[0]).getValue() << 4) | fromHex(c[1]).getValue());
-    }
-    return Status(ErrorCodes::FailedToParse,
-                  str::stream() << "The character " << c[0] << c[1]
-                                << " failed to parse from hex.");
+
+/** Same as `encode`, but with lowercase hex digits. */
+std::string encodeLower(StringData data);
+
+/** Raw memory `encodeLower` */
+inline std::string encodeLower(const void* data, size_t len) {
+    return encodeLower(StringData(reinterpret_cast<const char*>(data), len));
 }
 
 /**
- * Decodes 'hexString' into raw bytes, appended to the out parameter 'buf'. Callers must first
- * ensure that 'hexString' is a valid hex encoding.
+ * Decodes hex blob `s`, appending its decoded bytes to `buf`.
+ * Throws `FailedToParse` if `s` is not a valid hex blob encoding.
  */
-inline void fromHexString(StringData hexString, BufBuilder* buf) {
-    invariant(hexString.size() % 2 == 0);
-    // Combine every pair of two characters into one byte.
-    for (std::size_t i = 0; i < hexString.size(); i += 2) {
-        buf->appendChar(uassertStatusOK(fromHex(StringData(&hexString.rawData()[i], 2))));
-    }
-}
+void decode(StringData s, BufBuilder* buf);
+
+/** Overload that returns the decoded hex blob as a `std::string`. */
+std::string decode(StringData s);
+
+}  // namespace hexblob
 
 /**
- * Returns true if 'hexString' is a valid hexadecimal encoding.
+ * Returns a dump of the buffer as lower case hex digit pairs separated by spaces.
+ * Requires `len < 1000000`.
  */
-inline bool isValidHex(StringData hexString) {
-    // There must be an even number of characters, since each pair encodes a single byte.
-    return hexString.size() % 2 == 0 &&
-        std::all_of(hexString.begin(), hexString.end(), [](char c) { return std::isxdigit(c); });
+std::string hexdump(StringData data);
+
+/** Raw memory `hexdump`. */
+inline std::string hexdump(const void* data, size_t len) {
+    return hexdump(StringData(reinterpret_cast<const char*>(data), len));
 }
 
-inline std::string toHex(const void* inRaw, int len) {
-    static const char hexchars[] = "0123456789ABCDEF";
-
-    StringBuilder out;
-    const char* in = reinterpret_cast<const char*>(inRaw);
-    for (int i = 0; i < len; ++i) {
-        char c = in[i];
-        char hi = hexchars[(c & 0xF0) >> 4];
-        char lo = hexchars[(c & 0x0F)];
-
-        out << hi << lo;
-    }
-
-    return out.str();
+/** Render `val` in upper case hex, zero-padded to its full width. */
+template <typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
+std::string zeroPaddedHex(T val) {
+    return format(FMT_STRING("{:0{}X}"), std::make_unsigned_t<T>(val), 2 * sizeof(val));
 }
 
-template <typename T>
-std::string integerToHex(T val);
-
-inline std::string toHexLower(const void* inRaw, int len) {
-    static const char hexchars[] = "0123456789abcdef";
-
-    StringBuilder out;
-    const char* in = reinterpret_cast<const char*>(inRaw);
-    for (int i = 0; i < len; ++i) {
-        char c = in[i];
-        char hi = hexchars[(c & 0xF0) >> 4];
-        char lo = hexchars[(c & 0x0F)];
-
-        out << hi << lo;
-    }
-
-    return out.str();
+/** Render the unsigned equivalent of `val` in upper case hex. */
+template <typename T, std::enable_if_t<std::is_integral_v<T>, int> = 0>
+std::string unsignedHex(T val) {
+    return format(FMT_STRING("{:X}"), std::make_unsigned_t<T>(val));
 }
 
-/**
- * Returns the hex value with a fixed width of 8 chatacters.
- */
-std::string unsignedIntToFixedLengthHex(uint32_t val);
-
-/* @return a dump of the buffer as hex byte ascii output */
-std::string hexdump(const char* data, unsigned len);
 }  // namespace mongo

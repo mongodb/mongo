@@ -45,7 +45,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         LOGV2_DEBUG(4496700,
                     2,
                     "validateBSON return code has changed",
-                    "input"_attr = toHex(Data, Size),
+                    "input"_attr = hexblob::encode(Data, Size),
                     "ret"_attr = ret,
                     "oldRet"_attr = oldRet);
         // We trust the old implementation's OK, so dump the object to hopefully give a hint.

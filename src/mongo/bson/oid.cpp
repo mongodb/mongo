@@ -36,6 +36,7 @@
 #include <memory>
 
 #include "mongo/base/init.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
@@ -149,11 +150,8 @@ void OID::initFromTermNumber(int64_t term) {
 
 void OID::init(const std::string& s) {
     verify(s.size() == 24);
-    const char* p = s.c_str();
-    for (std::size_t i = 0; i < kOIDSize; i++) {
-        _data[i] = uassertStatusOK(fromHex(p));
-        p += 2;
-    }
+    std::string blob = hexblob::decode(StringData(s).substr(0, 2 * kOIDSize));
+    std::copy(blob.begin(), blob.end(), _data);
 }
 
 void OID::init(Date_t date, bool max) {
@@ -167,11 +165,11 @@ time_t OID::asTimeT() const {
 }
 
 std::string OID::toString() const {
-    return toHexLower(_data, kOIDSize);
+    return hexblob::encodeLower(_data, kOIDSize);
 }
 
 std::string OID::toIncString() const {
-    return toHexLower(getIncrement().bytes, kIncrementSize);
+    return hexblob::encodeLower(getIncrement().bytes, kIncrementSize);
 }
 
 }  // namespace mongo

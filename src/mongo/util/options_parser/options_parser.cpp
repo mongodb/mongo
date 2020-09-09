@@ -492,23 +492,10 @@ public:
 
 private:
     static StatusWith<std::vector<std::uint8_t>> hexToVec(StringData hex) {
-        if (!isValidHex(hex)) {
+        if (!hexblob::validate(hex))
             return {ErrorCodes::BadValue, "Not a valid, even length hex string"};
-        }
-
-        std::vector<std::uint8_t> ret;
-        ret.reserve(hex.size() / 2);
-
-        for (size_t i = 0; i < hex.size(); i += 2) {
-            auto swFromHex = fromHex(hex.substr(i, 2));
-            if (!swFromHex.isOK()) {
-                // isValidHex() above should guarantee this never occurs.
-                return {ErrorCodes::BadValue, str::stream() << "Invalid hexits at " << i};
-            }
-            ret.push_back(static_cast<std::uint8_t>(swFromHex.getValue()));
-        }
-
-        return ret;
+        std::string blob = hexblob::decode(hex);
+        return std::vector<std::uint8_t>(blob.begin(), blob.end());
     }
 
     // The type of expansion represented.
