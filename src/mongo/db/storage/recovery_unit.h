@@ -623,6 +623,14 @@ public:
         _mustBeTimestamped = true;
     }
 
+    void setNoEvictionAfterRollback() {
+        _noEvictionAfterRollback = true;
+    }
+
+    bool getNoEvictionAfterRollback() const {
+        return _noEvictionAfterRollback;
+    }
+
 protected:
     RecoveryUnit();
 
@@ -662,6 +670,8 @@ protected:
     }
 
     bool _mustBeTimestamped = false;
+
+    bool _noEvictionAfterRollback = false;
 
 private:
     // Sets the snapshot associated with this RecoveryUnit to a new globally unique id number.

@@ -102,6 +102,11 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
             // non-transaction, exclusive lock taking operation blocked
             // behind an active transaction's intent lock.
             opCtx->lockState()->setMaxLockTimeout(Milliseconds(0));
+
+            // This thread needs storage rollback to complete timely, so instruct the storage
+            // engine to not do any extra eviction for this thread, if supported.
+            opCtx->recoveryUnit()->setNoEvictionAfterRollback();
+
             try {
                 killAllExpiredTransactions(opCtx.get());
             } catch (ExceptionForCat<ErrorCategory::CancelationError>& ex) {
