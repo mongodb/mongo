@@ -35,12 +35,12 @@ namespace mongo::optimizer {
 
 class AbstractVisitor {
 public:
-    virtual void visit(ScanNode& node) = 0;
-    virtual void visit(MultiJoinNode& node) = 0;
-    virtual void visit(UnionNode& node) = 0;
-    virtual void visit(GroupByNode& node) = 0;
-    virtual void visit(UnwindNode& node) = 0;
-    virtual void visit(WindNode& node) = 0;
+    virtual void visit(const ScanNode& node) = 0;
+    virtual void visit(const MultiJoinNode& node) = 0;
+    virtual void visit(const UnionNode& node) = 0;
+    virtual void visit(const GroupByNode& node) = 0;
+    virtual void visit(const UnwindNode& node) = 0;
+    virtual void visit(const WindNode& node) = 0;
 };
 
 }  // namespace mongo::optimizer

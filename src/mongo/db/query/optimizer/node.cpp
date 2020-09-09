@@ -41,33 +41,31 @@ Node::Node(Context& ctx, NodePtr child) : _nodeId(ctx.getNextNodeId()) {
 Node::Node(Context& ctx, std::vector<NodePtr> children)
     : _nodeId(ctx.getNextNodeId()), _children(std::move(children)) {}
 
-void Node::generateMemoBase(std::ostringstream& os) {
+void Node::generateMemoBase(std::ostringstream& os) const {
     os << "NodeId: " << _nodeId << "\n";
 }
 
 std::string Node::generateMemo() {
-    std::ostringstream os;
-
     class MemoVisitor: public AbstractVisitor
     {
     protected:
-        void visit(ScanNode& node) override {
-            node.generateMemoInternal(os);
+        void visit(const ScanNode& node) override {
+            node.generateScanMemo(os);
         }
-        void visit(MultiJoinNode& node) override {
-            node.generateMemoInternal(os);
+        void visit(const MultiJoinNode& node) override {
+            node.generateMultiJoinMemo(os);
         }
-        void visit(UnionNode& node) override {
-            node.generateMemoInternal(os);
+        void visit(const UnionNode& node) override {
+            node.generateUnionMemo(os);
         }
-        void visit(GroupByNode& node) override {
-            node.generateMemoInternal(os);
+        void visit(const GroupByNode& node) override {
+            node.generateGroupByMemo(os);
         }
-        void visit(UnwindNode& node) override {
-            node.generateMemoInternal(os);
+        void visit(const UnwindNode& node) override {
+            node.generateUnwindMemo(os);
         }
-        void visit(WindNode& node) override {
-            node.generateMemoInternal(os);
+        void visit(const WindNode& node) override {
+            node.generateWindMemo(os);
         }
     public:
         std::ostringstream os;
@@ -92,7 +90,7 @@ NodePtr ScanNode::create(Context& ctx, CollectionNameType collectionName) {
 ScanNode::ScanNode(Context& ctx, CollectionNameType collectionName)
     : Node(ctx), _collectionName(std::move(collectionName)) {}
 
-void ScanNode::generateMemoInternal(std::ostringstream& os) {
+void ScanNode::generateScanMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
     os << "Scan" << "\n";
 }
@@ -117,7 +115,7 @@ MultiJoinNode::MultiJoinNode(Context& ctx,
       _filterSet(std::move(filterSet)),
       _projectionMap(std::move(projectionMap)) {}
 
-void MultiJoinNode::generateMemoInternal(std::ostringstream& os) {
+void MultiJoinNode::generateMultiJoinMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
     os << "MultiJoin" << "\n";
 }
@@ -133,7 +131,7 @@ NodePtr UnionNode::create(Context& ctx, std::vector<NodePtr> children) {
 UnionNode::UnionNode(Context& ctx, std::vector<NodePtr> children)
     : Node(ctx, std::move(children)) {}
 
-void UnionNode::generateMemoInternal(std::ostringstream& os) {
+void UnionNode::generateUnionMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
     os << "Union" << "\n";
 }
@@ -158,7 +156,7 @@ GroupByNode::GroupByNode(Context& ctx,
       _groupByVector(std::move(groupByVector)),
       _projectionMap(std::move(projectionMap)) {}
 
-void GroupByNode::generateMemoInternal(std::ostringstream& os) {
+void GroupByNode::generateGroupByMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
     os << "GroupBy" << "\n";
 }
@@ -183,7 +181,7 @@ UnwindNode::UnwindNode(Context& ctx,
       _projectionName(std::move(projectionName)),
       _retainNonArrays(retainNonArrays) {}
 
-void UnwindNode::generateMemoInternal(std::ostringstream& os) {
+void UnwindNode::generateUnwindMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
     os << "Unwind" << "\n";
 }
@@ -199,7 +197,7 @@ NodePtr WindNode::create(Context& ctx, ProjectionName projectionName, NodePtr ch
 WindNode::WindNode(Context& ctx, ProjectionName projectionName, NodePtr child)
     : Node(ctx, std::move(child)), _projectionName(std::move(projectionName)) {}
 
-void WindNode::generateMemoInternal(std::ostringstream& os) {
+void WindNode::generateWindMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
     os << "Wind" << "\n";
 }
