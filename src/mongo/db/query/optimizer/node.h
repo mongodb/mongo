@@ -58,7 +58,7 @@ protected:
     explicit Node(Context& ctx, NodePtr child);
     explicit Node(Context& ctx, std::vector<NodePtr> children);
 
-    virtual void generateMemoBase(std::ostringstream& os);
+    void generateMemoBase(std::ostringstream& os) const;
 
     virtual void visit(AbstractVisitor& visitor) = 0;
 
@@ -79,7 +79,7 @@ class ScanNode : public Node {
 public:
     static NodePtr create(Context& ctx, CollectionNameType collectionName);
 
-    void generateMemoInternal(std::ostringstream& os);
+    void generateScanMemo(std::ostringstream& os) const;
 
 protected:
     void visit(AbstractVisitor& visitor) override;
@@ -100,7 +100,7 @@ public:
                           ProjectionMap projectionMap,
                           std::vector<NodePtr> children);
 
-    void generateMemoInternal(std::ostringstream& os);
+    void generateMultiJoinMemo(std::ostringstream& os) const;
 
 protected:
     void visit(AbstractVisitor& visitor) override;
@@ -119,7 +119,7 @@ class UnionNode : public Node {
 public:
     static NodePtr create(Context& ctx, std::vector<NodePtr> children);
 
-    void generateMemoInternal(std::ostringstream& os);
+    void generateUnionMemo(std::ostringstream& os) const;
 
 protected:
     void visit(AbstractVisitor& visitor) override;
@@ -138,7 +138,7 @@ public:
                           ProjectionMap projectionMap,
                           NodePtr child);
 
-    void generateMemoInternal(std::ostringstream& os);
+    void generateGroupByMemo(std::ostringstream& os) const;
 
 protected:
     void visit(AbstractVisitor& visitor) override;
@@ -160,7 +160,7 @@ public:
                           bool retainNonArrays,
                           NodePtr child);
 
-    void generateMemoInternal(std::ostringstream& os);
+    void generateUnwindMemo(std::ostringstream& os) const;
 
 protected:
 
@@ -177,7 +177,7 @@ class WindNode : public Node {
 public:
     static NodePtr create(Context& ctx, ProjectionName projectionName, NodePtr child);
 
-    void generateMemoInternal(std::ostringstream& os);
+    void generateWindMemo(std::ostringstream& os) const;
 
 protected:
     void visit(AbstractVisitor& visitor) override;

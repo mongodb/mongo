@@ -37,8 +37,7 @@ TEST(Optimizer, Basic) {
     Context ctx;
 
     NodePtr ptr = ScanNode::create(ctx, "test");
-    const std::string& s = ptr->generateMemo();
-    NodePtr ptr1 = ScanNode::create(ctx, "test");
+    ASSERT_EQ("NodeId: 0\nScan\n", ptr->generateMemo());
 }
 
 }  // namespace
