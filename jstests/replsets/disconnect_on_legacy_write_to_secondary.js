@@ -52,16 +52,16 @@ const primaryDb = primaryDataConn.getDB("test");
 const primaryColl = primaryDb[collname];
 primaryDataConn.forceWriteMode('legacy');
 
-function getNotMasterLegacyUnackWritesCounter() {
+function getNotPrimaryLegacyUnackWritesCounter() {
     return assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1}))
-        .metrics.repl.network.notMasterLegacyUnacknowledgedWrites;
+        .metrics.repl.network.notPrimaryLegacyUnacknowledgedWrites;
 }
 
 function runStepDownTest({description, failpoint, operation}) {
     jsTestLog("Enabling failpoint to block " + description + "s");
     let failPoint = configureFailPoint(primaryAdmin, failpoint);
 
-    let failedLegacyUnackWritesBefore = getNotMasterLegacyUnackWritesCounter();
+    let failedLegacyUnackWritesBefore = getNotPrimaryLegacyUnackWritesCounter();
 
     jsTestLog("Trying legacy " + description + " on stepping-down primary");
     operation();
@@ -77,7 +77,7 @@ function runStepDownTest({description, failpoint, operation}) {
 
     // Validate the number of legacy unacknowledged writes failed due to step down resulted
     // in network disconnection.
-    let failedLegacyUnackWritesAfter = getNotMasterLegacyUnackWritesCounter();
+    let failedLegacyUnackWritesAfter = getNotPrimaryLegacyUnackWritesCounter();
     assert.eq(failedLegacyUnackWritesAfter, failedLegacyUnackWritesBefore + 1);
 
     // Allow the primary to be re-elected, and wait for it.
