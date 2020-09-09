@@ -6,6 +6,11 @@
   - [Cursors and Operations](#cursors-and-operations)
 - [Authentication](#authentication)
   - [SASL](#sasl)
+    - [Speculative Auth](#speculative-authentication)
+    - [SASL Supported Mechs](#sasl-supported-mechs)
+  - [X509 Authentication](#x509-authentication)
+  - [Cluster Authentication](#cluster-authentication)
+  - [Localhost Auth Bypass](#localhost-auth-bypass)
 - [Authorization](#authorization)
   - [Authorization Caching](#authorization-caching)
   - [Authorization Manager External State](#authorization-manager-external-state)
@@ -20,7 +25,183 @@
 
 ## Authentication
 
+On a server with authentication enabled, all but a small handful of commands require clients to
+authenticate before performing any action.  This typically occurs with a 1 to 3 round trip
+conversation using the `saslStart` and `saslContinue` commands, or though a single call to the
+`authenticate` command. See [SASL](#SASL) and [X.509](#X509) below for the details of these
+exchanges.
+
 ### SASL
+
+`SASL` (Simple Authentication and Security Layer) is a framework for authentication that allows
+users to authenticate using different mechanisms without much code duplication. A SASL mechanism is
+a series of challenge and responses that occur when authentication is being performed. There are a
+specified list of authentication mechanisms that SASL supports
+[here](https://www.iana.org/assignments/sasl-mechanisms/sasl-mechanisms.xhtml).
+[`CyrusSASL`](https://www.cyrusimap.org/sasl/) provides a SASL framework for clients and servers and
+an independent set of packages for different authentication mechanisms which are loaded dynamically
+at runtime. `SASL` mechanisms define a method of communication between a client and a server. It
+does not, however, define where the user credentials can be stored. With some `SASL` mechanisms,
+`PLAIN` for example, the credentials can be stored in the database itself or in `LDAP`.
+
+Before running authentication, the server sets an empty
+[`AuthenticationSession`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authentication_session.h)
+on the `Client`. During the first step of authentication, the client invokes `{saslStart: ...}`,
+which reaches
+[`doSaslStart`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/sasl_commands.cpp#L237-L242)
+which gets the mechanism used and performs the actual authentication by calling the step function
+(inherited from
+[`ServerMechanismBase::step`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/sasl_mechanism_registry.h#L161-L172))
+on the chosen mechanism (more on the mechanisms in the [SASL](#sasl) section). The server then sends
+a reply to the client with information regarding the status of authentication. If both
+authentication and authorization are complete, the client can begin executing commands against the
+server. If authentication requires more information to complete, the server requests this
+information. If authentication fails, then the client recieves that information and potentially
+closes the session.
+
+If, after the first SASL step, there is more work to be done, the client sends a
+[`CMDSaslContinue`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/sasl_commands.cpp#L98)
+to the server with whatever extra information the server requested. The server then retrieves the
+former
+[`AuthenticationSession`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authentication_session.h)
+from the current client and performs another SASL step. The server then sends the client a similar
+reply as it did from the `SASLStart` command. The `SASLContinue` phase repeats until the client is
+either authenticated or an error is encountered.
+
+#### Speculative Authentication
+
+To reduce connection overhead time, clients may begin and possibly complete their authentication
+exchange as part of the
+[`CmdHello`]((https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/repl/replication_info.cpp#L234))
+exchange.  In this mode, the body of the `saslStart` or `authenticate` command used for
+authentication may be embedded into the `hello` command under the field `{speculativeAuthenticate:
+$bodyOfAuthCmd}`.
+
+On success, the reply typically emitted by such a command when invoked directly, will then be
+returned by the server in the `{speculativeAuthenticate: ...}` field of the `hello` command's reply.
+If the authentication sub-command fails, the error is swallowed by the server, and no reply is
+included in the `hello` command response.
+
+#### SASL Supported Mechs
+
+When using the [SASL](#SASL) authentication workflow, it is necessary to select a specific mechanism
+to authenticate with (e.g. SCRAM-SHA-1, SCRAM-SHA-256, PLAIN, GSSAPI, etc...).  If the user has not
+included the mechanism in the mongodb:// URI, then the client can ask the server what mechanisms are
+available on a per-user basis before attempting to authenticate.
+
+Therefore, during the initial handshake using
+[`CmdHello`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/repl/replication_info.cpp#L234),
+the client will notify the server of the user it is about to authenticate by including
+`{saslSupportedMechs: 'username'}` with the `hello` command.  The server will then include
+`{saslSupportedMechs: [$listOfMechanisms]}` in the `hello` command's response.
+
+This allows clients to proceed with authentication by choosing an appropriate mechanism. The
+different named SASL mechanisms are listed below. If a mechanism can use a different storage method,
+the storage mechanism is listed as a sub-bullet below.
+
+- [**SCRAM-SHA-1**](https://tools.ietf.org/html/rfc5802)
+  - See the section on `SCRAM-SHA-256` for details on `SCRAM`. `SCRAM-SHA-1` uses `SHA-1` for the
+    hashing algorithm.
+- [**SCRAM-SHA-256**](https://tools.ietf.org/html/rfc7677)
+  - `SCRAM` stands for Salted Challenge Response Authentication Mechanism. `SCRAM-SHA-256` implements
+    the `SCRAM` protocol and uses `SHA-256` as a hashing algorithm to complement it. `SCRAM`
+    involves four steps, a client and server first, and a client and server final. During the client
+    first, the client sends the username for lookup. The server uses the username to retrieve the
+    relevant authentication information for the client. This generally includes the salt, StoredKey,
+    ServerKey, and iteration count. The client then computes a set of values (defined in [section
+    3](https://tools.ietf.org/html/rfc5802#section-3) of the `SCRAM` RFC), most notably the client
+    proof and the server signature. It sends the client proof (used to authenticate the client) to
+    the server, and the server then responds by sending the server proof. The hashing function used
+    to hash the client password that is stored by the server is what differentiates `SCRAM-SHA-1` vs
+    `SCRAM-SHA-256`, `SHA-1` is used in `SCRAM-SHA-1`. `SCRAM-SHA-256` is the preferred mechanism
+    over `SCRAM-SHA-1`. Note also that `SCRAM-SHA-256` performs [RFC 4013 SASLprep Unicode
+    normalization](https://tools.ietf.org/html/rfc4013) on all provided passwords before hashing,
+    while for backward compatibility reasons, `SCRAM-SHA-1` does not.
+- [**PLAIN**](https://tools.ietf.org/html/rfc4616)
+  - The `PLAIN` mechanism involves two steps for authentication. First, the client concatenates a
+    message using the authorization id, the authentication id (also the username), and the password
+    for a user and sends it to the server. The server validates that the information is correct and
+    authenticates the user. For storage, the server hashes one copy using SHA-1 and another using
+    SHA-256 so that the password is not stored in plaintext. Even when using the PLAIN mechanism,
+    the same secrets as used for the SCRAM methods are stored and used for validation. The chief
+    difference between using PLAIN and SCRAM-SHA-256 (or SCRAM-SHA-1) is that using SCRAM provides
+    mutual authentication and avoids transmitting the password to the server.  With PLAIN, it is
+    less difficult for a MitM attacker to compromise original credentials.
+  - **With local users**
+    - When the PLAIN mechanism is used with internal users, the user information is stored in the
+      [user
+      collection](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.cpp#L56)
+      on the database. See [authorization](#authorization) for more information.
+  - **With Native LDAP**
+    - When the PLAIN mechanism uses `Native LDAP`, the credential information is sent to and
+      recieved from LDAP when creating and authorizing a user. The mongo server sends user
+      credentials over the wire to the LDAP server and the LDAP server requests a password. The
+      mongo server sends the password in plain text and LDAP responds with whether the password is
+      correct. Here the communication with the driver and the mongod is the same, but the storage
+      mechanism for the credential information is different.
+  - **With Cyrus SASL / saslauthd**
+    - When using saslauthd, the mongo server communicates with a process called saslauthd running on
+      the same machine. The saslauthd process has ways of communicating with many other servers,
+      LDAP servers included. Saslauthd works in the same way as Native LDAP except that the
+      mongo process communicates using unix domain sockets.
+- [**GSSAPI**](https://tools.ietf.org/html/rfc4752)
+  - GSSAPI is an authentication mechanism that supports [Kerberos](https://web.mit.edu/kerberos/)
+    authentication. GSSAPI is the communication method used to communicate with Kerberos servers and
+    with clients. When initializing this auth mechanism, the server tries to acquire its credential
+    information from the KDC by calling
+    [`tryAcquireServerCredential`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/sasl/mongo_gssapi.h#L36).
+    If this is not approved, the server fasserts and the mechanism is not registered. On Windows,
+    SChannel provides a `GSSAPI` library for the server to use. On other platforms, the Cyrus SASL
+    library is used to make calls to the KDC (Kerberos key distribution center).
+
+The specific properties that each SASL mechanism provides is outlined in this table below.
+
+|               | Mutual Auth | No Plain Text |
+|---------------|-------------|---------------|
+| SCRAM         | X           | X             |
+| PLAIN         |             |               |
+| GSS-API       | X           | X             |
+
+### X509 Authentication
+
+`MONGODB-X509` is an authentication method that uses the x509 certificates from the SSL/TLS
+certificate key exchange. When the peer certificate validation happens during the SSL handshake, an
+[`SSLPeerInfo`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/util/net/ssl_types.h#L113-L143)
+is created and attached to the transport layer SessionHandle. During `MONGODB-X509` auth, the server
+grabs the client's username from the `SSLPeerInfo` struct and, if the client is a driver, verifies
+that the client name matches the username provided by the command object. If the client is
+performing intracluster authentication, see the details below in the authentication section and the
+code comments
+[here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/commands/authentication_commands.cpp#L74-L139).
+
+### Cluster Authentication
+
+There are a few different clients that can authenticate to a mongodb server. Three of the most
+common clients are drivers (including the shell), mongods, and mongos'. When clients authenticate to
+a server, they can use any of the authentication mechanisms described [below in the sasl
+section](#sasl). When a mongod or a mongos needs to authenticate to a mongodb server, it does not
+pass in distinguishing user credentials to authenticate (all servers authenticate to other servers
+as the `__system` user), so most of the options described below will not necessarily work. However,
+two options are available for authentication - keyfile auth and X509 auth. X509 auth is described in
+more detail above, but a precondition to using it is having TLS enabled.
+
+`keyfile` auth instructors servers to authenticate to each other using the `SCRAM-SHA-256` mechanism
+as the `local.__system` user who's password can be found in the named key file. A keyfile is a file
+stored on disk that servers load on startup, sending them when they behave as clients to another
+server. The keyfile contains the shared password between the servers.
+[`clusterAuthMode`](https://docs.mongodb.com/manual/reference/parameters/#param.clusterAuthMode) is
+a server parameter that configures how servers authenticate to each other. There are four modes used
+to allow a transition from keyfile, which provides minimal security, to x509 authentication, which
+provides the most security.
+
+### Localhost Auth Bypass
+
+When first setting up database authentication (using the `--auth` command to start a server), there
+is a feature called `localhostAuthBypass`. The `localhostAuthBypass` allows a client to connect over
+localhost without any user credentials to create a user as long as there are no users or roles
+registered in the database (no documents stored in the user collection). Once there is a user or
+role registered, the `localhostAuthBypass` is disabled and a user has to authenticate to perform
+most actions.
 
 ## Authorization
 
