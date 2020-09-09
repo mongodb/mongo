@@ -66,6 +66,8 @@ all:
     test_file: jstests/replsets/secondaryOk_slaveOk_aliases.js
   - ticket: SERVER-43902
     test_file: jstests/sharding/scaled_collection_stats.js
+  - ticket: SERVER-50416
+    test_file: jstests/replsets/disconnect_on_legacy_write_to_secondary.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

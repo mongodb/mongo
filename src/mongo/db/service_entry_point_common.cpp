@@ -113,10 +113,10 @@ MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
 MONGO_FAIL_POINT_DEFINE(failWithErrorCodeInRunCommand);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
-// not master error resulted in network disconnection.
-Counter64 notMasterLegacyUnackWrites;
-ServerStatusMetricField<Counter64> displayNotMasterLegacyUnackWrites(
-    "repl.network.notMasterLegacyUnacknowledgedWrites", &notMasterLegacyUnackWrites);
+// not primary error resulted in network disconnection.
+Counter64 notPrimaryLegacyUnackWrites;
+ServerStatusMetricField<Counter64> displayNotPrimaryLegacyUnackWrites(
+    "repl.network.notPrimaryLegacyUnacknowledgedWrites", &notPrimaryLegacyUnackWrites);
 
 // Tracks the number of times an unacknowledged write failed due to not master error
 // resulted in network disconnection.
@@ -1839,7 +1839,7 @@ DbResponse FireAndForgetOpRunner::run() {
     // Either way, we want to throw an exception here, which will cause the client to be
     // disconnected.
     if (LastError::get(hr->client()).hadNotPrimaryError()) {
-        notMasterLegacyUnackWrites.increment();
+        notPrimaryLegacyUnackWrites.increment();
         uasserted(ErrorCodes::NotWritablePrimary,
                   str::stream() << "Not-master error while processing '"
                                 << networkOpToString(hr->op()) << "' operation  on '"
