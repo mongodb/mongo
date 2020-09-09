@@ -176,6 +176,9 @@ src/mongo/embedded/java/aar/build/
 src/mongo/embedded/java/jar/build/
 local.properties
 
+# clangd language server
+.clangd/
+
 compile_commands.json
 generated_resmoke_config
 selected_tests_config
