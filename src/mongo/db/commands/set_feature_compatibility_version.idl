@@ -49,3 +49,8 @@ commands:
                               downgraded featureCompatibilityVersion."
                 type: safeBool
                 optional: true
+            fromConfigServer:
+                description: "A boolean that indicates whether the command is being requested by a
+                              config server."
+                type: safeBool
+                optional: true

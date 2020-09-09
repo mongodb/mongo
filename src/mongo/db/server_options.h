@@ -193,11 +193,12 @@ struct ServerGlobalParams {
             // The order of these enums matter, higher upgrades having higher values, so that
             // features can be active or inactive if the version is higher than some minimum or
             // lower than some maximum, respectively.
-            kUnsetDefault44Behavior = 0,
-            kFullyDowngradedTo44 = 1,
-            kDowngradingFrom47To44 = 2,
-            kUpgradingFrom44To47 = 3,
-            kVersion47 = 4,
+            kInvalid = 0,
+            kUnsetDefault44Behavior = 1,
+            kFullyDowngradedTo44 = 2,
+            kDowngradingFrom47To44 = 3,
+            kUpgradingFrom44To47 = 4,
+            kVersion47 = 5,
         };
 
         // These constants should only be used for generic FCV references. Generic references are
@@ -215,6 +216,10 @@ struct ServerGlobalParams {
         static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom47To44;
         static constexpr Version kDowngradingFromLatestToLastContinuous =
             Version::kDowngradingFrom47To44;
+        // kUpgradingFromLastLTSToLastContinuous is only ever set to a valid FCV when
+        // kLastLTS and kLastContinuous are not equal. Otherwise, this value should be set to
+        // kInvalid.
+        static constexpr Version kUpgradingFromLastLTSToLastContinuous = Version::kInvalid;
 
         /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This

@@ -52,6 +52,11 @@ using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
 
 void FcvOpObserver::_setVersion(OperationContext* opCtx,
                                 ServerGlobalParams::FeatureCompatibility::Version newVersion) {
+    boost::optional<FeatureCompatibilityParams::Version> prevVersion;
+
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        prevVersion = serverGlobalParams.featureCompatibility.getVersion();
+    }
     serverGlobalParams.mutableFeatureCompatibility.setVersion(newVersion);
     FeatureCompatibilityVersion::updateMinWireVersion();
 
@@ -92,9 +97,12 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     const auto shouldIncrementTopologyVersion =
         newVersion == FeatureCompatibilityParams::kLastLTS ||
-        newVersion == FeatureCompatibilityParams::kLastContinuous ||
+        (prevVersion &&
+         prevVersion.get() == FeatureCompatibilityParams::kDowngradingFromLatestToLastContinuous) ||
         newVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest ||
-        newVersion == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest;
+        newVersion == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest ||
+        newVersion == FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous;
+
     if (isReplSet && shouldIncrementTopologyVersion) {
         replCoordinator->incrementTopologyVersion();
     }
