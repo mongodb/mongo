@@ -42,11 +42,7 @@ function executeTest(db, isMongos) {
         error = assert.throws(function() {
             cursor.itcount();
         }, [], "expected query to abort due to time limit");
-        // TODO SERVER-32565: The error should always be MaxTimeMSExpired, but there are rare cases
-        // where interrupting javascript execution on the server with a stepdown or timeout results
-        // in an error code of InternalError or Interrupted instead, so we also accept those here.
-        assert.commandFailedWithCode(
-            error, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError]);
+        assert.commandFailedWithCode(error, ErrorCodes.MaxTimeMSExpired);
     })();
 
     //
@@ -102,11 +98,7 @@ function executeTest(db, isMongos) {
             cursor.next();
             cursor.next();
         }, [], "expected batch 2 (getmore) to abort due to time limit");
-        // TODO SERVER-32565: The error should always be MaxTimeMSExpired, but there are rare cases
-        // where interrupting javascript execution on the server with a stepdown or timeout results
-        // in an error code of InternalError or Interrupted instead, so we also accept those here.
-        assert.commandFailedWithCode(
-            error, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError]);
+        assert.commandFailedWithCode(error, ErrorCodes.MaxTimeMSExpired);
     })();
 
     //
@@ -168,11 +160,7 @@ function executeTest(db, isMongos) {
         error = assert.throws(function() {
             cursor.itcount();
         }, [], "expected find() to abort due to time limit");
-        // TODO SERVER-32565: The error should always be MaxTimeMSExpired, but there are rare cases
-        // where interrupting javascript execution on the server with a stepdown or timeout results
-        // in an error code of InternalError or Interrupted instead, so we also accept those here.
-        assert.commandFailedWithCode(
-            error, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError]);
+        assert.commandFailedWithCode(error, ErrorCodes.MaxTimeMSExpired);
     })();
 
     //
