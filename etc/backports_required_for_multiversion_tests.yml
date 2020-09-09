@@ -78,6 +78,8 @@ all:
     test_file: jstests/replsets/read_operations_during_rollback.js
   - ticket: SERVER-51262
     test_file: jstests/replsets/transactions_on_secondaries_not_allowed.js
+  - ticket: SERVER-50416
+    test_file: jstests/replsets/disconnect_on_legacy_write_to_secondary.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
