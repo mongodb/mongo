@@ -36,8 +36,11 @@ namespace {
 TEST(Optimizer, Basic) {
     Context ctx;
 
-    NodePtr ptr = ScanNode::create(ctx, "test");
-    ASSERT_EQ("NodeId: 0\nScan\n", ptr->generateMemo());
+    NodePtr ptrScan = ScanNode::create(ctx, "test");
+    Node::ChildVector v;
+    v.push_back(std::move(ptrScan));
+    NodePtr ptrJoin = MultiJoinNode::create(ctx, {}, {}, std::move(v));
+    ASSERT_EQ("NodeId: 1\nMultiJoin\nNodeId: 0\nScan\n", ptrJoin->generateMemo());
 }
 
 }  // namespace

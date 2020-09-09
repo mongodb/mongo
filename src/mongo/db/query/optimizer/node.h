@@ -51,7 +51,8 @@ using NodePtr = std::unique_ptr<Node>;
 class AbstractVisitor;
 
 class Node {
-    friend class AbstractVisitor;
+public:
+    using ChildVector = std::vector<NodePtr>;
 
 protected:
     explicit Node(Context& ctx);
@@ -60,29 +61,31 @@ protected:
 
     void generateMemoBase(std::ostringstream& os) const;
 
-    virtual void visit(AbstractVisitor& visitor) = 0;
+    virtual void visit(AbstractVisitor& visitor) const = 0;
 
-    virtual void visitPreOrder(AbstractVisitor& visitor) final;
+    void visitPreOrder(AbstractVisitor& visitor) const;
 
     // clone
 public:
     Node() = delete;
 
-    virtual std::string generateMemo() final;
+    std::string generateMemo() const;
+
+    //NodePtr clone(Context& ctx) const;
 
 private:
     const NodeIdType _nodeId;
-    std::vector<NodePtr> _children;
+    ChildVector _children;
 };
 
 class ScanNode : public Node {
 public:
     static NodePtr create(Context& ctx, CollectionNameType collectionName);
 
-    void generateScanMemo(std::ostringstream& os) const;
+    void generateMemo(std::ostringstream& os) const;
 
 protected:
-    void visit(AbstractVisitor& visitor) override;
+    void visit(AbstractVisitor& visitor) const override;
 
 private:
     explicit ScanNode(Context& ctx, CollectionNameType collectionName);
@@ -100,10 +103,10 @@ public:
                           ProjectionMap projectionMap,
                           std::vector<NodePtr> children);
 
-    void generateMultiJoinMemo(std::ostringstream& os) const;
+    void generateMemo(std::ostringstream& os) const;
 
 protected:
-    void visit(AbstractVisitor& visitor) override;
+    void visit(AbstractVisitor& visitor) const override;
 
 private:
     explicit MultiJoinNode(Context& ctx,
@@ -119,10 +122,10 @@ class UnionNode : public Node {
 public:
     static NodePtr create(Context& ctx, std::vector<NodePtr> children);
 
-    void generateUnionMemo(std::ostringstream& os) const;
+    void generateMemo(std::ostringstream& os) const;
 
 protected:
-    void visit(AbstractVisitor& visitor) override;
+    void visit(AbstractVisitor& visitor) const override;
 
 private:
     explicit UnionNode(Context& ctx, std::vector<NodePtr> children);
@@ -138,10 +141,10 @@ public:
                           ProjectionMap projectionMap,
                           NodePtr child);
 
-    void generateGroupByMemo(std::ostringstream& os) const;
+    void generateMemo(std::ostringstream& os) const;
 
 protected:
-    void visit(AbstractVisitor& visitor) override;
+    void visit(AbstractVisitor& visitor) const override;
 
 private:
     explicit GroupByNode(Context& ctx,
@@ -160,11 +163,10 @@ public:
                           bool retainNonArrays,
                           NodePtr child);
 
-    void generateUnwindMemo(std::ostringstream& os) const;
+    void generateMemo(std::ostringstream& os) const;
 
 protected:
-
-    void visit(AbstractVisitor& visitor) override;
+    void visit(AbstractVisitor& visitor) const override;
 
 private:
     UnwindNode(Context& ctx, ProjectionName projectionName, bool retainNonArrays, NodePtr child);
@@ -177,10 +179,10 @@ class WindNode : public Node {
 public:
     static NodePtr create(Context& ctx, ProjectionName projectionName, NodePtr child);
 
-    void generateWindMemo(std::ostringstream& os) const;
+    void generateMemo(std::ostringstream& os) const;
 
 protected:
-    void visit(AbstractVisitor& visitor) override;
+    void visit(AbstractVisitor& visitor) const override;
 
 private:
     WindNode(Context& ctx, ProjectionName projectionName, NodePtr child);
