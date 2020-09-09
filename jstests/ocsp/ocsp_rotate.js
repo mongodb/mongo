@@ -1,4 +1,5 @@
 // Validate rotate certificates works with ocsp
+// @tags: [live_record_incompatible]
 (function() {
 "use strict";
 

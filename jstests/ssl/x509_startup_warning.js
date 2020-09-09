@@ -1,4 +1,5 @@
 // Test for startuo warning when X509 auth and sslAllowInvalidCertificates are enabled
+// @tags: [live_record_incompatible]
 
 (function() {
 'use strict';

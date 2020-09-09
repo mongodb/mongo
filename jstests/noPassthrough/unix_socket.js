@@ -8,7 +8,10 @@
  *    cause the server to exit with an error (socket names with whitespace are now supported)
  * 4) That the default unix socket doesn't get created if --nounixsocket is specified
  */
-//@tags: [requires_sharding]
+// @tags: [
+//   requires_sharding,
+//   live_record_incompatible,
+// ]
 (function() {
 'use strict';
 // This test will only work on POSIX machines.

@@ -1,4 +1,5 @@
 // Tests the _runningMongoChildProcessIds shell built-in.
+// @tags: [live_record_incompatible]
 
 (function() {
 'use strict';

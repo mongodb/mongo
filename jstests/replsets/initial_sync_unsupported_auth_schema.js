@@ -1,5 +1,6 @@
 // Test that initial sync aborts when it encounters auth data from unsupported
 // auth schemas (see: SERVER-17671)
+// @tags: [live_record_incompatible]
 
 function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     'use strict';

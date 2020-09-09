@@ -3,7 +3,8 @@
  * the primary eventually. If we get a commitIndexBuild oplog entry instead, the secondary should
  * crash.
  * @tags: [
- *     requires_replication,
+ *   requires_replication,
+ *   live_record_incompatible,
  * ]
  */
 (function() {

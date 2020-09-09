@@ -1,5 +1,6 @@
 // Test that mongoS accepts --timeZoneInfo <timezoneDBPath> as a command-line argument and that an
 // aggregation pipeline with timezone expressions executes correctly on mongoS.
+// @tags: [live_record_incompatible]
 (function() {
 const tzGoodInfo = "jstests/libs/config_files/good_timezone_info";
 const tzBadInfo = "jstests/libs/config_files/bad_timezone_info";

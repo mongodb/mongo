@@ -2,7 +2,10 @@
  * Tests that reading from an existing sync source continues uninterrupted when the sync source
  * enters quiesce mode.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ *   requires_fcv_47,
+ *   live_record_incompatible,
+ * ]
  */
 (function() {
 "use strict";

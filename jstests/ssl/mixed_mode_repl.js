@@ -1,5 +1,6 @@
 // This test is related to mixed_mode_repl_nossl.js in
 // the sslSpecial test set. This test must be run with --use-ssl
+// @tags: [live_record_incompatible]
 
 load("jstests/ssl/libs/ssl_helpers.js");
 

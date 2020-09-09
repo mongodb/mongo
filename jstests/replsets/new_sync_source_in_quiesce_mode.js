@@ -2,7 +2,10 @@
  * Test that fetching oplog from a new sync source that is in quiesce mode fails to establish a
  * connection, causing the server to reenter sync source selection.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ *   requires_fcv_47,
+ *   live_record_incompatible,
+ * ]
  */
 
 (function() {

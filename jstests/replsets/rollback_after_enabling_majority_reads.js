@@ -7,6 +7,7 @@
  * least the stable timestamp, i.e. we do not attempt to roll back operations that were included in
  * @tags: [
  *   requires_persistence,
+ *   live_record_incompatible,
  * ]
  */
 (function() {

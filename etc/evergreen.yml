@@ -6026,7 +6026,7 @@ tasks:
 
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough
-  tags: ["replica_sets", "non_maj_read"]
+  tags: ["replica_sets", "non_maj_read", "non_live_record"]
   depends_on:
   - name: jsCore
   commands:
@@ -6081,7 +6081,7 @@ tasks:
 
 - <<: *task_template
   name: replica_sets_kill_primary_jscore_passthrough
-  tags: ["replica_sets", "large", "non_maj_read"]
+  tags: ["replica_sets", "large", "non_maj_read", "non_live_record"]
   depends_on:
   - name: jsCore
   commands:
@@ -6103,7 +6103,7 @@ tasks:
 
 - <<: *task_template
   name: replica_sets_kill_secondaries_jscore_passthrough
-  tags: ["replica_sets", "san", "large"]
+  tags: ["replica_sets", "san", "large", "non_live_record"]
   depends_on:
   - name: jsCore
   commands:
@@ -6114,7 +6114,7 @@ tasks:
 
 - <<: *task_template
   name: mongosTest
-  tags: ["misc_js", "non_read_maj"]
+  tags: ["misc_js", "non_read_maj", "non_live_record"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6917,7 +6917,7 @@ tasks:
       fallback_num_sub_suites: 32
 
 - name: sharding_csrs_continuous_config_stepdown_gen
-  tags: ["sharding", "common", "csrs"]
+  tags: ["sharding", "common", "csrs", "non_live_record"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6964,7 +6964,7 @@ tasks:
       fallback_num_sub_suites: 31
 
 - name: sharding_auth_audit_gen
-  tags: ["auth", "audit"]
+  tags: ["auth", "audit", "non_live_record"]
   depends_on:
   - name: sharding_auth_gen
   commands:
@@ -12793,38 +12793,55 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     record_with: --recordWith /opt/undodb5/bin/live-record
     exec_timeout_secs: 14400 # 4 hours
-    test_flags: --excludeWithAnyTags=requires_fast_memory
+    test_flags: --excludeWithAnyTags=requires_fast_memory,live_record_incompatible
   tasks:
   - name: compile_without_package_TG
+  - name: .aggfuzzer
+  - name: .aggregation
+  - name: audit
+  - name: .auth !.multiversion !.non_live_record
+  - name: .causally_consistent !.sharding
+  - name: .change_streams
+  - name: .misc_js !.non_live_record
+  - name: .encrypt
+  - name: initial_sync_fuzzer_gen
   - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: replica_sets_multi_stmt_txn_jscore_passthrough
-  - name: replica_sets_large_txns_format_jscore_passthrough
-  - name: sharded_collections_causally_consistent_jscore_txns_passthrough
-  - name: sharded_jscore_op_query_txns
-  - name: sharded_jscore_txns
-  - name: sharded_jscore_txns_sharded_collections
-  - name: sharding_jscore_passthrough
-  - name: sharding_jscore_op_query_passthrough
-  - name: aggregation
-  - name: aggregation_auth
-  - name: aggregation_disabled_optimization
-  - name: aggregation_ese
-  - name: aggregation_ese_gcm
-  - name: aggregation_facet_unwind_passthrough
-  - name: aggregation_slot_based_execution
-  - name: .auth .gle
-  - name: .jscore .encrypt
-  - name: noPassthroughWithMongod_gen
-  - name: parallel_compatibility
-  - name: serial_run
-  - name: session_jscore_passthrough
-  - name: .aggfuzzer
-  - name: query_fuzzer_standalone_gen
-  - name: update_fuzzer_gen
+  - name: jsCore_txns_large_txns_format
+  - name: jsonSchema
   - name: jstestfuzz_gen
   - name: jstestfuzz_interrupt_gen
+  - name: jstestfuzz_interrupt_replication_gen
+  - name: jstestfuzz_replication_gen
+  - name: jstestfuzz_replication_initsync_gen
+  - name: jstestfuzz_replication_session_gen
+  - name: jstestfuzz_sharded_gen
+  - name: jstestfuzz_sharded_causal_consistency_gen
+  - name: jstestfuzz_sharded_continuous_stepdown_gen
+  - name: jstestfuzz_sharded_session_gen
+  - name: multiversion_sanity_check_gen
+  - name: mqlrun
+  - name: .multi_shard
+  - name: tenant_migration_jscore_passthrough_gen
+  - name: .query_fuzzer
+  - name: .read_write_concern
+  - name: .replica_sets !.encrypt !.auth !.non_live_record
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough
+  - name: .read_only
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns
+  - name: .sharding .common !.non_live_record
+  - name: snmp
+  - name: .updatefuzzer
 
 - <<: *enterprise-rhel-62-64-bit-dynamic-required-template
   name: rhel-62-64-bit-dynamic-visibility-test

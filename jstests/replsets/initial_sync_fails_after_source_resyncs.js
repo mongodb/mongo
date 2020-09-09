@@ -1,6 +1,7 @@
 /**
  * Tests that initial sync will abort an attempt if the sync source enters and completes initial
  * sync during cloning (i.e. the source is resynced during an outage).
+ * @tags: [live_record_incompatible]
  */
 (function() {
 "use strict";

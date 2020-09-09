@@ -1,5 +1,6 @@
 /**
  * This test simulates initial sync workflows which are performed by the Atlas automation agent.
+ * @tags: [live_record_incompatible]
  */
 (function() {
 "use strict";

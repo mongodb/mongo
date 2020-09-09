@@ -1,6 +1,7 @@
 /**
  * Confirm that replication of an invalid index specification causes server abort (where index
  * version is >= 2).
+ * @tags: [live_record_incompatible]
  */
 
 (function() {

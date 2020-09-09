@@ -1,6 +1,7 @@
 /**
  * Confirm that replica members undergoing initial sync fail if an invalid index specification is
  * encountered (where index version is >= 2).
+ * @tags: [live_record_incompatible]
  */
 load("jstests/libs/logv2_helpers.js");
 

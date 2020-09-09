@@ -2,7 +2,10 @@
 // apply any remaining unapplied ops before coming up as a secondary. If the op fails to apply, the
 // server must fail to start up.
 //
-// @tags: [requires_persistence]
+// @tags: [
+//   requires_persistence,
+//   live_record_incompatible,
+// ]
 (function() {
 "use strict";
 

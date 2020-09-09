@@ -5,7 +5,10 @@
  * have that write is forced to (try to) roll back, and it crashes as it refuses to roll back
  * majority-committed writes.
  *
- * @tags: [multiversion_incompatible]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   live_record_incompatible,
+ * ]
  */
 
 (function() {

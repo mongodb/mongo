@@ -1057,25 +1057,19 @@ var stopMongoProgram = function(conn, signal, opts, waitpid) {
         returnCode = _stopMongoProgram(port, signal, opts, waitpid);
     }
 
-    if (conn.undoLiveRecordPid) {
-        print("Saving the UndoDB recording; it may take a few minutes...");
-        returnCode = waitProgram(conn.undoLiveRecordPid);
-        if (returnCode !== 0) {
-            throw new Error(
-                "Undo live-record failed to terminate correctly. This is likely a bug in Undo. " +
-                "Please record any logs and send them to the #server-tig Slack channel");
-        }
-    }
-
     // If we are not waiting for shutdown, then there is no exit code to check.
     if (!waitpid) {
-        return 0;
+        returnCode = 0;
     }
     if (allowedExitCode !== returnCode) {
         throw new MongoRunner.StopError(returnCode);
     } else if (returnCode !== MongoRunner.EXIT_CLEAN) {
         print("MongoDB process on port " + port + " intentionally exited with error code ",
               returnCode);
+    }
+
+    if (conn.undoLiveRecordPid) {
+        _stopUndoLiveRecord(conn.undoLiveRecordPid);
     }
 
     return returnCode;
@@ -1398,6 +1392,9 @@ MongoRunner.awaitConnection = function({pid, port, undoLiveRecordPid = null} = {
                 print("mongo program was not running at " + port +
                       ", process ended with exit code: " + res.exitCode);
                 serverExitCodeMap[port] = res.exitCode;
+                if (undoLiveRecordPid) {
+                    _stopUndoLiveRecord(undoLiveRecordPid);
+                }
                 return true;
             }
         }
@@ -1407,8 +1404,18 @@ MongoRunner.awaitConnection = function({pid, port, undoLiveRecordPid = null} = {
 };
 
 var _runUndoLiveRecord = function(pid) {
-    var argArray = [jsTestOptions().undoRecorderPath, "--thread-fuzzing", "-p", pid];
+    var argArray = [jsTestOptions().undoRecorderPath, "-p", pid];
     return _startMongoProgram.apply(null, argArray);
+};
+
+var _stopUndoLiveRecord = function(undoLiveRecordPid) {
+    print("Saving the UndoDB recording; it may take a few minutes...");
+    var undoReturnCode = waitProgram(undoLiveRecordPid);
+    if (undoReturnCode !== 0) {
+        throw new Error(
+            "Undo live-record failed to terminate correctly. This is likely a bug in Undo. " +
+            "Please record any logs and send them to the #server-tig Slack channel");
+    }
 };
 
 /**

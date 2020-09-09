@@ -7,6 +7,7 @@
 //   requires_sharding,
 //   uses_multi_shard_transaction,
 //   uses_transactions,
+//   live_record_incompatible,
 // ]
 (function() {
 "use strict";

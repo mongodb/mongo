@@ -1,6 +1,7 @@
 /*
  * This file tests an encrypted shell started using command line parameters.
  *
+ * @tags: [live_record_incompatible]
  */
 load('jstests/ssl/libs/ssl_helpers.js');
 
