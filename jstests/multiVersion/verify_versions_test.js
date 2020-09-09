@@ -42,8 +42,8 @@ function assertBinVersionComparesEqual(v1, v2) {
 
 // The current version is in the 4.5 series. This has to be changed very time we bump
 // the major version pair, but it provides a useful test of assumptions.
-assertBinVersionsEqual("4.5", version());
-assertBinVersionComparesEqual("4.5", version());
+assertBinVersionsEqual("4.7", version());
+assertBinVersionComparesEqual("4.7", version());
 
 // "latest" is the same version as the shell, "last-lts" is not.
 assertBinVersionsEqual("latest", version());
