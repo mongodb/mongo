@@ -138,6 +138,9 @@ public:
         MONGO_UNREACHABLE;
     }
     void setStableTimestamp(Timestamp stableTimestamp, bool force = false) final {}
+    Timestamp getStableTimestamp() const override {
+        return Timestamp();
+    }
     void setInitialDataTimestamp(Timestamp timestamp) final {}
     Timestamp getInitialDataTimestamp() const override {
         return Timestamp();
@@ -172,6 +175,7 @@ public:
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              const NamespaceString& nss,
                              std::shared_ptr<Ident> ident) final {}
+    void checkpoint() final {}
     Status currentFilesCompatible(OperationContext* opCtx) const final {
         return Status::OK();
     }

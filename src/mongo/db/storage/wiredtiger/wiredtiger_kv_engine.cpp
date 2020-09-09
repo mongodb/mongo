@@ -119,8 +119,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 
-MONGO_FAIL_POINT_DEFINE(pauseCheckpointThread);
-
 }  // namespace
 
 bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
@@ -254,231 +252,6 @@ std::string toString(const StorageEngine::OldestActiveTransactionTimestampResult
         return r.getStatus().toString();
     }
 }
-
-class WiredTigerKVEngine::WiredTigerCheckpointThread : public BackgroundJob {
-public:
-    explicit WiredTigerCheckpointThread(WiredTigerKVEngine* wiredTigerKVEngine,
-                                        WiredTigerSessionCache* sessionCache)
-        : BackgroundJob(false /* deleteSelf */),
-          _wiredTigerKVEngine(wiredTigerKVEngine),
-          _sessionCache(sessionCache) {}
-
-    virtual string name() const {
-        return "WTCheckpointThread";
-    }
-
-    virtual void run() {
-        ThreadClient tc(name(), getGlobalServiceContext());
-        LOGV2_DEBUG(22307, 1, "Starting thread", "threadName"_attr = name());
-
-        while (true) {
-            auto opCtx = tc->makeOperationContext();
-
-            {
-                stdx::unique_lock<Latch> lock(_mutex);
-                MONGO_IDLE_THREAD_BLOCK;
-
-                // Wait for 'wiredTigerGlobalOptions.checkpointDelaySecs' seconds; or until either
-                // shutdown is signaled or a checkpoint is triggered.
-                _condvar.wait_for(lock,
-                                  stdx::chrono::seconds(static_cast<std::int64_t>(
-                                      wiredTigerGlobalOptions.checkpointDelaySecs)),
-                                  [&] { return _shuttingDown || _triggerCheckpoint; });
-
-                // If the checkpointDelaySecs is set to 0, that means we should skip checkpointing.
-                // However, checkpointDelaySecs is adjustable by a runtime server parameter, so we
-                // need to wake up to check periodically. The wakeup to check period is arbitrary.
-                while (wiredTigerGlobalOptions.checkpointDelaySecs == 0 && !_shuttingDown &&
-                       !_triggerCheckpoint) {
-                    _condvar.wait_for(lock,
-                                      stdx::chrono::seconds(static_cast<std::int64_t>(3)),
-                                      [&] { return _shuttingDown || _triggerCheckpoint; });
-                }
-
-                if (_shuttingDown) {
-                    LOGV2_DEBUG(22309, 1, "Stopping thread", "threadName"_attr = name());
-                    return;
-                }
-
-                // Clear the trigger so we do not immediately checkpoint again after this.
-                _triggerCheckpoint = false;
-            }
-
-            pauseCheckpointThread.pauseWhileSet();
-
-            const Date_t startTime = Date_t::now();
-
-            const Timestamp stableTimestamp = _wiredTigerKVEngine->getStableTimestamp();
-            const Timestamp initialDataTimestamp = _wiredTigerKVEngine->getInitialDataTimestamp();
-
-            // The amount of oplog to keep is primarily dictated by a user setting. However, in
-            // unexpected cases, durable, recover to a timestamp storage engines may need to play
-            // forward from an oplog entry that would otherwise be truncated by the user
-            // setting. Furthermore, the entries in prepared or large transactions can refer to
-            // previous entries in the same transaction.
-            //
-            // Live (replication) rollback will replay oplogs from exactly the stable timestamp.
-            // With prepared or large transactions, it may require some additional entries prior to
-            // the stable timestamp. These requirements are summarized in getOplogNeededForRollback.
-            // Truncating the oplog at this point is sufficient for in-memory configurations, but
-            // could cause an unrecoverable scenario if the node crashed and has to play from the
-            // last stable checkpoint.
-            //
-            // By recording the oplog needed for rollback "now", then taking a stable checkpoint,
-            // we can safely assume that the oplog needed for crash recovery has caught up to the
-            // recorded value. After the checkpoint, this value will be published such that actors
-            // which truncate the oplog can read an updated value.
-            try {
-                // Three cases:
-                //
-                // First, initialDataTimestamp is Timestamp(0, 1) -> Take full checkpoint. This is
-                // when there is no consistent view of the data (i.e: during initial sync).
-                //
-                // Second, stableTimestamp < initialDataTimestamp: Skip checkpoints. The data on
-                // disk is prone to being rolled back. Hold off on checkpoints.  Hope that the
-                // stable timestamp surpasses the data on disk, allowing storage to persist newer
-                // copies to disk.
-                //
-                // Third, stableTimestamp >= initialDataTimestamp: Take stable checkpoint. Steady
-                // state case.
-                if (initialDataTimestamp.asULL() <= 1) {
-                    UniqueWiredTigerSession session = _sessionCache->getSession();
-                    WT_SESSION* s = session->getSession();
-                    invariantWTOK(s->checkpoint(s, "use_timestamp=false"));
-                } else if (stableTimestamp < initialDataTimestamp) {
-                    LOGV2_FOR_RECOVERY(
-                        23985,
-                        2,
-                        "Stable timestamp is behind the initial data timestamp, skipping "
-                        "a checkpoint. StableTimestamp: {stableTimestamp} InitialDataTimestamp: "
-                        "{initialDataTimestamp}",
-                        "stableTimestamp"_attr = stableTimestamp.toString(),
-                        "initialDataTimestamp"_attr = initialDataTimestamp.toString());
-                } else {
-                    auto oplogNeededForRollback = _wiredTigerKVEngine->getOplogNeededForRollback();
-
-                    LOGV2_FOR_RECOVERY(
-                        23986,
-                        2,
-                        "Performing stable checkpoint. StableTimestamp: {stableTimestamp}, "
-                        "OplogNeededForRollback: {oplogNeededForRollback}",
-                        "stableTimestamp"_attr = stableTimestamp,
-                        "oplogNeededForRollback"_attr = toString(oplogNeededForRollback));
-
-                    UniqueWiredTigerSession session = _sessionCache->getSession();
-                    WT_SESSION* s = session->getSession();
-                    invariantWTOK(s->checkpoint(s, "use_timestamp=true"));
-
-                    if (oplogNeededForRollback.isOK()) {
-                        // Now that the checkpoint is durable, publish the oplog needed to recover
-                        // from it.
-                        stdx::lock_guard<Latch> lk(_oplogNeededForCrashRecoveryMutex);
-                        _oplogNeededForCrashRecovery.store(
-                            oplogNeededForRollback.getValue().asULL());
-                    }
-                }
-
-                const auto secondsElapsed = durationCount<Seconds>(Date_t::now() - startTime);
-                if (secondsElapsed >= 30) {
-                    LOGV2_DEBUG(22308,
-                                1,
-                                "Checkpoint took {secondsElapsed} seconds to complete.",
-                                "secondsElapsed"_attr = secondsElapsed);
-                }
-            } catch (const WriteConflictException&) {
-                // Temporary: remove this after WT-3483
-                LOGV2_WARNING(22346, "Checkpoint encountered a write conflict exception.");
-            } catch (const AssertionException& exc) {
-                invariant(ErrorCodes::isShutdownError(exc.code()), exc.what());
-            }
-        }
-    }
-
-    /**
-     * Returns true if we have already triggered taking the first checkpoint.
-     */
-    bool hasTriggeredFirstStableCheckpoint() {
-        stdx::unique_lock<Latch> lock(_mutex);
-        return _hasTriggeredFirstStableCheckpoint;
-    }
-
-    /**
-     * Triggers taking the first stable checkpoint, which is when the stable timestamp advances past
-     * the initial data timestamp.
-     *
-     * The checkpoint thread runs automatically every wiredTigerGlobalOptions.checkpointDelaySecs
-     * seconds. This function avoids potentially waiting that full duration for a stable checkpoint,
-     * initiating one immediately.
-     *
-     * Do not call this function if hasTriggeredFirstStableCheckpoint() returns true.
-     */
-    void triggerFirstStableCheckpoint(Timestamp prevStable,
-                                      Timestamp initialData,
-                                      Timestamp currStable) {
-        stdx::unique_lock<Latch> lock(_mutex);
-        invariant(!_hasTriggeredFirstStableCheckpoint);
-        if (prevStable < initialData && currStable >= initialData) {
-            LOGV2(22310,
-                  "Triggering the first stable checkpoint. Initial Data: {initialData} PrevStable: "
-                  "{prevStable} CurrStable: {currStable}",
-                  "Triggering the first stable checkpoint",
-                  "initialData"_attr = initialData,
-                  "prevStable"_attr = prevStable,
-                  "currStable"_attr = currStable);
-            _hasTriggeredFirstStableCheckpoint = true;
-            _triggerCheckpoint = true;
-            _condvar.notify_one();
-        }
-    }
-
-    std::uint64_t getOplogNeededForCrashRecovery() const {
-        return _oplogNeededForCrashRecovery.load();
-    }
-
-    /*
-     * Atomically assign _oplogNeededForCrashRecovery to a variable.
-     * _oplogNeededForCrashRecovery will not change during assignment.
-     */
-    void assignOplogNeededForCrashRecoveryTo(boost::optional<Timestamp>* timestamp) {
-        stdx::lock_guard<Latch> lk(_oplogNeededForCrashRecoveryMutex);
-        *timestamp = Timestamp(_oplogNeededForCrashRecovery.load());
-    }
-
-    void shutdown() {
-        {
-            stdx::unique_lock<Latch> lock(_mutex);
-            _shuttingDown = true;
-            // Wake up the checkpoint thread early, to take a final checkpoint before shutting
-            // down, if one has not coincidentally just been taken.
-            _condvar.notify_one();
-        }
-        wait();
-    }
-
-private:
-    WiredTigerKVEngine* _wiredTigerKVEngine;
-    WiredTigerSessionCache* _sessionCache;
-
-    Mutex _oplogNeededForCrashRecoveryMutex =
-        MONGO_MAKE_LATCH("WiredTigerCheckpointThread::_oplogNeededForCrashRecoveryMutex");
-    AtomicWord<std::uint64_t> _oplogNeededForCrashRecovery;
-
-    // Protects the state below.
-    Mutex _mutex = MONGO_MAKE_LATCH("WiredTigerCheckpointThread::_mutex");
-
-    // The checkpoint thread idles on this condition variable for a particular time duration between
-    // taking checkpoints. It can be triggered early to expedite either: immediate checkpointing if
-    // _triggerCheckpoint is set; or shutdown cleanup if _shuttingDown is set.
-    stdx::condition_variable _condvar;
-
-    bool _shuttingDown = false;
-
-    // This flag ensures the first stable checkpoint is only triggered once.
-    bool _hasTriggeredFirstStableCheckpoint = false;
-
-    // This flag allows the checkpoint thread to wake up early when _condvar is signaled.
-    bool _triggerCheckpoint = false;
-};
 
 namespace {
 TicketHolder openWriteTransaction(128);
@@ -759,16 +532,6 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
     _sessionCache.reset(nullptr);
 }
 
-void WiredTigerKVEngine::startAsyncThreads() {
-    if (!_ephemeral) {
-        if (!_readOnly) {
-            _checkpointThread =
-                std::make_unique<WiredTigerCheckpointThread>(this, _sessionCache.get());
-            _checkpointThread->go();
-        }
-    }
-}
-
 void WiredTigerKVEngine::notifyStartupComplete() {
     WiredTigerUtil::notifyStartupComplete();
 }
@@ -897,11 +660,6 @@ void WiredTigerKVEngine::cleanShutdown() {
         LOGV2(22318, "Shutting down session sweeper thread");
         _sessionSweeper->shutdown();
         LOGV2(22319, "Finished shutting down session sweeper thread");
-    }
-    if (_checkpointThread) {
-        LOGV2(22322, "Shutting down checkpoint thread");
-        _checkpointThread->shutdown();
-        LOGV2(22323, "Finished shutting down checkpoint thread");
     }
     LOGV2_FOR_RECOVERY(23988,
                        2,
@@ -1385,7 +1143,7 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
 
     // Oplog truncation thread won't remove oplog since the checkpoint pinned by the backup cursor.
     stdx::lock_guard<Latch> lock(_oplogPinnedByBackupMutex);
-    _checkpointThread->assignOplogNeededForCrashRecoveryTo(&_oplogPinnedByBackup);
+    _oplogPinnedByBackup = Timestamp(_oplogNeededForCrashRecovery.load());
     auto pinOplogGuard = makeGuard([&] { _oplogPinnedByBackup = boost::none; });
 
     // Persist the sizeStorer information to disk before opening the backup cursor. We aren't
@@ -1907,6 +1665,74 @@ bool WiredTigerKVEngine::supportsDirectoryPerDB() const {
     return true;
 }
 
+void WiredTigerKVEngine::checkpoint() {
+    const Timestamp stableTimestamp = getStableTimestamp();
+    const Timestamp initialDataTimestamp = getInitialDataTimestamp();
+
+    // The amount of oplog to keep is primarily dictated by a user setting. However, in unexpected
+    // cases, durable, recover to a timestamp storage engines may need to play forward from an oplog
+    // entry that would otherwise be truncated by the user setting. Furthermore, the entries in
+    // prepared or large transactions can refer to previous entries in the same transaction.
+    //
+    // Live (replication) rollback will replay the oplog from exactly the stable timestamp. With
+    // prepared or large transactions, it may require some additional entries prior to the stable
+    // timestamp. These requirements are summarized in getOplogNeededForRollback. Truncating the
+    // oplog at this point is sufficient for in-memory configurations, but could cause an
+    // unrecoverable scenario if the node crashed and has to play from the last stable checkpoint.
+    //
+    // By recording the oplog needed for rollback "now", then taking a stable checkpoint, we can
+    // safely assume that the oplog needed for crash recovery has caught up to the recorded value.
+    // After the checkpoint, this value will be published such that actors which truncate the oplog
+    // can read an updated value.
+    try {
+        // Three cases:
+        //
+        // First, initialDataTimestamp is Timestamp(0, 1) -> Take full checkpoint. This is when
+        // there is no consistent view of the data (i.e: during initial sync).
+        //
+        // Second, stableTimestamp < initialDataTimestamp: Skip checkpoints. The data on disk is
+        // prone to being rolled back. Hold off on checkpoints.  Hope that the stable timestamp
+        // surpasses the data on disk, allowing storage to persist newer copies to disk.
+        //
+        // Third, stableTimestamp >= initialDataTimestamp: Take stable checkpoint. Steady state
+        // case.
+        if (initialDataTimestamp.asULL() <= 1) {
+            UniqueWiredTigerSession session = _sessionCache->getSession();
+            WT_SESSION* s = session->getSession();
+            invariantWTOK(s->checkpoint(s, "use_timestamp=false"));
+        } else if (stableTimestamp < initialDataTimestamp) {
+            LOGV2_FOR_RECOVERY(
+                23985,
+                2,
+                "Stable timestamp is behind the initial data timestamp, skipping a checkpoint.",
+                "stableTimestamp"_attr = stableTimestamp.toString(),
+                "initialDataTimestamp"_attr = initialDataTimestamp.toString());
+        } else {
+            auto oplogNeededForRollback = getOplogNeededForRollback();
+
+            LOGV2_FOR_RECOVERY(23986,
+                               2,
+                               "Performing stable checkpoint.",
+                               "stableTimestamp"_attr = stableTimestamp,
+                               "oplogNeededForRollback"_attr = toString(oplogNeededForRollback));
+
+            UniqueWiredTigerSession session = _sessionCache->getSession();
+            WT_SESSION* s = session->getSession();
+            invariantWTOK(s->checkpoint(s, "use_timestamp=true"));
+
+            if (oplogNeededForRollback.isOK()) {
+                // Now that the checkpoint is durable, publish the oplog needed to recover from it.
+                _oplogNeededForCrashRecovery.store(oplogNeededForRollback.getValue().asULL());
+            }
+        }
+    } catch (const WriteConflictException&) {
+        // TODO SERVER-50824: Check if this can be removed now that WT-3483 is done.
+        LOGV2_WARNING(22346, "Checkpoint encountered a write conflict exception.");
+    } catch (const AssertionException& exc) {
+        invariant(ErrorCodes::isShutdownError(exc.code()), exc.what());
+    }
+}
+
 bool WiredTigerKVEngine::hasIdent(OperationContext* opCtx, StringData ident) const {
     return _hasUri(WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession(), _uri(ident));
 }
@@ -2045,10 +1871,6 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
     // After publishing a stable timestamp to WT, we can record the updated stable timestamp value
     // for the necessary oplog to keep.
     _stableTimestamp.store(stableTimestamp.asULL());
-    if (_checkpointThread && !_checkpointThread->hasTriggeredFirstStableCheckpoint()) {
-        _checkpointThread->triggerFirstStableCheckpoint(
-            prevStable, Timestamp(_initialDataTimestamp.load()), stableTimestamp);
-    }
 
     // If 'force' is set, then we have already set the oldest timestamp equal to the stable
     // timestamp, so there is nothing left to do.
@@ -2193,13 +2015,6 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
         23989, 2, "WiredTiger::RecoverToStableTimestamp syncing size storer to disk.");
     syncSizeInfo(true);
 
-    if (!_ephemeral) {
-        LOGV2_FOR_ROLLBACK(
-            23990, 2, "WiredTiger::RecoverToStableTimestamp shutting down checkpoint thread.");
-        // Shutdown WiredTigerKVEngine owned accesses into the storage engine.
-        _checkpointThread->shutdown();
-    }
-
     const Timestamp stableTimestamp(_stableTimestamp.load());
     const Timestamp initialDataTimestamp(_initialDataTimestamp.load());
 
@@ -2214,11 +2029,6 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     if (ret) {
         return {ErrorCodes::UnrecoverableRollbackError,
                 str::stream() << "Error rolling back to stable. Err: " << wiredtiger_strerror(ret)};
-    }
-
-    if (!_ephemeral) {
-        _checkpointThread = std::make_unique<WiredTigerCheckpointThread>(this, _sessionCache.get());
-        _checkpointThread->go();
     }
 
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
@@ -2345,7 +2155,7 @@ boost::optional<Timestamp> WiredTigerKVEngine::getOplogNeededForCrashRecovery() 
         return boost::none;
     }
 
-    return Timestamp(_checkpointThread->getOplogNeededForCrashRecovery());
+    return Timestamp(_oplogNeededForCrashRecovery.load());
 }
 
 Timestamp WiredTigerKVEngine::getPinnedOplog() const {

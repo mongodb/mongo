@@ -58,6 +58,7 @@ void StorageGlobalParams::reset() {
     oplogMinRetentionHours.store(0.0);
     allowOplogTruncation = true;
     disableLockFreeReads = true;
+    checkpointDelaySecs = 0;
 }
 
 StorageGlobalParams storageGlobalParams;

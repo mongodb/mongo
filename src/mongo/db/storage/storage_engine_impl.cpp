@@ -670,8 +670,6 @@ void StorageEngineImpl::finishInit() {
     // A storage engine may need to start threads that require OperationsContexts with real Lockers,
     // as opposed to LockerNoops. Placing the start logic here, after the StorageEngine has been
     // instantiated, causes makeOperationContext() to create LockerImpls instead of LockerNoops.
-    _engine->startAsyncThreads();
-
     if (_engine->supportsRecoveryTimestamp()) {
         _timestampMonitor = std::make_unique<TimestampMonitor>(
             _engine.get(), getGlobalServiceContext()->getPeriodicRunner());
@@ -893,6 +891,10 @@ void StorageEngineImpl::setStableTimestamp(Timestamp stableTimestamp, bool force
     _engine->setStableTimestamp(stableTimestamp, force);
 }
 
+Timestamp StorageEngineImpl::getStableTimestamp() const {
+    return _engine->getStableTimestamp();
+}
+
 void StorageEngineImpl::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
     _engine->setInitialDataTimestamp(initialDataTimestamp);
 }
@@ -1031,6 +1033,10 @@ void StorageEngineImpl::addDropPendingIdent(const Timestamp& dropTimestamp,
                                             const NamespaceString& nss,
                                             std::shared_ptr<Ident> ident) {
     _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, nss, ident);
+}
+
+void StorageEngineImpl::checkpoint() {
+    _engine->checkpoint();
 }
 
 void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp) {

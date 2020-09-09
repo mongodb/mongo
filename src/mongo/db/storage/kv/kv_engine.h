@@ -53,18 +53,6 @@ class SnapshotManager;
 class KVEngine {
 public:
     /**
-     * This function should only be called after the StorageEngine is set on the ServiceContext.
-     *
-     * Starts asycnhronous threads for a storage engine's integration layer. Any such thread
-     * generating an OperationContext should be initialized here.
-     *
-     * In order for OperationContexts to be generated with real Locker objects, the generation must
-     * occur after the StorageEngine is instantiated and set on the ServiceContext. Otherwise,
-     * OperationContexts are created with LockerNoops.
-     */
-    virtual void startAsyncThreads() {}
-
-    /**
      * During the startup process, the storage engine is one of the first components to be started
      * up and fully initialized. But that fully initialized storage engine may not be recognized as
      * the end for the remaining storage startup tasks that still need to be performed.
@@ -274,6 +262,8 @@ public:
     virtual bool supportsCheckpoints() const {
         return false;
     }
+
+    virtual void checkpoint() {}
 
     virtual bool isDurable() const = 0;
 

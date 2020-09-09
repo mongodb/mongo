@@ -123,6 +123,8 @@ public:
 
     virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override;
 
+    virtual Timestamp getStableTimestamp() const override;
+
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
     virtual Timestamp getInitialDataTimestamp() const override;
@@ -314,6 +316,8 @@ public:
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              const NamespaceString& nss,
                              std::shared_ptr<Ident> ident) override;
+
+    void checkpoint() override;
 
     DurableCatalog* getCatalog() override {
         return _catalog.get();

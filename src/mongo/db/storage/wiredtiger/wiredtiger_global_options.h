@@ -40,7 +40,6 @@ class WiredTigerGlobalOptions {
 public:
     WiredTigerGlobalOptions()
         : cacheSizeGB(0),
-          checkpointDelaySecs(0),
           statisticsLogDelaySecs(0),
           directoryForIndexes(false),
           maxCacheOverflowFileSizeGBDeprecated(0),
@@ -50,7 +49,6 @@ public:
     Status store(const optionenvironment::Environment& params);
 
     double cacheSizeGB;
-    size_t checkpointDelaySecs;
     size_t statisticsLogDelaySecs;
     std::string journalCompressor;
     bool directoryForIndexes;

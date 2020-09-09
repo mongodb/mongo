@@ -473,6 +473,12 @@ public:
                                      std::shared_ptr<Ident> ident) = 0;
 
     /**
+     * Called when the checkpoint thread instructs the storage engine to take a checkpoint. The
+     * underlying storage engine must take a checkpoint at this point.
+     */
+    virtual void checkpoint() = 0;
+
+    /**
      * Recovers the storage engine state to the last stable timestamp. "Stable" in this case
      * refers to a timestamp that is guaranteed to never be rolled back. The stable timestamp
      * used should be one provided by StorageEngine::setStableTimestamp().
@@ -515,6 +521,11 @@ public:
      * timestamp, the oldest timestamp, and the commit timestamp backward.
      */
     virtual void setStableTimestamp(Timestamp stableTimestamp, bool force = false) = 0;
+
+    /**
+     * Returns the stable timestamp.
+     */
+    virtual Timestamp getStableTimestamp() const = 0;
 
     /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because

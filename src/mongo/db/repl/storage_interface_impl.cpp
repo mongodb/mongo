@@ -74,6 +74,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -1271,7 +1272,18 @@ void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx, Timest
                   "holdStableTimestamp"_attr = holdStableTimestamp);
         }
     });
-    serviceCtx->getStorageEngine()->setStableTimestamp(newStableTimestamp);
+
+    StorageEngine* storageEngine = serviceCtx->getStorageEngine();
+    Timestamp prevStableTimestamp = storageEngine->getStableTimestamp();
+
+    storageEngine->setStableTimestamp(newStableTimestamp);
+
+    Checkpointer* checkpointer = Checkpointer::get(serviceCtx);
+    if (checkpointer && !checkpointer->hasTriggeredFirstStableCheckpoint()) {
+        checkpointer->triggerFirstStableCheckpoint(prevStableTimestamp,
+                                                   storageEngine->getInitialDataTimestamp(),
+                                                   storageEngine->getStableTimestamp());
+    }
 }
 
 void StorageInterfaceImpl::setInitialDataTimestamp(ServiceContext* serviceCtx,

@@ -123,6 +123,10 @@ struct StorageGlobalParams {
     // settings with which lock-free reads are incompatible: standalone mode; and
     // enableMajorityReadConcern=false.
     bool disableLockFreeReads;
+
+    // Delay in seconds between triggering the next checkpoint after the completion of the previous
+    // one. A value of 0 indicates that checkpointing will be skipped.
+    size_t checkpointDelaySecs;
 };
 
 extern StorageGlobalParams storageGlobalParams;

@@ -121,11 +121,13 @@ env.Library(
         'control/storage_control.cpp',
     ],
     LIBDEPS=[
+        'checkpointer',
         'journal_flusher',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
+        'storage_options',
     ],
 )
 
@@ -509,6 +511,19 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'durable_catalog_impl',
         'kv/kv_drop_pending_ident_reaper',
+    ],
+)
+
+env.Library(
+    target='checkpointer',
+    source=[
+        'checkpointer.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/background_job',
+        'storage_options',
     ],
 )
 

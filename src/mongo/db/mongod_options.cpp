@@ -404,6 +404,9 @@ Status storeMongodOptions(const moe::Environment& params) {
 
     if (params.count("storage.syncPeriodSecs")) {
         storageGlobalParams.syncdelay = params["storage.syncPeriodSecs"].as<double>();
+        storageGlobalParams.checkpointDelaySecs =
+            static_cast<size_t>(params["storage.syncPeriodSecs"].as<double>());
+
         if (storageGlobalParams.syncdelay < 0 ||
             storageGlobalParams.syncdelay > StorageGlobalParams::kMaxSyncdelaySecs) {
             return Status(ErrorCodes::BadValue,

@@ -43,11 +43,6 @@ WiredTigerGlobalOptions wiredTigerGlobalOptions;
 
 Status WiredTigerGlobalOptions::store(const moe::Environment& params) {
     // WiredTiger storage engine options
-    if (params.count("storage.syncPeriodSecs")) {
-        wiredTigerGlobalOptions.checkpointDelaySecs =
-            static_cast<size_t>(params["storage.syncPeriodSecs"].as<double>());
-    }
-
     if (!wiredTigerGlobalOptions.engineConfig.empty()) {
         LOGV2(22293,
               "Engine custom option: {wiredTigerGlobalOptions_engineConfig}",

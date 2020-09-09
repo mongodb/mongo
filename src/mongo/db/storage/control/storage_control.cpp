@@ -35,7 +35,9 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -73,12 +75,25 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
     journalFlusher->go();
     JournalFlusher::set(serviceContext, std::move(journalFlusher));
 
+    if (storageEngine->supportsCheckpoints() && !storageEngine->isEphemeral() &&
+        !storageGlobalParams.readOnly) {
+        std::unique_ptr<Checkpointer> checkpointer =
+            std::make_unique<Checkpointer>(storageEngine->getEngine());
+        checkpointer->go();
+        Checkpointer::set(serviceContext, std::move(checkpointer));
+    }
+
     areControlsStarted = true;
 }
 
 void stopStorageControls(ServiceContext* serviceContext, const Status& reason) {
     if (areControlsStarted) {
         JournalFlusher::get(serviceContext)->shutdown(reason);
+
+        auto checkpointer = Checkpointer::get(serviceContext);
+        if (checkpointer) {
+            checkpointer->shutdown(reason);
+        }
     }
 }
 

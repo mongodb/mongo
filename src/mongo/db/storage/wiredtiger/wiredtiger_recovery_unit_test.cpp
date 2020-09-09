@@ -61,13 +61,6 @@ public:
                   false,                  // .repair
                   false                   // .readOnly
           ) {
-        // Deliberately not calling _engine->startAsyncThreads() because it starts an asynchronous
-        // checkpointing thread that can interfere with unit tests manipulating checkpoints
-        // manually.
-        //
-        // Alternatively, we would have to start using wiredTigerGlobalOptions.checkpointDelaySecs
-        // to set a high enough value such that the async thread never runs during testing.
-
         repl::ReplicationCoordinator::set(
             getGlobalServiceContext(),
             std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(

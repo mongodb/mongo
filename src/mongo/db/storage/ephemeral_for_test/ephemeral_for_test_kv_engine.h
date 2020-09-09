@@ -173,6 +173,10 @@ public:
 
     Timestamp getOldestTimestamp() const override;
 
+    Timestamp getStableTimestamp() const override {
+        return Timestamp();
+    }
+
     void setOldestTimestamp(Timestamp newOldestTimestamp, bool force) override;
 
     std::map<Timestamp, std::shared_ptr<StringStore>> getHistory_forTest();

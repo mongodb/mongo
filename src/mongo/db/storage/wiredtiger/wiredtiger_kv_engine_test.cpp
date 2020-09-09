@@ -43,7 +43,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/logv2/log.h"
@@ -82,19 +82,16 @@ public:
 
 private:
     std::unique_ptr<WiredTigerKVEngine> makeEngine() {
-        auto engine = std::make_unique<WiredTigerKVEngine>(kWiredTigerEngineName,
-                                                           _dbpath.path(),
-                                                           _cs.get(),
-                                                           "",
-                                                           1,
-                                                           0,
-                                                           false,
-                                                           false,
-                                                           _forRepair,
-                                                           false);
-        // There are unit tests expecting checkpoints to occur asynchronously.
-        engine->startAsyncThreads();
-        return engine;
+        return std::make_unique<WiredTigerKVEngine>(kWiredTigerEngineName,
+                                                    _dbpath.path(),
+                                                    _cs.get(),
+                                                    "",
+                                                    1,
+                                                    0,
+                                                    false,
+                                                    false,
+                                                    _forRepair,
+                                                    false);
     }
 
     const std::unique_ptr<ClockSource> _cs = std::make_unique<ClockSourceMock>();
@@ -246,6 +243,9 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
 }
 
 TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
+    std::unique_ptr<Checkpointer> checkpointer = std::make_unique<Checkpointer>(_engine);
+    checkpointer->go();
+
     auto opCtxPtr = makeOperationContext();
     // The initial data timestamp has to be set to take stable checkpoints. The first stable
     // timestamp greater than this will also trigger a checkpoint. The following loop of the
@@ -262,7 +262,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
 #endif
 #endif
     {
-        wiredTigerGlobalOptions.checkpointDelaySecs = 1;
+        storageGlobalParams.checkpointDelaySecs = 1;
     }
     ();
 
@@ -341,6 +341,8 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     _engine->setStableTimestamp(Timestamp(30, 1), false);
     callbackShouldFail.store(false);
     assertPinnedMovesSoon(Timestamp(40, 1));
+
+    checkpointer->shutdown({ErrorCodes::ShutdownInProgress, "Test finished"});
 }
 
 std::unique_ptr<KVHarnessHelper> makeHelper() {
