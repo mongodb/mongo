@@ -5,12 +5,12 @@
 (function() {
 "use strict";
 
-function getNotMasterUnackWritesCounter() {
+function getNotPrimaryUnackWritesCounter() {
     return assert.commandWorked(primaryDB.adminCommand({serverStatus: 1}))
-        .metrics.repl.network.notMasterUnacknowledgedWrites;
+        .metrics.repl.network.notPrimaryUnacknowledgedWrites;
 }
 
-const collName = "not_master_unacknowledged_write";
+const collName = "not_primary_unacknowledged_write";
 
 var rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
@@ -22,8 +22,8 @@ var secondaryDB = secondary.getDB("test");
 var primaryColl = primaryDB[collName];
 var secondaryColl = secondaryDB[collName];
 
-// Verify that reading from secondaries does not impact `notMasterUnacknowledgedWrites`.
-const preReadingCounter = getNotMasterUnackWritesCounter();
+// Verify that reading from secondaries does not impact `notPrimaryUnacknowledgedWrites`.
+const preReadingCounter = getNotPrimaryUnackWritesCounter();
 jsTestLog("Reading from secondary ...");
 [{name: "findOne", fn: () => secondaryColl.findOne()},
  {name: "distinct", fn: () => secondaryColl.distinct("item")},
@@ -32,7 +32,7 @@ jsTestLog("Reading from secondary ...");
     assert.doesNotThrow(fn);
     assert.eq(assert.commandWorked(secondary.getDB("admin").isMaster()).ismaster, false);
 });
-const postReadingCounter = getNotMasterUnackWritesCounter();
+const postReadingCounter = getNotPrimaryUnackWritesCounter();
 assert.eq(preReadingCounter, postReadingCounter);
 
 jsTestLog("Primary on port " + primary.port + " hangs up on unacknowledged writes");
@@ -71,7 +71,7 @@ var command =
 
 var awaitShell = startParallelShell(command, primary.port);
 
-let failedUnackWritesBefore = getNotMasterUnackWritesCounter();
+let failedUnackWritesBefore = getNotPrimaryUnackWritesCounter();
 
 jsTestLog("Beginning unacknowledged insert");
 primaryColl.insertOne({}, {writeConcern: {w: 0}});
@@ -87,7 +87,7 @@ assert.includes(result.toString(), "network error while attempting to run comman
 
 // Validate the number of unacknowledged writes failed due to step down resulted in network
 // disconnection.
-let failedUnackWritesAfter = getNotMasterUnackWritesCounter();
+let failedUnackWritesAfter = getNotPrimaryUnackWritesCounter();
 assert.eq(failedUnackWritesAfter, failedUnackWritesBefore + 1);
 
 rst.stopSet();

@@ -36,10 +36,10 @@ assert.commandWorked(
         primaryColl.insert({_id: 0}, {"writeConcern": {"w": "majority"}}));
 rst.awaitReplication();
 
-// It's possible for notMasterUnacknowledgedWrites to be non-zero because of mirrored reads during
+// It's possible for notPrimaryUnacknowledgedWrites to be non-zero because of mirrored reads during
 // initial sync.
 let replMetrics = assert.commandWorked(secondaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
-const startingNumNotMasterErrors = replMetrics.network.notMasterUnacknowledgedWrites;
+const startingNumNotMasterErrors = replMetrics.network.notPrimaryUnacknowledgedWrites;
 
 // Open a cursor on secondary.
 const cursorIdToBeReadAfterStepUp =
@@ -127,7 +127,7 @@ assert.eq(replMetrics.stateTransition.lastStateTransition, "stepUp");
 assert.eq(replMetrics.stateTransition.userOperationsKilled, 0);
 // Should account for find and getmore commands issued before step up.
 assert.gte(replMetrics.stateTransition.userOperationsRunning, 2);
-assert.eq(replMetrics.network.notMasterUnacknowledgedWrites, startingNumNotMasterErrors);
+assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, startingNumNotMasterErrors);
 
 rst.stopSet();
 })();
