@@ -65,7 +65,6 @@
         "clone",
         "cloneCollection",
         "cloneCollectionAsCapped",
-        "collMod",
         "convertToCapped",
         "copydb",
         "create",
