@@ -768,12 +768,12 @@ functions:
         set -o errexit
 
         cat <<EOF > notary_env.sh
-        export NOTARY_TOKEN=${signing_auth_token_46}
+        export NOTARY_TOKEN=${signing_auth_token_48}
         export BARQUE_USERNAME=${barque_user}
         export BARQUE_API_KEY=${barque_api_key}
         EOF
 
-        echo "${signing_auth_token_46}" > signing_auth_token
+        echo "${signing_auth_token_48}" > signing_auth_token
 
   "set up remote credentials": &set_up_remote_credentials
     command: shell.exec
@@ -7797,7 +7797,7 @@ tasks:
           mv distsrc.${ext|tgz} mongodb-src-${src_suffix}.${ext|tar.gz} || true
           /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-${push_name}-${push_arch}-${suffix}.msi || true
 
-          /usr/local/bin/notary-client.py --key-name "server-4.6" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz} mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          /usr/local/bin/notary-client.py --key-name "server-4.8" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz} mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
 
     # Put the binaries tarball/zipfile
     - command: s3.put
