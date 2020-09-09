@@ -45,28 +45,35 @@ void Node::generateMemoBase(std::ostringstream& os) const {
     os << "NodeId: " << _nodeId << "\n";
 }
 
-std::string Node::generateMemo() {
-    class MemoVisitor: public AbstractVisitor
-    {
+void Node::visitPreOrder(AbstractVisitor& visitor) const {
+    visit(visitor);
+    for (const NodePtr& ptr : _children) {
+        ptr->visitPreOrder(visitor);
+    }
+}
+
+std::string Node::generateMemo() const {
+    class MemoVisitor : public AbstractVisitor {
     protected:
         void visit(const ScanNode& node) override {
-            node.generateScanMemo(os);
+            node.generateMemo(os);
         }
         void visit(const MultiJoinNode& node) override {
-            node.generateMultiJoinMemo(os);
+            node.generateMemo(os);
         }
         void visit(const UnionNode& node) override {
-            node.generateUnionMemo(os);
+            node.generateMemo(os);
         }
         void visit(const GroupByNode& node) override {
-            node.generateGroupByMemo(os);
+            node.generateMemo(os);
         }
         void visit(const UnwindNode& node) override {
-            node.generateUnwindMemo(os);
+            node.generateMemo(os);
         }
         void visit(const WindNode& node) override {
-            node.generateWindMemo(os);
+            node.generateMemo(os);
         }
+
     public:
         std::ostringstream os;
     };
@@ -76,13 +83,6 @@ std::string Node::generateMemo() {
     return visitor.os.str();
 }
 
-void Node::visitPreOrder(AbstractVisitor& visitor) {
-    visit(visitor);
-    for (const NodePtr& ptr: _children) {
-        ptr->visitPreOrder(visitor);
-    }
-}
-
 NodePtr ScanNode::create(Context& ctx, CollectionNameType collectionName) {
     return NodePtr(new ScanNode(ctx, std::move(collectionName)));
 }
@@ -90,12 +90,13 @@ NodePtr ScanNode::create(Context& ctx, CollectionNameType collectionName) {
 ScanNode::ScanNode(Context& ctx, CollectionNameType collectionName)
     : Node(ctx), _collectionName(std::move(collectionName)) {}
 
-void ScanNode::generateScanMemo(std::ostringstream& os) const {
+void ScanNode::generateMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
-    os << "Scan" << "\n";
+    os << "Scan"
+       << "\n";
 }
 
-void ScanNode::visit(AbstractVisitor& visitor) {
+void ScanNode::visit(AbstractVisitor& visitor) const {
     visitor.visit(*this);
 }
 
@@ -115,12 +116,13 @@ MultiJoinNode::MultiJoinNode(Context& ctx,
       _filterSet(std::move(filterSet)),
       _projectionMap(std::move(projectionMap)) {}
 
-void MultiJoinNode::generateMultiJoinMemo(std::ostringstream& os) const {
+void MultiJoinNode::generateMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
-    os << "MultiJoin" << "\n";
+    os << "MultiJoin"
+       << "\n";
 }
 
-void MultiJoinNode::visit(AbstractVisitor& visitor) {
+void MultiJoinNode::visit(AbstractVisitor& visitor) const {
     visitor.visit(*this);
 }
 
@@ -131,12 +133,13 @@ NodePtr UnionNode::create(Context& ctx, std::vector<NodePtr> children) {
 UnionNode::UnionNode(Context& ctx, std::vector<NodePtr> children)
     : Node(ctx, std::move(children)) {}
 
-void UnionNode::generateUnionMemo(std::ostringstream& os) const {
+void UnionNode::generateMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
-    os << "Union" << "\n";
+    os << "Union"
+       << "\n";
 }
 
-void UnionNode::visit(AbstractVisitor& visitor) {
+void UnionNode::visit(AbstractVisitor& visitor) const {
     visitor.visit(*this);
 }
 
@@ -156,12 +159,13 @@ GroupByNode::GroupByNode(Context& ctx,
       _groupByVector(std::move(groupByVector)),
       _projectionMap(std::move(projectionMap)) {}
 
-void GroupByNode::generateGroupByMemo(std::ostringstream& os) const {
+void GroupByNode::generateMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
-    os << "GroupBy" << "\n";
+    os << "GroupBy"
+       << "\n";
 }
 
-void GroupByNode::visit(AbstractVisitor& visitor) {
+void GroupByNode::visit(AbstractVisitor& visitor) const {
     visitor.visit(*this);
 }
 
@@ -181,12 +185,13 @@ UnwindNode::UnwindNode(Context& ctx,
       _projectionName(std::move(projectionName)),
       _retainNonArrays(retainNonArrays) {}
 
-void UnwindNode::generateUnwindMemo(std::ostringstream& os) const {
+void UnwindNode::generateMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
-    os << "Unwind" << "\n";
+    os << "Unwind"
+       << "\n";
 }
 
-void UnwindNode::visit(AbstractVisitor& visitor) {
+void UnwindNode::visit(AbstractVisitor& visitor) const {
     visitor.visit(*this);
 }
 
@@ -197,12 +202,13 @@ NodePtr WindNode::create(Context& ctx, ProjectionName projectionName, NodePtr ch
 WindNode::WindNode(Context& ctx, ProjectionName projectionName, NodePtr child)
     : Node(ctx, std::move(child)), _projectionName(std::move(projectionName)) {}
 
-void WindNode::generateWindMemo(std::ostringstream& os) const {
+void WindNode::generateMemo(std::ostringstream& os) const {
     Node::generateMemoBase(os);
-    os << "Wind" << "\n";
+    os << "Wind"
+       << "\n";
 }
 
-void WindNode::visit(AbstractVisitor& visitor) {
+void WindNode::visit(AbstractVisitor& visitor) const {
     visitor.visit(*this);
 }
 
