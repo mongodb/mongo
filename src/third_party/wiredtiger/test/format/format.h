@@ -51,7 +51,9 @@
 #undef MEGABYTE
 #define MEGABYTE(v) ((v)*WT_MEGABYTE)
 
-#define WT_NAME "wt" /* Object name */
+#define BACKUP_INFO_FILE "BACKUP_INFO"         /* Format's backup information for restart */
+#define BACKUP_INFO_FILE_TMP "BACKUP_INFO.TMP" /* Format's backup information for restart */
+#define WT_NAME "wt"                           /* Object name */
 
 #define DATASOURCE(v) (strcmp(v, g.c_data_source) == 0 ? 1 : 0)
 
@@ -215,6 +217,7 @@ typedef struct {
     uint32_t c_timing_stress_checkpoint;
     uint32_t c_timing_stress_hs_checkpoint_delay;
     uint32_t c_timing_stress_hs_sweep;
+    uint32_t c_timing_stress_checkpoint_prepare;
     uint32_t c_timing_stress_split_1;
     uint32_t c_timing_stress_split_2;
     uint32_t c_timing_stress_split_3;

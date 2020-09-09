@@ -198,10 +198,12 @@ __modify_apply_one(WT_SESSION_IMPL *session, WT_ITEM *value, WT_MODIFY *modify, 
     } else { /* Shrink or grow */
         /* Move trailing data forward/backward to its new location. */
         from = (const uint8_t *)value->data + (offset + size);
-        WT_ASSERT(session, WT_DATA_IN_ITEM(value) &&
+        WT_ASSERT(session,
+          WT_DATA_IN_ITEM(value) &&
             from + (value->size - (offset + size)) <= (uint8_t *)value->mem + value->memsize);
         to = (uint8_t *)value->data + (offset + data_size);
-        WT_ASSERT(session, WT_DATA_IN_ITEM(value) &&
+        WT_ASSERT(session,
+          WT_DATA_IN_ITEM(value) &&
             to + (value->size - (offset + size)) <= (uint8_t *)value->mem + value->memsize);
         memmove(to, from, value->size - (offset + size));
 

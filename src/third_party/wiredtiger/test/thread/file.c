@@ -38,11 +38,8 @@ file_create(const char *name)
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     testutil_check(__wt_snprintf(config, sizeof(config),
-      "key_format=%s,"
-      "internal_page_max=%d,"
-      "leaf_page_max=%d,"
-      "%s",
-      ftype == ROW ? "u" : "r", 16 * 1024, 128 * 1024, ftype == FIX ? ",value_format=3t" : ""));
+      "key_format=%s,internal_page_max=%d,leaf_page_max=%d,%s", ftype == ROW ? "u" : "r", 16 * 1024,
+      128 * 1024, ftype == FIX ? ",value_format=3t" : ""));
 
     if ((ret = session->create(session, name, config)) != 0)
         if (ret != EEXIST)

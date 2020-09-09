@@ -14,7 +14,7 @@
 typedef struct {
     WT_FILE_SYSTEM iface;
 
-    TAILQ_HEAD(__wt_fhhash_inmem, __wt_file_handle_inmem) fhhash[WT_HASH_ARRAY_SIZE];
+    TAILQ_HEAD(__wt_fhhash_inmem, __wt_file_handle_inmem) * fhhash;
     TAILQ_HEAD(__wt_fh_inmem_qh, __wt_file_handle_inmem) fhqh;
 
     WT_SPINLOCK lock;
@@ -27,7 +27,7 @@ static int __im_file_size(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t *);
  *     Return a matching handle, if one exists.
  */
 static WT_FILE_HANDLE_INMEM *
-__im_handle_search(WT_FILE_SYSTEM *file_system, const char *name)
+__im_handle_search(WT_SESSION_IMPL *session, WT_FILE_SYSTEM *file_system, const char *name)
 {
     WT_FILE_HANDLE_INMEM *im_fh;
     WT_FILE_SYSTEM_INMEM *im_fs;
@@ -36,7 +36,7 @@ __im_handle_search(WT_FILE_SYSTEM *file_system, const char *name)
     im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
 
     hash = __wt_hash_city64(name, strlen(name));
-    bucket = hash % WT_HASH_ARRAY_SIZE;
+    bucket = hash & (S2C(session)->hash_size - 1);
     TAILQ_FOREACH (im_fh, &im_fs->fhhash[bucket], hashq)
         if (strcmp(im_fh->iface.name, name) == 0)
             break;
@@ -64,7 +64,7 @@ __im_handle_remove(
             return (__wt_set_return(session, EBUSY));
     }
 
-    bucket = im_fh->name_hash % WT_HASH_ARRAY_SIZE;
+    bucket = im_fh->name_hash & (S2C(session)->hash_size - 1);
     WT_FILE_HANDLE_REMOVE(im_fs, im_fh, bucket);
 
     /* Clean up private information. */
@@ -174,7 +174,7 @@ __im_fs_exist(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *n
 
     __wt_spin_lock(session, &im_fs->lock);
 
-    *existp = __im_handle_search(file_system, name) != NULL;
+    *existp = __im_handle_search(session, file_system, name) != NULL;
 
     __wt_spin_unlock(session, &im_fs->lock);
     return (0);
@@ -201,7 +201,7 @@ __im_fs_remove(
     __wt_spin_lock(session, &im_fs->lock);
 
     ret = ENOENT;
-    if ((im_fh = __im_handle_search(file_system, name)) != NULL)
+    if ((im_fh = __im_handle_search(session, file_system, name)) != NULL)
         ret = __im_handle_remove(session, file_system, im_fh, false);
 
     __wt_spin_unlock(session, &im_fs->lock);
@@ -231,15 +231,15 @@ __im_fs_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *
     __wt_spin_lock(session, &im_fs->lock);
 
     ret = ENOENT;
-    if ((im_fh = __im_handle_search(file_system, from)) != NULL) {
+    if ((im_fh = __im_handle_search(session, file_system, from)) != NULL) {
         WT_ERR(__wt_strdup(session, to, &copy));
         __wt_free(session, im_fh->iface.name);
         im_fh->iface.name = copy;
 
-        bucket = im_fh->name_hash % WT_HASH_ARRAY_SIZE;
+        bucket = im_fh->name_hash & (S2C(session)->hash_size - 1);
         WT_FILE_HANDLE_REMOVE(im_fs, im_fh, bucket);
         im_fh->name_hash = __wt_hash_city64(to, strlen(to));
-        bucket = im_fh->name_hash % WT_HASH_ARRAY_SIZE;
+        bucket = im_fh->name_hash & (S2C(session)->hash_size - 1);
         WT_FILE_HANDLE_INSERT(im_fs, im_fh, bucket);
     }
 
@@ -266,7 +266,7 @@ __im_fs_size(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *na
     __wt_spin_lock(session, &im_fs->lock);
 
     /* Search for the handle, then get its size. */
-    if ((im_fh = __im_handle_search(file_system, name)) == NULL)
+    if ((im_fh = __im_handle_search(session, file_system, name)) == NULL)
         ret = __wt_set_return(session, ENOENT);
     else
         *sizep = (wt_off_t)im_fh->buf.size;
@@ -343,9 +343,8 @@ __im_file_read(
     __wt_spin_unlock(session, &im_fs->lock);
     if (ret == 0)
         return (0);
-    WT_RET_MSG(session, WT_ERROR, "%s: handle-read: failed to read %" WT_SIZET_FMT
-                                  " bytes at "
-                                  "offset %" WT_SIZET_FMT,
+    WT_RET_MSG(session, WT_ERROR,
+      "%s: handle-read: failed to read %" WT_SIZET_FMT " bytes at offset %" WT_SIZET_FMT,
       file_handle->name, len, off);
 }
 
@@ -416,9 +415,8 @@ err:
     __wt_spin_unlock(session, &im_fs->lock);
     if (ret == 0)
         return (0);
-    WT_RET_MSG(session, ret, "%s: handle-write: failed to write %" WT_SIZET_FMT
-                             " bytes at "
-                             "offset %" WT_SIZET_FMT,
+    WT_RET_MSG(session, ret,
+      "%s: handle-write: failed to write %" WT_SIZET_FMT " bytes at offset %" WT_SIZET_FMT,
       file_handle->name, len, off);
 }
 
@@ -449,7 +447,7 @@ __im_file_open(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *
      * First search the file queue, if we find it, assert there's only a single reference, in-memory
      * only supports a single handle on any file, for now.
      */
-    im_fh = __im_handle_search(file_system, name);
+    im_fh = __im_handle_search(session, file_system, name);
     if (im_fh != NULL) {
 
         if (im_fh->ref != 0)
@@ -475,7 +473,7 @@ __im_file_open(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *
     im_fh->ref = 1;
 
     hash = __wt_hash_city64(name, strlen(name));
-    bucket = hash % WT_HASH_ARRAY_SIZE;
+    bucket = hash & (S2C(session)->hash_size - 1);
     im_fh->name_hash = hash;
     WT_FILE_HANDLE_INSERT(im_fs, im_fh, bucket);
 
@@ -519,6 +517,7 @@ __im_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session)
     WT_TAILQ_SAFE_REMOVE_END
 
     __wt_spin_destroy(session, &im_fs->lock);
+    __wt_free(session, im_fs->fhhash);
     __wt_free(session, im_fs);
 
     return (ret);
@@ -534,13 +533,14 @@ __wt_os_inmemory(WT_SESSION_IMPL *session)
     WT_DECL_RET;
     WT_FILE_SYSTEM *file_system;
     WT_FILE_SYSTEM_INMEM *im_fs;
-    u_int i;
+    uint64_t i;
 
     WT_RET(__wt_calloc_one(session, &im_fs));
+    WT_ERR(__wt_calloc_def(session, S2C(session)->hash_size, &im_fs->fhhash));
 
     /* Initialize private information. */
     TAILQ_INIT(&im_fs->fhqh);
-    for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
+    for (i = 0; i < S2C(session)->hash_size; i++)
         TAILQ_INIT(&im_fs->fhhash[i]);
 
     WT_ERR(__wt_spin_init(session, &im_fs->lock, "in-memory I/O"));
@@ -562,6 +562,7 @@ __wt_os_inmemory(WT_SESSION_IMPL *session)
     return (0);
 
 err:
+    __wt_free(session, im_fs->fhhash);
     __wt_free(session, im_fs);
     return (ret);
 }

@@ -151,9 +151,8 @@ test_join(TEST_OPTS *opts, SHARED_OPTS *sharedopts, bool bloom, bool sometimes_r
      * Note: id is repeated as id2. This makes it easier to identify the primary key in dumps of the
      * index files.
      */
-    testutil_check(session->create(session, opts->uri,
-      "key_format=i,value_format=iiSii,"
-      "columns=(id,post,bal,extra,flag,id2)"));
+    testutil_check(session->create(
+      session, opts->uri, "key_format=i,value_format=iiSii,columns=(id,post,bal,extra,flag,id2)"));
 
     testutil_check(session->create(session, sharedopts->posturi, "columns=(post)"));
     testutil_check(session->create(session, sharedopts->baluri, "columns=(bal)"));
@@ -203,9 +202,8 @@ test_join(TEST_OPTS *opts, SHARED_OPTS *sharedopts, bool bloom, bool sometimes_r
     }
     for (i = 0; i < N_INSERT_THREAD; ++i)
         fprintf(stderr,
-          "  insert thread %d did "
-          "%d inserts, %d removes, %d notfound, %d rollbacks\n",
-          i, insert_args[i].inserts, insert_args[i].removes, insert_args[i].notfounds,
+          "  insert thread %d did %d inserts, %d removes, %d notfound, %d rollbacks\n", i,
+          insert_args[i].inserts, insert_args[i].removes, insert_args[i].notfounds,
           insert_args[i].rollbacks);
 
     testutil_check(session->drop(session, sharedopts->posturi, NULL));
@@ -363,9 +361,7 @@ thread_join(void *arg)
              */
             testutil_check(joincur->get_key(joincur, &key));
             testutil_check(joincur->get_value(joincur, &post, &bal, &extra, &flag, &key2));
-            fprintf(stderr,
-              "FAIL: iteration %d: "
-              "key=%d/%d, postal_code=%d, balance=%d, flag=%d\n",
+            fprintf(stderr, "FAIL: iteration %d: key=%d/%d, postal_code=%d, balance=%d, flag=%d\n",
               threadargs->joins, key, key2, post, bal, flag);
             /* Save the results. */
             testutil_check(opts->conn->close(opts->conn, NULL));

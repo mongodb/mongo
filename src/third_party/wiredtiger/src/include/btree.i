@@ -141,8 +141,9 @@ __wt_btree_bytes_evictable(WT_SESSION_IMPL *session)
     bytes_inmem = btree->bytes_inmem;
     bytes_root = root_page == NULL ? 0 : root_page->memory_footprint;
 
-    return (bytes_inmem <= bytes_root ? 0 : __wt_cache_bytes_plus_overhead(
-                                              cache, bytes_inmem - bytes_root));
+    return (bytes_inmem <= bytes_root ?
+        0 :
+        __wt_cache_bytes_plus_overhead(cache, bytes_inmem - bytes_root));
 }
 
 /*
@@ -1509,6 +1510,11 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
       __wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen))
         return (false);
 
+    /* If the metadata page is clean but has modifications that appear too new to evict, skip it. */
+    if (WT_IS_METADATA(S2BT(session)->dhandle) && !modified &&
+      !__wt_txn_visible_all(session, mod->rec_max_txn, mod->rec_max_timestamp))
+        return (false);
+
     return (true);
 }
 
@@ -1718,7 +1724,7 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
   ,
   const char *func, int line
 #endif
-  )
+)
 {
     WT_DECL_RET;
     bool acquired;
@@ -1742,7 +1748,7 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
       ,
       func, line
 #endif
-      );
+    );
 
     /*
      * Expected failures: page not found or restart. Our callers list the errors they're expecting

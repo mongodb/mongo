@@ -1,7 +1,7 @@
 /*! @m_page{{c,java},eviction, Eviction}
 
 All the operations performed in WiredTiger are on the data read into
-preconfigured amount of memory. WiredTiger uses memory as a cache for
+pre-configured amount of memory. WiredTiger uses memory as a cache for
 all the data on the disk and the data in memory forms the current
 working set.
 
@@ -17,7 +17,7 @@ The WiredTiger eviction runs in the background with one eviction server
 thread and several eviction worker threads.
 
 1) The eviction server thread walks the btrees and adds the least
-recently used pages to the eviction queues until the queus are full.
+recently used pages to the eviction queues until the queues are full.
 2) The eviction workers continuously remove pages from the eviction
 queue and try to evict them.
 
@@ -42,7 +42,7 @@ remains solely on the disk unchanged.
 For history store eviction, the page is modified but the changes are
 all committed. Therefore, the page should be clean and can be removed
 from memory after the dirty changes are written to the new disk image,
-which is the data fomat WiredTiger stores on disk. The process that
+which is the data format WiredTiger stores on disk. The process that
 builds the disk image is called reconciliation. In reconciliation,
 WiredTiger writes the newest committed value of each key to the disk
 image. All the older values of the key are moved to the history store

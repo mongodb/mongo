@@ -58,7 +58,7 @@ __wt_handle_is_open(WT_SESSION_IMPL *session, const char *name)
     found = false;
 
     hash = __wt_hash_city64(name, strlen(name));
-    bucket = hash % WT_HASH_ARRAY_SIZE;
+    bucket = hash & (conn->hash_size - 1);
 
     __wt_spin_lock(session, &conn->fh_lock);
 
@@ -92,7 +92,7 @@ __handle_search(WT_SESSION_IMPL *session, const char *name, WT_FH *newfh, WT_FH 
     found = false;
 
     hash = __wt_hash_city64(name, strlen(name));
-    bucket = hash % WT_HASH_ARRAY_SIZE;
+    bucket = hash & (conn->hash_size - 1);
 
     __wt_spin_lock(session, &conn->fh_lock);
 
@@ -293,7 +293,7 @@ __handle_close(WT_SESSION_IMPL *session, WT_FH *fh, bool locked)
     }
 
     /* Remove from the list. */
-    bucket = fh->name_hash % WT_HASH_ARRAY_SIZE;
+    bucket = fh->name_hash & (conn->hash_size - 1);
     WT_FILE_HANDLE_REMOVE(conn, fh, bucket);
     (void)__wt_atomic_sub32(&conn->open_file_count, 1);
 

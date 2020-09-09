@@ -107,16 +107,12 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
 
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "create,"
-      "cache_size=%s,"
-      "eviction=(threads_max=5),"
-      "statistics=(fast)",
+      "create,cache_size=%s,eviction=(threads_max=5),statistics=(fast)",
       opts->table_type == TABLE_FIX ? "500MB" : "2GB"));
     testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "key_format=r,value_format=%s,"
-      "allocation_size=4K,leaf_page_max=64K",
+      "key_format=r,value_format=%s,allocation_size=4K,leaf_page_max=64K",
       opts->table_type == TABLE_FIX ? "8t" : "S"));
     testutil_check(session->create(session, opts->uri, buf));
     testutil_check(session->close(session, NULL));

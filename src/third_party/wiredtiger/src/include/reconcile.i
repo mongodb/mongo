@@ -217,10 +217,12 @@ __wt_rec_need_split(WT_RECONCILE *r, size_t len)
      * updates) associated with the page. If there are barely any items on the page, then it's not
      * worth splitting. We also want to temper this effect to avoid in-memory updates from
      * dominating the calculation and causing excessive splitting. Therefore, we'll limit the impact
-     * to a tenth of the cache usage occupied by those updates.
+     * to a tenth of the cache usage occupied by those updates. For small updates the overhead of
+     * the update structure could skew the calculation, so we subtract the overhead before
+     * considering the cache usage by the updates.
      */
     if (r->page->type == WT_PAGE_ROW_LEAF && page_items > WT_REC_SPLIT_MIN_ITEMS_USE_MEM)
-        len += r->supd_memsize / 10;
+        len += (r->supd_memsize - (r->supd_next * WT_UPDATE_SIZE)) / 10;
 
     /* Check for the disk image crossing a boundary. */
     return (WT_CHECK_CROSSING_BND(r, len));

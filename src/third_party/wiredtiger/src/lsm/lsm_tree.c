@@ -439,9 +439,9 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
     required = WT_LSM_TREE_MINIMUM_SIZE(lsm_tree->chunk_size, lsm_tree->merge_max, maxleafpage);
     if (conn->cache_size < required)
-        WT_RET_MSG(session, EINVAL, "LSM cache size %" PRIu64 " (%" PRIu64
-                                    "MB) too small, "
-                                    "must be at least %" PRIu64 " (%" PRIu64 "MB)",
+        WT_RET_MSG(session, EINVAL,
+          "LSM cache size %" PRIu64 " (%" PRIu64 "MB) too small, must be at least %" PRIu64
+          " (%" PRIu64 "MB)",
           conn->cache_size, conn->cache_size / WT_MEGABYTE, required,
           (required + (WT_MEGABYTE - 1)) / WT_MEGABYTE);
     return (0);
@@ -1083,8 +1083,9 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
      * There is no work to do if there is only a single chunk in the tree and it has a bloom filter
      * or is configured to never have a bloom filter.
      */
-    if (lsm_tree->nchunks == 1 && (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST) ||
-                                    F_ISSET(lsm_tree->chunk[0], WT_LSM_CHUNK_BLOOM))) {
+    if (lsm_tree->nchunks == 1 &&
+      (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST) ||
+        F_ISSET(lsm_tree->chunk[0], WT_LSM_CHUNK_BLOOM))) {
         __wt_lsm_tree_release(session, lsm_tree);
         return (0);
     }
@@ -1174,9 +1175,8 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
         if (flushing) {
             WT_ASSERT(session, chunk != NULL);
             if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
-                __wt_verbose(session, WT_VERB_LSM, "Compact flush done %s chunk %" PRIu32
-                                                   ". "
-                                                   "Start compacting progress %" PRIu64,
+                __wt_verbose(session, WT_VERB_LSM,
+                  "Compact flush done %s chunk %" PRIu32 ". Start compacting progress %" PRIu64,
                   name, chunk->id, lsm_tree->merge_progressing);
                 (void)__wt_atomic_sub32(&chunk->refcnt, 1);
                 flushing = ref = false;

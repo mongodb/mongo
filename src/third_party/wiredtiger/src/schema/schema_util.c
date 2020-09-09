@@ -100,12 +100,8 @@ __wt_schema_internal_session(WT_SESSION_IMPL *session, WT_SESSION_IMPL **int_ses
 int
 __wt_schema_session_release(WT_SESSION_IMPL *session, WT_SESSION_IMPL *int_session)
 {
-    WT_SESSION *wt_session;
-
-    if (session != int_session) {
-        wt_session = &int_session->iface;
-        WT_RET(wt_session->close(wt_session, NULL));
-    }
+    if (session != int_session)
+        WT_RET(__wt_session_close_internal(int_session));
 
     return (0);
 }
@@ -121,9 +117,7 @@ __str_name_check(WT_SESSION_IMPL *session, const char *name, bool skip_wt)
 
     if (!skip_wt && WT_PREFIX_MATCH(name, "WiredTiger"))
         WT_RET_MSG(session, EINVAL,
-          "%s: the \"WiredTiger\" name space may not be "
-          "used by applications",
-          name);
+          "%s: the \"WiredTiger\" name space may not be used by applications", name);
 
     /*
      * Disallow JSON quoting characters -- the config string parsing code supports quoted strings,
@@ -131,9 +125,7 @@ __str_name_check(WT_SESSION_IMPL *session, const char *name, bool skip_wt)
      */
     if (strpbrk(name, "{},:[]\\\"'") != NULL)
         WT_RET_MSG(session, EINVAL,
-          "%s: WiredTiger objects should not include grouping "
-          "characters in their names",
-          name);
+          "%s: WiredTiger objects should not include grouping characters in their names", name);
     return (0);
 }
 

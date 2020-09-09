@@ -387,9 +387,16 @@ take_incr_backup(WT_SESSION *session, int i)
                     first = false;
                 }
 
-                error_sys_check(lseek(rfd, (wt_off_t)offset, SEEK_SET));
+                /*
+                 * Don't use the system checker for lseek. The system check macro uses an int which
+                 * is often 4 bytes and checks for any negative value. The offset returned from
+                 * lseek is 8 bytes and we can have a false positive error check.
+                 */
+                if (lseek(rfd, (wt_off_t)offset, SEEK_SET) == -1)
+                    testutil_die(errno, "lseek: read");
                 error_sys_check(rdsize = (size_t)read(rfd, tmp, (size_t)size));
-                error_sys_check(lseek(wfd, (wt_off_t)offset, SEEK_SET));
+                if (lseek(wfd, (wt_off_t)offset, SEEK_SET) == -1)
+                    testutil_die(errno, "lseek: write");
                 /* Use the read size since we may have read less than the granularity. */
                 error_sys_check(write(wfd, tmp, rdsize));
             } else {

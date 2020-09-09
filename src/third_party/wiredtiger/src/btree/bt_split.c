@@ -1652,7 +1652,8 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_R
       session, multi->disk_image != NULL || (multi->supd_entries == 0 && !multi->supd_restore));
 
     /* Verify any disk image we have. */
-    WT_ASSERT(session, multi->disk_image == NULL ||
+    WT_ASSERT(session,
+      multi->disk_image == NULL ||
         __wt_verify_dsk_image(
           session, "[page instantiate]", multi->disk_image, 0, &multi->addr, true) == 0);
 

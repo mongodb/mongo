@@ -13,12 +13,13 @@
  *	Handle extension list errors that would normally panic the system but
  * which should fail gracefully when verifying.
  */
-#define WT_BLOCK_RET(session, block, v, ...)                                          \
-    do {                                                                              \
-        int __ret = (v);                                                              \
-        __wt_err(session, __ret, __VA_ARGS__);                                        \
-        return ((block)->verify ? __ret : __wt_panic(session, WT_PANIC,               \
-                                            "block manager extension list failure")); \
+#define WT_BLOCK_RET(session, block, v, ...)                                        \
+    do {                                                                            \
+        int __ret = (v);                                                            \
+        __wt_err(session, __ret, __VA_ARGS__);                                      \
+        return ((block)->verify ?                                                   \
+            __ret :                                                                 \
+            __wt_panic(session, WT_PANIC, "block manager extension list failure")); \
     } while (0)
 
 static int __block_append(WT_SESSION_IMPL *, WT_BLOCK *, WT_EXTLIST *, wt_off_t, wt_off_t);
@@ -494,9 +495,9 @@ __wt_block_alloc(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t *offp, wt_o
 
     WT_STAT_DATA_INCR(session, block_alloc);
     if (size % block->allocsize != 0)
-        WT_RET_MSG(session, EINVAL, "cannot allocate a block size %" PRIdMAX
-                                    " that is not "
-                                    "a multiple of the allocation size %" PRIu32,
+        WT_RET_MSG(session, EINVAL,
+          "cannot allocate a block size %" PRIdMAX
+          " that is not a multiple of the allocation size %" PRIu32,
           (intmax_t)size, block->allocsize);
 
     /*

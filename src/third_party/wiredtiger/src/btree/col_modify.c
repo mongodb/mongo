@@ -48,11 +48,11 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
      * A "full update list" is distinguished from "an update" by checking whether it has a "next"
      * update.
      */
-    WT_ASSERT(
-      session, ((modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE) &&
-                 value == NULL && upd_arg == NULL) ||
+    WT_ASSERT(session,
+      ((modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE) && value == NULL &&
+        upd_arg == NULL) ||
         (!(modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE) &&
-                 ((value == NULL && upd_arg != NULL) || (value != NULL && upd_arg == NULL))));
+          ((value == NULL && upd_arg != NULL) || (value != NULL && upd_arg == NULL))));
 
     /* If we don't yet have a modify structure, we'll need one. */
     WT_RET(__wt_page_modify_init(session, page));
@@ -74,8 +74,8 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
         WT_ASSERT(session, recno != WT_RECNO_OOB || cbt->compare != 0);
         if (cbt->compare != 0 &&
           (recno == WT_RECNO_OOB ||
-              recno > (btree->type == BTREE_COL_VAR ? __col_var_last_recno(cbt->ref) :
-                                                      __col_fix_last_recno(cbt->ref)))) {
+            recno > (btree->type == BTREE_COL_VAR ? __col_var_last_recno(cbt->ref) :
+                                                    __col_fix_last_recno(cbt->ref)))) {
             append = true;
             cbt->ins = NULL;
             cbt->ins_head = NULL;
@@ -179,7 +179,8 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
          * Check for insert split and checkpoint races in column-store: it's easy (as opposed to in
          * row-store) and a difficult bug to otherwise diagnose.
          */
-        WT_ASSERT(session, mod->mod_col_split_recno == WT_RECNO_OOB ||
+        WT_ASSERT(session,
+          mod->mod_col_split_recno == WT_RECNO_OOB ||
             (recno != WT_RECNO_OOB && mod->mod_col_split_recno > recno));
 
         if (upd_arg == NULL) {

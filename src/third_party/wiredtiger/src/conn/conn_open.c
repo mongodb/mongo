@@ -157,7 +157,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
      * error messages from the remaining operations while destroying the connection handle.
      */
     if (session != &conn->dummy_session) {
-        WT_TRET(session->iface.close(&session->iface, NULL));
+        WT_TRET(__wt_session_close_internal(session));
         session = conn->default_session = &conn->dummy_session;
     }
 

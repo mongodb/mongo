@@ -253,9 +253,8 @@ main(int argc, char *argv[])
         testutil_die(status, "system: %s", cmd);
 
     testutil_check(__wt_snprintf(cmd, sizeof(cmd),
-      "cp -rp %s/* %s; rm -f %s/WiredTiger.lock; "
-      "chmod 0555 %s; chmod -R 0444 %s/*",
-      home, home_rd2, home_rd2, home_rd2, home_rd2));
+      "cp -rp %s/* %s; rm -f %s/WiredTiger.lock; chmod 0555 %s; chmod -R 0444 %s/*", home, home_rd2,
+      home_rd2, home_rd2, home_rd2));
     if ((status = system(cmd)) < 0)
         testutil_die(status, "system: %s", cmd);
 

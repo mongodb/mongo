@@ -5,11 +5,13 @@ ActiveState
 Adler's
 Atomicity
 BLOBs
+BLRrVv
 CFLAGS
 CPPFLAGS
 CPUs
 CRC
 CSV
+CXX
 Cheng
 Christoph
 Collet's
@@ -72,6 +74,7 @@ MVCC's
 Makefiles
 Mewhort
 MongoDB
+MongoDB's
 Multithreaded
 NOTFOUND
 NSEC
@@ -278,6 +281,7 @@ hb
 hotbackup
 href
 hrow
+hs
 hsearch
 html
 htmlinclude
@@ -298,6 +302,7 @@ je
 jemalloc
 jitter
 jni
+jprx
 jrx
 json
 jxf
@@ -313,6 +318,7 @@ lastname
 latencies
 le
 len
+lgnd
 li
 libdir
 libhe
@@ -371,9 +377,11 @@ mutex
 mutexes
 mutexing
 mvcc
+mx
 mygcc
 mytable
 namespace
+nav
 ndary
 ndbm
 newsite
@@ -419,6 +427,7 @@ png
 posix
 pre
 prepends
+prev
 primary's
 printf
 printlog
@@ -503,7 +512,6 @@ svg
 sys
 syscalls
 sz
-t2
 tRuE
 tablename
 tcl
@@ -551,12 +559,14 @@ valuefmt
 valuev
 vec
 versa
+viewable
 vm
 vpmsum
 warmup
 wget
 whitespace
 wiredtiger
+workgen
 workQ
 writelock
 writelocks

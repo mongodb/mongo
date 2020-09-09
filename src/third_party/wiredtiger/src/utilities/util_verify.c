@@ -45,10 +45,8 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
                 dump_layout = true;
             else if (WT_PREFIX_MATCH(__wt_optarg, "dump_offsets=")) {
                 if (dump_offsets != NULL) {
-                    fprintf(stderr,
-                      "%s: only a single 'dump_offsets' "
-                      "argument supported\n",
-                      progname);
+                    fprintf(
+                      stderr, "%s: only a single 'dump_offsets' argument supported\n", progname);
                     return (usage());
                 }
                 dump_offsets = __wt_optarg + strlen("dump_offsets=");

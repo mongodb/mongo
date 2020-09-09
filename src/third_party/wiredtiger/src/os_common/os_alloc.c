@@ -106,7 +106,8 @@ __realloc_func(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t byt
      */
     p = *(void **)retp;
     bytes_allocated = (bytes_allocated_ret == NULL) ? 0 : *bytes_allocated_ret;
-    WT_ASSERT(session, (p == NULL && bytes_allocated == 0) ||
+    WT_ASSERT(session,
+      (p == NULL && bytes_allocated == 0) ||
         (p != NULL && (bytes_allocated_ret == NULL || bytes_allocated != 0)));
     WT_ASSERT(session, bytes_to_allocate != 0);
     WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
@@ -184,7 +185,8 @@ __wt_realloc_aligned(
          */
         p = *(void **)retp;
         bytes_allocated = (bytes_allocated_ret == NULL) ? 0 : *bytes_allocated_ret;
-        WT_ASSERT(session, (p == NULL && bytes_allocated == 0) ||
+        WT_ASSERT(session,
+          (p == NULL && bytes_allocated == 0) ||
             (p != NULL && (bytes_allocated_ret == NULL || bytes_allocated != 0)));
         WT_ASSERT(session, bytes_to_allocate != 0);
         WT_ASSERT(session, bytes_allocated < bytes_to_allocate);

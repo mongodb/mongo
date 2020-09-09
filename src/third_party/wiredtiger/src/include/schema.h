@@ -185,18 +185,22 @@ struct __wt_table {
  */
 #define WT_WITH_SCHEMA_LOCK(session, op)                                                      \
     do {                                                                                      \
-        WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) ||                      \
-            !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_NO_SCHEMA_LOCK |     \
-                               WT_SESSION_LOCKED_TABLE));                                     \
+        WT_ASSERT(session,                                                                    \
+          F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) ||                                       \
+            !F_ISSET(session,                                                                 \
+              WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_NO_SCHEMA_LOCK |                     \
+                WT_SESSION_LOCKED_TABLE));                                                    \
         WT_WITH_LOCK_WAIT(session, &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA, op); \
     } while (0)
-#define WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret, op)                                      \
-    do {                                                                                  \
-        WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) ||                  \
-            !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_NO_SCHEMA_LOCK | \
-                               WT_SESSION_LOCKED_TABLE));                                 \
-        WT_WITH_LOCK_NOWAIT(                                                              \
-          session, ret, &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA, op);        \
+#define WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret, op)                               \
+    do {                                                                           \
+        WT_ASSERT(session,                                                         \
+          F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) ||                            \
+            !F_ISSET(session,                                                      \
+              WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_NO_SCHEMA_LOCK |          \
+                WT_SESSION_LOCKED_TABLE));                                         \
+        WT_WITH_LOCK_NOWAIT(                                                       \
+          session, ret, &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA, op); \
     } while (0)
 
 /*
@@ -240,7 +244,8 @@ struct __wt_table {
     } while (0)
 #define WT_WITH_TABLE_WRITE_LOCK_NOWAIT(session, ret, op)                                     \
     do {                                                                                      \
-        WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE) ||                 \
+        WT_ASSERT(session,                                                                    \
+          F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE) ||                                  \
             !F_ISSET(session, WT_SESSION_LOCKED_TABLE_READ | WT_SESSION_LOCKED_HANDLE_LIST)); \
         if (F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE)) {                                \
             op;                                                                               \

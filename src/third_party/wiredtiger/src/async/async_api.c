@@ -70,7 +70,7 @@ __async_get_format(
 
     TAILQ_INSERT_HEAD(&async->formatqh, af, q);
     __wt_spin_unlock(session, &async->ops_lock);
-    WT_ERR(wt_session->close(wt_session, NULL));
+    WT_ERR(__wt_session_close_internal(session));
 
 setup:
     op->format = af;
@@ -292,7 +292,6 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASYNC *async;
     WT_CONNECTION_IMPL *conn, tmp_conn;
     WT_DECL_RET;
-    WT_SESSION *wt_session;
     uint32_t i, session_flags;
     bool run;
 
@@ -383,8 +382,7 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
             WT_ASSERT(session, async->worker_sessions[i] != NULL);
             F_CLR(async->worker_sessions[i], WT_SESSION_SERVER_ASYNC);
             WT_TRET(__wt_thread_join(session, &async->worker_tids[i]));
-            wt_session = &async->worker_sessions[i]->iface;
-            WT_TRET(wt_session->close(wt_session, NULL));
+            WT_TRET(__wt_session_close_internal(async->worker_sessions[i]));
             async->worker_sessions[i] = NULL;
         }
         conn->async_workers = tmp_conn.async_workers;
@@ -405,7 +403,6 @@ __wt_async_destroy(WT_SESSION_IMPL *session)
     WT_ASYNC_OP *op;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_SESSION *wt_session;
     uint32_t i;
 
     conn = S2C(session);
@@ -422,8 +419,7 @@ __wt_async_destroy(WT_SESSION_IMPL *session)
     /* Close the server threads' sessions. */
     for (i = 0; i < conn->async_workers; i++)
         if (async->worker_sessions[i] != NULL) {
-            wt_session = &async->worker_sessions[i]->iface;
-            WT_TRET(wt_session->close(wt_session, NULL));
+            WT_TRET(__wt_session_close_internal(async->worker_sessions[i]));
             async->worker_sessions[i] = NULL;
         }
     /* Free any op key/value buffers. */

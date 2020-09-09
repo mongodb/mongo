@@ -16,11 +16,14 @@ bool verbose = false; /* Verbose flag */
 
 static const char *command; /* Command name */
 
+/* Give users a hint in the help output for if they're trying to read MongoDB data files */
+static const char *mongodb_config = "log=(enabled=true,path=journal,compressor=snappy)";
+
 #define READONLY "readonly=true"
 #define REC_ERROR "log=(recover=error)"
 #define REC_LOGOFF "log=(enabled=false)"
 #define REC_RECOVER "log=(recover=on)"
-#define REC_SALVAGE "log=(recover=salvage)"
+#define SALVAGE "salvage=true"
 
 static void
 usage(void)
@@ -49,6 +52,7 @@ usage(void)
 
     fprintf(stderr, "WiredTiger Data Engine (version %d.%d)\n", WIREDTIGER_VERSION_MAJOR,
       WIREDTIGER_VERSION_MINOR);
+    fprintf(stderr, "MongoDB wiredtiger_open configuration: \"%s\"\n", mongodb_config);
     util_usage(NULL, "global_options:", options);
     util_usage(NULL, "commands:", commands);
 }
@@ -62,7 +66,7 @@ main(int argc, char *argv[])
     size_t len;
     int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
     char *p, *secretkey;
-    const char *cmd_config, *config, *p1, *p2, *p3, *readonly_config, *rec_config;
+    const char *cmd_config, *config, *p1, *p2, *p3, *readonly_config, *rec_config, *salvage_config;
     bool backward_compatible, logoff, meta_verify, readonly, recover, salvage;
 
     conn = NULL;
@@ -79,13 +83,12 @@ main(int argc, char *argv[])
     (void)wiredtiger_version(&major_v, &minor_v, NULL);
     if (major_v != WIREDTIGER_VERSION_MAJOR || minor_v != WIREDTIGER_VERSION_MINOR) {
         fprintf(stderr,
-          "%s: program build version %d.%d does not match "
-          "library build version %d.%d\n",
-          progname, WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR, major_v, minor_v);
+          "%s: program build version %d.%d does not match library build version %d.%d\n", progname,
+          WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR, major_v, minor_v);
         return (EXIT_FAILURE);
     }
 
-    cmd_config = config = readonly_config = secretkey = NULL;
+    cmd_config = config = readonly_config = salvage_config = secretkey = NULL;
     /*
      * We default to returning an error if recovery needs to be run. Generally we expect this to be
      * run after a clean shutdown. The printlog command disables logging entirely. If recovery is
@@ -130,7 +133,7 @@ main(int argc, char *argv[])
             readonly = true;
             break;
         case 'S': /* salvage */
-            rec_config = REC_SALVAGE;
+            salvage_config = SALVAGE;
             salvage = true;
             break;
         case 'V': /* version */
@@ -267,6 +270,8 @@ open:
         len += strlen(cmd_config);
     if (readonly_config != NULL)
         len += strlen(readonly_config);
+    if (salvage_config != NULL)
+        len += strlen(salvage_config);
     if (secretkey != NULL) {
         len += strlen(secretkey) + 30;
         p1 = ",encryption=(secretkey=";
@@ -278,9 +283,10 @@ open:
         (void)util_err(NULL, errno, NULL);
         goto err;
     }
-    if ((ret = __wt_snprintf(p, len, "error_prefix=wt,%s,%s,%s,%s%s%s%s",
+    if ((ret = __wt_snprintf(p, len, "error_prefix=wt,%s,%s,%s,%s,%s%s%s%s",
            config == NULL ? "" : config, cmd_config == NULL ? "" : cmd_config,
-           readonly_config == NULL ? "" : readonly_config, rec_config, p1, p2, p3)) != 0) {
+           readonly_config == NULL ? "" : readonly_config, rec_config,
+           salvage_config == NULL ? "" : salvage_config, p1, p2, p3)) != 0) {
         (void)util_err(NULL, ret, NULL);
         goto err;
     }

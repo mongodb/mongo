@@ -68,6 +68,12 @@ static bool inmem;
 #define ENV_CONFIG_REC "log=(recover=on)"
 
 /*
+ * A minimum width of 10, along with zero filling, means that all the keys sort according to their
+ * integer value, making each thread's key space distinct.
+ */
+#define KEY_FORMAT ("%010" PRIu64)
+
+/*
  * Maximum number of modifications that are allowed to perform cursor modify operation.
  */
 #define MAX_MODIFY_ENTRIES 10
@@ -191,7 +197,7 @@ thread_run(void *arg)
         if (columnar_table)
             cursor->set_key(cursor, i);
         else {
-            testutil_check(__wt_snprintf(kname, sizeof(kname), "%" PRIu64, i));
+            testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, i));
             cursor->set_key(cursor, kname);
         }
         /*
@@ -462,7 +468,7 @@ recover_and_verify(uint32_t nthreads)
                 if (columnar_table)
                     cursor->set_key(cursor, key);
                 else {
-                    testutil_check(__wt_snprintf(kname, sizeof(kname), "%" PRIu64, key));
+                    testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
                     cursor->set_key(cursor, kname);
                 }
 
@@ -479,9 +485,7 @@ recover_and_verify(uint32_t nthreads)
                     fatal = true;
                 } else {
                     if (!inmem)
-                        printf(
-                          "%s: deleted record"
-                          " found with key %" PRIu64 "\n",
+                        printf("%s: deleted record found with key %" PRIu64 "\n",
                           fname[DELETE_RECORD_FILE_ID], key);
                     absent++;
                     middle = key;
@@ -493,7 +497,7 @@ recover_and_verify(uint32_t nthreads)
                 if (columnar_table)
                     cursor->set_key(cursor, key);
                 else {
-                    testutil_check(__wt_snprintf(kname, sizeof(kname), "%" PRIu64, key));
+                    testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
                     cursor->set_key(cursor, kname);
                 }
 
@@ -501,9 +505,7 @@ recover_and_verify(uint32_t nthreads)
                     if (ret != WT_NOTFOUND)
                         testutil_die(ret, "search");
                     if (!inmem)
-                        printf(
-                          "%s: no insert record"
-                          " with key %" PRIu64 "\n",
+                        printf("%s: no insert record with key %" PRIu64 "\n",
                           fname[INSERT_RECORD_FILE_ID], key);
                     absent++;
                     middle = key;
@@ -546,7 +548,7 @@ recover_and_verify(uint32_t nthreads)
                 if (columnar_table)
                     cursor->set_key(cursor, key);
                 else {
-                    testutil_check(__wt_snprintf(kname, sizeof(kname), "%" PRIu64, key));
+                    testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
                     cursor->set_key(cursor, kname);
                 }
 

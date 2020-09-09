@@ -370,9 +370,8 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
     if (F_ISSET(txn, WT_TXN_READONLY)) {
         if (F_ISSET(txn, WT_TXN_IGNORE_PREPARE))
-            WT_RET_MSG(session, ENOTSUP,
-              "Transactions with ignore_prepare=true"
-              " cannot perform updates");
+            WT_RET_MSG(
+              session, ENOTSUP, "Transactions with ignore_prepare=true cannot perform updates");
         WT_RET_MSG(session, WT_ROLLBACK, "Attempt to update in a read-only transaction");
     }
 
@@ -852,7 +851,7 @@ __wt_txn_read_upd_list(
          * If the cursor is configured to ignore tombstones, copy the timestamps from the tombstones
          * to the stop time window of the update value being returned to the caller. Caller can
          * process the stop time window to decide if there was a tombstone on the update chain. If
-         * the time window already has a stop time set then we must've seen a tombstone prior to
+         * the time window already has a stop time set then we must have seen a tombstone prior to
          * ours in the update list, and therefore don't need to do this again.
          */
         if (type == WT_UPDATE_TOMBSTONE && F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE) &&
@@ -1006,8 +1005,9 @@ retry:
      */
     if (prepare_upd != NULL) {
         WT_ASSERT(session, F_ISSET(prepare_upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS));
-        if (retry && (prepare_upd->txnid == WT_TXN_ABORTED ||
-                       prepare_upd->prepare_state == WT_PREPARE_RESOLVED)) {
+        if (retry &&
+          (prepare_upd->txnid == WT_TXN_ABORTED ||
+            prepare_upd->prepare_state == WT_PREPARE_RESOLVED)) {
             retry = false;
             /* Clean out any stale value before performing the retry. */
             __wt_upd_value_clear(cbt->upd_value);
@@ -1045,8 +1045,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_RUNNING));
 
-    if (cfg != NULL)
-        WT_RET(__wt_txn_config(session, cfg));
+    WT_RET(__wt_txn_config(session, cfg));
 
     /* Allocate a snapshot if required. */
     if (txn->isolation == WT_ISO_SNAPSHOT) {
@@ -1211,14 +1210,11 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
     if (!F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
       FLD_ISSET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS) &&
       !F_ISSET(txn, WT_TXN_SHARED_TS_READ))
-        WT_RET_MSG(session, EINVAL,
-          "read_timestamp required and "
-          "none set on this transaction");
+        WT_RET_MSG(session, EINVAL, "read_timestamp required and none set on this transaction");
     if (FLD_ISSET(btree->assert_flags, WT_ASSERT_READ_TS_NEVER) &&
       F_ISSET(txn, WT_TXN_SHARED_TS_READ))
-        WT_RET_MSG(session, EINVAL,
-          "no read_timestamp required and "
-          "timestamp set on this transaction");
+        WT_RET_MSG(
+          session, EINVAL, "no read_timestamp required and timestamp set on this transaction");
     return (0);
 }
 

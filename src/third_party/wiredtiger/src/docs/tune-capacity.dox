@@ -12,7 +12,7 @@ An example of setting a capacity limit to 40MB per second:
 
 @snippet ex_all.c Configure capacity
 
-When a total capacity is set the volume of system reads and writes totalled
+When a total capacity is set the volume of system reads and writes totaled
 will not exceed the given I/O capacity.
 If a read or write is scheduled and would overflow the capacity, the issuing
 thread will sleep to guarantee the capacity ceiling.  The policy used is

@@ -58,35 +58,42 @@ class test_backup02(wttest.WiredTigerTestCase):
 #        ckpt = checkpoint_thread(self.conn, done)
 #        ckpt.start()
         bkp = backup_thread(self.conn, 'backup.dir', done)
-        bkp.start()
-
         work_queue = queue.Queue()
-        my_data = 'a' * self.dsize
-        for i in range(self.nops):
-            work_queue.put_nowait(('gi', i, my_data))
-
         opthreads = []
-        for i in range(self.nthreads):
-            t = op_thread(self.conn, uris, self.fmt, work_queue, done)
-            opthreads.append(t)
-            t.start()
+        try:
+            bkp.start()
 
-        # Add 200 update entries into the queue every .1 seconds.
-        more_time = self.time
-        while more_time > 0:
-            time.sleep(0.1)
-            my_data = str(more_time) + 'a' * (self.dsize - len(str(more_time)))
-            more_time = more_time - 0.1
+            my_data = 'a' * self.dsize
             for i in range(self.nops):
-                work_queue.put_nowait(('gu', i, my_data))
+                work_queue.put_nowait(('gi', i, my_data))
 
-        work_queue.join()
-        done.set()
-#        # Wait for checkpoint thread to notice status change.
-#        ckpt.join()
-        for t in opthreads:
-            t.join()
-        bkp.join()
+            for i in range(self.nthreads):
+                t = op_thread(self.conn, uris, self.fmt, work_queue, done)
+                opthreads.append(t)
+                t.start()
+
+            # Add 200 update entries into the queue every .1 seconds.
+            more_time = self.time
+            while more_time > 0:
+                time.sleep(0.1)
+                my_data = str(more_time) + 'a' * (self.dsize - len(str(more_time)))
+                more_time = more_time - 0.1
+                for i in range(self.nops):
+                    work_queue.put_nowait(('gu', i, my_data))
+        except:
+            # Deplete the work queue if there's an error.
+            while not work_queue.empty():
+                work_queue.get()
+                work_queue.task_done()
+            raise
+        finally:
+            work_queue.join()
+            done.set()
+            # Wait for checkpoint thread to notice status change.
+            # ckpt.join()
+            for t in opthreads:
+                t.join()
+            bkp.join()
 
 if __name__ == '__main__':
     wttest.run()

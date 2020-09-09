@@ -413,9 +413,11 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double 
      * application thread.
      */
     if (pct_fullp != NULL)
-        *pct_fullp = WT_MAX(0.0, 100.0 - WT_MIN(WT_MIN(cache->eviction_trigger - pct_full,
-                                                  cache->eviction_dirty_trigger - pct_dirty),
-                                           cache->eviction_updates_trigger - pct_updates));
+        *pct_fullp = WT_MAX(0.0,
+          100.0 -
+            WT_MIN(
+              WT_MIN(cache->eviction_trigger - pct_full, cache->eviction_dirty_trigger - pct_dirty),
+              cache->eviction_updates_trigger - pct_updates));
 
     /*
      * Only check the dirty trigger when the session is not busy.
@@ -458,6 +460,10 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
     if (didworkp != NULL)
         *didworkp = false;
 
+    /* Eviction causes reconciliation. So don't evict if we can't reconcile */
+    if (F_ISSET(session, WT_SESSION_NO_RECONCILE))
+        return (0);
+
     /*
      * If the current transaction is keeping the oldest ID pinned, it is in the middle of an
      * operation. This may prevent the oldest ID from moving forward, leading to deadlock, so only
@@ -474,8 +480,9 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
      * holding the handle list, schema or table locks (which can block checkpoints and eviction),
      * don't block the thread for eviction.
      */
-    if (F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_LOCKED_HANDLE_LIST |
-            WT_SESSION_LOCKED_SCHEMA | WT_SESSION_LOCKED_TABLE))
+    if (F_ISSET(session,
+          WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA |
+            WT_SESSION_LOCKED_TABLE))
         return (0);
 
     /* In memory configurations don't block when the cache is full. */

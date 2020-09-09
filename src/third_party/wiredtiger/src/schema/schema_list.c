@@ -29,9 +29,7 @@ __wt_schema_get_table_uri(
     if (!ok_incomplete && !table->cg_complete) {
         WT_ERR(__wt_session_release_dhandle(session));
         ret = __wt_set_return(session, EINVAL);
-        WT_ERR_MSG(session, ret,
-          "'%s' cannot be used "
-          "until all column groups are created",
+        WT_ERR_MSG(session, ret, "'%s' cannot be used until all column groups are created",
           table->iface.name);
     }
     *tablep = table;

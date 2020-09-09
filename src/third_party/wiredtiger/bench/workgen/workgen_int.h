@@ -51,10 +51,10 @@ struct WorkgenTimeStamp {
     WorkgenTimeStamp() {}
 
     static uint64_t get_timestamp_lag(double seconds) {
-        timespec start_time;
-        workgen_epoch(&start_time);
+        uint64_t start_time;
+        workgen_clock(&start_time);
 
-        return (ts_us(start_time) - secs_us(seconds));
+        return (ns_to_us(start_time) - secs_us(seconds));
     }
 
     static void sleep(double seconds) {
@@ -62,10 +62,9 @@ struct WorkgenTimeStamp {
     }
 
     static uint64_t get_timestamp() {
-        timespec start_time;
-        workgen_epoch(&start_time);
-
-        return (ts_us(start_time));
+        uint64_t start_time;
+        workgen_clock(&start_time);
+        return (ns_to_us(start_time));
     }
 };
 

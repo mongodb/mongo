@@ -94,6 +94,12 @@ static volatile THREAD_TS th_ts[MAX_TH];
     ",transaction_sync=(enabled,method=none)"
 #define ENV_CONFIG_REC "log=(archive=false,recover=on)"
 
+/*
+ * A minimum width of 10, along with zero filling, means that all the keys sort according to their
+ * integer value, making each thread's key space distinct.
+ */
+#define KEY_FORMAT ("%010" PRIu64)
+
 typedef struct {
     uint64_t absent_key; /* Last absent key */
     uint64_t exist_key;  /* First existing key after miss */
@@ -490,7 +496,7 @@ thread_ts_run(void *arg)
             }
         } else
 ts_wait:
-        __wt_sleep(0, 1000);
+            __wt_sleep(0, 1000);
     }
     /* NOTREACHED */
 }
@@ -539,10 +545,8 @@ thread_ckpt_run(void *arg)
                 if (WT_TIMEDIFF_SEC(now, start) >= 1)
                     printf("CKPT: !stable_set time %" PRIu64 "\n", WT_TIMEDIFF_SEC(now, start));
                 if (WT_TIMEDIFF_SEC(now, start) > MAX_STARTUP) {
-                    fprintf(stderr,
-                      "After %d seconds stable still not "
-                      "set. Aborting.\n",
-                      MAX_STARTUP);
+                    fprintf(
+                      stderr, "After %d seconds stable still not set. Aborting.\n", MAX_STARTUP);
                     /*
                      * For the checkpoint thread the info contains the number of threads.
                      */
@@ -690,7 +694,7 @@ thread_run(void *arg)
             }
         if (use_ts)
             stable_ts = __wt_atomic_addv64(&global_ts, 1);
-        testutil_check(__wt_snprintf(kname, sizeof(kname), "%" PRIu64, i));
+        testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, i));
 
         testutil_check(session->begin_transaction(session, NULL));
         if (use_prep)
@@ -871,9 +875,7 @@ print_missing(REPORT *r, const char *fname, const char *msg)
 {
     if (r->exist_key != INVALID_KEY)
         printf("%s: %s error %" PRIu64 " absent records %" PRIu64 "-%" PRIu64 ". Then keys %" PRIu64
-               "-%" PRIu64
-               " exist."
-               " Key range %" PRIu64 "-%" PRIu64 "\n",
+               "-%" PRIu64 " exist. Key range %" PRIu64 "-%" PRIu64 "\n",
           fname, msg, (r->exist_key - r->first_miss) - 1, r->first_miss, r->exist_key - 1,
           r->exist_key, r->last_key, r->first_key, r->last_key);
 }
@@ -990,9 +992,7 @@ main(int argc, char *argv[])
                 nth = MIN_TH;
         }
 
-        printf(
-          "Parent: compatibility: %s, "
-          "in-mem log sync: %s, timestamp in use: %s\n",
+        printf("Parent: compatibility: %s, in-mem log sync: %s, timestamp in use: %s\n",
           compat ? "true" : "false", inmem ? "true" : "false", use_ts ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
         printf("CONFIG: %s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
@@ -1047,9 +1047,7 @@ main(int argc, char *argv[])
      * particularly in automated testing.
      */
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && "
-      "cp -p * ../%s.SAVE",
-      home, home, home));
+      "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && cp -p * ../%s.SAVE", home, home, home));
     if ((status = system(buf)) < 0)
         testutil_die(status, "system: %s", buf);
     printf("Open database, run recovery and verify content\n");
@@ -1119,7 +1117,7 @@ main(int argc, char *argv[])
                   key, last_key);
                 break;
             }
-            testutil_check(__wt_snprintf(kname, sizeof(kname), "%" PRIu64, key));
+            testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
             cur_coll->set_key(cur_coll, kname);
             cur_local->set_key(cur_local, kname);
             cur_oplog->set_key(cur_oplog, kname);
@@ -1134,9 +1132,8 @@ main(int argc, char *argv[])
                  * larger than the saved one.
                  */
                 if (!inmem && stable_fp != 0 && stable_fp <= stable_val) {
-                    printf(
-                      "%s: COLLECTION no record with "
-                      "key %" PRIu64 " record ts %" PRIu64 " <= stable ts %" PRIu64 "\n",
+                    printf("%s: COLLECTION no record with key %" PRIu64 " record ts %" PRIu64
+                           " <= stable ts %" PRIu64 "\n",
                       fname, key, stable_fp, stable_val);
                     absent_coll++;
                 }
@@ -1155,9 +1152,8 @@ main(int argc, char *argv[])
                  * If we found a record, the stable timestamp written to our file better be no
                  * larger than the checkpoint one.
                  */
-                printf(
-                  "%s: COLLECTION record with "
-                  "key %" PRIu64 " record ts %" PRIu64 " > stable ts %" PRIu64 "\n",
+                printf("%s: COLLECTION record with key %" PRIu64 " record ts %" PRIu64
+                       " > stable ts %" PRIu64 "\n",
                   fname, key, stable_fp, stable_val);
                 fatal = true;
             }

@@ -67,16 +67,13 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
              * pool.
              */
             if (__wt_config_gets(session, &cfg[1], "shared_cache.size", &cval) != WT_NOTFOUND)
-                WT_RET_MSG(session, EINVAL,
-                  "Shared cache configuration requires a "
-                  "pool name");
+                WT_RET_MSG(session, EINVAL, "Shared cache configuration requires a pool name");
             return (0);
         }
 
         if (__wt_config_gets(session, &cfg[1], "cache_size", &cval_cache_size) != WT_NOTFOUND)
             WT_RET_MSG(session, EINVAL,
-              "Only one of cache_size and shared_cache can be "
-              "in the configuration");
+              "Only one of cache_size and shared_cache can be in the configuration");
 
         /*
          * NOTE: The allocations made when configuring and opening a cache pool don't really belong
@@ -185,8 +182,8 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
         used_cache -= conn->cache->cp_reserved;
     if (used_cache + reserve > size)
         WT_ERR_MSG(session, EINVAL,
-          "Shared cache unable to accommodate this configuration. "
-          "Shared cache size: %" PRIu64 ", requested min: %" PRIu64,
+          "Shared cache unable to accommodate this configuration. Shared cache size: %" PRIu64
+          ", requested min: %" PRIu64,
           size, used_cache + reserve);
 
     /* The configuration is verified - it's safe to update the pool. */
@@ -284,7 +281,6 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
     WT_CACHE_POOL *cp;
     WT_CONNECTION_IMPL *conn, *entry;
     WT_DECL_RET;
-    WT_SESSION *wt_session;
     bool cp_locked, found;
 
     conn = S2C(session);
@@ -328,8 +324,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
         __wt_cond_signal(session, cp->cache_pool_cond);
         WT_TRET(__wt_thread_join(session, &cache->cp_tid));
 
-        wt_session = &cache->cp_session->iface;
-        WT_TRET(wt_session->close(wt_session, NULL));
+        WT_TRET(__wt_session_close_internal(cache->cp_session));
 
         /*
          * Grab the lock again now to stop other threads joining the pool while we are figuring out

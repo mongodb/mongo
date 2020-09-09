@@ -74,10 +74,8 @@ main(int argc, char *argv[])
 
     testutil_check(wiredtiger_open(opts->home, NULL, "create,cache_size=200M", &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(session->create(session, opts->uri,
-      "key_format=r,"
-      "value_format=5sHQ,"
-      "columns=(id,country,year,population)"));
+    testutil_check(session->create(
+      session, opts->uri, "key_format=r,value_format=5sHQ,columns=(id,country,year,population)"));
 
     /* Create an index with a simple key. */
     testutil_check(session->create(session, countryuri, "columns=(country)"));

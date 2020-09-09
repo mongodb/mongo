@@ -143,9 +143,8 @@ __wt_cursor_modify_value_format_notsup(WT_CURSOR *cursor, WT_MODIFY *entries, in
 
     if (cursor->value_format != NULL && strlen(cursor->value_format) != 0) {
         session = CUR2S(cursor);
-        WT_RET_MSG(session, ENOTSUP,
-          "WT_CURSOR.modify only supported for 'S' and 'u' value "
-          "formats");
+        WT_RET_MSG(
+          session, ENOTSUP, "WT_CURSOR.modify only supported for 'S' and 'u' value formats");
     }
     return (__wt_cursor_notsup(cursor));
 }
@@ -669,7 +668,7 @@ __wt_cursor_cache(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     /* Move the cursor from the open list to the caching hash table. */
     if (cursor->uri_hash == 0)
         cursor->uri_hash = __wt_hash_city64(cursor->uri, strlen(cursor->uri));
-    bucket = cursor->uri_hash % WT_HASH_ARRAY_SIZE;
+    bucket = cursor->uri_hash & (S2C(session)->hash_size - 1);
     TAILQ_REMOVE(&session->cursors, cursor, q);
     TAILQ_INSERT_HEAD(&session->cursor_cache[bucket], cursor, q);
 
@@ -702,7 +701,7 @@ __wt_cursor_reopen(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle)
     WT_STAT_CONN_DECR_ATOMIC(session, cursor_cached_count);
     WT_STAT_DATA_INCR(session, cursor_open_count);
 
-    bucket = cursor->uri_hash % WT_HASH_ARRAY_SIZE;
+    bucket = cursor->uri_hash & (S2C(session)->hash_size - 1);
     TAILQ_REMOVE(&session->cursor_cache[bucket], cursor, q);
     TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
     F_CLR(cursor, WT_CURSTD_CACHED);
@@ -732,20 +731,28 @@ __wt_cursor_cache_release(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool *rel
         WT_RET(__wt_session_cursor_cache_sweep(session));
     }
 
-    WT_ERR(cursor->cache(cursor));
+    /*
+     * Caching the cursor releases its data handle. So we have to update statistics first. If
+     * caching fails, we'll decrement the statistics after reopening the cursor (and getting the
+     * data handle back).
+     */
     WT_STAT_CONN_INCR(session, cursor_cache);
     WT_STAT_DATA_INCR(session, cursor_cache);
+    WT_ERR(cursor->cache(cursor));
     WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_CACHED));
     *released = true;
 
     if (0) {
-    /*
-     * If caching fails, we must restore the state of the cursor back to open so that the close
-     * works from a known state. The reopen may also fail, but that doesn't matter at this point.
-     */
+        /*
+         * If caching fails, we must restore the state of the cursor back to open so that the close
+         * works from a known state. The reopen may also fail, but that doesn't matter at this
+         * point.
+         */
 err:
         WT_TRET(cursor->reopen(cursor, false));
         WT_ASSERT(session, !F_ISSET(cursor, WT_CURSTD_CACHED));
+        WT_STAT_CONN_DECR(session, cursor_cache);
+        WT_STAT_DATA_DECR(session, cursor_cache);
     }
 
     return (ret);
@@ -825,7 +832,7 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *to_d
      * Walk through all cursors, if there is a cached cursor that matches uri and configuration, use
      * it.
      */
-    bucket = hash_value % WT_HASH_ARRAY_SIZE;
+    bucket = hash_value & (S2C(session)->hash_size - 1);
     TAILQ_FOREACH (cursor, &session->cursor_cache[bucket], q) {
         if (cursor->uri_hash == hash_value && strcmp(cursor->uri, uri) == 0) {
             if ((ret = cursor->reopen(cursor, false)) != 0) {
@@ -953,9 +960,8 @@ __cursor_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
      * for consistency.
      */
     if (session->txn->isolation != WT_ISO_SNAPSHOT)
-        WT_ERR_MSG(session, ENOTSUP,
-          "not supported in read-committed or read-uncommitted "
-          "transactions");
+        WT_ERR_MSG(
+          session, ENOTSUP, "not supported in read-committed or read-uncommitted transactions");
     if (F_ISSET(session->txn, WT_TXN_AUTOCOMMIT))
         WT_ERR_MSG(session, ENOTSUP, "not supported in implicit transactions");
 

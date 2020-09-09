@@ -135,7 +135,7 @@ str2recno(WT_SESSION_IMPL *session, const char *p, uint64_t *recnop)
         WT_RET_MSG(session, ERANGE, "%s: invalid record number", p);
     if (endptr[0] != '\0')
 format:
-    WT_RET_MSG(session, EINVAL, "%s: invalid record number", p);
+        WT_RET_MSG(session, EINVAL, "%s: invalid record number", p);
 
     *recnop = recno;
     return (0);
@@ -420,8 +420,9 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
     cdump->child = child;
 
     /* Copy the dump flags from the child cursor. */
-    F_SET(cursor, F_MASK(child, WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_JSON | WT_CURSTD_DUMP_PRETTY |
-                      WT_CURSTD_DUMP_PRINT));
+    F_SET(cursor,
+      F_MASK(child,
+        WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_JSON | WT_CURSTD_DUMP_PRETTY | WT_CURSTD_DUMP_PRINT));
     if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
         WT_ERR(__wt_calloc_one(session, &json));
         cursor->json_private = child->json_private = json;

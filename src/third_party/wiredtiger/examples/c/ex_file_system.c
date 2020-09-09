@@ -852,10 +852,8 @@ main(void)
      * function as the "config" value.
      */
     open_config =
-      "create,log=(enabled=true),extensions=(local={"
-      "entry=demo_file_system_create,early_load=true,"
-      "config={config_string=\"demo-file-system\",config_value=37}"
-      "})";
+      "create,log=(enabled=true),extensions=(local={entry=demo_file_system_create,early_load=true,"
+      "config={config_string=\"demo-file-system\",config_value=37}})";
     /* Open a connection to the database, creating it if necessary. */
     if ((ret = wiredtiger_open(home, NULL, open_config, &conn)) != 0) {
         fprintf(stderr, "Error connecting to %s: %s\n", home == NULL ? "." : home,

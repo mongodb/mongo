@@ -263,8 +263,11 @@ class WiredTigerTestCase(unittest.TestCase):
         result = ''
         extfiles = {}
         skipIfMissing = False
+        earlyLoading = ''
         if hasattr(exts, 'skip_if_missing'):
             skipIfMissing = exts.skip_if_missing
+        if hasattr(exts, 'early_load_ext') and exts.early_load_ext == True:
+            earlyLoading = '=(early_load=true)'
         for ext in exts:
             extconf = ''
             if '=' in ext:
@@ -302,7 +305,7 @@ class WiredTigerTestCase(unittest.TestCase):
             else:
                 extfiles[ext] = complete
         if len(extfiles) != 0:
-            result = ',extensions=[' + ','.join(list(extfiles.values())) + ']'
+            result = ',extensions=[' + ','.join(list(extfiles.values())) + earlyLoading + ']'
         return result
 
     # Can be overridden, but first consider setting self.conn_config

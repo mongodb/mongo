@@ -108,17 +108,15 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
         block->compact_pct_tenths = 1;
     }
 
-    __wt_verbose(session, WT_VERB_COMPACT, "%s: %" PRIuMAX "MB (%" PRIuMAX
-                                           ") available space in the first "
-                                           "80%% of the file",
+    __wt_verbose(session, WT_VERB_COMPACT,
+      "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first 80%% of the file",
       block->name, (uintmax_t)avail_eighty / WT_MEGABYTE, (uintmax_t)avail_eighty);
-    __wt_verbose(session, WT_VERB_COMPACT, "%s: %" PRIuMAX "MB (%" PRIuMAX
-                                           ") available space in the first "
-                                           "90%% of the file",
+    __wt_verbose(session, WT_VERB_COMPACT,
+      "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first 90%% of the file",
       block->name, (uintmax_t)avail_ninety / WT_MEGABYTE, (uintmax_t)avail_ninety);
-    __wt_verbose(session, WT_VERB_COMPACT, "%s: require 10%% or %" PRIuMAX "MB (%" PRIuMAX
-                                           ") in the first "
-                                           "90%% of the file to perform compaction, compaction %s",
+    __wt_verbose(session, WT_VERB_COMPACT,
+      "%s: require 10%% or %" PRIuMAX "MB (%" PRIuMAX
+      ") in the first 90%% of the file to perform compaction, compaction %s",
       block->name, (uintmax_t)(block->size / 10) / WT_MEGABYTE, (uintmax_t)block->size / 10,
       *skipp ? "skipped" : "proceeding");
 
@@ -206,8 +204,9 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, bool start)
           session, WT_VERB_COMPACT, "pages written: %" PRIu64, block->compact_pages_written);
     }
 
-    __wt_verbose(session, WT_VERB_COMPACT, "file size %" PRIuMAX "MB (%" PRIuMAX ") with %" PRIuMAX
-                                           "%% space available %" PRIuMAX "MB (%" PRIuMAX ")",
+    __wt_verbose(session, WT_VERB_COMPACT,
+      "file size %" PRIuMAX "MB (%" PRIuMAX ") with %" PRIuMAX "%% space available %" PRIuMAX
+      "MB (%" PRIuMAX ")",
       (uintmax_t)size / WT_MEGABYTE, (uintmax_t)size,
       ((uintmax_t)el->bytes * 100) / (uintmax_t)size, (uintmax_t)el->bytes / WT_MEGABYTE,
       (uintmax_t)el->bytes);

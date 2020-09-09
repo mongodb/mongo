@@ -841,9 +841,9 @@ int ThreadRunner::op_run(Operation *op) {
       (track->ops % _workload->options.sample_rate == 0);
 
     VERBOSE(*this, "OP " << op->_optype << " " << op->_table._uri.c_str() << ", recno=" << recno);
-    timespec start;
+    uint64_t start;
     if (measure_latency)
-        workgen_epoch(&start);
+        workgen_clock(&start);
 
     // Whether or not we are measuring latency, we track how many operations
     // are in progress, or that complete.
@@ -929,15 +929,15 @@ int ThreadRunner::op_run(Operation *op) {
     }
 
     if (measure_latency) {
-        timespec stop;
-        workgen_epoch(&stop);
-        track->complete_with_latency(ts_us(stop - start));
+        uint64_t stop;
+        workgen_clock(&stop);
+        track->complete_with_latency(ns_to_us(stop - start));
     } else if (track != NULL)
         track->complete();
 
     if (op->_group != NULL) {
         uint64_t endtime = 0;
-        timespec now;
+        uint64_t now;
 
         if (op->_timed != 0.0)
             endtime = _op_time_us + secs_us(op->_timed);
@@ -951,8 +951,8 @@ int ThreadRunner::op_run(Operation *op) {
                      i != op->_group->end(); i++)
                     WT_ERR(op_run(&*i));
             }
-            workgen_epoch(&now);
-        } while (!_stop && ts_us(now) < endtime);
+            workgen_clock(&now);
+        } while (!_stop && ns_to_us(now) < endtime);
 
         if (op->_timed != 0.0)
             _op_time_us = endtime;
@@ -1487,14 +1487,13 @@ void SleepOperationInternal::parse_config(const std::string &config)
 int SleepOperationInternal::run(ThreadRunner *runner, WT_SESSION *session)
 {
     uint64_t endtime;
-    timespec now;
-    uint64_t now_us;
+    uint64_t now, now_us;
 
     (void)runner;    /* not used */
     (void)session;   /* not used */
 
-    workgen_epoch(&now);
-    now_us = ts_us(now);
+    workgen_clock(&now);
+    now_us = ns_to_us(now);
     if (runner->_thread->options.synchronized)
         endtime = runner->_op_time_us + secs_us(_sleepvalue);
     else
@@ -1509,8 +1508,8 @@ int SleepOperationInternal::run(ThreadRunner *runner, WT_SESSION *session)
         else
             usleep(sleep_us);
 
-        workgen_epoch(&now);
-        now_us = ts_us(now);
+        workgen_clock(&now);
+        now_us = ns_to_us(now);
     }
     return (0);
 }

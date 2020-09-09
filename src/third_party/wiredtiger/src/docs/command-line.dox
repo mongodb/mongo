@@ -142,7 +142,7 @@ The \c downgrade command downgrades the database to the specified compatibility 
 The following are command-specific options for the \c downgrade command:
 
 @par <code>-V version</code>
-The \c -V option is required, and specfies the version to which the database is downgraded.
+The \c -V option is required, and specifies the version to which the database is downgraded.
 
 <hr>
 @section util_drop wt drop

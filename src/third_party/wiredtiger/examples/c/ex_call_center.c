@@ -95,10 +95,7 @@ main(int argc, char *argv[])
      * in two groups: "main" and "address", created below.
      */
     error_check(session->create(session, "table:customers",
-      "key_format=r,"
-      "value_format=SSS,"
-      "columns=(id,name,address,phone),"
-      "colgroups=(main,address)"));
+      "key_format=r,value_format=SSS,columns=(id,name,address,phone),colgroups=(main,address)"));
 
     /* Create the main column group with value columns except address. */
     error_check(session->create(session, "colgroup:customers:main", "columns=(name,phone)"));
@@ -122,9 +119,7 @@ main(int argc, char *argv[])
      * together, so no column groups are declared.
      */
     error_check(session->create(session, "table:calls",
-      "key_format=r,"
-      "value_format=qrrSS,"
-      "columns=(id,call_date,cust_id,emp_id,call_type,notes)"));
+      "key_format=r,value_format=qrrSS,columns=(id,call_date,cust_id,emp_id,call_type,notes)"));
 
     /*
      * Create an index on the calls table with a composite key of cust_id and call_date.

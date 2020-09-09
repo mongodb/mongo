@@ -116,9 +116,8 @@ main(int argc, char *argv[])
      * Note: id is repeated as id2. This makes it easier to identify the primary key in dumps of the
      * index files.
      */
-    testutil_check(session->create(session, opts->uri,
-      "key_format=i,value_format=iiSii,"
-      "columns=(id,post,bal,extra,flag,id2)"));
+    testutil_check(session->create(
+      session, opts->uri, "key_format=i,value_format=iiSii,columns=(id,post,bal,extra,flag,id2)"));
 
     tablename = strchr(opts->uri, ':');
     testutil_assert(tablename != NULL);
@@ -188,10 +187,8 @@ main(int argc, char *argv[])
      */
     if (nfail != 0)
         fprintf(stderr,
-          "ERROR: %d failures when a single commit"
-          " took more than %d seconds.\n"
-          "This may indicate a real problem or a"
-          " particularly slow machine.\n",
+          "ERROR: %d failures when a single commit took more than %d seconds.\n"
+          "This may indicate a real problem or a particularly slow machine.\n",
           nfail, GAP_ERROR);
     testutil_assert(nfail == 0);
     testutil_progress(opts, "cleanup starting");

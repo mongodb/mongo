@@ -36,8 +36,9 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
     if (block)
         ret = (handle->fh_sync == NULL ? 0 : handle->fh_sync(handle, (WT_SESSION *)session));
     else
-        ret = (handle->fh_sync_nowait == NULL ? 0 : handle->fh_sync_nowait(
-                                                      handle, (WT_SESSION *)session));
+        ret =
+          (handle->fh_sync_nowait == NULL ? 0 :
+                                            handle->fh_sync_nowait(handle, (WT_SESSION *)session));
     WT_STAT_CONN_DECR_ATOMIC(session, thread_fsync_active);
     return (ret);
 }
@@ -160,7 +161,8 @@ __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, con
     WT_DECL_RET;
     uint64_t time_start, time_stop;
 
-    WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY) ||
+    WT_ASSERT(session,
+      !F_ISSET(S2C(session), WT_CONN_READONLY) ||
         WT_STRING_MATCH(fh->name, WT_SINGLETHREAD, strlen(WT_SINGLETHREAD)));
 
     __wt_verbose(session, WT_VERB_HANDLEOPS, "%s: handle-write: %" WT_SIZET_FMT " at %" PRIuMAX,

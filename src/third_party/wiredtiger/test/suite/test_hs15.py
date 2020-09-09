@@ -33,7 +33,7 @@ def timestamp_str(t):
 
 # test_hs15.py
 # Ensure eviction doesn't clear the history store again after checkpoint has done so because of the same update without timestamp.
-class test_hs14(wttest.WiredTigerTestCase):
+class test_hs15(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=5MB'
     session_config = 'isolation=snapshot'
 

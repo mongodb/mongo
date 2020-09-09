@@ -869,10 +869,8 @@ __wt_json_strncpy(WT_SESSION *wt_session, char **pdst, size_t dstlen, const char
                     WT_RET_MSG(session, EINVAL, "invalid Unicode within JSON string");
                 src += 4;
                 if (hi != 0)
-                    WT_RET_MSG(session, EINVAL,
-                      "Unicode \"%6.6s\" byte out of "
-                      "range in JSON",
-                      src - 6);
+                    WT_RET_MSG(
+                      session, EINVAL, "Unicode \"%6.6s\" byte out of range in JSON", src - 6);
                 *dst++ = (char)lo;
                 break;
             case 'f':

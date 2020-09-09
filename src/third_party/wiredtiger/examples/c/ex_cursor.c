@@ -171,8 +171,7 @@ main(int argc, char *argv[])
     error_check(conn->open_session(conn, NULL, NULL, &session));
 
     error_check(session->create(session, "table:world",
-      "key_format=r,value_format=5sii,"
-      "columns=(id,country,population,area)"));
+      "key_format=r,value_format=5sii,columns=(id,country,population,area)"));
 
     /*! [open cursor #1] */
     error_check(session->open_cursor(session, "table:world", NULL, NULL, &cursor));

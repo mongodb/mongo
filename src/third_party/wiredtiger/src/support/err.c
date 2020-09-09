@@ -271,9 +271,8 @@ __eventv(WT_SESSION_IMPL *session, bool msg_event, int error, const char *func, 
      * code, it's a recursive call.
      */
     if (ret == 0 && remain == 0)
-        __wt_err(session, ENOMEM,
-          "error or message truncated: internal WiredTiger buffer "
-          "too small");
+        __wt_err(
+          session, ENOMEM, "error or message truncated: internal WiredTiger buffer too small");
 
     if (ret != 0) {
 err:

@@ -282,8 +282,9 @@ done:
     return (0);
 
 err:
-    __wt_err(session, ret, "operation apply failed during recovery: operation type %" PRIu32
-                           " at LSN %" PRIu32 "/%" PRIu32,
+    __wt_err(session, ret,
+      "operation apply failed during recovery: operation type %" PRIu32 " at LSN %" PRIu32
+      "/%" PRIu32,
       optype, lsnp->l.file, lsnp->l.offset);
     return (ret);
 }
@@ -477,9 +478,8 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 
     if (r->files[fileid].uri != NULL)
         WT_RET_PANIC(r->session, WT_PANIC,
-          "metadata corruption: files %s and %s have the same "
-          "file ID %u",
-          uri, r->files[fileid].uri, fileid);
+          "metadata corruption: files %s and %s have the same file ID %u", uri,
+          r->files[fileid].uri, fileid);
     WT_RET(__wt_strdup(r->session, uri, &r->files[fileid].uri));
     WT_RET(__wt_config_getones(r->session, config, "checkpoint_lsn", &cval));
     /* If there is no checkpoint logged for the file, apply everything. */
@@ -851,7 +851,8 @@ done:
          * written. The rollback to stable operation should only rollback the latest page changes
          * solely based on the write generation numbers.
          */
-        WT_ASSERT(session, conn->txn_global.has_stable_timestamp == false &&
+        WT_ASSERT(session,
+          conn->txn_global.has_stable_timestamp == false &&
             conn->txn_global.stable_timestamp == WT_TS_NONE);
 
         /*
@@ -900,7 +901,7 @@ err:
     if (eviction_started)
         WT_TRET(__wt_evict_destroy(session));
 
-    WT_TRET(session->iface.close(&session->iface, NULL));
+    WT_TRET(__wt_session_close_internal(session));
     F_CLR(conn, WT_CONN_RECOVERING);
 
     return (ret);

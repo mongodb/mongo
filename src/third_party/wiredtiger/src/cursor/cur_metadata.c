@@ -46,9 +46,7 @@ __schema_source_config(
     WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
     srch->set_key(srch, buf->data);
     if ((ret = srch->search(srch)) != 0)
-        WT_ERR_MSG(session, ret,
-          "metadata information for source configuration"
-          " \"%s\" not found",
+        WT_ERR_MSG(session, ret, "metadata information for source configuration \"%s\" not found",
           (const char *)buf->data);
     WT_ERR(srch->get_value(srch, &v));
     WT_ERR(__wt_strdup(session, v, result));
@@ -100,8 +98,7 @@ __schema_create_collapse(WT_SESSION_IMPL *session, WT_CURSOR_METADATA *mdc, cons
         c->set_key(c, buf->data);
         if ((ret = c->search(c)) != 0)
             WT_ERR_MSG(session, ret,
-              "metadata information for source configuration"
-              " \"%s\" not found",
+              "metadata information for source configuration \"%s\" not found",
               (const char *)buf->data);
         WT_ERR(c->get_value(c, &v));
         WT_ERR(__wt_strdup(session, v, --cfg));
@@ -167,9 +164,10 @@ err:
  * Check if a key matches the metadata. The public value is "metadata:", but also check for the
  * internal version of the URI.
  */
-#define WT_KEY_IS_METADATA(key)                                                            \
-    ((key)->size > 0 && (WT_STRING_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1) || \
-                          WT_STRING_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1)))
+#define WT_KEY_IS_METADATA(key)                                          \
+    ((key)->size > 0 &&                                                  \
+      (WT_STRING_MATCH(WT_METADATA_URI, (key)->data, (key)->size - 1) || \
+        WT_STRING_MATCH(WT_METAFILE_URI, (key)->data, (key)->size - 1)))
 
 /*
  * __curmetadata_metadata_search --

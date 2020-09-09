@@ -78,20 +78,37 @@ static const char *const uri_shadow = "shadow";
 
 static const char *const ckpt_file = "checkpoint_done";
 
-static bool compat, inmem, use_ts;
+static bool compat, inmem, stress, use_ts;
 static volatile uint64_t global_ts = 1;
 
-#define ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
+/*
+ * The configuration sets the eviction update and dirty targets at 20% so that on average, each
+ * thread can have a couple of dirty pages before eviction threads kick in. See below where these
+ * symbols are used for cache sizing - we'll have about 10 pages allocated per thread. On the other
+ * side, the eviction update and dirty triggers are 90%, so application threads aren't involved in
+ * eviction until we're close to running out of cache.
+ */
+#define ENV_CONFIG_ADD_COMPAT ",compatibility=(release=\"2.9\")"
+#define ENV_CONFIG_ADD_EVICT_DIRTY ",eviction_dirty_target=20,eviction_dirty_trigger=90"
+#define ENV_CONFIG_ADD_STRESS ",timing_stress_for_test=[prepare_checkpoint_delay]"
+
 #define ENV_CONFIG_DEF                                        \
-    "cache_size=20M,create,"                                  \
+    "cache_size=%" PRIu32                                     \
+    "M,create,"                                               \
     "debug_mode=(table_logging=true,checkpoint_retention=5)," \
-    "eviction_updates_trigger=95,eviction_updates_target=80," \
+    "eviction_updates_target=20,eviction_updates_trigger=90," \
     "log=(archive=true,file_max=10M,enabled),session_max=%d," \
-    "statistics=(fast),statistics_log=(wait=1,json=true),"
+    "statistics=(fast),statistics_log=(wait=1,json=true)"
 #define ENV_CONFIG_TXNSYNC \
     ENV_CONFIG_DEF         \
-    "transaction_sync=(enabled,method=none)"
+    ",transaction_sync=(enabled,method=none)"
 #define ENV_CONFIG_REC "log=(archive=false,recover=on)"
+
+/*
+ * A minimum width of 10, along with zero filling, means that all the keys sort according to their
+ * integer value, making each thread's key space distinct.
+ */
+#define KEY_FORMAT ("%010" PRIu64)
 
 typedef struct {
     uint64_t absent_key; /* Last absent key */
@@ -232,6 +249,7 @@ thread_run(void *arg)
 {
     FILE *fp;
     WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_shadow;
+    WT_DECL_RET;
     WT_ITEM data;
     WT_RAND_STATE rnd;
     WT_SESSION *prepared_session, *session;
@@ -308,7 +326,7 @@ thread_run(void *arg)
     printf("Thread %" PRIu32 " starts at %" PRIu64 "\n", td->info, td->start);
     active_ts = 0;
     for (i = td->start;; ++i) {
-        testutil_check(__wt_snprintf(kname, sizeof(kname), "%" PRIu64, i));
+        testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, i));
 
         testutil_check(session->begin_transaction(session, NULL));
         if (use_prep)
@@ -344,7 +362,9 @@ thread_run(void *arg)
         data.size = __wt_random(&rnd) % MAX_VAL;
         data.data = cbuf;
         cur_coll->set_value(cur_coll, &data);
-        testutil_check(cur_coll->insert(cur_coll));
+        if ((ret = cur_coll->insert(cur_coll)) == WT_ROLLBACK)
+            goto rollback;
+        testutil_check(ret);
         cur_shadow->set_value(cur_shadow, &data);
         if (use_ts) {
             /*
@@ -356,11 +376,13 @@ thread_run(void *arg)
               __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts));
             testutil_check(session->timestamp_transaction(session, tscfg));
         }
-        testutil_check(cur_shadow->insert(cur_shadow));
+        if ((ret = cur_shadow->insert(cur_shadow)) == WT_ROLLBACK)
+            goto rollback;
         data.size = __wt_random(&rnd) % MAX_VAL;
         data.data = obuf;
         cur_oplog->set_value(cur_oplog, &data);
-        testutil_check(cur_oplog->insert(cur_oplog));
+        if ((ret = cur_oplog->insert(cur_oplog)) == WT_ROLLBACK)
+            goto rollback;
         if (use_prep) {
             /*
              * Run with prepare every once in a while. And also yield after prepare sometimes too.
@@ -382,7 +404,9 @@ thread_run(void *arg)
         }
         testutil_check(session->commit_transaction(session, NULL));
         /*
-         * Insert into the local table outside the timestamp txn.
+         * Insert into the local table outside the timestamp txn. This must occur after the
+         * timestamp transaction, not before, because of the possibility of rollback in the
+         * transaction. The local table must stay in sync with the other tables.
          */
         data.size = __wt_random(&rnd) % MAX_VAL;
         data.data = lbuf;
@@ -394,6 +418,13 @@ thread_run(void *arg)
          */
         if (fprintf(fp, "%" PRIu64 " %" PRIu64 "\n", active_ts, i) < 0)
             testutil_die(EIO, "fprintf");
+
+        if (0) {
+rollback:
+            testutil_check(session->rollback_transaction(session, NULL));
+            if (use_prep)
+                testutil_check(prepared_session->rollback_transaction(prepared_session, NULL));
+        }
     }
     /* NOTREACHED */
 }
@@ -410,20 +441,42 @@ run_workload(uint32_t nth)
     WT_SESSION *session;
     THREAD_DATA *td;
     wt_thread_t *thr;
-    uint32_t ckpt_id, i, ts_id;
+    uint32_t cache_mb, ckpt_id, i, ts_id;
     char envconf[512], uri[128];
 
     thr = dcalloc(nth + 2, sizeof(*thr));
     td = dcalloc(nth + 2, sizeof(THREAD_DATA));
+
+    /*
+     * Size the cache appropriately for the number of threads. Each thread adds keys sequentially to
+     * its own portion of the key space, so each thread will be dirtying one page at a time. By
+     * default, a leaf page grows to 32K in size before it splits and the thread begins to fill
+     * another page. We'll budget for 10 full size leaf pages per thread in the cache plus a little
+     * extra in the total for overhead.
+     */
+    cache_mb = ((32 * WT_KILOBYTE * 10) * nth) / WT_MEGABYTE + 20;
+
     if (chdir(home) != 0)
         testutil_die(errno, "Child chdir: %s", home);
     if (inmem)
-        testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_DEF, SESSION_MAX));
+        testutil_check(
+          __wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_DEF, cache_mb, SESSION_MAX));
     else
-        testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, SESSION_MAX));
+        testutil_check(
+          __wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, cache_mb, SESSION_MAX));
     if (compat)
-        strcat(envconf, ENV_CONFIG_COMPAT);
+        strcat(envconf, ENV_CONFIG_ADD_COMPAT);
+    if (stress)
+        strcat(envconf, ENV_CONFIG_ADD_STRESS);
 
+    /*
+     * The eviction dirty target and trigger configurations are not compatible with certain other
+     * configurations.
+     */
+    if (!compat && !inmem)
+        strcat(envconf, ENV_CONFIG_ADD_EVICT_DIRTY);
+
+    printf("wiredtiger_open configuration: %s\n", envconf);
     testutil_check(wiredtiger_open(NULL, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     /*
@@ -503,9 +556,7 @@ print_missing(REPORT *r, const char *fname, const char *msg)
 {
     if (r->exist_key != INVALID_KEY)
         printf("%s: %s error %" PRIu64 " absent records %" PRIu64 "-%" PRIu64 ". Then keys %" PRIu64
-               "-%" PRIu64
-               " exist."
-               " Key range %" PRIu64 "-%" PRIu64 "\n",
+               "-%" PRIu64 " exist. Key range %" PRIu64 "-%" PRIu64 "\n",
           fname, msg, (r->exist_key - r->first_miss) - 1, r->first_miss, r->exist_key - 1,
           r->exist_key, r->last_key, r->first_key, r->last_key);
 }
@@ -549,7 +600,7 @@ main(int argc, char *argv[])
 
     (void)testutil_set_progname(argv);
 
-    compat = inmem = false;
+    compat = inmem = stress = false;
     use_ts = true;
     nth = MIN_TH;
     rand_th = rand_time = true;
@@ -557,7 +608,7 @@ main(int argc, char *argv[])
     verify_only = false;
     working_dir = "WT_TEST.timestamp-abort";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "Ch:LmT:t:vz")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "Ch:LmsT:t:vz")) != EOF)
         switch (ch) {
         case 'C':
             compat = true;
@@ -571,14 +622,15 @@ main(int argc, char *argv[])
         case 'm':
             inmem = true;
             break;
+        case 's':
+            stress = true;
+            break;
         case 'T':
             rand_th = false;
             nth = (uint32_t)atoi(__wt_optarg);
             if (nth > MAX_TH) {
-                fprintf(stderr,
-                  "Number of threads is larger than the"
-                  " maximum %" PRId32 "\n",
-                  MAX_TH);
+                fprintf(
+                  stderr, "Number of threads is larger than the maximum %" PRId32 "\n", MAX_TH);
                 return (EXIT_FAILURE);
             }
             break;
@@ -626,12 +678,14 @@ main(int argc, char *argv[])
         }
 
         printf(
-          "Parent: compatibility: %s, "
-          "in-mem log sync: %s, timestamp in use: %s\n",
-          compat ? "true" : "false", inmem ? "true" : "false", use_ts ? "true" : "false");
+          "Parent: compatibility: %s, in-mem log sync: %s, add timing stress: %s, timestamp in "
+          "use: %s\n",
+          compat ? "true" : "false", inmem ? "true" : "false", stress ? "true" : "false",
+          use_ts ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
-          compat ? " -C" : "", inmem ? " -m" : "", !use_ts ? " -z" : "", working_dir, nth, timeout);
+        printf("CONFIG: %s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 "\n", progname,
+          compat ? " -C" : "", inmem ? " -m" : "", stress ? " -s" : "", !use_ts ? " -z" : "",
+          working_dir, nth, timeout);
         /*
          * Fork a child to insert as many items. We will then randomly kill the child, run recovery
          * and make sure all items we wrote exist after recovery runs.
@@ -682,9 +736,7 @@ main(int argc, char *argv[])
      * particularly in automated testing.
      */
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && "
-      "cp -p * ../%s.SAVE",
-      home, home, home));
+      "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && cp -p * ../%s.SAVE", home, home, home));
     if ((status = system(buf)) < 0)
         testutil_die(status, "system: %s", buf);
     printf("Open database, run recovery and verify content\n");
@@ -759,7 +811,7 @@ main(int argc, char *argv[])
                   key, last_key);
                 break;
             }
-            testutil_check(__wt_snprintf(kname, sizeof(kname), "%" PRIu64, key));
+            testutil_check(__wt_snprintf(kname, sizeof(kname), KEY_FORMAT, key));
             cur_coll->set_key(cur_coll, kname);
             cur_local->set_key(cur_local, kname);
             cur_oplog->set_key(cur_oplog, kname);
@@ -779,9 +831,8 @@ main(int argc, char *argv[])
                  * larger than the saved one.
                  */
                 if (!inmem && stable_fp != 0 && stable_fp <= stable_val) {
-                    printf(
-                      "%s: COLLECTION no record with "
-                      "key %" PRIu64 " record ts %" PRIu64 " <= stable ts %" PRIu64 "\n",
+                    printf("%s: COLLECTION no record with key %" PRIu64 " record ts %" PRIu64
+                           " <= stable ts %" PRIu64 "\n",
                       fname, key, stable_fp, stable_val);
                     absent_coll++;
                 }
@@ -807,9 +858,8 @@ main(int argc, char *argv[])
                  * If we found a record, the stable timestamp written to our file better be no
                  * larger than the checkpoint one.
                  */
-                printf(
-                  "%s: COLLECTION record with "
-                  "key %" PRIu64 " record ts %" PRIu64 " > stable ts %" PRIu64 "\n",
+                printf("%s: COLLECTION record with key %" PRIu64 " record ts %" PRIu64
+                       " > stable ts %" PRIu64 "\n",
                   fname, key, stable_fp, stable_val);
                 fatal = true;
             } else if ((ret = cur_shadow->search(cur_shadow)) != 0)

@@ -219,8 +219,7 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
     case BTREE_COL_VAR:
         if (key_conf.len != 0)
             WT_RET_MSG(session, EINVAL,
-              "the keys of variable-length column-store files "
-              "may not be Huffman encoded");
+              "the keys of variable-length column-store files may not be Huffman encoded");
         break;
     case BTREE_ROW:
         break;
@@ -330,27 +329,22 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip, struct __wt_huff
          */
         if (lineno > entries + 1)
             WT_ERR_MSG(session, EINVAL,
-              "Huffman table file %.*s is corrupted, "
-              "more than %" PRIu32 " entries",
-              (int)ip->len, ip->str, entries + 1);
+              "Huffman table file %.*s is corrupted, more than %" PRIu32 " entries", (int)ip->len,
+              ip->str, entries + 1);
         if (n != 2)
             WT_ERR_MSG(session, EINVAL,
-              "line %u of Huffman table file %.*s is corrupted: "
-              "expected two unsigned integral values",
+              "line %u of Huffman table file %.*s is corrupted: expected two unsigned integral "
+              "values",
               lineno, (int)ip->len, ip->str);
         if (symbol < 0 || symbol > entries)
             WT_ERR_MSG(session, EINVAL,
-              "line %u of Huffman file %.*s is corrupted; "
-              "symbol %" PRId64
-              " not in range, maximum "
-              "value is %u",
+              "line %u of Huffman file %.*s is corrupted; symbol %" PRId64
+              " not in range, maximum value is %u",
               lineno, (int)ip->len, ip->str, symbol, entries);
         if (frequency < 0 || frequency > UINT32_MAX)
             WT_ERR_MSG(session, EINVAL,
-              "line %u of Huffman file %.*s is corrupted; "
-              "frequency %" PRId64
-              " not in range, maximum "
-              "value is %" PRIu32,
+              "line %u of Huffman file %.*s is corrupted; frequency %" PRId64
+              " not in range, maximum value is %" PRIu32,
               lineno, (int)ip->len, ip->str, frequency, (uint32_t)UINT32_MAX);
 
         tp->symbol = (uint32_t)symbol;

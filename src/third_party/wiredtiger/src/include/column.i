@@ -176,9 +176,9 @@ __col_insert_search(
     /* Fast path appends. */
     if (recno >= WT_INSERT_RECNO(ret_ins)) {
         for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
-            ins_stack[i] = (i == 0) ? &ret_ins->next[0] : (ins_head->tail[i] != NULL) ?
-                                      &ins_head->tail[i]->next[i] :
-                                      &ins_head->head[i];
+            ins_stack[i] = (i == 0) ?
+              &ret_ins->next[0] :
+              (ins_head->tail[i] != NULL) ? &ins_head->tail[i]->next[i] : &ins_head->head[i];
             next_stack[i] = NULL;
         }
         return (ret_ins);

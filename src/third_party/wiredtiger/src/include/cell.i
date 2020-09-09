@@ -17,8 +17,9 @@ __cell_check_value_validity(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, bool e
     WT_DECL_RET;
 
     if ((ret = __wt_time_value_validate(session, tw, NULL, false)) != 0)
-        return (expected_error ? WT_ERROR : __wt_panic(session, ret,
-                                              "value timestamp window failed validation"));
+        return (expected_error ?
+            WT_ERROR :
+            __wt_panic(session, ret, "value timestamp window failed validation"));
 #else
     WT_UNUSED(session);
     WT_UNUSED(tw);
@@ -100,8 +101,9 @@ __wt_check_addr_validity(WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta, bool e
     WT_DECL_RET;
 
     if ((ret = __wt_time_aggregate_validate(session, ta, NULL, false)) != 0)
-        return (expected_error ? WT_ERROR : __wt_panic(session, ret,
-                                              "address timestamp window failed validation"));
+        return (expected_error ?
+            WT_ERROR :
+            __wt_panic(session, ret, "address timestamp window failed validation"));
 #else
     WT_UNUSED(session);
     WT_UNUSED(ta);
@@ -885,7 +887,7 @@ copy_cell_restart:
          * Set overflow flag.
          */
         F_SET(unpack, WT_CELL_UNPACK_OVERFLOW);
-    /* FALLTHROUGH */
+        /* FALLTHROUGH */
 
     case WT_CELL_ADDR_DEL:
     case WT_CELL_ADDR_INT:
@@ -905,7 +907,7 @@ copy_cell_restart:
          */
         if (unpack->raw == WT_CELL_KEY || unpack->raw == WT_CELL_KEY_PFX ||
           (unpack->raw == WT_CELL_VALUE && unpack->v == 0 &&
-              (cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0))
+            (cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0))
             v += WT_CELL_SIZE_ADJUST;
 
         unpack->data = p;
@@ -1113,8 +1115,9 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
         return (__wt_illegal_value(session, unpack->type));
     }
 
-    return (huffman == NULL || store->size == 0 ? 0 : __wt_huffman_decode(session, huffman,
-                                                        store->data, store->size, store));
+    return (huffman == NULL || store->size == 0 ?
+        0 :
+        __wt_huffman_decode(session, huffman, store->data, store->size, store));
 }
 
 /*

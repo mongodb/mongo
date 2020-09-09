@@ -96,12 +96,6 @@
 #define WT_ENCRYPT_LEN_SIZE sizeof(uint32_t)
 
 /*
- * Default hash table size; we don't need a prime number of buckets because we always use a good
- * hash function.
- */
-#define WT_HASH_ARRAY_SIZE 512
-
-/*
  * __wt_calloc_def, __wt_calloc_one --
  *     Most calloc calls don't need separate count or sizeof arguments.
  */

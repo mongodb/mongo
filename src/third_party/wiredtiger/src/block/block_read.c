@@ -238,9 +238,8 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_
      * test.
      */
     if (size < block->allocsize)
-        WT_RET_MSG(session, EINVAL, "%s: impossibly small block size of %" PRIu32
-                                    "B, less than "
-                                    "allocation size of %" PRIu32,
+        WT_RET_MSG(session, EINVAL,
+          "%s: impossibly small block size of %" PRIu32 "B, less than allocation size of %" PRIu32,
           block->name, size, block->allocsize);
 
     WT_RET(__wt_buf_init(session, buf, bufsize));
@@ -266,20 +265,14 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_
         }
 
         if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
-            __wt_errx(session, "%s: read checksum error for %" PRIu32
-                               "B block at "
-                               "offset %" PRIuMAX
-                               ": calculated block checksum "
-                               " doesn't match expected checksum",
+            __wt_errx(session,
+              "%s: read checksum error for %" PRIu32 "B block at offset %" PRIuMAX
+              ": calculated block checksum  doesn't match expected checksum",
               block->name, size, (uintmax_t)offset);
     } else if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
-        __wt_errx(session, "%s: read checksum error for %" PRIu32
-                           "B block at "
-                           "offset %" PRIuMAX
-                           ": block header checksum "
-                           "of %#" PRIx32
-                           " doesn't match expected checksum "
-                           "of %#" PRIx32,
+        __wt_errx(session,
+          "%s: read checksum error for %" PRIu32 "B block at offset %" PRIuMAX
+          ": block header checksum of %#" PRIx32 " doesn't match expected checksum of %#" PRIx32,
           block->name, size, (uintmax_t)offset, swap.checksum, checksum);
 
     if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))

@@ -256,8 +256,10 @@ __wt_value_return(WT_CURSOR_BTREE *cbt, WT_UPDATE_VALUE *upd_value)
          * We're passed a "standard" update that's visible to us. Our caller should have already
          * checked for deleted items (we're too far down the call stack to return not-found) and any
          * modify updates should be have been reconstructed into a full standard update.
+         *
+         * We are here to return a value to the caller. Make sure we don't skip the buf.
          */
-        WT_ASSERT(session, upd_value->type == WT_UPDATE_STANDARD);
+        WT_ASSERT(session, upd_value->type == WT_UPDATE_STANDARD && !upd_value->skip_buf);
         cursor->value.data = upd_value->buf.data;
         cursor->value.size = upd_value->buf.size;
     }

@@ -763,9 +763,8 @@ wiredtiger_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
             continue;
 
         (void)wtext->err_printf(wtext, NULL,
-          "WT_CONFIG_PARSER.next: unexpected configuration "
-          "information: %.*s=%.*s: %s",
-          (int)k.len, k.str, (int)v.len, v.str, wtext->strerror(wtext, NULL, ret));
+          "WT_CONFIG_PARSER.next: unexpected configuration information: %.*s=%.*s: %s", (int)k.len,
+          k.str, (int)v.len, v.str, wtext->strerror(wtext, NULL, ret));
         goto err;
     }
     if (ret != WT_NOTFOUND) {

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 ##############################################################################################
 # Check branches to ensure forward/backward compatibility, including some upgrade/downgrade testing.
-# Pass in -l to trigger the longer version of this test which tests more variants.
 ##############################################################################################
 
 set -e
@@ -151,32 +150,66 @@ upgrade_downgrade()
         done
 }
 
+# Only one of below flags will be set by the 1st argument of the script.
+older=false
+newer=false
+wt_standalone=false
+
+# Branches in below 2 arrays should be put in newer-to-older order.
+#
+# An overlap (last element of the 1st array & first element of the 2nd array)
+# is expected to avoid missing the edge testing coverage.
+#
+# The 2 arrays should be adjusted over time when newer branches are created,
+# or older branches are EOL.
+newer_release_branches=(develop mongodb-4.6 mongodb-4.4 mongodb-4.2)
+older_release_branches=(mongodb-4.2 mongodb-4.0 mongodb-3.6)
+
+declare -A scopes
+scopes[newer]="newer stable release branches"
+scopes[older]="older stable release branches"
+scopes[wt_standalone]="WiredTiger standalone releases"
+
 #############################################################
-# usage strinf
+# usage string
 #############################################################
 usage()
 {
-    echo "Usage: \tcompatibility_test_for_releases [-l]"
-    echo "\t-l\trun additional variants of wiredtiger"
+    echo -e "Usage: \tcompatibility_test_for_releases [-n|-o|-w]"
+    echo -e "\t-n\trun compatibility tests for ${scopes[newer]}"
+    echo -e "\t-o\trun compatibility tests for ${scopes[older]}"
+    echo -e "\t-w\trun compatibility tests for ${scopes[wt_standalone]}"
     exit 1
 }
 
-long=false
-
-if [ $# -eq 1 ]; then
-    if [ $1 = "-l" ]; then
-        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-        echo "Performing long compatibility test run"
-        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-        long=true
-    else
-        (usage)
-    fi
-else
-    if [ $# -gt 1 ]; then
-        (usage)
-    fi
+if [ $# -ne 1 ]; then
+    usage
 fi
+
+# Script argument processing
+case $1 in
+"-n")
+    newer=true
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Performing compatibility tests for ${scopes[newer]}"
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+;;
+"-o")
+    older=true
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Performing compatibility tests for ${scopes[older]}"
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+;;
+"-w")
+    wt_standalone=true
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Performing compatibility tests for ${scopes[wt_standalone]}"
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+;;
+*)
+    usage
+;;
+esac
 
 # Create a directory in which to do the work.
 top="test-compatibility-run"
@@ -184,20 +217,23 @@ rm -rf "$top" && mkdir "$top"
 cd "$top"
 
 # Build the branches.
-if [ "$long" = true ]; then
-    (build_branch mongodb-3.4)
-    (build_branch mongodb-3.6)
-    (build_branch mongodb-4.0)
+if [ "$newer" = true ]; then
+    for b in ${newer_release_branches[@]}; do
+        (build_branch $b)
+    done
 fi
-(build_branch mongodb-4.2)
-(build_branch mongodb-4.4)
-(build_branch mongodb-4.6)
-(build_branch develop)
+
+if [ "$older" = true ]; then
+    for b in ${older_release_branches[@]}; do
+        (build_branch $b)
+    done
+fi
 
 # Get the names of the last two WiredTiger releases, wt1 is the most recent release, wt2 is the
 # release before that. Minor trickiness, we depend on the "develop" directory already existing
 # so we have a source in which to do git commands.
-if [ "$long" = true ]; then
+if [ "${wt_standalone}" = true ]; then
+    (build_branch develop)
     cd develop; wt1=$(get_prev_version 1); cd ..
     (build_branch "$wt1")
     cd develop; wt2=$(get_prev_version 2); cd ..
@@ -205,42 +241,67 @@ if [ "$long" = true ]; then
 fi
 
 # Run format in each branch for supported access methods.
-if [ "$long" = true ]; then
-    (run_format mongodb-3.4 "fix row var")
-    (run_format mongodb-3.6 "fix row var")
-    (run_format mongodb-4.0 "fix row var")
+if [ "$newer" = true ]; then
+    for b in ${newer_release_branches[@]}; do
+        (run_format $b "row")
+    done
 fi
-(run_format mongodb-4.2 "fix row var")
-(run_format mongodb-4.4 "row")
-(run_format mongodb-4.6 "row")
-(run_format develop "row")
-if [ "$long" = true ]; then
+
+if [ "$older" = true ]; then
+    for b in ${older_release_branches[@]}; do
+        (run_format $b "fix row var")
+    done
+fi
+
+if [ "${wt_standalone}" = true ]; then
     (run_format "$wt1" "fix row var")
     (run_format "$wt2" "fix row var")
 fi
 
 # Verify backward compatibility for supported access methods.
-if [ "$long" = true ]; then
-    (verify_branches mongodb-3.6 mongodb-3.4 "fix row var")
-    (verify_branches mongodb-4.0 mongodb-3.6 "fix row var")
-    (verify_branches mongodb-4.2 mongodb-4.0 "fix row var")
+#
+# The branch array includes a list of branches in newer-to-older order.
+# For backport compatibility, the binary of the newer branch should
+# be used to verify the data files generated by the older branch.
+# e.g. (verify_branches mongodb-4.4 mongodb-4.2 "row")
+if [ "$newer" = true ]; then
+    for i in ${!newer_release_branches[@]}; do
+        [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
+        (verify_branches ${newer_release_branches[$i]} ${newer_release_branches[$((i+1))]} "row")
+    done
 fi
-(verify_branches mongodb-4.4 mongodb-4.2 "fix row var")
-(verify_branches mongodb-4.6 mongodb-4.4 "row")
-(verify_branches develop mongodb-4.6 "row")
-if [ "$long" = true ]; then
-    (verify_branches "$wt1" "$wt2" "row")
+
+if [ "$older" = true ]; then
+    for i in ${!older_release_branches[@]}; do
+        [[ $((i+1)) < ${#older_release_branches[@]} ]] && \
+        (verify_branches ${older_release_branches[$i]} ${older_release_branches[$((i+1))]} "fix row var")
+    done
+fi
+
+if [ "${wt_standalone}" = true ]; then
     (verify_branches develop "$wt1" "row")
+    (verify_branches "$wt1" "$wt2" "row")
 fi
 
 # Verify forward compatibility for supported access methods.
-(verify_branches mongodb-4.2 mongodb-4.4 "row")
-(verify_branches mongodb-4.4 mongodb-4.6 "row")
-(verify_branches mongodb-4.6 develop "row")
+#
+# The branch array includes a list of branches in newer-to-older order.
+# For forward compatibility, the binary of the older branch should
+# be used to verify the data files generated by the newer branch.
+# e.g. (verify_branches mongodb-4.2 mongodb-4.4 "row")
+if [ "$newer" = true ]; then
+    for i in ${!newer_release_branches[@]}; do
+        [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
+        (verify_branches ${newer_release_branches[$((i+1))]} ${newer_release_branches[$i]} "row")
+    done
+fi
 
 # Upgrade/downgrade testing for supported access methods.
-(upgrade_downgrade mongodb-4.2 mongodb-4.4 "row")
-(upgrade_downgrade mongodb-4.4 mongodb-4.6"row")
-(upgrade_downgrade mongodb-4.6 develop "row")
+if [ "$newer" = true ]; then
+    for i in ${!newer_release_branches[@]}; do
+        [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
+        (upgrade_downgrade ${newer_release_branches[$((i+1))]} ${newer_release_branches[$i]} "row")
+    done
+fi
 
 exit 0

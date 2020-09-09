@@ -78,9 +78,7 @@ __posix_sync(WT_SESSION_IMPL *session, int fd, const char *name, const char *fun
          * fdatasync or fsync.
          */
         ff_status = FF_IGNORE;
-        __wt_err(session, ret,
-          "fcntl(F_FULLFSYNC) failed, falling back to fdatasync "
-          "or fsync");
+        __wt_err(session, ret, "fcntl(F_FULLFSYNC) failed, falling back to fdatasync or fsync");
         break;
     case FF_IGNORE:
         break;
@@ -262,9 +260,9 @@ __posix_fs_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
 
         fp = strrchr(from, '/');
         tp = strrchr(to, '/');
-        same_directory =
-          (fp == NULL && tp == NULL) || (fp != NULL && tp != NULL && fp - from == tp - to &&
-                                          memcmp(from, to, (size_t)(fp - from)) == 0);
+        same_directory = (fp == NULL && tp == NULL) ||
+          (fp != NULL && tp != NULL && fp - from == tp - to &&
+            memcmp(from, to, (size_t)(fp - from)) == 0);
 
         if (!same_directory)
             WT_RET(__posix_directory_sync(session, to));
@@ -415,8 +413,8 @@ __posix_file_read(
       file_handle->name, pfh->fd, offset, len);
 
     /* Assert direct I/O is aligned and a multiple of the alignment. */
-    WT_ASSERT(
-      session, !pfh->direct_io || S2C(session)->buffer_alignment == 0 ||
+    WT_ASSERT(session,
+      !pfh->direct_io || S2C(session)->buffer_alignment == 0 ||
         (!((uintptr_t)buf & (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
           len >= S2C(session)->buffer_alignment && len % S2C(session)->buffer_alignment == 0));
 
@@ -600,8 +598,8 @@ __posix_file_write(
       file_handle->name, pfh->fd, offset, len);
 
     /* Assert direct I/O is aligned and a multiple of the alignment. */
-    WT_ASSERT(
-      session, !pfh->direct_io || S2C(session)->buffer_alignment == 0 ||
+    WT_ASSERT(session,
+      !pfh->direct_io || S2C(session)->buffer_alignment == 0 ||
         (!((uintptr_t)buf & (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
           len >= S2C(session)->buffer_alignment && len % S2C(session)->buffer_alignment == 0));
 
@@ -800,8 +798,8 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
     WT_SYSCALL_RETRY(((pfh->fd = open(name, f, mode)) == -1 ? -1 : 0), ret);
     if (ret != 0)
         WT_ERR_MSG(session, ret,
-          pfh->direct_io ? "%s: handle-open: open: failed with direct I/O configured, "
-                           "some filesystem types do not support direct I/O" :
+          pfh->direct_io ? "%s: handle-open: open: failed with direct I/O configured, some "
+                           "filesystem types do not support direct I/O" :
                            "%s: handle-open: open",
           name);
 

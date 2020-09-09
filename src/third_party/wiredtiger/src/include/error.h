@@ -86,19 +86,20 @@
 #define WT_RET_BUSY_OK(a) WT_RET_ERROR_OK(a, EBUSY)
 #define WT_RET_NOTFOUND_OK(a) WT_RET_ERROR_OK(a, WT_NOTFOUND)
 /* Set "ret" if not already set. */
-#define WT_TRET(a)                                                                             \
-    do {                                                                                       \
-        int __ret;                                                                             \
-        if ((__ret = (a)) != 0 && (__ret == WT_PANIC || ret == 0 || ret == WT_DUPLICATE_KEY || \
-                                    ret == WT_NOTFOUND || ret == WT_RESTART))                  \
-            ret = __ret;                                                                       \
+#define WT_TRET(a)                                                                           \
+    do {                                                                                     \
+        int __ret;                                                                           \
+        if ((__ret = (a)) != 0 &&                                                            \
+          (__ret == WT_PANIC || ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND || \
+            ret == WT_RESTART))                                                              \
+            ret = __ret;                                                                     \
     } while (0)
 #define WT_TRET_ERROR_OK(a, e)                                                               \
     do {                                                                                     \
         int __ret;                                                                           \
         if ((__ret = (a)) != 0 && __ret != (e) &&                                            \
           (__ret == WT_PANIC || ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND || \
-              ret == WT_RESTART))                                                            \
+            ret == WT_RESTART))                                                              \
             ret = __ret;                                                                     \
     } while (0)
 #define WT_TRET_BUSY_OK(a) WT_TRET_ERROR_OK(a, EBUSY)

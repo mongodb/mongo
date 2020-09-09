@@ -95,7 +95,12 @@ class test_hs06(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(2))
         self.session.checkpoint()
 
-        # Check the checkpoint wrote the expected values. Todo: Fix checkpoint cursors WT-5492.
+        # Check the checkpoint wrote the expected values.
+        #
+        # FIXME-WT-5927: Checkpoint cursors are known to have issues in durable history so we've
+        # removing the use of checkpoint handles in this test. As part of WT-5927, we should either
+        # re-enable the testing of checkpoint cursors or remove this comment.
+        #
         # cursor2 = self.session.open_cursor(uri, None, 'checkpoint=WiredTigerCheckpoint')
         cursor2 = self.session.open_cursor(uri)
         self.session.begin_transaction('read_timestamp=' + timestamp_str(2))

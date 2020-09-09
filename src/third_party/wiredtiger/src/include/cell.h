@@ -49,10 +49,10 @@
  * Bits 1 and 2 are reserved for "short" key and value cells (that is, a cell
  * carrying data less than 64B, where we can store the data length in the cell
  * descriptor byte):
- *	0x00	Not a short key/data cell
- *	0x01	Short key cell
- *	0x10	Short key cell, with a following prefix-compression byte
- *	0x11	Short value cell
+ *	0b00	Not a short key/data cell
+ *	0b01	Short key cell
+ *	0b10	Short key cell, with a following prefix-compression byte
+ *	0b11	Short value cell
  * In the "short" variants, the other 6 bits of the descriptor byte are the
  * data length.
  *

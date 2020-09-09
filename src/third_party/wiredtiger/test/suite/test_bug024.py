@@ -25,35 +25,34 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_txn21.py
-#   Transactions: smoke test the operation timeout API
-#
 
+from helper import copy_wiredtiger_home
 import wiredtiger, wttest
+from wtdataset import SimpleDataSet
+import os, shutil
 
-class test_txn21(wttest.WiredTigerTestCase):
+# test_bug024.py
+# WT-6526: test that we can successfully open a readonly connection after it was stopped while
+# the temporary turtle file existed. We simulate that by copying the turtle file to its temporary name
+# and then opening the connection readonly.
+class test_bug024(wttest.WiredTigerTestCase):
+    conn_config = ('cache_size=50MB')
 
-    # Connection-level configuration.
-    def test_operation_timeout_conn(self):
-        # Close the automatically opened connection and open one with the timeout configuration.
-        conn_config = 'operation_timeout_ms=2000'
+    # Create a table.
+    uri = "table:test_bug024"
+
+    def test_bug024(self):
+        nrows = 10
+        ds = SimpleDataSet(self, self.uri, nrows, key_format="S", value_format='u')
+        ds.populate()
+
         self.conn.close()
-        self.conn = wiredtiger.wiredtiger_open(self.home, conn_config)
+        # Copying the file manually to recreate the issue described in WT-6526.
+        shutil.copy('WiredTiger.turtle', 'WiredTiger.turtle.set')
 
-    # Transaction-level configuration.
-    def test_operation_timeout_txn(self):
-        # Test during begin.
-        self.session.begin_transaction('operation_timeout_ms=2000')
-        self.session.rollback_transaction()
-
-        # Test during rollback.
-        self.session.begin_transaction()
-        self.session.rollback_transaction('operation_timeout_ms=2000')
-
-        # Test during commit.
-        self.session.begin_transaction()
-        self.session.commit_transaction('operation_timeout_ms=2000')
+        # Open wiredtiger in new directory and in readonly mode.
+        conn = self.wiredtiger_open(self.home, "readonly")
+        conn.close()
 
 if __name__ == '__main__':
     wttest.run()
