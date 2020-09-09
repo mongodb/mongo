@@ -40,6 +40,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -681,6 +682,104 @@ TEST_F(ReshardingAggTest, OplogPipelineWithPreAndPostImage) {
     ASSERT_BSONOBJ_BINARY_EQ(addExpectedFields(deleteWithPreOplog, preImageOplog), next->toBson());
 
     ASSERT(!pipeline->getNext());
+}
+
+
+class ReshardingTxnCloningPipelineTest : public AggregationContextFixture {
+
+protected:
+    std::pair<std::deque<DocumentSource::GetNextResult>, std::deque<SessionTxnRecord>>
+    makeTransactions(size_t numTransactions, std::function<Timestamp(size_t)> getTimestamp) {
+        std::deque<DocumentSource::GetNextResult> mockResults;
+        std::deque<SessionTxnRecord>
+            expectedTransactions;  // this will hold the expected result for this test
+        for (size_t i = 0; i < numTransactions; i++) {
+            auto transaction = SessionTxnRecord(
+                makeLogicalSessionIdForTest(), 0, repl::OpTime(getTimestamp(i), 0), Date_t());
+            mockResults.emplace_back(Document(transaction.toBSON()));
+            expectedTransactions.emplace_back(transaction);
+        }
+        std::sort(expectedTransactions.begin(),
+                  expectedTransactions.end(),
+                  [](SessionTxnRecord a, SessionTxnRecord b) {
+                      return a.getSessionId().toBSON().woCompare(b.getSessionId().toBSON()) < 0;
+                  });
+        return std::pair(mockResults, expectedTransactions);
+    }
+
+    std::unique_ptr<Pipeline, PipelineDeleter> constructPipeline(
+        std::deque<DocumentSource::GetNextResult> mockResults,
+        Timestamp fetchTimestamp,
+        boost::optional<LogicalSessionId> startAfter) {
+        // create expression context
+        static const NamespaceString _transactionsNss{"config.transactions"};
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+            new ExpressionContextForTest(getOpCtx(), _transactionsNss));
+        expCtx->setResolvedNamespace(_transactionsNss, {_transactionsNss, {}});
+
+        auto pipeline =
+            createConfigTxnCloningPipelineForResharding(expCtx, fetchTimestamp, startAfter);
+        auto mockSource = DocumentSourceMock::createForTest(mockResults, expCtx);
+        pipeline->addInitialSource(mockSource);
+        return pipeline;
+    }
+
+    bool pipelineMatchesDeque(const std::unique_ptr<Pipeline, PipelineDeleter>& pipeline,
+                              const std::deque<SessionTxnRecord>& transactions) {
+        auto expected = transactions.begin();
+        boost::optional<Document> next;
+        for (size_t i = 0; i < transactions.size(); i++) {
+            next = pipeline->getNext();
+            if (expected == transactions.end() || !next ||
+                !expected->toBSON().binaryEqual(next->toBson())) {
+                return false;
+            }
+            expected++;
+        }
+        return !pipeline->getNext() && expected == transactions.end();
+    }
+};
+
+TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineSorted) {
+    auto [mockResults, expectedTransactions] =
+        makeTransactions(10, [](size_t) { return Timestamp::min(); });
+
+    auto pipeline = constructPipeline(mockResults, Timestamp::max(), boost::none);
+
+    ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
+}
+
+
+TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineBeforeFetchTimestamp) {
+    size_t numTransactions = 10;
+    Timestamp fetchTimestamp(numTransactions / 2 + 1, 0);
+    auto [mockResults, expectedTransactions] =
+        makeTransactions(numTransactions, [](size_t i) { return Timestamp(i + 1, 0); });
+    expectedTransactions.erase(
+        std::remove_if(expectedTransactions.begin(),
+                       expectedTransactions.end(),
+                       [&fetchTimestamp](SessionTxnRecord transaction) {
+                           return transaction.getLastWriteOpTime().getTimestamp() >= fetchTimestamp;
+                       }),
+        expectedTransactions.end());
+
+    auto pipeline = constructPipeline(mockResults, fetchTimestamp, boost::none);
+
+    ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
+}
+
+
+TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineAfterID) {
+    size_t numTransactions = 10;
+    auto [mockResults, expectedTransactions] =
+        makeTransactions(numTransactions, [](size_t i) { return Timestamp(i + 1, 0); });
+    auto middleTransaction = expectedTransactions.begin() + (numTransactions / 2);
+    expectedTransactions.erase(expectedTransactions.begin(), middleTransaction + 1);
+
+    auto pipeline =
+        constructPipeline(mockResults, Timestamp::max(), middleTransaction->getSessionId());
+
+    ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
 }
 
 }  // namespace

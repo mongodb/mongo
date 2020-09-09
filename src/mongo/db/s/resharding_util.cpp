@@ -222,6 +222,24 @@ std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
     return Pipeline::create(std::move(stages), expCtx);
 }
 
+std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResharding(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Timestamp fetchTimestamp,
+    boost::optional<LogicalSessionId> startAfter) {
+    invariant(!fetchTimestamp.isNull());
+
+    std::list<boost::intrusive_ptr<DocumentSource>> stages;
+    if (startAfter) {
+        stages.emplace_back(DocumentSourceMatch::create(
+            BSON("_id" << BSON("$gt" << startAfter->toBSON())), expCtx));
+    }
+    stages.emplace_back(DocumentSourceSort::create(expCtx, BSON("_id" << 1)));
+    stages.emplace_back(DocumentSourceMatch::create(
+        BSON("lastWriteOpTime.ts" << BSON("$lt" << fetchTimestamp)), expCtx));
+
+    return Pipeline::create(std::move(stages), expCtx);
+}
+
 void createSlimOplogView(OperationContext* opCtx, Database* db) {
     writeConflictRetry(
         opCtx, "createReshardingOplog", "local.system.resharding.slimOplogForGraphLookup", [&] {

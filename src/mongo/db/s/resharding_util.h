@@ -104,8 +104,25 @@ std::unique_ptr<Pipeline, PipelineDeleter> createAggForReshardingOplogBuffer(
     const boost::optional<ReshardingDonorOplogId>& resumeToken);
 
 /**
- * Creates a view on the oplog that facilitates the specialized oplog tailing a resharding recipient
- * performs on a donor.
+ * Create pipeline stages for iterating donor config.transactions.  The pipeline has these stages:
+ * pipeline: [
+ *      {$match: {_id: {$gt: <startAfter>}}},
+ *      {$sort: {_id: 1}},
+ *      {$match: {"lastWriteOpTime.ts": {$lt: <fetchTimestamp>}}},
+ * ],
+ * Note that the caller is responsible for making sure that the transactions ns is set in the
+ * expCtx.
+ *
+ * fetchTimestamp never isNull()
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResharding(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Timestamp fetchTimestamp,
+    boost::optional<LogicalSessionId> startAfter);
+
+/**
+ * Creates a view on the oplog that facilitates the specialized oplog tailing a resharding
+ * recipient performs on a donor.
  */
 void createSlimOplogView(OperationContext* opCtx, Database* db);
 
