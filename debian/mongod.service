@@ -1,7 +1,8 @@
 [Unit]
 Description=MongoDB Database Server
 Documentation=https://docs.mongodb.org/manual
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=mongodb
