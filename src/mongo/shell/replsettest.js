@@ -3523,7 +3523,7 @@ var ReplSetTest = function(opts) {
             // and too slowly processing heartbeats. When it steps down, it closes all of
             // its connections.
             _constructFromExistingSeedNode(opts);
-        }, 60);
+        }, 120);
     } else if (typeof opts.rstArgs === "object") {
         _constructFromExistingNodes(opts.rstArgs);
     } else {
