@@ -146,7 +146,6 @@ public:
 
         TenantMigrationDonorDocument _stateDoc;
 
-        std::shared_ptr<TenantMigrationAccessBlocker> _mtab;
         boost::optional<Status> _abortReason;
 
         // Promise that is resolved when the donor has majority-committed the migration decision.

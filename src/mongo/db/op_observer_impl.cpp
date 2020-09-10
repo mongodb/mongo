@@ -505,6 +505,10 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
                 opCtx, it->doc["_id"], it->doc);
         }
+    } else if (nss == NamespaceString::kTenantMigrationDonorsNamespace) {
+        for (auto it = first; it != last; it++) {
+            tenant_migration_donor::onWriteToDonorStateDoc(opCtx, it->doc);
+        }
     }
 }
 
@@ -574,7 +578,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
             opCtx, args.updateArgs.updatedDoc["_id"], args.updateArgs.updatedDoc);
     } else if (args.nss == NamespaceString::kTenantMigrationDonorsNamespace) {
-        tenant_migration_donor::onDonorStateDocUpdate(opCtx, args.updateArgs.updatedDoc);
+        tenant_migration_donor::onWriteToDonorStateDoc(opCtx, args.updateArgs.updatedDoc);
     }
 }
 

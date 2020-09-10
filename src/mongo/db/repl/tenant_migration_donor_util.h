@@ -51,7 +51,7 @@ std::unique_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(ServiceConte
 /**
  * Updates the donor's in-memory migration state to reflect the given persisted state.
  */
-void onDonorStateDocUpdate(OperationContext* opCtx, const BSONObj& donorStateDocBson);
+void onWriteToDonorStateDoc(OperationContext* opCtx, const BSONObj& donorStateDocBson);
 
 /**
  * If the operation has read concern "snapshot" or includes afterClusterTime, and the database is

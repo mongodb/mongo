@@ -56,6 +56,12 @@ MONGO_FAIL_POINT_DEFINE(skipSendingRecipientSyncDataCommand);
 
 const Seconds kRecipientSyncDataTimeout(30);
 
+std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlocker(
+    ServiceContext* serviceContext, StringData dbPrefix) {
+    return TenantMigrationAccessBlockerByPrefix::get(serviceContext)
+        .getTenantMigrationAccessBlockerForDbPrefix(dbPrefix);
+}
+
 }  // namespace
 
 TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
@@ -63,13 +69,6 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
     : repl::PrimaryOnlyService::TypedInstance<Instance>(), _serviceContext(serviceContext) {
     _stateDoc =
         TenantMigrationDonorDocument::parse(IDLParserErrorContext("initialStateDoc"), initialState);
-
-    _mtab = std::make_shared<TenantMigrationAccessBlocker>(
-        _serviceContext,
-        tenant_migration_donor::makeTenantMigrationExecutor(_serviceContext),
-        _stateDoc.getDatabasePrefix().toString());
-    TenantMigrationAccessBlockerByPrefix::get(_serviceContext)
-        .add(_stateDoc.getDatabasePrefix(), _mtab);
 }
 
 Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(BSONObj options) {
@@ -316,7 +315,10 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
         })
         .then([this, executor] {
             // Enter "blocking" state.
-            _mtab->startBlockingWrites();
+            auto mtab =
+                getTenantMigrationAccessBlocker(_serviceContext, _stateDoc.getDatabasePrefix());
+            invariant(mtab);
+            mtab->startBlockingWrites();
             const auto opTime = _updateStateDocument(TenantMigrationDonorStateEnum::kBlocking);
             return _waitForMajorityWriteConcern(executor, std::move(opTime));
         })
@@ -344,15 +346,22 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
         .then([this] {
             // Enter "commit" state.
             _updateStateDocument(TenantMigrationDonorStateEnum::kCommitted);
+            auto mtab =
+                getTenantMigrationAccessBlocker(_serviceContext, _stateDoc.getDatabasePrefix());
+            invariant(mtab);
+            return mtab->onCompletion();
         })
-        .onError([this](Status status) {
-            // Enter "abort" state.
-            _abortReason.emplace(status);
-            _updateStateDocument(TenantMigrationDonorStateEnum::kAborted);
-        })
-        .then([this] {
-            // Wait for the migration to commit or abort.
-            return _mtab->onCompletion();
+        .onError([this, executor](Status status) {
+            auto mtab =
+                getTenantMigrationAccessBlocker(_serviceContext, _stateDoc.getDatabasePrefix());
+            if (status == ErrorCodes::ConflictingOperationInProgress || !mtab) {
+                return SharedSemiFuture<void>(status);
+            } else {
+                // Enter "abort" state.
+                _abortReason.emplace(status);
+                _updateStateDocument(TenantMigrationDonorStateEnum::kAborted);
+                return mtab->onCompletion();
+            }
         })
         .onCompletion([this](Status status) {
             LOGV2(5006601,
