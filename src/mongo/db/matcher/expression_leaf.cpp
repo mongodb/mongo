@@ -55,10 +55,12 @@ ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     Value rhs,
     ElementPath::LeafArrayBehavior leafArrBehavior,
     ElementPath::NonLeafArrayBehavior nonLeafArrBehavior,
-    clonable_ptr<ErrorAnnotation> annotation)
+    clonable_ptr<ErrorAnnotation> annotation,
+    const CollatorInterface* collator)
     : LeafMatchExpression(type, path, leafArrBehavior, nonLeafArrBehavior, std::move(annotation)),
       _backingBSON(BSON(path << rhs)),
-      _rhs(_backingBSON.firstElement()) {
+      _rhs(_backingBSON.firstElement()),
+      _collator(collator) {
     invariant(_rhs.type() != BSONType::EOO);
 }
 
@@ -97,13 +99,15 @@ BSONObj ComparisonMatchExpressionBase::getSerializedRightHandSide() const {
 ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
                                                      StringData path,
                                                      Value rhs,
-                                                     clonable_ptr<ErrorAnnotation> annotation)
+                                                     clonable_ptr<ErrorAnnotation> annotation,
+                                                     const CollatorInterface* collator)
     : ComparisonMatchExpressionBase(type,
                                     path,
                                     std::move(rhs),
                                     ElementPath::LeafArrayBehavior::kTraverse,
                                     ElementPath::NonLeafArrayBehavior::kTraverse,
-                                    std::move(annotation)) {
+                                    std::move(annotation),
+                                    collator) {
     uassert(
         ErrorCodes::BadValue, "cannot compare to undefined", _rhs.type() != BSONType::Undefined);
 

@@ -41,7 +41,7 @@ namespace mongo {
 
 class BSONLexer {
 public:
-    explicit BSONLexer(BSONElement input);
+    BSONLexer(BSONObj obj, ParserGen::token_type startingToken);
 
     /**
      * Retrieves the next token in the stream.

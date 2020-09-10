@@ -409,3 +409,10 @@ server_parameters:
       expr: 1000
     validator:
         gt: 0
+
+  internalQueryEnableCSTParser:
+    description: "If true, use the grammar-based parser and CST to parse queries."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryEnableCSTParser"
+    cpp_vartype: AtomicWord<bool>
+    default: false

@@ -58,10 +58,8 @@ std::unique_ptr<Type> translateTreeExpr(const CNode::ArrayChildren& array,
                                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto expr = std::make_unique<Type>();
     for (auto&& node : array) {
-        // Tree expressions require each element to be an object.
-        for (auto&& [fieldName, child] : node.objectChildren()) {
-            expr->add(translateMatchPredicate(fieldName, child, expCtx).release());
-        }
+        // Tree expressions require each element to be it's own match expression object.
+        expr->add(translateMatchExpression(node, expCtx).release());
     }
     return expr;
 }
@@ -127,7 +125,9 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
                 [&](auto&& userValue) -> std::unique_ptr<MatchExpression> {
                     return std::make_unique<EqualityMatchExpression>(
                         StringData{stdx::get<UserFieldname>(fieldName)},
-                        cst_pipeline_translation::translateLiteralLeaf(cst));
+                        cst_pipeline_translation::translateLiteralLeaf(cst),
+                        nullptr, /* TODO SERVER-49486: Add ErrorAnnotation for MatchExpressions */
+                        expCtx->getCollator());
                 }},
             cst.payload);
     }

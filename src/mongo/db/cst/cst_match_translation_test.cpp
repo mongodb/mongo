@@ -54,7 +54,7 @@ auto getExpCtx() {
 
 auto parseMatchToCst(BSONObj input) {
     CNode output;
-    BSONLexer lexer(input["filter"]);
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     return output;
@@ -131,22 +131,22 @@ TEST(CstMatchTranslationTest, TranslatesLogicalTreeExpressions) {
         auto cst = parseMatchToCst(input);
         auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
         ASSERT_EQ(match->serialize().toString(),
-                  "{ $and: [ { $and: [ { b: { $not: { $regex: \"a\" } } } ] } ] }");
+                  "{ $and: [ { $and: [ { $and: [ { b: { $not: { $regex: \"a\" } } } ] } ] } ] }");
     }
     {
-        auto input = fromjson("{filter: {$or: [{b: {$not: /a/}}, {a: {$not: /b/}}]}}");
+        auto input = fromjson("{filter: {$or: [{b: 1}, {a: 2}]}}");
         auto cst = parseMatchToCst(input);
         auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
         ASSERT_EQ(match->serialize().toString(),
-                  "{ $and: [ { $or: [ { a: { $not: { $regex: \"b\" } } }, { b: { $not: { $regex: "
-                  "\"a\" } } } ] } ] }");
+                  "{ $and: [ { $or: [ { $and: [ { a: { $eq: 2 } } ] }, { $and: [ { b: { $eq: 1 } } "
+                  "] } ] } ] }");
     }
     {
         auto input = fromjson("{filter: {$nor: [{b: {$not: /a/}}]}}");
         auto cst = parseMatchToCst(input);
         auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
         ASSERT_EQ(match->serialize().toString(),
-                  "{ $and: [ { $nor: [ { b: { $not: { $regex: \"a\" } } } ] } ] }");
+                  "{ $and: [ { $nor: [ { $and: [ { b: { $not: { $regex: \"a\" } } } ] } ] } ] }");
     }
 }
 
@@ -156,22 +156,24 @@ TEST(CstMatchTranslationTest, TranslatesNestedLogicalTreeExpressions) {
         auto cst = parseMatchToCst(input);
         auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
         ASSERT_EQ(match->serialize().toString(),
-                  "{ $and: [ { $and: [ { $or: [ { b: { $not: { $regex: \"a\" } } } ] } ] } ] }");
+                  "{ $and: [ { $and: [ { $and: [ { $or: [ { $and: [ { b: { $not: { $regex: \"a\" } "
+                  "} } ] } ] } ] } ] } ] }");
     }
     {
         auto input = fromjson("{filter: {$or: [{$and: [{b: {$not: /a/}}, {a: {$not: /b/}}]}]}}");
         auto cst = parseMatchToCst(input);
         auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
         ASSERT_EQ(match->serialize().toString(),
-                  "{ $and: [ { $or: [ { $and: [ { a: { $not: { $regex: \"b\" } } }, { b: { $not: { "
-                  "$regex: \"a\" } } } ] } ] } ] }");
+                  "{ $and: [ { $or: [ { $and: [ { $and: [ { $and: [ { a: { $not: { $regex: \"b\" } "
+                  "} } ] }, { $and: [ { b: { $not: { $regex: \"a\" } } } ] } ] } ] } ] } ] }");
     }
     {
         auto input = fromjson("{filter: {$and: [{$nor: [{b: {$not: /a/}}]}]}}");
         auto cst = parseMatchToCst(input);
         auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
         ASSERT_EQ(match->serialize().toString(),
-                  "{ $and: [ { $and: [ { $nor: [ { b: { $not: { $regex: \"a\" } } } ] } ] } ] }");
+                  "{ $and: [ { $and: [ { $and: [ { $nor: [ { $and: [ { b: { $not: { $regex: \"a\" "
+                  "} } } ] } ] } ] } ] } ] }");
     }
 }
 

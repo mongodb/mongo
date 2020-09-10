@@ -45,7 +45,7 @@ namespace {
 
 TEST(CstErrorTest, EmptyStageSpec) {
     auto input = fromjson("{pipeline: [{}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
@@ -57,7 +57,7 @@ TEST(CstErrorTest, UnknownStageName) {
     // First stage.
     {
         auto input = fromjson("{pipeline: [{$unknownStage: {}}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                     AssertionException,
                                     ErrorCodes::FailedToParse,
@@ -67,7 +67,7 @@ TEST(CstErrorTest, UnknownStageName) {
     // Subsequent stage.
     {
         auto input = fromjson("{pipeline: [{$limit: 1}, {$unknownStage: {}}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                     AssertionException,
                                     ErrorCodes::FailedToParse,
@@ -79,7 +79,7 @@ TEST(CstErrorTest, UnknownStageName) {
 TEST(CstErrorTest, InvalidStageArgument) {
     {
         auto input = fromjson("{pipeline: [{$sample: 2}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         ASSERT_THROWS_CODE_AND_WHAT(
             ParserGen(lexer, nullptr).parse(),
             AssertionException,
@@ -89,7 +89,7 @@ TEST(CstErrorTest, InvalidStageArgument) {
     }
     {
         auto input = fromjson("{pipeline: [{$project: {a: 1}}, {$limit: {}}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                     AssertionException,
                                     ErrorCodes::FailedToParse,
@@ -101,7 +101,7 @@ TEST(CstErrorTest, InvalidStageArgument) {
 TEST(CstErrorTest, UnknownArgumentInStageSpec) {
     {
         auto input = fromjson("{pipeline: [{$sample: {huh: 1}}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         ASSERT_THROWS_CODE_AND_WHAT(
             ParserGen(lexer, nullptr).parse(),
             AssertionException,
@@ -111,7 +111,7 @@ TEST(CstErrorTest, UnknownArgumentInStageSpec) {
     }
     {
         auto input = fromjson("{pipeline: [{$project: {a: 1}}, {$limit: 1}, {$sample: {huh: 1}}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         ASSERT_THROWS_CODE_AND_WHAT(
             ParserGen(lexer, nullptr).parse(),
             AssertionException,
@@ -124,7 +124,7 @@ TEST(CstErrorTest, UnknownArgumentInStageSpec) {
 TEST(CstErrorTest, InvalidArgumentTypeWithinStageSpec) {
     {
         auto input = fromjson("{pipeline: [{$sample: {size: 'cmon'}}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         ASSERT_THROWS_CODE_AND_WHAT(
             ParserGen(lexer, nullptr).parse(),
             AssertionException,
@@ -134,7 +134,7 @@ TEST(CstErrorTest, InvalidArgumentTypeWithinStageSpec) {
     }
     {
         auto input = fromjson("{pipeline: [{$project: {a: 1}}, {$sample: {size: true}}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                     AssertionException,
                                     ErrorCodes::FailedToParse,
@@ -145,7 +145,7 @@ TEST(CstErrorTest, InvalidArgumentTypeWithinStageSpec) {
 
 TEST(CstErrorTest, MissingRequiredArgument) {
     auto input = fromjson("{pipeline: [{$sample: {}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     ASSERT_THROWS_CODE_AND_WHAT(
         ParserGen(lexer, nullptr).parse(),
         AssertionException,
@@ -156,7 +156,7 @@ TEST(CstErrorTest, MissingRequiredArgument) {
 
 TEST(CstErrorTest, MissingRequiredArgumentOfMultiArgStage) {
     auto input = fromjson("{pipeline: [{$unionWith: {pipeline: 0.0}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     ASSERT_THROWS_CODE_AND_WHAT(
         ParserGen(lexer, nullptr).parse(),
         AssertionException,
@@ -167,7 +167,7 @@ TEST(CstErrorTest, MissingRequiredArgumentOfMultiArgStage) {
 
 TEST(CstErrorTest, InvalidArgumentTypeForProjectionExpression) {
     auto input = fromjson("{pipeline: [{$project: {a: {$eq: '$b'}}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
@@ -178,7 +178,7 @@ TEST(CstErrorTest, InvalidArgumentTypeForProjectionExpression) {
 
 TEST(CstErrorTest, MixedProjectionTypes) {
     auto input = fromjson("{pipeline: [{$project: {a: 1, b: 0}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     ASSERT_THROWS_CODE_AND_WHAT(
         ParserGen(lexer, nullptr).parse(),
         AssertionException,
@@ -189,7 +189,7 @@ TEST(CstErrorTest, MixedProjectionTypes) {
 
 TEST(CstErrorTest, DeeplyNestedSyntaxError) {
     auto input = fromjson("{pipeline: [{$project: {a: {$and: [1, {$or: [{$eq: '$b'}]}]}}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     ASSERT_THROWS_CODE_AND_WHAT(
         ParserGen(lexer, nullptr).parse(),
         AssertionException,
@@ -202,7 +202,7 @@ TEST(CstErrorTest, DeeplyNestedSyntaxError) {
 
 TEST(CstErrorTest, SortWithRandomIntFails) {
     auto input = fromjson("{sort: {val: 5}}");
-    BSONLexer lexer(input["sort"]);
+    BSONLexer lexer(input["sort"].embeddedObject(), ParserGen::token::START_SORT);
     ASSERT_THROWS_CODE_AND_WHAT(
         ParserGen(lexer, nullptr).parse(),
         AssertionException,
@@ -212,7 +212,7 @@ TEST(CstErrorTest, SortWithRandomIntFails) {
 
 TEST(CstErrorTest, SortWithInvalidMetaFails) {
     auto input = fromjson("{sort: {val: {$meta: \"str\"}}}");
-    BSONLexer lexer(input["sort"]);
+    BSONLexer lexer(input["sort"].embeddedObject(), ParserGen::token::START_SORT);
     ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
@@ -222,7 +222,7 @@ TEST(CstErrorTest, SortWithInvalidMetaFails) {
 
 TEST(CstErrorTest, SortWithMetaSiblingKeyFails) {
     auto input = fromjson("{sort: {val: {$meta: \"textScore\", someKey: 4}}}");
-    BSONLexer lexer(input["sort"]);
+    BSONLexer lexer(input["sort"].embeddedObject(), ParserGen::token::START_SORT);
     ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,

@@ -62,19 +62,16 @@ assert.commandFailedWithCode(
 
 assert.commandFailedWithCode(db.runCommand({
     findAndModify: coll.getName(),
-    query: {q: doc},
+    query: doc,
     update: {$set: {b: 2}},
     maxTimeMS: failureTimeoutMS
 }),
                              ErrorCodes.MaxTimeMSExpired);
 
-assert.commandFailedWithCode(db.runCommand({
-    findAndModify: coll.getName(),
-    query: {q: doc},
-    remove: true,
-    maxTimeMS: failureTimeoutMS
-}),
-                             ErrorCodes.MaxTimeMSExpired);
+assert.commandFailedWithCode(
+    db.runCommand(
+        {findAndModify: coll.getName(), query: doc, remove: true, maxTimeMS: failureTimeoutMS}),
+    ErrorCodes.MaxTimeMSExpired);
 
 jsTestLog("Waiting for threads to join");
 assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "off"}));

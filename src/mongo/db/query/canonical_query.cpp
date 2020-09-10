@@ -34,6 +34,11 @@
 #include "mongo/db/query/canonical_query.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/cst/bson_lexer.h"
+#include "mongo/db/cst/c_node.h"
+#include "mongo/db/cst/cst_match_translation.h"
+#include "mongo/db/cst/cst_sort_translation.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/namespace_string.h"
@@ -114,15 +119,27 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         }
     }
 
-    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-        qr->getFilter(), newExpCtx, extensionsCallback, allowedFeatures);
+    // Make the CQ we'll hopefully return.
+    std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
+
+    StatusWithMatchExpression statusWithMatcher = [&]() -> StatusWithMatchExpression {
+        if (getTestCommandsEnabled() && internalQueryEnableCSTParser.load()) {
+            try {
+                BSONLexer lexer{qr->getFilter(), ParserGen::token::START_MATCH};
+                ParserGen(lexer, &cq->_filterCst).parse();
+                return cst_match_translation::translateMatchExpression(cq->_filterCst, newExpCtx);
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
+        } else {
+            return MatchExpressionParser::parse(
+                qr->getFilter(), newExpCtx, extensionsCallback, allowedFeatures);
+        }
+    }();
     if (!statusWithMatcher.isOK()) {
         return statusWithMatcher.getStatus();
     }
     std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
-
-    // Make the CQ we'll hopefully return.
-    std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
 
     Status initStatus =
         cq->init(opCtx,
@@ -239,7 +256,13 @@ void CanonicalQuery::initSortPattern(QueryMetadataBitSet unavailableMetadata) {
         _qr->setSort(BSONObj{});
     }
 
-    _sortPattern = SortPattern{_qr->getSort(), _expCtx};
+    if (getTestCommandsEnabled() && internalQueryEnableCSTParser.load()) {
+        BSONLexer lexer{_qr->getSort(), ParserGen::token::START_SORT};
+        ParserGen(lexer, &_sortCst).parse();
+        _sortPattern = cst_sort_translation::translateSortSpec(_sortCst, _expCtx);
+    } else {
+        _sortPattern = SortPattern{_qr->getSort(), _expCtx};
+    }
     _metadataDeps |= _sortPattern->metadataDeps(unavailableMetadata);
 
     // If the results of this query might have to be merged on a remote node, then that node might

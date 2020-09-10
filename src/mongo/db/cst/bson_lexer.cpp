@@ -135,10 +135,6 @@ const StringMap<ParserGen::token_type> reservedKeyFieldnameLookup = {
     {"options", ParserGen::token::ARG_OPTIONS},
     {"find", ParserGen::token::ARG_FIND},
     {"replacement", ParserGen::token::ARG_REPLACEMENT},
-    {"filter", ParserGen::token::ARG_FILTER},
-    {"query", ParserGen::token::ARG_QUERY},
-    {"q", ParserGen::token::ARG_Q},
-    {"sort", ParserGen::token::ARG_SORT},
     {"$allElementsTrue", ParserGen::token::ALL_ELEMENTS_TRUE},
     {"$anyElementTrue", ParserGen::token::ANY_ELEMENT_TRUE},
     {"$setDifference", ParserGen::token::SET_DIFFERENCE},
@@ -394,8 +390,32 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
     }
 }
 
-BSONLexer::BSONLexer(BSONElement input) {
-    tokenize(input, true);
+BSONLexer::BSONLexer(BSONObj obj, ParserGen::token_type startingToken) {
+    // Add a prefix to the location depending on the starting token.
+    ScopedLocationTracker inputPrefix{
+        this,
+        startingToken == ParserGen::token::START_PIPELINE
+            ? "pipeline"
+            : (startingToken == ParserGen::token::START_SORT ? "sort" : "filter")};
+    pushToken("start", startingToken);
+
+    // If 'obj' is representing a pipeline, each element is a stage with the fieldname being the
+    // array index. No need to tokenize the fieldname for that case.
+    if (startingToken == ParserGen::token::START_PIPELINE) {
+        pushToken("start array", ParserGen::token::START_ARRAY);
+        auto index = 0;
+        for (auto&& elem : obj) {
+            ScopedLocationTracker stageCtx{this, index++};
+            tokenize(elem, false);
+        }
+        pushToken("end array", ParserGen::token::END_ARRAY);
+    } else {
+        pushToken("start object", ParserGen::token::START_OBJECT);
+        for (auto&& elem : obj) {
+            tokenize(elem, true);
+        }
+        pushToken("end object", ParserGen::token::END_OBJECT);
+    }
 
     // Final token must indicate EOF.
     pushToken("EOF", ParserGen::token::END_OF_FILE);

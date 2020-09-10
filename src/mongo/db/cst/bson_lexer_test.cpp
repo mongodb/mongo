@@ -42,8 +42,8 @@ namespace {
 
 TEST(BSONLexerTest, TokenizesOpaqueUserObjects) {
     auto input = fromjson("{pipeline: [{a: 2, b: '1', c: \"$path\", d: \"$$NOW\"}]}");
-    BSONLexer lexer(input["pipeline"]);
-    ASSERT_EQ(ParserGen::token::ARG_PIPELINE, lexer.getNext().type_get());
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    ASSERT_EQ(ParserGen::token::START_PIPELINE, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::FIELDNAME, lexer.getNext().type_get());
@@ -61,8 +61,8 @@ TEST(BSONLexerTest, TokenizesOpaqueUserObjects) {
 
 TEST(BSONLexerTest, TokenizesReservedKeywords) {
     auto input = fromjson("{pipeline: [{$_internalInhibitOptimization: {}}]}");
-    BSONLexer lexer(input["pipeline"]);
-    ASSERT_EQ(ParserGen::token::ARG_PIPELINE, lexer.getNext().type_get());
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    ASSERT_EQ(ParserGen::token::START_PIPELINE, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STAGE_INHIBIT_OPTIMIZATION, lexer.getNext().type_get());
@@ -74,8 +74,8 @@ TEST(BSONLexerTest, TokenizesReservedKeywords) {
 
 TEST(BSONLexerTest, TokenizesReservedKeywordsAtAnyDepth) {
     auto input = fromjson("{pipeline: [{a: {$_internalInhibitOptimization: {}}}]}");
-    BSONLexer lexer(input["pipeline"]);
-    ASSERT_EQ(ParserGen::token::ARG_PIPELINE, lexer.getNext().type_get());
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    ASSERT_EQ(ParserGen::token::START_PIPELINE, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::FIELDNAME, lexer.getNext().type_get());
@@ -90,9 +90,9 @@ TEST(BSONLexerTest, TokenizesReservedKeywordsAtAnyDepth) {
 
 TEST(BSONLexerTest, MidRuleActionToSortNestedObject) {
     auto input = fromjson("{pipeline: [{pipeline: 2.0, coll: 'test'}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     // Iterate until the first object.
-    ASSERT_EQ(ParserGen::token::ARG_PIPELINE, lexer.getNext().type_get());
+    ASSERT_EQ(ParserGen::token::START_PIPELINE, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     // Kick the lexer to sort the object, which should move element 'coll' in front of 'pipeline'.
     // Not that this only works because these are reserved keywords recognized by the lexer,
@@ -111,9 +111,9 @@ TEST(BSONLexerTest, MidRuleActionToSortNestedObject) {
 TEST(BSONLexerTest, MidRuleActionToSortDoesNotSortNestedObjects) {
     auto input = fromjson(
         "{pipeline: [{$unionWith: {pipeline: [{$unionWith: 'inner', a: 3.0}], coll: 'outer'}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     // Iterate until we reach the $unionWith object.
-    ASSERT_EQ(ParserGen::token::ARG_PIPELINE, lexer.getNext().type_get());
+    ASSERT_EQ(ParserGen::token::START_PIPELINE, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STAGE_UNION_WITH, lexer.getNext().type_get());
@@ -141,9 +141,9 @@ TEST(BSONLexerTest, MultipleNestedObjectsAreReorderedCorrectly) {
     auto input = fromjson(
         "{pipeline: [{$unionWith: {pipeline: [{$unionWith: 'inner', a: 3.0}], coll: [{$unionWith: "
         "'innerB', a: 2.0}]}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     // Iterate until we reach the $unionWith object.
-    ASSERT_EQ(ParserGen::token::ARG_PIPELINE, lexer.getNext().type_get());
+    ASSERT_EQ(ParserGen::token::START_PIPELINE, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STAGE_UNION_WITH, lexer.getNext().type_get());
@@ -180,9 +180,9 @@ TEST(BSONLexerTest, MultiLevelBSONDoesntSortChildren) {
     auto input = fromjson(
         "{pipeline: [{$unionWith: {pipeline: [{$unionWith: {'nested': 3.0, 'apple': 3.0}, a: 3.0}],"
         " coll: 'outer'}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     // Iterate until we reach the $unionWith object.
-    ASSERT_EQ(ParserGen::token::ARG_PIPELINE, lexer.getNext().type_get());
+    ASSERT_EQ(ParserGen::token::START_PIPELINE, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STAGE_UNION_WITH, lexer.getNext().type_get());
@@ -215,8 +215,8 @@ TEST(BSONLexerTest, MultiLevelBSONDoesntSortChildren) {
 }
 
 TEST(BSONLexerTest, EmptyMatchExpressionsAreLexedCorrectly) {
-    BSONLexer lexer(fromjson("{filter: {}}").firstElement());
-    ASSERT_EQ(ParserGen::token::ARG_FILTER, lexer.getNext().type_get());
+    BSONLexer lexer(fromjson("{}"), ParserGen::token::START_MATCH);
+    ASSERT_EQ(ParserGen::token::START_MATCH, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::END_OBJECT, lexer.getNext().type_get());
 }
@@ -225,8 +225,8 @@ TEST(BSONLexerTest, TokenizesObjWithPathCorrectly) {
     auto input = fromjson(
         "{pipeline: [{$project: { m: { $dateToString: { date: '$date', "
         "format: '%Y-%m-%d' } } } } ] }");
-    BSONLexer lexer(input["pipeline"]);
-    ASSERT_EQ(ParserGen::token::ARG_PIPELINE, lexer.getNext().type_get());
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    ASSERT_EQ(ParserGen::token::START_PIPELINE, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_ARRAY, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::STAGE_PROJECT, lexer.getNext().type_get());
@@ -248,8 +248,8 @@ TEST(BSONLexerTest, TokenizesObjWithPathCorrectly) {
 
 TEST(BSONLexerTest, SortSpecTokensGeneratedCorrectly) {
     auto input = fromjson("{sort: {val: 1, test: -1.0, rand: {$meta: 'textScore'}}}");
-    BSONLexer lexer(input["sort"]);
-    ASSERT_EQ(ParserGen::token::ARG_SORT, lexer.getNext().type_get());
+    BSONLexer lexer(input["sort"].embeddedObject(), ParserGen::token::START_SORT);
+    ASSERT_EQ(ParserGen::token::START_SORT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::START_OBJECT, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::FIELDNAME, lexer.getNext().type_get());
     ASSERT_EQ(ParserGen::token::INT_ONE, lexer.getNext().type_get());

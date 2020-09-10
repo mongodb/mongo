@@ -48,7 +48,7 @@ TEST(CstExpressionTest, ParsesProjectWithAnd) {
     auto input = fromjson(
         "{pipeline: [{$project: {_id: 9.10, a: {$and: [4, {$and: [7, 8]}]}, b: {$and: [2, "
         "-3]}}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -66,7 +66,7 @@ TEST(CstExpressionTest, ParsesProjectWithOr) {
     CNode output;
     auto input = fromjson(
         "{pipeline: [{$project: {_id: 9.10, a: {$or: [4, {$or: [7, 8]}]}, b: {$or: [2, -3]}}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -85,7 +85,7 @@ TEST(CstExpressionTest, ParsesProjectWithNot) {
     auto input = fromjson(
         "{pipeline: [{$project: {_id: 9.10, a: {$not: [4]}, b: {$and: [1.0, {$not: "
         "[true]}]}}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -104,7 +104,7 @@ TEST(CstExpressionTest, ParsesComparisonExpressions) {
     auto parseAndTest = [](StringData expr) {
         CNode output;
         auto input = fromjson("{pipeline: [{$project: {_id: {$" + expr + ": [1, 2.5]}}}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
         auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -125,21 +125,21 @@ TEST(CstExpressionTest, FailsToParseInvalidComparisonExpressions) {
         {
             CNode output;
             auto input = fromjson("{pipeline: [{$project: {_id: {$" + expr + ": [1]}}}]}");
-            BSONLexer lexer(input["pipeline"]);
+            BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
             auto parseTree = ParserGen(lexer, &output);
             ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
         }
         {
             CNode output;
             auto input = fromjson("{pipeline: [{$project: {_id: {$" + expr + ": [1, 2, 3]}}}]}");
-            BSONLexer lexer(input["pipeline"]);
+            BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
             auto parseTree = ParserGen(lexer, &output);
             ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
         }
         {
             CNode output;
             auto input = fromjson("{pipeline: [{$project: {_id: {$" + expr + ": 1}}}]}");
-            BSONLexer lexer(input["pipeline"]);
+            BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
             auto parseTree = ParserGen(lexer, &output);
             ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
         }
@@ -154,14 +154,14 @@ TEST(CstExpressionTest, FailsToParseInvalidConvertExpressions) {
     {
         CNode output;
         auto input = fromjson("{pipeline: [{$project: {a: {$convert: 'x'}}}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
     }
     {
         CNode output;
         auto input = fromjson("{pipeline: [{$project: {a: {$convert: {input: 'x'}}}}]}");
-        BSONLexer lexer(input["pipeline"]);
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
     }
@@ -173,7 +173,7 @@ TEST(CstExpressionTest, ParsesConvertExpressions) {
         "{pipeline: [{$project: {a: {$toBool: 1}, b: {$toDate: 1100000000000}, "
         "c: {$toDecimal: 5}, d: {$toDouble: -2}, e: {$toInt: 1.999999}, "
         "f: {$toLong: 1.999999}, g: {$toObjectId: '$_id'}, h: {$toString: false}}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -196,7 +196,7 @@ TEST(CstExpressionTest, ParsesConvertExpressionsNoOptArgs) {
     auto input = fromjson(
         "{pipeline: [{$project: {a: {$convert: {input: 1, to: 'string'}}, "
         "b: {$convert : {input: 'true', to: 'bool'}}}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -221,7 +221,7 @@ TEST(CstExpressionTest, ParsesConvertExpressionsWithOptArgs) {
         "{pipeline: [{$project: {a: {$convert: {input: 1, to: 'string', "
         "onError: 'Could not convert'}}, b : {$convert : {input: "
         "true, to : 'double', onNull : 0}}}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -247,7 +247,7 @@ TEST(CstExpressionTest, ParsesIndexOf) {
         "b: { $indexOfBytes: ['ABC', 'B']}, "
         "c: { $indexOfCP: [ 'cafeteria', 'e' ] }, "
         "d: { $indexOfBytes: [ 'foo.bar.fi', '.', 5, 7 ] }}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -269,7 +269,7 @@ TEST(CstExpressionTest, ParsesDateFromString) {
     auto input = fromjson(
         "{pipeline: [{$project: { m: { $dateFromString: { dateString: '2017-02-08T12:10:40.787', "
         "timezone: 'America/New_York' } } }}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -290,7 +290,7 @@ TEST(CstExpressionTest, ParsesDateToString) {
     auto input = fromjson(
         "{pipeline: [{$project: { m: { $dateToString: { date: '$date', "
         "format: '%Y-%m-%d' } } } } ] }");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -311,7 +311,7 @@ TEST(CstExpressionTest, ParsesReplaceStringExpressions) {
         "{pipeline: [{$project: { "
         "h: { $replaceOne: { input: '$name', find: 'Cafe', replacement: 'CAFE' } }, "
         "i: { $replaceAll: { input: 'cafeSeattle', find: 'cafe', replacement: 'CAFE' } } }}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -335,7 +335,7 @@ TEST(CstExpressionTest, ParsesTrim) {
         "d: { $ltrim: { input: ' ggggoodbyeeeee' } }, "
         "e: { $rtrim: { input: 'ggggoodbyeeeee   '} }, "
         "f: { $trim: { input: '    ggggoodbyeeeee', chars: ' ge' } } }}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -357,7 +357,7 @@ TEST(CstExpressionTest, ParsesToUpperAndLower) {
         "{pipeline: [{$project: { "
         "g: { $toUpper: 'abc' }, "
         "v: { $toLower: 'ABC' }}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -376,7 +376,7 @@ TEST(CstExpressionTest, ParsesRegexExpressions) {
         "j: { $regexFind: { input: '$details', regex: /^[a-z0-9_.+-]/, options: 'i' } }, "
         "k: { $regexFindAll: { input: '$fname', regex: /(C(ar)*)ol/ } }, "
         "l: { $regexMatch: { input: '$description', regex: /lin(e|k)/ } } }}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -402,7 +402,7 @@ TEST(CstExpressionTest, ParsesSubstrExpressions) {
         "s: { $substr: [ '$quarter', 2, -1 ] }, "
         "t: { $substrBytes: [ '$name', 0, 3 ] }, "
         "u: { $substrCP: [ 'Hello World!', 6, 5 ] }}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -423,7 +423,7 @@ TEST(CstExpressionTest, ParsesStringLengthExpressions) {
         "{pipeline: [{$project: { "
         "p: { $strLenBytes: 'cafeteria' }, "
         "q: { $strLenCP: 'Hello World!' }}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -441,7 +441,7 @@ TEST(CstExpressionTest, ParsesSplit) {
     auto input = fromjson(
         "{pipeline: [{$project: { "
         "o: { $split: [ {$toUpper: 'abc'}, '-' ] }}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -459,7 +459,7 @@ TEST(CstExpressionTest, ParsesStrCaseCmp) {
     auto input = fromjson(
         "{pipeline: [{$project: { "
         "r: { $strcasecmp: [ '$quarter', '13q4' ] }}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -476,7 +476,7 @@ TEST(CstExpressionTest, ParsesConcat) {
     auto input = fromjson(
         "{pipeline: [{$project: { "
         "a: { $concat: [ 'item', ' - ', '$description' ]}}}]}");
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
@@ -493,7 +493,7 @@ TEST(CstExpressionTest, FailsToParseTripleDollar) {
     CNode output;
     auto input = BSON("pipeline" << BSON_ARRAY(BSON("$project" << BSON("a"
                                                                        << "$$$triple"))));
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
 }
@@ -502,7 +502,7 @@ TEST(CstExpressionTest, FailsToParseLoneDollar) {
     CNode output;
     auto input = BSON("pipeline" << BSON_ARRAY(BSON("$project" << BSON("a"
                                                                        << "$"))));
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
 }
@@ -511,7 +511,7 @@ TEST(CstExpressionTest, FailsToParseInvalidVarName) {
     CNode output;
     auto input = BSON("pipeline" << BSON_ARRAY(BSON("$project" << BSON("a"
                                                                        << "$$invalid"))));
-    BSONLexer lexer(input["pipeline"]);
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
 }

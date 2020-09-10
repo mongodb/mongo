@@ -21,6 +21,7 @@ env.Library(
         "canonical_query_encoder.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/cst/cst",
         "$BUILD_DIR/mongo/db/matcher/expressions",
         "collation/collator_factory_interface",
         "collation/collator_interface",

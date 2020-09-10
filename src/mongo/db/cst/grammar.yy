@@ -128,7 +128,6 @@
     ARG_COLL "coll argument"
     ARG_DATE "date argument"
     ARG_DATE_STRING "dateString argument"
-    ARG_FILTER "filter"
     ARG_FIND "find argument"
     ARG_FORMAT "format argument"
     ARG_INPUT "input argument"
@@ -136,12 +135,9 @@
     ARG_ON_NULL "onNull argument"
     ARG_OPTIONS "options argument"
     ARG_PIPELINE "pipeline argument"
-    ARG_Q "q"
-    ARG_QUERY "query"
     ARG_REGEX "regex argument"
     ARG_REPLACEMENT "replacement argument"
     ARG_SIZE "size argument"
-    ARG_SORT "sort argument"
     ARG_TIMEZONE "timezone argument"
     ARG_TO "to argument"
     ATAN2
@@ -272,7 +268,6 @@
 %token <Timestamp> TIMESTAMP "Timestamp"
 %token <UserMinKey> MIN_KEY "minKey"
 %token <UserMaxKey> MAX_KEY "maxKey"
-%token START_PIPELINE START_MATCH START_SORT
 
 //
 // Semantic values (aka the C++ types produced by the actions).
@@ -324,25 +319,22 @@
 %nterm <std::pair<CNode::Fieldname, CNode>> sortSpec
 
 %start start;
+// Sentinel tokens to indicate the starting point in the grammar.
+%token START_PIPELINE START_MATCH START_SORT
+
 //
 // Grammar rules
 //
 %%
 
 start:
-    ARG_PIPELINE pipeline {
+    START_PIPELINE pipeline {
         *cst = $pipeline;
     }
-    | ARG_FILTER match {
+    | START_MATCH match {
         *cst = $match;
     }
-    | ARG_QUERY match {
-        *cst = $match;
-    }
-    | ARG_Q match {
-        *cst = $match;
-    }
-    | ARG_SORT sortSpecs {
+    | START_SORT sortSpecs {
         *cst = $sortSpecs;
     }
 ;
@@ -790,12 +782,6 @@ arg:
     }
     | ARG_REPLACEMENT {
         $$ = "replacement";
-    }
-    | ARG_FILTER {
-        $$ = UserFieldname{"filter"};
-    }
-    | ARG_Q {
-        $$ = UserFieldname{"q"};
     }
 ;
 

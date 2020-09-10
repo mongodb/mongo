@@ -109,7 +109,8 @@ public:
                                   Value rhs,
                                   ElementPath::LeafArrayBehavior,
                                   ElementPath::NonLeafArrayBehavior,
-                                  clonable_ptr<ErrorAnnotation> annotation = nullptr);
+                                  clonable_ptr<ErrorAnnotation> annotation = nullptr,
+                                  const CollatorInterface* collator = nullptr);
 
     virtual ~ComparisonMatchExpressionBase() = default;
 
@@ -186,7 +187,8 @@ public:
     ComparisonMatchExpression(MatchType type,
                               StringData path,
                               Value rhs,
-                              clonable_ptr<ErrorAnnotation> annotation = nullptr);
+                              clonable_ptr<ErrorAnnotation> annotation = nullptr,
+                              const CollatorInterface* collator = nullptr);
 
     virtual ~ComparisonMatchExpression() = default;
 
@@ -199,12 +201,14 @@ public:
 
     EqualityMatchExpression(StringData path,
                             Value rhs,
-                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(EQ, path, std::move(rhs), std::move(annotation)) {}
+                            clonable_ptr<ErrorAnnotation> annotation = nullptr,
+                            const CollatorInterface* collator = nullptr)
+        : ComparisonMatchExpression(EQ, path, std::move(rhs), std::move(annotation), collator) {}
     EqualityMatchExpression(StringData path,
                             const BSONElement& rhs,
-                            clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ComparisonMatchExpression(EQ, path, Value(rhs), std::move(annotation)) {}
+                            clonable_ptr<ErrorAnnotation> annotation = nullptr,
+                            const CollatorInterface* collator = nullptr)
+        : ComparisonMatchExpression(EQ, path, Value(rhs), std::move(annotation), collator) {}
 
     StringData name() const final {
         return kName;

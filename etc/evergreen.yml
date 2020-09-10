@@ -5850,6 +5850,17 @@ tasks:
       resmoke_args: --suites=sharded_jscore_txns_sharded_collections --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: cst_jscore_passthrough
+  tags: ["jscore"]
+  depends_on:
+    - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=cst_jscore_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
   name: libunwind_tests
   tags: []
   commands:
@@ -10304,6 +10315,9 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
+    distros:
+    - rhel62-large
+  - name: cst_jscore_passthrough
 
 - name: enterprise-rhel-62-64-bit-large-txns-format
   display_name: "Enterprise RHEL 6.2 (large transactions format)"

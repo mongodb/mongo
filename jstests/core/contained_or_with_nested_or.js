@@ -40,5 +40,5 @@ const results = coll.find({
 // Just assert on the matching _ids. We avoid adding a sort to the query above to avoid
 // restricting the plans the query planner can consider.
 const matchingIds = results.map(result => result._id);
-assert.setEq(new Set(matchingIds), new Set([7, 8, 9, 10]));
+assert.setEq(new Set(matchingIds), new Set([7, 8, 9, 10]), tojson(results));
 }());

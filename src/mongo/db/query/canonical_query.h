@@ -31,6 +31,7 @@
 
 
 #include "mongo/base/status.h"
+#include "mongo/db/cst/c_node.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -236,11 +237,12 @@ private:
 
     std::unique_ptr<QueryRequest> _qr;
 
-    // _root points into _qr->getFilter()
+    CNode _filterCst;
     std::unique_ptr<MatchExpression> _root;
 
     boost::optional<projection_ast::Projection> _proj;
 
+    CNode _sortCst;
     boost::optional<SortPattern> _sortPattern;
 
     // Keeps track of what metadata has been explicitly requested.
