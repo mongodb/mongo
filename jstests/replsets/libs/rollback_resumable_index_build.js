@@ -7,8 +7,10 @@ const RollbackResumableIndexBuildTest = class {
      * rollback starts is specified by rollbackStartFailPointName. The phase that the index build
      * will resume from after rollback completes is specified by rollbackEndFailPointName. If
      * either of these points is in the drain writes phase, documents to insert into the side
-     * writes table must be specified by sideWrites. Documents specified by insertsToBeRolledBack
-     * are inserted after transitioning to rollback operations and will be rolled back.
+     * writes table must be specified by sideWrites. locksYieldedFailPointName specifies a point
+     * during the index build between rollbackEndFailPointName and rollbackStartFailPointName at
+     * which its locks are yielded. Documents specified by insertsToBeRolledBack are inserted after
+     * transitioning to rollback operations and will be rolled back.
      */
     static run(rollbackTest,
                dbName,
@@ -18,6 +20,7 @@ const RollbackResumableIndexBuildTest = class {
                rollbackStartFailPointData,
                rollbackEndFailPointName,
                rollbackEndFailPointData,
+               locksYieldedFailPointName,
                insertsToBeRolledBack,
                sideWrites = []) {
         const originalPrimary = rollbackTest.getPrimary();
@@ -28,6 +31,14 @@ const RollbackResumableIndexBuildTest = class {
         }
 
         rollbackTest.awaitLastOpCommitted();
+
+        // Set internalQueryExecYieldIterations to 0 and maxIndexBuildDrainBatchSize to 1 so that
+        // the index build is guaranteed to yield its locks between the rollback end and start
+        // failpoints.
+        assert.commandWorked(
+            originalPrimary.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 0}));
+        assert.commandWorked(
+            originalPrimary.adminCommand({setParameter: 1, maxIndexBuildDrainBatchSize: 1}));
 
         const coll = originalPrimary.getDB(dbName).getCollection(collName);
         const indexName = "rollback_resumable_index_build";
@@ -57,25 +68,15 @@ const RollbackResumableIndexBuildTest = class {
 
         assert.commandWorked(coll.insert(insertsToBeRolledBack));
 
-        // Disable the failpoint in a parallel shell so that the primary can step down when the
-        // rollback test is transitioning to sync source operations before rollback.
-        const awaitDisableFailPointAfterContinuingInBackground = startParallelShell(
-            funWithArgs(function(failPointName, buildUUID) {
-                // Wait for the index build to be continue in the background.
-                checkLog.containsJson(db.getMongo(), 4760400, {
-                    buildUUID: function(uuid) {
-                        return uuid["uuid"]["$uuid"] === buildUUID;
-                    }
-                });
-
-                // Disable the failpoint so that stepdown can proceed.
-                assert.commandWorked(
-                    db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
-            }, rollbackEndFp.failPointName, buildUUID), originalPrimary.port);
+        // Move the index build forward to a point at which its locks are yielded. This allows the
+        // primary to step down during the call to transitionToSyncSourceOperationsBeforeRollback()
+        // below.
+        const locksYieldedFp = configureFailPoint(
+            originalPrimary, locksYieldedFailPointName, {namespace: coll.getFullName()});
+        rollbackEndFp.off();
+        locksYieldedFp.wait();
 
         rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
-
-        awaitDisableFailPointAfterContinuingInBackground();
 
         // The index creation will report as having failed due to InterruptedDueToReplStateChange,
         // but it is still building in the background.
@@ -83,6 +84,7 @@ const RollbackResumableIndexBuildTest = class {
 
         // Wait until the index build reaches the desired starting point so that we can start the
         // rollback.
+        locksYieldedFp.off();
         rollbackStartFp.wait();
 
         // We ignore the return value here because the node will go into rollback immediately upon

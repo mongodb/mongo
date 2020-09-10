@@ -13,12 +13,6 @@
 
 load('jstests/replsets/libs/rollback_resumable_index_build.js');
 
-// TODO(SERVER-50775): Re-enable when stepdown issues are fixed in resumable index rollback tests.
-if (true) {
-    jsTestLog('Skipping test.');
-    return;
-}
-
 const dbName = "test";
 const insertsToBeRolledBack = [{a: 7}, {a: 8}];
 
@@ -32,7 +26,7 @@ RollbackResumableIndexBuildTest.runIndexBuildComplete(rollbackTest,
                                                       dbName,
                                                       coll.getName(),
                                                       {a: 1},
-                                                      "hangAfterSettingUpIndexBuildUnlocked",
+                                                      "hangAfterSettingUpIndexBuild",
                                                       {},
                                                       insertsToBeRolledBack);
 

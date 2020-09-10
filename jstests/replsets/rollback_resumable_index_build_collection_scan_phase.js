@@ -13,12 +13,6 @@
 
 load('jstests/replsets/libs/rollback_resumable_index_build.js');
 
-// TODO(SERVER-50775): Re-enable when stepdown issues are fixed in resumable index rollback tests.
-if (true) {
-    jsTestLog('Skipping test.');
-    return;
-}
-
 const dbName = "test";
 const rollbackStartFailPointName = "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion";
 const insertsToBeRolledBack = [{a: 6}, {a: 7}];
@@ -34,9 +28,10 @@ RollbackResumableIndexBuildTest.run(rollbackTest,
                                     coll.getName(),
                                     {a: 1},
                                     rollbackStartFailPointName,
-                                    {fieldsToMatch: {a: 2}},
-                                    "hangAfterSettingUpIndexBuildUnlocked",
+                                    {iteration: 3},
+                                    "hangAfterSettingUpIndexBuild",
                                     {},
+                                    "setYieldAllLocksHang",
                                     insertsToBeRolledBack);
 
 // Rollback to earlier in the collection scan phase.
@@ -45,9 +40,10 @@ RollbackResumableIndexBuildTest.run(rollbackTest,
                                     coll.getName(),
                                     {a: 1},
                                     rollbackStartFailPointName,
-                                    {iteration: 4},
+                                    {iteration: 3},
                                     "hangIndexBuildDuringCollectionScanPhaseAfterInsertion",
-                                    {iteration: 2},
+                                    {iteration: 1},
+                                    "setYieldAllLocksHang",
                                     insertsToBeRolledBack);
 
 rollbackTest.stop();

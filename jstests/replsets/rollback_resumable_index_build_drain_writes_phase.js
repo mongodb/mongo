@@ -13,15 +13,9 @@
 
 load('jstests/replsets/libs/rollback_resumable_index_build.js');
 
-// TODO(SERVER-50775): Re-enable when stepdown issues are fixed in resumable index rollback tests.
-if (true) {
-    jsTestLog('Skipping test.');
-    return;
-}
-
 const dbName = "test";
 const rollbackStartFailPointName = "hangIndexBuildDuringDrainWritesPhase";
-const insertsToBeRolledBack = [{a: 13}, {a: 14}];
+const insertsToBeRolledBack = [{a: 18}, {a: 19}];
 
 const rollbackTest = new RollbackTest(jsTestName());
 const coll = rollbackTest.getPrimary().getDB(dbName).getCollection(jsTestName());
@@ -34,11 +28,12 @@ RollbackResumableIndexBuildTest.run(rollbackTest,
                                     coll.getName(),
                                     {a: 1},
                                     rollbackStartFailPointName,
-                                    {iteration: 0},
-                                    "hangAfterSettingUpIndexBuildUnlocked",
+                                    {iteration: 1},
+                                    "hangAfterSettingUpIndexBuild",
                                     {},
+                                    "hangDuringIndexBuildDrainYield",
                                     insertsToBeRolledBack,
-                                    [{a: 4}, {a: 5}]);
+                                    [{a: 4}, {a: 5}, {a: 6}]);
 
 // Rollback to the collection scan phase.
 RollbackResumableIndexBuildTest.run(rollbackTest,
@@ -46,11 +41,12 @@ RollbackResumableIndexBuildTest.run(rollbackTest,
                                     coll.getName(),
                                     {a: 1},
                                     rollbackStartFailPointName,
-                                    {iteration: 0},
+                                    {iteration: 1},
                                     "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
-                                    {fieldsToMatch: {a: 2}},
+                                    {iteration: 1},
+                                    "hangDuringIndexBuildDrainYield",
                                     insertsToBeRolledBack,
-                                    [{a: 6}, {a: 7}]);
+                                    [{a: 7}, {a: 8}, {a: 9}]);
 
 // Rollback to the bulk load phase.
 RollbackResumableIndexBuildTest.run(rollbackTest,
@@ -58,26 +54,25 @@ RollbackResumableIndexBuildTest.run(rollbackTest,
                                     coll.getName(),
                                     {a: 1},
                                     rollbackStartFailPointName,
-                                    {iteration: 0},
+                                    {iteration: 1},
                                     "hangIndexBuildDuringBulkLoadPhase",
                                     {iteration: 1},
+                                    "hangDuringIndexBuildDrainYield",
                                     insertsToBeRolledBack,
-                                    [{a: 8}, {a: 9}]);
+                                    [{a: 10}, {a: 11}, {a: 12}]);
 
-// Rollback to earlier in the drain writes phase. We set maxIndexBuildDrainBatchSize to 1 so that
-// the primary can step down between iterations.
-assert.commandWorked(
-    rollbackTest.getPrimary().adminCommand({setParameter: 1, maxIndexBuildDrainBatchSize: 1}));
+// Rollback to earlier in the drain writes phase.
 RollbackResumableIndexBuildTest.run(rollbackTest,
                                     dbName,
                                     coll.getName(),
                                     {a: 1},
                                     rollbackStartFailPointName,
-                                    {iteration: 2},
+                                    {iteration: 3},
                                     "hangIndexBuildDuringDrainWritesPhaseSecond",
-                                    {iteration: 0},
+                                    {iteration: 1},
+                                    "hangDuringIndexBuildDrainYield",
                                     insertsToBeRolledBack,
-                                    [{a: 10}, {a: 11}, {a: 12}]);
+                                    [{a: 13}, {a: 14}, {a: 15}, {a: 16}, {a: 17}]);
 
 rollbackTest.stop();
 })();
