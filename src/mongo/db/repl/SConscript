@@ -1328,6 +1328,7 @@ env.Library(
         'tenant_migration_donor_service.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/future_util',
         'primary_only_service',
         'repl_server_parameters',
         'tenant_migration_donor',

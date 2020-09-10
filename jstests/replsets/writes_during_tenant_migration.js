@@ -14,6 +14,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const donorRst = new ReplSetTest(
     {nodes: 1, name: 'donor', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
@@ -260,6 +261,15 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
                                  ErrorCodes.TenantMigrationAborted);
     abortFp.off();
 
+    // Wait until the in-memory migration state is updated after the migration has majority
+    // committed the abort decision. Otherwise, the command below is expected to block and then get
+    // rejected.
+    assert.soon(() => {
+        const mtab =
+            testOpts.primaryDB.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
+        return mtab[dbPrefix].access === TenantMigrationUtil.accessState.kAllow;
+    });
+
     runCommand(testOpts);
     testCase.assertCommandSucceeded(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }
@@ -327,7 +337,7 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
  * Tests that the donor blocks writes that are executed in the blocking state and rejects them after
  * the migration aborts.
  */
-function testBlockedReadGetsUnblockedAndRejectedIfMigrationAborts(testCase, testOpts) {
+function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, testOpts) {
     let blockingFp =
         configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
     let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
@@ -844,7 +854,7 @@ const testFuncs = {
     inAborted: testWriteIsAcceptedIfSentAfterMigrationHasAborted,
     inBlocking: testWriteBlocksIfMigrationIsInBlocking,
     inBlockingThenCommitted: testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits,
-    inBlockingThenAborted: testBlockedReadGetsUnblockedAndRejectedIfMigrationAborts
+    inBlockingThenAborted: testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts
 };
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {

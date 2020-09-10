@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/executor/task_executor.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -36,32 +37,12 @@ namespace mongo {
  * Returns a future which will be fulfilled at the given date.
  */
 ExecutorFuture<void> sleepUntil(std::shared_ptr<executor::TaskExecutor> executor,
-                                const Date_t& date) {
-    auto [promise, future] = makePromiseFuture<void>();
-    auto taskCompletionPromise = std::make_shared<Promise<void>>(std::move(promise));
-
-    auto scheduledWorkHandle = executor->scheduleWorkAt(
-        date, [taskCompletionPromise](const executor::TaskExecutor::CallbackArgs& args) mutable {
-            if (args.status.isOK()) {
-                taskCompletionPromise->emplaceValue();
-            } else {
-                taskCompletionPromise->setError(args.status);
-            }
-        });
-
-    if (!scheduledWorkHandle.isOK()) {
-        taskCompletionPromise->setError(scheduledWorkHandle.getStatus());
-    }
-    return std::move(future).thenRunOn(executor);
-}
-
+                                const Date_t& date);
 /**
  * Returns a future which will be fulfilled after the given duration.
  */
 ExecutorFuture<void> sleepFor(std::shared_ptr<executor::TaskExecutor> executor,
-                              Milliseconds duration) {
-    return sleepUntil(executor, executor->now() + duration);
-}
+                              Milliseconds duration);
 
 namespace future_util_details {
 

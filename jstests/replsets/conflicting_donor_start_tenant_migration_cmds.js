@@ -9,20 +9,7 @@
 
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-
-/**
- * Starts a tenant migration on the given donor primary according the given migration options.
- */
-function startMigration(donorPrimaryHost, migrationOpts) {
-    const donorPrimary = new Mongo(donorPrimaryHost);
-    return donorPrimary.adminCommand({
-        donorStartMigration: 1,
-        migrationId: UUID(migrationOpts.migrationIdString),
-        recipientConnectionString: migrationOpts.recipientConnString,
-        databasePrefix: migrationOpts.dbPrefix,
-        readPreference: migrationOpts.readPreference
-    });
-}
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 /**
  * Asserts that the number of recipientDataSync commands executed on the given recipient primary is
@@ -79,8 +66,8 @@ let numRecipientSyncDataCmdSent = 0;
         readPreference: {mode: "primary"}
     };
 
-    assert.commandWorked(startMigration(rst0Primary.host, migrationOpts));
-    assert.commandWorked(startMigration(rst0Primary.host, migrationOpts));
+    assert.commandWorked(TenantMigrationUtil.startMigration(rst0Primary.host, migrationOpts));
+    assert.commandWorked(TenantMigrationUtil.startMigration(rst0Primary.host, migrationOpts));
 
     // If the second donorStartMigration had started a duplicate migration, the recipient would have
     // received four recipientSyncData commands instead of two.
@@ -97,8 +84,10 @@ let numRecipientSyncDataCmdSent = 0;
         readPreference: {mode: "primary"}
     };
 
-    let migrationThread0 = new Thread(startMigration, rst0Primary.host, migrationOpts);
-    let migrationThread1 = new Thread(startMigration, rst0Primary.host, migrationOpts);
+    let migrationThread0 =
+        new Thread(TenantMigrationUtil.startMigration, rst0Primary.host, migrationOpts);
+    let migrationThread1 =
+        new Thread(TenantMigrationUtil.startMigration, rst0Primary.host, migrationOpts);
 
     migrationThread0.start();
     migrationThread1.start();
@@ -121,9 +110,10 @@ let numRecipientSyncDataCmdSent = 0;
  */
 function testStartingConflictingMigrationAfterInitialMigrationCommitted(
     donorPrimary, migrationOpts0, migrationOpts1) {
-    assert.commandWorked(startMigration(donorPrimary.host, migrationOpts0));
-    assert.commandFailedWithCode(startMigration(donorPrimary.host, migrationOpts1),
-                                 ErrorCodes.ConflictingOperationInProgress);
+    assert.commandWorked(TenantMigrationUtil.startMigration(donorPrimary.host, migrationOpts0));
+    assert.commandFailedWithCode(
+        TenantMigrationUtil.startMigration(donorPrimary.host, migrationOpts1),
+        ErrorCodes.ConflictingOperationInProgress);
 
     // If the second donorStartMigration had started a duplicate migration, there would be two donor
     // state docs.
@@ -136,8 +126,10 @@ function testStartingConflictingMigrationAfterInitialMigrationCommitted(
  * migrations, only one of the migrations will start and succeed.
  */
 function testConcurrentConflictingMigrations(donorPrimary, migrationOpts0, migrationOpts1) {
-    let migrationThread0 = new Thread(startMigration, rst0Primary.host, migrationOpts0);
-    let migrationThread1 = new Thread(startMigration, rst0Primary.host, migrationOpts1);
+    let migrationThread0 =
+        new Thread(TenantMigrationUtil.startMigration, rst0Primary.host, migrationOpts0);
+    let migrationThread1 =
+        new Thread(TenantMigrationUtil.startMigration, rst0Primary.host, migrationOpts1);
 
     migrationThread0.start();
     migrationThread1.start();

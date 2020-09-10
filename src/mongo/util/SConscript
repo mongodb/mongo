@@ -510,6 +510,16 @@ env.Benchmark(
     ],
 )
 
+env.Library(
+    target='future_util',
+    source=[
+        'future_util.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/task_executor_interface'
+    ],
+)
+
 env.Benchmark(
     target='hash_table_bm',
     source='hash_table_bm.cpp',
@@ -672,6 +682,7 @@ icuEnv.CppUnitTest(
         'diagnostic_info' if get_option('use-diagnostic-latches') == 'on' else [],
         'dns_query',
         'fail_point',
+        'future_util',
         'icu',
         'latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
         'md5',
