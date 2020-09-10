@@ -29,15 +29,18 @@
 global:
   cpp_namespace: "mongo"
 
-imports:
-  - "mongo/idl/basic_types.idl"
+feature_flags:
+  measureOperationResourceConsumption:
+    description: "When true, records and reports per-operation resource consumption"
+    cpp_varname: gMeasureOperationResourceConsumption
+    default: false
 
 server_parameters:
-  measureOperationResourceConsumption:
-    description: "When true, records resource consumption for all operations"
+ aggregateOperationResourceConsumption:
+    description: "When true, globally aggregates per-operation resource consumption. Implies
+                  measureOperationResourceConsumption"
     set_at:
-      - runtime
       - startup
-    cpp_varname: measureOperationResourceConsumption
-    cpp_vartype: AtomicWord<bool>
+    cpp_varname: gAggregateOperationResourceConsumption
+    cpp_vartype: bool
     default: false
