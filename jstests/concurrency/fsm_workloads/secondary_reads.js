@@ -3,8 +3,8 @@
 /**
  * secondary_reads.js
  *
- * One thread (tid 0) is dedicated to writing documents with field 'x' in
- * ascending order into the collection.
+ * One thread (tid 0) is dedicated to writing documents with field 'x' in ascending order into the
+ * collection. This thread is also responsible for ensuring the required index on 'x' exists.
  *
  * Other threads do one of the following operations each iteration.
  * 1) Retrieve first 50 documents in descending order with local readConcern from a secondary node.
@@ -13,8 +13,9 @@
  * 3) Retrieve first 50 documents in descending order with majority readConcern from a secondary
  * node.
  *
- * For each read, we check if there is any 'hole' in the returned batch. There
- * should not be any 'hole' because oplogs are applied sequentially in batches.
+ * For each read, we perform a reverse index scan on 'x' and check if there are any 'holes' in the
+ * returned batch. There should not be any 'holes' because despite the secondary applying operations
+ * out of order, the scan on the ordered field 'x' guarantees we will see all inserts in-order.
  *
  * @tags: [requires_replication, uses_write_concern]
  */
@@ -29,8 +30,23 @@ var $config = (function() {
         return this.tid === 0;
     }
 
-    function insertDocuments(db, collName, writeConcern) {
-        let bulk = db[collName].initializeOrderedBulkOp();
+    function buildIndex(db, spec) {
+        assertAlways.commandWorked(db[this.collName].createIndex(spec));
+    }
+
+    function assertSecondaryReadOk(res) {
+        assertAlways.commandWorked(res);
+    }
+
+    function insertDocumentsAndBuildIndex(db, writeConcern) {
+        // This index is required to ensure secondary reads do not see "holes" between documents.
+        // Because documents are applied out-of-order on the secondary, we cannot perform a natural
+        // collection scan and expect to see all documents in-order, specifically if we read at a
+        // timestamp that falls in the middle of an already-completed batch. The property of not
+        // seeing "holes" between documents can only be guaranteed by scanning on an ordered index.
+        this.buildIndex(db, {x: 1});
+
+        let bulk = db[this.collName].initializeOrderedBulkOp();
         for (let i = this.nDocumentsInTotal; i < this.nDocumentsInTotal + this.nDocumentsToInsert;
              i++) {
             bulk.insert({_id: i, x: i});
@@ -41,16 +57,17 @@ var $config = (function() {
         this.nDocumentsInTotal += this.nDocumentsToInsert;
     }
 
-    function readFromSecondaries(db, collName, readConcernLevel) {
+    function readFromSecondaries(db, readConcernLevel) {
         let arr = [];
         let success = false;
         while (!success) {
             try {
-                arr = db[collName]
+                arr = db[this.collName]
                           .find()
                           .readPref('secondary')
                           .readConcern(readConcernLevel)
                           .sort({x: -1})
+                          .hint({x: 1})
                           .limit(this.nDocumentsToCheck)
                           .toArray();
                 success = true;
@@ -61,10 +78,7 @@ var $config = (function() {
                     e.errorLabels.includes('TransientTransactionError')) {
                     throw e;
                 }
-                // Retry if the query is interrupted.
-                assertAlways.eq(e.code,
-                                ErrorCodes.QueryPlanKilled,
-                                'unexpected error code: ' + e.code + ': ' + e.message);
+                this.assertSecondaryReadOk(e);
             }
         }
         // Make sure there is no hole in the result.
@@ -89,10 +103,9 @@ var $config = (function() {
         // secondaries with a randomly chosen readConcern level.
         function readFromSecondaries(db, collName) {
             if (this.isWriterThread()) {
-                this.insertDocuments(db, this.collName);
+                this.insertDocumentsAndBuildIndex(db);
             } else {
-                this.readFromSecondaries(
-                    db, this.collName, getReadConcernLevel(supportsCommittedReads(db)));
+                this.readFromSecondaries(db, getReadConcernLevel(supportsCommittedReads(db)));
             }
         }
 
@@ -105,9 +118,7 @@ var $config = (function() {
         this.nDocumentsInTotal = 0;
         // Start write workloads to activate oplog application on secondaries
         // before any reads.
-        this.insertDocuments(db, this.collName, {w: cluster.getReplSetNumNodes()});
-        // Facilitate sorting by "x".
-        db[collName].createIndex({x: 1});
+        this.insertDocumentsAndBuildIndex(db, {w: cluster.getReplSetNumNodes()});
     };
 
     return {
@@ -119,8 +130,10 @@ var $config = (function() {
             nDocumentsToInsert: 2000,
             nDocumentsToCheck: 50,
             isWriterThread: isWriterThread,
-            insertDocuments: insertDocuments,
+            insertDocumentsAndBuildIndex: insertDocumentsAndBuildIndex,
+            buildIndex: buildIndex,
             readFromSecondaries: readFromSecondaries,
+            assertSecondaryReadOk: assertSecondaryReadOk,
             collName: uniqueCollectionName
         },
         transitions: transitions,
