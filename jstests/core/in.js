@@ -6,9 +6,6 @@ t.save({a: 1});
 t.save({a: 2});
 
 // $in must take an array as argument: SERVER-7445
-// @tags: [
-//   sbe_incompatible,
-// ]
 assert.throws(function() {
     return t.find({a: {$in: {x: 1}}}).itcount();
 });

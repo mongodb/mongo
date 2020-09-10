@@ -213,6 +213,7 @@ enum class Builtin : uint8_t {
     sinh,
     tan,
     tanh,
+    isMember,
 };
 
 class CodeFragment {
@@ -380,12 +381,15 @@ private:
                                                                 value::Value operandValue);
     std::tuple<bool, value::TypeTags, value::Value> genericNot(value::TypeTags tag,
                                                                value::Value value);
+    std::pair<value::TypeTags, value::Value> genericIsMember(value::TypeTags lhsTag,
+                                                             value::Value lhsValue,
+                                                             value::TypeTags rhsTag,
+                                                             value::Value rhsValue);
     std::tuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags lhsTag,
                                                                       value::Value lhsValue,
                                                                       value::TypeTags rhsTag);
     std::pair<value::TypeTags, value::Value> genericNumConvertToPreciseInt64(value::TypeTags lhsTag,
                                                                              value::Value lhsValue);
-
     template <typename Op>
     std::pair<value::TypeTags, value::Value> genericCompare(value::TypeTags lhsTag,
                                                             value::Value lhsValue,
@@ -522,6 +526,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinTan(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTanh(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinConcat(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinIsMember(uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 

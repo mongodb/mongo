@@ -227,7 +227,7 @@ selector:
   - jstests/core/in6.js
   - jstests/core/in7.js
   - jstests/core/in8.js
-  - jstests/core/in8.js
+  - jstests/core/in_with_mixed_values.js
   - jstests/core/inc-SERVER-7446.js
   - jstests/core/inc1.js
   - jstests/core/inc2.js

@@ -739,9 +739,7 @@ public:
     void visit(const GeoNearMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
-    void visit(const InMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
+    void visit(const InMatchExpression* expr) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
         unsupportedExpression(expr);
@@ -1090,7 +1088,141 @@ public:
 
     void visit(const GeoMatchExpression* expr) final {}
     void visit(const GeoNearMatchExpression* expr) final {}
-    void visit(const InMatchExpression* expr) final {}
+    void visit(const InMatchExpression* expr) final {
+        auto equalities = expr->getEqualities();
+
+        // Build an ArraySet for testing membership of the field in the equalities vector of the
+        // InMatchExpression.
+        auto [arrSetTag, arrSetVal] = sbe::value::makeNewArraySet();
+        sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
+
+        auto arrSet = sbe::value::getArraySetView(arrSetVal);
+
+        for (auto&& equality : equalities) {
+
+            auto [tagView, valView] = sbe::bson::convertFrom(true,
+                                                             equality.rawdata(),
+                                                             equality.rawdata() + equality.size(),
+                                                             equality.fieldNameSize() - 1);
+
+            // An ArraySet assumes ownership of it's values so we have to make a copy here.
+            auto [tag, val] = sbe::value::copyValue(tagView, valView);
+            arrSet->push_back(tag, val);
+        }
+
+        // If the InMatchExpression doesn't carry any regex patterns, we can just check if the value
+        // in bound to the inputSlot is a member of the equalities set.
+        if (expr->getRegexes().size() == 0) {
+            auto makePredicate =
+                [&, arrSetTag = arrSetTag, arrSetVal = arrSetVal](
+                    sbe::value::SlotId inputSlot,
+                    std::unique_ptr<sbe::PlanStage> inputStage) -> MakePredicateReturnType {
+                // Copy the ArraySet because the the sbe EConstant assmumes ownership and the
+                // makePredicate function can be invoked multiple times in 'generateTraverse'.
+                auto [equalitiesTag, equalitiesVal] = sbe::value::copyValue(arrSetTag, arrSetVal);
+
+                return {sbe::makeE<sbe::EFunction>(
+                            "isMember",
+                            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
+                                        sbe::makeE<sbe::EConstant>(equalitiesTag, equalitiesVal))),
+                        std::move(inputStage)};
+            };
+
+            generateTraverse(_context, expr->path(), std::move(makePredicate));
+            return;
+        } else {
+            // If the InMatchExpression contains regex patterns, then we need to handle a regex-only
+            // case and a case where both equalities and regexes are present. The regex-only case is
+            // handled by building a traversal stage to traverse the array of regexes and call the
+            // 'regexMatch' built-in to check if the field being traversed has a value that matches
+            // a regex. The combined case uses a short-circuiting limit-1/union OR stage to first
+            // exhaust the equalities 'isMember' check, and then if no match is found it executes
+            // the regex-only traversal stage.
+            auto& regexes = expr->getRegexes();
+
+            auto [arrTag, arrVal] = sbe::value::makeNewArray();
+            sbe::value::ValueGuard arrGuard{arrTag, arrVal};
+
+            auto arr = sbe::value::getArrayView(arrVal);
+
+            arr->reserve(regexes.size());
+
+            for (auto&& r : regexes) {
+                auto regex = RegexMatchExpression::makeRegex(r->getString(), r->getFlags());
+                arr->push_back(sbe::value::TypeTags::pcreRegex,
+                               sbe::value::bitcastFrom(regex.release()));
+            }
+
+            auto makePredicate =
+                [&, arrSetTag = arrSetTag, arrSetVal = arrSetVal, arrTag = arrTag, arrVal = arrVal](
+                    sbe::value::SlotId inputSlot,
+                    std::unique_ptr<sbe::PlanStage> inputStage) -> MakePredicateReturnType {
+                auto regexArraySlot{_context->slotIdGenerator->generate()};
+                auto regexInputSlot{_context->slotIdGenerator->generate()};
+                auto regexOutputSlot{_context->slotIdGenerator->generate()};
+
+                // Build a traverse stage that traverses the query regex pattern array. Here the
+                // FROM branch binds an array constant carrying the regex patterns to a slot. Then
+                // the inner branch executes 'regexMatch' once per regex.
+                auto [regexTag, regexVal] = sbe::value::copyValue(arrTag, arrVal);
+                auto regexFromStage =
+                    sbe::makeProjectStage(makeLimitCoScanTree(_context->planNodeId),
+                                          _context->planNodeId,
+                                          regexArraySlot,
+                                          sbe::makeE<sbe::EConstant>(regexTag, regexVal));
+
+                auto regexInnerStage = sbe::makeProjectStage(
+                    makeLimitCoScanTree(_context->planNodeId),
+                    _context->planNodeId,
+                    regexInputSlot,
+                    makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
+                        "regexMatch",
+                        sbe::makeEs(sbe::makeE<sbe::EVariable>(regexArraySlot),
+                                    sbe::makeE<sbe::EVariable>(inputSlot)))));
+
+                auto regexStage = sbe::makeS<sbe::TraverseStage>(
+                    std::move(regexFromStage),
+                    std::move(regexInnerStage),
+                    regexArraySlot,
+                    regexOutputSlot,
+                    regexInputSlot,
+                    sbe::makeSV(),
+                    sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
+                                                 sbe::makeE<sbe::EVariable>(regexOutputSlot),
+                                                 sbe::makeE<sbe::EVariable>(regexInputSlot)),
+                    sbe::makeE<sbe::EVariable>(regexOutputSlot),
+                    _context->planNodeId,
+                    0);
+
+                // If equalities are present in addition to regexes, build a limit-1/union
+                // short-circuiting OR between a filter stage that checks membership of the field
+                // being traversed in the equalities and the regex traverse stage
+                if (equalities.size() > 0) {
+                    auto [equalitiesTag, equalitiesVal] =
+                        sbe::value::copyValue(arrSetTag, arrSetVal);
+                    std::vector<std::pair<EvalExpr, std::unique_ptr<sbe::PlanStage>>> branches;
+                    branches.emplace_back(
+                        sbe::makeE<sbe::EFunction>(
+                            "isMember",
+                            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
+                                        sbe::makeE<sbe::EConstant>(equalitiesTag, equalitiesVal))),
+                        makeLimitCoScanTree(_context->planNodeId));
+                    branches.emplace_back(regexOutputSlot, std::move(regexStage));
+
+                    return generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicOr,
+                                                            std::move(branches),
+                                                            _context->planNodeId,
+                                                            _context->slotIdGenerator);
+                }
+
+                return {sbe::makeE<sbe::EVariable>(regexOutputSlot), std::move(regexStage)};
+            };
+            generateTraverse(_context,
+                             expr->path(),
+                             std::move(makePredicate),
+                             LeafTraversalMode::kArrayElementsOnly);
+        }
+    }
     void visit(const InternalExprEqMatchExpression* expr) final {
         // This is a no-op. The $_internalExprEq match expression is produced internally by
         // rewriting an $expr expression to an AND($expr, $_internalExprEq), which can later be

@@ -1438,6 +1438,47 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(uint8_t 
     return {true, strTag, strValue};
 }
 
+std::pair<value::TypeTags, value::Value> ByteCode::genericIsMember(value::TypeTags lhsTag,
+                                                                   value::Value lhsValue,
+                                                                   value::TypeTags rhsTag,
+                                                                   value::Value rhsValue) {
+    if (value::isArray(rhsTag)) {
+        switch (rhsTag) {
+            case value::TypeTags::ArraySet: {
+                auto arrSet = value::getArraySetView(rhsValue);
+                auto& values = arrSet->values();
+                return {value::TypeTags::Boolean, values.find({lhsTag, lhsValue}) != values.end()};
+            }
+            case value::TypeTags::Array:
+            case value::TypeTags::bsonArray: {
+                auto rhsArr = value::ArrayEnumerator{rhsTag, rhsValue};
+                while (!rhsArr.atEnd()) {
+                    auto [rhsTag, rhsVal] = rhsArr.getViewOfValue();
+                    auto [tag, val] = value::compareValue(lhsTag, lhsValue, rhsTag, rhsVal);
+                    if (tag == value::TypeTags::NumberInt32 && val == 0) {
+                        return {value::TypeTags::Boolean, true};
+                    }
+                    rhsArr.advance();
+                }
+                return {value::TypeTags::Boolean, false};
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+    return {value::TypeTags::Nothing, 0};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(uint8_t arity) {
+    invariant(arity == 2);
+
+    auto [ownedInput, inputTag, inputValue] = getFromStack(0);
+    auto [ownedArr, arrTag, arrValue] = getFromStack(1);
+
+    auto [resultTag, resultVal] = genericIsMember(inputTag, inputValue, arrTag, arrValue);
+    return {false, resultTag, resultVal};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
@@ -1523,6 +1564,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinTanh(arity);
         case Builtin::concat:
             return builtinConcat(arity);
+        case Builtin::isMember:
+            return builtinIsMember(arity);
     }
 
     MONGO_UNREACHABLE;

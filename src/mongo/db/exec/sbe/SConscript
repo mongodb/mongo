@@ -90,6 +90,7 @@ env.CppUnitTest(
         'expressions/sbe_bson_size_test.cpp',
         'expressions/sbe_coerce_to_string_test.cpp',
         'expressions/sbe_concat_test.cpp',
+        'expressions/sbe_is_member_builtin_test.cpp',
         'expressions/sbe_to_upper_to_lower_test.cpp',
         'expressions/sbe_trigonometric_expressions_test.cpp',
         'sbe_filter_test.cpp',
