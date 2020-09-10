@@ -37,6 +37,7 @@
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
@@ -117,6 +118,25 @@ public:
 
 protected:
     AuthzManagerExternalStateLocal() = default;
+
+    class RolesLocks {
+    public:
+        RolesLocks() = default;
+        RolesLocks(OperationContext*);
+        ~RolesLocks();
+
+    private:
+        std::unique_ptr<Lock::DBLock> _adminLock;
+        std::unique_ptr<Lock::CollectionLock> _rolesLock;
+    };
+
+    /**
+     * Set an auto-releasing shared lock on the roles database.
+     * This allows us to maintain a consistent state during user acquisiiton.
+     *
+     * virtual to allow Mock to not lock anything.
+     */
+    virtual RolesLocks _lockRoles(OperationContext* opCtx);
 
 private:
     /**

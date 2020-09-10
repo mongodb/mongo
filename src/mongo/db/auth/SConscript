@@ -68,6 +68,7 @@ env.Library(
 env.Library(
     target='auth_impl_internal_local',
     source=[
+        env.Idlc('auth_types.idl')[0],
         'authz_manager_external_state_local.cpp',
     ],
     LIBDEPS=[

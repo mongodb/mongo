@@ -55,6 +55,7 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
@@ -410,6 +411,10 @@ Status AuthorizationManagerImpl::getRoleDescriptionsForDB(
         opCtx, dbname, privileges, restrictions, showBuiltinRoles, result);
 }
 
+namespace {
+MONGO_FAIL_POINT_DEFINE(authUserCacheBypass);
+}  // namespace
+
 StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,
                                                              const UserName& userName) try {
     if (userName == internalSecurity.user->getName()) {
@@ -432,6 +437,17 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
                   std::inserter(*request.roles, request.roles->begin()));
     }
 #endif
+
+    if (authUserCacheBypass.shouldFail()) {
+        // Bypass cache and force a fresh load of the user.
+        auto loadedUser = uassertStatusOK(_externalState->getUserObject(opCtx, request));
+        // We have to inject into the cache in order to get a UserHandle.
+        auto userHandle =
+            _userCache.insertOrAssignAndGet(request, std::move(loadedUser), Date_t::now());
+        invariant(userHandle);
+        LOGV2_DEBUG(4859401, 1, "Bypassing user cache to load user", "user"_attr = userName);
+        return userHandle;
+    }
 
     auto cachedUser = _userCache.acquire(opCtx, request);
     invariant(cachedUser);

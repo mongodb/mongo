@@ -65,3 +65,12 @@ types:
     cpp_type: "Privilege"
     deserializer: "mongo::Privilege::fromBSON"
     serializer: "mongo::Privilege::toBSON"
+
+structs:
+  authLocalGetUserFailPoint:
+    description: Data for authLocalGetUser failpoint
+    fields:
+      resolveRolesDelayMS:
+        type: int
+        default: 0
+        validator: { gte: 0 }
