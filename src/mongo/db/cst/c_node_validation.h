@@ -36,6 +36,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/cst/c_node.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 
 /**
  * Functions which perform additional validation beyond what a context free grammar can handle.
@@ -90,6 +91,15 @@ StatusWith<IsPositional> validateProjectionPathAsNormalOrPositional(
  * * Forbids dollar characters.
  * * Forbids null bytes.
  */
-Status validateSortPath(const std::vector<std::string>& pathComponents);
 
+Status validateSortPath(const std::vector<std::string>& pathComponents);
+/**
+ * Given a CNode holding the argument given to a parsed $type operator, this function returns
+ * Status::OK if the argument is either a valid number representing a BSON type, a valid string
+ * representing a BSON type, or an array whose members are all valid number-or-string BSON type
+ * specifiers. If the argument does not meet these conditions, than it is not a valid argument to
+ * $type, and this function returns an error status along with an error message detailing why the
+ * argument is invalid.
+ */
+Status validateTypeOperatorArgument(const CNode& argument);
 }  // namespace mongo::c_node_validation
