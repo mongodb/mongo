@@ -31,28 +31,17 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/client/shard.h"
-#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/read_through_cache.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 
 class BSONObjBuilder;
 
 static constexpr int kMaxNumStaleVersionRetries = 10;
-
-/**
- * If true, this operation should block behind a catalog cache refresh. Otherwise, the operation
- * will block skip the catalog cache refresh.
- */
-extern const OperationContext::Decoration<bool> operationShouldBlockBehindCatalogCacheRefresh;
 
 /**
  * Constructed exclusively by the CatalogCache to be used as vector clock (Time) to drive
@@ -141,20 +130,17 @@ private:
 class CachedDatabaseInfo {
 public:
     const ShardId& primaryId() const;
-    std::shared_ptr<Shard> primary() const {
-        return _primaryShard;
-    };
 
     bool shardingEnabled() const;
+
     DatabaseVersion databaseVersion() const;
 
 private:
     friend class CatalogCache;
 
-    CachedDatabaseInfo(DatabaseType dbt, std::shared_ptr<Shard> primaryShard);
+    CachedDatabaseInfo(DatabaseType dbt);
 
     DatabaseType _dbt;
-    std::shared_ptr<Shard> _primaryShard;
 };
 
 /**
@@ -300,9 +286,6 @@ public:
     void invalidateCollectionEntry_LINEARIZABLE(const NamespaceString& nss);
 
 private:
-    // Make the cache entries friends so they can access the private classes below
-    friend class CachedDatabaseInfo;
-
     class DatabaseCache
         : public ReadThroughCache<std::string, DatabaseType, ComparableDatabaseVersion> {
     public:
@@ -372,7 +355,16 @@ private:
     // Interface from which chunks will be retrieved
     CatalogCacheLoader& _cacheLoader;
 
-    // Encapsulates runtime statistics across all collections in the catalog cache
+    // Executor on which the caches below will execute their blocking work
+    std::shared_ptr<ThreadPool> _executor;
+
+    DatabaseCache _databaseCache;
+
+    CollectionCache _collectionCache;
+
+    /**
+     * Encapsulates runtime statistics across all databases and collections in this catalog cache
+     */
     struct Stats {
         // Counts how many times threads hit stale config exception (which is what triggers metadata
         // refreshes)
@@ -400,12 +392,6 @@ private:
         void report(BSONObjBuilder* builder) const;
 
     } _stats;
-
-    std::shared_ptr<ThreadPool> _executor;
-
-    DatabaseCache _databaseCache;
-
-    CollectionCache _collectionCache;
 };
 
 }  // namespace mongo

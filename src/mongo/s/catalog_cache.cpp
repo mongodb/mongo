@@ -54,13 +54,6 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
-
-const OperationContext::Decoration<bool> operationShouldBlockBehindCatalogCacheRefresh =
-    OperationContext::declareDecoration<bool>();
-
-const OperationContext::Decoration<bool> operationBlockedBehindCatalogCacheRefresh =
-    OperationContext::declareDecoration<bool>();
-
 namespace {
 
 // How many times to try refreshing the routing info if the set of chunks loaded from the config
@@ -68,8 +61,13 @@ namespace {
 const int kMaxInconsistentRoutingInfoRefreshAttempts = 3;
 
 const int kDatabaseCacheSize = 10000;
-
 const int kCollectionCacheSize = 10000;
+
+const OperationContext::Decoration<bool> operationShouldBlockBehindCatalogCacheRefresh =
+    OperationContext::declareDecoration<bool>();
+
+const OperationContext::Decoration<bool> operationBlockedBehindCatalogCacheRefresh =
+    OperationContext::declareDecoration<bool>();
 
 }  // namespace
 
@@ -110,14 +108,11 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
         // TODO SERVER-49724: Make ReadThroughCache support StringData keys
         auto dbEntry =
             _databaseCache.acquire(opCtx, dbName.toString(), CacheCausalConsistency::kLatestKnown);
-        if (!dbEntry) {
-            return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "database " << dbName << " not found"};
-        }
-        const auto primaryShard = uassertStatusOKWithContext(
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->getPrimary()),
-            str::stream() << "could not find the primary shard for database " << dbName);
-        return {CachedDatabaseInfo(*dbEntry, std::move(primaryShard))};
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "database " << dbName << " not found",
+                dbEntry);
+
+        return {CachedDatabaseInfo(*dbEntry)};
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -455,6 +450,10 @@ CatalogCache::DatabaseCache::LookupResult CatalogCache::DatabaseCache::_lookupDa
     Timer t{};
     try {
         auto newDb = _catalogCacheLoader.getDatabase(dbName).get();
+        uassertStatusOKWithContext(
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, newDb.getPrimary()),
+            str::stream() << "The primary shard for database " << dbName << " does not exist");
+
         auto newDbVersion =
             ComparableDatabaseVersion::makeComparableDatabaseVersion(newDb.getVersion());
         LOGV2_FOR_CATALOG_REFRESH(24101,
@@ -584,7 +583,9 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
         std::set<ShardId> shardIds;
         newRoutingHistory.getAllShardIds(&shardIds);
         for (const auto& shardId : shardIds) {
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+            uassertStatusOKWithContext(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId),
+                                       str::stream() << "Collection " << nss
+                                                     << " references shard which does not exist");
         }
 
         const auto newVersion =
@@ -659,8 +660,7 @@ bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other
     }
 }
 
-CachedDatabaseInfo::CachedDatabaseInfo(DatabaseType dbt, std::shared_ptr<Shard> primaryShard)
-    : _dbt(std::move(dbt)), _primaryShard(std::move(primaryShard)) {}
+CachedDatabaseInfo::CachedDatabaseInfo(DatabaseType dbt) : _dbt(std::move(dbt)) {}
 
 const ShardId& CachedDatabaseInfo::primaryId() const {
     return _dbt.getPrimary();
