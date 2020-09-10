@@ -59,8 +59,12 @@ class ConfigSvrDropCollectionCommand : public BasicCommand {
 public:
     ConfigSvrDropCollectionCommand() : BasicCommand("_configsvrDropCollection") {}
 
-    const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
+    /**
+     * We accept any apiVersion, apiStrict, and/or apiDeprecationErrors, and forward it with the
+     * "drop" command to shards.
+     */
+    bool acceptsAnyApiVersionParameters() const override {
+        return true;
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {

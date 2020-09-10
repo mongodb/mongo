@@ -53,6 +53,10 @@ const APIParametersFromClient initializeAPIParameters(OperationContext* opCtx,
             apiParamsFromClient.getApiVersion());
     }
 
+    if (command->acceptsAnyApiVersionParameters()) {
+        return apiParamsFromClient;
+    }
+
     if (apiParamsFromClient.getApiDeprecationErrors() || apiParamsFromClient.getApiStrict()) {
         uassert(4886600,
                 "Provided apiStrict and/or apiDeprecationErrors without passing apiVersion",

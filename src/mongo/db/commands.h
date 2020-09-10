@@ -365,6 +365,13 @@ public:
      */
     virtual const std::set<std::string>& deprecatedApiVersions() const;
 
+    /*
+     * Some commands permit any values for apiVersion, apiStrict, and apiDeprecationErrors.
+     */
+    virtual bool acceptsAnyApiVersionParameters() const {
+        return false;
+    }
+
     /**
      * Like adminOnly, but even stricter: we must either be authenticated for admin db,
      * or, if running without auth, on the local interface.  Used for things which
