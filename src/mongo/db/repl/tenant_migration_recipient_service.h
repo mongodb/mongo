@@ -85,14 +85,16 @@ public:
          */
         const std::string& getTenantId() const;
 
-        /*
-         *  Returns true if the instance state doc is marked for garbage collect.
-         */
-        bool isMarkedForGarbageCollect() const;
-
-
     private:
         friend class TenantMigrationRecipientServiceTest;
+
+        /*
+         * Transitions the instance state to 'kStarted'.
+         *
+         * Persists the instance state doc and waits for it to be majority replicated.
+         * Throws an user assertion on failure.
+         */
+        SharedSemiFuture<void> _initializeStateDoc();
 
         /**
          * Creates a client, connects it to the donor, and authenticates it if authParams is

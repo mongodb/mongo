@@ -171,6 +171,48 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_createAndConnectCli
         .semi();
 }
 
+SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc() {
+    stdx::lock_guard lk(_mutex);
+    // If the instance state is not 'kUninitialized', then the instance is restarted by step
+    // up. So, skip persisting the state doc. And, PrimaryOnlyService::onStepUp() waits for
+    // majority commit of the primary no-op oplog entry written by the node in the newer
+    // term before scheduling the Instance::run(). So, it's also safe to assume that
+    // instance's state document written in an older term on disk won't get rolled back for
+    // step up case.
+    if (_stateDoc.getState() != TenantMigrationRecipientStateEnum::kUninitialized) {
+        return {Future<void>::makeReady()};
+    }
+
+    auto uniqueOpCtx = cc().makeOperationContext();
+    auto opCtx = uniqueOpCtx.get();
+
+
+    LOGV2_DEBUG(5081400,
+                2,
+                "Recipient migration service initializing state document",
+                "tenantId"_attr = getTenantId(),
+                "migrationId"_attr = getMigrationUUID(),
+                "connectionString"_attr = _donorConnectionString,
+                "readPreference"_attr = _readPreference);
+
+    // Persist the state doc before starting the data sync.
+    _stateDoc.setState(TenantMigrationRecipientStateEnum::kStarted);
+    uassertStatusOK(tenantMigrationRecipientEntryHelpers::insertStateDoc(opCtx, _stateDoc));
+
+    if (MONGO_unlikely(failWhilePersistingTenantMigrationRecipientInstanceStateDoc.shouldFail())) {
+        LOGV2(4878500, "Persisting state doc failed due to fail point enabled.");
+        uassert(ErrorCodes::NotWritablePrimary,
+                "Persisting state doc failed - "
+                "'failWhilePersistingTenantMigrationRecipientInstanceStateDoc' fail point active",
+                false);
+    }
+
+    // Wait for the state doc to be majority replicated to make sure that the state doc doesn't
+    // rollback.
+    auto insertOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    return WaitForMajorityService::get(opCtx->getServiceContext()).waitUntilMajority(insertOpTime);
+}
+
 namespace {
 constexpr std::int32_t stopFailPointErrorCode = 4880402;
 void stopOnFailPoint(FailPoint* fp) {
@@ -184,10 +226,14 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     _scopedExecutor = executor;
     return ExecutorFuture(**executor)
-        .then([this]() -> SharedSemiFuture<void> {
-            auto uniqueOpCtx = cc().makeOperationContext();
-            auto opCtx = uniqueOpCtx.get();
-
+        .then([this]() { return _initializeStateDoc(); })
+        .then([this] {
+            stopOnFailPoint(&stopAfterPersistingTenantMigrationRecipientInstanceStateDoc);
+            return _createAndConnectClients();
+        })
+        .then([this] {
+            stopOnFailPoint(&stopAfterConnectingTenantMigrationRecipientInstance);
+            stdx::lock_guard lk(_mutex);
             // The instance is marked as garbage collect if the migration is either
             // committed or aborted on donor side. So, don't start the recipient task if the
             // instance state doc is marked for garbage collect.
@@ -195,49 +241,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                     str::stream() << "Can't start the data sync as the state doc is already marked "
                                      "for garbage collect for migration uuid: "
                                   << getMigrationUUID(),
-                    !isMarkedForGarbageCollect());
+                    !_stateDoc.getGarbageCollect());
 
-            auto lastOpBeforeRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-
-            // Persist the state doc before starting the data sync.
-            auto status = tenantMigrationRecipientEntryHelpers::insertStateDoc(opCtx, _stateDoc);
-
-            // TODO SERVER-50742: Ignoring duplicate check step should be removed.
-            // We can hit duplicate key error when the instances are rebuilt on a new primary after
-            // step up. So, it's ok to ignore duplicate key errors.
-            if (status != ErrorCodes::DuplicateKey) {
-                uassertStatusOK(status);
-            }
-
-            auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-            // No writes happened implies that the state doc is already on disk. This can happen
-            // only when the instances are rebuilt on node step up. And,
-            // PrimaryOnlyService::onStepUp() waits for majority commit of the primary no-op oplog
-            // entry written by the node in the newer term before scheduling the Instance::run().
-            // So, it's safe to assume that instance's state document written in an older term on
-            // disk won't get rolled back for step up case.
-            if (lastOpBeforeRun == lastOpAfterRun) {
-                // TODO SERVER-50742: Add an invariant check to make sure this case can happen only
-                // for step up.
-                return {Future<void>::makeReady()};
-            }
-
-            if (MONGO_unlikely(
-                    failWhilePersistingTenantMigrationRecipientInstanceStateDoc.shouldFail())) {
-                LOGV2(4878500, "Persisting state doc failed due to fail point enabled.");
-                uassert(ErrorCodes::NotWritablePrimary, "not writable primary ", false);
-            }
-
-            // Wait for the state doc to be majority replicated.
-            return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(lastOpAfterRun);
-        })
-        .then([this] {
-            stopOnFailPoint(&stopAfterPersistingTenantMigrationRecipientInstanceStateDoc);
-            return _createAndConnectClients();
-        })
-        .then([this] {
-            stopOnFailPoint(&stopAfterConnectingTenantMigrationRecipientInstance);
             // TODO SERVER-48808: Run cloners in MigrationServiceInstance
             // TODO SERVER-48811: Oplog fetching in MigrationServiceInstance
         })
@@ -260,11 +265,6 @@ const UUID& TenantMigrationRecipientService::Instance::getMigrationUUID() const 
 
 const std::string& TenantMigrationRecipientService::Instance::getTenantId() const {
     return _tenantId;
-}
-
-bool TenantMigrationRecipientService::Instance::isMarkedForGarbageCollect() const {
-    stdx::lock_guard lk(_mutex);
-    return _stateDoc.getGarbageCollect();
 }
 
 }  // namespace repl
