@@ -528,7 +528,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::rebuildIndex
         return status;
     }
 
-    CollectionWriter collection(opCtx, nss);
+    CollectionWriter collection(opCtx, nss, CollectionCatalog::LifetimeMode::kInplace);
 
     // Complete the index build.
     return _runIndexRebuildForRecovery(opCtx, collection, buildUUID, repair);
@@ -553,7 +553,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         indexNames.push_back(name);
     }
 
-    CollectionWriter collection(opCtx, nss);
+    CollectionWriter collection(opCtx, nss, CollectionCatalog::LifetimeMode::kInplace);
     {
         // These steps are combined into a single WUOW to ensure there are no commits without
         // the indexes.
@@ -1838,10 +1838,10 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
 }
 
 void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* opCtx,
-                                                            UUID collectionUUID,
+                                                            CollectionWriter& collection,
                                                             const std::vector<BSONObj>& specs,
                                                             bool fromMigrate) {
-    CollectionWriter collection(opCtx, collectionUUID);
+    auto collectionUUID = collection->uuid();
 
     invariant(collection, str::stream() << collectionUUID);
     invariant(collection->isEmpty(opCtx), str::stream() << collectionUUID);
@@ -2009,21 +2009,21 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
 
     // AutoGetCollection throws an exception if it is unable to look up the collection by UUID.
     NamespaceStringOrUUID nssOrUuid{dbName.toString(), collectionUUID};
-    AutoGetCollection collection(opCtx, nssOrUuid, MODE_X);
-    const auto& nss = collection->ns();
+    AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
+    CollectionWriter collection(autoColl);
 
     // Disallow index builds on drop-pending namespaces (system.drop.*) if we are primary.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().usingReplSets() &&
         replCoord->canAcceptWritesFor(opCtx, nssOrUuid)) {
         uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "drop-pending collection: " << nss,
-                !nss.isDropPendingNamespace());
+                str::stream() << "drop-pending collection: " << collection.get()->ns(),
+                !collection.get()->ns().isDropPendingNamespace());
     }
 
     // This check is for optimization purposes only as since this lock is released after this,
     // and is acquired again when we build the index in _setUpIndexBuild.
-    CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
+    CollectionShardingState::get(opCtx, collection.get()->ns())->checkShardVersionOrThrow(opCtx);
 
     // Lock from when we ascertain what indexes to build through to when the build is registered
     // on the Coordinator and persistedly set up in the catalog. This serializes setting up an
@@ -2032,7 +2032,8 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
 
     std::vector<BSONObj> filteredSpecs;
     try {
-        filteredSpecs = prepareSpecListForCreate(opCtx, collection.getCollection(), nss, specs);
+        filteredSpecs =
+            prepareSpecListForCreate(opCtx, collection.get(), collection.get()->ns(), specs);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -2041,17 +2042,16 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
         // The requested index (specs) are already built or are being built. Return success
         // early (this is v4.0 behavior compatible).
         ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
-        int numIndexes = getNumIndexesTotal(opCtx, collection.getCollection());
+        int numIndexes = getNumIndexesTotal(opCtx, collection.get());
         indexCatalogStats.numIndexesBefore = numIndexes;
         indexCatalogStats.numIndexesAfter = numIndexes;
         return SharedSemiFuture(indexCatalogStats);
     }
 
     // Bypass the thread pool if we are building indexes on an empty collection.
-    if (shouldBuildIndexesOnEmptyCollectionSinglePhased(
-            opCtx, collection.getCollection(), protocol)) {
+    if (shouldBuildIndexesOnEmptyCollectionSinglePhased(opCtx, collection.get(), protocol)) {
         ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
-        indexCatalogStats.numIndexesBefore = getNumIndexesTotal(opCtx, collection.getCollection());
+        indexCatalogStats.numIndexesBefore = getNumIndexesTotal(opCtx, collection.get());
         try {
             // Replicate this index build using the old-style createIndexes oplog entry to avoid
             // timestamping issues that would result from this empty collection optimization on a
@@ -2059,24 +2059,26 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
             // commitIndexBuild oplog entries, this optimization will fail to accurately timestamp
             // the catalog update when it uses the timestamp from the startIndexBuild, rather than
             // the commitIndexBuild, oplog entry.
-            writeConflictRetry(
-                opCtx, "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild", nss.ns(), [&] {
-                    WriteUnitOfWork wuow(opCtx);
-                    createIndexesOnEmptyCollection(opCtx, collection->uuid(), filteredSpecs, false);
-                    wuow.commit();
-                });
+            writeConflictRetry(opCtx,
+                               "IndexBuildsCoordinator::_filterSpecsAndRegisterBuild",
+                               collection.get()->ns().ns(),
+                               [&] {
+                                   WriteUnitOfWork wuow(opCtx);
+                                   createIndexesOnEmptyCollection(
+                                       opCtx, collection, filteredSpecs, false);
+                                   wuow.commit();
+                               });
         } catch (DBException& ex) {
             ex.addContext(str::stream() << "index build on empty collection failed: " << buildUUID);
             return ex.toStatus();
         }
-        indexCatalogStats.numIndexesAfter = getNumIndexesTotal(opCtx, collection.getCollection());
+        indexCatalogStats.numIndexesAfter = getNumIndexesTotal(opCtx, collection.get());
         return SharedSemiFuture(indexCatalogStats);
     }
 
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
         buildUUID, collectionUUID, dbName.toString(), filteredSpecs, protocol);
-    replIndexBuildState->stats.numIndexesBefore =
-        getNumIndexesTotal(opCtx, collection.getCollection());
+    replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection.get());
 
     auto status = _registerIndexBuild(lk, replIndexBuildState);
     if (!status.isOK()) {

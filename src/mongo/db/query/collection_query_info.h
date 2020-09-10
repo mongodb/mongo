@@ -91,9 +91,18 @@ public:
     void droppedIndex(OperationContext* opCtx, const CollectionPtr& coll, StringData indexName);
 
     /**
-     * Removes all cached query plans.
+     * Removes all cached query plans after ensuring that the PlanCache is uniquely owned. The
+     * PlanCache is made uniquely owned by creating a new instance and thus detaching from the
+     * shared instance.
      */
-    void clearQueryCache(const CollectionPtr& coll) const;
+    void clearQueryCache(OperationContext* opCtx, const CollectionPtr& coll);
+
+    /**
+     * Removes all cached query plans without ensuring that the PlanCache is uniquely owned, only
+     * allowed when setting an index to multikey. Setting an index to multikey can only go one way
+     * and has its own concurrency handling.
+     */
+    void clearQueryCacheForSetMultikey(const CollectionPtr& coll) const;
 
     void notifyOfQuery(OperationContext* opCtx,
                        const CollectionPtr& coll,
@@ -113,8 +122,8 @@ private:
     bool _keysComputed;
     UpdateIndexData _indexedPaths;
 
-    // A cache for query plans.
-    std::unique_ptr<PlanCache> _planCache;
+    // A cache for query plans. Shared across cloned Collection instances.
+    std::shared_ptr<PlanCache> _planCache;
 };
 
 }  // namespace mongo

@@ -287,7 +287,7 @@ void Cloner::_copyIndexes(OperationContext* opCtx,
     if (from_indexes.empty())
         return;
 
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    CollectionWriter collection(opCtx, nss);
     invariant(collection, str::stream() << "Missing collection " << nss << " (Cloner)");
 
     auto indexCatalog = collection->getIndexCatalog();
@@ -297,12 +297,11 @@ void Cloner::_copyIndexes(OperationContext* opCtx,
         return;
     }
 
-    auto collUUID = collection->uuid();
     auto fromMigrate = false;
     writeConflictRetry(opCtx, "_copyIndexes", nss.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
         IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-            opCtx, collUUID, indexesToBuild, fromMigrate);
+            opCtx, collection, indexesToBuild, fromMigrate);
         wunit.commit();
     });
 }

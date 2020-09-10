@@ -37,6 +37,7 @@
 #include "mongo/db/index/skipped_record_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/yieldable.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
@@ -189,7 +190,7 @@ private:
     /**
      * Yield lock manager locks and abandon the current storage engine snapshot.
      */
-    void _yield(OperationContext* opCtx);
+    void _yield(OperationContext* opCtx, const Yieldable* yieldable);
 
     void _checkDrainPhaseFailPoint(OperationContext* opCtx,
                                    FailPoint* fp,

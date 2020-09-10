@@ -178,8 +178,13 @@ public:
     IndexCatalog() = default;
     virtual ~IndexCatalog() = default;
 
-    inline IndexCatalog(IndexCatalog&&) = delete;
-    inline IndexCatalog& operator=(IndexCatalog&&) = delete;
+    IndexCatalog(const IndexCatalog&) = default;
+    IndexCatalog& operator=(const IndexCatalog&) = default;
+
+    IndexCatalog(IndexCatalog&&) = delete;
+    IndexCatalog& operator=(IndexCatalog&&) = delete;
+
+    virtual std::unique_ptr<IndexCatalog> clone() const = 0;
 
     // Must be called before used.
     virtual Status init(OperationContext* const opCtx) = 0;

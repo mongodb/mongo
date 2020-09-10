@@ -48,6 +48,11 @@ public:
         : _ns(ns), _catalogId(catalogId) {}
     ~CollectionMock() = default;
 
+    std::shared_ptr<Collection> clone() const {
+        return std::make_shared<CollectionMock>(*this);
+    }
+
+
     SharedCollectionDecorations* getSharedDecorations() const {
         return nullptr;
     }
@@ -310,7 +315,7 @@ private:
     UUID _uuid = UUID::gen();
     NamespaceString _ns;
     RecordId _catalogId{0};
-    std::unique_ptr<IndexCatalog> _indexCatalog;
+    clonable_ptr<IndexCatalog> _indexCatalog;
     bool _committed = true;
 };
 

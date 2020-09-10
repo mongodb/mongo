@@ -320,15 +320,18 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                     Status status = db->renameCollection(opCtx, newCollName, tmpName, stayTemp);
                     if (!status.isOK())
                         return status;
+                    auto uuid = futureColl->uuid();
                     opObserver->onRenameCollection(opCtx,
                                                    newCollName,
                                                    tmpName,
-                                                   futureColl->uuid(),
+                                                   uuid,
                                                    /*dropTargetUUID*/ {},
                                                    /*numRecords*/ 0U,
                                                    stayTemp);
 
                     wuow.commit();
+                    // Re-fetch collection after commit to get a valid pointer
+                    futureColl = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
                     return Status::OK();
                 });
 

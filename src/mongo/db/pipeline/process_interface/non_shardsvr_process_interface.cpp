@@ -110,18 +110,18 @@ StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::
 void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
     OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
     AutoGetCollection autoColl(opCtx, ns, MODE_X);
+    CollectionWriter collection(autoColl);
     writeConflictRetry(
         opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns.ns(), [&] {
             uassert(ErrorCodes::DatabaseDropPending,
                     str::stream() << "The database is in the process of being dropped " << ns.db(),
                     autoColl.getDb() && !autoColl.getDb()->isDropPending(opCtx));
 
-            const auto& collection = autoColl.getCollection();
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Failed to create indexes for aggregation because collection "
                                      "does not exist: "
                                   << ns << ": " << BSON("indexes" << indexSpecs),
-                    collection);
+                    collection.get());
 
             invariant(0U == collection->numRecords(opCtx),
                       str::stream() << "Expected empty collection for index creation: " << ns
@@ -139,7 +139,7 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
 
             WriteUnitOfWork wuow(opCtx);
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collection->uuid(), filteredIndexes, false  // fromMigrate
+                opCtx, collection, filteredIndexes, false  // fromMigrate
             );
             wuow.commit();
         });

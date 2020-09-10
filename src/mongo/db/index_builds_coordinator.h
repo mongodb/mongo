@@ -416,7 +416,7 @@ public:
      * Throws exception on error.
      */
     static void createIndexesOnEmptyCollection(OperationContext* opCtx,
-                                               UUID collectionUUID,
+                                               CollectionWriter& collection,
                                                const std::vector<BSONObj>& specs,
                                                bool fromMigrate);
 

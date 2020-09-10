@@ -560,7 +560,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
           "temporaryCollection"_attr = tmpName,
           "sourceCollection"_attr = source);
 
-    CollectionPtr tmpColl = nullptr;
+    Collection* tmpColl = nullptr;
     {
         auto collectionOptions =
             DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, sourceColl->getCatalogId());
@@ -626,8 +626,9 @@ Status renameBetweenDBs(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
             auto fromMigrate = false;
             try {
+                CollectionWriter tmpCollWriter(tmpColl);
                 IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                    opCtx, tmpColl->uuid(), indexesToCopy, fromMigrate);
+                    opCtx, tmpCollWriter, indexesToCopy, fromMigrate);
             } catch (DBException& ex) {
                 return ex.toStatus();
             }
@@ -642,13 +643,13 @@ Status renameBetweenDBs(OperationContext* opCtx,
     {
         NamespaceStringOrUUID tmpCollUUID =
             NamespaceStringOrUUID(std::string(tmpName.db()), tmpColl->uuid());
+        tmpColl = nullptr;
         statsTracker.reset();
 
         // Copy over all the data from source collection to temporary collection. For this we can
         // drop the exclusive database lock on the target and grab an intent lock on the temporary
         // collection.
         targetDBLock.reset();
-        tmpColl.reset();
 
         AutoGetCollection autoTmpColl(opCtx, tmpCollUUID, MODE_IX);
         if (!autoTmpColl) {

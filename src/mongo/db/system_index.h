@@ -31,8 +31,7 @@
 
 namespace mongo {
 
-class Collection;
-class CollectionPtr;
+class CollectionWriter;
 class OperationContext;
 class Status;
 
@@ -40,7 +39,7 @@ class Status;
  * Creates the appropriate indexes on _new_ system collections for authentication,
  * authorization, and sessions.
  */
-void createSystemIndexes(OperationContext* opCtx, const CollectionPtr& collection);
+void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection);
 
 /**
  * Verifies that only the appropriate indexes to support authentication, authorization, and

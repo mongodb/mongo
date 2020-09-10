@@ -52,12 +52,28 @@ class IndexDescriptor;
 struct InsertDeleteOptions;
 
 /**
- * how many: 1 per Collection.
- * lifecycle: attached to a Collection.
+ * IndexCatalogImpl is stored as a member of CollectionImpl. When the Collection is cloned this is
+ * cloned with it by making shallow copies of the contained IndexCatalogEntry. The IndexCatalogEntry
+ * instances are shared across multiple Collection instances.
  */
 class IndexCatalogImpl : public IndexCatalog {
 public:
     explicit IndexCatalogImpl(Collection* collection);
+    IndexCatalogImpl(const IndexCatalogImpl& other) = default;
+
+    /**
+     * Creates a cloned IndexCatalogImpl. Will make shallow copies of IndexCatalogEntryContainers so
+     * the IndexCatalogEntry will be shared across IndexCatalogImpl instances'
+     *
+     * Must call setCollection() after cloning to set the correct Collection backpointer
+     */
+    std::unique_ptr<IndexCatalog> clone() const override;
+
+    /**
+     * Must be called after clone() to set the backpointer to the correct Collection instance.
+     * This is required due to limitations in cloned_ptr.
+     */
+    void setCollection(Collection* collection);
 
     // must be called before used
     Status init(OperationContext* opCtx) override;
@@ -387,7 +403,7 @@ private:
                            const std::vector<std::string>& indexNamesToDrop,
                            bool haveIdIndex);
 
-    Collection* const _collection;
+    Collection* _collection;
 
     IndexCatalogEntryContainer _readyIndexes;
     IndexCatalogEntryContainer _buildingIndexes;

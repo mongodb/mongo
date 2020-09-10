@@ -773,7 +773,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
             firstError = result;
         }
 
-        auto removedColl = CollectionCatalog::get(opCtx).deregisterCollection(coll->uuid());
+        auto removedColl = CollectionCatalog::get(opCtx).deregisterCollection(opCtx, coll->uuid());
         opCtx->recoveryUnit()->registerChange(
             CollectionCatalog::get(opCtx).makeFinishDropCollectionChange(std::move(removedColl),
                                                                          coll->uuid()));
@@ -859,7 +859,7 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
     // After repairing, re-initialize the collection with a valid RecordStore.
     auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
     auto uuid = collectionCatalog.lookupUUIDByNSS(opCtx, nss).get();
-    collectionCatalog.deregisterCollection(uuid);
+    collectionCatalog.deregisterCollection(opCtx, uuid);
     _initCollection(opCtx, catalogId, nss, false);
 
     return status;

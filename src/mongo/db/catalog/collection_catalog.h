@@ -163,7 +163,7 @@ public:
     /**
      * Deregister the collection.
      */
-    std::shared_ptr<Collection> deregisterCollection(CollectionUUID uuid);
+    std::shared_ptr<Collection> deregisterCollection(OperationContext* opCtx, CollectionUUID uuid);
 
     /**
      * Returns the RecoveryUnit's Change for dropping the collection
@@ -352,18 +352,28 @@ public:
      * Commit unmanaged Collection that was acquired by lookupCollectionBy***ForMetadataWrite and
      * lifetime mode kUnmanagedClone.
      */
-    void commitUnmanagedClone(Collection* collection);
+    void commitUnmanagedClone(OperationContext* opCtx, Collection* collection);
 
     /**
      * Discard unmanaged Collection that was acquired by lookupCollectionBy***ForMetadataWrite and
      * lifetime mode kUnmanagedClone.
      */
-    void discardUnmanagedClone(Collection* collection);
+    void discardUnmanagedClone(OperationContext* opCtx, Collection* collection);
 
 private:
     friend class CollectionCatalog::iterator;
 
     std::shared_ptr<Collection> _lookupCollectionByUUID(WithLock, CollectionUUID uuid) const;
+
+    /**
+     * Helper to commit a cloned Collection into the catalog. It takes a vector of commit handlers
+     * that are executed in the same critical section that is used to install the Collection into
+     * the catalog.
+     */
+    void _commitWritableClone(
+        std::shared_ptr<Collection> cloned,
+        boost::optional<Timestamp> commitTime,
+        const std::vector<std::function<void(boost::optional<Timestamp>)>>& commitHandlers);
 
     const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
                                                            const stdx::lock_guard<Latch>&);

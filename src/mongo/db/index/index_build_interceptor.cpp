@@ -272,7 +272,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         // Lock yielding will be directed by the yield policy provided.
         // We will typically yield locks during the draining phase if we are holding intent locks.
         if (DrainYieldPolicy::kYield == drainYieldPolicy) {
-            _yield(opCtx);
+            _yield(opCtx, &coll);
         }
 
         // Account for more writes coming in during a batch.
@@ -369,9 +369,10 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     return Status::OK();
 }
 
-void IndexBuildInterceptor::_yield(OperationContext* opCtx) {
+void IndexBuildInterceptor::_yield(OperationContext* opCtx, const Yieldable* yieldable) {
     // Releasing locks means a new snapshot should be acquired when restored.
     opCtx->recoveryUnit()->abandonSnapshot();
+    yieldable->yield();
 
     auto locker = opCtx->lockState();
     Locker::LockSnapshot snapshot;
@@ -392,6 +393,7 @@ void IndexBuildInterceptor::_yield(OperationContext* opCtx) {
         });
 
     locker->restoreLockState(opCtx, snapshot);
+    yieldable->restore();
 }
 
 bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {

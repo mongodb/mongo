@@ -398,6 +398,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         uassert(4585200, "failpoint may not be set on foreground indexes", isBackgroundBuilding());
 
         // Unlock before hanging so replication recognizes we've completed.
+        collection.yield();
         Locker::LockSnapshot lockInfo;
         invariant(opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
 
@@ -408,6 +409,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 
         opCtx->lockState()->restoreLockState(opCtx, lockInfo);
         opCtx->recoveryUnit()->abandonSnapshot();
+        collection.restore();
     }
 
     Timer t;
@@ -511,6 +513,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 
     if (MONGO_unlikely(hangAfterStartingIndexBuildUnlocked.shouldFail())) {
         // Unlock before hanging so replication recognizes we've completed.
+        collection.yield();
         Locker::LockSnapshot lockInfo;
         invariant(opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
 
@@ -525,6 +528,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         } else {
             invariant(!"the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off for foreground index builds");
         }
+        collection.restore();
     }
 
     progress->finished();
@@ -786,10 +790,9 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
 
     onCommit();
 
-    opCtx->recoveryUnit()->onCommit([collection, this](boost::optional<Timestamp> commitTime) {
-        CollectionQueryInfo::get(collection).clearQueryCache(collection);
-        _buildIsCleanedUp = true;
-    });
+    CollectionQueryInfo::get(collection).clearQueryCache(opCtx, collection);
+    opCtx->recoveryUnit()->onCommit(
+        [this](boost::optional<Timestamp> commitTime) { _buildIsCleanedUp = true; });
 
     return Status::OK();
 }

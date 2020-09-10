@@ -514,7 +514,7 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    auto removedColl = CollectionCatalog::get(opCtx).deregisterCollection(uuid);
+    auto removedColl = CollectionCatalog::get(opCtx).deregisterCollection(opCtx, uuid);
     opCtx->recoveryUnit()->registerChange(
         CollectionCatalog::get(opCtx).makeFinishDropCollectionChange(std::move(removedColl), uuid));
 
@@ -562,13 +562,6 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     // namespace for callers that may not hold a collection lock.
     auto writableCollection = collToRename.getWritableCollection();
     CollectionCatalog::get(opCtx).setCollectionNamespace(opCtx, writableCollection, fromNss, toNss);
-
-    opCtx->recoveryUnit()->onCommit([writableCollection](auto commitTime) {
-        // Ban reading from this collection on committed reads on snapshots before now.
-        if (commitTime) {
-            writableCollection->setMinimumVisibleSnapshot(commitTime.get());
-        }
-    });
 
     return status;
 }
@@ -753,7 +746,8 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     // storage timestamps.  This way both primary and any secondaries will see the index created
     // after the collection is created.
     if (canAcceptWrites && createIdIndex && nss.isSystem()) {
-        createSystemIndexes(opCtx, collection);
+        CollectionWriter collWriter(collection);
+        createSystemIndexes(opCtx, collWriter);
     }
 
     return collection;

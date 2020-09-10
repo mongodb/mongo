@@ -439,7 +439,7 @@ BSONObj runCreateIndexesOnNewCollection(OperationContext* opCtx,
     // By this point, we have exclusive access to our collection, either because we created the
     // collection implicitly as part of createIndexes or because the collection was created earlier
     // in the same multi-document transaction.
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns);
+    CollectionWriter collection(opCtx, ns);
     UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx,
                                                                                collection->ns());
     invariant(opCtx->inMultiDocumentTransaction() || createCollImplicitly);
@@ -449,18 +449,19 @@ BSONObj runCreateIndexesOnNewCollection(OperationContext* opCtx,
                           << " in a multi-document transaction.",
             collection->numRecords(opCtx) == 0);
 
-    const int numIndexesBefore = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection);
+    const int numIndexesBefore =
+        IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.get());
     auto filteredSpecs =
-        IndexBuildsCoordinator::prepareSpecListForCreate(opCtx, collection, ns, specs);
+        IndexBuildsCoordinator::prepareSpecListForCreate(opCtx, collection.get(), ns, specs);
     // It's possible for 'filteredSpecs' to be empty if we receive a createIndexes request for the
     // _id index and also create the collection implicitly. By this point, the _id index has already
     // been created, and there is no more work to be done.
     if (!filteredSpecs.empty()) {
         IndexBuildsCoordinator::createIndexesOnEmptyCollection(
-            opCtx, collection->uuid(), filteredSpecs, false);
+            opCtx, collection, filteredSpecs, false);
     }
 
-    const int numIndexesAfter = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection);
+    const int numIndexesAfter = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.get());
 
     if (MONGO_unlikely(createIndexesWriteConflict.shouldFail())) {
         throw WriteConflictException();

@@ -80,7 +80,7 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
 }  // namespace
 
 CollectionQueryInfo::CollectionQueryInfo()
-    : _keysComputed(false), _planCache(std::make_unique<PlanCache>()) {}
+    : _keysComputed(false), _planCache(std::make_shared<PlanCache>()) {}
 
 const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx) const {
     invariant(_keysComputed);
@@ -181,14 +181,34 @@ void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
     }
 }
 
-void CollectionQueryInfo::clearQueryCache(const CollectionPtr& coll) const {
-    LOGV2_DEBUG(20907,
-                1,
-                "Clearing plan cache - collection info cache reset",
-                "namespace"_attr = coll->ns());
-    if (nullptr != _planCache.get()) {
+void CollectionQueryInfo::clearQueryCache(OperationContext* opCtx, const CollectionPtr& coll) {
+    // We are operating on a cloned collection, the use_count can only be 1 if we've created a new
+    // PlanCache instance for this collection clone. Checking the refcount can't race as we can't
+    // start readers on this collection while it is writable
+    if (_planCache.use_count() == 1) {
+        LOGV2_DEBUG(5014501,
+                    1,
+                    "Clearing plan cache - collection info cache cleared",
+                    "namespace"_attr = coll->ns());
+
         _planCache->clear();
+    } else {
+        LOGV2_DEBUG(5014502,
+                    1,
+                    "Clearing plan cache - collection info cache reinstantiated",
+                    "namespace"_attr = coll->ns());
+
+        _planCache = std::make_shared<PlanCache>();
+        updatePlanCacheIndexEntries(opCtx, coll);
     }
+}
+
+void CollectionQueryInfo::clearQueryCacheForSetMultikey(const CollectionPtr& coll) const {
+    LOGV2_DEBUG(5014500,
+                1,
+                "Clearing plan cache for multikey - collection info cache cleared",
+                "namespace"_attr = coll->ns());
+    _planCache->clear();
 }
 
 PlanCache* CollectionQueryInfo::getPlanCache() const {
@@ -244,7 +264,7 @@ void CollectionQueryInfo::droppedIndex(OperationContext* opCtx,
 }
 
 void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const CollectionPtr& coll) {
-    clearQueryCache(coll);
+    _planCache = std::make_shared<PlanCache>();
 
     _keysComputed = false;
     computeIndexKeys(opCtx, coll);

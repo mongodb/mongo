@@ -1175,56 +1175,6 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabasesWithLocks) {
     ASSERT_TRUE(_opObserver->onInsertsIsTargetDatabaseExclusivelyLocked);
 }
 
-TEST_F(RenameCollectionTest, CollectionPointerRemainsValidThroughRename) {
-    _createCollection(_opCtx.get(), _sourceNss);
-    Lock::DBLock sourceLk(_opCtx.get(), _sourceNss.db(), MODE_X);
-    Lock::DBLock targetLk(_opCtx.get(), _targetNss.db(), MODE_X);
-
-    // Get a pointer to the source collection, and ensure that it reports the expected namespace
-    // string.
-    CollectionPtr sourceColl = _getCollection_inlock(_opCtx.get(), _sourceNss);
-    ASSERT(sourceColl);
-
-    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
-
-    // Retrieve the pointer associated with the target namespace, and ensure that its the same
-    // pointer (i.e. the renamed collection has the very same Collection instance).
-    CollectionPtr targetColl = _getCollection_inlock(_opCtx.get(), _targetNss);
-    ASSERT(targetColl);
-    ASSERT_EQ(targetColl, sourceColl);
-
-    // Verify that the Collection reports that its namespace is now the target namespace.
-    ASSERT_EQ(targetColl->ns(), _targetNss);
-}
-
-TEST_F(RenameCollectionTest, CatalogPointersRenameValidThroughRenameForApplyOps) {
-    _createCollection(_opCtx.get(), _sourceNss);
-    AutoGetCollectionForRead sourceColl(_opCtx.get(), _sourceNss);
-    ASSERT(sourceColl);
-
-    auto uuid = UUID::gen();
-    auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns());
-    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), _sourceNss.db().toString(), uuid, cmd, {}));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
-
-    AutoGetCollectionForRead targetColl(_opCtx.get(), _targetNss);
-    ASSERT(targetColl);
-    ASSERT_EQ(targetColl.getCollection(), sourceColl.getCollection());
-    ASSERT_EQ(targetColl->ns(), _targetNss);
-}
-
-TEST_F(RenameCollectionTest, CollectionCatalogMappingRemainsIntactThroughRename) {
-    _createCollection(_opCtx.get(), _sourceNss);
-    Lock::DBLock sourceLk(_opCtx.get(), _sourceNss.db(), MODE_X);
-    Lock::DBLock targetLk(_opCtx.get(), _targetNss.db(), MODE_X);
-    auto& catalog = CollectionCatalog::get(_opCtx.get());
-    CollectionPtr sourceColl = _getCollection_inlock(_opCtx.get(), _sourceNss);
-    ASSERT(sourceColl);
-    ASSERT_EQ(sourceColl, catalog.lookupCollectionByUUID(_opCtx.get(), sourceColl->uuid()));
-    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
-    ASSERT_EQ(sourceColl, catalog.lookupCollectionByUUID(_opCtx.get(), sourceColl->uuid()));
-}
-
 TEST_F(RenameCollectionTest, FailRenameCollectionFromReplicatedToUnreplicatedDB) {
     NamespaceString sourceNss("foo.isReplicated");
     NamespaceString targetNss("local.isUnreplicated");

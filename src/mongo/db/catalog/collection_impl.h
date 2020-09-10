@@ -37,7 +37,7 @@
 namespace mongo {
 class IndexConsistency;
 class CollectionCatalog;
-class CollectionImpl final : public Collection, public CappedCallback {
+class CollectionImpl final : public Collection {
 public:
     enum ValidationAction { WARN, ERROR_V };
     enum ValidationLevel { OFF, MODERATE, STRICT_V };
@@ -49,6 +49,8 @@ public:
                             std::unique_ptr<RecordStore> recordStore);
 
     ~CollectionImpl();
+
+    std::shared_ptr<Collection> clone() const final;
 
     class FactoryImpl : public Factory {
     public:
@@ -89,11 +91,13 @@ public:
     }
 
     RecordStore* getRecordStore() const final {
-        return _recordStore.get();
+        return _shared->_recordStore.get();
     }
 
     std::shared_ptr<Ident> getSharedIdent() const final {
-        return _recordStore;
+        // Use shared_ptr's aliasing constructor so we can keep all shared state in a single
+        // reference counted object
+        return {_shared, _shared->_recordStore.get()};
     }
 
     const BSONObj getValidatorDoc() const final {
@@ -104,7 +108,7 @@ public:
 
     Snapshotted<BSONObj> docFor(OperationContext* opCtx, RecordId loc) const final {
         return Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(),
-                                    _recordStore->dataFor(opCtx, loc).releaseToBson());
+                                    _shared->_recordStore->dataFor(opCtx, loc).releaseToBson());
     }
 
     /**
@@ -336,13 +340,6 @@ public:
      */
     void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
 
-    bool haveCappedWaiters() const final;
-
-    /**
-     * Notify (capped collection) waiters of data changes, like an insert.
-     */
-    void notifyCappedWaitersIfNeeded() const final;
-
     /**
      * Get a pointer to the collection's default collator. The pointer must not be used after this
      * Collection is destroyed.
@@ -370,8 +367,6 @@ private:
      */
     Status checkValidation(OperationContext* opCtx, const BSONObj& document) const;
 
-    Status aboutToDeleteCapped(OperationContext* opCtx, const RecordId& loc, RecordData data);
-
     /**
      * same semantics as insertDocument, but doesn't do:
      *  - some user error checks
@@ -384,42 +379,78 @@ private:
                             std::vector<InsertStatement>::const_iterator end,
                             OpDebug* opDebug) const;
 
-    // This object is decorable and decorated with unversioned data related to the collection. Not
-    // associated with any particular Collection instance for the collection, but shared across all
-    // all instances for the same collection. This is a vehicle for users of a collection to cache
-    // unversioned state for a collection that is accessible across all of the Collection instances.
-    std::shared_ptr<SharedCollectionDecorations> _sharedDecorations;
+    /**
+     * Holder of shared state between CollectionImpl clones. Also implements CappedCallback, a
+     * pointer to which is given to the RecordStore, so that the CappedCallback logic can always be
+     * performed on the latest CollectionImpl instance without needing to know about copy-on-write
+     * on CollectionImpl instances.
+     */
+    struct SharedState : public CappedCallback {
+        SharedState(CollectionImpl* collection, std::unique_ptr<RecordStore> recordStore);
+        ~SharedState();
+
+        /**
+         * The Collection instance that need to be notified through the CappedCallback changes when
+         * the Collection is cloned for a write. When the constructor and destructor is run for
+         * CollectionImpl it notifies this class through this interface so we can keep track of the
+         * most recent Collection instance to be used when implementing CappedCallback.
+         */
+        void instanceCreated(CollectionImpl* collection);
+        void instanceDeleted(CollectionImpl* collection);
+
+        bool haveCappedWaiters() const final;
+        void notifyCappedWaitersIfNeeded() const final;
+        Status aboutToDeleteCapped(OperationContext* opCtx,
+                                   const RecordId& loc,
+                                   RecordData data) final;
+
+        // As we're holding a MODE_X lock when cloning Collections we may have up to two current
+        // Collection instances at the same time if there's a pending clone that is not commited to
+        // the catalog yet. We need to keep track of the previous instance in case of a rollback.
+        // When we delete from capped, operate on the latest collection.
+        CollectionImpl* _collectionLatest = nullptr;
+        CollectionImpl* _collectionPrev = nullptr;
+
+        // The RecordStore may be null during a repair operation.
+        std::unique_ptr<RecordStore> _recordStore;
+
+        // This object is decorable and decorated with unversioned data related to the collection.
+        // Not associated with any particular Collection instance for the collection, but shared
+        // across all all instances for the same collection. This is a vehicle for users of a
+        // collection to cache unversioned state for a collection that is accessible across all of
+        // the Collection instances.
+        SharedCollectionDecorations _sharedDecorations;
+
+        // The default collation which is applied to operations and indices which have no collation
+        // of their own. The collection's validator will respect this collation. If null, the
+        // default collation is simple binary compare.
+        std::unique_ptr<CollatorInterface> _collator;
+
+        // Notifier object for awaitData. Threads polling a capped collection for new data can wait
+        // on this object until notified of the arrival of new data.
+        //
+        // This is non-null if and only if the collection is a capped collection.
+        const std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
+
+        const bool _needCappedLock;
+    };
+
 
     NamespaceString _ns;
     RecordId _catalogId;
     UUID _uuid;
     bool _committed = true;
+    std::shared_ptr<SharedState> _shared;
 
-    // The RecordStore may be null during a repair operation.
-    std::shared_ptr<RecordStore> _recordStore;  // shared across all Collection instances.
-    const bool _needCappedLock;
-    std::unique_ptr<IndexCatalog> _indexCatalog;
+    clonable_ptr<IndexCatalog> _indexCatalog;
 
-
-    // The default collation which is applied to operations and indices which have no collation of
-    // their own. The collection's validator will respect this collation.
-    //
-    // If null, the default collation is simple binary compare.
-    std::unique_ptr<CollatorInterface> _collator;
-
-
+    // The validator is using shared state internally. Collections share validator until a new
+    // validator is set in setValidator which sets a new instance.
     Validator _validator;
-
     ValidationAction _validationAction;
     ValidationLevel _validationLevel;
 
     bool _recordPreImages = false;
-
-    // Notifier object for awaitData. Threads polling a capped collection for new data can wait
-    // on this object until notified of the arrival of new data.
-    //
-    // This is non-null if and only if the collection is a capped collection.
-    const std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
 
     // The earliest snapshot that is allowed to use this collection.
     boost::optional<Timestamp> _minVisibleSnapshot;

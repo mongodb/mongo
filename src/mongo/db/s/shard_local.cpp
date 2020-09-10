@@ -164,8 +164,9 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
         writeConflictRetry(opCtx, "ShardLocal::createIndexOnConfig", ns.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
             auto fromMigrate = true;
+            CollectionWriter collWriter(opCtx, collection->uuid());
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collection->uuid(), indexSpecs, fromMigrate);
+                opCtx, collWriter, indexSpecs, fromMigrate);
             wunit.commit();
         });
     } catch (const DBException& e) {

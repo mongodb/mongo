@@ -98,6 +98,15 @@ const BSONObj IndexCatalogImpl::_idObj = BSON("_id" << 1);
 
 IndexCatalogImpl::IndexCatalogImpl(Collection* collection) : _collection(collection) {}
 
+std::unique_ptr<IndexCatalog> IndexCatalogImpl::clone() const {
+    return std::make_unique<IndexCatalogImpl>(*this);
+}
+
+void IndexCatalogImpl::setCollection(Collection* collection) {
+    _collection = collection;
+}
+
+
 Status IndexCatalogImpl::init(OperationContext* opCtx) {
     vector<string> indexNames;
     auto durableCatalog = DurableCatalog::get(opCtx);

@@ -160,7 +160,7 @@ private:
  */
 class SharedCollectionDecorations : public Decorable<SharedCollectionDecorations> {};
 
-class Collection : public Decorable<Collection> {
+class Collection : public DecorableCopyable<Collection> {
 public:
     enum class StoreDeletedDoc { Off, On };
 
@@ -238,8 +238,10 @@ public:
          *
          * -Anything else indicates a well formed validator. The MatchExpression will maintain
          * pointers into _validatorDoc.
+         *
+         * Note: this is shared state across cloned Collection instances
          */
-        StatusWithMatchExpression filter = {nullptr};
+        StatusWith<std::shared_ptr<MatchExpression>> filter = {nullptr};
     };
 
     /**
@@ -249,6 +251,12 @@ public:
 
     Collection() = default;
     virtual ~Collection() = default;
+
+    /**
+     * Clones this Collection instance. Some members are deep copied and some are shallow copied.
+     * This should only be be called from the CollectionCatalog when it needs a writable collection.
+     */
+    virtual std::shared_ptr<Collection> clone() const = 0;
 
     /**
      * Fetches the shared state across Collection instances for the a collection. Returns an object

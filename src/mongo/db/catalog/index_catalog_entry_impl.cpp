@@ -370,7 +370,7 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
                     "Index set to multi key, clearing query plan cache",
                     "namespace"_attr = collection->ns(),
                     "keyPattern"_attr = _descriptor->keyPattern());
-        CollectionQueryInfo::get(collection).clearQueryCache(collection);
+        CollectionQueryInfo::get(collection).clearQueryCacheForSetMultikey(collection);
     }
 
     opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp>) {
