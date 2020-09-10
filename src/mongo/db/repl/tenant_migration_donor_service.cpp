@@ -131,6 +131,9 @@ void TenantMigrationDonorService::Instance::interrupt(Status status) {
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertStateDocument(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    invariant(_stateDoc.getState() == TenantMigrationDonorStateEnum::kUninitialized);
+    _stateDoc.setState(TenantMigrationDonorStateEnum::kDataSync);
+
     return AsyncTry([this] {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
@@ -377,54 +380,73 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
 
     return ExecutorFuture<void>(**executor)
         .then([this, executor] {
+            if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
+                return ExecutorFuture<void>(**executor, Status::OK());
+            }
+
             // Enter "dataSync" state.
             return _insertStateDocument(executor).then([this, executor](repl::OpTime opTime) {
                 return _waitForMajorityWriteConcern(executor, std::move(opTime));
             });
         })
         .then([this, executor, recipientTargeterRS] {
-            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS);
-        })
-        .then([this, executor] {
-            // Enter "blocking" state.
-            auto mtab =
-                getTenantMigrationAccessBlocker(_serviceContext, _stateDoc.getDatabasePrefix());
-            invariant(mtab);
-            mtab->startBlockingWrites();
-            return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kBlocking)
-                .then([this, executor](repl::OpTime opTime) {
-                    return _waitForMajorityWriteConcern(executor, std::move(opTime));
+            if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kDataSync) {
+                return ExecutorFuture<void>(**executor, Status::OK());
+            }
+
+            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS)
+                .then([this, executor] {
+                    // Enter "blocking" state.
+                    auto mtab = getTenantMigrationAccessBlocker(_serviceContext,
+                                                                _stateDoc.getDatabasePrefix());
+                    invariant(mtab);
+                    mtab->startBlockingWrites();
+                    return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kBlocking)
+                        .then([this, executor](repl::OpTime opTime) {
+                            return _waitForMajorityWriteConcern(executor, std::move(opTime));
+                        });
                 });
         })
         .then([this, executor, recipientTargeterRS] {
-            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS);
-        })
-        .then([this] {
-            auto opCtxHolder = cc().makeOperationContext();
-            auto opCtx = opCtxHolder.get();
+            if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kBlocking) {
+                return ExecutorFuture<void>(**executor, Status::OK());
+            }
 
-            pauseTenantMigrationAfterBlockingStarts.pauseWhileSet(opCtx);
+            invariant(_stateDoc.getBlockTimestamp());
 
-            abortTenantMigrationAfterBlockingStarts.execute([&](const BSONObj& data) {
-                if (data.hasField("blockTimeMS")) {
-                    const auto blockTime = Milliseconds{data.getIntField("blockTimeMS")};
-                    LOGV2(5010400,
-                          "Keep migration in blocking state before aborting",
-                          "blockTime"_attr = blockTime);
-                    opCtx->sleepFor(blockTime);
-                }
+            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS)
+                .then([this] {
+                    auto opCtxHolder = cc().makeOperationContext();
+                    auto opCtx = opCtxHolder.get();
 
-                uasserted(ErrorCodes::InternalError, "simulate a tenant migration error");
-            });
-        })
-        .then([this, executor] {
-            // Enter "commit" state.
-            return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kCommitted)
-                .then([this, executor](repl::OpTime opTime) {
-                    return _waitForMajorityWriteConcern(executor, std::move(opTime));
+                    pauseTenantMigrationAfterBlockingStarts.pauseWhileSet(opCtx);
+
+                    abortTenantMigrationAfterBlockingStarts.execute([&](const BSONObj& data) {
+                        if (data.hasField("blockTimeMS")) {
+                            const auto blockTime = Milliseconds{data.getIntField("blockTimeMS")};
+                            LOGV2(5010400,
+                                  "Keep migration in blocking state before aborting",
+                                  "blockTime"_attr = blockTime);
+                            opCtx->sleepFor(blockTime);
+                        }
+
+                        uasserted(ErrorCodes::InternalError, "simulate a tenant migration error");
+                    });
+                })
+                .then([this, executor] {
+                    // Enter "commit" state.
+                    return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kCommitted)
+                        .then([this, executor](repl::OpTime opTime) {
+                            return _waitForMajorityWriteConcern(executor, std::move(opTime));
+                        });
                 });
         })
         .onError([this, executor](Status status) {
+            if (_stateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
+                // The migration was resumed on startup and it was already aborted.
+                return ExecutorFuture<void>(**executor, Status::OK());
+            }
+
             auto mtab =
                 getTenantMigrationAccessBlocker(_serviceContext, _stateDoc.getDatabasePrefix());
             if (status == ErrorCodes::ConflictingOperationInProgress || !mtab) {
@@ -469,18 +491,25 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                 _decisionPromise.setError(status);
             }
         })
-        .then([this, executor] {
+        .then([this, executor, recipientTargeterRS] {
+            if (_stateDoc.getExpireAt()) {
+                // The migration state has already been marked as garbage collectable. Set the
+                // donorForgetMigration promise here since the Instance's destructor has an
+                // invariant that _receiveDonorForgetMigrationPromise is ready.
+                onReceiveDonorForgetMigration();
+                return ExecutorFuture<void>(**executor, Status::OK());
+            }
+
             // Wait for the donorForgetMigration command.
-            return _receiveDonorForgetMigrationPromise.getFuture();
-        })
-        .then([this, executor] {
-            return _markStateDocumentAsGarbageCollectable(executor).then(
-                [this, executor](repl::OpTime opTime) {
+            return std::move(_receiveDonorForgetMigrationPromise.getFuture())
+                .thenRunOn(**executor)
+                .then([this, executor, recipientTargeterRS] {
+                    return _sendRecipientForgetMigrationCommand(executor, recipientTargeterRS);
+                })
+                .then([this, executor] { return _markStateDocumentAsGarbageCollectable(executor); })
+                .then([this, executor](repl::OpTime opTime) {
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
                 });
-        })
-        .then([this, executor, recipientTargeterRS] {
-            return _sendRecipientForgetMigrationCommand(executor, recipientTargeterRS);
         })
         .onCompletion([this](Status status) {
             LOGV2(4920400,

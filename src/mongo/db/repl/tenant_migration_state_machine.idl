@@ -41,6 +41,7 @@ enums:
         description: "The state of an in-progress tenant migration."
         type: string
         values:
+            kUninitialized: "uninitialized"
             kDataSync: "data sync"
             kBlocking: "blocking"
             kCommitted: "committed"
@@ -76,6 +77,7 @@ structs:
             state:
                 type: TenantMigrationDonorState
                 description: "The state of the tenant migration."
+                default: kUninitialized
             blockTimestamp:
                 type: timestamp
                 description:

@@ -112,7 +112,7 @@ function testMigrationAbortsOnRecipientForgetMigrationCmdError(donorRst, recipie
 
     const donorStateDoc = configDonorsColl.findOne({_id: migrationId});
     assert.eq("committed", donorStateDoc.state);
-    assert(donorStateDoc.expireAt);
+    assert(!donorStateDoc.expireAt);
 }
 
 const donorRst = new ReplSetTest(

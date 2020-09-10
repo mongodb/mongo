@@ -44,8 +44,11 @@ function testDonorForgetMigration(donorRst, recipientRst, migrationId, dbPrefix)
                         null == node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker);
     });
 
-    assert.soon(
-        () => donorPrimary.getCollection(kConfigDonorsNS).count({databasePrefix: dbPrefix}) === 0);
+    assert.soon(() => 0 ===
+                    donorPrimary.getCollection(kConfigDonorsNS).count({databasePrefix: dbPrefix}));
+    assert.soon(() => 0 ===
+                    donorPrimary.adminCommand({serverStatus: 1})
+                        .repl.primaryOnlyServices.TenantMigrationDonorService);
 
     const donorRecipientMonitorPoolStats =
         donorPrimary.adminCommand({connPoolStats: 1}).replicaSets;
