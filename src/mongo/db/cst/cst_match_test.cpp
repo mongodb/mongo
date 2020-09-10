@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/platform/decimal128.h"
 #include <string>
 
 #include "mongo/bson/json.h"
@@ -147,6 +148,96 @@ TEST(CstMatchTest, ParsesNotWithChildExpression) {
               "\"<UserRegex /^a/>\" } } }");
 }
 
+TEST(CstMatchTest, ParsesExistsWithSimpleValueChild) {
+    CNode output;
+    auto input = fromjson("{filter: {a: {$exists: true}}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <UserFieldname a>: { <KeyFieldname existsExpr>: \"<UserBoolean true>\" } }");
+}
+
+TEST(CstMatchTest, ParsesExistsWithCompoundValueChild) {
+    CNode output;
+    auto input = fromjson("{filter: {a: {$exists: [\"hello\", 5, true, \"goodbye\"]}}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <UserFieldname a>: { <KeyFieldname existsExpr>: [ \"<UserString hello>\", "
+              "\"<UserInt 5>\", "
+              "\"<UserBoolean true>\", \"<UserString goodbye>\" ] } }");
+}
+
+TEST(CstMatchTest, ParsesExistsWithObjectChild) {
+    CNode output;
+    auto input = fromjson("{filter: {a: {$exists: {a: false }}}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <UserFieldname a>: { <KeyFieldname existsExpr>: { <UserFieldname a>: "
+              "\"<UserBoolean false>\" } } }");
+}
+
+TEST(CstMatchTest, ParsesTypeSingleArgument) {
+    // Check that $type parses with a string argument - a BSON type alias
+    {
+        CNode output;
+        auto input = fromjson("{filter: {a: {$type: \"bool\" }}}");
+        BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        ASSERT_EQ(output.toBson().toString(),
+                  "{ <UserFieldname a>: { <KeyFieldname type>: \"<UserString bool>\" } }");
+    }
+    // Check that $type parses a number (corresponding to a BSON type)
+    {
+        CNode output;
+        auto input = fromjson("{filter: {a: {$type: 1}}}");
+        BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        ASSERT_EQ(output.toBson().toString(),
+                  "{ <UserFieldname a>: { <KeyFieldname type>: \"<UserInt 1>\" } }");
+    }
+}
+
+TEST(CstMatchTest, ParsersTypeArrayArgument) {
+    CNode output;
+    auto input = fromjson("{filter: {a: {$type: [\"number\", 5, 127, \"objectId\"]}}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <UserFieldname a>: { <KeyFieldname type>: [ \"<UserString number>\", \"<UserInt "
+              "5>\", \"<UserInt 127>\", "
+              "\"<UserString objectId>\" ] } }");
+}
+
+TEST(CstMatchTest, ParsesCommentWithSimpleValueChild) {
+    CNode output;
+    auto input = fromjson("{filter: {a: 1, $comment: true}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <UserFieldname a>: \"<UserInt 1>\", <KeyFieldname commentExpr>: \"<UserBoolean "
+              "true>\" }");
+}
+
+TEST(CstMatchTest, ParsesCommentWithCompoundValueChild) {
+    CNode output;
+    auto input = fromjson("{filter: {a: 1, $comment: [\"hi\", 5]}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <UserFieldname a>: \"<UserInt 1>\", <KeyFieldname commentExpr>: [ \"<UserString "
+              "hi>\", \"<UserInt 5>\" ] }");
+}
+
 TEST(CstMatchTest, FailsToParseNotWithNonObject) {
     CNode output;
     auto input = fromjson("{filter: {a: {$not: 1}}}");
@@ -162,22 +253,16 @@ TEST(CstMatchTest, FailsToParseUnknownOperatorWithinNotExpression) {
     CNode output;
     auto input = fromjson("{filter: {a: {$not: {$and: [{a: 1}]}}}}");
     BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
-    ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
-                                AssertionException,
-                                ErrorCodes::FailedToParse,
-                                "syntax error, unexpected AND, expecting NOT at "
-                                "element '$and' within '$not' of input filter");
+    ASSERT_THROWS_CODE(
+        ParserGen(lexer, nullptr).parse(), AssertionException, ErrorCodes::FailedToParse);
 }
 
 TEST(CstMatchTest, FailsToParseNotWithEmptyObject) {
     CNode output;
     auto input = fromjson("{filter: {a: {$not: {}}}}");
     BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
-    ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
-                                AssertionException,
-                                ErrorCodes::FailedToParse,
-                                "syntax error, unexpected end of object, expecting NOT at element "
-                                "'end object' within '$not' of input filter");
+    ASSERT_THROWS_CODE(
+        ParserGen(lexer, nullptr).parse(), AssertionException, ErrorCodes::FailedToParse);
 }
 
 TEST(CstMatchTest, FailsToParseDollarPrefixedPredicates) {
@@ -251,5 +336,28 @@ TEST(CstMatchTest, FailsToParseLogicalKeywordWithEmptyArray) {
                                 "element 'end array' within '$nor' of input filter");
 }
 
+TEST(CstMatchTest, FailsToParseTypeWithBadSpecifier) {
+    // Shouldn't parse if the number given isn't a valid BSON type specifier.
+    {
+        auto input = fromjson("{filter: {a: {$type: 0}}}");
+        BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+        ASSERT_THROWS_CODE(
+            ParserGen(lexer, nullptr).parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Shouldn't parse if the string given isn't a valid BSON type alias.
+    {
+        auto input = fromjson("{filter: {$type: {a: \"notABsonType\"}}}");
+        BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+        ASSERT_THROWS_CODE(
+            ParserGen(lexer, nullptr).parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    // Shouldn't parse if any argument isn't a valid BSON type alias.
+    {
+        auto input = fromjson("{filter: {a: {$type: [1, \"number\", \"notABsonType\"]}}}");
+        BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+        ASSERT_THROWS_CODE(
+            ParserGen(lexer, nullptr).parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+}
 }  // namespace
 }  // namespace mongo

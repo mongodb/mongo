@@ -40,6 +40,7 @@
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/util/visit_helper.h"
 
 namespace mongo::cst_match_translation {
@@ -80,6 +81,69 @@ std::unique_ptr<MatchExpression> translateNot(
     return std::make_unique<NotMatchExpression>(std::move(root));
 }
 
+std::unique_ptr<MatchExpression> translateExists(const CNode::Fieldname& fieldName,
+                                                 const CNode& argument) {
+    auto root = std::make_unique<ExistsMatchExpression>(stdx::get<UserFieldname>(fieldName));
+    if (stdx::visit(
+            visit_helper::Overloaded{
+                [&](const UserLong& userLong) { return userLong != 0; },
+                [&](const UserDouble& userDbl) { return userDbl != 0; },
+                [&](const UserDecimal& userDc) { return userDc.isNotEqual(Decimal128(0)); },
+                [&](const UserInt& userInt) { return userInt != 0; },
+                [&](const UserBoolean& b) { return b; },
+                [&](const UserNull&) { return false; },
+                [&](const UserUndefined&) { return false; },
+                [&](auto&&) { return true; }},
+            argument.payload)) {
+        return root;
+    }
+    return std::make_unique<NotMatchExpression>(root.release());
+}
+
+MatcherTypeSet getMatcherTypeSet(const CNode& argument) {
+    MatcherTypeSet ts;
+    auto add_individual_to_type_set = [&](const CNode& a) {
+        return stdx::visit(
+            visit_helper::Overloaded{
+                [&](const UserLong& userLong) {
+                    auto valueAsInt =
+                        BSON("" << userLong).firstElement().parseIntegerElementToInt();
+                    ts.bsonTypes.insert(static_cast<BSONType>(valueAsInt.getValue()));
+                },
+                [&](const UserDouble& userDbl) {
+                    auto valueAsInt = BSON("" << userDbl).firstElement().parseIntegerElementToInt();
+                    ts.bsonTypes.insert(static_cast<BSONType>(valueAsInt.getValue()));
+                },
+                [&](const UserDecimal& userDc) {
+                    auto valueAsInt = BSON("" << userDc).firstElement().parseIntegerElementToInt();
+                    ts.bsonTypes.insert(static_cast<BSONType>(valueAsInt.getValue()));
+                },
+                [&](const UserInt& userInt) {
+                    auto valueAsInt = BSON("" << userInt).firstElement().parseIntegerElementToInt();
+                    ts.bsonTypes.insert(static_cast<BSONType>(valueAsInt.getValue()));
+                },
+                [&](const UserString& s) {
+                    if (StringData{s} == MatcherTypeSet::kMatchesAllNumbersAlias) {
+                        ts.allNumbers = true;
+                        return;
+                    }
+                    auto optValue = findBSONTypeAlias(s);
+                    invariant(optValue);
+                    ts.bsonTypes.insert(*optValue);
+                },
+                [&](auto&&) { MONGO_UNREACHABLE; }},
+            a.payload);
+    };
+    if (auto children = stdx::get_if<CNode::ArrayChildren>(&argument.payload)) {
+        for (auto child : (*children)) {
+            add_individual_to_type_set(child);
+        }
+    } else {
+        add_individual_to_type_set(argument);
+    }
+    return ts;
+}
+
 std::unique_ptr<MatchExpression> translatePathExpression(
     const CNode::Fieldname& fieldName,
     const CNode::ObjectChildren& object,
@@ -88,6 +152,11 @@ std::unique_ptr<MatchExpression> translatePathExpression(
         switch (stdx::get<KeyFieldname>(op)) {
             case KeyFieldname::notExpr:
                 return translateNot(fieldName, argument, expCtx);
+            case KeyFieldname::existsExpr:
+                return translateExists(fieldName, argument);
+            case KeyFieldname::type:
+                return std::make_unique<TypeMatchExpression>(stdx::get<UserFieldname>(fieldName),
+                                                             getMatcherTypeSet(argument));
             default:
                 MONGO_UNREACHABLE;
         }
@@ -108,6 +177,9 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
                 return translateTreeExpr<OrMatchExpression>(cst.arrayChildren(), expCtx);
             case KeyFieldname::norExpr:
                 return translateTreeExpr<NorMatchExpression>(cst.arrayChildren(), expCtx);
+            case KeyFieldname::commentExpr:
+                // comment expr is not added to the tree.
+                return nullptr;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -140,7 +212,12 @@ std::unique_ptr<MatchExpression> translateMatchExpression(
     const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto root = std::make_unique<AndMatchExpression>();
     for (const auto& [fieldName, expr] : cst.objectChildren()) {
-        root->add(translateMatchPredicate(fieldName, expr, expCtx).release());
+        // A nullptr for 'translatedExpression' indicates that the particular operator should not
+        // be added to 'root'. The $comment operator currently follows this convention.
+        if (auto translatedExpression = translateMatchPredicate(fieldName, expr, expCtx);
+            translatedExpression) {
+            root->add(translatedExpression.release());
+        }
     }
     return root;
 }

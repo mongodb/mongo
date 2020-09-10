@@ -34,8 +34,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/c_node_validation.h"
 #include "mongo/db/cst/path.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/util/make_data_structure.h"
@@ -252,6 +254,55 @@ Status addPathsFromTreeToSet(const CNode::ObjectChildren& children,
     return Status::OK();
 }
 
+template <typename T>
+Status validateNumericType(T num) {
+    auto valueAsInt = BSON("" << num).firstElement().parseIntegerElementToInt();
+    if (!valueAsInt.isOK() || valueAsInt.getValue() == 0 ||
+        !isValidBSONType(valueAsInt.getValue())) {
+        if constexpr (std::is_same_v<std::decay_t<T>, UserDecimal>) {
+            return Status{ErrorCodes::FailedToParse,
+                          str::stream() << "invalid numerical type code: " << num.toString()
+                                        << " provided as argument"};
+        } else {
+            return Status{ErrorCodes::FailedToParse,
+                          str::stream()
+                              << "invalid numerical type code: " << num << " provided as argument"};
+        }
+    }
+    return Status::OK();
+}
+
+Status validateSingleType(const CNode& element) {
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [&](const UserDouble& dbl) { return validateNumericType(dbl); },
+            [&](const UserInt& num) { return validateNumericType(num); },
+            [&](const UserLong& lng) { return validateNumericType(lng); },
+            [&](const UserDecimal& dc) { return validateNumericType(dc); },
+            [&](const UserString& st) {
+                if (st == MatcherTypeSet::kMatchesAllNumbersAlias) {
+                    return Status::OK();
+                }
+                auto optValue = findBSONTypeAlias(st);
+                if (!optValue) {
+                    // The string "missing" can be returned from the $type agg expression, but is
+                    // not valid for use in the $type match expression predicate. Return a special
+                    // error message for this case.
+                    if (st == StringData{typeName(BSONType::EOO)}) {
+                        return Status{
+                            ErrorCodes::FailedToParse,
+                            "unknown type name alias 'missing' (to query for "
+                            "non-existence of a field, use {$exists:false}) provided as argument"};
+                    }
+                    return Status{ErrorCodes::FailedToParse,
+                                  str::stream() << "unknown type name alias: '" << st
+                                                << "' provided as argument"};
+                }
+                return Status::OK();
+            },
+            [&](auto &&) -> Status { MONGO_UNREACHABLE; }},
+        element.payload);
+}
 }  // namespace
 
 StatusWith<IsInclusion> validateProjectionAsInclusionOrExclusion(const CNode& projects) {
@@ -326,4 +377,16 @@ Status validateSortPath(const std::vector<std::string>& pathComponents) {
     return Status::OK();
 }
 
+Status validateTypeOperatorArgument(const CNode& types) {
+    // If the CNode is an array, we need to validate all of the types within it.
+    if (auto&& children = stdx::get_if<CNode::ArrayChildren>(&types.payload)) {
+        for (auto&& child : (*children)) {
+            if (auto status = validateSingleType(child); !status.isOK()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    }
+    return validateSingleType(types);
+}
 }  // namespace mongo::c_node_validation
