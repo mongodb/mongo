@@ -124,8 +124,9 @@ struct ActiveTransactionHistory {
 
 ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                                                        const LogicalSessionId& lsid) {
-    // Restore the current timestamp read source after fetching transaction history.
-    ReadSourceScope readSourceScope(opCtx);
+    // Restore the current timestamp read source after fetching transaction history using
+    // DBDirectClient, which may change our ReadSource.
+    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
 
     ActiveTransactionHistory result;
 

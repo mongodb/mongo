@@ -445,7 +445,6 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
     // transaction to establish a read timestamp, but only for ReadSources that are expected to have
     // read timestamps.
     switch (_timestampReadSource) {
-        case ReadSource::kUnset:
         case ReadSource::kNoTimestamp:
             return boost::none;
         case ReadSource::kMajorityCommitted:
@@ -484,7 +483,6 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
             return _readAtTimestamp;
 
         // The follow ReadSources returned values in the first switch block.
-        case ReadSource::kUnset:
         case ReadSource::kNoTimestamp:
         case ReadSource::kMajorityCommitted:
         case ReadSource::kProvided:
@@ -507,7 +505,6 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     WT_SESSION* session = _session->getSession();
 
     switch (_timestampReadSource) {
-        case ReadSource::kUnset:
         case ReadSource::kNoTimestamp: {
             if (_isOplogReader) {
                 _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
@@ -827,7 +824,6 @@ void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,
                 "setting timestamp read source",
                 "readSource"_attr = toString(readSource),
                 "provided"_attr = ((provided) ? provided->toString() : "none"));
-
     invariant(!_isActive() || _timestampReadSource == readSource,
               str::stream() << "Current state: " << toString(_getState())
                             << ". Invalid internal state while setting timestamp read source: "

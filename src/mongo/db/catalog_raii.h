@@ -291,7 +291,7 @@ private:
 class ReadSourceScope {
 public:
     ReadSourceScope(OperationContext* opCtx,
-                    RecoveryUnit::ReadSource readSource = RecoveryUnit::ReadSource::kUnset,
+                    RecoveryUnit::ReadSource readSource,
                     boost::optional<Timestamp> provided = boost::none);
     ~ReadSourceScope();
 

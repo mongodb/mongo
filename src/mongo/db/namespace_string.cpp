@@ -144,6 +144,18 @@ bool NamespaceString::isLegalClientSystemNS() const {
     return false;
 }
 
+/**
+ * Oplog entries on 'system.views' should also be processed one at a time. View catalog immediately
+ * reflects changes for each oplog entry so we can see inconsistent view catalog if multiple oplog
+ * entries on 'system.views' are being applied out of the original order.
+ *
+ * Process updates to 'admin.system.version' individually as well so the secondary's FCV when
+ * processing each operation matches the primary's when committing that operation.
+ */
+bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
+    return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection();
+}
+
 NamespaceString NamespaceString::makeListCollectionsNSS(StringData dbName) {
     NamespaceString nss(dbName, listCollectionsCursorCol);
     dassert(nss.isValid());

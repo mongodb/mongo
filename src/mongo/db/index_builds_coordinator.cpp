@@ -2553,7 +2553,8 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
 
     // Read without a timestamp. When we commit, we block writes which guarantees all writes are
     // visible.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
+              opCtx->recoveryUnit()->getTimestampReadSource());
     // The collection scan might read with a kMajorityCommitted read source, but will restore
     // kNoTimestamp afterwards.
     _scanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
@@ -2655,7 +2656,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
             replState->buildUUID,
-            RecoveryUnit::ReadSource::kUnset,
+            RecoveryUnit::ReadSource::kNoTimestamp,
             IndexBuildInterceptor::DrainYieldPolicy::kYield));
     }
 
@@ -2681,7 +2682,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
             replState->buildUUID,
-            RecoveryUnit::ReadSource::kUnset,
+            RecoveryUnit::ReadSource::kNoTimestamp,
             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
     }
 
@@ -2769,7 +2770,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
         opCtx,
         replState->buildUUID,
-        RecoveryUnit::ReadSource::kUnset,
+        RecoveryUnit::ReadSource::kNoTimestamp,
         IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     try {
@@ -2916,7 +2917,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
             replState->buildUUID,
-            RecoveryUnit::ReadSource::kUnset,
+            RecoveryUnit::ReadSource::kNoTimestamp,
             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
         uassertStatusOK(

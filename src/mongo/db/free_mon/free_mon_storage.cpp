@@ -57,6 +57,10 @@ boost::optional<FreeMonStorageState> FreeMonStorage::read(OperationContext* opCt
 
     auto storageInterface = repl::StorageInterface::get(opCtx);
 
+    // Ensure we read without a timestamp.
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
+              opCtx->recoveryUnit()->getTimestampReadSource());
+
     AutoGetCollectionForRead autoRead(opCtx, NamespaceString::kServerConfigurationNamespace);
 
     auto swObj = storageInterface->findById(

@@ -359,7 +359,7 @@ TEST_F(EphemeralForTestKVEngineTest, ReadOlderSnapshotsSimple) {
     ASSERT(!rs->findRecord(&opCtx, loc2, &rd));
 
     opCtx.recoveryUnit()->abandonSnapshot();
-    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     ASSERT(rs->findRecord(&opCtx, loc1, &rd));
     ASSERT(rs->findRecord(&opCtx, loc2, &rd));
 }
@@ -452,7 +452,7 @@ TEST_F(EphemeralForTestKVEngineTest, SetReadTimestampBehindOldestTimestamp) {
     ASSERT_THROWS_CODE(rs->findRecord(&opCtx, loc2, &rd), DBException, ErrorCodes::SnapshotTooOld);
 
     opCtx.recoveryUnit()->abandonSnapshot();
-    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+    opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     ASSERT(rs->findRecord(&opCtx, loc1, &rd));
     ASSERT(rs->findRecord(&opCtx, loc2, &rd));
 }

@@ -119,7 +119,6 @@ bool RecoveryUnit::forkIfNeeded() {
 
     boost::optional<Timestamp> readFrom = boost::none;
     switch (_timestampReadSource) {
-        case ReadSource::kUnset:
         case ReadSource::kNoTimestamp:
         case ReadSource::kMajorityCommitted:
         case ReadSource::kNoOverlap:

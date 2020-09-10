@@ -90,6 +90,10 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    const NamespaceStringOrUUID& nsOrUUID,
                                                    AutoGetCollectionViewMode viewMode,
                                                    Date_t deadline) {
+    // The caller was expecting to conflict with batch application before entering this function.
+    // i.e. the caller does not currently have a ShouldNotConflict... block in scope.
+    bool callerWasConflicting = opCtx->lockState()->shouldConflictWithSecondaryBatchApplication();
+
     // Don't take the ParallelBatchWriterMode lock when the server parameter is set and our
     // storage engine supports snapshot reads.
     if (gAllowSecondaryReadsDuringBatchApplication.load() &&
@@ -99,11 +103,6 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     }
     const auto collectionLockMode = getLockModeForQuery(opCtx, nsOrUUID.nss());
     _autoColl.emplace(opCtx, nsOrUUID, collectionLockMode, viewMode, deadline);
-
-    // If the read source is explicitly set to kNoTimestamp, we read the most up to date data and do
-    // not consider changing our ReadSource (e.g. FTDC needs that).
-    if (opCtx->recoveryUnit()->getTimestampReadSource() == RecoveryUnit::ReadSource::kNoTimestamp)
-        return;
 
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     const auto readConcernLevel = repl::ReadConcernArgs::get(opCtx).getLevel();
@@ -152,6 +151,32 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                       str::stream() << "read timestamp " << readTimestamp->toString()
                                     << "was less than afterClusterTime: "
                                     << afterClusterTime->asTimestamp().toString());
+        }
+
+        // This assertion protects operations from reading inconsistent data on secondaries when
+        // using the default ReadSource of kNoTimestamp.
+
+        // Reading at lastApplied on secondaries is the safest behavior and is enabled for all user
+        // and DBDirectClient reads using 'local' and 'available' readConcerns. If an internal
+        // operation wishes to read without a timestamp during a batch, a ShouldNotConflict can
+        // suppress this fatal assertion with the following considerations:
+        // * The operation is not reading replicated data in a replication state where batch
+        //   application is active OR
+        // * Reading inconsistent, out-of-order data is either inconsequential or required by
+        //   the operation.
+
+        // If the caller entered this function expecting to conflict with batch application
+        // (i.e. no ShouldNotConflict block in scope), but they are reading without a timestamp and
+        // not holding the PBWM lock, then there is a possibility that this reader may
+        // unintentionally see inconsistent data during a batch. Certain namespaces are applied
+        // serially in oplog application, and therefore can be safely read without taking the PBWM
+        // lock or reading at a timestamp.
+        if (readSource == RecoveryUnit::ReadSource::kNoTimestamp && callerWasConflicting &&
+            !nss.mustBeAppliedInOwnOplogBatch() &&
+            SnapshotHelper::shouldReadAtLastApplied(opCtx, nss)) {
+            LOGV2_FATAL(4728700,
+                        "Reading from replicated collection without read timestamp or PBWM lock",
+                        "collection"_attr = nss);
         }
 
         auto minSnapshot = coll->getMinimumVisibleSnapshot();

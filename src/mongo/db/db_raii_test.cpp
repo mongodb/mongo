@@ -42,6 +42,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -219,6 +220,8 @@ TEST_F(DBRAIITestFixture,
     Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
+    // Simulate using a DBDirectClient to test this behavior for user reads.
+    client2.first->setInDirectClient(true);
     AutoGetCollectionForRead coll(client2.second.get(), nss);
 }
 
@@ -239,6 +242,8 @@ TEST_F(DBRAIITestFixture,
     Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
+    // Simulate using a DBDirectClient to test this behavior for user reads.
+    client2.first->setInDirectClient(true);
     AutoGetCollectionForRead coll(client2.second.get(), nss);
 }
 
@@ -266,10 +271,12 @@ TEST_F(DBRAIITestFixture,
     Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
+    // Simulate using a DBDirectClient to test this behavior for user reads.
+    client2.first->setInDirectClient(true);
     AutoGetCollectionForRead coll(client2.second.get(), NamespaceString("local.system.js"));
     // Reading from an unreplicated collection does not change the ReadSource to kLastApplied.
     ASSERT_EQ(client2.second.get()->recoveryUnit()->getTimestampReadSource(),
-              RecoveryUnit::ReadSource::kUnset);
+              RecoveryUnit::ReadSource::kNoTimestamp);
 
     // Reading from a replicated collection will try to switch to kLastApplied. Because we are
     // already reading without a timestamp and we can't reacquire the PBWM lock to continue reading
@@ -300,12 +307,15 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedConflict) {
     auto snapshotManager =
         client1.second.get()->getServiceContext()->getStorageEngine()->getSnapshotManager();
     snapshotManager->setLastApplied(opTime.getTimestamp());
+
+    // Simulate using a DBDirectClient to test this behavior for user reads.
+    client1.first->setInDirectClient(true);
     AutoGetCollectionForRead coll(client1.second.get(), nss);
 
     // We can't read from kLastApplied in this scenario because there is a catalog conflict. Resort
     // to taking the PBWM lock and reading without a timestamp.
     ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
-              RecoveryUnit::ReadSource::kUnset);
+              RecoveryUnit::ReadSource::kNoTimestamp);
     ASSERT_TRUE(client1.second.get()->lockState()->isLockHeldForMode(
         resourceIdParallelBatchWriterMode, MODE_IS));
 }
@@ -325,11 +335,41 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedUnavailable) {
     auto snapshotManager =
         client1.second.get()->getServiceContext()->getStorageEngine()->getSnapshotManager();
     ASSERT_FALSE(snapshotManager->getLastApplied());
+
+    // Simulate using a DBDirectClient to test this behavior for user reads.
+    client1.first->setInDirectClient(true);
     AutoGetCollectionForRead coll(client1.second.get(), nss);
 
     ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kLastApplied);
     ASSERT_FALSE(client1.second.get()->recoveryUnit()->getPointInTimeReadTimestamp());
+    ASSERT_FALSE(client1.second.get()->lockState()->isLockHeldForMode(
+        resourceIdParallelBatchWriterMode, MODE_IS));
+}
+
+TEST_F(DBRAIITestFixture, AutoGetCollectionForReadOplogOnSecondary) {
+    // This test simulates a situation where AutoGetCollectionForRead reads at lastApplied on a
+    // secondary.
+    auto replCoord = repl::ReplicationCoordinator::get(client1.second.get());
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    // Ensure the default ReadSource is used.
+    ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
+              RecoveryUnit::ReadSource::kNoTimestamp);
+
+    // Don't call into the ReplicationCoordinator to update lastApplied because it is only a mock
+    // class and does not update the correct state in the SnapshotManager.
+    repl::OpTime opTime(Timestamp(2, 1), 1);
+    auto snapshotManager =
+        client1.second.get()->getServiceContext()->getStorageEngine()->getSnapshotManager();
+    snapshotManager->setLastApplied(opTime.getTimestamp());
+
+    // Simulate using a DBDirectClient to test this behavior for user reads.
+    client1.first->setInDirectClient(true);
+    AutoGetCollectionForRead coll(client1.second.get(), NamespaceString::kRsOplogNamespace);
+
+    ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
+              RecoveryUnit::ReadSource::kLastApplied);
     ASSERT_FALSE(client1.second.get()->lockState()->isLockHeldForMode(
         resourceIdParallelBatchWriterMode, MODE_IS));
 }
@@ -342,11 +382,15 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadUsesLastAppliedOnSecondary) {
     CollectionOptions options;
     options.capped = true;
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
+
+    // Simulate using a DBDirectClient to test this behavior for user reads.
+    opCtx->getClient()->setInDirectClient(true);
     AutoGetCollectionForRead autoColl(opCtx, nss);
     auto exec = makeTailableQueryPlan(opCtx, autoColl.getCollection());
 
     // The collection scan should use the default ReadSource on a primary.
-    ASSERT_EQ(RecoveryUnit::ReadSource::kUnset, opCtx->recoveryUnit()->getTimestampReadSource());
+    ASSERT_EQ(RecoveryUnit::ReadSource::kNoTimestamp,
+              opCtx->recoveryUnit()->getTimestampReadSource());
 
     // When the tailable query recovers from its yield, it should discover that the node is
     // secondary and change its read source.
@@ -373,6 +417,9 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadChangedReadSourceAfterStepUp) 
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
     ASSERT_OK(
         repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    // Simulate using a DBDirectClient to test this behavior for user reads.
+    opCtx->getClient()->setInDirectClient(true);
     AutoGetCollectionForRead autoColl(opCtx, nss);
     auto exec = makeTailableQueryPlan(opCtx, autoColl.getCollection());
 
@@ -390,8 +437,35 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadChangedReadSourceAfterStepUp) 
 
     // After restoring, the collection scan should now be reading with kUnset, the default on
     // primaries.
-    ASSERT_EQ(RecoveryUnit::ReadSource::kUnset, opCtx->recoveryUnit()->getTimestampReadSource());
+    ASSERT_EQ(RecoveryUnit::ReadSource::kNoTimestamp,
+              opCtx->recoveryUnit()->getTimestampReadSource());
     ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&unused, nullptr));
+}
+
+DEATH_TEST_F(DBRAIITestFixture, AutoGetCollectionForReadUnsafe, "Fatal assertion") {
+    auto opCtx = client1.second.get();
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, {}));
+
+    ASSERT_OK(
+        repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    // Non-user read on a replicated collection should fail because we are reading on a secondary
+    // without a timestamp.
+    AutoGetCollectionForRead autoColl(opCtx, nss);
+}
+
+TEST_F(DBRAIITestFixture, AutoGetCollectionForReadSafe) {
+    auto opCtx = client1.second.get();
+    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, {}));
+
+    ASSERT_OK(
+        repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    // Non-user read on a replicated collection should not fail because of the ShouldNotConflict
+    // block.
+    ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
+
+    AutoGetCollectionForRead autoColl(opCtx, nss);
 }
 
 }  // namespace

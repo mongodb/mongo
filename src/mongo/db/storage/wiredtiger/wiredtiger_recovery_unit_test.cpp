@@ -203,7 +203,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
     }
 
     // Read without a timestamp. The write should be visible.
-    ASSERT_EQ(opCtx1->recoveryUnit()->getTimestampReadSource(), RecoveryUnit::ReadSource::kUnset);
+    ASSERT_EQ(opCtx1->recoveryUnit()->getTimestampReadSource(),
+              RecoveryUnit::ReadSource::kNoTimestamp);
     RecordData unused;
     ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
 
@@ -237,7 +238,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
 
         // Read without a timestamp, and we should see the first and third records.
         opCtx1->recoveryUnit()->abandonSnapshot();
-        opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+        opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
         ASSERT_TRUE(rs->findRecord(opCtx1, rid1, &unused));
         ASSERT_FALSE(rs->findRecord(opCtx1, rid2, &unused));
         ASSERT_TRUE(rs->findRecord(opCtx1, rid3, &unused));

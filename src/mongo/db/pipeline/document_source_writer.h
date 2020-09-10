@@ -65,7 +65,7 @@ public:
         }
 
         repl::ReadConcernArgs::get(_opCtx) = repl::ReadConcernArgs();
-        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::kUnset);
+        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     }
 
     ~DocumentSourceWriteBlock() {

@@ -131,7 +131,7 @@ private:
     Timestamp _commitTimestamp = Timestamp::min();
 
     // Specifies which external source to use when setting read timestamps on transactions.
-    ReadSource _timestampReadSource = ReadSource::kUnset;
+    ReadSource _timestampReadSource = ReadSource::kNoTimestamp;
     boost::optional<Timestamp> _readAtTimestamp = boost::none;
 };
 
