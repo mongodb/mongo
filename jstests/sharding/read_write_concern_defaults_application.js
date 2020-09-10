@@ -459,6 +459,7 @@ let testCases = {
     hello: {skip: "does not accept read or write concern"},
     hostInfo: {skip: "does not accept read or write concern"},
     httpClientRequest: {skip: "does not accept read or write concern"},
+    exportCollection: {skip: "internal command"},
     importCollection: {skip: "internal command"},
     insert: {
         setUp: function(conn) {

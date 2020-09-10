@@ -338,6 +338,7 @@ let viewsCommandTests = {
     hello: {skip: isUnrelated},
     hostInfo: {skip: isUnrelated},
     httpClientRequest: {skip: isAnInternalCommand},
+    exportCollection: {skip: isUnrelated},
     importCollection: {skip: isUnrelated},
     insert: {command: {insert: "view", documents: [{x: 1}]}, expectFailure: true},
     internalRenameIfOptionsAndIndexesMatch: {skip: isAnInternalCommand},
