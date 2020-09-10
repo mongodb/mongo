@@ -448,7 +448,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
                                   donorConnString.toString(),
                                   _stateDoc.getTenantId().toString(),
                                   _stateDoc.getReadPreference());
-        request.setReturnAfterReachingOpTime(_stateDoc.getBlockTimestamp());
+        request.setReturnAfterReachingTimestamp(_stateDoc.getBlockTimestamp());
         return request.toBSON(BSONObj());
     }());
 

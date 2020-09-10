@@ -1476,6 +1476,7 @@ env.CppUnitTest(
         'tenant_oplog_batcher_test.cpp',
         'vote_requester_test.cpp',
         'wait_for_majority_service_test.cpp',
+        'tenant_migration_recipient_entry_helpers_test.cpp',
         'tenant_migration_recipient_service_test.cpp',
     ],
     LIBDEPS=[
@@ -1556,6 +1557,7 @@ env.CppUnitTest(
         'task_executor_mock',
         'task_runner',
         'tenant_migration_recipient_service',
+        'tenant_migration_recipient_utils',
         'tenant_oplog_processing',
         'wait_for_majority_service',
     ],

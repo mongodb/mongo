@@ -44,7 +44,6 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/update_result.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
@@ -224,21 +223,21 @@ bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) 
     return false;
 }
 
-void Helpers::upsert(OperationContext* opCtx,
-                     const string& ns,
-                     const BSONObj& o,
-                     bool fromMigrate) {
+UpdateResult Helpers::upsert(OperationContext* opCtx,
+                             const string& ns,
+                             const BSONObj& o,
+                             bool fromMigrate) {
     BSONElement e = o["_id"];
     verify(e.type());
     BSONObj id = e.wrap();
-    upsert(opCtx, ns, id, o, fromMigrate);
+    return upsert(opCtx, ns, id, o, fromMigrate);
 }
 
-void Helpers::upsert(OperationContext* opCtx,
-                     const string& ns,
-                     const BSONObj& filter,
-                     const BSONObj& updateMod,
-                     bool fromMigrate) {
+UpdateResult Helpers::upsert(OperationContext* opCtx,
+                             const string& ns,
+                             const BSONObj& filter,
+                             const BSONObj& updateMod,
+                             bool fromMigrate) {
     OldClientContext context(opCtx, ns);
 
     const NamespaceString requestNs(ns);
@@ -251,7 +250,7 @@ void Helpers::upsert(OperationContext* opCtx,
     request.setFromMigration(fromMigrate);
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
 
-    ::mongo::update(opCtx, context.db(), request);
+    return ::mongo::update(opCtx, context.db(), request);
 }
 
 void Helpers::update(OperationContext* opCtx,

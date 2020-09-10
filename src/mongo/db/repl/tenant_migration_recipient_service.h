@@ -75,7 +75,8 @@ public:
 
     class Instance final : public PrimaryOnlyService::TypedInstance<Instance> {
     public:
-        explicit Instance(BSONObj stateDoc);
+        explicit Instance(const TenantMigrationRecipientService* recipientService,
+                          BSONObj stateDoc);
 
         void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept final;
 
@@ -112,17 +113,24 @@ public:
          */
         const std::string& getTenantId() const;
 
+        /**
+         * To be called on the instance returned by PrimaryOnlyService::getOrCreate(). Returns an
+         * error if the options this Instance was created with are incompatible with a request for
+         * an instance with the options given in 'options'.
+         */
+        Status checkIfOptionsConflict(const TenantMigrationRecipientDocument& StateDoc) const;
+
         /*
          * Blocks the thread until the tenant migration reaches consistent state in an interruptible
          * mode. Returns the donor optime at which the migration reached consistent state. Throws
-         * exceptions on error.
+         * exception on error.
          */
         OpTime waitUntilMigrationReachesConsistentState(OperationContext* opCtx) const;
 
         /*
          * Blocks the thread until the tenant oplog applier applied data past the given 'donorTs'
          * in an interruptible mode. Returns the majority applied donor optime which may be greater
-         * or equal to given 'donorTs'. Throws throw exceptions on error.
+         * or equal to given 'donorTs'. Throws exception on error.
          */
         OpTime waitUntilTimestampIsMajorityCommitted(OperationContext* opCtx,
                                                      const Timestamp& donorTs) const;
@@ -341,8 +349,9 @@ public:
         // (M)  Reads and writes guarded by _mutex.
         // (W)  Synchronization required only for writes.
 
-        std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;  // (M)
-        TenantMigrationRecipientDocument _stateDoc;                     // (M)
+        const TenantMigrationRecipientService* const _recipientService;  // (R) (not owned)
+        std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;   // (M)
+        TenantMigrationRecipientDocument _stateDoc;                      // (M)
 
         // This data is provided in the initial state doc and never changes.  We keep copies to
         // avoid having to obtain the mutex to access them.
@@ -385,6 +394,16 @@ public:
         // Promise that is resolved Signaled when the tenant data sync has reached consistent point.
         SharedPromise<OpTime> _dataConsistentPromise;  // (W)
     };
+
+private:
+    /*
+     * Ensures that only one Instance is able to insert the initial state doc provided by the user,
+     * into NamespaceString::kTenantMigrationRecipientsNamespace collection at a time.
+     *
+     * No other locks should be held when locking this. RSTl/global/db/collection locks have to be
+     * taken after taking this.
+     */
+    Lock::ResourceMutex _stateDocInsertMutex{"TenantMigrationRecipientStateDocInsert::mutex"};
 };
 }  // namespace repl
 }  // namespace mongo

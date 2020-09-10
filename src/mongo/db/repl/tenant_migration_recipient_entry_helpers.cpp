@@ -36,71 +36,55 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/str.h"
 
+
 namespace mongo {
 namespace repl {
-namespace {
-/**
- * Creates the tenant migration recipients collection if it doesn't exist.
- * Note: Throws WriteConflictException if the collection already exist.
- */
-CollectionPtr ensureTenantMigrationRecipientsCollectionExists(OperationContext* opCtx,
-                                                              Database* db,
-                                                              const NamespaceString& nss) {
-    // Sanity checks.
-    invariant(db);
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
-
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-    if (!collection) {
-        WriteUnitOfWork wuow(opCtx);
-
-        collection = db->createCollection(opCtx, nss, CollectionOptions());
-        // Ensure the collection exists.
-        invariant(collection);
-
-        wuow.commit();
-    }
-    return collection;
-}
-
-}  // namespace
 
 namespace tenantMigrationRecipientEntryHelpers {
 
 Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc) {
     const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
-    return writeConflictRetry(opCtx, "insertStateDoc", nss.ns(), [&]() -> Status {
-        // TODO SERVER-50741: Should be replaced by AutoGetCollection.
-        AutoGetOrCreateDb db(opCtx, nss.db(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+    AutoGetCollection collection(opCtx, nss, MODE_IX);
 
-        uassert(ErrorCodes::PrimarySteppedDown,
-                str::stream() << "No longer primary while attempting to insert tenant migration "
-                                 "recipient state document",
-                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
+    // Sanity check
+    uassert(ErrorCodes::PrimarySteppedDown,
+            str::stream() << "No longer primary while attempting to insert tenant migration "
+                             "recipient state document",
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
-        // TODO SERVER-50741: ensureTenantMigrationRecipientsCollectionExists() should be removed
-        // and this should return ErrorCodes::NamespaceNotFound when collection is missing.
-        auto collection = ensureTenantMigrationRecipientsCollectionExists(opCtx, db.getDb(), nss);
+    return writeConflictRetry(
+        opCtx, "insertTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> Status {
+            // Insert the 'stateDoc' if no active tenant migration found for the 'tenantId' provided
+            // in the 'stateDoc'. Tenant Migration is considered as active for a tenantId if a state
+            // document exists on the disk for that 'tenantId' and not marked to be garbage
+            // collected (i.e, 'expireAt' not set).
+            const auto filter = BSON(TenantMigrationRecipientDocument::kTenantIdFieldName
+                                     << stateDoc.getTenantId().toString()
+                                     << TenantMigrationRecipientDocument::kExpireAtFieldName
+                                     << BSON("$exists" << false));
+            const auto updateMod = BSON("$setOnInsert" << stateDoc.toBSON());
+            auto updateResult =
+                Helpers::upsert(opCtx, nss.ns(), filter, updateMod, /*fromMigrate=*/false);
 
-        WriteUnitOfWork wuow(opCtx);
-        Status status =
-            collection->insertDocument(opCtx, InsertStatement(stateDoc.toBSON()), nullptr);
-        if (!status.isOK()) {
-            return status;
-        }
-        wuow.commit();
-        return Status::OK();
-    });
+            // '$setOnInsert' update operator can no way modify the existing on-disk state doc.
+            invariant(!updateResult.numDocsModified);
+            if (updateResult.upsertedId.isEmpty()) {
+                return {ErrorCodes::ConflictingOperationInProgress,
+                        str::stream() << "Failed to insert the state doc: " << stateDoc.toBSON()
+                                      << "; Active tenant migration found for tenantId: "
+                                      << stateDoc.getTenantId()};
+            }
+            return Status::OK();
+        });
 }
 
 Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc) {
@@ -111,18 +95,19 @@ Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << nss.ns() << " does not exist");
     }
-    auto updateReq = UpdateRequest();
-    updateReq.setNamespaceString(nss);
-    updateReq.setQuery(BSON("_id" << stateDoc.getId()));
-    updateReq.setUpdateModification(
-        write_ops::UpdateModification::parseFromClassicUpdate(stateDoc.toBSON()));
-    auto updateResult = update(opCtx, collection.getDb(), updateReq);
-    if (updateResult.numMatched == 0) {
-        return {ErrorCodes::NoSuchKey,
-                str::stream() << "Existing Tenant Migration State Document not found for id: "
-                              << stateDoc.getId()};
-    }
-    return Status::OK();
+
+    return writeConflictRetry(
+        opCtx, "updateTenantMigrationRecipientStateDoc", nss.ns(), [&]() -> Status {
+            auto updateResult =
+                Helpers::upsert(opCtx, nss.ns(), stateDoc.toBSON(), /*fromMigrate=*/false);
+            if (updateResult.numMatched == 0) {
+                return {ErrorCodes::NoSuchKey,
+                        str::stream()
+                            << "Existing Tenant Migration State Document not found for id: "
+                            << stateDoc.getId()};
+            }
+            return Status::OK();
+        });
 }
 
 StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx,

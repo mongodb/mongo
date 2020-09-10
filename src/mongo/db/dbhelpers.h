@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/update_result.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -117,14 +118,14 @@ struct Helpers {
     static void putSingleton(OperationContext* opCtx, const char* ns, BSONObj obj);
 
     /**
-     * you have to lock
+     * Callers are expected to hold the collection lock.
      * you do not have to have Context set
      * o has to have an _id field or will assert
      */
-    static void upsert(OperationContext* opCtx,
-                       const std::string& ns,
-                       const BSONObj& o,
-                       bool fromMigrate = false);
+    static UpdateResult upsert(OperationContext* opCtx,
+                               const std::string& ns,
+                               const BSONObj& o,
+                               bool fromMigrate = false);
 
     /**
      * Performs an upsert of 'updateMod' if we don't match the given 'filter'.
@@ -132,11 +133,11 @@ struct Helpers {
      * Note: Query yielding is turned off, so both read and writes are performed
      * on the same storage snapshot.
      */
-    static void upsert(OperationContext* opCtx,
-                       const std::string& ns,
-                       const BSONObj& filter,
-                       const BSONObj& updateMod,
-                       bool fromMigrate = false);
+    static UpdateResult upsert(OperationContext* opCtx,
+                               const std::string& ns,
+                               const BSONObj& filter,
+                               const BSONObj& updateMod,
+                               bool fromMigrate = false);
 
     /**
      * Performs an update of 'updateMod' for the entry matching the given 'filter'.

@@ -55,25 +55,6 @@ public:
 
             const RequestType& requestBody = request();
 
-            // Sanity check that donor and recipient do not share any of the same hosts for
-            // migration
-            const auto donorConnectionString =
-                repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
-            const auto donorServers = donorConnectionString.getServers();
-            const auto recipientServers =
-                uassertStatusOK(
-                    MongoURI::parse(requestBody.getRecipientConnectionString().toString()))
-                    .getServers();
-            for (const auto& server : donorServers) {
-                uassert(ErrorCodes::InvalidOptions,
-                        "recipient and donor hosts must be different",
-                        std::none_of(recipientServers.begin(),
-                                     recipientServers.end(),
-                                     [&](const HostAndPort& recipientServer) {
-                                         return server == recipientServer;
-                                     }));
-            }
-
             const auto donorStateDoc =
                 TenantMigrationDonorDocument(requestBody.getMigrationId(),
                                              requestBody.getRecipientConnectionString().toString(),

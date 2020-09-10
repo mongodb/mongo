@@ -81,8 +81,11 @@ public:
             : _rid(rid), _locker(locker), _result(LOCK_INVALID) {}
 
         ResourceLock(Locker* locker, ResourceId rid, LockMode mode)
+            : ResourceLock(nullptr, locker, rid, mode) {}
+
+        ResourceLock(OperationContext* opCtx, Locker* locker, ResourceId rid, LockMode mode)
             : _rid(rid), _locker(locker), _result(LOCK_INVALID) {
-            lock(nullptr, mode);
+            lock(opCtx, mode);
         }
 
         ResourceLock(ResourceLock&& otherLock)
@@ -165,7 +168,13 @@ public:
     class ExclusiveLock : public ResourceLock {
     public:
         ExclusiveLock(Locker* locker, ResourceMutex mutex)
-            : ResourceLock(locker, mutex.rid(), MODE_X) {}
+            : ExclusiveLock(nullptr, locker, mutex) {}
+
+        /**
+         * Interruptible lock acquisition.
+         */
+        ExclusiveLock(OperationContext* opCtx, Locker* locker, ResourceMutex mutex)
+            : ResourceLock(opCtx, locker, mutex.rid(), MODE_X) {}
 
         using ResourceLock::lock;
 
@@ -185,8 +194,13 @@ public:
      */
     class SharedLock : public ResourceLock {
     public:
-        SharedLock(Locker* locker, ResourceMutex mutex)
-            : ResourceLock(locker, mutex.rid(), MODE_IS) {}
+        SharedLock(Locker* locker, ResourceMutex mutex) : SharedLock(nullptr, locker, mutex) {}
+
+        /**
+         * Interruptible lock acquisition.
+         */
+        SharedLock(OperationContext* opCtx, Locker* locker, ResourceMutex mutex)
+            : ResourceLock(opCtx, locker, mutex.rid(), MODE_IS) {}
     };
 
     /**

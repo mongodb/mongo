@@ -31,12 +31,22 @@ global:
   cpp_includes:
     - "mongo/client/read_preference.h"
     - "mongo/db/repl/tenant_migration_util.h"
+    - "mongo/db/repl/optime.h"
 
 imports:
   - "mongo/client/read_preference_setting.idl"
   - "mongo/idl/basic_types.idl"
   - "mongo/s/sharding_types.idl"
   - "mongo/db/repl/replication_types.idl"
+
+structs:
+    recipientSyncDataResponse:
+        description: "Response for the 'recipientSyncData' command"
+        strict: false
+        fields:
+            majorityAppliedDonorOpTime:
+                type: optime
+                description: "Majority applied donor optime by the recipient"
 
 commands:
   recipientSyncData:
@@ -48,20 +58,31 @@ commands:
         description: "Unique identifier for the tenant migration."
         type: uuid
       donorConnectionString:
-        description: "The URI string that the donor will utilize to create a connection with the recipient."
+        description: >-
+          The URI string that the recipient will utilize to create a connection with the 
+          donor.
         type: string
+        validator:
+          callback: "validateConnectionString"
       tenantId:
-        description: "The prefix from which the migrating database will be matched. The prefixes 'admin', 'local', 'config', the empty string, are not allowed."
+        description: >-
+          The prefix from which the migrating database will be matched. The prefixes 'admin',
+          'local', 'config', the empty string, are not allowed.
         type: string
         validator:
           callback: "validateDatabasePrefix"
       readPreference:
-        description: "The read preference settings that the donor will pass on to the recipient."
+        description: >-
+          The read preference settings that the donor will pass on to the recipient.
         type: readPreference
-      returnAfterReachingOpTime:
-        description: "If provided, the recipient should return after syncing up to this OpTime. Otherwise, the recipient will return once its copy of the data is consistent."
+      returnAfterReachingTimestamp:
+        description: >-
+          If provided, the recipient should return after syncing up to this timestamp. 
+          Otherwise, the recipient will return once its copy of the data is consistent.
         type: timestamp
         optional: true
+        validator:
+          callback: "validateTimestampNotNull"
 
   recipientForgetMigration:
     description: "Parser for the 'recipientForgetMigration' command."

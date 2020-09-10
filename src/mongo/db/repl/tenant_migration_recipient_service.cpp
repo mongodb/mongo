@@ -163,17 +163,38 @@ ThreadPool::Limits TenantMigrationRecipientService::getThreadPoolLimits() const 
 
 std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::constructInstance(
     BSONObj initialStateDoc) const {
-    return std::make_shared<TenantMigrationRecipientService::Instance>(initialStateDoc);
+    return std::make_shared<TenantMigrationRecipientService::Instance>(this, initialStateDoc);
 }
 
-TenantMigrationRecipientService::Instance::Instance(BSONObj stateDoc)
+TenantMigrationRecipientService::Instance::Instance(
+    const TenantMigrationRecipientService* recipientService, BSONObj stateDoc)
     : PrimaryOnlyService::TypedInstance<Instance>(),
+      _recipientService(recipientService),
       _stateDoc(TenantMigrationRecipientDocument::parse(IDLParserErrorContext("recipientStateDoc"),
                                                         stateDoc)),
       _tenantId(_stateDoc.getTenantId().toString()),
       _migrationUuid(_stateDoc.getId()),
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _readPreference(_stateDoc.getReadPreference()) {}
+
+Status TenantMigrationRecipientService::Instance::checkIfOptionsConflict(
+    const TenantMigrationRecipientDocument& requestedStateDoc) const {
+    invariant(requestedStateDoc.getId() == _migrationUuid);
+
+    if (requestedStateDoc.getTenantId() == _tenantId &&
+        requestedStateDoc.getDonorConnectionString() == _donorConnectionString &&
+        requestedStateDoc.getReadPreference().equals(_readPreference)) {
+        return Status::OK();
+    }
+
+    return Status(ErrorCodes::ConflictingOperationInProgress,
+                  str::stream() << "Requested options for tenant migration doesn't match"
+                                << " the active migration options, migrationId: " << _migrationUuid
+                                << ", tenantId: " << _tenantId
+                                << ", connectionString: " << _donorConnectionString
+                                << ", readPreference: " << _readPreference.toString()
+                                << ", requested options:" << requestedStateDoc.toBSON());
+}
 
 OpTime TenantMigrationRecipientService::Instance::waitUntilMigrationReachesConsistentState(
     OperationContext* opCtx) const {
@@ -314,7 +335,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
     auto uniqueOpCtx = cc().makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
 
-
     LOGV2_DEBUG(5081400,
                 2,
                 "Recipient migration service initializing state document",
@@ -325,7 +345,11 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
 
     // Persist the state doc before starting the data sync.
     _stateDoc.setState(TenantMigrationRecipientStateEnum::kStarted);
-    uassertStatusOK(tenantMigrationRecipientEntryHelpers::insertStateDoc(opCtx, _stateDoc));
+    {
+        Lock::ExclusiveLock stateDocInsertLock(
+            opCtx, opCtx->lockState(), _recipientService->_stateDocInsertMutex);
+        uassertStatusOK(tenantMigrationRecipientEntryHelpers::insertStateDoc(opCtx, _stateDoc));
+    }
 
     if (MONGO_unlikely(failWhilePersistingTenantMigrationRecipientInstanceStateDoc.shouldFail())) {
         LOGV2(4878500, "Persisting state doc failed due to fail point enabled.");
@@ -724,6 +748,13 @@ void TenantMigrationRecipientService::Instance::run(
     _scopedExecutor = executor;
     pauseBeforeRunTenantMigrationRecipientInstance.pauseWhileSet();
 
+    LOGV2(4879607,
+          "Starting tenant migration recipient instance: ",
+          "migrationId"_attr = getMigrationUUID(),
+          "tenantId"_attr = getTenantId(),
+          "connectionString"_attr = _donorConnectionString,
+          "readPreference"_attr = _readPreference);
+
     ExecutorFuture(**executor)
         .then([this] {
             stdx::lock_guard lk(_mutex);
@@ -768,7 +799,7 @@ void TenantMigrationRecipientService::Instance::run(
                     str::stream() << "Can't start the data sync as the state doc is already marked "
                                      "for garbage collect for migration uuid: "
                                   << getMigrationUUID(),
-                    !_stateDoc.getGarbageCollect());
+                    !_stateDoc.getExpireAt());
             _getStartOpTimesFromDonor(lk);
             auto opCtx = cc().makeOperationContext();
             uassertStatusOK(

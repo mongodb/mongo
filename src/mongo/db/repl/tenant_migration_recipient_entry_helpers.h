@@ -42,10 +42,19 @@ namespace repl {
 namespace tenantMigrationRecipientEntryHelpers {
 
 /**
- * Writes the state doc to the disk.
+ * Inserts the tenant migration recipient state document 'stateDoc' into
+ * 'config.tenantMigrationRecipients' collection. Also, creates the collection if not present
+ * before inserting the document.
  *
- * Returns 'DuplicateKey' error code if a document already exists on the disk with the same
- * 'migrationUUID'.
+ * NOTE: A state doc might get inserted based on a decision made out of a stale read within a
+ * storage transaction. Callers are expected to have their own concurrency mechanism to handle
+ * write skew problem.
+ *
+ * @Returns 'ConflictingOperationInProgress' error code if an active tenant migration found for the
+ * tenantId provided in the 'stateDoc'.
+ *
+ * Throws 'DuplicateKey' error code if a document already exists on the disk with the same
+ * 'migrationUUID', irrespective of the document marked for garbage collect or not.
  */
 Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc);
 

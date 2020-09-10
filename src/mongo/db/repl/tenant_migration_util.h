@@ -31,6 +31,9 @@
 #include <set>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -48,6 +51,37 @@ inline Status validateDatabasePrefix(const std::string& tenantId) {
     return isPrefixSupported
         ? Status::OK()
         : Status(ErrorCodes::BadValue,
-                 str::stream() << "cannot migrate databases with prefix \'" << tenantId << "'");
+                 str::stream() << "cannot migrate databases for tenant \'" << tenantId << "'");
 }
+
+inline Status validateTimestampNotNull(const Timestamp& ts) {
+    return (!ts.isNull())
+        ? Status::OK()
+        : Status(ErrorCodes::BadValue, str::stream() << "Timestamp can't be null");
+}
+
+inline Status validateConnectionString(const StringData& donorOrRecipientConnectionString) {
+    // Sanity check to make sure that donor and recipient do not share any of the same hosts
+    // for tenant migration.
+    const auto donorOrRecipientServers =
+        uassertStatusOK(MongoURI::parse(donorOrRecipientConnectionString.toString())).getServers();
+
+    const auto servers = repl::ReplicationCoordinator::get(cc().getServiceContext())
+                             ->getConfig()
+                             .getConnectionString()
+                             .getServers();
+
+    for (auto&& server : servers) {
+        bool foundMatch = std::any_of(
+            donorOrRecipientServers.begin(),
+            donorOrRecipientServers.end(),
+            [&](const HostAndPort& donorOrRecipient) { return server == donorOrRecipient; });
+        if (foundMatch) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Donor and recipient hosts must be different.");
+        }
+    }
+    return Status::OK();
+}
+
 }  // namespace mongo

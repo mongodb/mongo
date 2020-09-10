@@ -132,12 +132,12 @@ structs:
                 type: TenantMigrationRecipientState
                 description: "The state of the tenant migration."
                 default: kUninitialized
-            garbageCollect:
-                type: bool
+            expireAt:
+                type: date
                 description: >-
-                    A boolean that determines whether the state machine should be deleted
-                    after a delay via the TTL monitor.
-                default: false
+                    The wall-clock time at which the state machine document should be
+                    removed by the TTL monitor.
+                optional: true
             startApplyingOpTime:
                 description: >-
                     Populated during data sync; the donor's operation time when the data
