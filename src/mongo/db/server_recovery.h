@@ -37,8 +37,7 @@
 
 namespace mongo {
 /**
- * This class is for use with non-MMAPv1 storage engines that track record store sizes in catalog
- * metadata.
+ * This class is for use with storage engines that track record store sizes in catalog metadata.
  *
  * During normal server operation, we adjust the size metadata for all record stores. But when
  * performing replication recovery, we avoid doing so, as we trust that the size metadata on disk is

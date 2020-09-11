@@ -4,11 +4,9 @@
  * findAndModify_update_grow.js
  *
  * Each thread inserts a single document into a collection, and then
- * repeatedly performs the findAndModify command. Attempts to trigger
- * the same conditions that with MMAPv1 caused a document move,
- * by growing the size of the inserted document using the $set and $mul
- * update operators. Now checks that document moves don't happen and
- * that large changes in document size are handled correctly.
+ * repeatedly performs the findAndModify command. Checks that document
+ * moves don't happen and that large changes in document size are handled
+ * correctly.
  */
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
 

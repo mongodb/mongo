@@ -538,10 +538,6 @@ int ProcessInfo::getResidentSize() {
     return (int)((p.getResidentSizeInPages() * getPageSize()) / (1024.0 * 1024));
 }
 
-double ProcessInfo::getSystemMemoryPressurePercentage() {
-    return 0.0;
-}
-
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);

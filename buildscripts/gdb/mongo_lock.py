@@ -309,10 +309,7 @@ def find_mutex_holder(graph, thread_dict, show):
 
 def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-many-locals
     """Find lock manager holders."""
-    # In versions of MongoDB 4.0 and older, the LockerImpl class is templatized with a boolean
-    # parameter. With the removal of the MMAPv1 storage engine in MongoDB 4.2, the LockerImpl class
-    # is no longer templatized.
-    frame = find_frame(r'mongo::LockerImpl(?:\<.*\>)?::')
+    frame = find_frame(r'mongo::LockerImpl::')
     if not frame:
         return
 
@@ -321,15 +318,7 @@ def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-
     (_, lock_waiter_lwpid, _) = gdb.selected_thread().ptid
     lock_waiter = thread_dict[lock_waiter_lwpid]
 
-    try:
-        locker_ptr_type = gdb.lookup_type("mongo::LockerImpl<false>").pointer()
-    except gdb.error as err:
-        # If we don't find the templatized version of the LockerImpl class, then we try to find the
-        # non-templatized version.
-        if not err.args[0].startswith("No type named"):
-            raise
-
-        locker_ptr_type = gdb.lookup_type("mongo::LockerImpl").pointer()
+    locker_ptr_type = gdb.lookup_type("mongo::LockerImpl").pointer()
 
     lock_head = gdb.parse_and_eval(
         "mongo::getGlobalLockManager()->_getBucket(resId)->findOrInsert(resId)")

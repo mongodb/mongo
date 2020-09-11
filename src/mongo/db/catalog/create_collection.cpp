@@ -251,7 +251,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
     // collection already exists under a different name. If so, rename it into place. As this is
     // done during replay of the oplog, the operations do not need to be atomic, just idempotent.
     // We need to do the renaming part in a separate transaction, as we cannot transactionally
-    // create a database on MMAPv1, which could result in createCollection failing if the database
+    // create a database, which could result in createCollection failing if the database
     // does not yet exist.
     if (ui) {
         // Return an optional, indicating whether we need to early return (if the collection already
@@ -291,11 +291,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 // In the case of oplog replay, a future command may have created or renamed a
                 // collection with that same name. In that case, renaming this future collection to
                 // a random temporary name is correct: once all entries are replayed no temporary
-                // names will remain.  On MMAPv1 the rename can result in index names that are too
-                // long. However this should only happen for initial sync and "resync collection"
-                // for rollback, so we can let the error propagate resulting in an abort and restart
-                // of the initial sync or result in rollback to fassert, requiring a resync of that
-                // node.
+                // names will remain.
                 const bool stayTemp = true;
                 auto futureColl = db
                     ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, newCollName)

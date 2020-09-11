@@ -264,10 +264,9 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
         NamespaceString::kSessionTransactionsTableNamespace.ns(),
         [&] {
             // Need to take global lock here so repl::logOp will not unlock it and trigger the
-            // invariant that disallows unlocking global lock while inside a WUOW. Grab a DBLock
-            // here instead of plain GlobalLock to make sure the MMAPV1 flush lock will be
-            // lock/unlocked correctly. Take the transaction table db lock to ensure the same lock
-            // ordering with normal replicated updates to the table.
+            // invariant that disallows unlocking global lock while inside a WUOW. Take the
+            // transaction table db lock to ensure the same lock ordering with normal replicated
+            // updates to the table.
             Lock::DBLock lk(
                 opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IX);
             WriteUnitOfWork wunit(opCtx);

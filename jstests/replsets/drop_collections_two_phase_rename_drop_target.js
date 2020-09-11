@@ -42,8 +42,7 @@ twoPhaseDropTest.createCollection(fromCollName);
 twoPhaseDropTest.createCollection(toCollName);
 
 // Collection renames with dropTarget set to true should handle long index names in the target
-// collection gracefully. MMAPv1 imposes a hard limit on index namespaces so we have to drop
-// indexes that are too long to store on disk after renaming the collection.
+// collection gracefully.
 const primary = replTest.getPrimary();
 const testDb = primary.getDB(dbName);
 const fromColl = testDb.getCollection(fromCollName);

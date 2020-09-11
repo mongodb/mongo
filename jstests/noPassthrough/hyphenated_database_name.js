@@ -5,8 +5,8 @@
  */
 (function() {
 "use strict";
-var isDirectoryPerDBSupported = jsTest.options().storageEngine == "wiredTiger" ||
-    jsTest.options().storageEngine == "mmapv1" || !jsTest.options().storageEngine;
+var isDirectoryPerDBSupported =
+    jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
 if (!isDirectoryPerDBSupported)
     return;
 

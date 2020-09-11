@@ -97,45 +97,6 @@ int ProcessInfo::getResidentSize() {
     return _wconvertmtos(pmc.WorkingSetSize);
 }
 
-double ProcessInfo::getSystemMemoryPressurePercentage() {
-    MEMORYSTATUSEX mse;
-    mse.dwLength = sizeof(mse);
-    BOOL status = GlobalMemoryStatusEx(&mse);
-    if (!status) {
-        DWORD gle = GetLastError();
-        LOGV2_ERROR(23814,
-                    "GlobalMemoryStatusEx failed with {errnoWithDescription_gle}",
-                    "errnoWithDescription_gle"_attr = errnoWithDescription(gle));
-        fassert(28623, status);
-    }
-
-    DWORDLONG totalPageFile = mse.ullTotalPageFile;
-    if (totalPageFile == 0) {
-        return false;
-    }
-
-    // If the page file is >= 50%, say we are low on system memory
-    // If the page file is >= 75%, we are running very low on system memory
-    //
-    DWORDLONG highWatermark = totalPageFile / 2;
-    DWORDLONG veryHighWatermark = 3 * (totalPageFile / 4);
-
-    DWORDLONG usedPageFile = mse.ullTotalPageFile - mse.ullAvailPageFile;
-
-    // Below the watermark, we are fine
-    // Also check we will not do a divide by zero below
-    if (usedPageFile < highWatermark || veryHighWatermark <= highWatermark) {
-        return 0.0;
-    }
-
-    // Above the high watermark, we tell MMapV1 how much to remap
-    // < 1.0, we have some pressure, but not much so do not be very aggressive
-    // 1.0 = we are at very high watermark, remap everything
-    // > 1.0, the user may run out of memory, remap everything
-    // i.e., Example (N - 50) / (75 - 50)
-    return static_cast<double>(usedPageFile - highWatermark) / (veryHighWatermark - highWatermark);
-}
-
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
     MEMORYSTATUSEX mse;
     mse.dwLength = sizeof(mse);

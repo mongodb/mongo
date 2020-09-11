@@ -138,7 +138,7 @@ tasks:
     - func: "setup"
     - func: "run tests"
       vars:
-        resmoke_args: "--suites=somesuite --storageEngine=mmapv1"
+        resmoke_args: "--suites=somesuite --storageEngine=wiredTiger"
 
 
 modules:

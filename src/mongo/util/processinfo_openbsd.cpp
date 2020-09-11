@@ -130,10 +130,6 @@ int ProcessInfo::getResidentSize() {
     return rss;
 }
 
-double ProcessInfo::getSystemMemoryPressurePercentage() {
-    return 0.0;
-}
-
 void ProcessInfo::SystemInfo::collectSystemInfo() {
     osType = "BSD";
     osName = "OpenBSD";

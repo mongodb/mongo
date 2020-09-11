@@ -51,10 +51,6 @@ int ProcessInfo::getResidentSize() {
     return -1;
 }
 
-double ProcessInfo::getSystemMemoryPressurePercentage() {
-    return 0.0;
-}
-
 bool ProcessInfo::checkNumaEnabled() {
     return false;
 }

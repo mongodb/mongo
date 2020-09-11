@@ -458,7 +458,7 @@ class TestVariant(unittest.TestCase):
 
         # Check combined_resmoke_args when test_flags is set on the variant.
         resmoke_task = variant_ubuntu.get_task("resmoke_task")
-        self.assertEqual("--suites=somesuite --storageEngine=mmapv1 --param=value --ubuntu",
+        self.assertEqual("--suites=somesuite --storageEngine=wiredTiger --param=value --ubuntu",
                          resmoke_task.combined_resmoke_args)
 
         # Check combined_resmoke_args when the task doesn't have resmoke_args.
@@ -468,7 +468,7 @@ class TestVariant(unittest.TestCase):
         # Check combined_resmoke_args when test_flags is not set on the variant.
         variant_debian = self.conf.get_variant("debian")
         resmoke_task = variant_debian.get_task("resmoke_task")
-        self.assertEqual("--suites=somesuite --storageEngine=mmapv1",
+        self.assertEqual("--suites=somesuite --storageEngine=wiredTiger",
                          resmoke_task.combined_resmoke_args)
 
         # Check for tasks included in task_groups

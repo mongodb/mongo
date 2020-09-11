@@ -1778,7 +1778,7 @@ Examples:
             --crashOption output1
             --sshCrashUserHost admin@10.4.100.2
             --sshCrashOption "-oKexAlgorithms=+diffie-hellman-group1-sha1 -i /Users/jonathan/.ssh/mFi.pem"
-            --mongodOptions "--storageEngine mmapv1"
+            --mongodOptions "--storageEngine wiredTiger"
 
     Linux server running in AWS, testing nojournal:
       python powertest.py
@@ -1978,9 +1978,7 @@ Examples:
     mongod_options.add_option(
         "--removeLockFile", dest="remove_lock_file",
         help="If specified, the mongod.lock file will be deleted after a"
-        " powercycle event, before mongod is started. This is a"
-        " workaround for mongod failing start with MMAPV1 (See"
-        " SERVER-15109).", action="store_true", default=False)
+        " powercycle event, before mongod is started.", action="store_true", default=False)
 
     # Client options
     mongo_path = distutils.spawn.find_executable("dist-test/bin/mongo",
