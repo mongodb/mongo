@@ -39,6 +39,7 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/stage_types.h"
+#include "mongo/util/id_generator.h"
 
 namespace mongo {
 
@@ -110,7 +111,16 @@ private:
  * PlanStages, which can then be handed to a PlanRunner for execution.
  */
 struct QuerySolutionNode {
-    QuerySolutionNode() {}
+    /**
+     * Each node in a 'QuerySolution' tree is assigned a unique identifier of this type. The
+     * identifiers are unique within the tree, but not across trees.
+     *
+     * Ids are assigned as sequential positive integers starting from 1. An id of 0 means that no id
+     * was explicit assigned during construction of the QuerySolution.
+     */
+    using NodeId = uint32_t;
+
+    QuerySolutionNode() = default;
 
     /**
      * Constructs a QuerySolutionNode with a single child.
@@ -238,6 +248,10 @@ struct QuerySolutionNode {
      */
     bool hasNode(StageType type) const;
 
+    NodeId nodeId() const {
+        return _nodeId;
+    }
+
     // These are owned here.
     //
     // TODO SERVER-35512: Make this a vector of unique_ptr.
@@ -260,8 +274,13 @@ protected:
     void addCommon(str::stream* ss, int indent) const;
 
 private:
+    // Allows the QuerySolution constructor to set '_nodeId'.
+    friend class QuerySolution;
+
     QuerySolutionNode(const QuerySolutionNode&) = delete;
     QuerySolutionNode& operator=(const QuerySolutionNode&) = delete;
+
+    NodeId _nodeId{0u};
 };
 
 struct QuerySolutionNodeWithSortSet : public QuerySolutionNode {
@@ -291,11 +310,43 @@ struct QuerySolutionNodeWithSortSet : public QuerySolutionNode {
  * A tree of stages may be built from a QuerySolution.  The QuerySolution must outlive the tree
  * of stages.
  */
-struct QuerySolution {
-    QuerySolution() : hasBlockingStage(false), indexFilterApplied(false) {}
+class QuerySolution {
+public:
+    QuerySolution() = default;
 
-    // Owned here.
-    std::unique_ptr<QuerySolutionNode> root;
+    /**
+     * Return true if this solution tree contains a node of the given 'type'.
+     */
+    bool hasNode(StageType type) const {
+        return _root && _root->hasNode(type);
+    }
+
+    /**
+     * Output a human-readable std::string representing the plan.
+     */
+    std::string toString() {
+        if (!_root) {
+            return "empty query solution";
+        }
+
+        str::stream ss;
+        _root->appendToString(&ss, 0);
+        return ss;
+    }
+
+    const QuerySolutionNode* root() const {
+        return _root.get();
+    }
+    QuerySolutionNode* root() {
+        return _root.get();
+    }
+
+    /**
+     * Assigns the QuerySolutionNode rooted at 'root' to this QuerySolution. Also assigns a unique
+     * identifying integer to each node in the tree, which can subsequently be displayed in debug
+     * output (e.g. explain).
+     */
+    void setRoot(std::unique_ptr<QuerySolutionNode> root);
 
     // Any filters in root or below point into this object.  Must be owned.
     BSONObj filterData;
@@ -309,38 +360,24 @@ struct QuerySolution {
     // Hashed AND stage:
     // The hashed AND stage buffers data from multiple index scans and could block. In that case,
     // we would want to fall back on an alternate non-blocking solution.
-    bool hasBlockingStage;
+    bool hasBlockingStage{false};
 
     // Runner executing this solution might be interested in knowing
     // if the planning process for this solution was based on filtered indices.
-    bool indexFilterApplied;
+    bool indexFilterApplied{false};
 
     // Owned here. Used by the plan cache.
     std::unique_ptr<SolutionCacheData> cacheData;
 
-    /**
-     * True, of this solution tree contains a node of the given 'type'.
-     */
-    bool hasNode(StageType type) const {
-        return root && root->hasNode(type);
-    }
-
-    /**
-     * Output a human-readable std::string representing the plan.
-     */
-    std::string toString() {
-        if (nullptr == root) {
-            return "empty query solution";
-        }
-
-        str::stream ss;
-        root->appendToString(&ss, 0);
-        return ss;
-    }
-
 private:
+    using QsnIdGenerator = IdGenerator<QuerySolutionNode::NodeId>;
+
     QuerySolution(const QuerySolution&) = delete;
     QuerySolution& operator=(const QuerySolution&) = delete;
+
+    void assignNodeIds(QsnIdGenerator& idGenerator, QuerySolutionNode& node);
+
+    std::unique_ptr<QuerySolutionNode> _root;
 };
 
 struct TextNode : public QuerySolutionNodeWithSortSet {

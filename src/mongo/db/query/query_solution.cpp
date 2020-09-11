@@ -127,6 +127,8 @@ void QuerySolutionNode::addIndent(str::stream* ss, int level) {
 
 void QuerySolutionNode::addCommon(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
+    *ss << "nodeId = " << _nodeId << '\n';
+    addIndent(ss, indent + 1);
     *ss << "fetched = " << fetched() << '\n';
     addIndent(ss, indent + 1);
     *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << '\n';
@@ -146,6 +148,19 @@ bool QuerySolutionNode::hasNode(StageType type) const {
     }
 
     return false;
+}
+
+void QuerySolution::assignNodeIds(QsnIdGenerator& idGenerator, QuerySolutionNode& node) {
+    for (auto&& child : node.children) {
+        assignNodeIds(idGenerator, *child);
+    }
+    node._nodeId = idGenerator.generate();
+}
+
+void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
+    _root = std::move(root);
+    QsnIdGenerator idGenerator;
+    assignNodeIds(idGenerator, *_root);
 }
 
 //

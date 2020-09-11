@@ -501,8 +501,7 @@ size_t QueryPlannerTest::numSolutionMatches(const std::string& solnJson) const {
     BSONObj testSoln = fromjson(solnJson);
     size_t matches = 0;
     for (auto&& soln : solns) {
-        QuerySolutionNode* root = soln->root.get();
-        if (QueryPlannerTestLib::solutionMatches(testSoln, root, relaxBoundsCheck)) {
+        if (QueryPlannerTestLib::solutionMatches(testSoln, soln->root(), relaxBoundsCheck)) {
             ++matches;
         }
     }

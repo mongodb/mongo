@@ -243,7 +243,7 @@ public:
         ASSERT(
             QueryPlannerTestLib::solutionMatches("{fetch: {filter: {a:1}, node: "
                                                  "{ixscan: {filter: null, pattern: {d:1}}}}}",
-                                                 soln->root.get()));
+                                                 soln->root()));
 
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         const Collection* collection = ctx.getCollection();
@@ -296,7 +296,7 @@ public:
         // {a:100} is super selective so choose that.
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root.get()));
+            "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root()));
 
         // Turn on the "force intersect" option.
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
@@ -319,7 +319,7 @@ public:
             QueryPlannerTestLib::solutionMatches("{fetch: {node: {andSorted: {nodes: ["
                                                  "{ixscan: {filter: null, pattern: {a:1}}},"
                                                  "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
-                                                 soln->root.get()));
+                                                 soln->root()));
     }
 };
 
@@ -355,7 +355,7 @@ public:
             QueryPlannerTestLib::solutionMatches("{fetch: {node: {andHash: {nodes: ["
                                                  "{ixscan: {filter: null, pattern: {a:1}}},"
                                                  "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
-                                                 soln->root.get()));
+                                                 soln->root()));
 
         // Confirm that a backup plan is available.
         ASSERT(hasBackupPlan());
@@ -392,7 +392,7 @@ public:
         // Prefer the fully covered plan.
         ASSERT(QueryPlannerTestLib::solutionMatches(
             "{proj: {spec: {_id:0, a:1, b:1}, node: {ixscan: {pattern: {a: 1, b:1}}}}}",
-            soln->root.get()));
+            soln->root()));
     }
 };
 
@@ -425,9 +425,9 @@ public:
 
         // Anti-prefer the intersection plan.
         bool bestIsScanOverA = QueryPlannerTestLib::solutionMatches(
-            "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}", soln->root.get());
+            "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}", soln->root());
         bool bestIsScanOverB = QueryPlannerTestLib::solutionMatches(
-            "{fetch: {node: {ixscan: {pattern: {b: 1}}}}}", soln->root.get());
+            "{fetch: {node: {ixscan: {pattern: {b: 1}}}}}", soln->root());
         ASSERT(bestIsScanOverA || bestIsScanOverB);
     }
 };
@@ -464,7 +464,7 @@ public:
         // Prefer the fully covered plan.
         ASSERT(QueryPlannerTestLib::solutionMatches(
             "{proj: {spec: {_id:0, a:1, b:1}, node: {ixscan: {pattern: {a: 1, b:1}}}}}",
-            soln->root.get()));
+            soln->root()));
     }
 };
 
@@ -496,7 +496,7 @@ public:
         // {a: 100} is super selective so choose that.
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root.get()));
+            "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root()));
     }
 };
 
@@ -532,7 +532,7 @@ public:
         // {a: 100} is super selective so choose that.
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root.get()));
+            "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}", soln->root()));
     }
 };
 
@@ -565,7 +565,7 @@ public:
             "{sort: {pattern: {c: 1}, limit: 0, type:'simple', node:"
             "{fetch: {filter: null, node: "
             "{ixscan: {filter: null, pattern: {_id: 1}}}}}}}",
-            soln->root.get()));
+            soln->root()));
     }
 };
 
@@ -592,7 +592,7 @@ public:
 
         // The best must be a collscan.
         ASSERT(QueryPlannerTestLib::solutionMatches("{cscan: {dir: 1, filter: {foo: 2001}}}",
-                                                    soln->root.get()));
+                                                    soln->root()));
     }
 };
 
@@ -629,7 +629,7 @@ public:
         ASSERT(
             QueryPlannerTestLib::solutionMatches("{fetch: {filter: {a:1}, node: "
                                                  "{ixscan: {filter: null, pattern: {d:1,e:1}}}}}",
-                                                 soln->root.get()));
+                                                 soln->root()));
     }
 };
 
@@ -662,7 +662,7 @@ public:
         // Use index on 'b'.
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {node: {ixscan: {pattern: {b: 1}}}}}",
-                                                    soln->root.get()));
+                                                    soln->root()));
     }
 };
 
@@ -694,7 +694,7 @@ public:
         // Expect to use index {a: 1, b: 1}.
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}",
-                                                    soln->root.get()));
+                                                    soln->root()));
     }
 };
 

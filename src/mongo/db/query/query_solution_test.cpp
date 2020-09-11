@@ -1045,4 +1045,30 @@ TEST(QuerySolutionTest, SharedPrefixMultikeyNonMinMaxBoundsDoesNotProvideAnySort
     ASSERT_EQUALS(node.providedSorts().getIgnoredFields().size(), 0U);
     ASSERT_BSONOBJ_EQ(node.providedSorts().getBaseSortPattern(), BSONObj());
 }
+
+TEST(QuerySolutionTest, NodeIdsAssignedInPostOrderFashionStartingFromOne) {
+    // Construct a QuerySolution consisting of a root node with two children.
+    std::vector<std::unique_ptr<QuerySolutionNode>> children;
+    children.push_back(std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1))));
+    children.push_back(std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("b" << 1))));
+    auto orNode = std::make_unique<OrNode>();
+    orNode->addChildren(std::move(children));
+
+    // Before being added to the QuerySolution, all the nodes should have a nodeId of zero, which
+    // means that an id has not yet been assigned.
+    ASSERT_EQ(orNode->nodeId(), 0u);
+    ASSERT_EQ(orNode->children[0]->nodeId(), 0u);
+    ASSERT_EQ(orNode->children[1]->nodeId(), 0u);
+
+    auto querySolution = std::make_unique<QuerySolution>();
+    querySolution->setRoot(std::move(orNode));
+    auto root = querySolution->root();
+
+    // Since ids are assigned according to a post-order traversal, the root node should have id 3,
+    // the left child should have id 1, and the right child should have id 2.
+    ASSERT_EQ(root->nodeId(), 3);
+    ASSERT_EQ(root->children[0]->nodeId(), 1);
+    ASSERT_EQ(root->children[1]->nodeId(), 2);
+}
+
 }  // namespace

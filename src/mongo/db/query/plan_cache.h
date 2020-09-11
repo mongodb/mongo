@@ -109,7 +109,7 @@ public:
 namespace plan_ranker {
 struct PlanRankingDecision;
 }
-struct QuerySolution;
+class QuerySolution;
 struct QuerySolutionNode;
 
 /**

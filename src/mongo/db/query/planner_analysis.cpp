@@ -999,7 +999,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
     solnRoot = tryPushdownProjectBeneathSort(std::move(solnRoot));
 
-    soln->root = std::move(solnRoot);
+    soln->setRoot(std::move(solnRoot));
     return soln;
 }
 

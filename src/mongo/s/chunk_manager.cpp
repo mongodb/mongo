@@ -576,7 +576,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
         // Pick any solution that has non-trivial IndexBounds. bounds.size() == 0 represents a
         // trivial IndexBounds where none of the fields' values are bounded.
         for (auto&& soln : solutions) {
-            IndexBounds bounds = collapseQuerySolution(soln->root.get());
+            IndexBounds bounds = collapseQuerySolution(soln->root());
             if (bounds.size() > 0) {
                 return bounds;
             }

@@ -422,7 +422,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
                                              "{fetch: {node: {andSorted: {nodes: ["
                                              "{ixscan: {filter: null, pattern: {a:1}}},"
                                              "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
-                                             soln->root.get()));
+                                             soln->root()));
 
     // Get the resulting document.
     PlanStage::StageState state = PlanStage::NEED_TIME;
@@ -446,7 +446,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
                                              "{fetch: {node: {andSorted: {nodes: ["
                                              "{ixscan: {filter: null, pattern: {a:1}}},"
                                              "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
-                                             soln->root.get()));
+                                             soln->root()));
 
     // Restore index intersection force parameter.
     internalQueryForceIntersectionPlans.store(forceIxisectOldValue);

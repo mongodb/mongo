@@ -29,8 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/values/value.h"
 #include <boost/container/small_vector.hpp>
+
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/id_generator.h"
 
 namespace mongo {
 class BufReader;
@@ -582,4 +584,8 @@ using SlotAccessorMap = SlotMap<SlotAccessor*>;
 using FieldAccessorMap = absl::flat_hash_map<std::string, std::unique_ptr<ViewOfValueAccessor>>;
 using SlotSet = absl::flat_hash_set<SlotId>;
 using SlotVector = std::vector<SlotId>;
+
+using SlotIdGenerator = IdGenerator<value::SlotId>;
+using FrameIdGenerator = IdGenerator<FrameId>;
+using SpoolIdGenerator = IdGenerator<SpoolId>;
 }  // namespace mongo::sbe::value

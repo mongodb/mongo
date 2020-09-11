@@ -46,10 +46,10 @@ std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,
     // $text/$where context (and $text/$where are allowed), then no attempt should be made to
     // execute the query.
     invariant(!cq.canHaveNoopMatchNodes());
-    invariant(solution.root);
+    invariant(solution.root());
     invariant(ws);
     auto builder = std::make_unique<ClassicStageBuilder>(opCtx, collection, cq, solution, ws);
-    return builder->build(solution.root.get());
+    return builder->build(solution.root());
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>
@@ -64,14 +64,14 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
     // $text/$where context (and $text/$where are allowed), then no attempt should be made to
     // execute the query.
     invariant(!cq.canHaveNoopMatchNodes());
-    invariant(solution.root);
+    invariant(solution.root());
 
     auto sbeYieldPolicy = dynamic_cast<PlanYieldPolicySBE*>(yieldPolicy);
     invariant(sbeYieldPolicy);
 
     auto builder = std::make_unique<SlotBasedStageBuilder>(
         opCtx, collection, cq, solution, sbeYieldPolicy, needsTrialRunProgressTracker);
-    auto root = builder->build(solution.root.get());
+    auto root = builder->build(solution.root());
     auto data = builder->getPlanStageData();
 
     // Register this plan to yield according to the configured policy.

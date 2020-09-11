@@ -1073,8 +1073,7 @@ protected:
         BSONObj testSoln = fromjson(solnJson);
         size_t matches = 0;
         for (auto&& soln : solns) {
-            QuerySolutionNode* root = soln->root.get();
-            if (QueryPlannerTestLib::solutionMatches(testSoln, root)) {
+            if (QueryPlannerTestLib::solutionMatches(testSoln, soln->root())) {
                 ++matches;
             }
         }
@@ -1155,8 +1154,7 @@ protected:
     QuerySolution* firstMatchingSolution(const string& solnJson) const {
         BSONObj testSoln = fromjson(solnJson);
         for (auto&& soln : solns) {
-            QuerySolutionNode* root = soln->root.get();
-            if (QueryPlannerTestLib::solutionMatches(testSoln, root)) {
+            if (QueryPlannerTestLib::solutionMatches(testSoln, soln->root())) {
                 return soln.get();
             }
         }
@@ -1178,7 +1176,7 @@ protected:
      */
     void assertSolutionMatches(QuerySolution* trueSoln, const string& solnJson) const {
         BSONObj testSoln = fromjson(solnJson);
-        if (!QueryPlannerTestLib::solutionMatches(testSoln, trueSoln->root.get())) {
+        if (!QueryPlannerTestLib::solutionMatches(testSoln, trueSoln->root())) {
             str::stream ss;
             ss << "Expected solution " << solnJson
                << " did not match true solution: " << trueSoln->toString() << '\n';

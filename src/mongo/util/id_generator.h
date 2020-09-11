@@ -29,9 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/values/slot.h"
-
-namespace mongo::sbe::value {
+namespace mongo {
 /**
  * A reusable id generator suitable for use with integer ids that generates each new id by adding an
  * increment to the previously generated id. This generator is not thread safe; calls to
@@ -76,8 +74,4 @@ public:
         return idVector;
     }
 };
-
-using SlotIdGenerator = IdGenerator<value::SlotId>;
-using FrameIdGenerator = IdGenerator<FrameId>;
-using SpoolIdGenerator = IdGenerator<SpoolId>;
-}  // namespace mongo::sbe::value
+}  // namespace mongo

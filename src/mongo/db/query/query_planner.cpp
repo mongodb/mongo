@@ -1063,7 +1063,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
             QueryPlannerParams paramsForCoveredIxScan;
             auto soln = buildWholeIXSoln(index, query, paramsForCoveredIxScan);
-            if (soln && !soln->root->fetched()) {
+            if (soln && !soln->root()->fetched()) {
                 LOGV2_DEBUG(
                     20983, 5, "Planner: outputting soln that uses index to provide projection");
                 PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
