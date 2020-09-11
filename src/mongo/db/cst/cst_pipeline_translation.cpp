@@ -401,6 +401,20 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
             return make_intrusive<ExpressionSubtract>(expCtx.get(), std::move(expressions));
         case KeyFieldname::trunc:
             return make_intrusive<ExpressionTrunc>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::allElementsTrue:
+            return make_intrusive<ExpressionAllElementsTrue>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::anyElementTrue:
+            return make_intrusive<ExpressionAnyElementTrue>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::setDifference:
+            return make_intrusive<ExpressionSetDifference>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::setEquals:
+            return make_intrusive<ExpressionSetEquals>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::setIntersection:
+            return make_intrusive<ExpressionSetIntersection>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::setIsSubset:
+            return make_intrusive<ExpressionSetIsSubset>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::setUnion:
+            return make_intrusive<ExpressionSetUnion>(expCtx.get(), std::move(expressions));
         default:
             MONGO_UNREACHABLE;
     }

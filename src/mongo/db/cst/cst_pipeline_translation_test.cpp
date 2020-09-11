@@ -1313,5 +1313,78 @@ TEST(CstSortTranslationTest, SortWithMetaGeneratesCorrectSortPattern) {
         assertSortPatternsEQ(correctPattern, pattern);
     }
 }
+
+TEST(CstPipelineTranslationTest, AllElementsTrueTest) {
+    const auto cst = CNode{
+        CNode::ObjectChildren{{KeyFieldname::allElementsTrue,
+                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$allElementsTrue: [\"$set\"]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, AnyElementsTrueTest) {
+    const auto cst = CNode{
+        CNode::ObjectChildren{{KeyFieldname::anyElementTrue,
+                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$anyElementTrue: [\"$set\"]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, SetDifferenceTest) {
+    const auto cst = CNode{
+        CNode::ObjectChildren{{KeyFieldname::setDifference,
+                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}},
+                                                          CNode{UserFieldPath{"set2", false}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$setDifference: [\"$set\", \"$set2\"]}")) == expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, SetEqualsTest) {
+    const auto cst = CNode{
+        CNode::ObjectChildren{{KeyFieldname::setEquals,
+                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}},
+                                                          CNode{UserFieldPath{"set2", false}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$setEquals: [\"$set\", \"$set2\"]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, SetIntersectionTest) {
+    const auto cst = CNode{
+        CNode::ObjectChildren{{KeyFieldname::setIntersection,
+                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}},
+                                                          CNode{UserFieldPath{"set2", false}},
+                                                          CNode{UserFieldPath{"set3", false}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$setIntersection: [\"$set\", \"$set2\", \"$set3\"]}")) ==
+        expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, SetIsSubsetTest) {
+    const auto cst = CNode{
+        CNode::ObjectChildren{{KeyFieldname::setIsSubset,
+                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}},
+                                                          CNode{UserFieldPath{"set2", false}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$setIsSubset: [\"$set\", \"$set2\"]}")) == expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, SetUnionTest) {
+    const auto cst = CNode{
+        CNode::ObjectChildren{{KeyFieldname::setUnion,
+                               CNode{CNode::ArrayChildren{CNode{UserFieldPath{"set", false}},
+                                                          CNode{UserFieldPath{"set2", false}},
+                                                          CNode{UserFieldPath{"set3", false}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$setUnion: [\"$set\", \"$set2\", \"$set3\"]}")) ==
+        expr->serialize(false)));
+}
+
 }  // namespace
 }  // namespace mongo

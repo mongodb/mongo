@@ -135,6 +135,13 @@ const StringMap<ParserGen::token_type> reservedKeyLookup = {
     {"query", ParserGen::token::ARG_QUERY},
     {"q", ParserGen::token::ARG_Q},
     {"sort", ParserGen::token::ARG_SORT},
+    {"$allElementsTrue", ParserGen::token::ALL_ELEMENTS_TRUE},
+    {"$anyElementTrue", ParserGen::token::ANY_ELEMENT_TRUE},
+    {"$setDifference", ParserGen::token::SET_DIFFERENCE},
+    {"$setEquals", ParserGen::token::SET_EQUALS},
+    {"$setIntersection", ParserGen::token::SET_INTERSECTION},
+    {"$setIsSubset", ParserGen::token::SET_IS_SUBSET},
+    {"$setUnion", ParserGen::token::SET_UNION},
 };
 // Mapping of reserved keywords to BSON tokens. Any key which is not included in this map is
 // assumed to be a user value.
