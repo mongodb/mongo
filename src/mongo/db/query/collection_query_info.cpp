@@ -181,7 +181,7 @@ void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
     }
 }
 
-void CollectionQueryInfo::clearQueryCache(const Collection* coll) {
+void CollectionQueryInfo::clearQueryCache(const Collection* coll) const {
     LOGV2_DEBUG(20907,
                 1,
                 "Clearing plan cache - collection info cache reset",

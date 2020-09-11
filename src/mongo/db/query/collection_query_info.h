@@ -84,7 +84,7 @@ public:
     /**
      * Removes all cached query plans.
      */
-    void clearQueryCache(const Collection* coll);
+    void clearQueryCache(const Collection* coll) const;
 
     void notifyOfQuery(OperationContext* opCtx,
                        const Collection* coll,

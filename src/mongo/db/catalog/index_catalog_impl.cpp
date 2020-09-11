@@ -431,12 +431,8 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     invariant(!frozen || !isReadyIndex);
 
     auto* const descriptorPtr = descriptor.get();
-    auto entry = std::make_shared<IndexCatalogEntryImpl>(opCtx,
-                                                         _collection->getCatalogId(),
-                                                         ident,
-                                                         std::move(descriptor),
-                                                         &CollectionQueryInfo::get(_collection),
-                                                         frozen);
+    auto entry = std::make_shared<IndexCatalogEntryImpl>(
+        opCtx, _collection->getCatalogId(), ident, std::move(descriptor), frozen);
 
     IndexDescriptor* desc = entry->descriptor();
     std::unique_ptr<SortedDataInterface> sdi =

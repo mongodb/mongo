@@ -46,7 +46,6 @@
 namespace mongo {
 
 class CollatorInterface;
-class CollectionQueryInfo;
 class IndexAccessMethod;
 class IndexDescriptor;
 class MatchExpression;
@@ -62,7 +61,6 @@ public:
                           RecordId catalogId,
                           const std::string& ident,
                           std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
-                          CollectionQueryInfo* queryInfo,               // not owned, optional
                           bool isFrozen);
 
     void init(std::unique_ptr<IndexAccessMethod> accessMethod) final;
@@ -217,8 +215,6 @@ private:
     const std::string _ident;
 
     std::unique_ptr<IndexDescriptor> _descriptor;  // owned here
-
-    CollectionQueryInfo* _queryInfo;  // not owned here
 
     std::unique_ptr<IndexAccessMethod> _accessMethod;
 

@@ -65,11 +65,9 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
                                              RecordId catalogId,
                                              const std::string& ident,
                                              std::unique_ptr<IndexDescriptor> descriptor,
-                                             CollectionQueryInfo* const queryInfo,
                                              bool isFrozen)
     : _ident(ident),
       _descriptor(std::move(descriptor)),
-      _queryInfo(queryInfo),
       _catalogId(catalogId),
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
@@ -367,13 +365,13 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
             _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
         }
     }
-    if (indexMetadataHasChanged && _queryInfo) {
+    if (indexMetadataHasChanged) {
         LOGV2_DEBUG(4718705,
                     1,
                     "Index set to multi key, clearing query plan cache",
                     "namespace"_attr = collection->ns(),
                     "keyPattern"_attr = _descriptor->keyPattern());
-        _queryInfo->clearQueryCache(collection);
+        CollectionQueryInfo::get(collection).clearQueryCache(collection);
     }
 
     opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp>) {
