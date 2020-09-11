@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <regex>
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/matcher/expression.h"
@@ -45,8 +44,6 @@ namespace mongo {
 class ExpressionWithPlaceholder {
 
 public:
-    static const std::regex placeholderRegex;
-
     /**
      * Constructs an ExpressionWithPlaceholder from an existing match expression. Returns a non-OK
      * status if the paths inside the match expression do not name a consistent placeholder string.

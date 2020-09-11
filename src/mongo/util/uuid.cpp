@@ -29,14 +29,15 @@
 
 #include "mongo/platform/basic.h"
 
-#include <regex>
-
 #include "mongo/util/uuid.h"
+
+#include <pcrecpp.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/static_immortal.h"
 
 namespace mongo {
 
@@ -44,10 +45,6 @@ namespace {
 
 Mutex uuidGenMutex;
 SecureRandom uuidGen;
-
-// Regex to match valid version 4 UUIDs with variant bits set
-std::regex uuidRegex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
-                     std::regex::optimize);
 
 }  // namespace
 
@@ -89,7 +86,14 @@ UUID UUID::parse(const BSONObj& obj) {
 }
 
 bool UUID::isUUIDString(const std::string& s) {
-    return std::regex_match(s, uuidRegex);
+    // Regex to match valid version 4 UUIDs with variant bits set
+    static StaticImmortal<pcrecpp::RE> uuidRegex(
+        "[[:xdigit:]]{8}-"
+        "[[:xdigit:]]{4}-"
+        "[[:xdigit:]]{4}-"
+        "[[:xdigit:]]{4}-"
+        "[[:xdigit:]]{12}");
+    return uuidRegex->FullMatch(s);
 }
 
 bool UUID::isRFC4122v4() const {
