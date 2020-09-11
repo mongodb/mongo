@@ -54,7 +54,6 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
-#include "mongo/transport/service_executor.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
@@ -303,12 +302,6 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
         serializeAuthenticatedUsers("runBy"_sd);
     } else {
         serializeAuthenticatedUsers("effectiveUsers"_sd);
-    }
-
-    if (const auto seCtx = transport::ServiceExecutorContext::get(client)) {
-        bool isDedicated = (seCtx->getThreadingModel() ==
-                            transport::ServiceExecutorContext::ThreadingModel::kDedicated);
-        infoBuilder->append("threaded"_sd, isDedicated);
     }
 
     if (clientOpCtx) {

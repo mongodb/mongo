@@ -136,6 +136,8 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
     transport::TransportLayerASIO::Options opts(config);
     opts.transportMode = transport::Mode::kSynchronous;
 
+    ctx->setServiceExecutor(std::make_unique<ServiceExecutorSynchronous>(ctx));
+
     std::vector<std::unique_ptr<TransportLayer>> retVector;
     retVector.emplace_back(std::make_unique<transport::TransportLayerASIO>(opts, sep));
     return std::make_unique<TransportLayerManager>(std::move(retVector));
