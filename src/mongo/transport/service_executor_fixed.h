@@ -32,7 +32,6 @@
 #include <memory>
 
 #include "mongo/base/status.h"
-#include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -54,8 +53,6 @@ class ServiceExecutorFixed : public ServiceExecutor,
 public:
     explicit ServiceExecutorFixed(ThreadPool::Options options);
     virtual ~ServiceExecutorFixed();
-
-    static ServiceExecutorFixed* get(ServiceContext* ctx);
 
     Status start() override;
     Status shutdown(Milliseconds timeout) override;

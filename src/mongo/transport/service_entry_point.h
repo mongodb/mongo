@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <limits>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/transport/session.h"
@@ -81,13 +79,6 @@ public:
      * Returns the number of sessions currently open.
      */
     virtual size_t numOpenSessions() const = 0;
-
-    /**
-     * Returns the maximum number of sessions that can be open.
-     */
-    virtual size_t maxOpenSessions() const {
-        return std::numeric_limits<size_t>::max();
-    }
 
     /**
      * Processes a request and fills out a DbResponse.

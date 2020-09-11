@@ -38,7 +38,6 @@
 #include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_utils.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/thread_safety_context.h"
 
 namespace mongo {
 namespace transport {
@@ -46,14 +45,6 @@ namespace {
 constexpr auto kThreadsRunning = "threadsRunning"_sd;
 constexpr auto kExecutorLabel = "executor"_sd;
 constexpr auto kExecutorName = "passthrough"_sd;
-
-const auto getServiceExecutorSynchronous =
-    ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorSynchronous>>();
-
-const auto serviceExecutorSynchronousRegisterer = ServiceContext::ConstructorActionRegisterer{
-    "ServiceExecutorSynchronous", [](ServiceContext* ctx) {
-        getServiceExecutorSynchronous(ctx) = std::make_unique<ServiceExecutorSynchronous>(ctx);
-    }};
 }  // namespace
 
 thread_local std::deque<ServiceExecutor::Task> ServiceExecutorSynchronous::_localWorkQueue = {};
@@ -85,12 +76,6 @@ Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
         ? Status::OK()
         : Status(ErrorCodes::Error::ExceededTimeLimit,
                  "passthrough executor couldn't shutdown all worker threads within time limit.");
-}
-
-ServiceExecutorSynchronous* ServiceExecutorSynchronous::get(ServiceContext* ctx) {
-    auto& ref = getServiceExecutorSynchronous(ctx);
-    invariant(ref);
-    return ref.get();
 }
 
 Status ServiceExecutorSynchronous::scheduleTask(Task task, ScheduleFlags flags) {

@@ -33,18 +33,19 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/client.h"
-#include "mongo/db/service_context.h"
 #include "mongo/platform/bitwise_enum_operators.h"
-#include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/session.h"
 #include "mongo/transport/transport_mode.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
+// This needs to be forward declared here because the service_context.h is a circular dependency.
+class ServiceContext;
+
 namespace transport {
+
+class Session;
 
 /*
  * This is the interface for all ServiceExecutors.
@@ -121,74 +122,6 @@ public:
      */
     virtual void appendStats(BSONObjBuilder* bob) const = 0;
 };
-
-/**
- * ServiceExecutorContext determines which ServiceExecutor is used for each Client.
- */
-class ServiceExecutorContext {
-public:
-    enum ThreadingModel {
-        kBorrowed,
-        kDedicated,
-    };
-
-    /**
-     * Get a pointer to the ServiceExecutorContext for a given client.
-     *
-     * This function is valid to invoke either on the Client thread or with the Client lock.
-     */
-    static ServiceExecutorContext* get(Client* client) noexcept;
-
-    /**
-     * Set the ServiceExecutorContext for a given client.
-     *
-     * This function may only be invoked once and only while under the Client lock.
-     */
-    static void set(Client* client, ServiceExecutorContext seCtx) noexcept;
-
-    ServiceExecutorContext() = default;
-
-    /**
-     * Set the ThreadingModel for the associated Client's service execution.
-     *
-     * This function is only valid to invoke with the Client lock or before the Client is set.
-     */
-    ServiceExecutorContext& setThreadingModel(ThreadingModel threadingModel) noexcept;
-
-    /**
-     * Set if reserved resources are available for the associated Client's service execution.
-     *
-     * This function is only valid to invoke with the Client lock or before the Client is set.
-     */
-    ServiceExecutorContext& setCanUseReserved(bool canUseReserved) noexcept;
-
-    /**
-     * Get the ThreadingModel for the associated Client.
-     *
-     * This function is valid to invoke either on the Client thread or with the Client lock.
-     */
-    auto getThreadingModel() const noexcept {
-        return _threadingModel;
-    }
-
-    /**
-     * Get an appropriate ServiceExecutor given the current parameters.
-     *
-     * This function is only valid to invoke from the associated Client thread. This function does
-     * not require the Client lock since all writes must also happen from that thread.
-     */
-    ServiceExecutor* getServiceExecutor() const noexcept;
-
-private:
-    friend StringData toString(ThreadingModel threadingModel);
-
-    Client* _client = nullptr;
-    ServiceEntryPoint* _sep = nullptr;
-
-    ThreadingModel _threadingModel = ThreadingModel::kDedicated;
-    bool _canUseReserved = false;
-};
-
 
 }  // namespace transport
 
