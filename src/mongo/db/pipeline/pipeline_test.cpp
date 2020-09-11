@@ -426,6 +426,22 @@ TEST(PipelineOptimizationTest, SortLimitSortRetainsLimit) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, SortLimitSortWithDifferentSortPatterns) {
+    std::string inputPipe =
+        "[{$sort: {a: 1}}"
+        ",{$limit: 12}"
+        ",{$sort: {b: 1}}"
+        "]";
+
+    std::string outputPipe =
+        "[{$sort: {sortKey: {a: 1}, limit: 12}}"
+        ",{$sort: {sortKey: {b: 1}}}"
+        "]";
+
+    std::string serializedPipe = inputPipe;
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
 TEST(PipelineOptimizationTest, SortSortLimitRetainsLimit) {
     std::string inputPipe =
         "[{$sort: {a: 1}}"

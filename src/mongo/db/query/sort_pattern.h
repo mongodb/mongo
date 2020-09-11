@@ -50,6 +50,11 @@ public:
         bool isAscending = true;
         boost::optional<FieldPath> fieldPath;
         boost::intrusive_ptr<ExpressionMeta> expression;
+
+        bool operator==(const SortPatternPart& other) const {
+            return isAscending == other.isAscending && fieldPath == other.fieldPath &&
+                expression == other.expression;
+        }
     };
 
     SortPattern(const BSONObj&, const boost::intrusive_ptr<ExpressionContext>&);
@@ -93,6 +98,10 @@ public:
 
     const SortPatternPart& operator[](int idx) const {
         return _sortPattern[idx];
+    }
+
+    bool operator==(const SortPattern& other) const {
+        return _sortPattern == other._sortPattern && _paths == other._paths;
     }
 
     std::vector<SortPatternPart>::const_iterator begin() const {

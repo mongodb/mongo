@@ -35,6 +35,7 @@
 
 #include "mongo/base/exact_cast.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -169,24 +170,33 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
         _sortExecutor->setLimit(*limit);
     }
 
-    if (std::next(itr) == container->end()) {
+    auto nextStage = std::next(itr);
+    if (nextStage == container->end()) {
         return container->end();
     }
 
-    if (auto nextSort = dynamic_cast<DocumentSourceSort*>((*std::next(itr)).get())) {
-        // If subsequent $sort stage exists, optimize by erasing the initial one.
-        // Since $sort is not guaranteed to be stable, we can blindly remove the first $sort.
-        auto thisLim = _sortExecutor->getLimit();
-        auto otherLim = nextSort->_sortExecutor->getLimit();
-        // When coalescing subsequent $sort stages, retain the existing/lower limit.
-        if (thisLim && (!otherLim || otherLim > thisLim)) {
-            nextSort->_sortExecutor->setLimit(thisLim);
-        }
-        Pipeline::SourceContainer::iterator ret = std::next(itr);
+    limit = getLimit();
+
+    // Since $sort is not guaranteed to be stable, we can blindly remove the first $sort only when
+    // there's no limit on the current sort.
+    auto nextSort = dynamic_cast<DocumentSourceSort*>((*nextStage).get());
+    if (!limit && nextSort) {
         container->erase(itr);
-        return ret;
+        return nextStage;
     }
-    return std::next(itr);
+
+    if (limit && nextSort) {
+        // If there's a limit between two adjacent sorts with the same key pattern it's safe to
+        // merge the two sorts and take the minimum of the limits.
+        if (dynamic_cast<DocumentSourceSort*>((*itr).get())->getSortKeyPattern() ==
+            nextSort->getSortKeyPattern()) {
+            // When coalescing subsequent $sort stages, the existing/lower limit is retained in
+            // 'setLimit'.
+            nextSort->_sortExecutor->setLimit(*limit);
+            container->erase(itr);
+        }
+    }
+    return nextStage;
 }
 
 DepsTracker::State DocumentSourceSort::getDependencies(DepsTracker* deps) const {
