@@ -38,7 +38,7 @@ from time import sleep
 def timestamp_str(t):
     return '%x' % t
 
-def retry_rollback(self, name, code):
+def retry_rollback(self, name, txn_session, code):
     retry_limit = 100
     retries = 0
     completed = False
@@ -46,7 +46,12 @@ def retry_rollback(self, name, code):
     while not completed and retries < retry_limit:
         if retries != 0:
             self.pr("Retrying operation for " + name)
+            if txn_session:
+                txn_session.rollback_transaction()
             sleep(0.1)
+            if txn_session:
+                txn_session.begin_transaction('isolation=snapshot')
+                self.pr("Began new transaction for " + name)
         try:
             code()
             completed = True
@@ -164,13 +169,13 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             # Perform several updates in parallel with checkpoint.
             # Rollbacks may occur when checkpoint is running, so retry as needed.
             self.pr("updates")
-            retry_rollback(self, 'update ds1, e',
+            retry_rollback(self, 'update ds1, e', None,
                            lambda: self.large_updates(uri_1, value_e, ds_1, nrows, 70))
-            retry_rollback(self, 'update ds2, e',
+            retry_rollback(self, 'update ds2, e', None,
                            lambda: self.large_updates(uri_2, value_e, ds_2, nrows, 70))
-            retry_rollback(self, 'update ds1, f',
+            retry_rollback(self, 'update ds1, f', None,
                            lambda: self.large_updates(uri_1, value_f, ds_1, nrows, 80))
-            retry_rollback(self, 'update ds2, f',
+            retry_rollback(self, 'update ds2, f', None,
                            lambda: self.large_updates(uri_2, value_f, ds_2, nrows, 80))
         finally:
             done.set()
@@ -271,12 +276,17 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         else:
             self.conn.set_timestamp('stable_timestamp=' + timestamp_str(50))
 
-        # Here's the update operation we'll perform, encapsulated so we can easily retry
+        # Here's the update operations we'll perform, encapsulated so we can easily retry
         # it if we get a rollback. Rollbacks may occur when checkpoint is running.
-        def simple_update(cursor, key, value):
-            cursor.set_key(key)
-            cursor.set_value(value)
-            self.assertEquals(cursor.update(), 0)
+        def prepare_range_updates(session, cursor, ds, value, nrows, prepare_config):
+            self.pr("updates")
+            for i in range(1, nrows):
+                key = ds.key(i)
+                cursor.set_key(key)
+                cursor.set_value(value)
+                self.assertEquals(cursor.update(), 0)
+            self.pr("prepare")
+            session.prepare_transaction(prepare_config)
 
         # Create a checkpoint thread
         done = threading.Event()
@@ -289,23 +299,19 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             session_p1 = self.conn.open_session()
             cursor_p1 = session_p1.open_cursor(uri_1)
             session_p1.begin_transaction('isolation=snapshot')
-            self.pr("updates 1")
-            for i in range(1, nrows):
-                retry_rollback(self, 'update ds1',
-                               lambda: simple_update(cursor_p1, ds_1.key(i), value_e))
-            self.pr("prepare 1")
-            session_p1.prepare_transaction('prepare_timestamp=' + timestamp_str(69))
+            retry_rollback(self, 'update ds1', session_p1,
+                           lambda: prepare_range_updates(
+                               session_p1, cursor_p1, ds_1, value_e, nrows,
+                               'prepare_timestamp=' + timestamp_str(69)))
 
             # Perform several updates in parallel with checkpoint.
             session_p2 = self.conn.open_session()
             cursor_p2 = session_p2.open_cursor(uri_2)
             session_p2.begin_transaction('isolation=snapshot')
-            self.pr("updates 2")
-            for i in range(1, nrows):
-                retry_rollback(self, 'update ds2',
-                               lambda: simple_update(cursor_p2, ds_2.key(i), value_e))
-            self.pr("prepare 2")
-            session_p2.prepare_transaction('prepare_timestamp=' + timestamp_str(69))
+            retry_rollback(self, 'update ds2', session_p2,
+                           lambda: prepare_range_updates(
+                               session_p2, cursor_p2, ds_2, value_e, nrows,
+                               'prepare_timestamp=' + timestamp_str(69)))
         finally:
             done.set()
             ckpt.join()
