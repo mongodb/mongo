@@ -44,8 +44,9 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='cst_pipeline_translation_test',
     source=[
-        'cst_pipeline_translation_test.cpp',
         'cst_literals_test.cpp',
+        'cst_pipeline_translation_test.cpp',
+        'cst_set_operator_translation_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
