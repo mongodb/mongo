@@ -764,31 +764,6 @@ void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,
                                         MultikeyPaths* multikeyPaths,
                                         boost::optional<RecordId> id,
                                         OnSuppressedErrorFn onSuppressedError) const {
-    static stdx::unordered_set<int> whiteList{ErrorCodes::CannotBuildIndexKeys,
-                                              // Btree
-                                              ErrorCodes::CannotIndexParallelArrays,
-                                              // FTS
-                                              16732,
-                                              16733,
-                                              16675,
-                                              17261,
-                                              17262,
-                                              // Hash
-                                              16766,
-                                              // Ambiguous array field name
-                                              16746,
-                                              // Haystack
-                                              16775,
-                                              16776,
-                                              // 2dsphere geo
-                                              16755,
-                                              16756,
-                                              // 2d geo
-                                              16804,
-                                              13067,
-                                              13068,
-                                              13026,
-                                              13027};
     try {
         doGetKeys(obj, context, keys, multikeyMetadataKeys, multikeyPaths, id);
     } catch (const AssertionException& ex) {
@@ -801,8 +776,8 @@ void AbstractIndexAccessMethod::getKeys(const BSONObj& obj,
         if (multikeyPaths) {
             multikeyPaths->clear();
         }
-        // Only suppress the errors in the whitelist.
-        if (whiteList.find(ex.code()) == whiteList.end()) {
+
+        if (ex.isA<ErrorCategory::Interruption>() || ex.isA<ErrorCategory::ShutdownError>()) {
             throw;
         }
 
