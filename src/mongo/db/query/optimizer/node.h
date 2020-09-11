@@ -179,4 +179,5 @@ public:
 private:
     const ProjectionName _projectionName;
 };
+
 }  // namespace mongo::optimizer
