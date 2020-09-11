@@ -931,7 +931,8 @@ MongoRunner.StopError.prototype = Object.create(Error.prototype);
 MongoRunner.StopError.prototype.constructor = MongoRunner.StopError;
 
 // Constants for exit codes of MongoDB processes
-MongoRunner.EXIT_ABORT = -6;
+// On Windows, std::abort causes the process to exit with return code 14.
+MongoRunner.EXIT_ABORT = _isWindows() ? 14 : -6;
 MongoRunner.EXIT_CLEAN = 0;
 MongoRunner.EXIT_BADOPTIONS = 2;
 MongoRunner.EXIT_REPLICATION_ERROR = 3;

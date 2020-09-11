@@ -86,8 +86,7 @@ assert.soon(function() {
 });
 
 // Secondary should crash on receiving the unexpected commitIndexBuild oplog entry.
-const fassertProcessExitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
-assert.eq(fassertProcessExitCode, res.exitCode);
+assert.eq(MongoRunner.EXIT_ABORT, res.exitCode);
 assert(rawMongoProgramOutput().match('Fatal assertion.*4698902'),
        'Index build should have aborted secondary due to unexpected commitIndexBuild oplog entry.');
 
