@@ -329,7 +329,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
             }
 
             if (!serverGlobalParams.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
-                std::string renameTarget = absoluteLogpath + "." + terseCurrentTime(false);
+                std::string renameTarget = absoluteLogpath + "." + terseCurrentTimeForFilename();
                 boost::system::error_code ec;
                 boost::filesystem::rename(absoluteLogpath, renameTarget, ec);
                 if (!ec) {

@@ -50,7 +50,7 @@ void addLogRotator(LogRotateCallback cb) {
 
 bool rotateLogs(bool renameFiles) {
     // Rotate on both logv1 and logv2 so all files that need rotation gets rotated
-    std::string suffix = "." + terseCurrentTime(false);
+    std::string suffix = "." + terseCurrentTimeForFilename();
     LOGV2(23166, "Log rotation initiated", "suffix"_attr = suffix);
     bool success = true;
 

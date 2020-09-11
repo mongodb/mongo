@@ -91,7 +91,7 @@ StatusWith<std::unique_ptr<FTDCFileManager>> FTDCFileManager::create(
     auto interimDocs = mgr->recoverInterimFile();
 
     // Open the archive file for writing
-    auto swFile = mgr->generateArchiveFileName(path, terseUTCCurrentTime());
+    auto swFile = mgr->generateArchiveFileName(path, terseCurrentTimeForFilename(true));
     if (!swFile.isOK()) {
         return swFile.getStatus();
     }
@@ -315,7 +315,7 @@ Status FTDCFileManager::rotate(Client* client) {
         return s;
     }
 
-    auto swFile = generateArchiveFileName(_path, terseUTCCurrentTime());
+    auto swFile = generateArchiveFileName(_path, terseCurrentTimeForFilename(true));
     if (!swFile.isOK()) {
         return swFile.getStatus();
     }

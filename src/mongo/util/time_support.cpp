@@ -142,21 +142,20 @@ std::string time_t_to_String_short(time_t t) {
     return buf;
 }
 
+constexpr auto kUTCFilenameFormat = "%Y-%m-%dT%H-%M-%S"_sd;
+constexpr auto kUTCFilenameFormatZ = "%Y-%m-%dT%H-%M-%SZ"_sd;
 
-// uses ISO 8601 dates without trailing Z
-// colonsOk should be false when creating filenames
-std::string terseCurrentTime(bool colonsOk) {
+// Produces a UTC datetime string suitable for use in filenames.
+std::string terseCurrentTimeForFilename(bool appendZed) {
     struct tm t;
     time_t_to_Struct(time(nullptr), &t);
 
-    const char* fmt = (colonsOk ? "%Y-%m-%dT%H:%M:%S" : "%Y-%m-%dT%H-%M-%S");
-    char buf[32];
-    fassert(16226, strftime(buf, sizeof(buf), fmt, &t) == 19);
-    return buf;
-}
+    const auto fmt = appendZed ? kUTCFilenameFormatZ : kUTCFilenameFormat;
+    const std::size_t expLen = appendZed ? 20 : 19;
 
-std::string terseUTCCurrentTime() {
-    return terseCurrentTime(false) + "Z";
+    char buf[32];
+    fassert(16226, strftime(buf, sizeof(buf), fmt.rawData(), &t) == expLen);
+    return buf;
 }
 
 DateStringBuffer& DateStringBuffer::iso8601(Date_t date, bool local) {

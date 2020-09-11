@@ -288,15 +288,10 @@ private:
 };
 
 /**
- * uses ISO 8601 dates without trailing "Z".
- * `colonsOk` should be false when creating filenames.
+ * Uses a format similar to, but incompatable with ISO 8601
+ * to produce UTC based datetimes suitable for use in filenames.
  */
-std::string terseCurrentTime(bool colonsOk = true);
-
-/**
- * Produces a short UTC date + time approriate for file names with Z appended.
- */
-std::string terseUTCCurrentTime();
+std::string terseCurrentTimeForFilename(bool appendZed = false);
 
 /** @{ */
 /**

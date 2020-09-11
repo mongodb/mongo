@@ -68,7 +68,7 @@ RemoveSaver::RemoveSaver(const string& a,
     _file = _root;
 
     stringstream ss;
-    ss << why << "." << terseCurrentTime(false) << "." << NUM++ << ".bson";
+    ss << why << "." << terseCurrentTimeForFilename() << "." << NUM++ << ".bson";
     _file /= ss.str();
 
     auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
