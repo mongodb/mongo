@@ -309,6 +309,7 @@ const allCommands = {
     updateUser: {skip: isPrimaryOnly},
     usersInfo: {skip: isPrimaryOnly},
     validate: {skip: isNotAUserDataRead},
+    voteCommitImportCollection: {skip: isNotAUserDataRead},
     voteCommitIndexBuild: {skip: isNotAUserDataRead},
     waitForFailPoint: {skip: isNotAUserDataRead},
     waitForOngoingChunkSplits: {skip: isNotAUserDataRead},

@@ -581,6 +581,7 @@ let viewsCommandTests = {
     usersInfo: {skip: isUnrelated},
     validate: {command: {validate: "view"}, expectFailure: true},
     waitForOngoingChunkSplits: {skip: isUnrelated},
+    voteCommitImportCollection: {skip: isUnrelated},
     voteCommitIndexBuild: {skip: isUnrelated},
     voteCommitTransaction: {skip: isUnrelated},
     voteAbortTransaction: {skip: isUnrelated},
