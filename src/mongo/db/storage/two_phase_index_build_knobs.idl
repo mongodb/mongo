@@ -62,7 +62,6 @@ server_parameters:
       build will proceed as a non-resumable index build.
       Set to 0 to skip the wait. This will also disable resumable index builds.
       Set to a negative value to wait indefinitely for the majority commit point.
-      TODO(SERVER-50519): Set default to -1.
     set_at: startup
     cpp_vartype: long long
     cpp_varname: gResumableIndexBuildMajorityOpTimeTimeoutMillis

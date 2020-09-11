@@ -420,13 +420,19 @@ bool isIndexBuildResumable(OperationContext* opCtx,
         return false;
     }
 
+    // Only index builds with the default "all-voters" commit quorum running on voting nodes should
+    // be resumable. A node that cannot contribute to the commit quorum should not be waiting for
+    // the majority commit point when trying to commit the index build.
     // IndexBuildsOptions::commitQuorum will be set if we are primary. Otherwise, we have to check
     // the config.system.indexBuilds collection.
     if (indexBuildOptions.commitQuorum) {
-        if (indexBuildOptions.commitQuorum->numNodes == CommitQuorumOptions::kDisabled) {
+        if (CommitQuorumOptions::kVotingMembers != indexBuildOptions.commitQuorum->mode) {
             return false;
         }
     } else {
+        // The commit quorum may be updated using the setIndexBuildCommitQuorum command, so we will
+        // rely on the deadline to unblock ourselves from the majority wait if the commit quorum is
+        // no longer "all-voters".
         auto swCommitQuorum = indexbuildentryhelpers::getCommitQuorum(opCtx, replState.buildUUID);
         if (!swCommitQuorum.isOK()) {
             LOGV2(5044600,
@@ -437,9 +443,22 @@ bool isIndexBuildResumable(OperationContext* opCtx,
             return false;
         }
         auto commitQuorum = swCommitQuorum.getValue();
-        if (commitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
+        if (CommitQuorumOptions::kVotingMembers != commitQuorum.mode) {
             return false;
         }
+    }
+
+    // Ensure that this node is a voting member in the replica set config.
+    auto rsConfig = replCoord->getConfig();
+    auto hap = replCoord->getMyHostAndPort();
+    if (auto memberConfig = rsConfig.findMemberByHostAndPort(hap)) {
+        if (!memberConfig->isVoter()) {
+            return false;
+        }
+    } else {
+        // We cannot determine our member config, so skip the majority wait and leave this index
+        // build as non-resumable.
+        return false;
     }
 
     return true;
