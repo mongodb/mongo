@@ -196,9 +196,11 @@ void RandomizedIdempotencyTest::runIdempotencyTestCase() {
     size_t depth = 1;
     size_t length = 1;
 
-    const double kScalarProbability = 0.25;
-    const double kDocProbability = 0.25;
-    const double kArrProbability = 0.25;
+    // Eliminate modification of array elements, because they cause theoretically valid sequences
+    // that cause idempotency issues.
+    const double kScalarProbability = 0.375;
+    const double kDocProbability = 0.375;
+    const double kArrProbability = 0;
 
     this->seed = SecureRandom().nextInt64();
     PseudoRandom seedGenerator(this->seed);
@@ -236,8 +238,25 @@ void RandomizedIdempotencyTest::runUpdateV2IdempotencyTestCase(double v2Probabil
     this->seed = SecureRandom().nextInt64();
     PseudoRandom seedGenerator(this->seed);
     RandomizedScalarGenerator scalarGenerator{PseudoRandom(seedGenerator.nextInt64())};
+
+    // Eliminate modification of array elements when generating $v:1 oplog udpates, because they
+    // cause theoretically valid sequences that cause idempotency issues.
+    //
+    // For example oplog entries '{$unset: {a.1: null}}' and '{$set: {a.1.1: null}}' can break
+    // idempotency if the entries are applied on an input document '{a: []}'. These entries should
+    // not have been generated in practice if the starting document is '{a: []}', but the current
+    // 'UpdateSequenceGenerator' is not smart enough to figure that out.
+    const double kScalarProbability = 0.375;
+    const double kDocProbability = 0.375;
+    const double kArrProbability = 0;
+
     std::set<StringData> fields{"f00", "f10", "f01", "f11", "f02", "f20"};
-    UpdateSequenceGenerator updateV1Generator({fields, 2 /* depth */, 2 /* length */},
+    UpdateSequenceGenerator updateV1Generator({fields,
+                                               2 /* depth */,
+                                               2 /* length */,
+                                               kScalarProbability,
+                                               kDocProbability,
+                                               kArrProbability},
                                               PseudoRandom(seedGenerator.nextInt64()),
                                               &scalarGenerator);
 
