@@ -8,6 +8,7 @@ env.Library(
     target="optimizer",
     source=[
         "defs.cpp",
+        "memo.cpp",
         "node.cpp",
     ],
     LIBDEPS=[

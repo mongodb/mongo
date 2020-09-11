@@ -37,6 +37,7 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/filter.h"
 #include "mongo/db/query/optimizer/projection.h"
@@ -45,157 +46,137 @@
 
 namespace mongo::optimizer {
 
-class Node;
-using NodePtr = std::unique_ptr<Node>;
 
-class AbstractVisitor;
+class ScanNode;
+class MultiJoinNode;
+class UnionNode;
+class GroupByNode;
+class UnwindNode;
+class WindNode;
+
+using PolymorphicNode =
+    algebra::PolyValue<ScanNode, MultiJoinNode, UnionNode, GroupByNode, UnwindNode, WindNode>;
+
+template <typename Derived, size_t Arity>
+using Operator = algebra::OpSpecificArity<PolymorphicNode, Derived, Arity>;
+
+template <typename Derived, size_t Arity>
+using OperatorDynamic = algebra::OpSpecificDynamicArity<PolymorphicNode, Derived, Arity>;
+
+template <typename Derived>
+using OperatorDynamicHomogenous = OperatorDynamic<Derived, 0>;
+
+using PolymorphicNodeVector = std::vector<PolymorphicNode>;
+
+template <typename T, typename... Args>
+inline auto make(Args&&... args) {
+    return PolymorphicNode::make<T>(std::forward<Args>(args)...);
+}
+
+template <typename... Args>
+inline auto makeSeq(Args&&... args) {
+    PolymorphicNodeVector seq;
+    (seq.emplace_back(std::forward<Args>(args)), ...);
+    return seq;
+}
 
 class Node {
-public:
-    using ChildVector = std::vector<NodePtr>;
-
 protected:
     explicit Node(Context& ctx);
-    explicit Node(Context& ctx, NodePtr child);
-    explicit Node(Context& ctx, ChildVector children);
 
     void generateMemoBase(std::ostringstream& os) const;
 
-    virtual void visit(AbstractVisitor& visitor) const = 0;
-    void visitPreOrder(AbstractVisitor& visitor) const;
-    void visitPostOrder(AbstractVisitor& visitor) const;
-
-    // clone
 public:
     Node() = delete;
 
-    std::string generateMemo() const;
-
-    NodePtr clone(Context& ctx) const;
-
-    int getChildCount() const;
-
 private:
     const NodeIdType _nodeId;
-    ChildVector _children;
 };
 
-class ScanNode : public Node {
+class ScanNode final : public Operator<ScanNode, 0>, public Node {
+    using Base = Operator<ScanNode, 0>;
+
 public:
-    static NodePtr create(Context& ctx, CollectionNameType collectionName);
-    static NodePtr clone(Context& ctx, const ScanNode& other);
+    explicit ScanNode(Context& ctx, CollectionNameType collectionName);
 
     void generateMemo(std::ostringstream& os) const;
 
-protected:
-    void visit(AbstractVisitor& visitor) const override;
-
 private:
-    explicit ScanNode(Context& ctx, CollectionNameType collectionName);
-
     const CollectionNameType _collectionName;
 };
 
-class MultiJoinNode : public Node {
+class MultiJoinNode final : public OperatorDynamicHomogenous<MultiJoinNode>, public Node {
+    using Base = OperatorDynamicHomogenous<MultiJoinNode>;
+
 public:
     using FilterSet = std::unordered_set<FilterType>;
     using ProjectionMap = std::unordered_map<ProjectionName, ProjectionType>;
 
-    static NodePtr create(Context& ctx,
-                          FilterSet filterSet,
-                          ProjectionMap projectionMap,
-                          ChildVector children);
-    static NodePtr clone(Context& ctx, const MultiJoinNode& other, ChildVector newChildren);
-
-    void generateMemo(std::ostringstream& os) const;
-
-protected:
-    void visit(AbstractVisitor& visitor) const override;
-
-private:
     explicit MultiJoinNode(Context& ctx,
                            FilterSet filterSet,
                            ProjectionMap projectionMap,
-                           ChildVector children);
+                           PolymorphicNodeVector children);
 
+    void generateMemo(std::ostringstream& os) const;
+
+private:
     FilterSet _filterSet;
     ProjectionMap _projectionMap;
 };
 
-class UnionNode : public Node {
+class UnionNode final : public OperatorDynamicHomogenous<UnionNode>, public Node {
+    using Base = OperatorDynamicHomogenous<UnionNode>;
+
 public:
-    static NodePtr create(Context& ctx, ChildVector children);
-    static NodePtr clone(Context& ctx, const UnionNode& other, ChildVector newChildren);
+    explicit UnionNode(Context& ctx, PolymorphicNodeVector children);
 
     void generateMemo(std::ostringstream& os) const;
-
-protected:
-    void visit(AbstractVisitor& visitor) const override;
-
-private:
-    explicit UnionNode(Context& ctx, ChildVector children);
 };
 
-class GroupByNode : public Node {
+class GroupByNode : public Operator<GroupByNode, 1>, public Node {
+    using Base = Operator<GroupByNode, 1>;
+
 public:
     using GroupByVector = std::vector<ProjectionName>;
     using ProjectionMap = std::unordered_map<ProjectionName, ProjectionType>;
 
-    static NodePtr create(Context& ctx,
-                          GroupByVector groupByVector,
-                          ProjectionMap projectionMap,
-                          NodePtr child);
-    static NodePtr clone(Context& ctx, const GroupByNode& other, NodePtr newChild);
-
-    void generateMemo(std::ostringstream& os) const;
-
-protected:
-    void visit(AbstractVisitor& visitor) const override;
-
-private:
     explicit GroupByNode(Context& ctx,
                          GroupByVector groupByVector,
                          ProjectionMap projectionMap,
-                         NodePtr child);
+                         PolymorphicNode child);
 
+    void generateMemo(std::ostringstream& os) const;
+
+private:
     GroupByVector _groupByVector;
     ProjectionMap _projectionMap;
 };
 
-class UnwindNode : public Node {
+class UnwindNode final : public Operator<UnwindNode, 1>, public Node {
+    using Base = Operator<UnwindNode, 1>;
+
 public:
-    static NodePtr create(Context& ctx,
-                          ProjectionName projectionName,
-                          bool retainNonArrays,
-                          NodePtr child);
-    static NodePtr clone(Context& ctx, const UnwindNode& other, NodePtr newChild);
+    explicit UnwindNode(Context& ctx,
+                        ProjectionName projectionName,
+                        bool retainNonArrays,
+                        PolymorphicNode child);
 
     void generateMemo(std::ostringstream& os) const;
 
-protected:
-    void visit(AbstractVisitor& visitor) const override;
-
 private:
-    UnwindNode(Context& ctx, ProjectionName projectionName, bool retainNonArrays, NodePtr child);
-
     const ProjectionName _projectionName;
     const bool _retainNonArrays;
 };
 
-class WindNode : public Node {
+class WindNode final : public Operator<WindNode, 1>, public Node {
+    using Base = Operator<WindNode, 1>;
+
 public:
-    static NodePtr create(Context& ctx, ProjectionName projectionName, NodePtr child);
-    static NodePtr clone(Context& ctx, const WindNode& other, NodePtr newChild);
+    explicit WindNode(Context& ctx, ProjectionName projectionName, PolymorphicNode child);
 
     void generateMemo(std::ostringstream& os) const;
 
-protected:
-    void visit(AbstractVisitor& visitor) const override;
-
 private:
-    WindNode(Context& ctx, ProjectionName projectionName, NodePtr child);
-
     const ProjectionName _projectionName;
 };
-
 }  // namespace mongo::optimizer

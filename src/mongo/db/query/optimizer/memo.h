@@ -31,16 +31,24 @@
 
 #include <string>
 
+#include "mongo/db/query/optimizer/node.h"
+
 namespace mongo::optimizer {
 
-class AbstractVisitor {
+class MemoGenerator {
 public:
-    virtual void visit(const ScanNode& node) = 0;
-    virtual void visit(const MultiJoinNode& node) = 0;
-    virtual void visit(const UnionNode& node) = 0;
-    virtual void visit(const GroupByNode& node) = 0;
-    virtual void visit(const UnwindNode& node) = 0;
-    virtual void visit(const WindNode& node) = 0;
+    template <typename T, typename... Ts>
+    void transport(const T&, Ts&&...) {}
+
+    template <typename T>
+    void prepare(const T& n) {
+        n.generateMemo(_os);
+    }
+
+    std::string generateMemo(const PolymorphicNode& e);
+
+private:
+    std::ostringstream _os;
 };
 
-}  // namespace mongo::optimizer
+} // namespace mongo::optimizer

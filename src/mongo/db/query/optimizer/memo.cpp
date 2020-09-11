@@ -27,30 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/memo.h"
 #include "mongo/db/query/optimizer/node.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo::optimizer {
-namespace {
 
-TEST(Optimizer, Basic) {
-    Context ctx;
-    MemoGenerator gen;
-
-    PolymorphicNode scanNode = make<ScanNode>(ctx, "test");
-    ASSERT_EQ("NodeId: 0\nScan\n", gen.generateMemo(scanNode));
-
-    PolymorphicNode joinNode = make<MultiJoinNode>(ctx,
-                                                   MultiJoinNode::FilterSet{},
-                                                   MultiJoinNode::ProjectionMap{},
-                                                   makeSeq(std::move(scanNode)));
-    ASSERT_EQ("NodeId: 1\nMultiJoin\nNodeId: 0\nScan\n", gen.generateMemo(joinNode));
-
-
-    PolymorphicNode cloned = joinNode;
-    ASSERT_EQ("NodeId: 1\nMultiJoin\nNodeId: 0\nScan\n", gen.generateMemo(cloned));
+std::string MemoGenerator::generateMemo(const PolymorphicNode& e) {
+    _os.str("");
+    _os.clear();
+    algebra::transport<false>(e, *this);
+    return _os.str();
 }
 
-}  // namespace
-}  // namespace mongo::optimizer
+} // namespace mongo::optimizer
