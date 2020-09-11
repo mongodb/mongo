@@ -66,8 +66,7 @@ public:
         // If this pipeline is being run as part of explain, then cache a copy to use later during
         // serialization.
         if (expCtx->explain >= ExplainOptions::Verbosity::kExecStats) {
-            _cachedPipeline =
-                Pipeline::create(_pipeline->getSources(), _pipeline->getContext()).release();
+            _cachedPipeline = _pipeline->getSources();
         }
     }
 
@@ -162,7 +161,7 @@ private:
     void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
-    Pipeline* _cachedPipeline = nullptr;
+    Pipeline::SourceContainer _cachedPipeline;
     bool _usedDisk = false;
     ExecutionProgress _executionState = ExecutionProgress::kIteratingSource;
 };

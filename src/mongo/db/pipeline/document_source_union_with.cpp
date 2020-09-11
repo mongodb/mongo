@@ -269,7 +269,7 @@ Value DocumentSourceUnionWith::serialize(boost::optional<ExplainOptions::Verbosi
             // We've either exhausted the sub-pipeline or at least started iterating it. Use the
             // cached pipeline to get the explain output since the '_pipeline' may have been
             // modified for any optimizations or pushdowns into the initial $cursor stage.
-            pipeCopy = _cachedPipeline;
+            pipeCopy = Pipeline::create(_cachedPipeline, _pipeline->getContext()).release();
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
             // serialization in the explain output.
