@@ -75,7 +75,7 @@ public:
      */
     Status initForResume(OperationContext* opCtx,
                          Collection* collection,
-                         const IndexSorterInfo& sorterInfo,
+                         const IndexStateInfo& stateInfo,
                          IndexBuildPhaseEnum phase);
 
     /**

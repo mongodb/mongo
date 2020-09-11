@@ -50,8 +50,16 @@ enums:
             kDrainWrites: "drain writes"
 
 structs:
-    IndexSorterInfo:
-        description: "The information to resume the sorter for an index build"
+    MultikeyPath:
+        description: "One set of multikey components for the multikey paths."
+        strict: true
+        fields:
+            multikeyComponents:
+                description: "The path-level components of the multikey paths."
+                type: array<int>
+
+    IndexStateInfo:
+        description: "The state of the index build needed to resume it."
         strict: true
         fields:
             sideWritesTable:
@@ -83,6 +91,12 @@ structs:
             spec:
                 description: "The index specification"
                 type: object_owned
+            isMultikey:
+                description: "Whether the index was already marked as multikey."
+                type: bool
+            multikeyPaths:
+                description: "The multikey paths for the index, if supported."
+                type: array<MultikeyPath>
 
     ResumeIndexInfo:
         description: "Information needed to resume index builds"
@@ -106,4 +120,4 @@ structs:
                 optional: true
             indexes:
                 description: "The information needed to resume each specific index in this build"
-                type: array<IndexSorterInfo>
+                type: array<IndexStateInfo>

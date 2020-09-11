@@ -21,17 +21,30 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName());
-assert.commandWorked(coll.insert([{a: 1}, {a: 2}]));
+const runTests = function(docs, indexSpec, collNameSuffix) {
+    const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName() + collNameSuffix);
+    assert.commandWorked(coll.insert(docs));
 
-ResumableIndexBuildTest.run(
-    rst, dbName, coll.getName(), {a: 1}, failPointName, {iteration: 0}, "collection scan", {
-        numScannedAferResume: 2
-    });
-ResumableIndexBuildTest.run(
-    rst, dbName, coll.getName(), {a: 1}, failPointName, {iteration: 1}, "collection scan", {
-        numScannedAferResume: 1
-    });
+    const runTest = function(iteration) {
+        ResumableIndexBuildTest.run(rst,
+                                    dbName,
+                                    coll.getName(),
+                                    indexSpec,
+                                    failPointName,
+                                    {iteration: iteration},
+                                    "collection scan",
+                                    {numScannedAferResume: 2 - iteration});
+    };
+
+    runTest(0);
+    runTest(1);
+};
+
+runTests([{a: 1}, {a: 2}], {a: 1}, "");
+runTests([{a: [1, 2]}, {a: 2}], {a: 1}, "_multikey_first");
+runTests([{a: 1}, {a: [1, 2]}], {a: 1}, "_multikey_last");
+runTests(
+    [{a: [1, 2], b: {c: [3, 4]}, d: ""}, {e: "", f: [[]], g: null, h: 8}], {"$**": 1}, "_wildcard");
 
 rst.stopSet();
 })();

@@ -20,12 +20,19 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName());
-assert.commandWorked(coll.insert({a: 1}));
+const runTests = function(docs, indexSpec, collNameSuffix) {
+    const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName() + collNameSuffix);
+    assert.commandWorked(coll.insert(docs));
 
-ResumableIndexBuildTest.run(rst, dbName, coll.getName(), {a: 1}, failPointName, {}, "initialized", {
-    numScannedAferResume: 1
-});
+    ResumableIndexBuildTest.run(
+        rst, dbName, coll.getName(), indexSpec, failPointName, {}, "initialized", {
+            numScannedAferResume: 1
+        });
+};
+
+runTests({a: 1}, {a: 1}, "");
+runTests({a: [1, 2]}, {a: 1}, "_multikey");
+runTests({a: [1, 2], b: {c: [3, 4]}, d: ""}, {"$**": 1}, "_wildcard");
 
 rst.stopSet();
 })();

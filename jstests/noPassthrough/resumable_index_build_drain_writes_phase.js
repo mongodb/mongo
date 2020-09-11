@@ -21,29 +21,33 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName());
-assert.commandWorked(coll.insert({a: 1}));
+const runTests = function(docs, indexSpec, sideWrites, collNameSuffix) {
+    const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName() + collNameSuffix);
+    assert.commandWorked(coll.insert(docs));
 
-ResumableIndexBuildTest.run(rst,
-                            dbName,
-                            coll.getName(),
-                            {a: 1},
-                            failPointName,
-                            {iteration: 0},
-                            "drain writes",
-                            {skippedPhaseLogID: 20392},
-                            [{a: 2}, {a: 3}],
-                            [{a: 4}, {a: 5}]);
-ResumableIndexBuildTest.run(rst,
-                            dbName,
-                            coll.getName(),
-                            {a: 1},
-                            failPointName,
-                            {iteration: 1},
-                            "drain writes",
-                            {skippedPhaseLogID: 20392},
-                            [{a: 6}, {a: 7}],
-                            [{a: 8}, {a: 9}]);
+    const runTest = function(iteration) {
+        ResumableIndexBuildTest.run(rst,
+                                    dbName,
+                                    coll.getName(),
+                                    indexSpec,
+                                    failPointName,
+                                    {iteration: iteration},
+                                    "drain writes",
+                                    {skippedPhaseLogID: 20392},
+                                    sideWrites,
+                                    [{a: 4}, {a: 5}]);
+    };
+
+    runTest(0);
+    runTest(1);
+};
+
+runTests({a: 1}, {a: 1}, [{a: 2}, {a: 3}], "");
+runTests({a: [1, 2]}, {a: 1}, [{a: 2}, {a: 3}], "_multikey");
+runTests({a: 1},
+         {"$**": 1},
+         [{a: [1, 2], b: {c: [3, 4]}, d: ""}, {e: "", f: [[]], g: null, h: 8}],
+         "_wildcard");
 
 rst.stopSet();
 })();

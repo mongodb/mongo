@@ -274,29 +274,28 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             info = statusWithInfo.getValue();
             indexInfoObjs.push_back(info);
 
-            boost::optional<IndexSorterInfo> sorterInfo;
+            boost::optional<IndexStateInfo> stateInfo;
             IndexToBuild index;
             index.block =
                 std::make_unique<IndexBuildBlock>(collection->ns(), info, _method, _buildUUID);
             if (resumeInfo) {
                 auto resumeInfoIndexes = resumeInfo->getIndexes();
                 // Find the resume information that corresponds to this spec.
-                auto sorterInfoIt =
-                    std::find_if(resumeInfoIndexes.begin(),
-                                 resumeInfoIndexes.end(),
-                                 [&info](const IndexSorterInfo& indexInfo) {
-                                     return info.woCompare(indexInfo.getSpec()) == 0;
-                                 });
+                auto stateInfoIt = std::find_if(resumeInfoIndexes.begin(),
+                                                resumeInfoIndexes.end(),
+                                                [&info](const IndexStateInfo& indexInfo) {
+                                                    return info.woCompare(indexInfo.getSpec()) == 0;
+                                                });
                 uassert(ErrorCodes::NoSuchKey,
                         str::stream() << "Unable to locate resume information for " << info
                                       << " due to inconsistent resume information for index build "
                                       << _buildUUID << " in collection " << ns << "("
                                       << _collectionUUID << ")",
-                        sorterInfoIt != resumeInfoIndexes.end());
+                        stateInfoIt != resumeInfoIndexes.end());
 
-                sorterInfo = *sorterInfoIt;
+                stateInfo = *stateInfoIt;
                 status = index.block->initForResume(
-                    opCtx, collection.getWritableCollection(), *sorterInfo, resumeInfo->getPhase());
+                    opCtx, collection.getWritableCollection(), *stateInfo, resumeInfo->getPhase());
             } else {
                 status = index.block->init(opCtx, collection.getWritableCollection());
             }
@@ -315,13 +314,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (!status.isOK())
                 return status;
 
-            index.bulk = index.real->initiateBulk(
-                eachIndexBuildMaxMemoryUsageBytes,
-                // When resuming from the drain writes phase, there is no Sorter state to
-                // reconstruct.
-                resumeInfo && resumeInfo->getPhase() != IndexBuildPhaseEnum::kDrainWrites
-                    ? sorterInfo
-                    : boost::none);
+            index.bulk = index.real->initiateBulk(eachIndexBuildMaxMemoryUsageBytes, stateInfo);
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
@@ -944,14 +937,10 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
             BSONArrayBuilder ranges(indexInfo.subarrayStart("ranges"));
             for (const auto& rangeInfo : state.ranges) {
                 BSONObjBuilder range(ranges.subobjStart());
-
                 range.append("startOffset", rangeInfo.getStartOffset());
                 range.append("endOffset", rangeInfo.getEndOffset());
                 range.append("checksum", rangeInfo.getChecksum());
-
-                range.done();
             }
-            ranges.done();
         }
 
         auto indexBuildInterceptor =
@@ -967,8 +956,18 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
             indexInfo.append("skippedRecordTrackerTable", *skippedRecordTrackerTableIdent);
 
         indexInfo.append("spec", index.block->getSpec());
+        indexInfo.append("isMultikey", index.bulk->isMultikey());
 
-        indexInfo.done();
+        BSONArrayBuilder multikeyPaths(indexInfo.subarrayStart("multikeyPaths"));
+        for (const auto& multikeyPath : index.bulk->getMultikeyPaths()) {
+            BSONObjBuilder multikeyPathObj(multikeyPaths.subobjStart());
+            BSONArrayBuilder multikeyComponents(
+                multikeyPathObj.subarrayStart("multikeyComponents"));
+
+            for (const auto& multikeyComponent : multikeyPath) {
+                multikeyComponents.append(multikeyComponent);
+            }
+        }
     }
     indexesArray.done();
 

@@ -274,11 +274,11 @@ public:
      *
      * maxMemoryUsageBytes: amount of memory consumed before the external sorter starts spilling to
      *                      disk
-     * sorterInfo: the information to use to resume the index build, or boost::none if starting a
+     * stateInfo: the information to use to resume the index build, or boost::none if starting a
      * new index build.
      */
     virtual std::unique_ptr<BulkBuilder> initiateBulk(
-        size_t maxMemoryUsageBytes, const boost::optional<IndexSorterInfo>& sorterInfo) = 0;
+        size_t maxMemoryUsageBytes, const boost::optional<IndexStateInfo>& stateInfo) = 0;
 
     /**
      * Call this when you are ready to finish your bulk work.
@@ -530,7 +530,7 @@ public:
                             MultikeyPaths paths) final;
 
     std::unique_ptr<BulkBuilder> initiateBulk(
-        size_t maxMemoryUsageBytes, const boost::optional<IndexSorterInfo>& sorterInfo) final;
+        size_t maxMemoryUsageBytes, const boost::optional<IndexStateInfo>& stateInfo) final;
 
     Status commitBulk(OperationContext* opCtx,
                       BulkBuilder* bulk,

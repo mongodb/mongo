@@ -76,7 +76,7 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
 
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,
                                       Collection* collection,
-                                      const IndexSorterInfo& sorterInfo,
+                                      const IndexStateInfo& stateInfo,
                                       IndexBuildPhaseEnum phase) {
 
     _indexName = _spec.getStringField("name");
@@ -107,9 +107,9 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
     _indexBuildInterceptor =
         std::make_unique<IndexBuildInterceptor>(opCtx,
                                                 indexCatalogEntry,
-                                                sorterInfo.getSideWritesTable(),
-                                                sorterInfo.getDuplicateKeyTrackerTable(),
-                                                sorterInfo.getSkippedRecordTrackerTable());
+                                                stateInfo.getSideWritesTable(),
+                                                stateInfo.getDuplicateKeyTrackerTable(),
+                                                stateInfo.getSkippedRecordTrackerTable());
     indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
     _completeInit(opCtx, collection);

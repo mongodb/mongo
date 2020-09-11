@@ -352,8 +352,8 @@ const ResumableIndexBuildTest = class {
         assert.commandWorked(coll.insert(postIndexBuildInserts));
 
         for (const node of rst.nodes) {
-            const collection = node.getDB(dbName).getCollection(collName);
-            assert(collection.validate(), "Index validation failed");
+            const res = node.getDB(dbName).getCollection(collName).validate();
+            assert(res.valid, "Index validation failed: " + tojson(res));
         }
 
         assert.commandWorked(coll.dropIndex(indexName));

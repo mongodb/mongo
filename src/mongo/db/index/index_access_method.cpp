@@ -91,6 +91,17 @@ SortOptions makeSortOptions(size_t maxMemoryUsageBytes) {
         .MaxMemoryUsageBytes(maxMemoryUsageBytes);
 }
 
+MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPathsVec) {
+    MultikeyPaths multikeyPaths;
+    for (const auto& multikeyPath : multikeyPathsVec) {
+        multikeyPaths.emplace_back(boost::container::ordered_unique_range_t(),
+                                   multikeyPath.getMultikeyComponents().begin(),
+                                   multikeyPath.getMultikeyComponents().end());
+    }
+
+    return multikeyPaths;
+}
+
 }  // namespace
 
 struct BtreeExternalSortComparison {
@@ -464,7 +475,7 @@ public:
 
     BulkBuilderImpl(IndexCatalogEntry* index,
                     size_t maxMemoryUsageBytes,
-                    const IndexSorterInfo& sorterInfo);
+                    const IndexStateInfo& stateInfo);
 
     Status insert(OperationContext* opCtx,
                   const BSONObj& obj,
@@ -490,6 +501,11 @@ public:
 private:
     void _addMultikeyMetadataKeysIntoSorter();
 
+    Sorter* _makeSorter(
+        size_t maxMemoryUsageBytes,
+        boost::optional<StringData> fileName = boost::none,
+        const boost::optional<std::vector<SorterRange>>& ranges = boost::none) const;
+
     Sorter::Settings _makeSorterSettings() const;
 
     IndexCatalogEntry* _indexCatalogEntry;
@@ -510,29 +526,24 @@ private:
 };
 
 std::unique_ptr<IndexAccessMethod::BulkBuilder> AbstractIndexAccessMethod::initiateBulk(
-    size_t maxMemoryUsageBytes, const boost::optional<IndexSorterInfo>& sorterInfo) {
-    return sorterInfo
-        ? std::make_unique<BulkBuilderImpl>(_indexCatalogEntry, maxMemoryUsageBytes, *sorterInfo)
+    size_t maxMemoryUsageBytes, const boost::optional<IndexStateInfo>& stateInfo) {
+    return stateInfo
+        ? std::make_unique<BulkBuilderImpl>(_indexCatalogEntry, maxMemoryUsageBytes, *stateInfo)
         : std::make_unique<BulkBuilderImpl>(_indexCatalogEntry, maxMemoryUsageBytes);
 }
 
 AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(IndexCatalogEntry* index,
                                                             size_t maxMemoryUsageBytes)
-    : _indexCatalogEntry(index),
-      _sorter(Sorter::make(makeSortOptions(maxMemoryUsageBytes),
-                           BtreeExternalSortComparison(),
-                           _makeSorterSettings())) {}
+    : _indexCatalogEntry(index), _sorter(_makeSorter(maxMemoryUsageBytes)) {}
 
 AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(IndexCatalogEntry* index,
                                                             size_t maxMemoryUsageBytes,
-                                                            const IndexSorterInfo& sorterInfo)
+                                                            const IndexStateInfo& stateInfo)
     : _indexCatalogEntry(index),
-      _sorter(Sorter::makeFromExistingRanges(sorterInfo.getFileName()->toString(),
-                                             *sorterInfo.getRanges(),
-                                             makeSortOptions(maxMemoryUsageBytes),
-                                             BtreeExternalSortComparison(),
-                                             _makeSorterSettings())),
-      _keysInserted(*sorterInfo.getNumKeys()) {}
+      _sorter(_makeSorter(maxMemoryUsageBytes, stateInfo.getFileName(), stateInfo.getRanges())),
+      _keysInserted(stateInfo.getNumKeys().value_or(0)),
+      _isMultiKey(stateInfo.getIsMultikey()),
+      _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {}
 
 Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(OperationContext* opCtx,
                                                           const BSONObj& obj,
@@ -637,6 +648,21 @@ AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
     return std::pair<KeyString::Value::SorterDeserializeSettings,
                      mongo::NullValue::SorterDeserializeSettings>(
         {_indexCatalogEntry->accessMethod()->getSortedDataInterface()->getKeyStringVersion()}, {});
+}
+
+AbstractIndexAccessMethod::BulkBuilderImpl::Sorter*
+AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorter(
+    size_t maxMemoryUsageBytes,
+    boost::optional<StringData> fileName,
+    const boost::optional<std::vector<SorterRange>>& ranges) const {
+    return fileName ? Sorter::makeFromExistingRanges(fileName->toString(),
+                                                     *ranges,
+                                                     makeSortOptions(maxMemoryUsageBytes),
+                                                     BtreeExternalSortComparison(),
+                                                     _makeSorterSettings())
+                    : Sorter::make(makeSortOptions(maxMemoryUsageBytes),
+                                   BtreeExternalSortComparison(),
+                                   _makeSorterSettings());
 }
 
 Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
