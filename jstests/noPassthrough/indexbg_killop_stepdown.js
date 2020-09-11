@@ -91,8 +91,7 @@ assert.soon(function() {
 });
 
 // After restarting the old primary, we expect that the index build completes successfully.
-const fassertProcessExitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
-rst.stop(primary.nodeId, undefined, {forRestart: true, allowedExitCode: fassertProcessExitCode});
+rst.stop(primary.nodeId, undefined, {forRestart: true, allowedExitCode: MongoRunner.EXIT_ABORT});
 rst.start(primary.nodeId, undefined, true /* restart */);
 
 // Wait for the index build to complete.

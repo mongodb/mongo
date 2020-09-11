@@ -58,8 +58,7 @@ assert.soon(function() {
 });
 
 // After restarting the secondary, expect that the index build completes successfully.
-const fassertProcessExitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
-rst.stop(secondary.nodeId, undefined, {forRestart: true, allowedExitCode: fassertProcessExitCode});
+rst.stop(secondary.nodeId, undefined, {forRestart: true, allowedExitCode: MongoRunner.EXIT_ABORT});
 rst.start(secondary.nodeId, undefined, true /* restart */);
 
 secondary = rst.getSecondary();

@@ -105,7 +105,6 @@ assert.eq(0, syncSource.getDB(dbName)[collName].find(disappearingDoc).itcount())
 assert.eq(0, resyncNode.getDB(dbName)[collName].find(disappearingDoc).itcount());
 
 // We expect node 1 to have crashed.
-const exitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
-rst.stop(0, undefined, {allowedExitCode: exitCode});
+rst.stop(0, undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
 rst.stopSet();
 })();
