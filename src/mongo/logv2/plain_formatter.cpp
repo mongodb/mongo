@@ -152,6 +152,15 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     StringData message = extract<StringData>(attributes::message(), rec).get();
     const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get();
 
+    // Log messages logged via logd are already formatted and have the id == 0
+    if (attrs.empty()) {
+        if (extract<int32_t>(attributes::id(), rec).get() == 0) {
+            buffer.append(message.rawData(), message.rawData() + message.size());
+
+            return;
+        }
+    }
+
     TextValueExtractor extractor;
     extractor.args.reserve(attrs.size());
     attrs.apply(extractor);

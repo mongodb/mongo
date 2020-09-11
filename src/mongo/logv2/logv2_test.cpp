@@ -1769,6 +1769,18 @@ TEST_F(UnstructuredLoggingTest, Args) {
     });
 }
 
+TEST_F(UnstructuredLoggingTest, ArgsLikeFormatSpecifier) {
+    // Ensure the plain formatter does not process the formatted string
+    startCapturingLogMessages();
+
+    std::string format_str = "format {} str {} fields";
+    logd(format_str, 1, "{ x : 1}");  // NOLINT
+    validate([&format_str](const BSONObj& obj) {
+        ASSERT_EQUALS(obj.getField(kMessageFieldName).String(),
+                      fmt::format(format_str, 1, "{ x : 1}"));
+    });
+}
+
 TEST_F(UnstructuredLoggingTest, ManyArgs) {
     std::string format_str = "{}{}{}{}{}{}{}{}{}{}{}";
     logd(format_str, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);  // NOLINT
