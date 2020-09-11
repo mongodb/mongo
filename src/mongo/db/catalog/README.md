@@ -631,6 +631,46 @@ will block replication until their index build is complete.
 See
 [IndexBuildsCoordinator::_waitForNextIndexBuildActionAndCommit](https://github.com/mongodb/mongo/blob/r4.4.0-rc9/src/mongo/db/index_builds_coordinator_mongod.cpp#L632).
 
+## Resumable Index Builds
+
+On clean shutdown, index builds save their progress in internal idents that will be used for resuming
+the index builds when the server starts up. The persisted information includes:
+* [Phase of the index build](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/resumable_index_builds.idl#L43) when it was interrupted for shutdown:
+    * initialized
+    * collection scan
+    * bulk load
+    * drain writes
+* Information relevant to the phase for reconstructing the internal state of the index build at
+  startup. This may include:
+    * The internal state of the external sorter.
+    * Idents for side writes, duplicate keys, and skipped records.
+
+During [startup recovery](#startup-recovery), the persisted information is used to reconstruct the
+in-memory state for the index build and resume from the phase that we left off in. If we fail to
+resume the index build for whatever reason, the index build will restart from the beginning.
+
+Not all incomplete index builds are resumable upon restart. The current criteria for index build
+resumability can be found in [IndexBuildsCoordinator::isIndexBuildResumable()](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/index_builds_coordinator.cpp#L375). Generally,
+index builds are resumable under the following conditions:
+* Storage engine is configured to be persistent with encryption disabled.
+* The index build is running on a voting member of the replica set with the default [commit quorum](#commit-quorum)
+  `"votingMembers"`.
+* Majority read concern is enabled.
+
+Currently, rollback does not make any special accommodations for resumable index builds and will
+restart index builds where applicable. The current state of index builds is positioned to support
+future rollback work.
+
+For improved rollback semantics, resumable index builds require a majority read cursor during
+collection scan phase. Index builds wait for the majority commit point to advance before starting
+the collection scan. The majority wait happens after installing the
+[side table for intercepting new writes](#temporary-side-table-for-new-writes).
+
+See [MultiIndexBlock::_constructStateObject()](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/catalog/multi_index_block.cpp#L900)
+for where we persist the relevant information necessary to resume the index build at shutdown
+and [StorageEngineImpl::_handleInternalIdents()](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/storage/storage_engine_impl.cpp#L329)
+for where we search for and parse the resume information on startup.
+
 ## Single-Phase Index Builds
 
 Index builds on empty collections replicate a `createIndexes` oplog entry. This oplog entry was used
@@ -872,6 +912,10 @@ The second step of recovering the catalog is [reconciling unfinished index build
 * An [unfinished FCV 4.2- background index build on a secondary](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L513-L525 "Github") will be rebuilt in the foreground
   (an oplog entry was written saying the index exists).
 * An [unfinished FCV 4.4\+](https://github.com/mongodb/mongo/blob/e485c1a8011d85682cb8dafa87ab92b9c23daa66/src/mongo/db/storage/storage_engine_impl.cpp#L483-L511 "Github") background index build will be restarted in the background.
+    * If the server was previously shut down cleanly, we may be able to [resume the index build](#resumable-index-builds)
+      at the phase that it was stopped in. This resume information is stored in an internal ident
+      written at shutdown. If we fail to resume the index build, we will clean up the internal ident
+      and restart the index build in the background.
 
 After storage completes its recovery, control is passed to [replication
 recovery](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/README.md#startup-recovery
