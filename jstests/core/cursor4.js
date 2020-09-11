@@ -1,10 +1,4 @@
 // Test inequality bounds with multi-field sorting
-//
-// This test is currently disabled in SBE passthroughs due to bugs that cause problems on big-endian
-// platforms. Once these bugs are fixed, this test should be re-enabled for SBE.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 function checkResults(expected, cursor) {
     assert.eq(expected.length, cursor.count());
