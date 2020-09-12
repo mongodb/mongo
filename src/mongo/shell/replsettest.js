@@ -2559,6 +2559,8 @@ var ReplSetTest = function(opts) {
         }
 
         print("checkOplogs starting oplog checks.");
+        print("checkOplogs waiting for secondaries to be ready.");
+        this.awaitSecondaryNodes(self.kDefaultTimeoutMS, slaves);
         if (slaves.length >= 1) {
             let readers = [];
             let smallestTS = new Timestamp(Math.pow(2, 32) - 1, Math.pow(2, 32) - 1);
