@@ -1592,6 +1592,10 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
 
             // Clean up the persisted Sorter data since resuming failed.
             for (const auto& index : resumeInfo.getIndexes()) {
+                if (!index.getFileName()) {
+                    continue;
+                }
+
                 LOGV2(5043100,
                       "Removing resumable index build temp file",
                       "file"_attr = index.getFileName(),
