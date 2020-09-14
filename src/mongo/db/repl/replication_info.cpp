@@ -259,7 +259,7 @@ public:
 
     std::string help() const override {
         return "Check if this server is primary for a replica set\n"
-               "{ isMaster : 1 }";
+               "{ hello : 1 }";
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const final {
