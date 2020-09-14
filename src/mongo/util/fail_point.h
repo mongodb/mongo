@@ -465,6 +465,13 @@ public:
      */
     void registerAllFailPointsAsServerParameters();
 
+    /**
+     * Sets all registered FailPoints to Mode::off. Used primarily during unit test cleanup to
+     * reset the state of all FailPoints set by the unit test. Does not prevent FailPoints from
+     * being enabled again after.
+     */
+    void disableAllFailpoints();
+
 private:
     bool _frozen;
     StringMap<FailPoint*> _fpMap;

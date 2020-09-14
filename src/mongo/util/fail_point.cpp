@@ -371,6 +371,12 @@ void FailPointRegistry::registerAllFailPointsAsServerParameters() {
     }
 }
 
+void FailPointRegistry::disableAllFailpoints() {
+    for (auto& [_, fp] : _fpMap) {
+        fp->setMode(FailPoint::Mode::off);
+    }
+}
+
 static constexpr auto kFailPointServerParameterPrefix = "failpoint."_sd;
 
 FailPointServerParameter::FailPointServerParameter(StringData name, ServerParameterType spt)

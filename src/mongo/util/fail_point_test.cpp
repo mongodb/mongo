@@ -54,6 +54,12 @@ using mongo::FailPointEnableBlock;
 namespace stdx = mongo::stdx;
 
 namespace mongo_test {
+namespace {
+// Used by tests in this file that need access to a failpoint that is a registered in the
+// FailPointRegistry.
+MONGO_FAIL_POINT_DEFINE(dummy2);
+}  // namespace
+
 TEST(FailPoint, InitialState) {
     FailPoint failPoint("testFP");
     ASSERT_FALSE(failPoint.shouldFail());
@@ -138,6 +144,51 @@ TEST(FailPoint, SetGetParam) {
     failPoint.setMode(FailPoint::alwaysOn, 0, BSON("x" << 20));
 
     failPoint.execute([&](const BSONObj& data) { ASSERT_EQUALS(20, data["x"].numberInt()); });
+}
+
+TEST(FailPoint, DisableAllFailpoints) {
+    auto& registry = mongo::globalFailPointRegistry();
+
+    FailPoint& fp1 = *registry.find("dummy");
+    FailPoint& fp2 = *registry.find("dummy2");
+    int counter1 = 0;
+    int counter2 = 0;
+    fp1.execute([&](const BSONObj&) { counter1++; });
+    fp2.execute([&](const BSONObj&) { counter2++; });
+
+    ASSERT_EQ(0, counter1);
+    ASSERT_EQ(0, counter2);
+
+    fp1.setMode(FailPoint::alwaysOn);
+    fp2.setMode(FailPoint::alwaysOn);
+
+    fp1.execute([&](const BSONObj&) { counter1++; });
+    fp2.execute([&](const BSONObj&) { counter2++; });
+
+    ASSERT_EQ(1, counter1);
+    ASSERT_EQ(1, counter2);
+
+    registry.disableAllFailpoints();
+
+    fp1.execute([&](const BSONObj&) { counter1++; });
+    fp2.execute([&](const BSONObj&) { counter2++; });
+
+    ASSERT_EQ(1, counter1);
+    ASSERT_EQ(1, counter2);
+
+    // Check that you can still enable and continue using FailPoints after a call to
+    // disableAllFailpoints()
+    fp1.setMode(FailPoint::alwaysOn);
+    fp2.setMode(FailPoint::alwaysOn);
+
+    fp1.execute([&](const BSONObj&) { counter1++; });
+    fp2.execute([&](const BSONObj&) { counter2++; });
+
+    ASSERT_EQ(2, counter1);
+    ASSERT_EQ(2, counter2);
+
+    // Reset the state for future tests.
+    registry.disableAllFailpoints();
 }
 
 class FailPointStress : public mongo::unittest::Test {
