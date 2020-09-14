@@ -209,14 +209,14 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
-        if self.configsvr is not None:
-            teardown_handler.teardown(self.configsvr, "config server", mode=mode)
-
         for mongos in self.mongos:
             teardown_handler.teardown(mongos, "mongos", mode=mode)
 
         for shard in self.shards:
             teardown_handler.teardown(shard, "shard", mode=mode)
+
+        if self.configsvr is not None:
+            teardown_handler.teardown(self.configsvr, "config server", mode=mode)
 
         if teardown_handler.was_successful():
             self.logger.info("Successfully stopped all members of the sharded cluster.")
