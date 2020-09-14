@@ -72,6 +72,9 @@ awaitStepUp();
 
 rst.awaitReplication();
 
+// Wait for the index build to be aborted before asserting that it doesn't exist.
+IndexBuildTest.waitForIndexBuildToStop(secondaryDB, coll.getName(), "a_1");
+
 IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
 
 const secondaryColl = secondaryDB.getCollection(coll.getName());
