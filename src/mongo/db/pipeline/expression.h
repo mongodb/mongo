@@ -797,8 +797,6 @@ class ExpressionAllElementsTrue final : public ExpressionFixedArity<ExpressionAl
 public:
     explicit ExpressionAllElementsTrue(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx) {}
-    ExpressionAllElementsTrue(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -839,8 +837,6 @@ class ExpressionAnyElementTrue final : public ExpressionFixedArity<ExpressionAny
 public:
     explicit ExpressionAnyElementTrue(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx) {}
-    ExpressionAnyElementTrue(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2141,8 +2137,6 @@ class ExpressionSetDifference final : public ExpressionFixedArity<ExpressionSetD
 public:
     explicit ExpressionSetDifference(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSetDifference, 2>(expCtx) {}
-    ExpressionSetDifference(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionSetDifference, 2>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2157,8 +2151,6 @@ class ExpressionSetEquals final : public ExpressionVariadic<ExpressionSetEquals>
 public:
     explicit ExpressionSetEquals(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionSetEquals>(expCtx) {}
-    ExpressionSetEquals(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionVariadic<ExpressionSetEquals>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2174,8 +2166,6 @@ class ExpressionSetIntersection final : public ExpressionVariadic<ExpressionSetI
 public:
     explicit ExpressionSetIntersection(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionSetIntersection>(expCtx) {}
-    ExpressionSetIntersection(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionVariadic<ExpressionSetIntersection>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2199,8 +2189,6 @@ class ExpressionSetIsSubset : public ExpressionFixedArity<ExpressionSetIsSubset,
 public:
     explicit ExpressionSetIsSubset(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionSetIsSubset, 2>(expCtx) {}
-    ExpressionSetIsSubset(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionSetIsSubset, 2>(expCtx, std::move(children)) {}
 
     boost::intrusive_ptr<Expression> optimize() override;
     Value evaluate(const Document& root, Variables* variables) const override;
@@ -2219,8 +2207,6 @@ class ExpressionSetUnion final : public ExpressionVariadic<ExpressionSetUnion> {
 public:
     explicit ExpressionSetUnion(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionSetUnion>(expCtx) {}
-    ExpressionSetUnion(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionVariadic<ExpressionSetUnion>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;

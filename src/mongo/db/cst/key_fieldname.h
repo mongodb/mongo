@@ -36,9 +36,7 @@
 #define KEYFIELDNAMES(ENUMIFY)   \
     ENUMIFY(abs)                 \
     ENUMIFY(add)                 \
-    ENUMIFY(allElementsTrue)     \
     ENUMIFY(andExpr)             \
-    ENUMIFY(anyElementTrue)      \
     ENUMIFY(atan2)               \
     ENUMIFY(ceil)                \
     ENUMIFY(charsArg)            \
@@ -97,11 +95,6 @@
     ENUMIFY(round)               \
     ENUMIFY(rtrim)               \
     ENUMIFY(sample)              \
-    ENUMIFY(setDifference)       \
-    ENUMIFY(setEquals)           \
-    ENUMIFY(setIntersection)     \
-    ENUMIFY(setIsSubset)         \
-    ENUMIFY(setUnion)            \
     ENUMIFY(sizeArg)             \
     ENUMIFY(skip)                \
     ENUMIFY(split)               \

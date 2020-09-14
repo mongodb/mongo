@@ -116,9 +116,7 @@
 %token
     ABS
     ADD
-    ALL_ELEMENTS_TRUE "allElementsTrue"
     AND
-    ANY_ELEMENT_TRUE "anyElementTrue"
     ARG_CHARS "chars argument"
     ARG_COLL "coll argument"
     ARG_DATE "date argument"
@@ -195,11 +193,6 @@
     REPLACE_ONE
     ROUND
     RTRIM
-    SET_DIFFERENCE "setDifference"
-    SET_EQUALS "setEquals"
-    SET_INTERSECTION "setIntersection"
-    SET_IS_SUBSET "setIsSubset"
-    SET_UNION "setUnion"
     SPLIT
     SQRT
     STAGE_INHIBIT_OPTIMIZATION
@@ -291,8 +284,6 @@
 %nterm <std::pair<CNode::Fieldname, CNode>> onErrorArg onNullArg
 %nterm <std::pair<CNode::Fieldname, CNode>> formatArg timezoneArg charsArg optionsArg
 %nterm <std::vector<CNode>> expressions values exprZeroToTwo
-%nterm <CNode> setExpression allElementsTrue anyElementTrue setDifference setEquals
-%nterm <CNode> setIntersection setIsSubset setUnion
 
 // Match expressions.
 %nterm <CNode> match predicates compoundMatchExprs predValue additionalExprs
@@ -533,13 +524,13 @@ predicate: predFieldname predValue {
 // Will need to expand to allow comparisons against literal objects (note that order of fields
 // in object predicates is important! --> {a: 1, $gt: 2} is different than {$gt: 2, a: 1}).
 predValue:
-    simpleValue
+    simpleValue 
     | START_OBJECT compoundMatchExprs END_OBJECT {
         $$ = $compoundMatchExprs;
     }
 ;
 
-compoundMatchExprs:
+compoundMatchExprs: 
     %empty {
         $$ = CNode::noopLeaf();
     }
@@ -573,12 +564,12 @@ logicalExpr: logicalExprField START_ARRAY match additionalExprs END_ARRAY {
     }
 ;
 
-logicalExprField:
+logicalExprField: 
     AND { $$ = KeyFieldname::andExpr; }
     | OR { $$ = KeyFieldname::orExpr; }
     | NOR { $$ = KeyFieldname::norExpr; }
 
-additionalExprs:
+additionalExprs: 
     %empty {
         $$ = CNode{CNode::ArrayChildren{}};
     }
@@ -869,27 +860,6 @@ aggExprAsUserFieldname:
     | TO_UPPER {
         $$ = UserFieldname{"$toUpper"};
     }
-    | ALL_ELEMENTS_TRUE {
-        $$ = UserFieldname{"$allElementsTrue"};
-    }
-    | ANY_ELEMENT_TRUE {
-        $$ = UserFieldname{"$anyElementTrue"};
-    }
-    | SET_DIFFERENCE {
-        $$ = UserFieldname{"$setDifference"};
-    }
-    | SET_EQUALS {
-        $$ = UserFieldname{"$setEquals"};
-    }
-    | SET_INTERSECTION {
-        $$ = UserFieldname{"$setIntersection"};
-    }
-    | SET_IS_SUBSET {
-        $$ = UserFieldname{"$setIsSubset"};
-    }
-    | SET_UNION {
-        $$ = UserFieldname{"$setUnion"};
-    }
 ;
 
 // Rules for literal non-terminals.
@@ -1117,7 +1087,7 @@ exprFixedTwoArg: START_ARRAY expression[expr1] expression[expr2] END_ARRAY {
 
 compoundExpression:
     expressionArray | expressionObject | maths | boolExps | literalEscapes | compExprs
-    | typeExpression | stringExps | setExpression
+    | typeExpression | stringExps
 ;
 
 // These are arrays occuring in Expressions outside of $const/$literal. They may contain further
@@ -1592,70 +1562,6 @@ sortSpec:
         $$ = {$1, $2};
     } | valueFieldname oneOrNegOne {
         $$ = {$1, $2};
-    }
-;
-
-setExpression:
-    allElementsTrue | anyElementTrue | setDifference | setEquals | setIntersection | setIsSubset
-    | setUnion
-;
-
-allElementsTrue:
-    START_OBJECT ALL_ELEMENTS_TRUE START_ARRAY expression END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::allElementsTrue, CNode{$expression}}}};
-    }
-;
-
-anyElementTrue:
-    START_OBJECT ANY_ELEMENT_TRUE START_ARRAY expression END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::anyElementTrue, CNode{$expression}}}};
-    }
-;
-
-setDifference:
-    START_OBJECT SET_DIFFERENCE exprFixedTwoArg END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::setDifference,
-                                          $exprFixedTwoArg}}};
-    }
-;
-
-setEquals:
-    START_OBJECT SET_EQUALS START_ARRAY expression[expr1] expression[expr2] expressions
-        END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::setEquals,
-                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
-        auto&& others = $expressions;
-        auto&& array = $$.objectChildren()[0].second.arrayChildren();
-        array.insert(array.end(), others.begin(), others.end());
-    }
-;
-
-setIntersection:
-    START_OBJECT SET_INTERSECTION START_ARRAY expression[expr1] expression[expr2] expressions
-        END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::setIntersection,
-                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
-        auto&& others = $expressions;
-        auto&& array = $$.objectChildren()[0].second.arrayChildren();
-        array.insert(array.end(), others.begin(), others.end());
-    }
-;
-
-setIsSubset:
-    START_OBJECT SET_IS_SUBSET exprFixedTwoArg END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::setIsSubset,
-                                          $exprFixedTwoArg}}};
-    }
-;
-
-setUnion:
-    START_OBJECT SET_UNION START_ARRAY expression[expr1] expression[expr2] expressions
-        END_ARRAY END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::setUnion,
-                                          CNode{CNode::ArrayChildren{$expr1, $expr2}}}}};
-        auto&& others = $expressions;
-        auto&& array = $$.objectChildren()[0].second.arrayChildren();
-        array.insert(array.end(), others.begin(), others.end());
     }
 ;
 
