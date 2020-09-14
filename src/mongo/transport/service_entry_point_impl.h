@@ -36,7 +36,9 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_reserved.h"
+#include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/service_state_machine.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/cidr.h"
@@ -75,8 +77,12 @@ public:
         return _currentConnections.load();
     }
 
+    size_t maxOpenSessions() const final {
+        return _maxNumConnections;
+    }
+
 private:
-    using SSMList = std::list<std::shared_ptr<ServiceStateMachine>>;
+    using SSMList = std::list<std::shared_ptr<transport::ServiceStateMachine>>;
     using SSMListIterator = SSMList::iterator;
 
     ServiceContext* const _svcCtx;
@@ -87,11 +93,9 @@ private:
     stdx::condition_variable _shutdownCondition;
     SSMList _sessions;
 
-    size_t _maxNumConnections{DEFAULT_MAX_CONN};
+    const size_t _maxNumConnections{DEFAULT_MAX_CONN};
     AtomicWord<size_t> _currentConnections{0};
     AtomicWord<size_t> _createdConnections{0};
-
-    std::unique_ptr<transport::ServiceExecutorReserved> _adminInternalPool;
 };
 
 /*

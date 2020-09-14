@@ -86,6 +86,7 @@ env.Library(
 tlEnv.Library(
     target='service_executor',
     source=[
+        'service_executor.cpp',
         'service_executor_fixed.cpp',
         'service_executor_reserved.cpp',
         'service_executor_synchronous.cpp',
@@ -180,7 +181,8 @@ tlEnv.CppUnitTest(
         'transport_layer_asio_test.cpp',
         'service_executor_test.cpp',
         'max_conns_override_test.cpp',
-        'service_state_machine_test.cpp',
+        # TODO: service_state_machine test to be re-written in SERVER-50141
+        # 'service_state_machine_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

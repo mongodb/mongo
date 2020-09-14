@@ -193,10 +193,6 @@ ServiceEntryPoint* ServiceContext::getServiceEntryPoint() const {
     return _serviceEntryPoint.get();
 }
 
-transport::ServiceExecutor* ServiceContext::getServiceExecutor() const {
-    return _serviceExecutor.get();
-}
-
 void ServiceContext::setStorageEngine(std::unique_ptr<StorageEngine> engine) {
     invariant(engine);
     invariant(!_storageEngine);
@@ -225,10 +221,6 @@ void ServiceContext::setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep
 
 void ServiceContext::setTransportLayer(std::unique_ptr<transport::TransportLayer> tl) {
     _transportLayer = std::move(tl);
-}
-
-void ServiceContext::setServiceExecutor(std::unique_ptr<transport::ServiceExecutor> exec) {
-    _serviceExecutor = std::move(exec);
 }
 
 void ServiceContext::ClientDeleter::operator()(Client* client) const {
