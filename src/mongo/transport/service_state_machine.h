@@ -58,10 +58,12 @@ namespace transport {
  * user.
  */
 class ServiceStateMachine : public std::enable_shared_from_this<ServiceStateMachine> {
+public:
+    class ThreadGuardedExecutor;
+
     ServiceStateMachine(ServiceStateMachine&) = delete;
     ServiceStateMachine& operator=(ServiceStateMachine&) = delete;
 
-public:
     ServiceStateMachine(ServiceStateMachine&&) = delete;
     ServiceStateMachine& operator=(ServiceStateMachine&&) = delete;
 
