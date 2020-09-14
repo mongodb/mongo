@@ -1,6 +1,8 @@
 /*
  * Test that aggregation log lines include remoteOpWaitMillis: the amount of time the merger spent
  * waiting for results from shards.
+ *
+ * @tags: [uses_change_streams]
  */
 (function() {
 
