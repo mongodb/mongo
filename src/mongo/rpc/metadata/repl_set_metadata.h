@@ -149,7 +149,7 @@ private:
     long long _configTerm = repl::OpTime::kUninitializedTerm;
     OID _replicaSetId;
     int _currentSyncSourceIndex = -1;
-    bool _isPrimary;
+    bool _isPrimary = false;
 };
 
 }  // namespace rpc
