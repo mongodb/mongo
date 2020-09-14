@@ -242,6 +242,9 @@ public:
     }
 
     void tearDown() override {
+        // Ensure that even on test failures all failpoint state gets reset.
+        globalFailPointRegistry().disableAllFailpoints();
+
         WaitForMajorityService::get(getServiceContext()).shutDown();
 
         _testExecutor->shutdown();
