@@ -1448,7 +1448,21 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionIfNull* expr) final {
-        unsupportedExpression(expr->getOpName());
+        _context->ensureArity(2);
+
+        auto replacementIfNull = _context->popExpr();
+        auto input = _context->popExpr();
+
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(std::move(input));
+        sbe::EVariable inputRef(frameId, 0);
+
+        // If input is null or missing, return replacement expression. Otherwise, return input.
+        auto ifNullExpr = sbe::makeE<sbe::EIf>(
+            generateNullOrMissing(frameId, 0), std::move(replacementIfNull), inputRef.clone());
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(ifNullExpr)));
     }
     void visit(ExpressionIn* expr) final {
         unsupportedExpression(expr->getOpName());

@@ -1,8 +1,6 @@
 // SERVER-6232: seg fault when providing an empty object as an expression argument in agg
 // clear and populated db
-// @tags: [
-//   sbe_incompatible,
-// ]
+
 db.s6232.drop();
 db.s6232.save({});
 

@@ -3,7 +3,6 @@
 // key.
 // @tags: [
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 
 // $ifNull returns the result of the first expression if not null or undefined, otherwise of the
