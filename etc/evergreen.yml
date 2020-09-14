@@ -10638,6 +10638,41 @@ buildvariants:
   - name: jsCore
   - name: .replica_sets
 
+- name: enterprise-rhel-62-64-bit-operation-resource-consumption-metrics
+  display_name: "Enterprise RHEL 6.2 Shared Library (Operation Resource Consumption Metrics)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  batchtime: 10080 # 7 days
+  expansions:
+    test_flags: >-
+      --mongodSetParameters="{measureOperationResourceConsumption: true}"
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --ssl
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      MONGO_DISTMOD=rhel62
+      --link-model=dynamic
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    build_mongoreplay: false
+    large_distro_name: rhel62-large
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel62-large
+  - name: jsCore
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: .replica_sets .common
+  - name: .concurrency .common !.large
+  - name: .concurrency .common .large
+    distros:
+    - rhel62-large
+
 - name: enterprise-rhel-62-64-bit-coverage
   display_name: "~ Enterprise RHEL 6.2 DEBUG Code Coverage"
   modules:
