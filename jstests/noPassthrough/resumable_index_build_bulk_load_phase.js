@@ -14,12 +14,6 @@
 
 load("jstests/noPassthrough/libs/index_build.js");
 
-// TODO (SERVER-50920): Re-enable once resuming from the bulk load phase is fixed.
-if (true) {
-    jsTestLog("Skipping test.");
-    return;
-}
-
 const dbName = "test";
 const failPointName = "hangIndexBuildDuringBulkLoadPhase";
 

@@ -136,30 +136,26 @@ public:
     InMemIterator() {}
 
     /// Only a single value
-    InMemIterator(const Data& singleValue)
-        : _data(std::make_shared<std::deque<Data>>(1, singleValue)) {}
+    InMemIterator(const Data& singleValue) : _data(1, singleValue) {}
 
     /// Any number of values
     template <typename Container>
-    InMemIterator(const Container& input)
-        : _data(std::make_shared<std::deque<Data>>(input.begin(), input.end())) {}
-
-    InMemIterator(std::shared_ptr<std::deque<Data>> input) : _data(input) {}
+    InMemIterator(const Container& input) : _data(input.begin(), input.end()) {}
 
     void openSource() {}
     void closeSource() {}
 
     bool more() {
-        return _data && !_data->empty();
+        return !_data.empty();
     }
     Data next() {
-        Data out = std::move(_data->front());
-        _data->pop_front();
+        Data out = std::move(_data.front());
+        _data.pop_front();
         return out;
     }
 
 private:
-    std::shared_ptr<std::deque<Data>> _data;
+    std::deque<Data> _data;
 };
 
 /**
@@ -581,7 +577,7 @@ public:
     void add(const Key& key, const Value& val) {
         invariant(!_done);
 
-        _data->emplace_back(key.getOwned(), val.getOwned());
+        _data.emplace_back(key.getOwned(), val.getOwned());
 
         _memUsed += key.memUsageForSorter();
         _memUsed += val.memUsageForSorter();
@@ -596,14 +592,14 @@ public:
         _memUsed += key.memUsageForSorter();
         _memUsed += val.memUsageForSorter();
 
-        _data->emplace_back(std::move(key), std::move(val));
+        _data.emplace_back(std::move(key), std::move(val));
 
         if (_memUsed > this->_opts.maxMemoryUsageBytes)
             spill();
     }
 
     Iterator* done() {
-        invariant(!_done);
+        invariant(!std::exchange(_done, true));
 
         if (this->_iters.empty()) {
             sort();
@@ -611,9 +607,7 @@ public:
         }
 
         spill();
-        Iterator* mergeIt = Iterator::merge(this->_iters, this->_fileFullPath, this->_opts, _comp);
-        _done = true;
-        return mergeIt;
+        return Iterator::merge(this->_iters, this->_fileFullPath, this->_opts, _comp);
     }
 
 private:
@@ -631,7 +625,7 @@ private:
 
     void sort() {
         STLComparator less(_comp);
-        std::stable_sort(_data->begin(), _data->end(), less);
+        std::stable_sort(_data.begin(), _data.end(), less);
 
         // Does 2x more compares than stable_sort
         // TODO test on windows
@@ -639,10 +633,8 @@ private:
     }
 
     void spill() {
-        invariant(!_done);
-
         this->_usedDisk = true;
-        if (_data->empty())
+        if (_data.empty())
             return;
 
         if (!this->_opts.extSortAllowed) {
@@ -660,8 +652,8 @@ private:
 
         SortedFileWriter<Key, Value> writer(
             this->_opts, this->_fileFullPath, _nextSortedFileWriterOffset, _settings);
-        for (; !_data->empty(); _data->pop_front()) {
-            writer.addAlreadySorted(_data->front().first, _data->front().second);
+        for (; !_data.empty(); _data.pop_front()) {
+            writer.addAlreadySorted(_data.front().first, _data.front().second);
         }
         Iterator* iteratorPtr = writer.done();
         _nextSortedFileWriterOffset = writer.getFileEndOffset();
@@ -676,9 +668,7 @@ private:
     std::streampos _nextSortedFileWriterOffset = 0;
     bool _done = false;
     size_t _memUsed = 0;
-
-    // Data that has not been spilled.
-    std::shared_ptr<std::deque<Data>> _data = std::make_shared<std::deque<Data>>();
+    std::deque<Data> _data;  // Data that has not been spilled.
 };
 
 template <typename Key, typename Value, typename Comparator>

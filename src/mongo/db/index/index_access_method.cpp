@@ -499,7 +499,7 @@ public:
     void persistDataForShutdown() final;
 
 private:
-    void _addMultikeyMetadataKeysIntoSorter();
+    void _insertMultikeyMetadataKeysIntoSorter();
 
     Sorter* _makeSorter(
         size_t maxMemoryUsageBytes,
@@ -618,7 +618,7 @@ bool AbstractIndexAccessMethod::BulkBuilderImpl::isMultikey() const {
 
 IndexAccessMethod::BulkBuilder::Sorter::Iterator*
 AbstractIndexAccessMethod::BulkBuilderImpl::done() {
-    _addMultikeyMetadataKeysIntoSorter();
+    _insertMultikeyMetadataKeysIntoSorter();
     return _sorter->done();
 }
 
@@ -632,15 +632,19 @@ AbstractIndexAccessMethod::BulkBuilderImpl::getPersistedSorterState() const {
 }
 
 void AbstractIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown() {
-    _addMultikeyMetadataKeysIntoSorter();
+    _insertMultikeyMetadataKeysIntoSorter();
     _sorter->persistDataForShutdown();
 }
 
-void AbstractIndexAccessMethod::BulkBuilderImpl::_addMultikeyMetadataKeysIntoSorter() {
+void AbstractIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysIntoSorter() {
     for (const auto& keyString : _multikeyMetadataKeys) {
         _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
     }
+
+    // We clear the multikey metadata keys to prevent them from being inserted into the Sorter
+    // twice in the case that done() is called and then persistDataForShutdown() is later called.
+    _multikeyMetadataKeys.clear();
 }
 
 AbstractIndexAccessMethod::BulkBuilderImpl::Sorter::Settings
