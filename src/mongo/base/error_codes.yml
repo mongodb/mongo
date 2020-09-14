@@ -27,6 +27,8 @@ error_categories:
     - CloseConnectionError
     - VersionedAPIError
     - ValidationError
+    # Codes for internal use only that must never be returned in a network response.
+    - InternalOnly
 
 error_codes:
     - {code: 0,name: OK}
@@ -319,10 +321,9 @@ error_codes:
     - {code: 279,name: ClientDisconnect,categories: [Interruption]}
     - {code: 280,name: ChangeStreamFatalError,categories: [NonResumableChangeStreamError]}
 
-    # The two codes below are for internal use only and must never be returned in a network response
     # TransactionCoordinatorSteppingDown gets converted to InterruptedDueToReplStateChange
-    - {code: 281,name: TransactionCoordinatorSteppingDown,categories: [Interruption]}
-    - {code: 282,name: TransactionCoordinatorReachedAbortDecision}
+    - {code: 281,name: TransactionCoordinatorSteppingDown,categories: [Interruption,InternalOnly]}
+    - {code: 282,name: TransactionCoordinatorReachedAbortDecision,categories: [InternalOnly]}
 
     - {code: 283,name: WouldChangeOwningShard,extra: WouldChangeOwningShardInfo}
     - {code: 284,name: ForTestingErrorExtraInfoWithExtraInfoInNamespace,
@@ -330,13 +331,11 @@ error_codes:
     - {code: 285,name: IndexBuildAlreadyInProgress}
     - {code: 286,name: ChangeStreamHistoryLost,categories: [NonResumableChangeStreamError]}
 
-    # The code below is for internal use only and must never be returned in a network response
-    - {code: 287,name: TransactionCoordinatorDeadlineTaskCanceled}
+    - {code: 287,name: TransactionCoordinatorDeadlineTaskCanceled,categories: [InternalOnly]}
 
     - {code: 288,name: ChecksumMismatch,categories: [ConnectionFatalMessageParseError]}
 
-    # Internal only code used by WaitForMajorityService.
-    - {code: 289,name: WaitForMajorityServiceEarlierOpTimeAvailable}
+    - {code: 289,name: WaitForMajorityServiceEarlierOpTimeAvailable,categories: [InternalOnly]}
 
     - {code: 290,name: TransactionExceededLifetimeLimitSeconds,
                  categories: [Interruption,ExceededTimeLimitError]}
@@ -359,31 +358,25 @@ error_codes:
     # NeedRetargettingError categories.
     - {code: 304,name: ShardInvalidatedForTargeting,extra: ShardInvalidatedForTargetingInfo}
 
-    # Internal only codes used by the ReadThroughCache and must never be returned in a network
-    # response
-    - {code: 306,name: ReadThroughCacheLookupCanceled}
+    - {code: 306,name: ReadThroughCacheLookupCanceled,categories: [InternalOnly]}
 
     - {code: 307,name: RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist}
     - {code: 308,name: CurrentConfigNotCommittedYet}
     - {code: 309,name: ExhaustCommandFinished}
     - {code: 310,name: PeriodicJobIsStopped,categories: [CancelationError]}
 
-    # The codes below are for internal use only and must never be returned in a network response.
-    - {code: 311,name: TransactionCoordinatorCanceled}
-    - {code: 312,name: OperationIsKilledAndDelisted,categories: [CancelationError]}
+    - {code: 311,name: TransactionCoordinatorCanceled,categories: [InternalOnly]}
+    - {code: 312,name: OperationIsKilledAndDelisted,categories: [CancelationError,InternalOnly]}
 
     - {code: 313,name: ResumableRangeDeleterDisabled}
     - {code: 314,name: ObjectIsBusy}
 
 
-    # The code below is for internal use only and must never be returned in a network response
-    - {code: 315,name: TooStaleToSyncFromSource}
+    - {code: 315,name: TooStaleToSyncFromSource,categories: [InternalOnly]}
 
-    # The code below is for internal use only and must never be returned in a network response.
-    - {code: 316,name: QueryTrialRunCompleted}
+    - {code: 316,name: QueryTrialRunCompleted,categories: [InternalOnly]}
 
-    # The code below is for internal use only and must never be returned in a network response.
-    - {code: 317,name: ConnectionPoolExpired,categories: [NetworkError,RetriableError]}
+    - {code: 317,name: ConnectionPoolExpired,categories: [NetworkError,RetriableError,InternalOnly]}
 
     - {code: 318,name: ForTestingOptionalErrorExtraInfo,extra: OptionalErrorExtraInfoExample,extraIsOptional: True}
     - {code: 319,name: MovePrimaryInProgress}
