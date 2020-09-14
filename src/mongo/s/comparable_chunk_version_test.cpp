@@ -101,13 +101,22 @@ TEST(ComparableChunkVersionTest, DefaultConstructedVersionsAreEqual) {
     ASSERT_FALSE(defaultVersion1 > defaultVersion2);
 }
 
-TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLess) {
+TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanWithChunksVersion) {
     const ComparableChunkVersion defaultVersion{};
-    const auto version1 =
+    const auto withChunksVersion =
+        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(1, 0, OID::gen()));
+    ASSERT(defaultVersion != withChunksVersion);
+    ASSERT(defaultVersion < withChunksVersion);
+    ASSERT_FALSE(defaultVersion > withChunksVersion);
+}
+
+TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanNoChunksVersion) {
+    const ComparableChunkVersion defaultVersion{};
+    const auto noChunksVersion =
         ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, OID::gen()));
-    ASSERT(defaultVersion != version1);
-    ASSERT(defaultVersion < version1);
-    ASSERT_FALSE(defaultVersion > version1);
+    ASSERT(defaultVersion != noChunksVersion);
+    ASSERT(defaultVersion < noChunksVersion);
+    ASSERT_FALSE(defaultVersion > noChunksVersion);
 }
 
 TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanUnsharded) {
@@ -142,14 +151,14 @@ TEST(ComparableChunkVersionTest, UnshardedAndDroppedAreEqual) {
     ASSERT(version2 == version4);
 }
 
-TEST(ComparableChunkVersionTest, NoChunksAreDifferent) {
+TEST(ComparableChunkVersionTest, TwoNoChunksVersionsAreTheSame) {
     const auto oid = OID::gen();
     const auto version1 =
         ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, oid));
     const auto version2 =
         ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, oid));
-    ASSERT(version1 != version2);
-    ASSERT(version1 < version2);
+    ASSERT(version1 == version2);
+    ASSERT_FALSE(version1 < version2);
     ASSERT_FALSE(version1 > version2);
 }
 
@@ -157,24 +166,18 @@ TEST(ComparableChunkVersionTest, NoChunksCompareBySequenceNum) {
     const auto oid = OID::gen();
     const auto version1 =
         ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(1, 0, oid));
+
     const auto noChunkSV1 =
         ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, oid));
 
     ASSERT(version1 != noChunkSV1);
     ASSERT(noChunkSV1 > version1);
 
-    const auto noChunkSV2 =
-        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(0, 0, oid));
-
-    ASSERT(noChunkSV1 != noChunkSV2);
-    ASSERT_FALSE(noChunkSV1 > noChunkSV2);
-    ASSERT(noChunkSV2 > noChunkSV1);
-
     const auto version2 =
         ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion(2, 0, oid));
 
-    ASSERT(version2 != noChunkSV2);
-    ASSERT(version2 > noChunkSV2);
+    ASSERT(version2 != noChunkSV1);
+    ASSERT(version2 > noChunkSV1);
 }
 
 TEST(ComparableChunkVersionTest, NoChunksGreaterThanUnshardedBySequenceNum) {
@@ -206,7 +209,7 @@ TEST(ComparableChunkVersionTest, NoChunksGreaterThanDefault) {
     ASSERT(noChunkSV > defaultVersion);
 }
 
-TEST(ComparableChunkVersionTest, ForcedRefreshSequenceNumber) {
+TEST(ComparableChunkVersionTest, CompareForcedRefreshVersionVersusValidChunkVersion) {
     auto oid = OID::gen();
     const ComparableChunkVersion defaultVersionBeforeForce;
     const auto versionBeforeForce =
@@ -230,6 +233,20 @@ TEST(ComparableChunkVersionTest, ForcedRefreshSequenceNumber) {
 
     ASSERT(defaultVersionAfterForce != forcedRefreshVersion);
     ASSERT(defaultVersionAfterForce < forcedRefreshVersion);
+}
+
+TEST(ComparableChunkVersionTest, CompareTwoForcedRefreshVersions) {
+    const auto forcedRefreshVersion1 =
+        ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh();
+    ASSERT(forcedRefreshVersion1 == forcedRefreshVersion1);
+    ASSERT_FALSE(forcedRefreshVersion1 < forcedRefreshVersion1);
+    ASSERT_FALSE(forcedRefreshVersion1 > forcedRefreshVersion1);
+
+    const auto forcedRefreshVersion2 =
+        ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh();
+    ASSERT_FALSE(forcedRefreshVersion1 == forcedRefreshVersion2);
+    ASSERT(forcedRefreshVersion1 < forcedRefreshVersion2);
+    ASSERT_FALSE(forcedRefreshVersion1 > forcedRefreshVersion2);
 }
 
 }  // namespace

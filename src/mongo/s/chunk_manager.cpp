@@ -770,37 +770,62 @@ std::string ComparableChunkVersion::toString() const {
 }
 
 bool ComparableChunkVersion::operator==(const ComparableChunkVersion& other) const {
-    if (_forcedRefreshSequenceNum == other._forcedRefreshSequenceNum) {
-        if (_forcedRefreshSequenceNum == 0)
-            return true;  // Default constructed value
+    if (_forcedRefreshSequenceNum != other._forcedRefreshSequenceNum)
+        return false;  // Values created on two sides of a forced refresh sequence number are always
+                       // considered different
+    if (_forcedRefreshSequenceNum == 0)
+        return true;  // Only default constructed values have _forcedRefreshSequenceNum == 0 and
+                      // they are always equal
+    if (_chunkVersion.is_initialized() != other._chunkVersion.is_initialized())
+        return false;  // One side is not initialised, but the other is, which can only happen if
+                       // one side is ForForcedRefresh and the other is made from
+                       // makeComparableChunkVersion
+    if (!_chunkVersion.is_initialized())
+        return true;  // Both sides are not initialised, which means these are two equivalent
+                      // ForForcedRefresh versions
 
-        if (sameEpoch(other)) {
-            if (_chunkVersion->majorVersion() == 0 && other._chunkVersion->majorVersion() == 0) {
-                return _chunkVersion->epoch() == OID();
-            }
-            return _chunkVersion->majorVersion() == other._chunkVersion->majorVersion() &&
-                _chunkVersion->minorVersion() == other._chunkVersion->minorVersion();
-        }
-    }
-    return false;
+    return sameEpoch(other) &&
+        _chunkVersion->majorVersion() == other._chunkVersion->majorVersion() &&
+        _chunkVersion->minorVersion() == other._chunkVersion->minorVersion();
 }
 
 bool ComparableChunkVersion::operator<(const ComparableChunkVersion& other) const {
     if (_forcedRefreshSequenceNum < other._forcedRefreshSequenceNum)
-        return true;
+        return true;  // Values created on two sides of a forced refresh sequence number are always
+                      // considered different
     if (_forcedRefreshSequenceNum > other._forcedRefreshSequenceNum)
-        return false;
+        return false;  // Values created on two sides of a forced refresh sequence number are always
+                       // considered different
     if (_forcedRefreshSequenceNum == 0)
-        return false;  // Default constructed value
-
-    if (sameEpoch(other) && other._chunkVersion->epoch() != OID() &&
-        _chunkVersion->majorVersion() != 0 && other._chunkVersion->majorVersion() != 0) {
-        return _chunkVersion->majorVersion() < other._chunkVersion->majorVersion() ||
-            (_chunkVersion->majorVersion() == other._chunkVersion->majorVersion() &&
-             _chunkVersion->minorVersion() < other._chunkVersion->minorVersion());
-    } else {
-        return _epochDisambiguatingSequenceNum < other._epochDisambiguatingSequenceNum;
+        return false;  // Only default constructed values have _forcedRefreshSequenceNum == 0 and
+                       // they are always equal
+    if (_chunkVersion.is_initialized() != other._chunkVersion.is_initialized())
+        return _epochDisambiguatingSequenceNum <
+            other._epochDisambiguatingSequenceNum;  // One side is not initialised, but the other
+                                                    // is, which can only happen if one side is
+                                                    // ForForcedRefresh and the other is made from
+                                                    // makeComparableChunkVersion. In this case, use
+                                                    // the _epochDisambiguatingSequenceNum to see
+                                                    // which one is more recent.
+    if (!_chunkVersion.is_initialized())
+        return _epochDisambiguatingSequenceNum <
+            other._epochDisambiguatingSequenceNum;  // Both sides are not initialised, which can
+                                                    // only happen if both were created from
+                                                    // ForForcedRefresh. In this case, use the
+                                                    // _epochDisambiguatingSequenceNum to see which
+                                                    // one is more recent.
+    if (sameEpoch(other)) {
+        if (_chunkVersion->isSet() && other._chunkVersion->isSet())
+            return _chunkVersion->majorVersion() < other._chunkVersion->majorVersion() ||
+                (_chunkVersion->majorVersion() == other._chunkVersion->majorVersion() &&
+                 _chunkVersion->minorVersion() < other._chunkVersion->minorVersion());
+        else if (!_chunkVersion->isSet() && !other._chunkVersion->isSet())
+            return false;  // Both sides are the "no chunks on the shard version"
     }
+
+    // If the epochs are different, or if they match, but one of the versions is the "no chunks"
+    // version, use the _epochDisambiguatingSequenceNum to disambiguate
+    return _epochDisambiguatingSequenceNum < other._epochDisambiguatingSequenceNum;
 }
 
 }  // namespace mongo
