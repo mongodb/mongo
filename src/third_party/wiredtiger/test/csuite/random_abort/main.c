@@ -747,12 +747,8 @@ main(int argc, char *argv[])
     if (chdir(home) != 0)
         testutil_die(errno, "parent chdir: %s", home);
 
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "rm -rf ../%s.SAVE; mkdir ../%s.SAVE; "
-      "cp -p WiredTigerLog.* ../%s.SAVE;",
-      home, home, home));
-    if ((status = system(buf)) < 0)
-        testutil_die(status, "system: %s", buf);
+    /* Copy the data to a separate folder for debugging purpose. */
+    testutil_copy_data(home);
 
     /*
      * Recover the database and verify whether all the records from all threads are present or not?

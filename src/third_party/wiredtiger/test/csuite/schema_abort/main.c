@@ -1041,15 +1041,9 @@ main(int argc, char *argv[])
      */
     if (chdir(home) != 0)
         testutil_die(errno, "parent chdir: %s", home);
-    /*
-     * The tables can get very large, so while we'd ideally like to copy the entire database, we
-     * only copy the log files for now. Otherwise it can take far too long to run the test,
-     * particularly in automated testing.
-     */
-    testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && cp -p * ../%s.SAVE", home, home, home));
-    if ((status = system(buf)) < 0)
-        testutil_die(status, "system: %s", buf);
+
+    /* Copy the data to a separate folder for debugging purpose. */
+    testutil_copy_data(home);
     printf("Open database, run recovery and verify content\n");
 
     /*

@@ -415,7 +415,6 @@ int snap_repeat_txn(WT_CURSOR *, TINFO *);
 void snap_repeat_update(TINFO *, bool);
 void snap_track(TINFO *, thread_op);
 void timestamp_once(WT_SESSION *, bool);
-void timestamp_parse(WT_SESSION *, const char *, uint64_t *);
 int trace_config(const char *);
 void trace_init(void);
 void trace_ops_init(TINFO *);

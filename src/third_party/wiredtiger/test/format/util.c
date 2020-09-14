@@ -259,7 +259,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag)
         lock_writelock(session, &g.ts_lock);
 
     if ((ret = conn->query_timestamp(conn, tsbuf, "get=all_durable")) == 0) {
-        timestamp_parse(session, tsbuf, &all_durable);
+        testutil_timestamp_parse(tsbuf, &all_durable);
 
         /*
          * If a lag is permitted, move the oldest timestamp half the way to the current
@@ -293,20 +293,6 @@ timestamp_once(WT_SESSION *session, bool allow_lag)
 
     if (LOCK_INITIALIZED(&g.ts_lock))
         lock_writeunlock(session, &g.ts_lock);
-}
-
-/*
- * timestamp_parse --
- *     Parse a timestamp to an integral value.
- */
-void
-timestamp_parse(WT_SESSION *session, const char *str, uint64_t *tsp)
-{
-    char *p;
-
-    *tsp = strtoull(str, &p, 16);
-    if (session != NULL)
-        WT_ASSERT((WT_SESSION_IMPL *)session, p - str <= 16);
 }
 
 /*
@@ -376,7 +362,7 @@ set_oldest_timestamp(void)
     conn = g.wts_conn;
 
     if ((ret = conn->query_timestamp(conn, tsbuf, "get=oldest")) == 0) {
-        timestamp_parse(NULL, tsbuf, &oldest_ts);
+        testutil_timestamp_parse(tsbuf, &oldest_ts);
         g.timestamp = oldest_ts;
         testutil_check(
           __wt_snprintf(buf, sizeof(buf), "%s%" PRIx64, oldest_timestamp_str, g.oldest_timestamp));

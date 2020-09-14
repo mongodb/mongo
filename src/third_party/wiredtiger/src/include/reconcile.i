@@ -222,7 +222,7 @@ __wt_rec_need_split(WT_RECONCILE *r, size_t len)
      * considering the cache usage by the updates.
      */
     if (r->page->type == WT_PAGE_ROW_LEAF && page_items > WT_REC_SPLIT_MIN_ITEMS_USE_MEM)
-        len += (r->supd_memsize - (r->supd_next * WT_UPDATE_SIZE)) / 10;
+        len += (r->supd_memsize - ((size_t)r->supd_next * WT_UPDATE_SIZE)) / 10;
 
     /* Check for the disk image crossing a boundary. */
     return (WT_CHECK_CROSSING_BND(r, len));

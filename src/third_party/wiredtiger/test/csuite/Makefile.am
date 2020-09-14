@@ -151,6 +151,10 @@ test_wt6185_modify_ts_SOURCES = wt6185_modify_ts/main.c
 noinst_PROGRAMS += test_wt6185_modify_ts
 all_TESTS += test_wt6185_modify_ts
 
+test_wt6616_checkpoint_oldest_ts_SOURCES = wt6616_checkpoint_oldest_ts/main.c
+noinst_PROGRAMS += test_wt6616_checkpoint_oldest_ts
+all_TESTS += test_wt6616_checkpoint_oldest_ts
+
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)
 LOG_COMPILER = env top_builddir=$(top_builddir) top_srcdir=$(top_srcdir) $(TEST_WRAPPER)
