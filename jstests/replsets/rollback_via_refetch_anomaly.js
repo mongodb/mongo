@@ -96,7 +96,6 @@
 (function() {
 "use strict";
 
-load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/libs/rollback_test.js");
 
@@ -149,11 +148,7 @@ assert.soonNoExcept(() => {
 checkLog.containsJson(P2, 21331);
 jsTestLog("P2 stepped up");
 
-reply = assert.commandWorked(testDB.runCommand({delete: "test", deletes: [{q: {}, limit: 0}]}));
-jsTestLog(`Deleted from P1 at ${reply.operationTime}`);
-
-// Ensure P1's lastApplied > P2's, even if P1's set-up entry was written at the same timestamp as
-// P2's delete timestamp.
+// Write to P1 to ensure TS 4 (P1's delete timestamp) > TS 3 (P2's step-up timestamp).
 assert.soon(() => {
     testDB.runCommand({insert: "otherCollection", documents: [{}]});
     function lastApplied(node) {
@@ -166,7 +161,10 @@ assert.soon(() => {
     return timestampCmp(P1applied, P2applied) > 0;
 }, "P1's lastApplied never surpassed P2's");
 
-jsTestLog("Reconnecting P1 to P2, so P1 rolls back");
+reply = assert.commandWorked(testDB.runCommand({delete: "test", deletes: [{q: {}, limit: 0}]}));
+jsTestLog(`Deleted from P1 at ${reply.operationTime}.` +
+          ` Reconnecting P1 to P2, so P1 rolls back.`);
+
 P1.reconnect([P2]);
 // "Rollback using the 'rollbackViaRefetch' method".
 checkLog.containsJson(P1, 21103);
