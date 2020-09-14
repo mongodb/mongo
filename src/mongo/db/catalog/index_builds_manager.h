@@ -101,7 +101,9 @@ public:
                               const UUID& buildUUID,
                               boost::optional<RecordId> resumeAfterRecordId = boost::none);
 
-    Status resumeBuildingIndexFromBulkLoadPhase(OperationContext* opCtx, const UUID& buildUUID);
+    Status resumeBuildingIndexFromBulkLoadPhase(OperationContext* opCtx,
+                                                const Collection* collection,
+                                                const UUID& buildUUID);
 
     /**
      * Iterates through every record in the collection to index it. May also remove documents
@@ -132,7 +134,9 @@ public:
     /**
      * Runs the index constraint violation checking phase of the index build..
      */
-    Status checkIndexConstraintViolations(OperationContext* opCtx, const UUID& buildUUID);
+    Status checkIndexConstraintViolations(OperationContext* opCtx,
+                                          const Collection* collection,
+                                          const UUID& buildUUID);
 
     /**
      * Persists information in the index catalog entry that the index is ready for use, as well as

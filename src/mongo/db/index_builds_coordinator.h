@@ -661,7 +661,7 @@ protected:
      */
     void _insertSortedKeysIntoIndexForResume(OperationContext* opCtx,
                                              std::shared_ptr<ReplIndexBuildState> replState);
-    void _setUpForScanCollectionAndInsertSortedKeysIntoIndex(
+    const Collection* _setUpForScanCollectionAndInsertSortedKeysIntoIndex(
         OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
 
     /**

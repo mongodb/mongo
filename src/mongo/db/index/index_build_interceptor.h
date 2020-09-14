@@ -113,7 +113,7 @@ public:
      * Given a duplicate key, record the key for later verification by a call to
      * checkDuplicateKeyConstraints();
      */
-    Status recordDuplicateKey(OperationContext* opCtx, const KeyString::Value& key);
+    Status recordDuplicateKey(OperationContext* opCtx, const KeyString::Value& key) const;
 
     /**
      * Returns Status::OK if all previously recorded duplicate key constraint violations have been

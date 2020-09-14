@@ -241,7 +241,7 @@ public:
         // writeConflictRetry loop.
         uassertStatusOK(indexer->insertAllDocumentsInCollection(opCtx, collection.get()));
 
-        uassertStatusOK(indexer->checkConstraints(opCtx));
+        uassertStatusOK(indexer->checkConstraints(opCtx, collection.get()));
 
         writeConflictRetry(opCtx, "commitReIndex", toReIndexNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);

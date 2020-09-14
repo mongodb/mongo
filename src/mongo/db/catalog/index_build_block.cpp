@@ -52,17 +52,11 @@ namespace mongo {
 
 class IndexCatalog;
 
-IndexBuildBlock::IndexBuildBlock(IndexCatalog* indexCatalog,
-                                 const NamespaceString& nss,
+IndexBuildBlock::IndexBuildBlock(const NamespaceString& nss,
                                  const BSONObj& spec,
                                  IndexBuildMethod method,
                                  boost::optional<UUID> indexBuildUUID)
-    : _indexCatalog(indexCatalog),
-      _nss(nss),
-      _spec(spec.getOwned()),
-      _method(method),
-      _buildUUID(indexBuildUUID),
-      _indexCatalogEntry(nullptr) {}
+    : _nss(nss), _spec(spec.getOwned()), _method(method), _buildUUID(indexBuildUUID) {}
 
 void IndexBuildBlock::finalizeTemporaryTables(OperationContext* opCtx,
                                               TemporaryRecordStore::FinalizationAction action) {
@@ -75,8 +69,9 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
     // Register this index with the CollectionQueryInfo to regenerate the cache. This way, updates
     // occurring while an index is being build in the background will be aware of whether or not
     // they need to modify any indexes.
+    auto indexCatalogEntry = getEntry(opCtx, collection);
     CollectionQueryInfo::get(collection)
-        .addedIndex(opCtx, collection, _indexCatalogEntry->descriptor());
+        .addedIndex(opCtx, collection, indexCatalogEntry->descriptor());
 }
 
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,
@@ -85,14 +80,14 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
                                       IndexBuildPhaseEnum phase) {
 
     _indexName = _spec.getStringField("name");
-    auto descriptor =
-        _indexCatalog->findIndexByName(opCtx, _indexName, true /* includeUnfinishedIndexes */);
+    auto descriptor = collection->getIndexCatalog()->findIndexByName(
+        opCtx, _indexName, true /* includeUnfinishedIndexes */);
 
-    _indexCatalogEntry = descriptor->getEntry();
+    auto indexCatalogEntry = descriptor->getEntry();
 
     uassert(4945000,
             "Index catalog entry not found while attempting to resume index build",
-            _indexCatalogEntry);
+            indexCatalogEntry);
     uassert(
         4945001, "Cannot resume a non-hybrid index build", _method == IndexBuildMethod::kHybrid);
 
@@ -103,19 +98,19 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
             opCtx,
             collection->getCatalogId(),
             descriptor,
-            _indexCatalogEntry->getIdent(),
-            _indexCatalogEntry->getPrefix());
+            indexCatalogEntry->getIdent(),
+            indexCatalogEntry->getPrefix());
         if (!status.isOK())
             return status;
     }
 
     _indexBuildInterceptor =
         std::make_unique<IndexBuildInterceptor>(opCtx,
-                                                _indexCatalogEntry,
+                                                indexCatalogEntry,
                                                 sorterInfo.getSideWritesTable(),
                                                 sorterInfo.getDuplicateKeyTrackerTable(),
                                                 sorterInfo.getSkippedRecordTrackerTable());
-    _indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
+    indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
     _completeInit(opCtx, collection);
 
@@ -150,17 +145,17 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
     if (!status.isOK())
         return status;
 
-    _indexCatalogEntry =
-        _indexCatalog->createIndexEntry(opCtx, std::move(descriptor), CreateIndexEntryFlags::kNone);
+    auto indexCatalogEntry = collection->getIndexCatalog()->createIndexEntry(
+        opCtx, std::move(descriptor), CreateIndexEntryFlags::kNone);
 
     if (_method == IndexBuildMethod::kHybrid) {
-        _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(opCtx, _indexCatalogEntry);
-        _indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
+        _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(opCtx, indexCatalogEntry);
+        indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
     }
 
     if (isBackgroundIndex) {
         opCtx->recoveryUnit()->onCommit(
-            [entry = _indexCatalogEntry, coll = collection](boost::optional<Timestamp> commitTime) {
+            [entry = indexCatalogEntry, coll = collection](boost::optional<Timestamp> commitTime) {
                 // This will prevent the unfinished index from being visible on index iterators.
                 if (commitTime) {
                     entry->setMinimumVisibleSnapshot(commitTime.get());
@@ -184,13 +179,14 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_X));
 
-    if (_indexCatalogEntry) {
-        invariant(_indexCatalog->dropIndexEntry(opCtx, _indexCatalogEntry).isOK());
+    auto indexCatalogEntry = getEntry(opCtx, collection);
+    if (indexCatalogEntry) {
+        invariant(collection->getIndexCatalog()->dropIndexEntry(opCtx, indexCatalogEntry).isOK());
         if (_indexBuildInterceptor) {
-            _indexCatalogEntry->setIndexBuildInterceptor(nullptr);
+            indexCatalogEntry->setIndexBuildInterceptor(nullptr);
         }
     } else {
-        _indexCatalog->deleteIndexFromDisk(opCtx, _indexName);
+        collection->getIndexCatalog()->deleteIndexFromDisk(opCtx, _indexName);
     }
 }
 
@@ -213,14 +209,15 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
         invariant(_indexBuildInterceptor->areAllWritesApplied(opCtx));
     }
 
-    collection->indexBuildSuccess(opCtx, _indexCatalogEntry);
+    auto indexCatalogEntry = getEntry(opCtx, collection);
+    collection->indexBuildSuccess(opCtx, indexCatalogEntry);
     auto svcCtx = opCtx->getClient()->getServiceContext();
 
     opCtx->recoveryUnit()->onCommit(
         [svcCtx,
          indexName = _indexName,
          spec = _spec,
-         entry = _indexCatalogEntry,
+         entry = indexCatalogEntry,
          coll = collection,
          buildUUID = _buildUUID](boost::optional<Timestamp> commitTime) {
             // Note: this runs after the WUOW commits but before we release our X lock on the
@@ -254,6 +251,21 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                     std::make_pair(coll->uuid(), indexName));
             }
         });
+}
+
+const IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx,
+                                                   const Collection* collection) const {
+    auto descriptor = collection->getIndexCatalog()->findIndexByName(
+        opCtx, _indexName, true /* includeUnfinishedIndexes */);
+
+    return descriptor->getEntry();
+}
+
+IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx, Collection* collection) {
+    auto descriptor = collection->getIndexCatalog()->findIndexByName(
+        opCtx, _indexName, true /* includeUnfinishedIndexes */);
+
+    return descriptor->getEntry();
 }
 
 }  // namespace mongo

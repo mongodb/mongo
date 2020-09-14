@@ -97,8 +97,8 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
         operationContext(), coll, std::vector<BSONObj>(), MultiIndexBlock::kNoopOnInitFn));
     ASSERT_EQUALS(0U, specs.size());
 
-    ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext()));
-    ASSERT_OK(indexer->checkConstraints(operationContext()));
+    ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll.get()));
+    ASSERT_OK(indexer->checkConstraints(operationContext(), coll.get()));
 
     {
         WriteUnitOfWork wunit(operationContext());
@@ -121,8 +121,8 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(), {}, {}));
-    ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext()));
-    ASSERT_OK(indexer->checkConstraints(operationContext()));
+    ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll.get()));
+    ASSERT_OK(indexer->checkConstraints(operationContext(), coll.get()));
 
     {
         WriteUnitOfWork wunit(operationContext());
@@ -148,7 +148,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(), {}, {}));
     auto isResumable = false;
-    indexer->abortWithoutCleanupForRollback(operationContext(), isResumable);
+    indexer->abortWithoutCleanupForRollback(operationContext(), coll.get(), isResumable);
 }
 
 TEST_F(MultiIndexBlockTest, InitWriteConflictException) {

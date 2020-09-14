@@ -276,12 +276,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
             boost::optional<IndexSorterInfo> sorterInfo;
             IndexToBuild index;
-            index.block = std::make_unique<IndexBuildBlock>(
-                collection.getWritableCollection()->getIndexCatalog(),
-                collection->ns(),
-                info,
-                _method,
-                _buildUUID);
+            index.block =
+                std::make_unique<IndexBuildBlock>(collection->ns(), info, _method, _buildUUID);
             if (resumeInfo) {
                 auto resumeInfoIndexes = resumeInfo->getIndexes();
                 // Find the resume information that corresponds to this spec.
@@ -312,7 +308,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                     opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
             });
 
-            index.real = index.block->getEntry()->accessMethod();
+            auto indexCatalogEntry =
+                index.block->getEntry(opCtx, collection.getWritableCollection());
+            index.real = indexCatalogEntry->accessMethod();
             status = index.real->initializeAsEmpty(opCtx);
             if (!status.isOK())
                 return status;
@@ -325,7 +323,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                     ? sorterInfo
                     : boost::none);
 
-            const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
+            const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
             collection->getIndexCatalog()->prepareInsertDeleteOptions(
                 opCtx, collection->ns(), descriptor, &index.options);
@@ -346,7 +344,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                   "maxTemporaryMemoryUsageMB"_attr =
                       eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024);
 
-            index.filterExpression = index.block->getEntry()->getFilterExpression();
+            index.filterExpression = indexCatalogEntry->getFilterExpression();
 
             if (!resumeInfo) {
                 // TODO SERVER-14888 Suppress this in cases we don't want to audit.
@@ -571,7 +569,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
               RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
           "duration"_attr = duration_cast<Milliseconds>(Seconds(t.seconds())));
 
-    Status ret = dumpInsertsFromBulk(opCtx);
+    Status ret = dumpInsertsFromBulk(opCtx, collection);
     if (!ret.isOK())
         return ret;
 
@@ -606,12 +604,14 @@ Status MultiIndexBlock::insertSingleDocumentForInitialSyncOrRecovery(OperationCo
     return Status::OK();
 }
 
-Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx) {
-    return dumpInsertsFromBulk(opCtx, nullptr);
+Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx, const Collection* collection) {
+    return dumpInsertsFromBulk(opCtx, collection, nullptr);
 }
 
 Status MultiIndexBlock::dumpInsertsFromBulk(
-    OperationContext* opCtx, const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord) {
+    OperationContext* opCtx,
+    const Collection* collection,
+    const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord) {
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -631,9 +631,9 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
         // When onDuplicateRecord is passed, 'dupsAllowed' should be passed to reflect whether or
         // not the index is unique.
         bool dupsAllowed = (onDuplicateRecord)
-            ? !_indexes[i].block->getEntry()->descriptor()->unique()
+            ? !_indexes[i].block->getEntry(opCtx, collection)->descriptor()->unique()
             : _indexes[i].options.dupsAllowed;
-        IndexCatalogEntry* entry = _indexes[i].block->getEntry();
+        const IndexCatalogEntry* entry = _indexes[i].block->getEntry(opCtx, collection);
         LOGV2_DEBUG(20392,
                     1,
                     "Index build: inserting from external sorter into index",
@@ -701,7 +701,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
     // Callers are responsible for stopping writes by holding an S or X lock while draining before
     // completing the index build.
     for (size_t i = 0; i < _indexes.size(); i++) {
-        auto interceptor = _indexes[i].block->getEntry()->indexBuildInterceptor();
+        auto interceptor = _indexes[i].block->getEntry(opCtx, coll)->indexBuildInterceptor();
         if (!interceptor)
             continue;
 
@@ -721,7 +721,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
 Status MultiIndexBlock::retrySkippedRecords(OperationContext* opCtx, const Collection* collection) {
     invariant(!_buildIsCleanedUp);
     for (auto&& index : _indexes) {
-        auto interceptor = index.block->getEntry()->indexBuildInterceptor();
+        auto interceptor = index.block->getEntry(opCtx, collection)->indexBuildInterceptor();
         if (!interceptor)
             continue;
 
@@ -733,14 +733,14 @@ Status MultiIndexBlock::retrySkippedRecords(OperationContext* opCtx, const Colle
     return Status::OK();
 }
 
-Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
+Status MultiIndexBlock::checkConstraints(OperationContext* opCtx, const Collection* collection) {
     invariant(!_buildIsCleanedUp);
 
     // For each index that may be unique, check that no recorded duplicates still exist. This can
     // only check what is visible on the index. Callers are responsible for ensuring all writes to
     // the collection are visible.
     for (size_t i = 0; i < _indexes.size(); i++) {
-        auto interceptor = _indexes[i].block->getEntry()->indexBuildInterceptor();
+        auto interceptor = _indexes[i].block->getEntry(opCtx, collection)->indexBuildInterceptor();
         if (!interceptor)
             continue;
 
@@ -753,12 +753,14 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx) {
 }
 
 boost::optional<ResumeIndexInfo> MultiIndexBlock::abortWithoutCleanupForRollback(
-    OperationContext* opCtx, bool isResumable) {
-    return _abortWithoutCleanup(opCtx, false /* shutdown */, isResumable);
+    OperationContext* opCtx, const Collection* collection, bool isResumable) {
+    return _abortWithoutCleanup(opCtx, collection, false /* shutdown */, isResumable);
 }
 
-void MultiIndexBlock::abortWithoutCleanupForShutdown(OperationContext* opCtx, bool isResumable) {
-    _abortWithoutCleanup(opCtx, true /* shutdown */, isResumable);
+void MultiIndexBlock::abortWithoutCleanupForShutdown(OperationContext* opCtx,
+                                                     const Collection* collection,
+                                                     bool isResumable) {
+    _abortWithoutCleanup(opCtx, collection, true /* shutdown */, isResumable);
 }
 
 MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn = [](const BSONObj& spec) {};
@@ -793,12 +795,12 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         // catalog entry. The interceptor will write multikey metadata keys into the index during
         // IndexBuildInterceptor::sideWrite, so we only need to pass the cached MultikeyPaths into
         // IndexCatalogEntry::setMultikey here.
-        auto interceptor = _indexes[i].block->getEntry()->indexBuildInterceptor();
+        auto indexCatalogEntry = _indexes[i].block->getEntry(opCtx, collection);
+        auto interceptor = indexCatalogEntry->indexBuildInterceptor();
         if (interceptor) {
             auto multikeyPaths = interceptor->getMultikeyPaths();
             if (multikeyPaths) {
-                _indexes[i].block->getEntry()->setMultikey(
-                    opCtx, collection, {}, multikeyPaths.get());
+                indexCatalogEntry->setMultikey(opCtx, collection, {}, multikeyPaths.get());
             }
         }
 
@@ -809,8 +811,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         // MultikeyPaths into IndexCatalogEntry::setMultikey here.
         const auto& bulkBuilder = _indexes[i].bulk;
         if (bulkBuilder->isMultikey()) {
-            _indexes[i].block->getEntry()->setMultikey(
-                opCtx, collection, {}, bulkBuilder->getMultikeyPaths());
+            indexCatalogEntry->setMultikey(opCtx, collection, {}, bulkBuilder->getMultikeyPaths());
         }
 
         // The commit() function can be called multiple times on write conflict errors. Dropping the
@@ -840,6 +841,7 @@ void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {
 }
 
 boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(OperationContext* opCtx,
+                                                                       const Collection* collection,
                                                                        bool shutdown,
                                                                        bool isResumable) {
     invariant(!_buildIsCleanedUp);
@@ -859,14 +861,15 @@ boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(Operation
         invariant(_method == IndexBuildMethod::kHybrid);
 
         if (shutdown) {
-            _writeStateToDisk(opCtx);
+            _writeStateToDisk(opCtx, collection);
 
             // TODO (SERVER-48419): Keep the temporary tables unconditionally of shutdown once
             // rollback uses the resume information.
             action = TemporaryRecordStore::FinalizationAction::kKeep;
         } else {
-            resumeInfo = ResumeIndexInfo::parse(
-                IDLParserErrorContext("MultiIndexBlock::getResumeInfo"), _constructStateObject());
+            resumeInfo =
+                ResumeIndexInfo::parse(IDLParserErrorContext("MultiIndexBlock::getResumeInfo"),
+                                       _constructStateObject(opCtx, collection));
         }
     }
 
@@ -879,8 +882,9 @@ boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(Operation
     return resumeInfo;
 }
 
-void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) const {
-    auto obj = _constructStateObject();
+void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
+                                        const Collection* collection) const {
+    auto obj = _constructStateObject(opCtx, collection);
     auto rs = opCtx->getServiceContext()
                   ->getStorageEngine()
                   ->makeTemporaryRecordStoreForResumableIndexBuild(opCtx);
@@ -908,7 +912,8 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) const {
     rs->finalizeTemporaryTable(opCtx, TemporaryRecordStore::FinalizationAction::kKeep);
 }
 
-BSONObj MultiIndexBlock::_constructStateObject() const {
+BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
+                                               const Collection* collection) const {
     BSONObjBuilder builder;
     _buildUUID->appendToBuilder(&builder, "_id");
     builder.append("phase", IndexBuildPhase_serializer(_phase));
@@ -949,7 +954,8 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
             ranges.done();
         }
 
-        auto indexBuildInterceptor = index.block->getEntry()->indexBuildInterceptor();
+        auto indexBuildInterceptor =
+            index.block->getEntry(opCtx, collection)->indexBuildInterceptor();
         indexInfo.append("sideWritesTable", indexBuildInterceptor->getSideWritesTableIdent());
 
         if (auto duplicateKeyTrackerTableIdent =

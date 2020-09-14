@@ -286,7 +286,7 @@ public:
         }
 
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
-        ASSERT_OK(indexer.checkConstraints(_opCtx));
+        ASSERT_OK(indexer.checkConstraints(_opCtx, coll.get()));
 
         {
             WriteUnitOfWork wuow(_opCtx);
@@ -2120,7 +2120,7 @@ public:
         // Inserting all the documents has the side-effect of setting internal state on the index
         // builder that the index is multikey.
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, autoColl.getCollection()));
-        ASSERT_OK(indexer.checkConstraints(_opCtx));
+        ASSERT_OK(indexer.checkConstraints(_opCtx, autoColl.getCollection()));
 
         {
             WriteUnitOfWork wuow(_opCtx);
@@ -2312,7 +2312,7 @@ public:
             ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
         }
 
-        ASSERT_OK(indexer.checkConstraints(_opCtx));
+        ASSERT_OK(indexer.checkConstraints(_opCtx, autoColl.getCollection()));
 
         {
             WriteUnitOfWork wuow(_opCtx);
@@ -3051,7 +3051,7 @@ public:
             buildingIndex->indexBuildInterceptor()->getSkippedRecordTracker()->areAllRecordsApplied(
                 _opCtx));
         ASSERT_TRUE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
-        ASSERT_OK(indexer.checkConstraints(_opCtx));
+        ASSERT_OK(indexer.checkConstraints(_opCtx, collection.get()));
 
         {
             WriteUnitOfWork wuow(_opCtx);

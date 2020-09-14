@@ -211,7 +211,7 @@ protected:
         ASSERT_OK(
             indexer.init(opCtx(), coll, indexSpec, MultiIndexBlock::kNoopOnInitFn).getStatus());
         ASSERT_OK(indexer.insertAllDocumentsInCollection(opCtx(), coll.get()));
-        ASSERT_OK(indexer.checkConstraints(opCtx()));
+        ASSERT_OK(indexer.checkConstraints(opCtx(), coll.get()));
 
         WriteUnitOfWork wunit(opCtx());
         ASSERT_OK(indexer.commit(opCtx(),

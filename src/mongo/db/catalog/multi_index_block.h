@@ -177,8 +177,9 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    Status dumpInsertsFromBulk(OperationContext* opCtx);
+    Status dumpInsertsFromBulk(OperationContext* opCtx, const Collection* collection);
     Status dumpInsertsFromBulk(OperationContext* opCtx,
+                               const Collection* collection,
                                const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord);
     /**
      * For background indexes using an IndexBuildInterceptor to capture inserts during a build,
@@ -216,7 +217,7 @@ public:
      *
      * Must not be in a WriteUnitOfWork.
      */
-    Status checkConstraints(OperationContext* opCtx);
+    Status checkConstraints(OperationContext* opCtx, const Collection* collection);
 
     /**
      * Marks the index ready for use. Should only be called as the last method after
@@ -278,6 +279,7 @@ public:
      * This should only be used during rollback.
      */
     boost::optional<ResumeIndexInfo> abortWithoutCleanupForRollback(OperationContext* opCtx,
+                                                                    const Collection* collection,
                                                                     bool isResumable);
 
     /**
@@ -289,7 +291,9 @@ public:
      *
      * This should only be used during shutdown.
      */
-    void abortWithoutCleanupForShutdown(OperationContext* opCtx, bool isResumable);
+    void abortWithoutCleanupForShutdown(OperationContext* opCtx,
+                                        const Collection* collection,
+                                        bool isResumable);
 
     /**
      * Returns true if this build block supports background writes while building an index. This is
@@ -317,12 +321,13 @@ private:
      * supported.
      */
     boost::optional<ResumeIndexInfo> _abortWithoutCleanup(OperationContext* opCtx,
+                                                          const Collection* collection,
                                                           bool shutdown,
                                                           bool isResumable);
 
-    void _writeStateToDisk(OperationContext* opCtx) const;
+    void _writeStateToDisk(OperationContext* opCtx, const Collection* collection) const;
 
-    BSONObj _constructStateObject() const;
+    BSONObj _constructStateObject(OperationContext* opCtx, const Collection* collection) const;
 
 
     // Is set during init() and ensures subsequent function calls act on the same Collection.

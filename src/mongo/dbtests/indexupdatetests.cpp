@@ -165,7 +165,7 @@ public:
 
         ASSERT_OK(indexer.init(_opCtx, coll, spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
-        ASSERT_OK(indexer.checkConstraints(_opCtx));
+        ASSERT_OK(indexer.checkConstraints(_opCtx, coll.get()));
 
         WriteUnitOfWork wunit(_opCtx);
         ASSERT_OK(indexer.commit(_opCtx,
@@ -226,7 +226,7 @@ public:
         // Hybrid index builds check duplicates explicitly.
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
 
-        auto status = indexer.checkConstraints(_opCtx);
+        auto status = indexer.checkConstraints(_opCtx, coll.get());
         ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
     }
 };
@@ -343,7 +343,7 @@ Status IndexBuildBase::createIndex(const BSONObj& indexSpec) {
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.checkConstraints(_opCtx);
+    status = indexer.checkConstraints(_opCtx, collection().get());
     if (!status.isOK()) {
         return status;
     }

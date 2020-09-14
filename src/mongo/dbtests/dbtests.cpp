@@ -142,7 +142,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
     if (!status.isOK()) {
         return status;
     }
-    status = indexer.checkConstraints(opCtx);
+    status = indexer.checkConstraints(opCtx, coll);
     if (!status.isOK()) {
         return status;
     }

@@ -89,11 +89,7 @@ public:
         return _indexBuildInterceptor != nullptr;
     }
 
-    IndexBuildInterceptor* indexBuildInterceptor() final {
-        return _indexBuildInterceptor;
-    }
-
-    const IndexBuildInterceptor* indexBuildInterceptor() const final {
+    IndexBuildInterceptor* indexBuildInterceptor() const final {
         return _indexBuildInterceptor;
     }
 

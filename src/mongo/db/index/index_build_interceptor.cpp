@@ -152,7 +152,7 @@ void IndexBuildInterceptor::finalizeTemporaryTables(
 }
 
 Status IndexBuildInterceptor::recordDuplicateKey(OperationContext* opCtx,
-                                                 const KeyString::Value& key) {
+                                                 const KeyString::Value& key) const {
     invariant(_indexCatalogEntry->descriptor()->unique());
     return _duplicateKeyTracker->recordKey(opCtx, key);
 }

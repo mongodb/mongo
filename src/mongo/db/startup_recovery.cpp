@@ -183,7 +183,7 @@ Status buildMissingIdIndex(OperationContext* opCtx, Collection* collection) {
         return status;
     }
 
-    status = indexer.checkConstraints(opCtx);
+    status = indexer.checkConstraints(opCtx, collection);
     if (!status.isOK()) {
         return status;
     }

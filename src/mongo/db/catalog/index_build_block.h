@@ -41,8 +41,7 @@ class IndexBuildBlock {
     IndexBuildBlock& operator=(const IndexBuildBlock&) = delete;
 
 public:
-    IndexBuildBlock(IndexCatalog* indexCatalog,
-                    const NamespaceString& nss,
+    IndexBuildBlock(const NamespaceString& nss,
                     const BSONObj& spec,
                     IndexBuildMethod method,
                     // The index build UUID is only required for persisting to the catalog.
@@ -98,9 +97,8 @@ public:
      *
      * This entry is owned by the IndexCatalog.
      */
-    IndexCatalogEntry* getEntry() {
-        return _indexCatalogEntry;
-    }
+    const IndexCatalogEntry* getEntry(OperationContext* opCtx, const Collection* collection) const;
+    IndexCatalogEntry* getEntry(OperationContext* opCtx, Collection* collection);
 
     /**
      * Returns the name of the index managed by this index builder.
@@ -119,7 +117,6 @@ public:
 private:
     void _completeInit(OperationContext* opCtx, Collection* collection);
 
-    IndexCatalog* const _indexCatalog;
     const NamespaceString _nss;
 
     BSONObj _spec;
@@ -128,8 +125,6 @@ private:
 
     std::string _indexName;
     std::string _indexNamespace;
-
-    IndexCatalogEntry* _indexCatalogEntry;
 
     std::unique_ptr<IndexBuildInterceptor> _indexBuildInterceptor;
 };

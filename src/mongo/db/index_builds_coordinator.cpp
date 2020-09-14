@@ -1799,7 +1799,8 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
         uassertStatusOK(
             _indexBuildsManager.retrySkippedRecords(opCtx, buildUUID, collection.get()));
     }
-    uassertStatusOK(_indexBuildsManager.checkIndexConstraintViolations(opCtx, buildUUID));
+    uassertStatusOK(
+        _indexBuildsManager.checkIndexConstraintViolations(opCtx, collection.get(), buildUUID));
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto onCreateEachFn = [&](const BSONObj& spec) {
@@ -2597,12 +2598,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
-        _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
-
-        // The collection object should always exist while an index build is registered.
-        auto collection =
-            CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, replState->collectionUUID);
-        invariant(collection);
+        auto collection = _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
 
         uassertStatusOK(_indexBuildsManager.startBuildingIndex(
             opCtx, collection, replState->buildUUID, resumeAfterRecordId));
@@ -2621,10 +2617,9 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
-        _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
-
-        uassertStatusOK(
-            _indexBuildsManager.resumeBuildingIndexFromBulkLoadPhase(opCtx, replState->buildUUID));
+        auto collection = _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
+        uassertStatusOK(_indexBuildsManager.resumeBuildingIndexFromBulkLoadPhase(
+            opCtx, collection, replState->buildUUID));
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildDumpsInsertsFromBulk.shouldFail())) {
@@ -2633,22 +2628,25 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     }
 }
 
-void IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeysIntoIndex(
+const Collection* IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeysIntoIndex(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     // Rebuilding system indexes during startup using the IndexBuildsCoordinator is done by all
     // storage engines if they're missing.
     invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
 
-    auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, replState->collectionUUID);
-    invariant(nss);
+    auto collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, replState->collectionUUID);
+    invariant(collection);
 
     // Set up the thread's currentOp information to display createIndexes cmd information.
-    updateCurOpOpDescription(opCtx, *nss, replState->indexSpecs);
+    updateCurOpOpDescription(opCtx, collection->ns(), replState->indexSpecs);
 
     // Index builds can safely ignore prepare conflicts and perform writes. On secondaries,
     // prepare operations wait for index builds to complete.
     opCtx->recoveryUnit()->setPrepareConflictBehavior(
         PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+
+    return collection;
 }
 
 /*
@@ -2817,8 +2815,8 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
             !replCoord->getMemberState().startup2();
         if (IndexBuildProtocol::kSinglePhase == replState->protocol ||
             twoPhaseAndNotInitialSyncing) {
-            uassertStatusOK(
-                _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
+            uassertStatusOK(_indexBuildsManager.checkIndexConstraintViolations(
+                opCtx, collection.get(), replState->buildUUID));
         }
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
         logFailure(e.toStatus(), collection->ns(), replState);
@@ -2928,8 +2926,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
             RecoveryUnit::ReadSource::kNoTimestamp,
             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
-        uassertStatusOK(
-            _indexBuildsManager.checkIndexConstraintViolations(opCtx, replState->buildUUID));
+        uassertStatusOK(_indexBuildsManager.checkIndexConstraintViolations(
+            opCtx, collection.get(), replState->buildUUID));
 
         // Commit the index build.
         uassertStatusOK(_indexBuildsManager.commitIndexBuild(opCtx,
