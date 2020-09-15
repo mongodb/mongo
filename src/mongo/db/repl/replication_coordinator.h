@@ -1043,7 +1043,7 @@ public:
     /**
      * A testing only function that cancels and reschedules replication heartbeats immediately.
      */
-    virtual void restartHeartbeats_forTest() = 0;
+    virtual void restartScheduledHeartbeats_forTest() = 0;
 
 protected:
     ReplicationCoordinator();

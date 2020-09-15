@@ -143,7 +143,7 @@ public:
             }
             return true;
         } else if (cmdObj.hasElement("restartHeartbeats")) {
-            replCoord->restartHeartbeats_forTest();
+            replCoord->restartScheduledHeartbeats_forTest();
             return true;
         }
 

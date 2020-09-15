@@ -1287,11 +1287,6 @@ std::pair<MemberId, Date_t> TopologyCoordinator::getStalestLiveMember() const {
     return std::make_pair(earliestMemberId, earliestDate);
 }
 
-void TopologyCoordinator::resetAllMemberTimeouts(Date_t now) {
-    for (auto&& memberData : _memberData)
-        memberData.updateLiveness(now);
-}
-
 void TopologyCoordinator::resetMemberTimeouts(Date_t now,
                                               const stdx::unordered_set<HostAndPort>& member_set) {
     for (auto&& memberData : _memberData) {
@@ -3300,9 +3295,13 @@ void TopologyCoordinator::setStorageEngineSupportsReadCommitted(bool supported) 
         supported ? ReadCommittedSupport::kYes : ReadCommittedSupport::kNo;
 }
 
-void TopologyCoordinator::restartHeartbeats() {
-    for (auto& hb : _memberData) {
-        hb.restart();
+void TopologyCoordinator::restartHeartbeat(const Date_t now, const HostAndPort& target) {
+    for (auto&& member : _memberData) {
+        if (member.getHostAndPort() == target) {
+            member.restart();
+            member.updateLiveness(now);
+            return;
+        }
     }
 }
 
