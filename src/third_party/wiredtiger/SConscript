@@ -156,6 +156,7 @@ condition_map = {
     'POWERPC_HOST' : env['TARGET_ARCH'] == 'ppc64le',
     'X86_HOST'     : env['TARGET_ARCH'] == 'x86_64',
     'ZSERIES_HOST' : env['TARGET_ARCH'] == 's390x',
+    'MIPS_HOST'   : env['TARGET_ARCH'] == 'mips64el',
 }
 
 def filtered_filelist(f, checksum):

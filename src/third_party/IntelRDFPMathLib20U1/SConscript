@@ -312,7 +312,7 @@ elif processor == "aarch64":
     cpp_defines['efi2'] = '1'
     cpp_defines['EFI2'] = '1'
 # Using 64 bit little endian
-elif processor == 'x86_64' or processor == 'ppc64le':
+elif processor == 'x86_64' or processor == 'ppc64le' or processor == 'mips64el':
     cpp_defines['efi2'] = '1'
     cpp_defines['EFI2'] = '1'
 # Using 64 bit big endian

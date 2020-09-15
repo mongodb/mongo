@@ -1140,6 +1140,7 @@ processor_macros = {
     'sparc'      : { 'endian': 'big',    'defines': ('__sparc',)},
     'x86_64'     : { 'endian': 'little', 'defines': ('__x86_64', '_M_AMD64')},
     'emscripten' : { 'endian': 'little', 'defines': ('__EMSCRIPTEN__', )},
+    'mips64el'   : { 'endian': 'little', 'defines': ('__MIPSEL__',) },
 }
 
 def CheckForProcessor(context, which_arch):
@@ -2759,8 +2760,9 @@ def doConfigure(myenv):
         # This tells clang/gcc to use the gold linker if it is available - we prefer the gold linker
         # because it is much faster. Don't use it if the user has already configured another linker
         # selection manually.
-        if not any(flag.startswith('-fuse-ld=') for flag in env['LINKFLAGS']):
-            AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
+        if env['TARGET_ARCH'] != 'mips64el':
+            if not any(flag.startswith('-fuse-ld=') for flag in env['LINKFLAGS']):
+                AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
 
         # Explicitly enable GNU build id's if the linker supports it.
         AddToLINKFLAGSIfSupported(myenv, '-Wl,--build-id')
