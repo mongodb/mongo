@@ -435,6 +435,50 @@ std::size_t hashValue(TypeTags tag, Value val) noexcept {
         case TypeTags::ksValue: {
             return getKeyStringView(val)->hash();
         }
+        case TypeTags::Array:
+        case TypeTags::ArraySet:
+        case TypeTags::bsonArray: {
+            auto arr = ArrayEnumerator{tag, val};
+            auto res = hashInit();
+
+            // There should be enough entropy in the first 4 elements.
+            for (int i = 0; i < 4 && !arr.atEnd(); ++i) {
+                auto [elemTag, elemVal] = arr.getViewOfValue();
+                res = hashCombine(res, hashValue(elemTag, elemVal));
+                arr.advance();
+            }
+
+            return res;
+        }
+        case TypeTags::Object:
+        case TypeTags::bsonObject: {
+            auto obj = ObjectEnumerator{tag, val};
+            auto res = hashInit();
+
+            // There should be enough entropy in the first 4 elements.
+            for (int i = 0; i < 4 && !obj.atEnd(); ++i) {
+                auto [elemTag, elemVal] = obj.getViewOfValue();
+                res = hashCombine(res, hashValue(elemTag, elemVal));
+                obj.advance();
+            }
+
+            return res;
+        }
+        case TypeTags::bsonBinData: {
+            auto size = getBSONBinDataSize(tag, val);
+            if (size < 8) {
+                // Zero initialize buffer and copy bytes in.
+                char buffer[8] = {};
+                memcpy(buffer, getRawPointerView(val), size);
+
+                // Hash as if it is 64bit integer.
+                return absl::Hash<uint64_t>{}(readFromMemory<uint64_t>(buffer));
+            } else {
+                // Hash only the first 8 bytes. It should be enough.
+                return absl::Hash<uint64_t>{}(
+                    readFromMemory<uint64_t>(getRawPointerView(val) + sizeof(uint32_t)));
+            }
+        }
         default:
             break;
     }

@@ -188,6 +188,17 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                                         Value rhsValue);
 
 /**
+ * A simple hash combination.
+ */
+inline std::size_t hashInit() noexcept {
+    return 17;
+}
+
+inline std::size_t hashCombine(std::size_t state, std::size_t val) noexcept {
+    return state * 31 + val;
+}
+
+/**
  * RAII guard.
  */
 class ValueGuard {

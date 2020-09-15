@@ -551,10 +551,10 @@ struct MaterializedRowComparator {
 
 struct MaterializedRowHasher {
     std::size_t operator()(const MaterializedRow& k) const {
-        size_t res = 17;
+        size_t res = hashInit();
         for (size_t idx = 0; idx < k.size(); ++idx) {
             auto [tag, val] = k.getViewOfValue(idx);
-            res = res * 31 + hashValue(tag, val);
+            res = hashCombine(res, hashValue(tag, val));
         }
         return res;
     }

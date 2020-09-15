@@ -99,6 +99,46 @@ TEST(SBEValues, Hash) {
     value::releaseValue(tagDecimal, valDecimal);
 }
 
+TEST(SBEValues, HashCompound) {
+    using namespace std::literals;
+    {
+        auto [tag1, val1] = value::makeNewArray();
+        auto arr1 = value::getArrayView(val1);
+        arr1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        arr1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
+        arr1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
+
+        auto [tag2, val2] = value::makeNewArray();
+        auto arr2 = value::getArrayView(val2);
+        arr2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+        arr2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
+        arr2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
+
+        ASSERT_EQUALS(value::hashValue(tag1, val1), value::hashValue(tag2, val2));
+
+        value::releaseValue(tag1, val1);
+        value::releaseValue(tag2, val2);
+    }
+    {
+        auto [tag1, val1] = value::makeNewObject();
+        auto obj1 = value::getObjectView(val1);
+        obj1->push_back("a"sv, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        obj1->push_back("b"sv, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
+        obj1->push_back("c"sv, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
+
+        auto [tag2, val2] = value::makeNewObject();
+        auto obj2 = value::getObjectView(val2);
+        obj2->push_back("a"sv, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+        obj2->push_back("b"sv, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
+        obj2->push_back("c"sv, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
+
+        ASSERT_EQUALS(value::hashValue(tag1, val1), value::hashValue(tag2, val2));
+
+        value::releaseValue(tag1, val1);
+        value::releaseValue(tag2, val2);
+    }
+}
+
 TEST(SBEVM, Add) {
     {
         auto tagInt32 = value::TypeTags::NumberInt32;
