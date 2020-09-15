@@ -106,4 +106,21 @@ const facetAutoBucketedPrices = facetResult[0].autoBucketedPrices;
 assert.sameMembers(facetManufacturers, mostCommonManufacturers);
 assert.sameMembers(facetBucketedPrices, numTVsBucketedByPriceRange);
 assert.sameMembers(facetAutoBucketedPrices, numTVsAutomaticallyBucketedByPriceRange);
+
+/**
+ * A simple case using $facet + $match. This also tests the bug found in SERVER-50504 is fixed.
+ */
+
+coll.drop();
+assert.commandWorked(coll.insert({"_id": 1, "quizzes": [{"score": 100}]}));
+assert.commandWorked(coll.insert({"_id": 2, "quizzes": [{"score": 200}]}));
+
+const facetPipeline =
+    [{$facet: {scoreRank: [{$match: {'quizzes.0.score': {$gt: 0}}}, {$count: 'count'}]}}];
+
+const facetRes = coll.aggregate(facetPipeline).toArray();
+assert.eq(facetRes.length, 1);
+const scoreRank = facetRes[0]['scoreRank'];
+assert.eq(scoreRank.length, 1);
+assert.eq(scoreRank[0]['count'], 2);
 }());

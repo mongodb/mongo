@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression.h"
 
 namespace mongo {
@@ -138,6 +139,20 @@ public:
 protected:
     void _doAddDependencies(DepsTracker* deps) const final {
         if (!path().empty()) {
+            // If a path contains a numeric component then it should not be naively added to the
+            // projection, since we do not support projecting specific array indices. Instead we add
+            // the prefix of the path up to the numeric path component. Note that we start at path
+            // component 1 rather than 0, because a numeric path component at the root of the
+            // document can only ever be a field name, never an array index.
+            FieldRef fieldRef(path());
+            for (size_t i = 1; i < fieldRef.numParts(); ++i) {
+                if (fieldRef.isNumericPathComponentStrict(i)) {
+                    auto prefix = fieldRef.dottedSubstring(0, i);
+                    deps->fields.insert(prefix.toString());
+                    return;
+                }
+            }
+
             deps->fields.insert(path().toString());
         }
     }

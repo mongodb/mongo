@@ -226,6 +226,20 @@ TEST_F(DocumentSourceMatchTest, ShouldAddDependenciesOfAllBranchesOfOrClause) {
     ASSERT_EQUALS(false, dependencies.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
+TEST_F(DocumentSourceMatchTest, ShouldNotAddPotentialArrayIndexToDependencies) {
+    auto match = DocumentSourceMatch::create(
+        fromjson("{$or: [{'a.0': 1, '3': 1, 'd.01': 1}, {'b.c.d.1': {$gt: 1}}]}"), getExpCtx());
+    DepsTracker dependencies;
+    ASSERT_EQUALS(DepsTracker::State::SEE_NEXT, match->getDependencies(&dependencies));
+    // Here we add "a" instead of "a.0". Since we do not support projecting specific array indices,
+    // we add the prefix of the path up to the numeric path component instead.
+    ASSERT_EQUALS(1U, dependencies.fields.count("a"));
+    ASSERT_EQUALS(1U, dependencies.fields.count("b.c.d"));
+    ASSERT_EQUALS(1U, dependencies.fields.count("3"));
+    ASSERT_EQUALS(1U, dependencies.fields.count("d.01"));
+    ASSERT_EQUALS(4U, dependencies.fields.size());
+}
+
 TEST_F(DocumentSourceMatchTest, TextSearchShouldRequireWholeDocumentAndTextScore) {
     auto match = DocumentSourceMatch::create(fromjson("{$text: {$search: 'hello'} }"), getExpCtx());
     DepsTracker dependencies(DepsTracker::kAllMetadata & ~DepsTracker::kOnlyTextScore);
