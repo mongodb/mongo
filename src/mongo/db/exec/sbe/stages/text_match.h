@@ -83,7 +83,7 @@ private:
     const value::SlotId _inputSlot;
     const value::SlotId _outputSlot;
 
-    value::SlotAccessor* _inValueAccessor;
+    value::SlotAccessor* _inValueAccessor{nullptr};
     value::ViewOfValueAccessor _outValueAccessor;
 };
 
