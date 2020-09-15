@@ -228,6 +228,10 @@ public:
         return false;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     std::string help() const final {
         return "list collections for this db";
     }

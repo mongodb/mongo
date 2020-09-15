@@ -32,6 +32,7 @@
 #include <map>
 #include <string>
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"
 
@@ -46,13 +47,10 @@ public:
     static ResourceConsumption& get(ServiceContext* svcCtx);
 
     /**
-     * Metrics maintains non-thread-safe, per-operation resource consumption metrics for a specific
-     * database.
+     * Metrics maintains a set of resource consumption metrics.
      */
     class Metrics {
     public:
-        static Metrics& get(OperationContext* opCtx);
-
         /**
          * Adds other Metrics to this one.
          */
@@ -60,6 +58,53 @@ public:
         Metrics& operator+=(const Metrics& other) {
             add(other);
             return *this;
+        }
+    };
+
+    /**
+     * MetricsCollector maintains non-thread-safe, per-operation resource consumption metrics for a
+     * specific database.
+     */
+    class MetricsCollector {
+    public:
+        static MetricsCollector& get(OperationContext* opCtx);
+
+        /**
+         * When called, resource consumption metrics should be recorded and added to the global
+         * structure.
+         */
+        void beginScopedCollecting() {
+            invariant(!isInScope());
+            _collecting = ScopedCollectionState::kInScopeCollecting;
+        }
+
+        /**
+         * When called, sets state that a ScopedMetricsCollector is in scope, but is not recording
+         * metrics. This is to support nesting Scope objects and preventing lower levels from
+         * overriding this behavior.
+         */
+        void beginScopedNotCollecting() {
+            invariant(!isInScope());
+            _collecting = ScopedCollectionState::kInScopeNotCollecting;
+        }
+
+        /**
+         * When called, resource consumption metrics should not be recorded. Returns whether this
+         * Collector was in a collecting state.
+         */
+        bool endScopedCollecting() {
+            bool wasCollecting = isCollecting();
+            _collecting = ScopedCollectionState::kInactive;
+            return wasCollecting;
+        }
+
+        bool isCollecting() const {
+            return _collecting == ScopedCollectionState::kInScopeCollecting;
+        }
+
+        bool isInScope() const {
+            return _collecting == ScopedCollectionState::kInScopeCollecting ||
+                _collecting == ScopedCollectionState::kInScopeNotCollecting;
         }
 
         /**
@@ -73,17 +118,71 @@ public:
             return _dbName;
         }
 
+        /**
+         * To observe the stored Metrics, the dbName must be set. This prevents "losing" collected
+         * Metrics due to the Collector stopping without being associated with any database yet.
+         */
+        Metrics& getMetrics() {
+            invariant(!_dbName.empty(), "observing Metrics before a dbName has been set");
+            return _metrics;
+        }
+
+        const Metrics& getMetrics() const {
+            invariant(!_dbName.empty(), "observing Metrics before a dbName has been set");
+            return _metrics;
+        }
+
     private:
+        /**
+         * Represents the ScopedMetricsCollector state.
+         */
+        enum class ScopedCollectionState {
+            // No ScopedMetricsCollector is in scope
+            kInactive,
+            // A ScopedMetricsCollector is in scope but not collecting metrics
+            kInScopeNotCollecting,
+            // A ScopedMetricsCollector is in scope and collecting metrics
+            kInScopeCollecting
+        };
+        ScopedCollectionState _collecting = ScopedCollectionState::kInactive;
         std::string _dbName;
+        Metrics _metrics;
     };
 
     /**
-     * Adds a Metrics object to an existing Metrics object in the map, keyed by database name. If no
-     * Metrics exist for the database, the value is initialized with the provided Metrics.
-     *
-     * The Metrics database name must not be an empty string.
+     * When instantiated with commandCollectsMetrics=true, enables operation resource consumption
+     * collection. When destructed, appends collected metrics to the global structure.
      */
-    void add(const Metrics& metrics);
+    class ScopedMetricsCollector {
+    public:
+        ScopedMetricsCollector(OperationContext* opCtx, bool commandCollectsMetrics);
+        ScopedMetricsCollector(OperationContext* opCtx) : ScopedMetricsCollector(opCtx, true) {}
+        ~ScopedMetricsCollector();
+
+    private:
+        bool _topLevel;
+        OperationContext* _opCtx;
+    };
+
+    /**
+     * Returns whether the database's metrics should be collected.
+     */
+    static bool shouldCollectMetricsForDatabase(StringData dbName) {
+        if (dbName == NamespaceString::kAdminDb || dbName == NamespaceString::kConfigDb ||
+            dbName == NamespaceString::kLocalDb) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Adds a MetricsCollector's Metrics to an existing Metrics object in the map, keyed by
+     * database name. If no Metrics exist for the database, the value is initialized with the
+     * provided MetricsCollector's Metrics.
+     *
+     * The MetricsCollector's database name must not be an empty string.
+     */
+    void add(const MetricsCollector& metrics);
 
     /**
      * Returns a copy of the Metrics map.

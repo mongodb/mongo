@@ -244,6 +244,10 @@ public:
         return true;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) const override {

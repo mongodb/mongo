@@ -75,6 +75,10 @@ public:
         return false;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     bool canIgnorePrepareConflicts() const override {
         return true;
     }

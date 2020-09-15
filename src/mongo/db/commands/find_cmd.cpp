@@ -178,6 +178,10 @@ public:
         return true;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     class Invocation final : public CommandInvocation {
     public:
         Invocation(const FindCmd* definition, const OpMsgRequest& request, StringData dbName)

@@ -409,6 +409,13 @@ public:
     }
 
     /**
+      Returns true if this command collects operation resource consumption metrics.
+     */
+    virtual bool collectsResourceConsumptionMetrics() const {
+        return false;
+    }
+
+    /**
      * Return true if the command requires auth.
      */
     virtual bool requiresAuth() const {

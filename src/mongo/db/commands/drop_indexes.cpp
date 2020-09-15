@@ -79,6 +79,11 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
+
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     std::string help() const override {
         return "drop indexes for a collection";
     }

@@ -77,6 +77,10 @@ public:
         return true;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     std::string help() const override {
         return "Commits a transaction";
     }
@@ -178,6 +182,10 @@ public:
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
+    bool collectsResourceConsumptionMetrics() const override {
         return true;
     }
 

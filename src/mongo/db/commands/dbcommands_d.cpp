@@ -223,6 +223,10 @@ public:
         return false;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
         std::string collectionName;
         if (const auto rootElt = cmdObj["root"]) {

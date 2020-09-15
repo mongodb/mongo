@@ -220,6 +220,10 @@ private:
         return false;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     ReadWriteType getReadWriteType() const final {
         return ReadWriteType::kWrite;
     }

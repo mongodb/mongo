@@ -737,6 +737,10 @@ public:
         return true;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }

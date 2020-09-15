@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/stats/operation_resource_consumption_gen.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/unittest/unittest.h"
 
@@ -39,6 +40,8 @@ class ResourceConsumptionMetricsTest : public ServiceContextTest {
 public:
     void setUp() {
         _opCtx = makeOperationContext();
+        gMeasureOperationResourceConsumption = true;
+        gAggregateOperationResourceConsumption = true;
     }
 
     typedef std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
@@ -58,10 +61,12 @@ TEST_F(ResourceConsumptionMetricsTest, Add) {
 
     auto [client2, opCtx2] = makeClientAndCtx("opCtx2");
 
-    auto& operationMetrics1 = ResourceConsumption::Metrics::get(_opCtx.get());
-    auto& operationMetrics2 = ResourceConsumption::Metrics::get(opCtx2.get());
+    auto& operationMetrics1 = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+    auto& operationMetrics2 = ResourceConsumption::MetricsCollector::get(opCtx2.get());
 
+    operationMetrics1.beginScopedCollecting();
     operationMetrics1.setDbName("db1");
+    operationMetrics2.beginScopedCollecting();
     operationMetrics2.setDbName("db2");
     globalResourceConsumption.add(operationMetrics1);
     globalResourceConsumption.add(operationMetrics1);
@@ -72,5 +77,99 @@ TEST_F(ResourceConsumptionMetricsTest, Add) {
     ASSERT_EQ(globalMetrics.count("db1"), 1);
     ASSERT_EQ(globalMetrics.count("db2"), 1);
     ASSERT_EQ(globalMetrics.count("db3"), 0);
+}
+
+TEST_F(ResourceConsumptionMetricsTest, ScopedMetricsCollector) {
+    auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
+    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+
+    // Collect, but don't set a dbName
+    {
+        const bool collectMetrics = true;
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), collectMetrics);
+        ASSERT_TRUE(operationMetrics.isCollecting());
+    }
+
+    ASSERT_FALSE(operationMetrics.isCollecting());
+
+    auto metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy.size(), 0);
+
+    // Don't collect
+    {
+        const bool collectMetrics = false;
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), collectMetrics);
+        operationMetrics.setDbName("db1");
+        ASSERT_FALSE(operationMetrics.isCollecting());
+    }
+
+    ASSERT_FALSE(operationMetrics.isCollecting());
+
+    metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy.count("db1"), 0);
+
+    // Collect
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get());
+        operationMetrics.setDbName("db1");
+    }
+
+    metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy.count("db1"), 1);
+
+    // Collect on a different database
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get());
+        operationMetrics.setDbName("db2");
+    }
+
+    metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy.count("db1"), 1);
+    ASSERT_EQ(metricsCopy.count("db2"), 1);
+}
+
+TEST_F(ResourceConsumptionMetricsTest, NestedScopedMetricsCollector) {
+    auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
+    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+
+    // Collect, nesting does not override that behavior.
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get());
+        operationMetrics.setDbName("db1");
+
+        {
+            const bool collectMetrics = false;
+            ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), collectMetrics);
+            ASSERT_TRUE(operationMetrics.isCollecting());
+
+            {
+                ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get());
+                ASSERT_TRUE(operationMetrics.isCollecting());
+            }
+        }
+    }
+
+    auto metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy.count("db1"), 1);
+
+    // Don't collect, nesting does not override that behavior.
+    {
+        const bool collectMetrics = false;
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), collectMetrics);
+        operationMetrics.setDbName("db2");
+
+        {
+            ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get());
+            ASSERT_FALSE(operationMetrics.isCollecting());
+
+            {
+                ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), collectMetrics);
+                ASSERT_FALSE(operationMetrics.isCollecting());
+            }
+        }
+    }
+
+    metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy.count("db2"), 0);
 }
 }  // namespace mongo

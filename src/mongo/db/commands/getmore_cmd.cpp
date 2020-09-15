@@ -746,6 +746,10 @@ public:
         return FindCommon::kMaxBytesToReturnToClientAtOnce + 1024u;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     /**
      * A getMore command increments the getMore counter, not the command counter.
      */

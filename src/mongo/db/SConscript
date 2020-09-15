@@ -1249,6 +1249,7 @@ env.Library(
         'catalog/database_holder',
         'commands/server_status_core',
         'kill_sessions',
+        'stats/resource_consumption_metrics',
     ],
 )
 

@@ -29,17 +29,63 @@
 
 #include "mongo/db/stats/resource_consumption_metrics.h"
 
+#include "mongo/db/stats/operation_resource_consumption_gen.h"
+
 namespace mongo {
 namespace {
-const OperationContext::Decoration<ResourceConsumption::Metrics> getOperationMetrics =
-    OperationContext::declareDecoration<ResourceConsumption::Metrics>();
+const OperationContext::Decoration<ResourceConsumption::MetricsCollector> getMetricsCollector =
+    OperationContext::declareDecoration<ResourceConsumption::MetricsCollector>();
 const ServiceContext::Decoration<ResourceConsumption> getGlobalResourceConsumption =
     ServiceContext::declareDecoration<ResourceConsumption>();
 }  // namespace
 
 
-ResourceConsumption::Metrics& ResourceConsumption::Metrics::get(OperationContext* opCtx) {
-    return getOperationMetrics(opCtx);
+ResourceConsumption::MetricsCollector& ResourceConsumption::MetricsCollector::get(
+    OperationContext* opCtx) {
+    return getMetricsCollector(opCtx);
+}
+
+ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,
+                                                                    bool commandCollectsMetrics)
+    : _opCtx(opCtx) {
+
+    // Nesting is allowed but does nothing. Lower-level ScopedMetricsCollectors should not influence
+    // the top-level Collector's behavior.
+    auto& metrics = MetricsCollector::get(opCtx);
+    _topLevel = !metrics.isInScope();
+    if (!_topLevel) {
+        return;
+    }
+
+    if (!commandCollectsMetrics || !gMeasureOperationResourceConsumption) {
+        metrics.beginScopedNotCollecting();
+        return;
+    }
+
+    metrics.beginScopedCollecting();
+}
+
+ResourceConsumption::ScopedMetricsCollector::~ScopedMetricsCollector() {
+    if (!_topLevel) {
+        return;
+    }
+
+    auto& collector = MetricsCollector::get(_opCtx);
+    bool wasCollecting = collector.endScopedCollecting();
+    if (!wasCollecting) {
+        return;
+    }
+
+    if (collector.getDbName().empty()) {
+        return;
+    }
+
+    if (!gAggregateOperationResourceConsumption) {
+        return;
+    }
+
+    auto& globalResourceConsumption = ResourceConsumption::get(_opCtx);
+    globalResourceConsumption.add(collector);
 }
 
 ResourceConsumption& ResourceConsumption::get(ServiceContext* svcCtx) {
@@ -50,10 +96,10 @@ ResourceConsumption& ResourceConsumption::get(OperationContext* opCtx) {
     return getGlobalResourceConsumption(opCtx->getServiceContext());
 }
 
-void ResourceConsumption::add(const Metrics& metrics) {
-    invariant(!metrics.getDbName().empty());
+void ResourceConsumption::add(const MetricsCollector& collector) {
+    invariant(!collector.getDbName().empty());
     stdx::unique_lock<Mutex> lk(_mutex);
-    _metrics[metrics.getDbName()] += metrics;
+    _metrics[collector.getDbName()] += collector.getMetrics();
 }
 
 ResourceConsumption::MetricsMap ResourceConsumption::getMetrics() const {

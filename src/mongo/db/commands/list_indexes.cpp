@@ -111,6 +111,10 @@ public:
         return false;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     std::string help() const override {
         return "list indexes for a collection";
     }

@@ -129,6 +129,10 @@ public:
         return true;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     CmdDropDatabase() : BasicCommand("dropDatabase") {}
 
     bool run(OperationContext* opCtx,
@@ -235,6 +239,10 @@ public:
         return true;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     virtual bool errmsgRun(OperationContext* opCtx,
                            const string& dbname,
                            const BSONObj& cmdObj,
@@ -288,6 +296,10 @@ public:
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
+    bool collectsResourceConsumptionMetrics() const override {
         return true;
     }
 
@@ -658,6 +670,11 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
+
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     std::string help() const override {
         return "Sets collection options.\n"
                "Example: { collMod: 'foo', viewOn: 'bar'} "

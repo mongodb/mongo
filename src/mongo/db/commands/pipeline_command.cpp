@@ -86,6 +86,10 @@ public:
         return true;
     }
 
+    bool collectsResourceConsumptionMetrics() const override {
+        return true;
+    }
+
     class Invocation final : public CommandInvocation {
     public:
         Invocation(Command* cmd,

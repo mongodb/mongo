@@ -60,6 +60,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view_catalog.h"
@@ -226,6 +227,12 @@ Message getMore(OperationContext* opCtx,
     *exhaust = false;
 
     const NamespaceString nss(ns);
+
+    ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx);
+    if (ResourceConsumption::shouldCollectMetricsForDatabase(nss.db())) {
+        auto& opMetrics = ResourceConsumption::MetricsCollector::get(opCtx);
+        opMetrics.setDbName(nss.db().toString());
+    }
 
     // Cursors come in one of two flavors:
     //
@@ -565,6 +572,12 @@ bool runQuery(OperationContext* opCtx,
             str::stream() << "Invalid ns [" << nss.ns() << "]",
             nss.isValid());
     invariant(!nss.isCommand());
+
+    ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx);
+    if (ResourceConsumption::shouldCollectMetricsForDatabase(nss.db())) {
+        auto& opMetrics = ResourceConsumption::MetricsCollector::get(opCtx);
+        opMetrics.setDbName(nss.db().toString());
+    }
 
     // Set CurOp information.
     const auto upconvertedQuery = upconvertQueryEntry(q.query, nss, q.ntoreturn, q.ntoskip);
