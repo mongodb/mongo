@@ -1269,7 +1269,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         CatalogCacheLoader::get(serviceContext).shutDown();
     }
 
-#if __has_feature(address_sanitizer)
+#if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
     // When running under address sanitizer, we get false positive leaks due to disorder around
     // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
     // harder to dry up the server from active connections before going on to really shut down.
@@ -1339,6 +1339,12 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
     LatchAnalyzer::get(serviceContext).dump();
+#endif
+
+#if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
+    // SessionKiller relies on the network stack being cleanly shutdown which only occurs under
+    // sanitizers
+    SessionKiller::shutdown(serviceContext);
 #endif
 
     FlowControl::shutdown(serviceContext);

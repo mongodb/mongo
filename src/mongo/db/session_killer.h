@@ -105,6 +105,8 @@ public:
      */
     static void set(ServiceContext* ctx, std::shared_ptr<SessionKiller> sk);
 
+    static void shutdown(ServiceContext* ctx);
+
     explicit SessionKiller(ServiceContext* sc, KillFunc killer);
     ~SessionKiller();
 

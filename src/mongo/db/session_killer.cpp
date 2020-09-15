@@ -197,4 +197,13 @@ void SessionKiller::set(ServiceContext* sc, std::shared_ptr<SessionKiller> sk) {
     getSessionKiller(sc) = sk;
 }
 
+
+void SessionKiller::shutdown(ServiceContext* sc) {
+    auto shared = getSessionKiller(sc);
+    getSessionKiller(sc).reset();
+
+    // Nuke
+    shared.reset();
+}
+
 }  // namespace mongo
