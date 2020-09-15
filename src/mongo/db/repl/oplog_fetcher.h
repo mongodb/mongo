@@ -447,5 +447,69 @@ private:
     int _lastBatchElapsedMS = 0;
 };
 
+class OplogFetcherFactory {
+public:
+    virtual ~OplogFetcherFactory() = default;
+    virtual std::unique_ptr<OplogFetcher> operator()(
+        executor::TaskExecutor* executor,
+        OpTime lastFetched,
+        HostAndPort source,
+        ReplSetConfig config,
+        std::unique_ptr<OplogFetcher::OplogFetcherRestartDecision> oplogFetcherRestartDecision,
+        int requiredRBID,
+        bool requireFresherSyncSource,
+        DataReplicatorExternalState* dataReplicatorExternalState,
+        OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
+        OplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
+        const int batchSize,
+        OplogFetcher::StartingPoint startingPoint = OplogFetcher::StartingPoint::kSkipFirstDoc,
+        BSONObj filter = BSONObj(),
+        ReadConcernArgs readConcern = ReadConcernArgs(),
+        StringData name = "oplog fetcher"_sd) const = 0;
+};
+
+template <class T>
+class OplogFetcherFactoryImpl : public OplogFetcherFactory {
+public:
+    std::unique_ptr<OplogFetcher> operator()(
+        executor::TaskExecutor* executor,
+        OpTime lastFetched,
+        HostAndPort source,
+        ReplSetConfig config,
+        std::unique_ptr<OplogFetcher::OplogFetcherRestartDecision> oplogFetcherRestartDecision,
+        int requiredRBID,
+        bool requireFresherSyncSource,
+        DataReplicatorExternalState* dataReplicatorExternalState,
+        OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
+        OplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
+        const int batchSize,
+        OplogFetcher::StartingPoint startingPoint = OplogFetcher::StartingPoint::kSkipFirstDoc,
+        BSONObj filter = BSONObj(),
+        ReadConcernArgs readConcern = ReadConcernArgs(),
+        StringData name = "oplog_fetcher"_sd) const final {
+        return std::make_unique<T>(executor,
+                                   lastFetched,
+                                   source,
+                                   config,
+                                   std::move(oplogFetcherRestartDecision),
+                                   requiredRBID,
+                                   requireFresherSyncSource,
+                                   dataReplicatorExternalState,
+                                   std::move(enqueueDocumentsFn),
+                                   std::move(onShutdownCallbackFn),
+                                   batchSize,
+                                   startingPoint,
+                                   std::move(filter),
+                                   std::move(readConcern),
+                                   name);
+    }
+
+    static std::unique_ptr<OplogFetcherFactory> get() {
+        return std::make_unique<OplogFetcherFactoryImpl<T>>();
+    }
+};
+
+typedef OplogFetcherFactoryImpl<OplogFetcher> CreateOplogFetcherFn;
+
 }  // namespace repl
 }  // namespace mongo

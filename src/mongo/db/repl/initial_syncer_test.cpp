@@ -440,34 +440,7 @@ protected:
                     new MockDBClientConnection(_mockServer.get()));
             });
             _initialSyncer->setClonerExecutor_forTest(_clonerExecutor);
-            _initialSyncer->setCreateOplogFetcherFn_forTest(
-                [](executor::TaskExecutor* executor,
-                   OpTime lastFetched,
-                   HostAndPort source,
-                   ReplSetConfig config,
-                   std::unique_ptr<OplogFetcher::OplogFetcherRestartDecision>
-                       oplogFetcherRestartDecision,
-                   int requiredRBID,
-                   bool requireFresherSyncSource,
-                   DataReplicatorExternalState* dataReplicatorExternalState,
-                   OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
-                   OplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
-                   const int batchSize,
-                   OplogFetcher::StartingPoint startingPoint) {
-                    return std::unique_ptr<OplogFetcher>(
-                        new OplogFetcherMock(executor,
-                                             lastFetched,
-                                             source,
-                                             config,
-                                             std::move(oplogFetcherRestartDecision),
-                                             requiredRBID,
-                                             requireFresherSyncSource,
-                                             dataReplicatorExternalState,
-                                             std::move(enqueueDocumentsFn),
-                                             std::move(onShutdownCallbackFn),
-                                             batchSize,
-                                             startingPoint));
-                });
+            _initialSyncer->setCreateOplogFetcherFn_forTest(CreateOplogFetcherMockFn::get());
         } catch (...) {
             ASSERT_OK(exceptionToStatus());
         }

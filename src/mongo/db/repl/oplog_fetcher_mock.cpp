@@ -48,7 +48,10 @@ OplogFetcherMock::OplogFetcherMock(
     EnqueueDocumentsFn enqueueDocumentsFn,
     OnShutdownCallbackFn onShutdownCallbackFn,
     const int batchSize,
-    StartingPoint startingPoint)
+    StartingPoint startingPoint,
+    BSONObj filter,
+    ReadConcernArgs readConcern,
+    StringData name)
     : OplogFetcher(executor,
                    lastFetched,
                    std::move(source),
@@ -63,7 +66,10 @@ OplogFetcherMock::OplogFetcherMock(
                    // Pass a dummy OnShutdownCallbackFn to the base OplogFetcher.
                    [](const auto& a, const int b) {},
                    batchSize,
-                   startingPoint),
+                   startingPoint,
+                   filter,
+                   readConcern,
+                   name),
       _oplogFetcherRestartDecision(std::move(oplogFetcherRestartDecision)),
       _onShutdownCallbackFn(std::move(onShutdownCallbackFn)),
       _enqueueDocumentsFn(std::move(enqueueDocumentsFn)),

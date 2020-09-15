@@ -214,32 +214,7 @@ InitialSyncer::InitialSyncer(
       _onCompletion(onCompletion),
       _createClientFn(
           [] { return std::make_unique<DBClientConnection>(true /* autoReconnect */); }),
-      _createOplogFetcherFn(
-          [](executor::TaskExecutor* executor,
-             OpTime lastFetched,
-             HostAndPort source,
-             ReplSetConfig config,
-             std::unique_ptr<OplogFetcher::OplogFetcherRestartDecision> oplogFetcherRestartDecision,
-             int requiredRBID,
-             bool requireFresherSyncSource,
-             DataReplicatorExternalState* dataReplicatorExternalState,
-             OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
-             OplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
-             const int batchSize,
-             OplogFetcher::StartingPoint startingPoint) {
-              return std::make_unique<OplogFetcher>(executor,
-                                                    lastFetched,
-                                                    source,
-                                                    config,
-                                                    std::move(oplogFetcherRestartDecision),
-                                                    requiredRBID,
-                                                    requireFresherSyncSource,
-                                                    dataReplicatorExternalState,
-                                                    std::move(enqueueDocumentsFn),
-                                                    std::move(onShutdownCallbackFn),
-                                                    batchSize,
-                                                    startingPoint);
-          }) {
+      _createOplogFetcherFn(CreateOplogFetcherFn::get()) {
     uassert(ErrorCodes::BadValue, "task executor cannot be null", _exec);
     uassert(ErrorCodes::BadValue, "invalid storage interface", _storage);
     uassert(ErrorCodes::BadValue, "invalid replication process", _replicationProcess);
@@ -492,9 +467,9 @@ void InitialSyncer::setCreateClientFn_forTest(const CreateClientFn& createClient
 }
 
 void InitialSyncer::setCreateOplogFetcherFn_forTest(
-    const CreateOplogFetcherFn& createOplogFetcherFn) {
+    std::unique_ptr<OplogFetcherFactory> createOplogFetcherFn) {
     LockGuard lk(_mutex);
-    _createOplogFetcherFn = createOplogFetcherFn;
+    _createOplogFetcherFn = std::move(createOplogFetcherFn);
 }
 
 OplogFetcher* InitialSyncer::getOplogFetcher_forTest() const {
@@ -1177,7 +1152,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     }
 
     const auto& config = configResult.getValue();
-    _oplogFetcher = _createOplogFetcherFn(
+    _oplogFetcher = (*_createOplogFetcherFn)(
         *_attemptExec,
         beginFetchingOpTime,
         _syncSource,

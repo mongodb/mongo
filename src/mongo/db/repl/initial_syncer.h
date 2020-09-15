@@ -153,23 +153,6 @@ public:
      */
     using CreateClientFn = std::function<std::unique_ptr<DBClientConnection>()>;
 
-    /**
-     * Type of function to create an OplogFetcher.
-     */
-    using CreateOplogFetcherFn = std::function<std::unique_ptr<OplogFetcher>(
-        executor::TaskExecutor* executor,
-        OpTime lastFetched,
-        HostAndPort source,
-        ReplSetConfig config,
-        std::unique_ptr<OplogFetcher::OplogFetcherRestartDecision> oplogFetcherRestartDecision,
-        int requiredRBID,
-        bool requireFresherSyncSource,
-        DataReplicatorExternalState* dataReplicatorExternalState,
-        OplogFetcher::EnqueueDocumentsFn enqueueDocumentsFn,
-        OplogFetcher::OnShutdownCallbackFn onShutdownCallbackFn,
-        const int batchSize,
-        OplogFetcher::StartingPoint startingPoint)>;
-
     struct InitialSyncAttemptInfo {
         int durationMillis;
         Status status;
@@ -276,7 +259,7 @@ public:
      *
      * For testing only.
      */
-    void setCreateOplogFetcherFn_forTest(const CreateOplogFetcherFn& createOplogFetcherFn);
+    void setCreateOplogFetcherFn_forTest(std::unique_ptr<OplogFetcherFactory> createOplogFetcherFn);
 
     /**
      *
@@ -775,7 +758,7 @@ private:
     CreateClientFn _createClientFn;
 
     // Used to create the OplogFetcher for the InitialSyncer.
-    CreateOplogFetcherFn _createOplogFetcherFn;
+    std::unique_ptr<OplogFetcherFactory> _createOplogFetcherFn;
 
     // Contains stats on the current initial sync request (includes all attempts).
     // To access these stats in a user-readable format, use getInitialSyncProgress().
