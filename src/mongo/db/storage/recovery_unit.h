@@ -382,11 +382,7 @@ public:
      */
     enum ReadSource {
         /**
-         * Do not read from a timestamp. This is the default.
-         */
-        kUnset,
-        /**
-         * Read without a timestamp explicitly.
+         * Read without a timestamp. This is the default.
          */
         kNoTimestamp,
         /**
@@ -414,8 +410,6 @@ public:
 
     static std::string toString(ReadSource rs) {
         switch (rs) {
-            case ReadSource::kUnset:
-                return "kUnset";
             case ReadSource::kNoTimestamp:
                 return "kNoTimestamp";
             case ReadSource::kMajorityCommitted:
@@ -445,7 +439,7 @@ public:
                                         boost::optional<Timestamp> provided = boost::none) {}
 
     virtual ReadSource getTimestampReadSource() const {
-        return ReadSource::kUnset;
+        return ReadSource::kNoTimestamp;
     };
 
     /**

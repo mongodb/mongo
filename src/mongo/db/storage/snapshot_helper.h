@@ -37,6 +37,10 @@ namespace SnapshotHelper {
 boost::optional<RecoveryUnit::ReadSource> getNewReadSource(OperationContext* opCtx,
                                                            const NamespaceString& nss);
 
+bool shouldReadAtLastApplied(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             std::string* reason = nullptr);
+
 bool collectionChangesConflictWithRead(boost::optional<Timestamp> collectionMin,
                                        boost::optional<Timestamp> readTimestamp);
 }  // namespace SnapshotHelper

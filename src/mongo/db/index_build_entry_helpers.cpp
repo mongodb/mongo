@@ -260,7 +260,8 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
 
 StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
     // Read the most up to date data.
-    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
+              opCtx->recoveryUnit()->getTimestampReadSource());
     AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
     Collection* collection = autoCollection.getCollection();
 

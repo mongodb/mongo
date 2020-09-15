@@ -116,7 +116,7 @@ protected:
         uassertStatusOK(indexer.insertAllDocumentsInCollection(&_opCtx, _collection));
         uassertStatusOK(
             indexer.drainBackgroundWrites(&_opCtx,
-                                          RecoveryUnit::ReadSource::kUnset,
+                                          RecoveryUnit::ReadSource::kNoTimestamp,
                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
         uassertStatusOK(indexer.checkConstraints(&_opCtx));
         {

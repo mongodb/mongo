@@ -116,7 +116,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
                                                    DrainYieldPolicy drainYieldPolicy) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
     // Reading at a timestamp during hybrid index builds is not supported.
-    invariant(readSource == RecoveryUnit::ReadSource::kUnset);
+    invariant(readSource == RecoveryUnit::ReadSource::kNoTimestamp);
 
     // These are used for logging only.
     int64_t totalDeleted = 0;

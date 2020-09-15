@@ -1026,8 +1026,9 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
     // destroyed by unstash in its destructor. Thus we set the flag explicitly.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
-    // Explicitly start future read transactions without a timestamp.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    // Ensure future transactions read without a timestamp.
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
+              opCtx->recoveryUnit()->getTimestampReadSource());
 
     // When querying indexes, we return the record matching the key if it exists, or an adjacent
     // document. This means that it is possible for us to hit a prepare conflict if we query for an

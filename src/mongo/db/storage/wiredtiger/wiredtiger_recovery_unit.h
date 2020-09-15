@@ -244,7 +244,7 @@ private:
     bool _isTimestamped = false;
 
     // Specifies which external source to use when setting read timestamps on transactions.
-    ReadSource _timestampReadSource = ReadSource::kUnset;
+    ReadSource _timestampReadSource = ReadSource::kNoTimestamp;
 
     // Commits are assumed ordered.  Unordered commits are assumed to always need to reserve a
     // new optime, and thus always call oplogDiskLocRegister() on the record store.

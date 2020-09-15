@@ -2105,7 +2105,8 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                                          const IndexBuildOptions& indexBuildOptions) {
     // Read without a timestamp. When we commit, we block writes which guarantees all writes are
     // visible.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
+              opCtx->recoveryUnit()->getTimestampReadSource());
     _scanCollectionAndInsertKeysIntoSorter(opCtx, replState);
     _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     _signalPrimaryForCommitReadiness(opCtx, replState);
@@ -2169,7 +2170,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
             replState->buildUUID,
-            RecoveryUnit::ReadSource::kUnset,
+            RecoveryUnit::ReadSource::kNoTimestamp,
             IndexBuildInterceptor::DrainYieldPolicy::kYield));
     }
 
@@ -2195,7 +2196,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
             replState->buildUUID,
-            RecoveryUnit::ReadSource::kUnset,
+            RecoveryUnit::ReadSource::kNoTimestamp,
             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
     }
 
@@ -2278,7 +2279,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
         opCtx,
         replState->buildUUID,
-        RecoveryUnit::ReadSource::kUnset,
+        RecoveryUnit::ReadSource::kNoTimestamp,
         IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     try {

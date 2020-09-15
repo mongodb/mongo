@@ -263,8 +263,9 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
     const std::vector<OplogEntry*>& cachedOps,
     const bool checkForCommands) noexcept {
     bool isTransactionWithCommand = false;
-    // Traverse the oplog chain with its own snapshot and read timestamp.
-    ReadSourceScope readSourceScope(opCtx);
+    // Ensure future transactions read without a timestamp.
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
+              opCtx->recoveryUnit()->getTimestampReadSource());
 
     std::vector<OplogEntry> ops;
 
@@ -539,11 +540,10 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
         LOGV2(21848, "Hit skipReconstructPreparedTransactions failpoint");
         return;
     }
-    // Read the transactions table and the oplog collection without a timestamp.
-    // The below DBDirectClient read uses AutoGetCollectionForRead which could implicitly change the
-    // read source. So we need to explicitly set the read source to kNoTimestamp to force reads in
-    // this scope to be untimestamped.
-    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+
+    // Ensure future transactions read without a timestamp.
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
+              opCtx->recoveryUnit()->getTimestampReadSource());
 
     DBDirectClient client(opCtx);
     const auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,

@@ -38,29 +38,37 @@
 #include "mongo/logv2/log.h"
 
 namespace mongo {
-namespace SnapshotHelper {
-bool canSwitchReadSource(OperationContext* opCtx) {
-
-    // Most readConcerns have behavior controlled at higher levels. Local and available are the only
-    // ReadConcerns that should consider changing, since they read without a timestamp by default.
+namespace {
+bool canReadAtLastApplied(OperationContext* opCtx) {
+    // Local and available are the only ReadConcern levels that allow their ReadSource to be
+    // overridden to read at lastApplied. They read without a timestamp by default, but this check
+    // allows user secondary reads from conflicting with oplog batch application by reading at a
+    // consistent point in time.
+    // Internal operations use DBDirectClient as a loopback to perform local operations, and they
+    // expect the same level of consistency guarantees as any user operation. For that reason,
+    // DBDirectClient should be able to change the owning operation's ReadSource in order to serve
+    // consistent data.
     const auto readConcernLevel = repl::ReadConcernArgs::get(opCtx).getLevel();
-    if (readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern ||
-        readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern) {
+    if ((opCtx->getClient()->isFromUserConnection() || opCtx->getClient()->isInDirectClient()) &&
+        (readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern ||
+         readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern)) {
         return true;
     }
-
     return false;
 }
+}  // namespace
 
+namespace SnapshotHelper {
 bool shouldReadAtLastApplied(OperationContext* opCtx,
                              const NamespaceString& nss,
                              std::string* reason) {
-
     // If this is true, then the operation opted-in to the PBWM lock, implying that it cannot change
     // its ReadSource. It's important to note that it is possible for this to be false, but still be
     // holding the PBWM lock, explained below.
     if (opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-        *reason = "conflicts with batch application";
+        if (reason) {
+            *reason = "conflicts with batch application";
+        }
         return false;
     }
 
@@ -71,16 +79,32 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
     // guaranteed to observe all previous writes. This may occur when multiple collection locks are
     // held concurrently, which is often the case when DBDirectClient is used.
     if (opCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode, MODE_IS)) {
-        *reason = "PBWM lock is held";
+        if (reason) {
+            *reason = "PBWM lock is held";
+        }
         LOGV2_DEBUG(20577, 1, "not reading at lastApplied because the PBWM lock is held");
         return false;
     }
 
-    // If we are in a replication state (like secondary or primary catch-up) where we are not
-    // accepting writes, we should read at lastApplied. If this node can accept writes, then no
-    // conflicting replication batches are being applied and we can read from the default snapshot.
+    // If this node can accept writes (i.e. primary), then no conflicting replication batches are
+    // being applied and we can read from the default snapshot. If we are in a replication state
+    // (like secondary or primary catch-up) where we are not accepting writes, we should read at
+    // lastApplied.
     if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin")) {
-        *reason = "primary";
+        if (reason) {
+            *reason = "primary";
+        }
+        return false;
+    }
+
+    // If we are not secondary, then we should not attempt to read at lastApplied because it may not
+    // be available or valid. Any operations reading outside of the primary or secondary states must
+    // be internal. We give these operations the benefit of the doubt rather than attempting to read
+    // at a lastApplied timestamp that is not valid.
+    if (!repl::ReplicationCoordinator::get(opCtx)->isInPrimaryOrSecondaryState(opCtx)) {
+        if (reason) {
+            *reason = "not primary or secondary";
+        }
         return false;
     }
 
@@ -88,7 +112,9 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
     // written by the replication system.  However, the oplog is special, as it *is* written by the
     // replication system.
     if (!nss.isReplicated() && !nss.isOplog()) {
-        *reason = "unreplicated collection";
+        if (reason) {
+            *reason = "unreplicated collection";
+        }
         return false;
     }
 
@@ -96,15 +122,14 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
 }
 boost::optional<RecoveryUnit::ReadSource> getNewReadSource(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
-    const bool canSwitch = canSwitchReadSource(opCtx);
-    if (!canSwitch) {
+    if (!canReadAtLastApplied(opCtx)) {
         return boost::none;
     }
 
     const auto existing = opCtx->recoveryUnit()->getTimestampReadSource();
     std::string reason;
     const bool readAtLastApplied = shouldReadAtLastApplied(opCtx, nss, &reason);
-    if (existing == RecoveryUnit::ReadSource::kUnset) {
+    if (existing == RecoveryUnit::ReadSource::kNoTimestamp) {
         // Shifting from reading without a timestamp to reading with a timestamp can be dangerous
         // because writes will appear to vanish. This case is intended for new reads on secondaries
         // and query yield recovery after state transitions from primary to secondary.
@@ -124,13 +149,14 @@ boost::optional<RecoveryUnit::ReadSource> getNewReadSource(OperationContext* opC
         if (!readAtLastApplied) {
             LOGV2_DEBUG(4452902,
                         2,
-                        "Changing ReadSource to kUnset",
+                        "Changing ReadSource to kNoTimestamp",
                         "collection"_attr = nss,
                         "reason"_attr = reason);
-            // their ReadSources after performing reads at an un-timetamped snapshot. The only
-            // exception is callers of this function that may need to change from kUnset to
-            // kLastApplied in the event of a catalog conflict or query yield.
-            return RecoveryUnit::ReadSource::kUnset;
+            // This shift to kNoTimestamp assumes that callers will not make future attempts to
+            // manipulate their ReadSources after performing reads at an un-timetamped snapshot. The
+            // only exception is callers of this function that may need to change from kNoTimestamp
+            // to kLastApplied in the event of a catalog conflict or query yield.
+            return RecoveryUnit::ReadSource::kNoTimestamp;
         }
     }
     return boost::none;

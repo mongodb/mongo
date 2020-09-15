@@ -372,7 +372,7 @@ TEST_F(SnapshotManagerTests, InsertAndReadOnLastAppliedSnapshot) {
     // Not reading on the last applied timestamp returns the most recent data.
     auto op = makeOperation();
     auto ru = op->recoveryUnit();
-    ru->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+    ru->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     ASSERT_EQ(itCountOn(op), 1);
     ASSERT(readRecordOn(op, id));
 
@@ -408,7 +408,7 @@ TEST_F(SnapshotManagerTests, UpdateAndDeleteOnLocalSnapshot) {
     // Not reading on the last local timestamp returns the most recent data.
     auto op = makeOperation();
     auto ru = op->recoveryUnit();
-    ru->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+    ru->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     ASSERT_EQ(itCountOn(op), 1);
     auto record = readRecordOn(op, id);
     ASSERT_EQ(std::string(record->data.data()), "Blue spotted stingray");

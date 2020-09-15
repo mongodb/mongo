@@ -280,7 +280,7 @@ Status CollectionBulkLoaderImpl::commit() {
 
             status = _idIndexBlock->drainBackgroundWrites(
                 _opCtx.get(),
-                RecoveryUnit::ReadSource::kUnset,
+                RecoveryUnit::ReadSource::kNoTimestamp,
                 _nss.isSystemDotViews() ? IndexBuildInterceptor::DrainYieldPolicy::kNoYield
                                         : IndexBuildInterceptor::DrainYieldPolicy::kYield);
             if (!status.isOK()) {

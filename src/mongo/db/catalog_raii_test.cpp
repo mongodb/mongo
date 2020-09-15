@@ -230,7 +230,7 @@ public:
     }
 
 private:
-    ReadSource _source = ReadSource::kUnset;
+    ReadSource _source = ReadSource::kNoTimestamp;
     boost::optional<Timestamp> _timestamp;
 };
 
@@ -257,8 +257,8 @@ TEST_F(ReadSourceScopeTest, RestoreReadSource) {
     ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kProvided);
     ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(), Timestamp(1, 2));
     {
-        ReadSourceScope scope(opCtx());
-        ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kUnset);
+        ReadSourceScope scope(opCtx(), ReadSource::kNoTimestamp);
+        ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kNoTimestamp);
 
         opCtx()->recoveryUnit()->setTimestampReadSource(ReadSource::kNoOverlap);
         ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kNoOverlap);

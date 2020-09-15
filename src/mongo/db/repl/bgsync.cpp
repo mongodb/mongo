@@ -673,8 +673,9 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
 
     ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
 
-    // Explicitly start future read transactions without a timestamp.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    // Ensure future transactions read without a timestamp.
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
+              opCtx->recoveryUnit()->getTimestampReadSource());
 
     // Rollback is a synchronous operation that uses the task executor and may not be
     // executed inside the fetcher callback.
@@ -851,8 +852,9 @@ void BackgroundSync::start(OperationContext* opCtx) {
     OpTime lastAppliedOpTime;
     ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
 
-    // Explicitly start future read transactions without a timestamp.
-    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    // Ensure future transactions read without a timestamp.
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
+              opCtx->recoveryUnit()->getTimestampReadSource());
 
     do {
         lastAppliedOpTime = _readLastAppliedOpTime(opCtx);

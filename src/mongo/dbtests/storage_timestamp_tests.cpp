@@ -102,7 +102,7 @@ public:
     OneOffRead(OperationContext* opCtx, const Timestamp& ts) : _opCtx(opCtx) {
         _opCtx->recoveryUnit()->abandonSnapshot();
         if (ts.isNull()) {
-            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
         } else {
             _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, ts);
         }
@@ -110,7 +110,7 @@ public:
 
     ~OneOffRead() {
         _opCtx->recoveryUnit()->abandonSnapshot();
-        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     }
 
 private:
@@ -233,7 +233,7 @@ public:
      */
     void reset(NamespaceString nss) const {
         ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss.ns(), [&] {
-            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kUnset);
+            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
             AutoGetCollection collRaii(_opCtx, nss, LockMode::MODE_X);
 
             if (collRaii.getCollection()) {
@@ -2054,7 +2054,7 @@ public:
                   firstInsert.asTimestamp());
 
         ASSERT_OK(indexer.drainBackgroundWrites(_opCtx,
-                                                RecoveryUnit::ReadSource::kUnset,
+                                                RecoveryUnit::ReadSource::kNoTimestamp,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
         auto indexCatalog = autoColl.getCollection()->getIndexCatalog();
@@ -2097,7 +2097,7 @@ public:
         setReplCoordAppliedOpTime(repl::OpTime(afterSecondInsert.asTimestamp(), presentTerm));
 
         ASSERT_OK(indexer.drainBackgroundWrites(_opCtx,
-                                                RecoveryUnit::ReadSource::kUnset,
+                                                RecoveryUnit::ReadSource::kNoTimestamp,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
         {
@@ -2897,7 +2897,7 @@ public:
 
         ASSERT_FALSE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
         ASSERT_OK(indexer.drainBackgroundWrites(_opCtx,
-                                                RecoveryUnit::ReadSource::kUnset,
+                                                RecoveryUnit::ReadSource::kNoTimestamp,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
 

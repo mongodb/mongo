@@ -131,7 +131,9 @@ public:
           _oplogApplicationEndPoint(oplogApplicationEndPoint) {}
 
     void startup(OperationContext* opCtx) final {
-        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        invariant(opCtx->recoveryUnit()->getTimestampReadSource() ==
+                  RecoveryUnit::ReadSource::kNoTimestamp);
+
         _client = std::make_unique<DBDirectClient>(opCtx);
         BSONObj predicate = _oplogApplicationEndPoint
             ? BSON("$gte" << _oplogApplicationStartPoint << "$lte" << *_oplogApplicationEndPoint)
