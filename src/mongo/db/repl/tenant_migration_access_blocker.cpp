@@ -271,6 +271,8 @@ void TenantMigrationAccessBlocker::_waitForOpTimeToMajorityCommit(
 }
 
 void TenantMigrationAccessBlocker::appendInfoForServerStatus(BSONObjBuilder* builder) const {
+    stdx::lock_guard<Latch> lg(_mutex);
+
     BSONObjBuilder tenantBuilder;
     tenantBuilder.append("access", _access);
     if (_blockTimestamp) {
