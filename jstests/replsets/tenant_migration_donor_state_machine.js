@@ -59,16 +59,19 @@ const accessState = {
     kReject: 3
 };
 
-// Use a shorter delay since the default delay is very large.
-const kGarbageCollectionDelayMS = 3 * 1000;
-
 const donorRst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
     name: "donor",
     nodeOptions: {
         setParameter: {
             enableTenantMigrations: true,
-            tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS
+
+            // Set the delay before a donor state doc is garbage collected to be short to speed up
+            // the test.
+            tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
+
+            // Set the TTL monitor to run at a smaller interval to speed up the test.
+            ttlMonitorSleepSecs: 1,
         }
     }
 });
