@@ -70,6 +70,8 @@ public:
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
 
+    void interrupt(Status status) override{};
+
     void onReshardingFieldsChanges(
         boost::optional<TypeCollectionReshardingFields> reshardingFields);
 

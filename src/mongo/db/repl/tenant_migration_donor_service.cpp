@@ -71,6 +71,12 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
         TenantMigrationDonorDocument::parse(IDLParserErrorContext("initialStateDoc"), initialState);
 }
 
+TenantMigrationDonorService::Instance::~Instance() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    invariant(_decisionPromise.getFuture().isReady());
+    invariant(_receiveDonorForgetMigrationPromise.getFuture().isReady());
+}
+
 Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(BSONObj options) {
     auto stateDoc = TenantMigrationDonorDocument::parse(IDLParserErrorContext("stateDoc"), options);
 
@@ -91,8 +97,19 @@ Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(BSONObj opt
 
 void TenantMigrationDonorService::Instance::onReceiveDonorForgetMigration() {
     stdx::lock_guard<Latch> lg(_mutex);
-    if (!_receivedDonorForgetMigrationPromise.getFuture().isReady()) {
-        _receivedDonorForgetMigrationPromise.emplaceValue();
+    if (!_receiveDonorForgetMigrationPromise.getFuture().isReady()) {
+        _receiveDonorForgetMigrationPromise.emplaceValue();
+    }
+}
+
+void TenantMigrationDonorService::Instance::interrupt(Status status) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    // Resolve any unresolved promises to avoid hanging.
+    if (!_decisionPromise.getFuture().isReady()) {
+        _decisionPromise.setError(status);
+    }
+    if (!_receiveDonorForgetMigrationPromise.getFuture().isReady()) {
+        _receiveDonorForgetMigrationPromise.setError(status);
     }
 }
 
@@ -371,6 +388,13 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "status"_attr = status,
                   "abortReason"_attr = _abortReason);
 
+            stdx::lock_guard<Latch> lg(_mutex);
+
+            if (_decisionPromise.getFuture().isReady()) {
+                // The promise has already been fulfilled due to stepup or shutdown.
+                return;
+            }
+
             if (status.isOK()) {
                 _decisionPromise.emplaceValue();
             } else {
@@ -385,7 +409,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
         })
         .then([this, executor] {
             // Wait for the donorForgetMigration command.
-            return _receivedDonorForgetMigrationPromise.getFuture();
+            return _receiveDonorForgetMigrationPromise.getFuture();
         })
         .then([this, executor] {
             const auto opTime = _markStateDocumentAsGarbageCollectable();

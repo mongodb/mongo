@@ -76,6 +76,8 @@ public:
         SemiFuture<void> run(
             std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
 
+        void interrupt(Status status) override{};
+
         void setInitialChunksAndZones(std::vector<ChunkType> initialChunks,
                                       std::vector<TagsType> newZones);
 

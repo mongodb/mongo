@@ -75,6 +75,8 @@ public:
 
         SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept final;
 
+        void interrupt(Status status) override{};
+
         /*
          *  Returns the instance id.
          */

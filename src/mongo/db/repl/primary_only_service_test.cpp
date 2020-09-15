@@ -136,6 +136,8 @@ public:
                 .semi();
         }
 
+        void interrupt(Status status) override{};
+
         int getID() {
             stdx::lock_guard lk(_mutex);
             return _id["_id"].Int();

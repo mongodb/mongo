@@ -70,8 +70,12 @@ public:
     public:
         Instance(ServiceContext* serviceContext, const BSONObj& initialState);
 
+        ~Instance();
+
         SemiFuture<void> run(
             std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
+
+        void interrupt(Status status) override;
 
         /**
          * To be called on the instance returned by PrimaryOnlyService::getOrCreate. Returns an
@@ -140,19 +144,19 @@ public:
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
             RemoteCommandTargeter* recipientTargeter);
 
-        mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationDonorService::_mutex");
-
         ServiceContext* _serviceContext;
 
         TenantMigrationDonorDocument _stateDoc;
-
         boost::optional<Status> _abortReason;
+
+        // Protects the promises below.
+        mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationDonorService::_mutex");
 
         // Promise that is resolved when the donor has majority-committed the migration decision.
         SharedPromise<void> _decisionPromise;
 
         // Promise that is resolved when the donor receives the donorForgetMigration command.
-        SharedPromise<void> _receivedDonorForgetMigrationPromise;
+        SharedPromise<void> _receiveDonorForgetMigrationPromise;
     };
 
 private:

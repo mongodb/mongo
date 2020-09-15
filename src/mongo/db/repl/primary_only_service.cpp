@@ -329,9 +329,15 @@ void PrimaryOnlyService::onStepDown() {
         return;
     }
 
+    for (auto& instance : _instances) {
+        instance.second->interrupt({ErrorCodes::InterruptedDueToReplStateChange,
+                                    "PrimaryOnlyService interrupted due to stepdown"});
+    }
+
     if (_scopedExecutor) {
         (*_scopedExecutor)->shutdown();
     }
+
     _state = State::kPaused;
     _rebuildStatus = Status::OK();
 }
@@ -356,6 +362,11 @@ void PrimaryOnlyService::shutdown() {
         _state = State::kShutdown;
     }
 
+    for (auto& instance : savedInstances) {
+        instance.second->interrupt(
+            {ErrorCodes::InterruptedAtShutdown, "PrimaryOnlyService interrupted due to shutdown"});
+    }
+
     if (savedScopedExecutor) {
         // Make sure to shut down the scoped executor before the parent executor to avoid
         // SERVER-50612.
@@ -363,6 +374,7 @@ void PrimaryOnlyService::shutdown() {
         // No need to join() here since joining the parent executor below will join with all tasks
         // owned by the scoped executor.
     }
+
     if (savedExecutor) {
         savedExecutor->shutdown();
         savedExecutor->join();

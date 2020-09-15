@@ -106,6 +106,13 @@ public:
         virtual SemiFuture<void> run(
             std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept = 0;
 
+        /**
+         * This is the function that is called when this running Instance needs to be interrupted.
+         * It should unblock any work managed by this Instance by, for example, emplacing the given
+         * error into any unresolved promises that the Instance manages.
+         */
+        virtual void interrupt(Status status) = 0;
+
     private:
         bool _running = false;
 
