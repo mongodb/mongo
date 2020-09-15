@@ -45,6 +45,7 @@
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {
@@ -85,11 +86,25 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
     : repl::PrimaryOnlyService::TypedInstance<Instance>(), _serviceContext(serviceContext) {
     _stateDoc =
         TenantMigrationDonorDocument::parse(IDLParserErrorContext("initialStateDoc"), initialState);
+    if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
+        // The migration was resumed on stepup.
+        stdx::lock_guard<Latch> lg(_mutex);
+
+        _durableState.state = _stateDoc.getState();
+        if (_stateDoc.getAbortReason()) {
+            _durableState.abortReason =
+                getStatusFromCommandResult(_stateDoc.getAbortReason().get());
+        }
+
+        if (!_initialDonorStateDurablePromise.getFuture().isReady()) {
+            _initialDonorStateDurablePromise.emplaceValue();
+        }
+    }
 }
 
 TenantMigrationDonorService::Instance::~Instance() {
     stdx::lock_guard<Latch> lg(_mutex);
-    invariant(_decisionPromise.getFuture().isReady());
+    invariant(_initialDonorStateDurablePromise.getFuture().isReady());
     invariant(_receiveDonorForgetMigrationPromise.getFuture().isReady());
 }
 
@@ -111,6 +126,15 @@ Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(BSONObj opt
     return Status::OK();
 }
 
+TenantMigrationDonorService::Instance::DurableState
+TenantMigrationDonorService::Instance::getDurableState(OperationContext* opCtx) {
+    // Wait for the insert of the state doc to become majority-committed.
+    _initialDonorStateDurablePromise.getFuture().get(opCtx);
+
+    stdx::lock_guard<Latch> lg(_mutex);
+    return _durableState;
+}
+
 void TenantMigrationDonorService::Instance::onReceiveDonorForgetMigration() {
     stdx::lock_guard<Latch> lg(_mutex);
     if (!_receiveDonorForgetMigrationPromise.getFuture().isReady()) {
@@ -121,8 +145,8 @@ void TenantMigrationDonorService::Instance::onReceiveDonorForgetMigration() {
 void TenantMigrationDonorService::Instance::interrupt(Status status) {
     stdx::lock_guard<Latch> lg(_mutex);
     // Resolve any unresolved promises to avoid hanging.
-    if (!_decisionPromise.getFuture().isReady()) {
-        _decisionPromise.setError(status);
+    if (!_initialDonorStateDurablePromise.getFuture().isReady()) {
+        _initialDonorStateDurablePromise.setError(status);
     }
     if (!_receiveDonorForgetMigrationPromise.getFuture().isReady()) {
         _receiveDonorForgetMigrationPromise.setError(status);
@@ -282,7 +306,27 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
     std::shared_ptr<executor::ScopedTaskExecutor> executor, repl::OpTime opTime) {
     return WaitForMajorityService::get(_serviceContext)
         .waitUntilMajority(std::move(opTime))
-        .thenRunOn(**executor);
+        .thenRunOn(**executor)
+        .then([this] {
+            stdx::lock_guard<Latch> lg(_mutex);
+            _durableState.state = _stateDoc.getState();
+            switch (_durableState.state) {
+                case TenantMigrationDonorStateEnum::kDataSync:
+                    if (!_initialDonorStateDurablePromise.getFuture().isReady()) {
+                        _initialDonorStateDurablePromise.emplaceValue();
+                    }
+                    break;
+                case TenantMigrationDonorStateEnum::kBlocking:
+                case TenantMigrationDonorStateEnum::kCommitted:
+                    break;
+                case TenantMigrationDonorStateEnum::kAborted:
+                    invariant(_abortReason);
+                    _durableState.abortReason = _abortReason;
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        });
 }
 
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipient(
@@ -443,13 +487,19 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
         })
         .onError([this, executor](Status status) {
             if (_stateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
-                // The migration was resumed on startup and it was already aborted.
+                // The migration was resumed on stepup and it was already aborted.
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
 
             auto mtab =
                 getTenantMigrationAccessBlocker(_serviceContext, _stateDoc.getDatabasePrefix());
             if (status == ErrorCodes::ConflictingOperationInProgress || !mtab) {
+                stdx::lock_guard<Latch> lg(_mutex);
+                if (!_initialDonorStateDurablePromise.getFuture().isReady()) {
+                    // Fulfill the promise since the state doc failed to insert.
+                    _initialDonorStateDurablePromise.setError(status);
+                }
+
                 return ExecutorFuture<void>(**executor, status);
             } else {
                 // Enter "abort" state.
@@ -467,29 +517,6 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "dbPrefix"_attr = _stateDoc.getDatabasePrefix(),
                   "status"_attr = status,
                   "abortReason"_attr = _abortReason);
-
-            stdx::lock_guard<Latch> lg(_mutex);
-
-            if (_decisionPromise.getFuture().isReady()) {
-                // The promise has already been fulfilled due to stepup or shutdown.
-                return;
-            }
-
-            if (status.isOK()) {
-                // The migration commited or aborted successfully.
-                if (_abortReason) {
-                    _decisionPromise.setError(
-                        {ErrorCodes::TenantMigrationAborted,
-                         str::stream() << "Tenant migration with id \"" << _stateDoc.getId()
-                                       << "\" and dbPrefix \"" << _stateDoc.getDatabasePrefix()
-                                       << "\" aborted due to " << _abortReason});
-                } else {
-                    _decisionPromise.emplaceValue();
-                }
-            } else {
-                // There was a conflicting migration or this node is stepping down or shutting down.
-                _decisionPromise.setError(status);
-            }
         })
         .then([this, executor, recipientTargeterRS] {
             if (_stateDoc.getExpireAt()) {

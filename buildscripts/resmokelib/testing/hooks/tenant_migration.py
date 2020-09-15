@@ -69,8 +69,9 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
 
 
 class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
-    MAX_SLEEP_SECONDS = 0.1
-    MAX_BLOCK_TIME_MS = 5 * 1000
+    MAX_SLEEP_SECS = 0.1
+    MAX_BLOCK_TIME_MILLISECS = 5 * 1000
+    DONOR_START_MIGRATION_POLL_INTERVAL_SECS = 0.1
     TENANT_MIGRATION_ABORTED_ERROR_CODE = 325
 
     def __init__(self, logger, rs_fixtures, db_prefix):
@@ -107,10 +108,10 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         self.join()
 
     def _enable_abort(self, donor_primary_client, donor_primary_port, donor_primary_rs_name):
-        # Configure the failpoint to make the migration abort after the migration has been blocking
-        # reads and writes for a randomly generated number of seconds (< MAX_BLOCK_TIME_MS). Must
-        # be called with _disable_abort at the start and end of each test so that each test uses
-        # its own randomly generated block time.
+        # Configure the failpoint to make the migration abort after the migration has been
+        # blocking reads and writes for a randomly generated number of milliseconds
+        # (< MAX_BLOCK_TIME_MILLISECS). Must be called with _disable_abort at the start and
+        # end of each test so that each test uses its own randomly generated block time.
         try:
             donor_primary_client.admin.command(
                 bson.SON([("configureFailPoint", "abortTenantMigrationAfterBlockingStarts"),
@@ -118,7 +119,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                           ("data",
                            bson.SON([("blockTimeMS",
                                       random.uniform(
-                                          0, _TenantMigrationThread.MAX_BLOCK_TIME_MS))]))]))
+                                          0, _TenantMigrationThread.MAX_BLOCK_TIME_MILLISECS))]))]))
         except pymongo.errors.OperationFailure as err:
             self.logger.exception(
                 "Unable to enable the failpoint to make migrations abort on donor primary on port "
@@ -146,20 +147,31 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         donor_primary = rs_fixture.get_primary()
         donor_primary_client = donor_primary.mongo_client()
 
-        time.sleep(random.uniform(0, _TenantMigrationThread.MAX_SLEEP_SECONDS))
+        time.sleep(random.uniform(0, _TenantMigrationThread.MAX_SLEEP_SECS))
 
         self.logger.info(
             "Starting a tenant migration with donor primary on port %d of replica set '%s'.",
             donor_primary.port, rs_fixture.replset_name)
 
+        cmd_obj = {
+            "donorStartMigration": 1, "migrationId": bson.Binary(uuid.uuid4().bytes, 4),
+            "recipientConnectionString": "dummySet/dummyHost:1234",
+            "databasePrefix": self._db_prefix, "readPreference": {"mode": "primary"}
+        }
+
         try:
             self._enable_abort(donor_primary_client, donor_primary.port, rs_fixture.replset_name)
 
-            donor_primary_client.admin.command({
-                "donorStartMigration": 1, "migrationId": bson.Binary(
-                    uuid.uuid4().bytes, 4), "recipientConnectionString": "dummySet/dummyHost:1234",
-                "databasePrefix": self._db_prefix, "readPreference": {"mode": "primary"}
-            }, bson.codec_options.CodecOptions(uuid_representation=bson.binary.UUID_SUBTYPE))
+            while True:
+                # Keep polling the migration state until the migration completes, otherwise we might
+                # end up disabling 'abortTenantMigrationAfterBlockingStarts' before the migration
+                # enters the blocking state and aborts.
+                res = donor_primary_client.admin.command(
+                    cmd_obj,
+                    bson.codec_options.CodecOptions(uuid_representation=bson.binary.UUID_SUBTYPE))
+                if (not res["ok"] or res["state"] == "committed" or res["state"] == "aborted"):
+                    break
+                time.sleep(_TenantMigrationThread.DONOR_START_MIGRATION_POLL_INTERVAL_SECS)
         except pymongo.errors.OperationFailure as err:
             if err.code == _TenantMigrationThread.TENANT_MIGRATION_ABORTED_ERROR_CODE:
                 self.logger.exception(

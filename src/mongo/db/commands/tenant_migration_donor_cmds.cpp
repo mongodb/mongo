@@ -41,13 +41,14 @@ namespace {
 class DonorStartMigrationCmd : public TypedCommand<DonorStartMigrationCmd> {
 public:
     using Request = DonorStartMigration;
+    using Response = DonorStartMigrationResponse;
 
     class Invocation : public InvocationBase {
 
     public:
         using InvocationBase::InvocationBase;
 
-        void typedRun(OperationContext* opCtx) {
+        Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::CommandNotSupported,
                     "donorStartMigration command not enabled",
                     repl::enableTenantMigrations);
@@ -87,7 +88,16 @@ public:
                 TenantMigrationDonorService::Instance::getOrCreate(donorService, donorStateDoc);
             uassertStatusOK(donor->checkIfOptionsConflict(donorStateDoc));
 
-            donor->getDecisionFuture().get(opCtx);
+            auto durableState = donor->getDurableState(opCtx);
+
+            auto response = Response(durableState.state);
+            if (durableState.abortReason) {
+                BSONObjBuilder bob;
+                durableState.abortReason.get().serializeErrorToBSON(&bob);
+                response.setAbortReason(bob.obj());
+            }
+
+            return response;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const {}
@@ -115,45 +125,6 @@ public:
 
 } donorStartMigrationCmd;
 
-class DonorWaitForMigrationToCommitCmd : public TypedCommand<DonorWaitForMigrationToCommitCmd> {
-public:
-    using Request = DonorWaitForMigrationToCommit;
-
-    class Invocation : public InvocationBase {
-
-    public:
-        using InvocationBase::InvocationBase;
-
-        void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::CommandNotSupported,
-                    "donorWaitForMigrationToCommit command not enabled",
-                    repl::enableTenantMigrations);
-        }
-
-    private:
-        void doCheckAuthorization(OperationContext* opCtx) const {}
-
-        bool supportsWriteConcern() const override {
-            return false;
-        }
-        NamespaceString ns() const {
-            return NamespaceString(request().getDbName(), "");
-        }
-    };
-
-    std::string help() const override {
-        return "Wait for migration to be committed.";
-    }
-    bool adminOnly() const override {
-        return true;
-    }
-
-    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return BasicCommand::AllowedOnSecondary::kNever;
-    }
-
-} donorWaitForMigrationToCommitCmd;
-
 class DonorForgetMigrationCmd : public TypedCommand<DonorForgetMigrationCmd> {
 public:
     using Request = DonorForgetMigration;
@@ -179,6 +150,14 @@ public:
                     str::stream() << "Could not find tenant migration with id "
                                   << requestBody.getMigrationId(),
                     donor);
+
+            auto durableState = donor.get()->getDurableState(opCtx);
+            uassert(ErrorCodes::TenantMigrationInProgress,
+                    str::stream() << "Could not forget migration with id "
+                                  << requestBody.getMigrationId()
+                                  << " since no decision has been made yet",
+                    durableState.state == TenantMigrationDonorStateEnum::kCommitted ||
+                        durableState.state == TenantMigrationDonorStateEnum::kAborted);
 
             donor.get().get()->onReceiveDonorForgetMigration();
             donor.get().get()->getCompletionFuture().get(opCtx);
