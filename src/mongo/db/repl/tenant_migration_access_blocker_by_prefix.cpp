@@ -95,6 +95,14 @@ TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlockerForDbPrefix
     }
 }
 
+void TenantMigrationAccessBlockerByPrefix::shutDown() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    std::for_each(_tenantMigrationAccessBlockers.begin(),
+                  _tenantMigrationAccessBlockers.end(),
+                  [](auto& it) { it.second->shutDown(); });
+    _tenantMigrationAccessBlockers.clear();
+}
+
 void TenantMigrationAccessBlockerByPrefix::appendInfoForServerStatus(BSONObjBuilder* builder) {
     stdx::lock_guard<Latch> lg(_mutex);
 

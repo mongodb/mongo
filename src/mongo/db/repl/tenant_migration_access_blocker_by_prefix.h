@@ -71,6 +71,12 @@ public:
         StringData dbPrefix);
 
     /**
+     * Shuts down each of the TenantMigrationAccessBlockers and releases the shared_ptrs to the
+     * TenantMigrationAccessBlockers from the map.
+     */
+    void shutDown();
+
+    /**
      * Iterates through each of the TenantMigrationAccessBlockers stored by the mapping
      * and appends the server status of each blocker to the BSONObjBuilder.
      */

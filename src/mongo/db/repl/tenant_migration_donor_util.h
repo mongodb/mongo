@@ -44,9 +44,10 @@ namespace mongo {
 namespace tenant_migration_donor {
 
 /**
- * Creates a task executor to be used for a tenant migration.
+ * Returns a task executor to be used for tenant migration donor tasks that need to run even while
+ * the node is not primary, creating it if needed.
  */
-std::unique_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(ServiceContext* serviceContext);
+std::shared_ptr<executor::TaskExecutor> getTenantMigrationDonorExecutor();
 
 /**
  * Updates the donor's in-memory migration state to reflect the given persisted state.

@@ -394,6 +394,8 @@ error_codes:
 
     - {code: 327, name: NoSuchTenantMigration}
 
+    - {code: 328, name: TenantMigrationAccessBlockerShuttingDown, categories: [InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

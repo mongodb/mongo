@@ -111,11 +111,15 @@ namespace mongo {
  * If the "commit" or "abort" write aborts or rolls back via replication rollback, the node calls
  * rollBackCommitOrAbort, which cancels the asynchronous task.
  */
-class TenantMigrationAccessBlocker {
+class TenantMigrationAccessBlocker
+    : public std::enable_shared_from_this<TenantMigrationAccessBlocker> {
 public:
     TenantMigrationAccessBlocker(ServiceContext* serviceContext,
-                                 std::unique_ptr<executor::TaskExecutor> executor,
-                                 std::string dbPrefix);
+                                 std::shared_ptr<executor::TaskExecutor> executor,
+                                 std::string dbPrefix)
+        : _serviceContext(serviceContext),
+          _executor(std::move(executor)),
+          _dbPrefix(std::move(dbPrefix)) {}
 
     //
     // Called by all writes and reads against the database.
@@ -138,19 +142,24 @@ public:
 
     void commit(repl::OpTime opTime);
     void abort(repl::OpTime opTime);
-    void rollBackCommitOrAbort();
+
+    /**
+     * Sets an internal flag indicating this TenantMigrationAccessBlocker should stop retrying
+     * internal tasks and interrupts internal tasks if any are running.
+     */
+    void shutDown();
 
     SharedSemiFuture<void> onCompletion();
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) const;
 
 private:
-    void _waitForOpTimeToMajorityCommit(repl::OpTime opTime, std::function<void()> callbackFn);
+    ExecutorFuture<void> _waitForOpTimeToMajorityCommit(repl::OpTime opTime);
 
     enum class Access { kAllow, kBlockWrites, kBlockWritesAndReads, kReject };
 
     ServiceContext* _serviceContext;
-    std::unique_ptr<executor::TaskExecutor> _executor;
+    std::shared_ptr<executor::TaskExecutor> _executor;
     std::string _dbPrefix;
 
     // Protects the state below.
@@ -159,8 +168,9 @@ private:
     Access _access{Access::kAllow};
 
     boost::optional<Timestamp> _blockTimestamp;
-
     boost::optional<repl::OpTime> _commitOrAbortOpTime;
+
+    bool _inShutdown{false};
     OperationContext* _waitForCommitOrAbortToMajorityCommitOpCtx{nullptr};
 
     stdx::condition_variable _transitionOutOfBlockingCV;

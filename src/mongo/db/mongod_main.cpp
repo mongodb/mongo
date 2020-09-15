@@ -1170,6 +1170,19 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             4784909, {LogComponent::kReplication}, "Shutting down the ReplicationCoordinator");
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);
 
+        LOGV2_OPTIONS(5093807,
+                      {LogComponent::kTenantMigration},
+                      "Shutting down all TenantMigrationAccessBlockers on global shutdown");
+        TenantMigrationAccessBlockerByPrefix::get(serviceContext).shutDown();
+
+        LOGV2_OPTIONS(5093808,
+                      {LogComponent::kTenantMigration},
+                      "Shutting down and joining the tenant migration donor executor");
+        auto tenantMigrationDonorExecutor =
+            tenant_migration_donor::getTenantMigrationDonorExecutor();
+        tenantMigrationDonorExecutor->shutdown();
+        tenantMigrationDonorExecutor->join();
+
         // Terminate the index consistency check.
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             LOGV2_OPTIONS(4784904,

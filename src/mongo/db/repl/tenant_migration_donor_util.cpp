@@ -68,7 +68,7 @@ void onTransitionToDataSync(OperationContext* opCtx,
     invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kDataSync);
     auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
         opCtx->getServiceContext(),
-        tenant_migration_donor::makeTenantMigrationExecutor(opCtx->getServiceContext()),
+        getTenantMigrationDonorExecutor(),
         donorStateDoc.getDatabasePrefix().toString());
     TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
         .add(donorStateDoc.getDatabasePrefix(), mtab);
@@ -130,16 +130,24 @@ void onTransitionToAborted(OperationContext* opCtx,
 
 }  // namespace
 
-std::unique_ptr<executor::TaskExecutor> makeTenantMigrationExecutor(
-    ServiceContext* serviceContext) {
-    ThreadPool::Options tpOptions;
-    tpOptions.threadNamePrefix = kThreadNamePrefix;
-    tpOptions.poolName = kPoolName;
-    tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
+std::shared_ptr<executor::TaskExecutor> getTenantMigrationDonorExecutor() {
+    static Mutex mutex = MONGO_MAKE_LATCH("TenantMigrationDonorUtilExecutor::_mutex");
+    static std::shared_ptr<executor::TaskExecutor> executor;
 
-    return std::make_unique<executor::ThreadPoolTaskExecutor>(
-        std::make_unique<ThreadPool>(tpOptions),
-        executor::makeNetworkInterface(kNetName, nullptr, nullptr));
+    stdx::lock_guard<Latch> lg(mutex);
+    if (!executor) {
+        ThreadPool::Options tpOptions;
+        tpOptions.threadNamePrefix = kThreadNamePrefix;
+        tpOptions.poolName = kPoolName;
+        tpOptions.minThreads = 0;
+        tpOptions.maxThreads = 16;
+
+        executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+            std::make_unique<ThreadPool>(tpOptions), executor::makeNetworkInterface(kNetName));
+        executor->startup();
+    }
+
+    return executor;
 }
 
 void onWriteToDonorStateDoc(OperationContext* opCtx, const BSONObj& donorStateDocBson) {
@@ -232,10 +240,10 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         NamespaceString::kTenantMigrationDonorsNamespace);
     Query query;
     store.forEach(opCtx, query, [&](const TenantMigrationDonorDocument& doc) {
-        auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
-            opCtx->getServiceContext(),
-            makeTenantMigrationExecutor(opCtx->getServiceContext()),
-            doc.getDatabasePrefix().toString());
+        auto mtab =
+            std::make_shared<TenantMigrationAccessBlocker>(opCtx->getServiceContext(),
+                                                           getTenantMigrationDonorExecutor(),
+                                                           doc.getDatabasePrefix().toString());
 
         TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
             .add(doc.getDatabasePrefix(), mtab);
