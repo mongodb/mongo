@@ -1,7 +1,7 @@
 #include "kms_message/kms_response_parser.h"
 #include "kms_message_private.h"
 
-#include "kms_message_private.h"
+#include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +24,7 @@ _parser_init (kms_response_parser_t *parser)
    parser->raw_response = kms_request_str_new ();
    parser->content_length = -1;
    parser->response = calloc (1, sizeof (kms_response_t));
+   KMS_ASSERT (parser->response);
    parser->response->headers = kms_kv_list_new ();
    parser->state = PARSING_STATUS_LINE;
    parser->start = 0;
@@ -34,6 +35,8 @@ kms_response_parser_t *
 kms_response_parser_new (void)
 {
    kms_response_parser_t *parser = malloc (sizeof (kms_response_parser_t));
+   KMS_ASSERT (parser);
+
    _parser_init (parser);
    return parser;
 }
@@ -59,11 +62,26 @@ static bool
 _parse_int (const char *str, int *result)
 {
    char *endptr = NULL;
+   int64_t long_result;
 
-   *result = (int) strtol (str, &endptr, 10);
-   if (*endptr) {
+   errno = 0;
+   long_result = strtol (str, &endptr, 10);
+   if (endptr == str) {
+      /* No digits were parsed. Consider this an error */
       return false;
    }
+   if (endptr != NULL && *endptr != '\0') {
+      /* endptr points to the first invalid character. */
+      return false;
+   }
+   if (errno == EINVAL || errno == ERANGE) {
+      return false;
+   }
+   if (long_result > INT32_MAX || long_result < INT32_MIN) {
+      return false;
+   }
+   *result = (int) long_result;
+
    return true;
 }
 
@@ -72,6 +90,8 @@ static bool
 _parse_int_from_view (const char *str, int start, int end, int *result)
 {
    char *num_str = malloc (end - start + 1);
+   KMS_ASSERT (num_str);
+
    bool ret;
 
    strncpy (num_str, str + start, end - start);

@@ -1,8 +1,7 @@
 /*
- * Copyright 2018-present MongoDB, Inc.
+ * Copyright 2020-present MongoDB, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License"){}
- *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
@@ -15,18 +14,20 @@
  * limitations under the License.
  */
 
-#ifndef KMS_PORT_H
-#define KMS_PORT_H
-
-#include <stddef.h>
-
+#include "kms_port.h"
 #if defined(_WIN32)
-#define kms_strcasecmp _stricmp
-char *
-kms_strndup (const char *src, size_t len);
-#else
-#define kms_strndup strndup
-#define kms_strcasecmp strcasecmp
-#endif
+#include <stdlib.h>
+#include <string.h>
+char * kms_strndup (const char *src, size_t len)
+{
+   char *dst = (char *) malloc (len + 1);
+   if (!dst) {
+      return 0;
+   }
 
-#endif /* KMS_PORT_H */
+   memcpy (dst, src, len);
+   dst[len] = '\0';
+
+   return dst;
+}
+#endif

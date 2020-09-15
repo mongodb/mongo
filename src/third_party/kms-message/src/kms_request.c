@@ -61,6 +61,7 @@ kms_request_new (const char *method,
    kms_request_t *request = calloc (1, sizeof (kms_request_t));
    const char *question_mark;
 
+   KMS_ASSERT (request);
    /* parsing may set failed to true */
    request->failed = false;
 
@@ -92,10 +93,14 @@ kms_request_new (const char *method,
    request->header_fields = kms_kv_list_new ();
    request->auto_content_length = true;
 
-   kms_request_set_date (request, NULL);
+   if (!kms_request_set_date (request, NULL)) {
+      return request;
+   }
 
    if (opt && opt->connection_close) {
-      kms_request_add_header_field (request, "Connection", "close");
+      if (!kms_request_add_header_field (request, "Connection", "close")) {
+         return request;
+      }
    }
 
    if (opt && opt->crypto.sha256) {
@@ -164,7 +169,9 @@ kms_request_set_date (kms_request_t *request, const struct tm *tm)
    kms_request_str_set_chars (request->date, buf, sizeof "YYYYmmDD" - 1);
    kms_request_str_set_chars (request->datetime, buf, sizeof AMZ_DT_FORMAT - 1);
    kms_kv_list_del (request->header_fields, "X-Amz-Date");
-   kms_request_add_header_field (request, "X-Amz-Date", buf);
+   if (!kms_request_add_header_field (request, "X-Amz-Date", buf)) {
+      return false;
+   }
 
    return true;
 }
@@ -309,7 +316,8 @@ append_canonical_headers (kms_kv_list_t *lst, kms_request_str_t *str)
     * values in headers that have multiple values." */
    for (i = 0; i < lst->len; i++) {
       kv = &lst->kvs[i];
-      if (previous_key && 0 == strcasecmp (previous_key->str, kv->key->str)) {
+      if (previous_key &&
+          0 == kms_strcasecmp (previous_key->str, kv->key->str)) {
          /* duplicate header */
          kms_request_str_append_char (str, ',');
          kms_request_str_append_stripped (str, kv->value);
@@ -339,12 +347,13 @@ append_signed_headers (kms_kv_list_t *lst, kms_request_str_t *str)
 
    for (i = 0; i < lst->len; i++) {
       kv = &lst->kvs[i];
-      if (previous_key && 0 == strcasecmp (previous_key->str, kv->key->str)) {
+      if (previous_key &&
+          0 == kms_strcasecmp (previous_key->str, kv->key->str)) {
          /* duplicate header */
          continue;
       }
 
-      if (0 == strcasecmp (kv->key->str, "connection")) {
+      if (0 == kms_strcasecmp (kv->key->str, "connection")) {
          continue;
       }
 
@@ -412,7 +421,8 @@ finalize (kms_request_t *request)
 static int
 cmp_header_field_names (const void *a, const void *b)
 {
-   return strcasecmp (((kms_kv_t *) a)->key->str, ((kms_kv_t *) b)->key->str);
+   return kms_strcasecmp (((kms_kv_t *) a)->key->str,
+                          ((kms_kv_t *) b)->key->str);
 }
 
 static kms_kv_list_t *
@@ -447,6 +457,7 @@ kms_request_get_canonical (kms_request_t *request)
    kms_request_str_append_newline (canonical);
    normalized = kms_request_str_path_normalized (request->path);
    kms_request_str_append_escaped (canonical, normalized, false);
+   kms_request_str_destroy (normalized);
    kms_request_str_append_newline (canonical);
    append_canonical_query (request, canonical);
    kms_request_str_append_newline (canonical);
@@ -454,12 +465,14 @@ kms_request_get_canonical (kms_request_t *request)
    append_canonical_headers (lst, canonical);
    kms_request_str_append_newline (canonical);
    append_signed_headers (lst, canonical);
-   kms_request_str_append_newline (canonical);
-   kms_request_str_append_hashed (
-      &request->crypto, canonical, request->payload);
-
-   kms_request_str_destroy (normalized);
    kms_kv_list_destroy (lst);
+   kms_request_str_append_newline (canonical);
+   if (!kms_request_str_append_hashed (
+          &request->crypto, canonical, request->payload)) {
+      KMS_ERROR (request, "could not generate hash");
+      kms_request_str_destroy (canonical);
+      return NULL;
+   }
 
    return kms_request_str_detach (canonical);
 }
@@ -514,6 +527,10 @@ kms_request_get_string_to_sign (kms_request_t *request)
    kms_request_str_append_chars (sts, "/aws4_request\n", -1);
 
    creq = kms_request_str_wrap (kms_request_get_canonical (request), -1);
+   if (!creq) {
+      goto done;
+   }
+
    if (!kms_request_str_append_hashed (&request->crypto, sts, creq)) {
       goto done;
    }

@@ -51,10 +51,13 @@ kms_request_str_t *
 kms_request_str_new (void)
 {
    kms_request_str_t *s = malloc (sizeof (kms_request_str_t));
+   KMS_ASSERT (s);
 
    s->len = 0;
    s->size = 16;
    s->str = malloc (s->size);
+   KMS_ASSERT (s->str);
+
    s->str[0] = '\0';
 
    return s;
@@ -64,11 +67,15 @@ kms_request_str_t *
 kms_request_str_new_from_chars (const char *chars, ssize_t len)
 {
    kms_request_str_t *s = malloc (sizeof (kms_request_str_t));
+   KMS_ASSERT (s);
+
    size_t actual_len;
 
    actual_len = len < 0 ? strlen (chars) : (size_t) len;
    s->size = actual_len + 1;
    s->str = malloc (s->size);
+   KMS_ASSERT (s->str);
+
    memcpy (s->str, chars, actual_len);
    s->str[actual_len] = '\0';
    s->len = actual_len;
@@ -86,6 +93,8 @@ kms_request_str_wrap (char *chars, ssize_t len)
    }
 
    s = malloc (sizeof (kms_request_str_t));
+   KMS_ASSERT (s);
+
 
    s->str = chars;
    s->len = len < 0 ? strlen (chars) : (size_t) len;
@@ -148,8 +157,10 @@ kms_request_str_t *
 kms_request_str_dup (kms_request_str_t *str)
 {
    kms_request_str_t *dup = malloc (sizeof (kms_request_str_t));
+   KMS_ASSERT (dup);
 
-   dup->str = strndup (str->str, str->len);
+
+   dup->str = kms_strndup (str->str, str->len);
    dup->len = str->len;
    dup->size = str->len + 1;
 

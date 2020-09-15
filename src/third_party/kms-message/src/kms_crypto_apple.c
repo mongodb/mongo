@@ -16,8 +16,11 @@
 
 #include "kms_crypto.h"
 
+#ifdef KMS_MESSAGE_ENABLE_CRYPTO_COMMON_CRYPTO
+
 #include <CommonCrypto/CommonDigest.h>
 #include <CommonCrypto/CommonHMAC.h>
+
 
 int
 kms_crypto_init ()
@@ -54,3 +57,5 @@ kms_sha256_hmac (void *unused_ctx,
    CCHmac (kCCHmacAlgSHA256, key_input, key_len, input, len, hash_out);
    return true;
 }
+
+#endif /* KMS_MESSAGE_ENABLE_CRYPTO_COMMON_CRYPTO */

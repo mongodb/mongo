@@ -16,6 +16,8 @@
 
 #include "kms_crypto.h"
 
+#ifdef KMS_MESSAGE_ENABLE_CRYPTO_CNG
+
 // tell windows.h not to include a bunch of headers we don't need:
 #define WIN32_LEAN_AND_MEAN
 
@@ -130,3 +132,5 @@ cleanup:
 
    return status == STATUS_SUCCESS ? 1 : 0;
 }
+
+#endif /* KMS_MESSAGE_ENABLE_CRYPTO_CNG */
