@@ -228,10 +228,19 @@ void PrimaryOnlyServiceRegistry::onStepDown() {
     }
 }
 
-void PrimaryOnlyServiceRegistry::reportServiceInfo(BSONObjBuilder* result) {
+void PrimaryOnlyServiceRegistry::reportServiceInfoForServerStatus(BSONObjBuilder* result) noexcept {
     BSONObjBuilder subBuilder(result->subobjStart("primaryOnlyServices"));
     for (auto& service : _servicesByName) {
         subBuilder.appendNumber(service.first, service.second->getNumberOfInstances());
+    }
+}
+
+void PrimaryOnlyServiceRegistry::reportServiceInfoForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode connMode,
+    MongoProcessInterface::CurrentOpSessionsMode sessionMode,
+    std::vector<BSONObj>* ops) noexcept {
+    for (auto& [_, service] : _servicesByName) {
+        service->reportInstanceInfoForCurrentOp(connMode, sessionMode, ops);
     }
 }
 
@@ -241,6 +250,20 @@ PrimaryOnlyService::PrimaryOnlyService(ServiceContext* serviceContext)
 size_t PrimaryOnlyService::getNumberOfInstances() {
     stdx::lock_guard lk(_mutex);
     return _instances.size();
+}
+
+void PrimaryOnlyService::reportInstanceInfoForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode connMode,
+    MongoProcessInterface::CurrentOpSessionsMode sessionMode,
+    std::vector<BSONObj>* ops) noexcept {
+
+    stdx::lock_guard lk(_mutex);
+    for (auto& [_, instance] : _instances) {
+        auto op = instance->reportForCurrentOp(connMode, sessionMode);
+        if (op.has_value()) {
+            ops->push_back(std::move(op.get()));
+        }
+    }
 }
 
 bool PrimaryOnlyService::isRunning() const {

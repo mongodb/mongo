@@ -268,6 +268,12 @@ void MongosProcessInterface::_reportCurrentOpsForIdleSessions(OperationContext* 
 void MongosProcessInterface::_reportCurrentOpsForTransactionCoordinators(
     OperationContext* opCtx, bool includeIdle, std::vector<BSONObj>* ops) const {};
 
+void MongosProcessInterface::_reportCurrentOpsForPrimaryOnlyServices(
+    OperationContext* opCtx,
+    CurrentOpConnectionsMode connMode,
+    CurrentOpSessionsMode sessionMode,
+    std::vector<BSONObj>* ops) const {};
+
 std::vector<GenericCursor> MongosProcessInterface::getIdleCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
     invariant(hasGlobalServiceContext());

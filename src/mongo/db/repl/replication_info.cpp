@@ -89,7 +89,7 @@ constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
 
 void appendPrimaryOnlyServiceInfo(ServiceContext* serviceContext, BSONObjBuilder* result) {
     auto registry = PrimaryOnlyServiceRegistry::get(serviceContext);
-    registry->reportServiceInfo(result);
+    registry->reportServiceInfoForServerStatus(result);
 }
 
 /**

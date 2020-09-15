@@ -159,6 +159,20 @@ public:
             _completionPromise.setError(status);
         };
 
+        // Whether or not an op is reported depends on the "reportOp" field of the state doc the
+        // Instance was created with.
+        boost::optional<BSONObj> reportForCurrentOp(
+            MongoProcessInterface::CurrentOpConnectionsMode connMode,
+            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override {
+            stdx::lock_guard lk(_mutex);
+
+            if (_stateDoc.getBoolField("reportOp")) {
+                return BSON("instanceID" << _id << "state" << _state);
+            } else {
+                return boost::none;
+            }
+        }
+
         int getID() {
             stdx::lock_guard lk(_mutex);
             return _id["_id"].Int();
@@ -432,7 +446,7 @@ TEST_F(PrimaryOnlyServiceTest, DoubleCreateInstance) {
 TEST_F(PrimaryOnlyServiceTest, ReportServiceInfo) {
     {
         BSONObjBuilder resultBuilder;
-        _registry->reportServiceInfo(&resultBuilder);
+        _registry->reportServiceInfoForServerStatus(&resultBuilder);
 
         ASSERT_BSONOBJ_EQ(BSON("primaryOnlyServices" << BSON("TestService" << 0)),
                           resultBuilder.obj());
@@ -444,7 +458,7 @@ TEST_F(PrimaryOnlyServiceTest, ReportServiceInfo) {
 
     {
         BSONObjBuilder resultBuilder;
-        _registry->reportServiceInfo(&resultBuilder);
+        _registry->reportServiceInfoForServerStatus(&resultBuilder);
 
         ASSERT_BSONOBJ_EQ(BSON("primaryOnlyServices" << BSON("TestService" << 1)),
                           resultBuilder.obj());
@@ -454,7 +468,7 @@ TEST_F(PrimaryOnlyServiceTest, ReportServiceInfo) {
 
     {
         BSONObjBuilder resultBuilder;
-        _registry->reportServiceInfo(&resultBuilder);
+        _registry->reportServiceInfoForServerStatus(&resultBuilder);
 
         ASSERT_BSONOBJ_EQ(BSON("primaryOnlyServices" << BSON("TestService" << 2)),
                           resultBuilder.obj());
@@ -690,4 +704,20 @@ TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByStepdown) {
     ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange,
               instance->getCompletionFuture().getNoThrow());
     ASSERT_EQ(ErrorCodes::NotWritablePrimary, instance->getDocumentWriteException().getNoThrow());
+}
+
+TEST_F(PrimaryOnlyServiceTest, ReportCurOpInfo) {
+    auto unreportedInstance =
+        TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+    auto reportedInstance = TestService::Instance::getOrCreate(
+        _service, BSON("_id" << 1 << "state" << 0 << "reportOp" << true));
+
+    std::vector<BSONObj> ops;
+    _service->reportInstanceInfoForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode::kIncludeIdle,
+        MongoProcessInterface::CurrentOpSessionsMode::kIncludeIdle,
+        &ops);
+    ASSERT_EQ(1, ops.size());
+    ASSERT_EQ(1, ops[0]["instanceID"]["_id"].Int());
+    ASSERT_TRUE(ops[0].hasField("state"));
 }

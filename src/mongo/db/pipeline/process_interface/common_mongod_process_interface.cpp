@@ -54,6 +54,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -490,6 +491,17 @@ BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
 void CommonMongodProcessInterface::_reportCurrentOpsForTransactionCoordinators(
     OperationContext* opCtx, bool includeIdle, std::vector<BSONObj>* ops) const {
     reportCurrentOpsForTransactionCoordinators(opCtx, includeIdle, ops);
+}
+
+void CommonMongodProcessInterface::_reportCurrentOpsForPrimaryOnlyServices(
+    OperationContext* opCtx,
+    CurrentOpConnectionsMode connMode,
+    CurrentOpSessionsMode sessionMode,
+    std::vector<BSONObj>* ops) const {
+    auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+    invariant(registry);
+
+    registry->reportServiceInfoForCurrentOp(connMode, sessionMode, ops);
 }
 
 void CommonMongodProcessInterface::_reportCurrentOpsForIdleSessions(

@@ -72,6 +72,15 @@ public:
 
     void interrupt(Status status) override{};
 
+    /**
+     * TODO(SERVER-51021) Report ReshardingRecipientService Instances in currentOp().
+     */
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept final {
+        return boost::none;
+    }
+
     void onReshardingFieldsChanges(
         boost::optional<TypeCollectionReshardingFields> reshardingFields);
 

@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -115,6 +116,16 @@ public:
          * error into any unresolved promises that the Instance manages.
          */
         virtual void interrupt(Status status) = 0;
+
+        /**
+         * Returns a BSONObj containing information about the state of this running Instance, to be
+         * reported in currentOp() output, or boost::none if this Instance should not show up in
+         * currentOp, based on the given 'connMode' and 'sessionMode' that currentOp() is running
+         * with.
+         */
+        virtual boost::optional<BSONObj> reportForCurrentOp(
+            MongoProcessInterface::CurrentOpConnectionsMode connMode,
+            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept = 0;
 
     private:
         bool _running = false;
@@ -229,6 +240,16 @@ public:
      * Returns the number of currently running Instances of this service.
      */
     size_t getNumberOfInstances();
+
+    /**
+     * Adds information about the Instances belonging to this service to 'ops', to show up in
+     * currentOp(). 'connMode' and 'sessionMode' are arguments provided to currentOp, and can be
+     * used to make decisions about whether or not various Instances should actually show up in the
+     * currentOp() output for this invocation of currentOp().
+     */
+    void reportInstanceInfoForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode connMode,
+                                        MongoProcessInterface::CurrentOpSessionsMode sessionMode,
+                                        std::vector<BSONObj>* ops) noexcept;
 
 protected:
     /**
@@ -347,7 +368,18 @@ public:
      * Adds a 'primaryOnlyServices' sub-obj to the 'result' BSONObjBuilder containing a count of the
      * number of active instances for each registered service.
      */
-    void reportServiceInfo(BSONObjBuilder* result);
+    void reportServiceInfoForServerStatus(BSONObjBuilder* result) noexcept;
+
+
+    /**
+     * Adds information about the Instances running in all registered services to 'ops', to show up
+     * in currentOp(). 'connMode' and 'sessionMode' are arguments provided to currentOp, and can be
+     * used to make decisions about whether or not various Instances should actually show up in the
+     * currentOp() output for this invocation of currentOp().
+     */
+    void reportServiceInfoForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode connMode,
+                                       MongoProcessInterface::CurrentOpSessionsMode sessionMode,
+                                       std::vector<BSONObj>* ops) noexcept;
 
     void onStartup(OperationContext*) final;
     void onShutdown() final;

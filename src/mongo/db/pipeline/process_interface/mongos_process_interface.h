@@ -249,6 +249,11 @@ protected:
     void _reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
                                                      bool includeIdle,
                                                      std::vector<BSONObj>* ops) const final;
+
+    void _reportCurrentOpsForPrimaryOnlyServices(OperationContext* opCtx,
+                                                 CurrentOpConnectionsMode connMode,
+                                                 CurrentOpSessionsMode sessionMode,
+                                                 std::vector<BSONObj>* ops) const final;
 };
 
 }  // namespace mongo

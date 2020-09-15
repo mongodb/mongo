@@ -85,6 +85,15 @@ public:
             return _completionPromise.getFuture();
         }
 
+        /**
+         * TODO(SERVER-50974) Report TenantMigrationRecipientService Instances in currentOp().
+         */
+        boost::optional<BSONObj> reportForCurrentOp(
+            MongoProcessInterface::CurrentOpConnectionsMode connMode,
+            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept final {
+            return boost::none;
+        }
+
         /*
          *  Returns the instance id.
          */

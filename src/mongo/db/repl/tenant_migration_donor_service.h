@@ -82,6 +82,15 @@ public:
         void interrupt(Status status) override;
 
         /**
+         * TODO(SERVER-50975) Report TenantMigrationDonorService Instances in currentOp().
+         */
+        boost::optional<BSONObj> reportForCurrentOp(
+            MongoProcessInterface::CurrentOpConnectionsMode connMode,
+            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override {
+            return boost::none;
+        }
+
+        /**
          * To be called on the instance returned by PrimaryOnlyService::getOrCreate. Returns an
          * error if the options this Instance was created with are incompatible with a request for
          * an instance with the options given in 'options'.
