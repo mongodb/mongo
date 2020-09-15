@@ -459,7 +459,7 @@ done:
  *     Configure a transactions operation timeout duration.
  */
 static int
-__txn_config_operation_timeout(WT_SESSION_IMPL *session, const char *cfg[])
+__txn_config_operation_timeout(WT_SESSION_IMPL *session, const char *cfg[], bool start_timer)
 {
     WT_CONFIG_ITEM cval;
     WT_TXN *txn;
@@ -476,8 +476,15 @@ __txn_config_operation_timeout(WT_SESSION_IMPL *session, const char *cfg[])
      * The default configuration value is 0, we can't tell if they're setting it back to 0 or, if
      * the default was automatically passed in.
      */
-    if (cval.val != 0)
+    if (cval.val != 0) {
         txn->operation_timeout_us = (uint64_t)(cval.val * WT_THOUSAND);
+        /*
+         * The op timer will generally be started on entry to the API call however when we configure
+         * it internally we need to start it separately.
+         */
+        if (start_timer)
+            __wt_op_timer_start(session);
+    }
     return (0);
 }
 
@@ -504,7 +511,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
           WT_STRING_MATCH("read-committed", cval.str, cval.len) ? WT_ISO_READ_COMMITTED :
                                                                   WT_ISO_READ_UNCOMMITTED;
 
-    WT_RET(__txn_config_operation_timeout(session, cfg));
+    WT_RET(__txn_config_operation_timeout(session, cfg, false));
 
     /*
      * The default sync setting is inherited from the connection, but can be overridden by an
@@ -1280,7 +1287,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || txn->mod_count == 0);
 
     /* Configure the timeout for this commit operation. */
-    WT_ERR(__txn_config_operation_timeout(session, cfg));
+    WT_ERR(__txn_config_operation_timeout(session, cfg, true));
 
     /*
      * Clear the prepared round up flag if the transaction is not prepared. There is no rounding up
@@ -1690,7 +1697,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
         WT_TRET(txn->notify->notify(txn->notify, (WT_SESSION *)session, txn->id, 0));
 
     /* Configure the timeout for this rollback operation. */
-    WT_RET(__txn_config_operation_timeout(session, cfg));
+    WT_RET(__txn_config_operation_timeout(session, cfg, true));
 
     /*
      * Resolving prepared updates is expensive. Sort prepared modifications so all updates for each
