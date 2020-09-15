@@ -52,6 +52,7 @@
 #include "mongo/db/repl/rollback_checker.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/executor/scoped_task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -296,7 +297,7 @@ public:
      *
      * For testing only
      */
-    void setClonerExecutor_forTest(executor::TaskExecutor* clonerExec);
+    void setClonerExecutor_forTest(std::shared_ptr<executor::TaskExecutor> clonerExec);
 
     /**
      *
@@ -711,15 +712,17 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("InitialSyncer::_mutex");           // (S)
     const InitialSyncerOptions _opts;                                           // (R)
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
-    executor::TaskExecutor* _exec;                                              // (R)
+    std::shared_ptr<executor::TaskExecutor> _exec;                              // (R)
+    std::unique_ptr<executor::ScopedTaskExecutor> _attemptExec;                 // (X)
     // The executor that the Cloner thread runs on.  In production code this is the same as _exec,
     // but for unit testing, _exec is single-threaded and our NetworkInterfaceMock runs it in
     // lockstep with the unit test code.  If we pause the cloners using failpoints
     // NetworkInterfaceMock is unaware of this and this causes our unit tests to deadlock.
-    executor::TaskExecutor* _clonerExec;      // (R)
-    ThreadPool* _writerPool;                  // (R)
-    StorageInterface* _storage;               // (R)
-    ReplicationProcess* _replicationProcess;  // (S)
+    std::shared_ptr<executor::TaskExecutor> _clonerExec;               // (R)
+    std::unique_ptr<executor::ScopedTaskExecutor> _clonerAttemptExec;  // (X)
+    ThreadPool* _writerPool;                                           // (R)
+    StorageInterface* _storage;                                        // (R)
+    ReplicationProcess* _replicationProcess;                           // (S)
 
     // This is invoked with the final status of the initial sync. If startup() fails, this callback
     // is never invoked. The caller gets the last applied optime when the initial sync completes
@@ -785,6 +788,9 @@ private:
     // Amount of time an outage is allowed to continue before the initial sync attempt is marked
     // as failed.
     Milliseconds _allowedOutageDuration;  // (M)
+
+    // The initial sync attempt has been canceled
+    bool _attemptCanceled = false;  // (X)
 };
 
 }  // namespace repl

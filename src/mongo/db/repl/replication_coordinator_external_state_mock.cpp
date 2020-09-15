@@ -88,6 +88,11 @@ executor::TaskExecutor* ReplicationCoordinatorExternalStateMock::getTaskExecutor
     return nullptr;
 }
 
+std::shared_ptr<executor::TaskExecutor>
+ReplicationCoordinatorExternalStateMock::getSharedTaskExecutor() const {
+    return nullptr;
+}
+
 ThreadPool* ReplicationCoordinatorExternalStateMock::getDbWorkThreadPool() const {
     return nullptr;
 }

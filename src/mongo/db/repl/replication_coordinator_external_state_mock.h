@@ -68,6 +68,7 @@ public:
     virtual void shutdown(OperationContext* opCtx);
     virtual void clearAppliedThroughIfCleanShutdown(OperationContext* opCtx);
     virtual executor::TaskExecutor* getTaskExecutor() const override;
+    virtual std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const override;
     virtual ThreadPool* getDbWorkThreadPool() const override;
     virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
     void onDrainComplete(OperationContext* opCtx) override;

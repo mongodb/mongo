@@ -33,7 +33,7 @@ assert.commandWorked(primaryColl.insert({_id: "a"}, {writeConcern: {w: 2}}));
 const initialSyncNode = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
+        'failpoint.initialSyncHangBeforeSplittingControlFlow': tojson({mode: 'alwaysOn'}),
         'failpoint.forceSyncSourceCandidate':
             tojson({mode: 'alwaysOn', data: {hostAndPort: primary.name}})
     }
@@ -53,12 +53,12 @@ assert.commandWorked(
 jsTestLog("Setting the initial sync source from secondary to primary.");
 assert.commandWorked(initialSyncNode.adminCommand({replSetSyncFrom: secondary.name}));
 
-// Turning off the 'initialSyncHangBeforeCopyingDatabases' failpoint should cause initial sync
+// Turning off the 'initialSyncHangBeforeSplittingControlFlow' failpoint should cause initial sync
 // to restart with the secondary as the sync source.
 let hangBeforeFinishInitialSync =
     configureFailPoint(initialSyncNode, "initialSyncHangBeforeFinish");
 assert.commandWorked(initialSyncNode.adminCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
+    {configureFailPoint: 'initialSyncHangBeforeSplittingControlFlow', mode: 'off'}));
 hangBeforeFinishInitialSync.wait();
 let res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));
 assert.eq(secondary.name, res.syncSourceHost, res);

@@ -48,6 +48,7 @@ public:
         ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
 
     executor::TaskExecutor* getTaskExecutor() const override;
+    std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const;
 
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 

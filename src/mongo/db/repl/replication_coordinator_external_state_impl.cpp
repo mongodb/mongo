@@ -425,6 +425,11 @@ executor::TaskExecutor* ReplicationCoordinatorExternalStateImpl::getTaskExecutor
     return _taskExecutor.get();
 }
 
+std::shared_ptr<executor::TaskExecutor>
+ReplicationCoordinatorExternalStateImpl::getSharedTaskExecutor() const {
+    return _taskExecutor;
+}
+
 ThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() const {
     return _writerPool.get();
 }

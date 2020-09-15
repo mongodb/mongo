@@ -78,6 +78,7 @@ public:
     virtual void clearAppliedThroughIfCleanShutdown(OperationContext* opCtx);
 
     virtual executor::TaskExecutor* getTaskExecutor() const override;
+    std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const override;
     virtual ThreadPool* getDbWorkThreadPool() const override;
     virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
     void onDrainComplete(OperationContext* opCtx) override;
@@ -200,7 +201,7 @@ private:
     long long _nextThreadId = 0;
 
     // Task executor used to run replication tasks.
-    std::unique_ptr<executor::TaskExecutor> _taskExecutor;
+    std::shared_ptr<executor::TaskExecutor> _taskExecutor;
 
     // Used by repl::applyOplogBatch() to apply the sync source's operations in parallel.
     // Also used by database and collection cloners to perform storage operations.

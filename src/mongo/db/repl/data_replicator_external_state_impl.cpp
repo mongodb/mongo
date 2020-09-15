@@ -73,6 +73,11 @@ executor::TaskExecutor* DataReplicatorExternalStateImpl::getTaskExecutor() const
     return _replicationCoordinatorExternalState->getTaskExecutor();
 }
 
+std::shared_ptr<executor::TaskExecutor> DataReplicatorExternalStateImpl::getSharedTaskExecutor()
+    const {
+    return _replicationCoordinatorExternalState->getSharedTaskExecutor();
+}
+
 OpTimeWithTerm DataReplicatorExternalStateImpl::getCurrentTermAndLastCommittedOpTime() {
     return {_replicationCoordinator->getTerm(), _replicationCoordinator->getLastCommittedOpTime()};
 }
