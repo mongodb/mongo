@@ -126,4 +126,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResh
  */
 void createSlimOplogView(OperationContext* opCtx, Database* db);
 
+/**
+ * Creates pipeline for filtering collection data matching the recipient shard.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> createAggForCollectionCloning(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ShardKeyPattern& newShardKeyPattern,
+    const NamespaceString& sourceNss,
+    const ShardId& recipientShard);
+
 }  // namespace mongo

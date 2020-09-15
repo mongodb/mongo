@@ -34,11 +34,13 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -282,6 +284,88 @@ void createSlimOplogView(OperationContext* opCtx, Database* db) {
                                options));
             wuow.commit();
         });
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> createAggForCollectionCloning(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ShardKeyPattern& newShardKeyPattern,
+    const NamespaceString& tempNss,
+    const ShardId& recipientShard) {
+    std::list<boost::intrusive_ptr<DocumentSource>> stages;
+
+    BSONObj replaceWithBSON = BSON("$replaceWith" << BSON("original"
+                                                          << "$$ROOT"));
+    stages.emplace_back(
+        DocumentSourceReplaceRoot::createFromBson(replaceWithBSON.firstElement(), expCtx));
+
+    invariant(tempNss.isTemporaryReshardingCollection());
+    std::string cacheChunksColl = "cache.chunks." + tempNss.toString();
+    BSONObjBuilder lookupBuilder;
+    lookupBuilder.append("from",
+                         BSON("db"
+                              << "config"
+                              << "coll" << cacheChunksColl));
+    {
+        BSONObjBuilder letBuilder(lookupBuilder.subobjStart("let"));
+        {
+            BSONArrayBuilder skVarBuilder(letBuilder.subarrayStart("sk"));
+            for (auto&& field : newShardKeyPattern.toBSON()) {
+                skVarBuilder.append("$original." + field.fieldNameStringData());
+            }
+        }
+    }
+    BSONArrayBuilder lookupPipelineBuilder(lookupBuilder.subarrayStart("pipeline"));
+    lookupPipelineBuilder.append(
+        BSON("$match" << BSON(
+                 "$expr" << BSON("$eq" << BSON_ARRAY(recipientShard.toString() << "$shard")))));
+    lookupPipelineBuilder.append(BSON(
+        "$match" << BSON(
+            "$expr" << BSON(
+                "$let" << BSON(
+                    "vars" << BSON("min" << BSON("$map" << BSON("input" << BSON("$objectToArray"
+                                                                                << "$_id")
+                                                                        << "in"
+                                                                        << "$$this.v"))
+                                         << "max"
+                                         << BSON("$map" << BSON("input" << BSON("$objectToArray"
+                                                                                << "$max")
+                                                                        << "in"
+                                                                        << "$$this.v")))
+                           << "in"
+                           << BSON(
+                                  "$and" << BSON_ARRAY(
+                                      BSON("$gte" << BSON_ARRAY("$$sk"
+                                                                << "$$min"))
+                                      << BSON("$cond" << BSON(
+                                                  "if"
+                                                  << BSON("$allElementsTrue" << BSON_ARRAY(BSON(
+                                                              "$map"
+                                                              << BSON("input"
+                                                                      << "$$max"
+                                                                      << "in"
+                                                                      << BSON("$eq" << BSON_ARRAY(
+                                                                                  BSON("$type"
+                                                                                       << "$$this")
+                                                                                  << "$maxKey"))))))
+                                                  << "then"
+                                                  << BSON("$lte" << BSON_ARRAY("$$sk"
+                                                                               << "$$max"))
+                                                  << "else"
+                                                  << BSON("$lt" << BSON_ARRAY("$$sk"
+                                                                              << "$$max")))))))))));
+
+    lookupPipelineBuilder.done();
+    lookupBuilder.append("as", "intersectingChunk");
+    BSONObj lookupBSON(BSON("" << lookupBuilder.obj()));
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(lookupBSON.firstElement(), expCtx));
+    stages.emplace_back(DocumentSourceMatch::create(
+        BSON("intersectingChunk" << BSON("$ne" << BSONArray())), expCtx));
+    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(BSON("$replaceWith"
+                                                                       << "$original")
+                                                                      .firstElement(),
+                                                                  expCtx));
+
+    return Pipeline::create(std::move(stages), expCtx);
 }
 
 }  // namespace mongo
