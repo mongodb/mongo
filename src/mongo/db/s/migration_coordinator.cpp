@@ -235,32 +235,21 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
         23899, 2, "Making abort decision durable", "migrationId"_attr = _migrationInfo.getId());
     migrationutil::persistAbortDecision(opCtx, _migrationInfo.getId());
 
-    try {
-        LOGV2_DEBUG(23900,
-                    2,
-                    "Bumping transaction number with lsid {lsid} and current txnNumber "
-                    "{currentTxnNumber} on "
-                    "recipient shard {recipientShardId} for abort of collection {nss}",
-                    "Bumping transaction number on recipient shard for abort",
-                    "namespace"_attr = _migrationInfo.getNss(),
-                    "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
-                    "lsid"_attr = _migrationInfo.getLsid(),
-                    "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
-                    "migrationId"_attr = _migrationInfo.getId());
-        migrationutil::advanceTransactionOnRecipient(opCtx,
-                                                     _migrationInfo.getRecipientShardId(),
-                                                     _migrationInfo.getLsid(),
-                                                     _migrationInfo.getTxnNumber());
-    } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& exShardNotFound) {
-        LOGV2_DEBUG(4620231,
-                    1,
-                    "Failed to advance transaction number on recipient shard for abort",
-                    "namespace"_attr = _migrationInfo.getNss(),
-                    "migrationId"_attr = _migrationInfo.getId(),
-                    "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
-                    "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
-                    "error"_attr = exShardNotFound);
-    }
+    LOGV2_DEBUG(
+        23900,
+        2,
+        "Bumping transaction number with lsid {lsid} and current txnNumber {currentTxnNumber} on "
+        "recipient shard {recipientShardId} for abort of collection {nss}",
+        "Bumping transaction number on recipient shard for abort",
+        "namespace"_attr = _migrationInfo.getNss(),
+        "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
+        "lsid"_attr = _migrationInfo.getLsid(),
+        "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
+        "migrationId"_attr = _migrationInfo.getId());
+    migrationutil::advanceTransactionOnRecipient(opCtx,
+                                                 _migrationInfo.getRecipientShardId(),
+                                                 _migrationInfo.getLsid(),
+                                                 _migrationInfo.getTxnNumber());
 
     hangBeforeSendingAbortDecision.pauseWhileSet();
 

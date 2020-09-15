@@ -218,7 +218,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                networkPtr);
 
     // The shard registry must be started once the grid is initialized
-    grid->shardRegistry()->startupPeriodicReloader(opCtx);
+    grid->shardRegistry()->startup(opCtx);
 
     // The catalog client must be started after the shard registry has been started up
     grid->catalogClient()->startup();

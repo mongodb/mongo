@@ -679,20 +679,11 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
         opCtx, "ready remote range deletion", [&](OperationContext* newOpCtx) {
             hangInReadyRangeDeletionOnRecipientInterruptible.pauseWhileSet(newOpCtx);
 
-            try {
-                sendToRecipient(
-                    newOpCtx,
-                    recipientId,
-                    updateOp,
-                    BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
-            } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& exShardNotFound) {
-                LOGV2_DEBUG(4620232,
-                            1,
-                            "Failed to mark range deletion task on recipient shard as ready",
-                            "migrationId"_attr = migrationId,
-                            "error"_attr = exShardNotFound);
-                return;
-            }
+            sendToRecipient(
+                newOpCtx,
+                recipientId,
+                updateOp,
+                BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
 
             if (hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible.shouldFail()) {
                 hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible.pauseWhileSet(
