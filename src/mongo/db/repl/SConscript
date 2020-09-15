@@ -1182,6 +1182,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/executor/scoped_task_executor',
         'repl_server_parameters',
     ]
 )

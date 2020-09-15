@@ -78,6 +78,7 @@ public:
      * Returns task executor for scheduling tasks to be run asynchronously.
      */
     virtual executor::TaskExecutor* getTaskExecutor() const = 0;
+    virtual std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const = 0;
 
     /**
      * Returns the current term and last committed optime.

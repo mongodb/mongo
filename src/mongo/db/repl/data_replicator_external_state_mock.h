@@ -45,6 +45,7 @@ public:
     DataReplicatorExternalStateMock();
 
     executor::TaskExecutor* getTaskExecutor() const override;
+    std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const override;
 
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 
@@ -69,8 +70,8 @@ public:
 
     StatusWith<ReplSetConfig> getCurrentConfig() const override;
 
-    // Task executor. Not owned by us.
-    executor::TaskExecutor* taskExecutor = nullptr;
+    // Task executor.
+    std::shared_ptr<executor::TaskExecutor> taskExecutor = nullptr;
 
     // Returned by getCurrentTermAndLastCommittedOpTime.
     long long currentTerm = OpTime::kUninitializedTerm;

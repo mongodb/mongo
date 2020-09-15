@@ -397,7 +397,7 @@ protected:
         };
 
         auto dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
-        dataReplicatorExternalState->taskExecutor = _executorProxy.get();
+        dataReplicatorExternalState->taskExecutor = _executorProxy;
         dataReplicatorExternalState->currentTerm = 1LL;
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
         {
@@ -439,7 +439,7 @@ protected:
                 return std::unique_ptr<DBClientConnection>(
                     new MockDBClientConnection(_mockServer.get()));
             });
-            _initialSyncer->setClonerExecutor_forTest(_clonerExecutor.get());
+            _initialSyncer->setClonerExecutor_forTest(_clonerExecutor);
             _initialSyncer->setCreateOplogFetcherFn_forTest(
                 [](executor::TaskExecutor* executor,
                    OpTime lastFetched,
@@ -514,8 +514,8 @@ protected:
     void doSuccessfulInitialSyncWithOneBatch();
     OplogEntry doInitialSyncWithOneBatch();
 
-    std::unique_ptr<TaskExecutorMock> _executorProxy;
-    std::unique_ptr<executor::ThreadPoolTaskExecutor> _clonerExecutor;
+    std::shared_ptr<TaskExecutorMock> _executorProxy;
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _clonerExecutor;
 
     InitialSyncerOptions _options;
     InitialSyncerOptions::SetMyLastOptimeFn _setMyLastOptime;
@@ -716,7 +716,7 @@ TEST_F(InitialSyncerTest, InvalidConstruction) {
     // Null callback function.
     {
         auto dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
-        dataReplicatorExternalState->taskExecutor = &getExecutor();
+        dataReplicatorExternalState->taskExecutor = _executorProxy;
         ASSERT_THROWS_CODE_AND_WHAT(InitialSyncer(options,
                                                   std::move(dataReplicatorExternalState),
                                                   _dbWorkThreadPool.get(),
@@ -1058,7 +1058,7 @@ TEST_F(InitialSyncerTest, InitialSyncerResetsOnCompletionCallbackFunctionPointer
     decltype(_lastApplied) lastApplied = getDetectableErrorStatus();
 
     auto dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
-    dataReplicatorExternalState->taskExecutor = &getExecutor();
+    dataReplicatorExternalState->taskExecutor = _executorProxy;
     auto initialSyncer = std::make_unique<InitialSyncer>(
         _options,
         std::move(dataReplicatorExternalState),

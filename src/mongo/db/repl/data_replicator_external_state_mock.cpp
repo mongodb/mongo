@@ -75,6 +75,10 @@ DataReplicatorExternalStateMock::DataReplicatorExternalStateMock()
                            OplogApplier::Observer*) { return ops.back().getOpTime(); }) {}
 
 executor::TaskExecutor* DataReplicatorExternalStateMock::getTaskExecutor() const {
+    return taskExecutor.get();
+}
+std::shared_ptr<executor::TaskExecutor> DataReplicatorExternalStateMock::getSharedTaskExecutor()
+    const {
     return taskExecutor;
 }
 
