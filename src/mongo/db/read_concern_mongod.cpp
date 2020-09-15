@@ -34,7 +34,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_concern.h"
@@ -45,6 +44,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/concurrency/notification.h"
@@ -334,14 +334,14 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                                       << " readConcern without replication enabled"};
             }
 
-            auto currentTime = LogicalClock::get(opCtx)->getClusterTime();
-            if (currentTime < *targetClusterTime) {
+            const auto currentTime = VectorClock::get(opCtx)->getTime();
+            if (currentTime.clusterTime() < *targetClusterTime) {
                 return {ErrorCodes::InvalidOptions,
                         str::stream() << "readConcern " << readConcernName
                                       << " value must not be greater than the current clusterTime. "
                                          "Requested clusterTime: "
-                                      << targetClusterTime->toString()
-                                      << "; current clusterTime: " << currentTime.toString()};
+                                      << targetClusterTime->toString() << "; current clusterTime: "
+                                      << currentTime.clusterTime().toString()};
             }
 
             auto status = makeNoopWriteIfNeeded(opCtx, *targetClusterTime);

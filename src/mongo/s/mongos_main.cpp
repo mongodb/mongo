@@ -59,7 +59,6 @@
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
@@ -723,8 +722,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     if (getHostName().empty()) {
         quickExit(EXIT_BADOPTIONS);
     }
-
-    LogicalClock::set(serviceContext, std::make_unique<LogicalClock>(serviceContext));
 
     ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupMongoS);
 

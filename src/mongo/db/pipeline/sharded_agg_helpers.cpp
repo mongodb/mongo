@@ -33,7 +33,6 @@
 #include "sharded_agg_helpers.h"
 
 #include "mongo/db/curop.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -48,6 +47,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -845,7 +845,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
     // if there was only one shard in the cluster when the command began execution. If a shard was
     // added since the earlier targeting logic ran, then refreshing here may cause us to illegally
     // target an unsplit pipeline to more than one shard.
-    auto shardRegistryReloadTime = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    auto shardRegistryReloadTime = currentTime.clusterTime().asTimestamp();
     if (hasChangeStream) {
         auto* shardRegistry = Grid::get(opCtx)->shardRegistry();
         if (!shardRegistry->reload(opCtx)) {

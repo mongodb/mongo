@@ -36,7 +36,6 @@
 #include <functional>
 #include <memory>
 
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -128,9 +127,6 @@ void ReplCoordTest::init() {
 
     // PRNG seed for tests.
     const int64_t seed = 0;
-
-    auto logicalClock = std::make_unique<LogicalClock>(service);
-    LogicalClock::set(service, std::move(logicalClock));
 
     TopologyCoordinator::Options settings;
     auto topo = std::make_unique<TopologyCoordinator>(settings);

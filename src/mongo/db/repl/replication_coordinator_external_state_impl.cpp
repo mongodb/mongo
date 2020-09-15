@@ -56,7 +56,6 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer.h"
@@ -93,6 +92,7 @@
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/system_index.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -710,7 +710,8 @@ void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(ServiceContext*
 }
 
 Timestamp ReplicationCoordinatorExternalStateImpl::getGlobalTimestamp(ServiceContext* service) {
-    return LogicalClock::get(service)->getClusterTime().asTimestamp();
+    const auto currentTime = VectorClock::get(service)->getTime();
+    return currentTime.clusterTime().asTimestamp();
 }
 
 bool ReplicationCoordinatorExternalStateImpl::oplogExists(OperationContext* opCtx) {

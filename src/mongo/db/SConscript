@@ -1655,7 +1655,6 @@ env.Library(
         'key_generator.cpp',
         'keys_collection_cache.cpp',
         'keys_collection_manager.cpp',
-        'logical_clock.cpp',
         'logical_time_validator.cpp',
         'vector_clock.cpp',
         env.Idlc('keys_collection_manager.idl')[0],
@@ -1741,9 +1740,9 @@ env.Library(
 )
 
 env.Library(
-    target= 'logical_clock_test_fixture',
+    target= 'vector_clock_test_fixture',
     source= [
-        'logical_clock_test_fixture.cpp',
+        'vector_clock_test_fixture.cpp',
     ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/db/auth/authmocks',
@@ -2226,7 +2225,6 @@ envWithAsio.CppUnitTest(
         'index_builds_coordinator_mongod_test.cpp',
         'keypattern_test.cpp',
         'keys_collection_document_test.cpp',
-        'logical_clock_test.cpp',
         'logical_session_cache_test.cpp',
         'logical_session_id_test.cpp',
         'logical_time_test.cpp',
@@ -2253,6 +2251,7 @@ envWithAsio.CppUnitTest(
         'transaction_participant_test.cpp',
         'update_index_data_test.cpp',
         'vector_clock_mongod_test.cpp',
+        'vector_clock_test.cpp',
         'write_concern_options_test.cpp',
         'error_labels_test.cpp',
         env.Idlc('commands_test_example.idl')[0],
@@ -2290,7 +2289,6 @@ envWithAsio.CppUnitTest(
         'index_builds_coordinator_mongod',
         'keys_collection_client_direct',
         'keys_collection_document',
-        'logical_clock_test_fixture',
         'logical_session_cache',
         'logical_session_cache_impl',
         'logical_session_id',
@@ -2331,6 +2329,7 @@ envWithAsio.CppUnitTest(
         'transaction',
         'update_index_data',
         'vector_clock',
+        'vector_clock_test_fixture',
         'write_concern_options',
         'write_ops',
     ],

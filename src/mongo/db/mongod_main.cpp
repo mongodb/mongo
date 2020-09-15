@@ -95,7 +95,6 @@
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/log_process_details.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_cache_factory_mongod.h"
 #include "mongo/db/logical_time_metadata_hook.h"
@@ -968,9 +967,6 @@ void setUpReplication(ServiceContext* serviceContext) {
     repl::TopologyCoordinator::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
     topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
-
-    auto logicalClock = std::make_unique<LogicalClock>(serviceContext);
-    LogicalClock::set(serviceContext, std::move(logicalClock));
 
     auto replCoord = std::make_unique<repl::ReplicationCoordinatorImpl>(
         serviceContext,

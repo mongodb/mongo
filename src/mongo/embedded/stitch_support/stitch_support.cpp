@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/parsed_update_array_filters.h"
@@ -125,8 +124,6 @@ ServiceContext* initialize() {
     uassertStatusOKWithContext(status, "Global initialization failed");
     setGlobalServiceContext(ServiceContext::make());
     auto serviceContext = getGlobalServiceContext();
-    auto logicalClock = std::make_unique<LogicalClock>(serviceContext);
-    LogicalClock::set(serviceContext, std::move(logicalClock));
 
     return serviceContext;
 }

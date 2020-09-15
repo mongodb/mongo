@@ -52,7 +52,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/rebuild_indexes.h"
@@ -61,6 +60,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/storage_util.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -170,7 +170,7 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
         // Set the minimum snapshot for all Collections in this db. This ensures that readers
         // using majority readConcern level can only use the collections after their repaired
         // versions are in the committed view.
-        auto clusterTime = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
+        auto clusterTime = VectorClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
 
         for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
             auto collection =

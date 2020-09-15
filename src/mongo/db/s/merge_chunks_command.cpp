@@ -37,11 +37,11 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
@@ -196,11 +196,12 @@ void mergeChunks(OperationContext* opCtx,
     //
     // Run _configsvrCommitChunkMerge.
     //
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
     MergeChunkRequest request{nss,
                               shardingState->shardId().toString(),
                               epoch,
                               chunkBoundaries,
-                              LogicalClock::get(opCtx)->getClusterTime().asTimestamp()};
+                              currentTime.clusterTime().asTimestamp()};
 
     auto configCmdObj =
         request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());

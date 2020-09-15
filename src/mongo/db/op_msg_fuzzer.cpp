@@ -33,7 +33,6 @@
 #include "mongo/db/auth/authz_manager_external_state_local.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/client.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -98,8 +97,6 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     }
     mongo::ServiceContext::UniqueOperationContext opCtx =
         serviceContext->makeOperationContext(client.get());
-    auto logicalClock = std::make_unique<mongo::LogicalClock>(serviceContext);
-    mongo::LogicalClock::set(serviceContext, std::move(logicalClock));
     mongo::VectorClockMutable::get(serviceContext)->tickClusterTimeTo(kInMemoryLogicalTime);
 
     int new_size = Size + sizeof(int);

@@ -37,10 +37,10 @@
 #include "mongo/db/key_generator.h"
 #include "mongo/db/keys_collection_cache.h"
 #include "mongo/db/keys_collection_client.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/fail_point.h"
@@ -252,12 +252,12 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
             if (latestKeyStatusWith.getStatus().isOK()) {
                 errorCount = 0;
                 const auto& latestKey = latestKeyStatusWith.getValue();
-                auto currentTime = LogicalClock::get(service)->getClusterTime();
+                const auto currentTime = VectorClock::get(service)->getTime();
 
                 _hasSeenKeys.store(true);
 
                 nextWakeup = keys_collection_manager_util::howMuchSleepNeedFor(
-                    currentTime, latestKey.getExpiresAt(), refreshInterval);
+                    currentTime.clusterTime(), latestKey.getExpiresAt(), refreshInterval);
             } else {
                 errorCount += 1;
                 nextWakeup = Milliseconds(kRefreshIntervalIfErrored.count() * errorCount);

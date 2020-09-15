@@ -381,7 +381,7 @@ TEST(KeysCollectionManagerUtilTest, HowMuchSleepNeededForCalculationDoesNotOverf
     auto defaultKeysIntervalSeconds = Seconds(KeysRotationIntervalSec);
 
     // Mock inputs that would have caused an overflow without the changes from SERVER-48709.
-    // "currentTime" is the current logical time in the LogicalClock, which will typically be close
+    // "currentTime" is the current clusterTime in the VectorClock, which will typically be close
     // to a timestamp constructed from the number of seconds since the unix epoch. "latestExpiredAt"
     // is the highest expiration logical time of any key, which will at most be currentTime +
     // (default key rotation interval * 2) because two valid keys are kept at a time. "interval" is

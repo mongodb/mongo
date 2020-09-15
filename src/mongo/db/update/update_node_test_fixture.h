@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/update/update_node.h"
@@ -69,11 +68,6 @@ protected:
 
     void setUp() override {
         resetApplyParams();
-
-        // Set up the logical clock needed by CurrentDateNode and ObjectReplaceExecutor.
-        auto service = mongo::getGlobalServiceContext();
-        auto logicalClock = std::make_unique<mongo::LogicalClock>(service);
-        mongo::LogicalClock::set(service, std::move(logicalClock));
     }
 
     virtual void resetApplyParams() {

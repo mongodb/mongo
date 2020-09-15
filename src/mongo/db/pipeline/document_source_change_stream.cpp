@@ -34,7 +34,6 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
@@ -52,6 +51,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/vector_clock.h"
 
 namespace mongo {
 
@@ -413,7 +413,10 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
     if (!startFrom) {
         const auto currentTime = !expCtx->inMongos
             ? LogicalTime{replCoord->getMyLastAppliedOpTime().getTimestamp()}
-            : LogicalClock::get(expCtx->opCtx)->getClusterTime();
+            : [&] {
+                  const auto currentTime = VectorClock::get(expCtx->opCtx)->getTime();
+                  return currentTime.clusterTime();
+              }();
         startFrom = currentTime.addTicks(1).asTimestamp();
     }
 

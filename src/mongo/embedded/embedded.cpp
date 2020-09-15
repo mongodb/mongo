@@ -49,7 +49,6 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_access_method_factory_impl.h"
 #include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
@@ -115,9 +114,6 @@ void setUpCatalog(ServiceContext* serviceContext) {
 ServiceContext::ConstructorActionRegisterer replicationManagerInitializer(
     "CreateReplicationManager", {"SSLManager", "default"}, [](ServiceContext* serviceContext) {
         repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceImpl>());
-
-        auto logicalClock = std::make_unique<LogicalClock>(serviceContext);
-        LogicalClock::set(serviceContext, std::move(logicalClock));
 
         auto replCoord = std::make_unique<ReplicationCoordinatorEmbedded>(serviceContext);
         repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));

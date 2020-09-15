@@ -36,7 +36,6 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/vector_clock.h"
@@ -123,9 +122,7 @@ protected:
         repl::ReadConcernArgs::get(operationContext()) =
             repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
-        // Set up a logical clock with an initial time.
-        auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
-        LogicalClock::set(getServiceContext(), std::move(logicalClock));
+        // Set the initial clusterTime.
         VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
 
         // Set up a tick source for transaction metrics.

@@ -30,9 +30,9 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/platform/basic.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/str.h"
@@ -224,10 +224,10 @@ RuntimeConstants Variables::generateRuntimeConstants(OperationContext* opCtx) {
     // logical clock is available, set the clusterTime in the runtime constants. Otherwise, the
     // clusterTime is set to the null Timestamp.
     if (opCtx->getClient()) {
-        if (auto logicalClock = LogicalClock::get(opCtx); logicalClock) {
-            auto clusterTime = logicalClock->getClusterTime();
-            if (clusterTime != LogicalTime::kUninitialized) {
-                return {Date_t::now(), clusterTime.asTimestamp()};
+        if (const auto vectorClock = VectorClock::get(opCtx)) {
+            const auto now = vectorClock->getTime();
+            if (now.clusterTime() != LogicalTime::kUninitialized) {
+                return {Date_t::now(), now.clusterTime().asTimestamp()};
             }
         }
     }

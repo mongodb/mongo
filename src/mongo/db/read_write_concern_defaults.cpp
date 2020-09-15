@@ -33,7 +33,7 @@
 
 #include "mongo/db/read_write_concern_defaults.h"
 
-#include "mongo/db/logical_clock.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -119,7 +119,8 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewConcerns(
     }
 
     auto* const serviceContext = opCtx->getServiceContext();
-    rwc.setUpdateOpTime(LogicalClock::get(serviceContext)->getClusterTime().asTimestamp());
+    const auto currentTime = VectorClock::get(serviceContext)->getTime();
+    rwc.setUpdateOpTime(currentTime.clusterTime().asTimestamp());
     rwc.setUpdateWallClockTime(serviceContext->getFastClockSource()->now());
 
     auto current = _getDefault(opCtx);

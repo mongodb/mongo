@@ -34,8 +34,8 @@
 #include "mongo/db/s/config/initial_split_policy.h"
 
 #include "mongo/client/read_preference.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
@@ -273,11 +273,12 @@ InitialSplitPolicy::ShardCollectionConfig SingleChunkOnPrimarySplitPolicy::creat
     ShardCollectionConfig initialChunks;
     ChunkVersion version(1, 0, OID::gen());
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
     appendChunk(params.nss,
                 keyPattern.globalMin(),
                 keyPattern.globalMax(),
                 &version,
-                LogicalClock::get(opCtx)->getClusterTime().asTimestamp(),
+                currentTime.clusterTime().asTimestamp(),
                 params.primaryShardId,
                 &initialChunks.chunks);
     return initialChunks;
@@ -301,14 +302,14 @@ InitialSplitPolicy::ShardCollectionConfig UnoptimizedSplitPolicy::createFirstChu
                                                      shardKeyPattern.getKeyPattern().globalMax()),
                                           balancerConfig->getMaxChunkSizeBytes(),
                                           0));
-    return generateShardCollectionInitialChunks(
-        params.nss,
-        shardKeyPattern,
-        params.primaryShardId,
-        LogicalClock::get(opCtx)->getClusterTime().asTimestamp(),
-        shardSelectedSplitPoints,
-        shardIds,
-        1  // numContiguousChunksPerShard
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    return generateShardCollectionInitialChunks(params.nss,
+                                                shardKeyPattern,
+                                                params.primaryShardId,
+                                                currentTime.clusterTime().asTimestamp(),
+                                                shardSelectedSplitPoints,
+                                                shardIds,
+                                                1  // numContiguousChunksPerShard
     );
 }
 
@@ -321,14 +322,14 @@ InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFir
     std::vector<ShardId> shardIds;
     shardRegistry->getAllShardIdsNoReload(&shardIds);
 
-    return generateShardCollectionInitialChunks(
-        params.nss,
-        shardKeyPattern,
-        params.primaryShardId,
-        LogicalClock::get(opCtx)->getClusterTime().asTimestamp(),
-        _splitPoints,
-        shardIds,
-        _numContiguousChunksPerShard);
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    return generateShardCollectionInitialChunks(params.nss,
+                                                shardKeyPattern,
+                                                params.primaryShardId,
+                                                currentTime.clusterTime().asTimestamp(),
+                                                _splitPoints,
+                                                shardIds,
+                                                _numContiguousChunksPerShard);
 }
 
 AbstractTagsBasedSplitPolicy::AbstractTagsBasedSplitPolicy(OperationContext* opCtx,
@@ -356,7 +357,8 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
 
     std::vector<ShardId> shardIds;
     shardRegistry->getAllShardIdsNoReload(&shardIds);
-    const auto validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    const auto validAfter = currentTime.clusterTime().asTimestamp();
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
 
     auto tagToShards = getTagsToShardIds();
@@ -667,12 +669,13 @@ ReshardingSplitPolicy::ReshardingSplitPolicy(OperationContext* opCtx,
 InitialSplitPolicy::ShardCollectionConfig ReshardingSplitPolicy::createFirstChunks(
     OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern, SplitPolicyParams params) {
 
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
     return createChunks(shardKeyPattern,
                         params,
                         _numContiguousChunksPerShard,
                         _recipientShardIds,
                         _splitPoints,
-                        LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
+                        currentTime.clusterTime().asTimestamp());
 }
 
 }  // namespace mongo

@@ -38,7 +38,6 @@
 #include "mongo/s/catalog_cache.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/logv2/log.h"

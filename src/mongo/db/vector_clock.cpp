@@ -33,6 +33,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/logical_clock_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/vector_clock_document_gen.h"
@@ -77,6 +78,18 @@ void VectorClock::registerVectorClockOnServiceContext(ServiceContext* service,
 VectorClock::VectorTime VectorClock::getTime() const {
     stdx::lock_guard<Latch> lock(_mutex);
     return VectorTime(_vectorTime);
+}
+
+LogicalTime VectorClock::getClusterTimeForReplicaSet(ServiceContext* svcCtx) {
+    if (getGlobalReplSettings().usingReplSets()) {
+        auto now = get(svcCtx)->getTime();
+        return now.clusterTime();
+    }
+    return {};
+}
+
+LogicalTime VectorClock::getClusterTimeForReplicaSet(OperationContext* opCtx) {
+    return getClusterTimeForReplicaSet(opCtx->getClient()->getServiceContext());
 }
 
 bool VectorClock::_lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks) {

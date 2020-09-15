@@ -43,7 +43,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index/index_access_method_factory_impl.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/service_entry_point_mongod.h"
@@ -83,8 +82,6 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
 
     auto const serviceContext = getServiceContext();
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
-    auto logicalClock = std::make_unique<LogicalClock>(serviceContext);
-    LogicalClock::set(serviceContext, std::move(logicalClock));
 
     // Set up the periodic runner to allow background job execution for tests that require it.
     auto runner = makePeriodicRunner(getServiceContext());

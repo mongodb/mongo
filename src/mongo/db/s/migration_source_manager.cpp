@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/op_observer.h"
@@ -53,6 +52,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
@@ -408,14 +408,14 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         migratedChunkType.setMax(_args.getMaxKey());
         migratedChunkType.setVersion(_chunkVersion);
 
-        CommitChunkMigrationRequest::appendAsCommand(
-            &builder,
-            getNss(),
-            _args.getFromShardId(),
-            _args.getToShardId(),
-            migratedChunkType,
-            metadata.getCollVersion(),
-            LogicalClock::get(_opCtx)->getClusterTime().asTimestamp());
+        const auto currentTime = VectorClock::get(_opCtx)->getTime();
+        CommitChunkMigrationRequest::appendAsCommand(&builder,
+                                                     getNss(),
+                                                     _args.getFromShardId(),
+                                                     _args.getToShardId(),
+                                                     migratedChunkType,
+                                                     metadata.getCollVersion(),
+                                                     currentTime.clusterTime().asTimestamp());
 
         builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
     }

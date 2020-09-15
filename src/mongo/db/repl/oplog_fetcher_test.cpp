@@ -29,13 +29,13 @@
 
 #include <memory>
 
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/task_executor_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/signed_logical_time.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata.h"
@@ -394,11 +394,6 @@ void OplogFetcherTest::setUp() {
     // Always enable oplogFetcherUsesExhaust at the beginning of each unittest in case some
     // unittests disable it in the test.
     oplogFetcherUsesExhaust = true;
-
-    // Set up a logical clock.
-    auto service = getGlobalServiceContext();
-    auto logicalClock = std::make_unique<LogicalClock>(service);
-    LogicalClock::set(service, std::move(logicalClock));
 }
 
 std::unique_ptr<OplogFetcher> OplogFetcherTest::makeOplogFetcher() {
@@ -2284,7 +2279,7 @@ TEST_F(OplogFetcherTest, GetMoreEmptyBatch) {
 TEST_F(OplogFetcherTest, HandleLogicalTimeMetaDataAndAdvanceClusterTime) {
     auto firstEntry = makeNoopOplogEntry(lastFetched);
 
-    auto oldClusterTime = LogicalClock::get(getGlobalServiceContext())->getClusterTime();
+    const auto oldTime = VectorClock::get(getGlobalServiceContext())->getTime();
 
     auto logicalTime = LogicalTime(Timestamp(123456, 78));
     auto signedTime = SignedLogicalTime(logicalTime, TimeProofService::TimeProof(), 0);
@@ -2309,9 +2304,9 @@ TEST_F(OplogFetcherTest, HandleLogicalTimeMetaDataAndAdvanceClusterTime) {
     ASSERT_OK(processSingleBatch(makeFirstBatch(0LL, {firstEntry}, metadataObj))->getStatus());
 
     // Test that the cluster time is updated to the cluster time in the metadata.
-    auto currentClusterTime = LogicalClock::get(getGlobalServiceContext())->getClusterTime();
-    ASSERT_EQ(currentClusterTime, logicalTime);
-    ASSERT_NE(oldClusterTime, logicalTime);
+    const auto currentTime = VectorClock::get(getGlobalServiceContext())->getTime();
+    ASSERT_EQ(currentTime.clusterTime(), logicalTime);
+    ASSERT_NE(oldTime.clusterTime(), logicalTime);
 }
 
 TEST_F(OplogFetcherTest, CheckFindCommandIncludesFilter) {

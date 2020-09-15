@@ -39,10 +39,10 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/transaction_validation.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -860,9 +860,10 @@ void TransactionRouter::Router::setDefaultAtClusterTime(OperationContext* opCtx)
         return;
     }
 
-    auto defaultTime = LogicalClock::get(opCtx)->getClusterTime();
-    _setAtClusterTime(
-        opCtx, repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(), defaultTime);
+    const auto defaultTime = VectorClock::get(opCtx)->getTime();
+    _setAtClusterTime(opCtx,
+                      repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime(),
+                      defaultTime.clusterTime());
 }
 
 void TransactionRouter::Router::_setAtClusterTime(

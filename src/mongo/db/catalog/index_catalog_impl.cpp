@@ -56,7 +56,6 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
@@ -74,6 +73,7 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/ttl_collection_cache.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -1026,7 +1026,7 @@ public:
             // a commit timestamp. We use the cluster time since it's guaranteed to be greater
             // than the time of the index removal. It is possible the cluster time could be in the
             // future, and we will need to do another write to reach the minimum visible snapshot.
-            commitTime = LogicalClock::getClusterTimeForReplicaSet(_opCtx).asTimestamp();
+            commitTime = VectorClock::getClusterTimeForReplicaSet(_opCtx).asTimestamp();
         }
         _entry->setDropped();
         _collection->setMinimumVisibleSnapshot(commitTime.get());

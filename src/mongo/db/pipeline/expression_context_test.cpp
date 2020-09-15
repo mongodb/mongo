@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -56,8 +55,6 @@ using ExpressionContextTest = ServiceContextTest;
 
 TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
     auto opCtx = makeOperationContext();
-    auto logicalClock = std::make_unique<LogicalClock>(opCtx->getServiceContext());
-    LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
     auto t1 = VectorClockMutable::get(opCtx->getServiceContext())->tickClusterTime(1);
     t1.addTicks(100);
     VectorClockMutable::get(opCtx->getServiceContext())->tickClusterTimeTo(t1);

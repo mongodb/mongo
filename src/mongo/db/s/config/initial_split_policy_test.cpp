@@ -32,9 +32,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/unittest/unittest.h"
@@ -331,10 +331,9 @@ public:
         const auto shardCollectionConfig =
             splitPolicy.createFirstChunks(opCtx, shardKeyPattern, {});
 
-        const std::vector<ChunkType> expectedChunks =
-            makeChunks(expectedChunkRanges,
-                       expectedShardIds,
-                       LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
+        const auto currentTime = VectorClock::get(opCtx)->getTime();
+        const std::vector<ChunkType> expectedChunks = makeChunks(
+            expectedChunkRanges, expectedShardIds, currentTime.clusterTime().asTimestamp());
         assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
     }
 
@@ -582,10 +581,9 @@ public:
         const auto shardCollectionConfig =
             splitPolicy.createFirstChunks(operationContext(), shardKeyPattern, {});
 
-        const std::vector<ChunkType> expectedChunks =
-            makeChunks(expectedChunkRanges,
-                       expectedShardIds,
-                       LogicalClock::get(operationContext())->getClusterTime().asTimestamp());
+        const auto currentTime = VectorClock::get(operationContext())->getTime();
+        const std::vector<ChunkType> expectedChunks = makeChunks(
+            expectedChunkRanges, expectedShardIds, currentTime.clusterTime().asTimestamp());
         assertChunkVectorsAreEqual(expectedChunks, shardCollectionConfig.chunks);
     }
 };

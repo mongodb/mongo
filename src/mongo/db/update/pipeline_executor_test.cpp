@@ -35,7 +35,6 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/json.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/update/update_node_test_fixture.h"

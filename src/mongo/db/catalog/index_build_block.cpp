@@ -40,11 +40,11 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/ttl_collection_cache.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -228,7 +228,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                 // timestamp. We use the cluster time since it's guaranteed to be greater than the
                 // time of the index build. It is possible the cluster time could be in the future,
                 // and we will need to do another write to reach the minimum visible snapshot.
-                commitTime = LogicalClock::getClusterTimeForReplicaSet(svcCtx).asTimestamp();
+                commitTime = VectorClock::getClusterTimeForReplicaSet(svcCtx).asTimestamp();
             }
 
             LOGV2(20345,

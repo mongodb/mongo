@@ -41,7 +41,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/keys_collection_document.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"

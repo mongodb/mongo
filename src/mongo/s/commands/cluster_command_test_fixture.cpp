@@ -37,7 +37,6 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/vector_clock.h"
@@ -52,9 +51,7 @@ void ClusterCommandTestFixture::setUp() {
     CatalogCacheTestFixture::setUp();
     CatalogCacheTestFixture::setupNShards(numShards);
 
-    // Set up a logical clock with an initial time.
-    auto logicalClock = std::make_unique<LogicalClock>(getServiceContext());
-    LogicalClock::set(getServiceContext(), std::move(logicalClock));
+    // Set the initial clusterTime.
     VectorClock::get(getServiceContext())->advanceClusterTime_forTest(kInMemoryLogicalTime);
 
     auto keysCollectionClient = std::make_unique<KeysCollectionClientSharded>(

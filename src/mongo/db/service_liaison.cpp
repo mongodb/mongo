@@ -31,7 +31,6 @@
 
 #include "mongo/db/service_liaison.h"
 
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {

@@ -35,7 +35,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"

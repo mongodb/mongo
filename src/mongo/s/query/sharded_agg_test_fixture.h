@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
@@ -58,8 +57,6 @@ public:
 
     void setUp() {
         CatalogCacheTestFixture::setUp();
-        auto serviceCtx = operationContext()->getServiceContext();
-        LogicalClock::set(serviceCtx, std::make_unique<LogicalClock>(serviceCtx));
         _expCtx = make_intrusive<ExpressionContextForTest>(operationContext(), kTestAggregateNss);
         _expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>(executor());
         _expCtx->inMongos = true;

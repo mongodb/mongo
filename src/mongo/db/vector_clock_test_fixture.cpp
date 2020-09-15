@@ -29,12 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/logical_clock_test_fixture.h"
+#include "mongo/db/vector_clock_test_fixture.h"
 
 #include <memory>
 
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
@@ -46,18 +45,16 @@
 
 namespace mongo {
 
-LogicalClockTestFixture::LogicalClockTestFixture() = default;
+VectorClockTestFixture::VectorClockTestFixture() = default;
 
-LogicalClockTestFixture::~LogicalClockTestFixture() = default;
+VectorClockTestFixture::~VectorClockTestFixture() = default;
 
-void LogicalClockTestFixture::setUp() {
+void VectorClockTestFixture::setUp() {
     ShardingMongodTestFixture::setUp();
 
     auto service = getServiceContext();
 
-    auto logicalClock = std::make_unique<LogicalClock>(service);
-    LogicalClock::set(service, std::move(logicalClock));
-    _clock = LogicalClock::get(service);
+    _clock = VectorClock::get(service);
 
     service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_mockClockSource));
     service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(_mockClockSource));
@@ -67,38 +64,43 @@ void LogicalClockTestFixture::setUp() {
     ASSERT_OK(replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
 }
 
-void LogicalClockTestFixture::tearDown() {
+void VectorClockTestFixture::tearDown() {
     _dbDirectClient.reset();
     ShardingMongodTestFixture::tearDown();
 }
 
-VectorClockMutable* LogicalClockTestFixture::resetClock() {
+VectorClockMutable* VectorClockTestFixture::resetClock() {
     auto service = getServiceContext();
     VectorClock::get(service)->resetVectorClock_forTest();
     return VectorClockMutable::get(service);
 }
 
-void LogicalClockTestFixture::advanceClusterTime(LogicalTime newTime) {
+void VectorClockTestFixture::advanceClusterTime(LogicalTime newTime) {
     VectorClock::get(getServiceContext())->advanceClusterTime_forTest(newTime);
 }
 
-LogicalClock* LogicalClockTestFixture::getClock() const {
+VectorClock* VectorClockTestFixture::getClock() const {
     return _clock;
 }
 
-ClockSourceMock* LogicalClockTestFixture::getMockClockSource() const {
+LogicalTime VectorClockTestFixture::getClusterTime() const {
+    auto now = getClock()->getTime();
+    return now.clusterTime();
+}
+
+ClockSourceMock* VectorClockTestFixture::getMockClockSource() const {
     return _mockClockSource.get();
 }
 
-void LogicalClockTestFixture::setMockClockSourceTime(Date_t time) const {
+void VectorClockTestFixture::setMockClockSourceTime(Date_t time) const {
     _mockClockSource->reset(time);
 }
 
-Date_t LogicalClockTestFixture::getMockClockSourceTime() const {
+Date_t VectorClockTestFixture::getMockClockSourceTime() const {
     return _mockClockSource->now();
 }
 
-DBDirectClient* LogicalClockTestFixture::getDBClient() const {
+DBDirectClient* VectorClockTestFixture::getDBClient() const {
     return _dbDirectClient.get();
 }
 

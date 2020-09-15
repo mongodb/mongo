@@ -49,7 +49,6 @@
 #include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -648,13 +647,13 @@ void runCommand(OperationContext* opCtx,
                 (!readConcernArgs.getArgsAtClusterTime() ||
                  readConcernArgs.wasAtClusterTimeSelected())) {
                 auto atClusterTime = [&] {
-                    auto latestKnownClusterTime = LogicalClock::get(opCtx)->getClusterTime();
+                    const auto latestKnownTime = VectorClock::get(opCtx)->getTime();
                     // Choose a time after the user-supplied afterClusterTime.
                     auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
-                    if (afterClusterTime && *afterClusterTime > latestKnownClusterTime) {
+                    if (afterClusterTime && *afterClusterTime > latestKnownTime.clusterTime()) {
                         return afterClusterTime->asTimestamp();
                     }
-                    return latestKnownClusterTime.asTimestamp();
+                    return latestKnownTime.clusterTime().asTimestamp();
                 }();
                 readConcernArgs.setArgsAtClusterTimeForSnapshot(atClusterTime);
             }

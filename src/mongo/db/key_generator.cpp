@@ -33,8 +33,8 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/keys_collection_client.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/util/fail_point.h"
 
@@ -80,8 +80,8 @@ Status KeyGenerator::generateNewKeysIfNeeded(OperationContext* opCtx) {
         return {ErrorCodes::FailPointEnabled, "key generation disabled"};
     }
 
-    auto currentTime = LogicalClock::get(opCtx)->getClusterTime();
-    auto keyStatus = _client->getNewKeys(opCtx, _purpose, currentTime, false);
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    auto keyStatus = _client->getNewKeys(opCtx, _purpose, currentTime.clusterTime(), false);
 
     if (!keyStatus.isOK()) {
         return keyStatus.getStatus();
@@ -92,10 +92,10 @@ Status KeyGenerator::generateNewKeysIfNeeded(OperationContext* opCtx) {
 
     LogicalTime currentKeyExpiresAt;
 
-    long long keyId = currentTime.asTimestamp().asLL();
+    long long keyId = currentTime.clusterTime().asTimestamp().asLL();
 
     if (keyIter == newKeys.cend()) {
-        currentKeyExpiresAt = addSeconds(currentTime, _keyValidForInterval);
+        currentKeyExpiresAt = addSeconds(currentTime.clusterTime(), _keyValidForInterval);
         auto status = insertNewKey(opCtx, _client, keyId, _purpose, currentKeyExpiresAt);
 
         if (!status.isOK()) {
@@ -103,8 +103,8 @@ Status KeyGenerator::generateNewKeysIfNeeded(OperationContext* opCtx) {
         }
 
         keyId++;
-    } else if (keyIter->getExpiresAt() < currentTime) {
-        currentKeyExpiresAt = addSeconds(currentTime, _keyValidForInterval);
+    } else if (keyIter->getExpiresAt() < currentTime.clusterTime()) {
+        currentKeyExpiresAt = addSeconds(currentTime.clusterTime(), _keyValidForInterval);
         auto status = insertNewKey(opCtx, _client, keyId, _purpose, currentKeyExpiresAt);
 
         if (!status.isOK()) {
@@ -128,7 +128,7 @@ Status KeyGenerator::generateNewKeysIfNeeded(OperationContext* opCtx) {
         if (!status.isOK()) {
             return status;
         }
-    } else if (keyIter->getExpiresAt() < currentTime) {
+    } else if (keyIter->getExpiresAt() < currentTime.clusterTime()) {
         currentKeyExpiresAt = addSeconds(currentKeyExpiresAt, _keyValidForInterval);
         auto status = insertNewKey(opCtx, _client, keyId, _purpose, currentKeyExpiresAt);
 
