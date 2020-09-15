@@ -31,7 +31,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -48,6 +53,9 @@ namespace repl {
 
 // Fails before waiting for the state doc to be majority replicated.
 MONGO_FAIL_POINT_DEFINE(failWhilePersistingTenantMigrationRecipientInstanceStateDoc);
+MONGO_FAIL_POINT_DEFINE(stopAfterPersistingTenantMigrationRecipientInstanceStateDoc);
+MONGO_FAIL_POINT_DEFINE(stopAfterConnectingTenantMigrationRecipientInstance);
+MONGO_FAIL_POINT_DEFINE(setTenantMigrationRecipientInstanceHostTimeout);
 
 TenantMigrationRecipientService::TenantMigrationRecipientService(ServiceContext* serviceContext)
     : PrimaryOnlyService(serviceContext) {}
@@ -71,13 +79,110 @@ std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::c
 }
 
 TenantMigrationRecipientService::Instance::Instance(BSONObj stateDoc)
-    : PrimaryOnlyService::TypedInstance<Instance>() {
-    _stateDoc = TenantMigrationRecipientDocument::parse(IDLParserErrorContext("recipientStateDoc"),
-                                                        stateDoc);
+    : PrimaryOnlyService::TypedInstance<Instance>(),
+      _stateDoc(TenantMigrationRecipientDocument::parse(IDLParserErrorContext("recipientStateDoc"),
+                                                        stateDoc)),
+      _tenantId(_stateDoc.getDatabasePrefix().toString()),
+      _migrationUuid(_stateDoc.getId()),
+      _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
+      _readPreference(_stateDoc.getReadPreference()) {}
+
+std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_connectAndAuth(
+    const HostAndPort& serverAddress, StringData applicationName, BSONObj authParams) {
+    std::string errMsg;
+    auto clientBase = ConnectionString(serverAddress).connect(applicationName, errMsg);
+    if (!clientBase) {
+        LOGV2_ERROR(4880400,
+                    "Failed to connect to migration donor",
+                    "tenantId"_attr = getTenantId(),
+                    "migrationId"_attr = getMigrationUUID(),
+                    "serverAddress"_attr = serverAddress,
+                    "applicationName"_attr = applicationName,
+                    "error"_attr = errMsg);
+        uasserted(ErrorCodes::HostNotFound, errMsg);
+    }
+    // ConnectionString::connect() always returns a DBClientConnection in a unique_ptr of
+    // DBClientBase type.
+    std::unique_ptr<DBClientConnection> client(
+        checked_cast<DBClientConnection*>(clientBase.release()));
+    if (!authParams.isEmpty()) {
+        client->auth(authParams);
+    } else {
+        // Tenant migration in production should always require auth.
+        uassert(4880405, "No auth data provided to tenant migration", getTestCommandsEnabled());
+    }
+
+    return client;
 }
+
+SemiFuture<void> TenantMigrationRecipientService::Instance::_createAndConnectClients() {
+    LOGV2_DEBUG(4880401,
+                1,
+                "Recipient migration service connecting clients",
+                "tenantId"_attr = getTenantId(),
+                "migrationId"_attr = getMigrationUUID(),
+                "connectionString"_attr = _donorConnectionString,
+                "readPreference"_attr = _readPreference,
+                "authParams"_attr = redact(_authParams));
+    auto connectionStringWithStatus = ConnectionString::parse(_donorConnectionString);
+    if (!connectionStringWithStatus.isOK()) {
+        LOGV2_ERROR(4880403,
+                    "Failed to parse connection string",
+                    "tenantId"_attr = getTenantId(),
+                    "migrationId"_attr = getMigrationUUID(),
+                    "connectionString"_attr = _donorConnectionString,
+                    "error"_attr = connectionStringWithStatus.getStatus());
+
+        return SemiFuture<void>::makeReady(connectionStringWithStatus.getStatus());
+    }
+    auto connectionString = std::move(connectionStringWithStatus.getValue());
+    const auto& servers = connectionString.getServers();
+    stdx::lock_guard lk(_mutex);
+    _donorReplicaSetMonitor = ReplicaSetMonitor::createIfNeeded(
+        connectionString.getSetName(), std::set<HostAndPort>(servers.begin(), servers.end()));
+    Milliseconds findHostTimeout = ReplicaSetMonitorInterface::kDefaultFindHostTimeout;
+    setTenantMigrationRecipientInstanceHostTimeout.execute([&](const BSONObj& data) {
+        findHostTimeout = Milliseconds(data["findHostTimeoutMillis"].safeNumberLong());
+    });
+    return _donorReplicaSetMonitor->getHostOrRefresh(_readPreference, findHostTimeout)
+        .thenRunOn(**_scopedExecutor)
+        .then([this](const HostAndPort& serverAddress) {
+            stdx::lock_guard lk(_mutex);
+            auto applicationName =
+                "TenantMigrationRecipient_" + getTenantId() + "_" + getMigrationUUID().toString();
+            _client = _connectAndAuth(serverAddress, applicationName, _authParams);
+
+            applicationName += "_fetcher";
+            _oplogFetcherClient = _connectAndAuth(serverAddress, applicationName, _authParams);
+        })
+        .onError([this](const Status& status) {
+            LOGV2_ERROR(4880404,
+                        "Connecting to donor failed",
+                        "tenantId"_attr = getTenantId(),
+                        "migrationId"_attr = getMigrationUUID(),
+                        "error"_attr = status);
+
+            // Make sure we don't end up with a partially initialized set of connections.
+            stdx::lock_guard lk(_mutex);
+            _client = nullptr;
+            _oplogFetcherClient = nullptr;
+            return status;
+        })
+        .semi();
+}
+
+namespace {
+constexpr std::int32_t stopFailPointErrorCode = 4880402;
+void stopOnFailPoint(FailPoint* fp) {
+    uassert(stopFailPointErrorCode,
+            "Skipping remaining processing due to fail point",
+            MONGO_likely(!fp->shouldFail()));
+}
+}  // namespace
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
+    _scopedExecutor = executor;
     return ExecutorFuture(**executor)
         .then([this]() -> SharedSemiFuture<void> {
             auto uniqueOpCtx = cc().makeOperationContext();
@@ -128,23 +233,33 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 .waitUntilMajority(lastOpAfterRun);
         })
         .then([this] {
+            stopOnFailPoint(&stopAfterPersistingTenantMigrationRecipientInstanceStateDoc);
+            return _createAndConnectClients();
+        })
+        .then([this] {
+            stopOnFailPoint(&stopAfterConnectingTenantMigrationRecipientInstance);
             // TODO SERVER-48808: Run cloners in MigrationServiceInstance
             // TODO SERVER-48811: Oplog fetching in MigrationServiceInstance
         })
         .onCompletion([this](Status status) {
             LOGV2(4878501,
                   "Tenant Recipient data sync completed.",
+                  "tenantId"_attr = getTenantId(),
                   "migrationId"_attr = getMigrationUUID(),
-                  "dbPrefix"_attr = _stateDoc.getDatabasePrefix(),
-                  "status"_attr = status);
+                  "error"_attr = status);
+            if (status.code() == stopFailPointErrorCode)
+                return Status::OK();
             return status;
         })
         .semi();
 }
 
 const UUID& TenantMigrationRecipientService::Instance::getMigrationUUID() const {
-    stdx::lock_guard lk(_mutex);
-    return _stateDoc.getId();
+    return _migrationUuid;
+}
+
+const std::string& TenantMigrationRecipientService::Instance::getTenantId() const {
+    return _tenantId;
 }
 
 bool TenantMigrationRecipientService::Instance::isMarkedForGarbageCollect() const {

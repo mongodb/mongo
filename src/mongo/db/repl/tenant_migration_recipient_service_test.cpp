@@ -29,6 +29,9 @@
 
 #include <memory>
 
+#include "mongo/client/connpool.h"
+#include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_impl.h"
@@ -41,23 +44,29 @@
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/dbtests/mock/mock_conn_registry.h"
+#include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 
-using namespace mongo;
-using namespace mongo::repl;
+namespace mongo {
+namespace repl {
 
 class TenantMigrationRecipientServiceTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
+        // Only the ReplicaSetMonitor scanning protocol supports mock connections.
+        ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
+        ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
         WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
 
@@ -95,6 +104,10 @@ public:
         _registry->onShutdown();
         _service = nullptr;
 
+        // Clearing the connection pool is necessary when doing tests which use the
+        // ReplicaSetMonitor.  See src/mongo/dbtests/mock/mock_replica_set.h for details.
+        ScopedDbConnection::clearPool();
+        ReplicaSetMonitorProtocolTestUtil::resetRSMProtocol();
         ServiceContextMongoDTest::tearDown();
     }
 
@@ -123,10 +136,26 @@ protected:
     PrimaryOnlyServiceRegistry* _registry;
     PrimaryOnlyService* _service;
     long long _term = 0;
+
+    // Accessors to class private members
+    DBClientConnection* getClient(const TenantMigrationRecipientService::Instance* instance) const {
+        return instance->_client.get();
+    }
+
+    DBClientConnection* getOplogFetcherClient(
+        const TenantMigrationRecipientService::Instance* instance) const {
+        return instance->_oplogFetcherClient.get();
+    }
+
+private:
+    unittest::MinimumLoggedSeverityGuard _replicationSeverityGuard{
+        logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(1)};
 };
 
 
 TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientServiceInstanceCreation) {
+    FailPointEnableBlock fp("stopAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+
     const UUID migrationUUID = UUID::gen();
 
     TenantMigrationRecipientDocument TenantMigrationRecipientInstance(
@@ -167,3 +196,207 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
     auto status = instance->getCompletionFuture().getNoThrow();
     ASSERT_EQ(ErrorCodes::NotWritablePrimary, status.code());
 }
+
+TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_Primary) {
+    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /*dollarPrefixHosts */);
+
+    TenantMigrationRecipientDocument TenantMigrationRecipientInstance(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, TenantMigrationRecipientInstance.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    auto* client = getClient(instance.get());
+    auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
+    // Both clients should be populated.
+    ASSERT(client);
+    ASSERT(oplogFetcherClient);
+
+    // Clients should be distinct.
+    ASSERT(client != oplogFetcherClient);
+
+    // Clients should be connected to primary.
+    auto primary = replSet.getHosts()[0].toString();
+    ASSERT_EQ(primary, client->getServerAddress());
+    ASSERT(client->isStillConnected());
+    ASSERT_EQ(primary, oplogFetcherClient->getServerAddress());
+    ASSERT(oplogFetcherClient->isStillConnected());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_Secondary) {
+    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 2, true /* hasPrimary */, true /*dollarPrefixHosts */);
+
+    TenantMigrationRecipientDocument TenantMigrationRecipientInstance(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::SecondaryOnly));
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, TenantMigrationRecipientInstance.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    auto* client = getClient(instance.get());
+    auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
+    // Both clients should be populated.
+    ASSERT(client);
+    ASSERT(oplogFetcherClient);
+
+    // Clients should be distinct.
+    ASSERT(client != oplogFetcherClient);
+
+    // Clients should be connected to secondary.
+    auto secondary = replSet.getHosts()[1].toString();
+    ASSERT_EQ(secondary, client->getServerAddress());
+    ASSERT(client->isStillConnected());
+    ASSERT_EQ(secondary, oplogFetcherClient->getServerAddress());
+    ASSERT(oplogFetcherClient->isStillConnected());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_PrimaryFails) {
+    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+    FailPointEnableBlock timeoutFp("setTenantMigrationRecipientInstanceHostTimeout",
+                                   BSON("findHostTimeoutMillis" << 100));
+
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /*dollarPrefixHosts */);
+    // Primary is unavailable.
+    replSet.kill(replSet.getHosts()[0].toString());
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Keep scanning the replica set while waiting for task completion.  This would normally
+    // be automatic but that doesn't work with mock replica sets.
+    while (!instance->getCompletionFuture().isReady()) {
+        auto monitor = ReplicaSetMonitor::get(replSet.getSetName());
+        // Monitor may not have been created yet.
+        if (monitor) {
+            monitor->runScanForMockReplicaSet();
+        }
+        mongo::sleepmillis(50);
+    }
+    // Wait for task completion failure.
+    ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference,
+                  instance->getCompletionFuture().getNoThrow().code());
+
+    auto* client = getClient(instance.get());
+    auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
+    // Neither client should be populated.
+    ASSERT_FALSE(client);
+    ASSERT_FALSE(oplogFetcherClient);
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_PrimaryFailsOver) {
+    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 2, true /* hasPrimary */, true /*dollarPrefixHosts */);
+
+    // Primary is unavailable.
+    replSet.kill(replSet.getHosts()[0].toString());
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    auto* client = getClient(instance.get());
+    auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
+    // Both clients should be populated.
+    ASSERT(client);
+    ASSERT(oplogFetcherClient);
+
+    // Clients should be distinct.
+    ASSERT(client != oplogFetcherClient);
+
+    // Clients should be connected to secondary.
+    auto secondary = replSet.getHosts()[1].toString();
+    ASSERT_EQ(secondary, client->getServerAddress());
+    ASSERT(client->isStillConnected());
+    ASSERT_EQ(secondary, oplogFetcherClient->getServerAddress());
+    ASSERT(oplogFetcherClient->isStillConnected());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_BadConnectString) {
+    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+
+    const UUID migrationUUID = UUID::gen();
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        "broken,connect,string,no,set,name",
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion failure.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, instance->getCompletionFuture().getNoThrow().code());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientConnection_NonSetConnectString) {
+    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+
+    const UUID migrationUUID = UUID::gen();
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        "localhost:12345",
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion failure.
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, instance->getCompletionFuture().getNoThrow().code());
+}
+
+}  // namespace repl
+}  // namespace mongo

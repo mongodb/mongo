@@ -37,7 +37,9 @@
 
 namespace mongo {
 
+class DBClientConnection;
 class OperationContext;
+class ReplicaSetMonitor;
 class ServiceContext;
 
 namespace repl {
@@ -79,15 +81,57 @@ public:
         const UUID& getMigrationUUID() const;
 
         /*
+         *  Returns the tenant id (database prefix).
+         */
+        const std::string& getTenantId() const;
+
+        /*
          *  Returns true if the instance state doc is marked for garbage collect.
          */
         bool isMarkedForGarbageCollect() const;
 
+
     private:
-        // Protects below data members.
+        friend class TenantMigrationRecipientServiceTest;
+
+        /**
+         * Creates a client, connects it to the donor, and authenticates it if authParams is
+         * non-empty.  Throws a user assertion on failure.
+         *
+         */
+        std::unique_ptr<DBClientConnection> _connectAndAuth(const HostAndPort& serverAddress,
+                                                            StringData applicationName,
+                                                            BSONObj authParams);
+
+        /**
+         * Creates and connects both the oplog fetcher client and the client used for other
+         * operations.
+         */
+        SemiFuture<void> _createAndConnectClients();
+
+        std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
+
+        // Protects below non-const data members.
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
 
         TenantMigrationRecipientDocument _stateDoc;
+
+        // This data is provided in the initial state doc and never changes.  We keep copies to
+        // avoid having to obtain the mutex to access them.
+        const std::string _tenantId;
+        const UUID _migrationUuid;
+        const std::string _donorConnectionString;
+        const ReadPreferenceSetting _readPreference;
+        // TODO(SERVER-50670): Populate authParams
+        const BSONObj _authParams;
+
+        std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;
+
+        // Because the cloners and oplog fetcher use exhaust, we need a separate connection for
+        // each.  The '_client' will be used for the cloners and other operations such as fetching
+        // optimes while the '_oplogFetcherClient' will be reserved for the oplog fetcher only.
+        std::unique_ptr<DBClientConnection> _client;
+        std::unique_ptr<DBClientConnection> _oplogFetcherClient;
     };
 };
 
