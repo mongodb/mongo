@@ -99,9 +99,9 @@ let getNumNodesCmdRanOn = function(rsNodes, {dbName, profileQuery, expectedNode,
 
         if (result != null) {
             if (secOk && expectedNode == "secondary") {
-                assert(profileDB.adminCommand({isMaster: 1}).secondary);
+                assert(profileDB.adminCommand({hello: 1}).secondary);
             } else if (expectedNode == "primary") {
-                assert(profileDB.adminCommand({isMaster: 1}).ismaster);
+                assert(profileDB.adminCommand({hello: 1}).isWritablePrimary);
             }
             numNodesCmdRanOn += 1;
         }

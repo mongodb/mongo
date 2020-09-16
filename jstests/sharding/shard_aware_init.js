@@ -9,10 +9,10 @@
 (function() {
 "use strict";
 
-var waitForMaster = function(conn) {
+var waitForPrimary = function(conn) {
     assert.soon(function() {
-        var res = conn.getDB('admin').runCommand({isMaster: 1});
-        return res.ismaster;
+        var res = conn.getDB('admin').runCommand({hello: 1});
+        return res.isWritablePrimary;
     });
 };
 
@@ -55,7 +55,7 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
         delete options.replSet;
         delete options.shardsvr;
         var mongodConn = MongoRunner.runMongod(options);
-        waitForMaster(mongodConn);
+        waitForPrimary(mongodConn);
 
         var res = mongodConn.getDB('admin').system.version.update({_id: 'shardIdentity'},
                                                                   shardIdentityDoc);
@@ -66,7 +66,7 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
         newMongodOptions.shardsvr = '';
         newMongodOptions.replSet = rsName;
         mongodConn = MongoRunner.runMongod(newMongodOptions);
-        waitForMaster(mongodConn);
+        waitForPrimary(mongodConn);
 
         res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
@@ -113,7 +113,7 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
     });
     MongoRunner.stopMongod(mongodConn);
     mongodConn = MongoRunner.runMongod(newMongodOptions);
-    waitForMaster(mongodConn);
+    waitForPrimary(mongodConn);
 
     res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
@@ -133,7 +133,7 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
     delete newMongodOptions.replSet;
     delete newMongodOptions.shardsvr;
     mongodConn = MongoRunner.runMongod(newMongodOptions);
-    waitForMaster(mongodConn);
+    waitForPrimary(mongodConn);
 
     let writeResult = assert.commandWorked(mongodConn.getDB('admin').system.version.update(
         {_id: 'shardIdentity'}, {_id: 'shardIdentity', shardName: 'x', clusterId: ObjectId()}));
@@ -145,7 +145,7 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
     newMongodOptions.replSet = rsName;
     assert.throws(function() {
         var connToCrashedMongod = MongoRunner.runMongod(newMongodOptions);
-        waitForMaster(connToCrashedMongod);
+        waitForPrimary(connToCrashedMongod);
     });
 
     // We call MongoRunner.stopMongod() using a former connection to the server that is

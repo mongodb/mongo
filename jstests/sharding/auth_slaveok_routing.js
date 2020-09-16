@@ -29,9 +29,9 @@ function doesRouteToSec(coll, query) {
     assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
     var serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
     var conn = new Mongo(serverInfo.host + ":" + serverInfo.port.toString());
-    var cmdRes = conn.getDB('admin').runCommand({isMaster: 1});
+    var cmdRes = conn.getDB('admin').runCommand({hello: 1});
 
-    jsTest.log('isMaster: ' + tojson(cmdRes));
+    jsTest.log('hello: ' + tojson(cmdRes));
 
     return cmdRes.secondary;
 }

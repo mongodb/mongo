@@ -217,6 +217,7 @@ var checkAdminOps = function(hasAuth) {
         checkCommandSucceeded(adminDB, {whatsmyuri: 1});
         checkCommandSucceeded(adminDB, {isdbgrid: 1});
         checkCommandSucceeded(adminDB, {ismaster: 1});
+        checkCommandSucceeded(adminDB, {hello: 1});
         checkCommandSucceeded(adminDB, {split: 'test.foo', find: {i: 1, j: 1}});
         var chunk = configDB.chunks.findOne({ns: 'test.foo', shard: st.rs0.name});
         checkCommandSucceeded(
@@ -226,10 +227,11 @@ var checkAdminOps = function(hasAuth) {
         checkCommandFailed(adminDB, {getCmdLineOpts: 1});
         checkCommandFailed(adminDB, {serverStatus: 1});
         checkCommandFailed(adminDB, {listShards: 1});
-        // whatsmyuri, isdbgrid, and ismaster don't require any auth
+        // whatsmyuri, isdbgrid, ismaster, and hello don't require any auth
         checkCommandSucceeded(adminDB, {whatsmyuri: 1});
         checkCommandSucceeded(adminDB, {isdbgrid: 1});
         checkCommandSucceeded(adminDB, {ismaster: 1});
+        checkCommandSucceeded(adminDB, {hello: 1});
         checkCommandFailed(adminDB, {split: 'test.foo', find: {i: 1, j: 1}});
         var chunkKey = {i: {$minKey: 1}, j: {$minKey: 1}};
         checkCommandFailed(

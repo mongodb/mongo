@@ -157,25 +157,25 @@ db.countaa.save({"regex": /foo/i});
 assert.eq(3, db.countaa.count(), "counta1");
 assert.eq(3, db.countaa.find().itcount(), "counta1");
 
-// isMaster and query-wrapped-command
-let isMaster = db.runCommand({isMaster: 1});
-assert(isMaster.ismaster);
-assert.eq('isdbgrid', isMaster.msg);
-delete isMaster.localTime;
-delete isMaster.$clusterTime;
-delete isMaster.operationTime;
+// hello and query-wrapped-command
+let hello = db.runCommand({hello: 1});
+assert(hello.isWritablePrimary);
+assert.eq('isdbgrid', hello.msg);
+delete hello.localTime;
+delete hello.$clusterTime;
+delete hello.operationTime;
 
-let im2 = db.runCommand({query: {isMaster: 1}});
-delete im2.localTime;
-delete im2.$clusterTime;
-delete im2.operationTime;
-assert.eq(isMaster, im2);
+let hello2 = db.runCommand({query: {hello: 1}});
+delete hello2.localTime;
+delete hello2.$clusterTime;
+delete hello2.operationTime;
+assert.eq(hello, hello2);
 
-im2 = db.runCommand({$query: {isMaster: 1}});
-delete im2.localTime;
-delete im2.$clusterTime;
-delete im2.operationTime;
-assert.eq(isMaster, im2);
+hello2 = db.runCommand({$query: {hello: 1}});
+delete hello2.localTime;
+delete hello2.$clusterTime;
+delete hello2.operationTime;
+assert.eq(hello, hello2);
 
 s.stop();
 })();

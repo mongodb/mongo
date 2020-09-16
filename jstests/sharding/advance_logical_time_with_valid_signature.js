@@ -26,12 +26,12 @@ let disconnectedDB = st.s1.getDB("test");
 // Send an insert to the connected mongos to advance its cluster time.
 let res = assert.commandWorked(connectedDB.runCommand({insert: "foo", documents: [{x: 1}]}));
 
-// Get logicalTime metadata from the connected mongos's response and send it in an isMaster
-// command to the disconnected mongos. isMaster does not require mongos to contact any other
+// Get logicalTime metadata from the connected mongos's response and send it in a hello
+// command to the disconnected mongos. hello does not require mongos to contact any other
 // servers, so the command should succeed.
 let lt = res.$clusterTime;
 res =
-    assert.commandWorked(disconnectedDB.runCommand({isMaster: 1, $clusterTime: lt}),
+    assert.commandWorked(disconnectedDB.runCommand({hello: 1, $clusterTime: lt}),
                          "expected the disconnected mongos to accept cluster time: " + tojson(lt));
 
 // Verify cluster time response from the disconnected mongos matches what was passed.

@@ -33,7 +33,7 @@ startupKeys.toArray().forEach(function(key, i) {
 // Verify there is a $clusterTime with a signature in the response.
 jsTestLog("Verify a signature is included in the cluster time in a response.");
 
-let res = assert.commandWorked(st.s.getDB("test").runCommand({isMaster: 1}));
+let res = assert.commandWorked(st.s.getDB("test").runCommand({hello: 1}));
 assert.hasFields(res, ["$clusterTime"]);
 assert.hasFields(res.$clusterTime, ["signature"]);
 assert.hasFields(res.$clusterTime.signature, ["hash", "keyId"]);
@@ -69,7 +69,7 @@ st.rs0.stopSet(null /* signal */, true /* forRestart */);
 st.rs0.startSet({restart: true});
 
 // The shard primary should return a dummy signed cluster time, because there are no keys.
-res = assert.commandWorked(st.rs0.getPrimary().getDB("test").runCommand({isMaster: 1}));
+res = assert.commandWorked(st.rs0.getPrimary().getDB("test").runCommand({hello: 1}));
 assert.hasFields(res, ["$clusterTime", "operationTime"]);
 assert.eq(res.$clusterTime.signature.keyId, NumberLong(0));
 

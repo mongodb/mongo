@@ -58,7 +58,7 @@ assert(containsValidLogicalTimeBson(res),
            "replica set to contain logicalTime, received: " + tojson(res));
 
 // Verify mongos can accept requests with $clusterTime in the command body.
-assert.commandWorked(testDB.runCommand({isMaster: 1, $clusterTime: res.$clusterTime}));
+assert.commandWorked(testDB.runCommand({hello: 1, $clusterTime: res.$clusterTime}));
 
 // A mongod in a sharded replica set returns a logicalTime bson that matches the expected
 // format.
@@ -69,7 +69,7 @@ assert(containsValidLogicalTimeBson(res),
            "logicalTime, received: " + tojson(res));
 
 // Verify mongod can accept requests with $clusterTime in the command body.
-res = assert.commandWorked(testDB.runCommand({isMaster: 1, $clusterTime: res.$clusterTime}));
+res = assert.commandWorked(testDB.runCommand({hello: 1, $clusterTime: res.$clusterTime}));
 
 st.stop();
 

@@ -7,7 +7,7 @@ load("jstests/replsets/rslib.js");
 var five_minutes = 5 * 60 * 1000;
 
 var numRSHosts = function() {
-    var result = assert.commandWorked(rsObj.nodes[0].adminCommand({ismaster: 1}));
+    var result = assert.commandWorked(rsObj.nodes[0].adminCommand({hello: 1}));
     return result.hosts.length + result.passives.length;
 };
 

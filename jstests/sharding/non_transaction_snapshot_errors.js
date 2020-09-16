@@ -32,7 +32,7 @@ const kCommandTestCases = [
 
 function runTest(st, numShardsToError, errorCode, isSharded) {
     const db = st.s.getDB(dbName);
-    const atClusterTime = st.s.adminCommand('ismaster').operationTime;
+    const atClusterTime = st.s.adminCommand('hello').operationTime;
 
     for (let commandTestCase of kCommandTestCases) {
         for (let readConcern of [{level: "snapshot"},

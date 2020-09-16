@@ -21,12 +21,12 @@ var checkShardingServerStatus = function(doc) {
 
     var configConnStr = shardingSection.configsvrConnectionString;
     var configConn = new Mongo(configConnStr);
-    var configIsMaster = configConn.getDB('admin').runCommand({isMaster: 1});
+    var configHello = configConn.getDB('admin').runCommand({hello: 1});
 
     var configOpTimeObj = shardingSection.lastSeenConfigServerOpTime;
 
     assert.gt(configConnStr.indexOf('/'), 0);
-    assert.gte(configIsMaster.configsvr, 1);  // If it's a shard, this field won't exist.
+    assert.gte(configHello.configsvr, 1);  // If it's a shard, this field won't exist.
     assert.neq(null, configOpTimeObj);
     assert.neq(null, configOpTimeObj.ts);
     assert.neq(null, configOpTimeObj.t);

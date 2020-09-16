@@ -17,12 +17,12 @@ var assertCorrectTargeting = function(explain, isMongos, secExpected) {
     }
 
     var explainDestConn = new Mongo(serverInfo.host + ':' + serverInfo.port);
-    var isMaster = explainDestConn.getDB('admin').runCommand({isMaster: 1});
+    var hello = explainDestConn.getDB('admin').runCommand({hello: 1});
 
     if (secExpected) {
-        assert(isMaster.secondary);
+        assert(hello.secondary);
     } else {
-        assert(isMaster.ismaster);
+        assert(hello.isWritablePrimary);
     }
 };
 

@@ -59,7 +59,7 @@ function testResume(mongosColl, collToWatch) {
     assert.commandWorked(mongosColl.update({_id: -1}, {$set: {updated: true}}));
 
     // Record current time to resume a change stream later in the test.
-    const resumeTimeFirstUpdate = mongosDB.runCommand({isMaster: 1}).$clusterTime.clusterTime;
+    const resumeTimeFirstUpdate = mongosDB.runCommand({hello: 1}).$clusterTime.clusterTime;
 
     assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updated: true}}));
 

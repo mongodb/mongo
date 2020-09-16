@@ -32,7 +32,7 @@ let st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 assert.soonNoExcept(function() {
     assert(st.s.getDB("admin").system.keys.count() >= 2);
 
-    let res = assert.commandWorked(st.s.getDB("test").runCommand({isMaster: 1}));
+    let res = assert.commandWorked(st.s.getDB("test").runCommand({hello: 1}));
     assertContainsValidLogicalTime(res, false);
 
     return true;
@@ -70,7 +70,7 @@ st.restartMongoses();
 
 // Eventually mongos will discover the new keys, and start signing cluster times.
 assert.soonNoExcept(function() {
-    assertContainsValidLogicalTime(st.s.getDB("test").runCommand({isMaster: 1}), false);
+    assertContainsValidLogicalTime(st.s.getDB("test").runCommand({hello: 1}), false);
     return true;
 }, "expected mongos to eventually start signing cluster times", 60 * 1000);  // 60 seconds.
 

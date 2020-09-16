@@ -14,7 +14,7 @@ let secondaries = st.rs0.getSecondaries();
 let foundArbiter = false;
 for (let i = 0; i < secondaries.length; i++) {
     let conn = secondaries[i].getDB("admin");
-    const res = conn.runCommand({isMaster: 1});
+    const res = conn.runCommand({hello: 1});
     if (res["arbiterOnly"]) {
         assert(!foundArbiter);
         foundArbiter = true;

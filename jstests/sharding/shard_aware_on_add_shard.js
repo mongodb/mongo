@@ -6,10 +6,10 @@
 (function() {
 "use strict";
 
-var waitForIsMaster = function(conn) {
+var waitForPrimary = function(conn) {
     assert.soon(function() {
-        var res = conn.getDB('admin').runCommand({isMaster: 1});
-        return res.ismaster;
+        var res = conn.getDB('admin').runCommand({hello: 1});
+        return res.isWritablePrimary;
     });
 };
 
@@ -36,7 +36,7 @@ var clusterId = st.s.getDB('config').getCollection('version').findOne().clusterI
 // Add a shard that is a standalone mongod.
 
 var standaloneConn = MongoRunner.runMongod({shardsvr: ''});
-waitForIsMaster(standaloneConn);
+waitForPrimary(standaloneConn);
 
 jsTest.log("Going to add standalone as shard: " + standaloneConn);
 var newShardName = "newShard";
@@ -51,7 +51,7 @@ MongoRunner.stopMongod(standaloneConn);
 var replTest = new ReplSetTest({nodes: 1});
 replTest.startSet({shardsvr: ''});
 replTest.initiate();
-waitForIsMaster(replTest.getPrimary());
+waitForPrimary(replTest.getPrimary());
 
 jsTest.log("Going to add replica set as shard: " + tojson(replTest));
 assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: replTest.getURL()}));

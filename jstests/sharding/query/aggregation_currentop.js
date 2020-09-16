@@ -884,7 +884,7 @@ assert.commandFailedWithCode(
 
 // Test that an operation which is at the BSON user size limit does not throw an error when the
 // currentOp metadata is added to the output document.
-const bsonUserSizeLimit = assert.commandWorked(shardAdminDB.isMaster()).maxBsonObjectSize;
+const bsonUserSizeLimit = assert.commandWorked(shardAdminDB.hello()).maxBsonObjectSize;
 
 let aggPipeline = [
     {$currentOp: {}},
