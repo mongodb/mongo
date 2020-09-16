@@ -129,8 +129,8 @@ structs:
                 cpp_name: _id
                 type: Value
                 optional: true
-                description: "Used by tests in replication and also by resharding to store
-                              timestamps."
+                description: "Used by tests in replication and also by production resharding code to
+                              store timestamps."
             stmtId:
                 cpp_name: statementId
                 type: StmtId

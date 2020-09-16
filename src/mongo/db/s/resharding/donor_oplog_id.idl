@@ -42,8 +42,8 @@ structs:
             clusterTime:
                 type: timestamp
                 description: >-
-                    The clusterTime of the final oplog entry of a transaction. If the operation is
-                    not from a transaction, then it is the same value as the ts field.
+                    The oplog entry timestamp of the final oplog entry of a transaction. If the
+                    operation is not from a transaction, then it is the same value as the ts field.
             ts:
                 type: timestamp
-                description: "The clusterTime of this operation."
+                description: "The oplog entry timestamp associated with this operation."

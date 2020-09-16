@@ -31,16 +31,23 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/s/resharding_util.h"
+
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/s/resharding_util.h"
+#include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -263,18 +270,7 @@ void createSlimOplogView(OperationContext* opCtx, Database* db) {
             // by zeroing out their `prevOpTime`.
             CollectionOptions options;
             options.viewOn = NamespaceString::kRsOplogNamespace.coll().toString();
-            options.pipeline = BSON_ARRAY(BSON(
-                "$project" << BSON(
-                    "_id"
-                    << "$ts"
-                    << "op" << 1 << "o" << BSON("applyOps" << BSON("ui" << 1 << "reshardDest" << 1))
-                    << "ts" << 1 << "prevOpTime.ts"
-                    << BSON("$cond" << BSON("if" << BSON("$eq" << BSON_ARRAY(BSON("$type"
-                                                                                  << "$stmtId")
-                                                                             << "missing"))
-                                                 << "then"
-                                                 << "$prevOpTime.ts"
-                                                 << "else" << Timestamp::min())))));
+            options.pipeline = BSON_ARRAY(getSlimOplogPipeline());
             WriteUnitOfWork wuow(opCtx);
             uassertStatusOK(
                 db->createView(opCtx,
@@ -282,6 +278,201 @@ void createSlimOplogView(OperationContext* opCtx, Database* db) {
                                options));
             wuow.commit();
         });
+}
+
+BSONObj getSlimOplogPipeline() {
+    return BSON("$project" << BSON(
+                    "_id"
+                    << "$ts"
+                    << "op" << 1 << "o"
+                    << BSON("applyOps" << BSON("ui" << 1 << "destinedRecipient" << 1)) << "ts" << 1
+                    << "prevOpTime.ts"
+                    << BSON("$cond" << BSON("if" << BSON("$eq" << BSON_ARRAY(BSON("$type"
+                                                                                  << "$stmtId")
+                                                                             << "missing"))
+                                                 << "then"
+                                                 << "$prevOpTime.ts"
+                                                 << "else" << Timestamp::min()))));
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForResharding(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ReshardingDonorOplogId& startAfter,
+    UUID collUUID,
+    const ShardId& recipientShard,
+    bool doesDonorOwnMinKeyChunk) {
+
+    using Doc = Document;
+    using Arr = std::vector<Value>;
+    using V = Value;
+    const Value EXISTS = V{Doc{{"$exists", true}}};
+    const Value DNE = V{Doc{{"$exists", false}}};
+
+    Pipeline::SourceContainer stages;
+    // The node receiving the query verifies continuity of oplog entries (i.e: that the recipient
+    // hasn't fallen off the oplog). This stage provides the input timestamp that the donor uses for
+    // verification.
+    stages.emplace_back(DocumentSourceMatch::create(
+        Doc{{"ts", Doc{{"$gte", startAfter.getTs()}}}}.toBson(), expCtx));
+
+    const Value captureCommandsOnCollectionClause = doesDonorOwnMinKeyChunk
+        ? V{Doc{{"op", "c"_sd}, {"ui", collUUID}}}
+        : V{Doc{{"op", "c"_sd}, {"ui", collUUID}, {"o.drop", EXISTS}}};
+
+    stages.emplace_back(DocumentSourceMatch::create(
+        Doc{{"$or",
+             // Only capture CRUD operations relevant for the `destinedRecipient`.
+             Arr{V{Doc{{"op", Doc{{"$in", Arr{V{"i"_sd}, V{"u"_sd}, V{"d"_sd}, V{"n"_sd}}}}},
+                       {"ui", collUUID},
+                       {"destinedRecipient", recipientShard.toString()}}},
+                 // Capture all commands. One cannot determine if a command is relevant to the
+                 // `destinedRecipient` until after oplog chaining via `prevOpTime` is resolved.
+                 V{Doc{{"op", "c"_sd},
+                       {"o.applyOps", EXISTS},
+                       {"o.partialTxn", DNE},
+                       {"o.prepare", DNE}}},
+                 V{Doc{{"op", "c"_sd}, {"o.commitTransaction", EXISTS}}},
+                 V{Doc{{"op", "c"_sd}, {"o.abortTransaction", EXISTS}}},
+                 captureCommandsOnCollectionClause}}}
+            .toBson(),
+        expCtx));
+
+    // Denormalize oplog chaining. This will shove meta-information (particularly timestamps and
+    // `destinedRecipient`) into the current aggregation output (still a raw oplog entry). This
+    // meta-information is used for performing $lookups against the timestamp field and filtering
+    // out earlier commands where the necessary `destinedRecipient` data wasn't yet available.
+    stages.emplace_back(DocumentSourceGraphLookUp::create(
+        expCtx,
+        NamespaceString("local.system.resharding.slimOplogForGraphLookup"),  // from
+        "history",                                                           // as
+        "prevOpTime.ts",                                                     // connectFromField
+        "ts",                                                                // connectToField
+        ExpressionFieldPath::parse(expCtx.get(),
+                                   "$ts",
+                                   expCtx->variablesParseState),  // startWith
+        boost::none,                                              // additionalFilter
+        boost::optional<FieldPath>("depthForResharding"),         // depthField
+        boost::none,                                              // maxDepth
+        boost::none));                                            // unwindSrc
+
+    // Only keep oplog entries for the relevant `destinedRecipient`.
+    stages.emplace_back(DocumentSourceMatch::create(
+        Doc{{"$or",
+             Arr{V{Doc{{"history", Doc{{"$size", 1}}},
+                       {"$or",
+                        Arr{V{Doc{{"history.0.op", Doc{{"$ne", "c"_sd}}}}},
+                            V{Doc{{"history.0.op", "c"_sd}, {"history.0.o.applyOps", DNE}}}}}}},
+                 V{Doc{{"history",
+                        Doc{{"$elemMatch",
+                             Doc{{"op", "c"_sd},
+                                 {"o.applyOps",
+                                  Doc{{"$elemMatch",
+                                       Doc{{"ui", collUUID},
+                                           {"destinedRecipient",
+                                            recipientShard.toString()}}}}}}}}}}}}}}
+            .toBson(),
+        expCtx));
+
+    // There's no guarantee to the order of entries accumulated in $graphLookup. The $reduce
+    // expression sorts the `history` array in ascending `depthForResharding` order. The
+    // $reverseArray expression will give an array in ascending timestamp order.
+    stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
+                    history: {$reverseArray: {$reduce: {\
+                        input: '$history',\
+                        initialValue: {$range: [0, {$size: '$history'}]},\
+                        in: {$concatArrays: [\
+                            {$slice: ['$$value', '$$this.depthForResharding']},\
+                            ['$$this'],\
+                            {$slice: [\
+                                '$$value',\
+                                {$subtract: [\
+                                    {$add: ['$$this.depthForResharding', 1]},\
+                                    {$size: '$history'}]}]}]}}}}}"),
+                                                        expCtx));
+
+    // If the last entry in the history is an `abortTransaction`, leave the `abortTransaction` oplog
+    // entry in place, but remove all prior `applyOps` entries. The `abortTransaction` entry is
+    // required to update the `config.transactions` table. Removing the `applyOps` entries ensures
+    // we don't make any data writes that would have to be undone.
+    stages.emplace_back(DocumentSourceAddFields::create(fromjson("{\
+                        'history': {$let: {\
+                            vars: {lastEntry: {$arrayElemAt: ['$history', -1]}},\
+                            in: {$cond: {\
+                                if: {$and: [\
+                                    {$eq: ['$$lastEntry.op', 'c']},\
+                                    {$ne: [{$type: '$$lastEntry.o.abortTransaction'}, 'missing']}\
+                                ]},\
+                                then: ['$$lastEntry'],\
+                                else: '$history'}}}}}"),
+                                                        expCtx));
+
+    // Unwind the history array. The output at this point is a new stream of oplog entries, each
+    // with exactly one history element. If there are no multi-oplog transactions (e.g: large
+    // transactions, prepared transactions), the documents will be in timestamp order. In the
+    // presence of large or prepared transactions, the data writes that were part of prior oplog
+    // entries will be adjacent to each other, terminating with a `commitTransaction` oplog entry.
+    stages.emplace_back(DocumentSourceUnwind::create(expCtx, "history", false, boost::none));
+
+    // Group the relevant timestamps into an `_id` field. The `_id.clusterTime` value is the
+    // timestamp of the last entry in a multi-oplog entry transaction. The `_id.ts` value is the
+    // timestamp of the oplog entry that operation appeared in. For typical CRUD operations, these
+    // are the same. In multi-oplog entry transactions, `_id.clusterTime` may be later than
+    // `_id.ts`.
+    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
+        fromjson("{$replaceRoot: {newRoot: {$mergeObjects: [\
+                     '$history',\
+                     {_id: {clusterTime: '$ts', ts: '$history.ts'}}]}}}")
+            .firstElement(),
+        expCtx));
+
+    // Now that the chained oplog entries are adjacent with an annotated `ReshardingDonorOplogId`,
+    // the pipeline can prune anything earlier than the resume time.
+    stages.emplace_back(DocumentSourceMatch::create(
+        Doc{{"_id", Doc{{"$gt", startAfter.toBSON()}}}}.toBson(), expCtx));
+
+    // Using the `ts` field, attach the full oplog document. Note that even for simple oplog
+    // entries, the oplog contents were thrown away making this step necessary for all documents.
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(Doc{{"$lookup",
+                                                                  Doc{{"from", "oplog.rs"_sd},
+                                                                      {"localField", "ts"_sd},
+                                                                      {"foreignField", "ts"_sd},
+                                                                      {"as", "fullEntry"_sd}}}}
+                                                                 .toBson()
+                                                                 .firstElement(),
+                                                             expCtx));
+
+    // The outer fields of the pipeline document only contain meta-information about the
+    // operation. The prior `$lookup` places the actual operations into a `fullEntry` array of size
+    // one (timestamps are unique, thus always exactly one value).
+    stages.emplace_back(DocumentSourceUnwind::create(expCtx, "fullEntry", false, boost::none));
+
+    // Keep only the oplog entry from the `$lookup` merged with the `_id`.
+    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
+        fromjson("{$replaceRoot: {newRoot: {$mergeObjects: ['$fullEntry', {_id: '$_id'}]}}}")
+            .firstElement(),
+        expCtx));
+
+    // Filter out anything inside of an `applyOps` specifically destined for another shard. This
+    // ensures zone restrictions are obeyed. Data will never be sent to a shard that it isn't meant
+    // to end up on.
+    stages.emplace_back(DocumentSourceAddFields::create(
+        Doc{{"o.applyOps",
+             Doc{{"$cond",
+                  Doc{{"if", Doc{{"$eq", Arr{V{"$op"_sd}, V{"c"_sd}}}}},
+                      {"then",
+                       Doc{{"$filter",
+                            Doc{{"input", "$o.applyOps"_sd},
+                                {"cond",
+                                 Doc{{"$and",
+                                      Arr{V{Doc{{"$eq", Arr{V{"$$this.ui"_sd}, V{collUUID}}}}},
+                                          V{Doc{{"$eq",
+                                                 Arr{V{"$$this.destinedRecipient"_sd},
+                                                     V{recipientShard.toString()}}}}}}}}}}}}},
+                      {"else", "$o.applyOps"_sd}}}}}}
+            .toBson(),
+        expCtx));
+
+    return Pipeline::create(std::move(stages), expCtx);
 }
 
 }  // namespace mongo

@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
@@ -125,5 +126,18 @@ std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResh
  * recipient performs on a donor.
  */
 void createSlimOplogView(OperationContext* opCtx, Database* db);
+
+BSONObj getSlimOplogPipeline();
+
+/**
+ * Creates a pipeline that can be serialized into a query for fetching oplog entries. `startAfter`
+ * may be `Timestamp::isNull()` to fetch from the beginning of the oplog.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForResharding(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ReshardingDonorOplogId& startAfter,
+    UUID collUUID,
+    const ShardId& recipientShard,
+    bool doesDonorOwnMinKeyChunk);
 
 }  // namespace mongo
