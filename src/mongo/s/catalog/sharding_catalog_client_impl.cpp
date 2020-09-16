@@ -94,8 +94,6 @@ const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::Prim
 const int kMaxReadRetry = 3;
 const int kMaxWriteRetry = 3;
 
-const int kRetryableBatchWriteBSONSizeOverhead = kWriteCommandBSONArrayPerElementOverheadBytes * 2;
-
 const NamespaceString kSettingsNamespace("config", "settings");
 
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
@@ -869,7 +867,8 @@ void ShardingCatalogClientImpl::insertConfigDocumentsAsRetryableWrite(
         BSONObj toAdd = docs.back();
         docs.pop_back();
 
-        const int docSizePlusOverhead = toAdd.objsize() + kRetryableBatchWriteBSONSizeOverhead;
+        const int docSizePlusOverhead =
+            toAdd.objsize() + write_ops::kRetryableAndTxnBatchWriteBSONSizeOverhead;
         // Check if pushing this object will exceed the batch size limit or the max object size
         if ((workingBatchItemSize + 1 > write_ops::kMaxWriteBatchSize) ||
             (workingBatchDocSize + docSizePlusOverhead > BSONObjMaxUserSize)) {

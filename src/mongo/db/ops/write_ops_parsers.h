@@ -44,6 +44,9 @@ namespace write_ops {
 // byte (zero terminator) = 7 bytes
 constexpr int kWriteCommandBSONArrayPerElementOverheadBytes = 7;
 
+constexpr int kRetryableAndTxnBatchWriteBSONSizeOverhead =
+    kWriteCommandBSONArrayPerElementOverheadBytes * 2;
+
 /**
  * Parses the 'limit' property of a delete entry, which has inverted meaning from the 'multi'
  * property of an update.

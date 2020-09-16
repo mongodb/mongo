@@ -88,32 +88,6 @@ MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeUpdatingChunks);
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeCommit);
 
 namespace {
-
-OpMsg runCommandInLocalTxn(OperationContext* opCtx,
-                           StringData db,
-                           bool startTransaction,
-                           TxnNumber txnNumber,
-                           BSONObj cmdObj) {
-    BSONObjBuilder bob(std::move(cmdObj));
-    if (startTransaction) {
-        bob.append("startTransaction", true);
-    }
-    bob.append("autocommit", false);
-    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
-
-    BSONObjBuilder lsidBuilder(bob.subobjStart("lsid"));
-    opCtx->getLogicalSessionId()->serialize(&bob);
-    lsidBuilder.doneFast();
-
-    return OpMsg::parseOwned(
-        opCtx->getServiceContext()
-            ->getServiceEntryPoint()
-            ->handleRequest(opCtx,
-                            OpMsgRequest::fromDBAndBody(db.toString(), bob.obj()).serialize())
-            .get()
-            .response);
-}
-
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 static constexpr int kMaxNumStaleShardVersionRetries = 10;
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
@@ -163,16 +137,11 @@ boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
     return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
 }
 
-Status updateConfigDocumentInTxn(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const BSONObj& query,
-                                 const BSONObj& update,
-                                 bool upsert,
-                                 bool useMultiUpdate,
-                                 bool startTransaction,
-                                 TxnNumber txnNumber) {
-    invariant(nss.db() == NamespaceString::kConfigDb);
-
+BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
+                                    const BSONObj& query,
+                                    const BSONObj& update,
+                                    bool upsert,
+                                    bool useMultiUpdate) {
     BatchedCommandRequest request([&] {
         write_ops::Update updateOp(nss);
         updateOp.setUpdates({[&] {
@@ -186,20 +155,14 @@ Status updateConfigDocumentInTxn(OperationContext* opCtx,
         return updateOp;
     }());
 
-    return getStatusFromWriteCommandReply(
-        runCommandInLocalTxn(opCtx, nss.db(), startTransaction, txnNumber, request.toBSON()).body);
+    return request;
 }
 
-Status pipelineUpdateConfigDocumentInTxn(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         const BSONObj& query,
-                                         const std::vector<BSONObj>& updates,
-                                         bool upsert,
-                                         bool useMultiUpdate,
-                                         bool startTransaction,
-                                         TxnNumber txnNumber) {
-    invariant(nss.db() == NamespaceString::kConfigDb);
-
+BatchedCommandRequest buildPipelineUpdateOp(const NamespaceString& nss,
+                                            const BSONObj& query,
+                                            const std::vector<BSONObj>& updates,
+                                            bool upsert,
+                                            bool useMultiUpdate) {
     BatchedCommandRequest request([&] {
         write_ops::Update updateOp(nss);
         updateOp.setUpdates({[&] {
@@ -213,68 +176,7 @@ Status pipelineUpdateConfigDocumentInTxn(OperationContext* opCtx,
         return updateOp;
     }());
 
-    return getStatusFromWriteCommandReply(
-        runCommandInLocalTxn(opCtx, nss.db(), startTransaction, txnNumber, request.toBSON()).body);
-}
-
-Status updateShardingCatalogEntryForCollectionInTxn(OperationContext* opCtx,
-                                                    const NamespaceString& nss,
-                                                    const CollectionType& coll,
-                                                    const bool upsert,
-                                                    const bool startTransaction,
-                                                    TxnNumber txnNumber) {
-    fassert(51249, coll.validate());
-
-    auto status = updateConfigDocumentInTxn(opCtx,
-                                            CollectionType::ConfigNS,
-                                            BSON(CollectionType::fullNs(nss.ns())),
-                                            coll.toBSON(),
-                                            upsert,
-                                            false /* multi */,
-                                            startTransaction,
-                                            txnNumber);
-    return status.withContext(str::stream() << "Collection metadata write failed");
-}
-
-Status commitTxnForConfigDocument(OperationContext* opCtx, TxnNumber txnNumber) {
-    // Swap out the clients in order to get a fresh opCtx. Previous operations in this transaction
-    // that have been run on this opCtx would have set the timeout in the locker on the opCtx, but
-    // commit should not have a lock timeout.
-    auto newClient = getGlobalServiceContext()->makeClient("commitRefineShardKey");
-    AlternativeClientRegion acr(newClient);
-    auto commitOpCtx = cc().makeOperationContext();
-    AuthorizationSession::get(commitOpCtx.get()->getClient())
-        ->grantInternalAuthorization(commitOpCtx.get()->getClient());
-    commitOpCtx.get()->setLogicalSessionId(opCtx->getLogicalSessionId().get());
-    commitOpCtx.get()->setTxnNumber(txnNumber);
-
-    BSONObjBuilder bob;
-    bob.append("commitTransaction", true);
-    bob.append("autocommit", false);
-    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
-    bob.append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::Majority);
-
-    BSONObjBuilder lsidBuilder(bob.subobjStart("lsid"));
-    commitOpCtx->getLogicalSessionId()->serialize(&bob);
-    lsidBuilder.doneFast();
-
-    const auto cmdObj = bob.obj();
-
-    const auto replyOpMsg =
-        OpMsg::parseOwned(commitOpCtx->getServiceContext()
-                              ->getServiceEntryPoint()
-                              ->handleRequest(commitOpCtx.get(),
-                                              OpMsgRequest::fromDBAndBody(
-                                                  NamespaceString::kAdminDb.toString(), cmdObj)
-                                                  .serialize())
-                              .get()
-                              .response);
-
-    auto commandStatus = getStatusFromCommandResult(replyOpMsg.body);
-    if (!commandStatus.isOK()) {
-        return commandStatus;
-    }
-    return getWriteConcernStatusFromCommandResult(replyOpMsg.body);
+    return request;
 }
 
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx, const NamespaceString& nss) {
@@ -747,12 +649,8 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
             ->grantInternalAuthorization(asr.opCtx()->getClient());
         TxnNumber txnNumber = 0;
 
-        uassertStatusOK(updateShardingCatalogEntryForCollectionInTxn(asr.opCtx(),
-                                                                     nss,
-                                                                     collType,
-                                                                     false /* upsert */,
-                                                                     true /* startTransaction */,
-                                                                     txnNumber));
+        updateShardingCatalogEntryForCollectionInTxn(
+            asr.opCtx(), nss, collType, false /* upsert */, true /* startTransaction */, txnNumber);
 
         LOGV2(21933,
               "refineCollectionShardKey updated collection entry for {namespace}: took "
@@ -774,14 +672,17 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         // to the newly-generated objectid, (ii) their bounds for each new field in the refined
         // key to MinKey (except for the global max chunk where the max bounds are set to
         // MaxKey), and unsetting (iii) their jumbo field.
-        uassertStatusOK(pipelineUpdateConfigDocumentInTxn(asr.opCtx(),
-                                                          ChunkType::ConfigNS,
-                                                          BSON("ns" << nss.ns()),
-                                                          chunkUpdates,
-                                                          false,  // upsert
-                                                          true,   // useMultiUpdate
-                                                          false,  // startTransaction
-                                                          txnNumber));
+        uassertStatusOK(getStatusFromWriteCommandReply(
+            writeToConfigDocumentInTxn(asr.opCtx(),
+                                       ChunkType::ConfigNS,
+                                       buildPipelineUpdateOp(ChunkType::ConfigNS,
+                                                             BSON("ns" << nss.ns()),
+                                                             chunkUpdates,
+                                                             false,  // upsert
+                                                             true    // useMultiUpdate
+                                                             ),
+                                       false,  // startTransaction
+                                       txnNumber)));
 
         LOGV2(21935,
               "refineCollectionShardKey: updated chunk entries for {namespace}: took "
@@ -795,14 +696,17 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         // Update all config.tags entries for the given namespace by setting their bounds for
         // each new field in the refined key to MinKey (except for the global max tag where the
         // max bounds are set to MaxKey).
-        uassertStatusOK(pipelineUpdateConfigDocumentInTxn(asr.opCtx(),
-                                                          TagsType::ConfigNS,
-                                                          BSON("ns" << nss.ns()),
-                                                          tagUpdates,
-                                                          false,  // upsert
-                                                          true,   // useMultiUpdate
-                                                          false,  // startTransaction
-                                                          txnNumber));
+        uassertStatusOK(getStatusFromWriteCommandReply(
+            writeToConfigDocumentInTxn(asr.opCtx(),
+                                       TagsType::ConfigNS,
+                                       buildPipelineUpdateOp(TagsType::ConfigNS,
+                                                             BSON("ns" << nss.ns()),
+                                                             tagUpdates,
+                                                             false,  // upsert
+                                                             true    // useMultiUpdate
+                                                             ),
+                                       false,  // startTransaction
+                                       txnNumber)));
 
 
         LOGV2(21936,
@@ -819,7 +723,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         }
 
         // Note this will wait for majority write concern.
-        uassertStatusOK(commitTxnForConfigDocument(asr.opCtx(), txnNumber));
+        commitTxnForConfigDocument(asr.opCtx(), txnNumber);
     }
 
     ShardingLogging::get(opCtx)->logChange(opCtx,
@@ -841,6 +745,29 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
             "error"_attr = ex.toStatus(),
             "namespace"_attr = nss.ns());
     }
+}
+
+void ShardingCatalogManager::updateShardingCatalogEntryForCollectionInTxn(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionType& coll,
+    const bool upsert,
+    const bool startTransaction,
+    TxnNumber txnNumber) {
+    fassert(51249, coll.validate());
+
+    auto status = getStatusFromCommandResult(
+        writeToConfigDocumentInTxn(opCtx,
+                                   CollectionType::ConfigNS,
+                                   buildUpdateOp(CollectionType::ConfigNS,
+                                                 BSON(CollectionType::fullNs(nss.ns())),
+                                                 coll.toBSON(),
+                                                 upsert,
+                                                 false /* multi */
+                                                 ),
+                                   startTransaction,
+                                   txnNumber));
+    uassertStatusOKWithContext(status, "Collection metadata write failed");
 }
 
 }  // namespace mongo

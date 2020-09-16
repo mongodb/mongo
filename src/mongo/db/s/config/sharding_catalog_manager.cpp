@@ -33,8 +33,10 @@
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
+#include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -46,6 +48,9 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/transport/service_entry_point.h"
 
 namespace mongo {
 namespace {
@@ -55,6 +60,71 @@ const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::
 // This value is initialized only if the node is running as a config server
 const auto getShardingCatalogManager =
     ServiceContext::declareDecoration<boost::optional<ShardingCatalogManager>>();
+
+OpMsg runCommandInLocalTxn(OperationContext* opCtx,
+                           StringData db,
+                           bool startTransaction,
+                           TxnNumber txnNumber,
+                           BSONObj cmdObj) {
+    BSONObjBuilder bob(std::move(cmdObj));
+    if (startTransaction) {
+        bob.append("startTransaction", true);
+    }
+    bob.append("autocommit", false);
+    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
+
+    BSONObjBuilder lsidBuilder(bob.subobjStart("lsid"));
+    opCtx->getLogicalSessionId()->serialize(&bob);
+    lsidBuilder.doneFast();
+
+    return OpMsg::parseOwned(
+        opCtx->getServiceContext()
+            ->getServiceEntryPoint()
+            ->handleRequest(opCtx,
+                            OpMsgRequest::fromDBAndBody(db.toString(), bob.obj()).serialize())
+            .get()
+            .response);
+}
+
+void runCommitOrAbortTxnForConfigDocument(OperationContext* opCtx,
+                                          TxnNumber txnNumber,
+                                          std::string cmdName) {
+    // Swap out the clients in order to get a fresh opCtx. Previous operations in this transaction
+    // that have been run on this opCtx would have set the timeout in the locker on the opCtx, but
+    // commit should not have a lock timeout.
+    auto newClient = getGlobalServiceContext()->makeClient("ShardingCatalogManager");
+    AlternativeClientRegion acr(newClient);
+    auto newOpCtx = cc().makeOperationContext();
+    AuthorizationSession::get(newOpCtx.get()->getClient())
+        ->grantInternalAuthorization(newOpCtx.get()->getClient());
+    newOpCtx.get()->setLogicalSessionId(opCtx->getLogicalSessionId().get());
+    newOpCtx.get()->setTxnNumber(txnNumber);
+
+    BSONObjBuilder bob;
+    bob.append(cmdName, true);
+    bob.append("autocommit", false);
+    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
+    bob.append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::Majority);
+
+    BSONObjBuilder lsidBuilder(bob.subobjStart("lsid"));
+    newOpCtx->getLogicalSessionId()->serialize(&bob);
+    lsidBuilder.doneFast();
+
+    const auto cmdObj = bob.obj();
+
+    const auto replyOpMsg =
+        OpMsg::parseOwned(newOpCtx->getServiceContext()
+                              ->getServiceEntryPoint()
+                              ->handleRequest(newOpCtx.get(),
+                                              OpMsgRequest::fromDBAndBody(
+                                                  NamespaceString::kAdminDb.toString(), cmdObj)
+                                                  .serialize())
+                              .get()
+                              .response);
+
+    uassertStatusOK(getStatusFromCommandResult(replyOpMsg.body));
+    uassertStatusOK(getWriteConcernStatusFromCommandResult(replyOpMsg.body));
+}
 
 }  // namespace
 
@@ -393,6 +463,73 @@ StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(
     }
 
     return false;
+}
+
+BSONObj ShardingCatalogManager::writeToConfigDocumentInTxn(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           const BatchedCommandRequest& request,
+                                                           bool startTransaction,
+                                                           TxnNumber txnNumber) {
+    invariant(nss.db() == NamespaceString::kConfigDb);
+    return runCommandInLocalTxn(opCtx, nss.db(), startTransaction, txnNumber, request.toBSON())
+        .body;
+}
+
+void ShardingCatalogManager::insertConfigDocumentsInTxn(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        std::vector<BSONObj> docs,
+                                                        bool startTransaction,
+                                                        TxnNumber txnNumber) {
+    invariant(nss.db() == NamespaceString::kConfigDb);
+
+    std::vector<BSONObj> workingBatch;
+    size_t workingBatchItemSize = 0;
+    int workingBatchDocSize = 0;
+
+    auto doBatchInsert = [&]() {
+        BatchedCommandRequest request([&] {
+            write_ops::Insert insertOp(nss);
+            insertOp.setDocuments(workingBatch);
+            return insertOp;
+        }());
+
+        uassertStatusOK(getStatusFromWriteCommandReply(
+            writeToConfigDocumentInTxn(opCtx, nss, request, startTransaction, txnNumber)));
+    };
+
+    while (!docs.empty()) {
+        BSONObj toAdd = docs.back();
+        docs.pop_back();
+
+        const int docSizePlusOverhead =
+            toAdd.objsize() + write_ops::kRetryableAndTxnBatchWriteBSONSizeOverhead;
+        // Check if pushing this object will exceed the batch size limit or the max object size
+        if ((workingBatchItemSize + 1 > write_ops::kMaxWriteBatchSize) ||
+            (workingBatchDocSize + docSizePlusOverhead > BSONObjMaxUserSize)) {
+            doBatchInsert();
+
+            workingBatch.clear();
+            workingBatchItemSize = 0;
+            workingBatchDocSize = 0;
+        }
+
+        workingBatch.push_back(toAdd);
+        ++workingBatchItemSize;
+        workingBatchDocSize += docSizePlusOverhead;
+    }
+
+    if (!workingBatch.empty())
+        doBatchInsert();
+}
+
+void ShardingCatalogManager::commitTxnForConfigDocument(OperationContext* opCtx,
+                                                        TxnNumber txnNumber) {
+    runCommitOrAbortTxnForConfigDocument(opCtx, txnNumber, "commitTransaction");
+}
+
+void ShardingCatalogManager::abortTxnForConfigDocument(OperationContext* opCtx,
+                                                       TxnNumber txnNumber) {
+    runCommitOrAbortTxnForConfigDocument(opCtx, txnNumber, "abortTransaction");
 }
 
 }  // namespace mongo

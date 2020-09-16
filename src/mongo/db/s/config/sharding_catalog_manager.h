@@ -36,6 +36,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
@@ -181,6 +182,37 @@ public:
      * with any changes to the zones.
      */
     Lock::ExclusiveLock lockZoneMutex(OperationContext* opCtx);
+
+    /**
+     * Runs the write 'request' on namespace 'nss' in a transaction with 'txnNumber'. Write must be
+     * on a collection in the config database.
+     */
+    BSONObj writeToConfigDocumentInTxn(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const BatchedCommandRequest& request,
+                                       bool startTransaction,
+                                       TxnNumber txnNumber);
+
+    /**
+     * Inserts 'docs' to namespace 'nss' in a transaction with 'txnNumber'. Breaks into multiple
+     * batches if 'docs' is larger than the max batch size. Write must be on a collection in the
+     * config database.
+     */
+    void insertConfigDocumentsInTxn(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    std::vector<BSONObj> docs,
+                                    bool startTransaction,
+                                    TxnNumber txnNumber);
+
+    /**
+     * Runs commit for the transaction with 'txnNumber'.
+     */
+    void commitTxnForConfigDocument(OperationContext* opCtx, TxnNumber txnNumber);
+
+    /**
+     * Runs abort for the transaction with 'txnNumber'.
+     */
+    void abortTxnForConfigDocument(OperationContext* opCtx, TxnNumber txnNumber);
 
     //
     // Chunk Operations
@@ -338,6 +370,19 @@ public:
     void refineCollectionShardKey(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const ShardKeyPattern& newShardKey);
+
+    /**
+     * Runs a replacement update on config.collections for the collection entry for 'nss' in a
+     * transaction with 'txnNumber'. 'coll' is used as the replacement doc.
+     *
+     * Throws exception on errors.
+     */
+    void updateShardingCatalogEntryForCollectionInTxn(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const CollectionType& coll,
+                                                      const bool upsert,
+                                                      const bool startTransaction,
+                                                      TxnNumber txnNumber);
 
     /**
      * Creates a ScopedLock on the collection name in _namespaceSerializer. This is to prevent
