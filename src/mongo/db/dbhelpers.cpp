@@ -250,7 +250,26 @@ void Helpers::upsert(OperationContext* opCtx,
     request.setFromMigration(fromMigrate);
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
 
-    update(opCtx, context.db(), request);
+    ::mongo::update(opCtx, context.db(), request);
+}
+
+void Helpers::update(OperationContext* opCtx,
+                     const string& ns,
+                     const BSONObj& filter,
+                     const BSONObj& updateMod,
+                     bool fromMigrate) {
+    OldClientContext context(opCtx, ns);
+
+    const NamespaceString requestNs(ns);
+    auto request = UpdateRequest();
+    request.setNamespaceString(requestNs);
+
+    request.setQuery(filter);
+    request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(updateMod));
+    request.setFromMigration(fromMigrate);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
+
+    ::mongo::update(opCtx, context.db(), request);
 }
 
 void Helpers::putSingleton(OperationContext* opCtx, const char* ns, BSONObj obj) {
@@ -263,7 +282,7 @@ void Helpers::putSingleton(OperationContext* opCtx, const char* ns, BSONObj obj)
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(obj));
     request.setUpsert();
 
-    update(opCtx, context.db(), request);
+    ::mongo::update(opCtx, context.db(), request);
 
     CurOp::get(opCtx)->done();
 }

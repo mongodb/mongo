@@ -137,6 +137,18 @@ struct Helpers {
                        const BSONObj& updateMod,
                        bool fromMigrate = false);
 
+    /**
+     * Performs an update of 'updateMod' for the entry matching the given 'filter'.
+     * Callers are expected to hold the collection lock.
+     * Note: Query yielding is turned off, so both read and writes are performed
+     * on the same storage snapshot.
+     */
+    static void update(OperationContext* opCtx,
+                       const std::string& ns,
+                       const BSONObj& filter,
+                       const BSONObj& updateMod,
+                       bool fromMigrate = false);
+
     // TODO: this should be somewhere else probably
     /* Takes object o, and returns a new object with the
      * same field elements but the names stripped out.

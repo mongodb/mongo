@@ -391,8 +391,7 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     // commit quorum on (i.e., commit value set as non-zero or a valid tag) and vice-versa. So,
     // after this point, it's not possible for the index build's commit quorum value to get updated
     // to CommitQuorumOptions::kDisabled.
-
-    Status upsertStatus(ErrorCodes::InternalError, "Uninitialized value");
+    Status persistStatus = Status::OK();
 
     IndexBuildEntry indexbuildEntry(
         buildUUID, replState->collectionUUID, CommitQuorumOptions(), replState->indexNames);
@@ -400,15 +399,16 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     indexbuildEntry.setCommitReadyMembers(votersList);
 
     {
-        // Upserts doesn't need to acquire pbwm lock.
+        // Updates don't need to acquire pbwm lock.
         ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
-        upsertStatus = indexbuildentryhelpers::persistCommitReadyMemberInfo(opCtx, indexbuildEntry);
+        persistStatus =
+            indexbuildentryhelpers::persistCommitReadyMemberInfo(opCtx, indexbuildEntry);
     }
 
-    if (upsertStatus.isOK()) {
+    if (persistStatus.isOK()) {
         _signalIfCommitQuorumIsSatisfied(opCtx, replState);
     }
-    return upsertStatus;
+    return persistStatus;
 }
 
 void IndexBuildsCoordinatorMongod::setSignalAndCancelVoteRequestCbkIfActive(
