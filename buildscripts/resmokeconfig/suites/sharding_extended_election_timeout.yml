@@ -1,0 +1,17 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/sharding/range_deleter_shutdown_and_failover_during_set_fcv.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      readMode: commands
+  fixture:
+    class: ReplicaSetFixture
+    replset_config_options:
+      settings:
+        electionTimeoutMillis: 25000
+    num_nodes: 3
