@@ -283,7 +283,7 @@ def generate(env):
         )
     ))
 
-    # We can't allow these to interact with the cache beacuse the
+    # We can't allow these to interact with the cache because the
     # second action produces a file unknown to SCons. If caching were
     # permitted, the other two files could be retrieved from cache but
     # the file produced by the second action could not (and would not)
@@ -368,6 +368,14 @@ def generate(env):
             # This dependency is necessary so that we build into this
             # string before we create the file.
             icecc_version_string_value,
+
+            # TODO: SERVER-50587 We need to make explicit depends here because of NINJA_SKIP. Any
+            # dependencies in the nodes created in setupEnv with NINJA_SKIP would have
+            # that dependency chain hidden from ninja, so they won't be rebuilt unless
+            # added as dependencies here on this node that has NINJA_SKIP=False.
+            '$CC',
+            '$CXX',
+            icecc_version_file,
         ],
     )
 

@@ -987,7 +987,7 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
         variables[rule] = cmd
         if use_command_env:
             variables["env"] = get_command_env(env)
-        return rule, variables
+        return rule, variables, [tool_command]
 
     return get_response_file_command
 
@@ -1017,13 +1017,21 @@ def generate_command(env, node, action, targets, sources, executor=None):
     return cmd.replace("$", "$$")
 
 
-def get_shell_command(env, node, action, targets, sources, executor=None):
+def get_generic_shell_command(env, node, action, targets, sources, executor=None):
     return (
         "CMD",
         {
             "cmd": generate_command(env, node, action, targets, sources, executor=None),
             "env": get_command_env(env),
         },
+        # Since this function is a rule mapping provider, it must return a list of dependencies,
+        # and usually this would be the path to a tool, such as a compiler, used for this rule.
+        # However this function is to generic to be able to reliably extract such deps
+        # from the command, so we return a placeholder empty list. It should be noted that
+        # generally this function will not be used soley and is more like a template to generate
+        # the basics for a custom provider which may have more specific options for a provier
+        # function for a custom NinjaRuleMapping.
+        []
     )
 
 
@@ -1059,11 +1067,26 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
     if not comstr:
         return None
 
-    provider = __NINJA_RULE_MAPPING.get(comstr, get_shell_command)
-    rule, variables = provider(sub_env, node, action, tlist, slist, executor=executor)
+    provider = __NINJA_RULE_MAPPING.get(comstr, get_generic_shell_command)
+    rule, variables, provider_deps = provider(sub_env, node, action, tlist, slist, executor=executor)
 
     # Get the dependencies for all targets
     implicit = list({dep for tgt in tlist for dep in get_dependencies(tgt)})
+    for provider_dep in provider_deps:
+        provider_dep = sub_env.subst(provider_dep)
+        if not provider_dep:
+            continue
+
+        if isinstance(provider_dep, SCons.Node.Node):
+            implicit.append(provider_dep)
+            continue
+
+        provider_dep_abspath = sub_env.WhereIs(provider_dep)
+        if provider_dep_abspath:
+            implicit.append(provider_dep_abspath)
+            continue
+
+        raise Exception(f"Could not resolve path for {provider_dep} dependency on node '{node}'")
 
     ninja_build = {
         "order_only": get_order_only(node),
@@ -1127,7 +1150,7 @@ def register_custom_handler(env, name, handler):
 
 
 def register_custom_rule_mapping(env, pre_subst_string, rule):
-    """Register a custom handler for SCons function actions."""
+    """Register a function to call for a given rule."""
     global __NINJA_RULE_MAPPING
     __NINJA_RULE_MAPPING[pre_subst_string] = rule
 
@@ -1140,7 +1163,7 @@ def register_custom_rule(env, rule, command, description="", deps=None, pool=Non
     }
 
     if use_depfile:
-        rule_obj["depfile"] = os.path.join(get_path(env['NINJA_BUILDDIR']),'$out.depfile')
+        rule_obj["depfile"] = os.path.join(get_path(env['NINJA_BUILDDIR']), '$out.depfile')
 
     if deps is not None:
         rule_obj["deps"] = deps
@@ -1335,7 +1358,7 @@ def generate(env):
 
     # Provide a way for custom rule authors to easily access command
     # generation.
-    env.AddMethod(get_shell_command, "NinjaGetShellCommand")
+    env.AddMethod(get_generic_shell_command, "NinjaGetGenericShellCommand")
     env.AddMethod(gen_get_response_file_command, "NinjaGenResponseFileProvider")
 
     # Provides a way for users to handle custom FunctionActions they
