@@ -774,10 +774,10 @@ TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineAfterID) {
     auto [mockResults, expectedTransactions] =
         makeTransactions(numTransactions, [](size_t i) { return Timestamp(i + 1, 0); });
     auto middleTransaction = expectedTransactions.begin() + (numTransactions / 2);
+    auto middleTransactionSessionId = middleTransaction->getSessionId();
     expectedTransactions.erase(expectedTransactions.begin(), middleTransaction + 1);
 
-    auto pipeline =
-        constructPipeline(mockResults, Timestamp::max(), middleTransaction->getSessionId());
+    auto pipeline = constructPipeline(mockResults, Timestamp::max(), middleTransactionSessionId);
 
     ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
 }
