@@ -178,6 +178,8 @@ selector:
   - jstests/sharding/mongos_helloOk_protocol.js
   # Enable the following once SERVER-55725 is backported to 4.0.
   - jstests/sharding/time_zone_info_mongos.js
+  # Remove if/once SERVER-50547 is backported to 4.0.
+  - jstests/sharding/pipeline_length_limit.js
 executor:
   config:
     shell_options:

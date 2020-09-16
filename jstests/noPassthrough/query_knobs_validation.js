@@ -38,6 +38,7 @@ const expectedParamDefaults = {
     internalDocumentSourceSortMaxBlockingSortBytes: 100 * 1024 * 1024,
     internalLookupStageIntermediateDocumentMaxSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024,
+    internalPipelineLengthLimit: 2147483647,  // INT_MAX
     internalQueryMaxPushBytes: 100 * 1024 * 1024,
     internalQueryMaxAddToSetBytes: 100 * 1024 * 1024,
     // Should be half the value of 'internalQueryExecYieldIterations' parameter.
