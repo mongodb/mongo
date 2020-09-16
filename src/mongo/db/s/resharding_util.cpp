@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -57,6 +58,61 @@
 
 namespace mongo {
 using namespace fmt::literals;
+
+namespace {
+
+UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
+    dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
+
+    auto uuid = CollectionCatalog::get(opCtx).lookupUUIDByNSS(opCtx, nss);
+    invariant(uuid);
+
+    return *uuid;
+}
+
+// Assembles the namespace string for the temporary resharding collection based on the source
+// namespace components.
+NamespaceString getTempReshardingNss(StringData db, const UUID& sourceUuid) {
+    return NamespaceString(db,
+                           fmt::format("{}{}",
+                                       NamespaceString::kTemporaryReshardingCollectionPrefix,
+                                       sourceUuid.toString()));
+}
+
+// Ensure that this shard owns the document. This must be called after verifying that we
+// are in a resharding operation so that we are guaranteed that migrations are suspended.
+bool documentBelongsToMe(OperationContext* opCtx, CollectionShardingState* css, BSONObj doc) {
+    auto currentKeyPattern = ShardKeyPattern(css->getCollectionDescription(opCtx).getKeyPattern());
+    auto ownershipFilter = css->getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
+
+    return ownershipFilter.keyBelongsToMe(currentKeyPattern.extractShardKeyFromDoc(doc));
+}
+
+boost::optional<TypeCollectionDonorFields> getDonorFields(OperationContext* opCtx,
+                                                          const NamespaceString& sourceNss,
+                                                          BSONObj fullDocument) {
+    auto css = CollectionShardingState::get(opCtx, sourceNss);
+    auto collDesc = css->getCollectionDescription(opCtx);
+
+    if (!collDesc.isSharded())
+        return boost::none;
+
+    const auto& reshardingFields = collDesc.getReshardingFields();
+    if (!reshardingFields)
+        return boost::none;
+
+    const auto& donorFields = reshardingFields->getDonorFields();
+    if (!donorFields)
+        return boost::none;
+
+    if (!documentBelongsToMe(opCtx, css, fullDocument))
+        return boost::none;
+
+    return donorFields;
+}
+
+}  // namespace
 
 NamespaceString constructTemporaryReshardingNss(const NamespaceString& originalNss,
                                                 const ChunkManager& cm) {
@@ -473,6 +529,33 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
         expCtx));
 
     return Pipeline::create(std::move(stages), expCtx);
+}
+
+boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
+                                              const NamespaceString& sourceNss,
+                                              BSONObj fullDocument) {
+    auto donorFields = getDonorFields(opCtx, sourceNss, fullDocument);
+    if (!donorFields)
+        return boost::none;
+
+    bool allowLocks = true;
+    auto tempNssRoutingInfo = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+        opCtx,
+        getTempReshardingNss(sourceNss.db(), getCollectionUuid(opCtx, sourceNss)),
+        allowLocks);
+
+    uassert(ErrorCodes::ShardInvalidatedForTargeting,
+            "Routing information is not available for the temporary resharding collection.",
+            tempNssRoutingInfo.getStatus() != ErrorCodes::StaleShardVersion);
+
+    uassertStatusOK(tempNssRoutingInfo);
+
+    auto reshardingKeyPattern = ShardKeyPattern(donorFields->getReshardingKey());
+    auto shardKey = reshardingKeyPattern.extractShardKeyFromDoc(fullDocument);
+
+    return tempNssRoutingInfo.getValue()
+        .findIntersectingChunkWithSimpleCollation(shardKey)
+        .getShardId();
 }
 
 }  // namespace mongo

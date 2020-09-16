@@ -69,6 +69,11 @@ protected:
         OperationContext* opCtx,
         const std::vector<repl::ReplOperation>& stmts,
         const repl::OpTime& prepareOrCommitOptime) override;
+
+    void shardAnnotateOplogEntry(OperationContext* opCtx,
+                                 const NamespaceString nss,
+                                 const BSONObj& doc,
+                                 repl::ReplOperation& op) override;
 };
 
 }  // namespace mongo

@@ -140,4 +140,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
     const ShardId& recipientShard,
     bool doesDonorOwnMinKeyChunk);
 
+/**
+ * Returns the shard Id of the recipient shard that would own the document under the new shard
+ * key pattern.
+ */
+boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
+                                              const NamespaceString& sourceNss,
+                                              BSONObj fullDocument);
+
 }  // namespace mongo

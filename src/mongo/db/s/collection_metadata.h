@@ -224,6 +224,11 @@ public:
      */
     void toBSONChunks(BSONArrayBuilder* builder) const;
 
+    const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
+        invariant(isSharded());
+        return _cm->getReshardingFields();
+    }
+
 private:
     // The full routing table for the collection or boost::none if the collection is not sharded
     boost::optional<ChunkManager> _cm;

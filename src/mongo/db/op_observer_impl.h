@@ -33,6 +33,12 @@
 
 namespace mongo {
 
+namespace repl {
+
+class ReplOperation;
+
+}
+
 class OpObserverImpl : public OpObserver {
     OpObserverImpl(const OpObserverImpl&) = delete;
     OpObserverImpl& operator=(const OpObserverImpl&) = delete;
@@ -213,6 +219,11 @@ private:
         OperationContext* opCtx,
         const std::vector<repl::ReplOperation>& stmts,
         const repl::OpTime& prepareOrCommitOptime) {}
+
+    virtual void shardAnnotateOplogEntry(OperationContext* opCtx,
+                                         const NamespaceString nss,
+                                         const BSONObj& doc,
+                                         repl::ReplOperation& op) {}
 };
 
 extern const OperationContext::Decoration<boost::optional<OpObserverImpl::DocumentKey>>

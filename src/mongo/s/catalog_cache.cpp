@@ -97,11 +97,16 @@ CatalogCache::~CatalogCache() {
 }
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
-                                                         StringData dbName) {
-    invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked(),
-              "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
-              "hold the lock during a network call, and can lead to a deadlock as described in "
-              "SERVER-37398.");
+                                                         StringData dbName,
+                                                         bool allowLocks) {
+    if (!allowLocks) {
+        invariant(
+            !opCtx->lockState() || !opCtx->lockState()->isLocked(),
+            "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
+            "hold the lock during a network call, and can lead to a deadlock as described in "
+            "SERVER-37398.");
+    }
+
     try {
         // TODO SERVER-49724: Make ReadThroughCache support StringData keys
         auto dbEntry =
@@ -120,14 +125,20 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
 }
 
 StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
-    OperationContext* opCtx, const NamespaceString& nss, boost::optional<Timestamp> atClusterTime) {
-    invariant(
-        !opCtx->lockState() || !opCtx->lockState()->isLocked(),
-        "Do not hold a lock while refreshing the catalog cache. Doing so would potentially hold "
-        "the lock during a network call, and can lead to a deadlock as described in SERVER-37398.");
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<Timestamp> atClusterTime,
+    bool allowLocks) {
+    if (!allowLocks) {
+        invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked(),
+                  "Do not hold a lock while refreshing the catalog cache. Doing so would "
+                  "potentially hold "
+                  "the lock during a network call, and can lead to a deadlock as described in "
+                  "SERVER-37398.");
+    }
 
     try {
-        const auto swDbInfo = getDatabase(opCtx, nss.db());
+        const auto swDbInfo = getDatabase(opCtx, nss.db(), allowLocks);
 
         if (!swDbInfo.isOK()) {
             if (swDbInfo == ErrorCodes::NamespaceNotFound) {
@@ -157,6 +168,10 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
                                 dbInfo.databaseVersion(),
                                 collEntryFuture.get(opCtx),
                                 atClusterTime);
+        }
+
+        if (allowLocks) {
+            return Status{ErrorCodes::StaleShardVersion, "Routing info refresh did not complete"};
         }
 
         operationBlockedBehindCatalogCacheRefresh(opCtx) = true;
@@ -192,14 +207,15 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
 }
 
 StatusWith<ChunkManager> CatalogCache::getCollectionRoutingInfo(OperationContext* opCtx,
-                                                                const NamespaceString& nss) {
-    return _getCollectionRoutingInfoAt(opCtx, nss, boost::none);
+                                                                const NamespaceString& nss,
+                                                                bool allowLocks) {
+    return _getCollectionRoutingInfoAt(opCtx, nss, boost::none, allowLocks);
 }
 
 StatusWith<ChunkManager> CatalogCache::getCollectionRoutingInfoAt(OperationContext* opCtx,
                                                                   const NamespaceString& nss,
                                                                   Timestamp atClusterTime) {
-    return _getCollectionRoutingInfoAt(opCtx, nss, atClusterTime);
+    return _getCollectionRoutingInfoAt(opCtx, nss, atClusterTime, false);
 }
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationContext* opCtx,

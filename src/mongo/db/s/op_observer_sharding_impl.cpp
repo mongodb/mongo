@@ -34,11 +34,13 @@
 #include "mongo/db/s/op_observer_sharding_impl.h"
 
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/active_move_primaries_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/resharding_util.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -212,6 +214,13 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
     opCtx->recoveryUnit()->registerChange(
         std::make_unique<LogTransactionOperationsForShardingHandler>(
             opCtx->getServiceContext(), stmts, prepareOrCommitOptime));
+}
+
+void OpObserverShardingImpl::shardAnnotateOplogEntry(OperationContext* opCtx,
+                                                     const NamespaceString nss,
+                                                     const BSONObj& doc,
+                                                     repl::ReplOperation& op) {
+    op.setDestinedRecipient(getDestinedRecipient(opCtx, nss, doc));
 }
 
 }  // namespace mongo

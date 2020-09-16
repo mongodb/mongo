@@ -85,6 +85,10 @@ public:
         return _impl->get().uuidMatches(uuid);
     }
 
+    const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
+        return _impl->get().getReshardingFields();
+    }
+
 protected:
     std::shared_ptr<Impl> _impl;
 };

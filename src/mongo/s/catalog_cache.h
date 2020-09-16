@@ -175,7 +175,9 @@ public:
      * and returns it. If the database was not in cache, all the sharded collections will be in the
      * 'needsRefresh' state.
      */
-    StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx, StringData dbName);
+    StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx,
+                                               StringData dbName,
+                                               bool allowLocks = false);
 
     /**
      * Blocking method to get the routing information for a specific collection at a given cluster
@@ -201,7 +203,8 @@ public:
      * always be available.
      */
     StatusWith<ChunkManager> getCollectionRoutingInfo(OperationContext* opCtx,
-                                                      const NamespaceString& nss);
+                                                      const NamespaceString& nss,
+                                                      bool allowLocks = false);
 
     /**
      * Same as getDatbase above, but in addition forces the database entry to be refreshed.
@@ -363,7 +366,8 @@ private:
 
     StatusWith<ChunkManager> _getCollectionRoutingInfoAt(OperationContext* opCtx,
                                                          const NamespaceString& nss,
-                                                         boost::optional<Timestamp> atClusterTime);
+                                                         boost::optional<Timestamp> atClusterTime,
+                                                         bool allowLocks = false);
 
     // Interface from which chunks will be retrieved
     CatalogCacheLoader& _cacheLoader;

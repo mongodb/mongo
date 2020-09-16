@@ -144,6 +144,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/grid',
+        'sharding_api_d',
     ],
 )
 
