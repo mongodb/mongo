@@ -322,7 +322,23 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                                       << " readConcern without replication enabled"};
             }
 
-            auto currentTime = LogicalClock::get(opCtx)->getClusterTime();
+            // We must read the member state before obtaining the cluster time. Otherwise, we can
+            // run into a race where the cluster time is read as uninitialized, but the member state
+            // is set to RECOVERING by another thread before we invariant that the node is in
+            // STARTUP or STARTUP2.
+            const auto memberState = replCoord->getMemberState();
+
+            const auto currentTime = LogicalClock::get(opCtx)->getClusterTime();
+            if (currentTime == LogicalTime::kUninitialized) {
+                // currentTime should only be uninitialized if we are in startup recovery or initial
+                // sync.
+                invariant(memberState.startup() || memberState.startup2());
+                return {ErrorCodes::NotPrimaryOrSecondary,
+                        str::stream() << "Current clusterTime is uninitialized, cannot service the "
+                                         "requested clusterTime. Requested clusterTime: "
+                                      << targetClusterTime->toString()
+                                      << "; current clusterTime: " << currentTime.toString()};
+            }
             if (currentTime < *targetClusterTime) {
                 return {ErrorCodes::InvalidOptions,
                         str::stream() << "readConcern " << readConcernName
