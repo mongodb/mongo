@@ -137,6 +137,32 @@ Status upsert(OperationContext* opCtx, const BSONObj& filter, const BSONObj& upd
                               });
 }
 
+Status update(OperationContext* opCtx, const BSONObj& filter, const BSONObj& updateMod) {
+    return writeConflictRetry(opCtx,
+                              "updateIndexBuildEntry",
+                              NamespaceString::kIndexBuildEntryNamespace.ns(),
+                              [&]() -> Status {
+                                  AutoGetCollection autoCollection(
+                                      opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
+                                  const Collection* collection = autoCollection.getCollection();
+                                  if (!collection) {
+                                      str::stream ss;
+                                      ss << "Collection not found: "
+                                         << NamespaceString::kIndexBuildEntryNamespace.ns();
+                                      return Status(ErrorCodes::NamespaceNotFound, ss);
+                                  }
+
+                                  WriteUnitOfWork wuow(opCtx);
+                                  Helpers::update(opCtx,
+                                                  NamespaceString::kIndexBuildEntryNamespace.ns(),
+                                                  filter,
+                                                  updateMod,
+                                                  /*fromMigrate=*/false);
+                                  wuow.commit();
+                                  return Status::OK();
+                              });
+}
+
 }  // namespace
 
 namespace indexbuildentryhelpers {
@@ -176,7 +202,11 @@ Status persistCommitReadyMemberInfo(OperationContext* opCtx,
               !indexBuildEntry.getCommitQuorum().isInitialized());
 
     auto [filter, updateMod] = buildIndexBuildEntryFilterAndUpdate(indexBuildEntry);
-    return upsert(opCtx, filter, updateMod);
+
+    // Only update if the document still exists. We update instead of upsert so that we don't race
+    // with the index build commit / abort that deletes the document; upserting after committing /
+    // aborting would insert instead, and lead to an orphaned document.
+    return update(opCtx, filter, updateMod);
 }
 
 Status persistIndexCommitQuorum(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry) {
