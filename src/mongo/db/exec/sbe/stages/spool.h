@@ -66,7 +66,7 @@ public:
 
 private:
     std::shared_ptr<SpoolBuffer> _buffer{nullptr};
-    size_t _bufferIt;
+    size_t _bufferIt{0};
     const SpoolId _spoolId;
 
     const value::SlotVector _vals;
@@ -242,7 +242,7 @@ public:
 
 private:
     std::shared_ptr<SpoolBuffer> _buffer{nullptr};
-    size_t _bufferIt;
+    size_t _bufferIt{0};
     const SpoolId _spoolId;
 
     const value::SlotVector _vals;
