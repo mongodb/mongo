@@ -35,6 +35,7 @@ const expectedParamDefaults = {
     internalDocumentSourceLookupCacheSizeBytes: 100 * 1024 * 1024,
     internalLookupStageIntermediateDocumentMaxSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024,
+    internalPipelineLengthLimit: 2147483647,  // INT_MAX
     internalQueryMaxJsEmitBytes: 100 * 1024 * 1024,
     internalQueryMaxPushBytes: 100 * 1024 * 1024,
     internalQueryMaxAddToSetBytes: 100 * 1024 * 1024,

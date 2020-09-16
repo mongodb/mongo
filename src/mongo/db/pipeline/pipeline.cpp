@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
@@ -202,6 +203,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::create(
 
 void Pipeline::validateCommon() const {
     size_t i = 0;
+
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "Pipeline length must be no longer than "
+                          << internalPipelineLengthLimit << " stages",
+            static_cast<int>(_sources.size()) <= internalPipelineLengthLimit);
+
     for (auto&& stage : _sources) {
         auto constraints = stage->constraints(_splitState);
 

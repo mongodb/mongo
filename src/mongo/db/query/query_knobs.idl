@@ -139,6 +139,19 @@ server_parameters:
     default: false
 
   #
+  # Parsing
+  #
+
+  internalPipelineLengthLimit:
+    description: "The maximum length allowed for an an aggregation pipeline."
+    set_at: [ startup ]
+    cpp_varname: "internalPipelineLengthLimit"
+    cpp_vartype: std::int32_t
+    default: 2147483647 # INT_MAX
+    validator:
+      gt: 0
+
+  #
   # Planning and enumeration
   #
   internalQueryPlannerMaxIndexedSolutions:
