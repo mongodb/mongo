@@ -1070,7 +1070,6 @@ public:
         _context->ensureArity(arity);
         auto frameId = _context->frameIdGenerator->generate();
 
-
         auto generateNotNumberOrDate = [frameId](const sbe::value::SlotId slotId) {
             sbe::EVariable var{frameId, slotId};
             return sbe::makeE<sbe::EPrimBinary>(
@@ -1289,9 +1288,57 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(operands), std::move(cmpWithFallback)));
     }
+
     void visit(ExpressionConcat* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+        auto frameId = _context->frameIdGenerator->generate();
+
+        std::vector<std::unique_ptr<sbe::EExpression>> binds;
+        std::vector<std::unique_ptr<sbe::EExpression>> checkNullArg;
+        std::vector<std::unique_ptr<sbe::EExpression>> checkStringArg;
+        std::vector<std::unique_ptr<sbe::EExpression>> argVars;
+        sbe::value::SlotId slot{0};
+        for (size_t idx = 0; idx < arity; ++idx, ++slot) {
+            sbe::EVariable var(frameId, slot);
+            binds.push_back(_context->popExpr());
+            checkNullArg.push_back(generateNullOrMissing(frameId, slot));
+            checkStringArg.push_back(
+                sbe::makeE<sbe::EFunction>("isString", sbe::makeEs(var.clone())));
+            argVars.push_back(var.clone());
+        }
+        std::reverse(std::begin(binds), std::end(binds));
+
+        using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+        auto checkNullAnyArgument =
+            std::accumulate(std::move_iterator<iter_t>(checkNullArg.begin() + 1),
+                            std::move_iterator<iter_t>(checkNullArg.end()),
+                            std::move(checkNullArg.front()),
+                            [](auto&& acc, auto&& ex) {
+                                return sbe::makeE<sbe::EPrimBinary>(
+                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                            });
+
+        auto checkStringAllArguments =
+            std::accumulate(std::move_iterator<iter_t>(checkStringArg.begin() + 1),
+                            std::move_iterator<iter_t>(checkStringArg.end()),
+                            std::move(checkStringArg.front()),
+                            [](auto&& acc, auto&& ex) {
+                                return sbe::makeE<sbe::EPrimBinary>(
+                                    sbe::EPrimBinary::logicAnd, std::move(acc), std::move(ex));
+                            });
+        auto concatExpr = sbe::makeE<sbe::EIf>(
+            std::move(checkNullAnyArgument),
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+            sbe::makeE<sbe::EIf>(std::move(checkStringAllArguments),
+                                 sbe::makeE<sbe::EFunction>("concat", std::move(argVars)),
+                                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073001},
+                                                        "$concat supports only strings")));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(concatExpr)));
     }
+
     void visit(ExpressionConcatArrays* expr) final {
         unsupportedExpression(expr->getOpName());
     }

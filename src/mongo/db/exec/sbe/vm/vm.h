@@ -197,6 +197,7 @@ enum class Builtin : uint8_t {
     toUpper,
     toLower,
     coerceToString,
+    concat,
     acos,
     acosh,
     asin,
@@ -520,6 +521,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinSinh(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTan(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTanh(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinConcat(uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 

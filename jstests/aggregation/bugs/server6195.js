@@ -1,7 +1,4 @@
 // ensure $concat asserts on string
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 load('jstests/aggregation/extras/utils.js');
 

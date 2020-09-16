@@ -1424,6 +1424,20 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinTanh(uint8_t ar
     return genericTanh(operandTag, operandValue);
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(uint8_t arity) {
+    StringBuilder result;
+    for (size_t idx = 0; idx < arity; ++idx) {
+        auto [_, tag, value] = getFromStack(idx);
+        if (!value::isString(tag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        result << sbe::value::getRawStringView(tag, value);
+    }
+
+    auto [strTag, strValue] = sbe::value::makeNewString(result.str());
+    return {true, strTag, strValue};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
@@ -1507,6 +1521,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinTan(arity);
         case Builtin::tanh:
             return builtinTanh(arity);
+        case Builtin::concat:
+            return builtinConcat(arity);
     }
 
     MONGO_UNREACHABLE;
