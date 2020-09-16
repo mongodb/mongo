@@ -1221,7 +1221,7 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
                                                             << "ui" << UUID::gen() << "ns"
                                                             << "test.t"
                                                             << "wall" << Date_t() << "o"
-                                                            << BSON("convertToCapped"
+                                                            << BSON("emptycapped"
                                                                     << "t")),
                                                   RecordId(2));
 

@@ -271,7 +271,6 @@ public:
         kApplyOps,
         kDropDatabase,
         kEmptyCapped,
-        kConvertToCapped,
         kCreateIndexes,
         kStartIndexBuild,
         kCommitIndexBuild,

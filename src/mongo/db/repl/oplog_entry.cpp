@@ -61,8 +61,6 @@ OplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
         return OplogEntry::CommandType::kDropDatabase;
     } else if (commandString == "emptycapped") {
         return OplogEntry::CommandType::kEmptyCapped;
-    } else if (commandString == "convertToCapped") {
-        return OplogEntry::CommandType::kConvertToCapped;
     } else if (commandString == "createIndexes") {
         return OplogEntry::CommandType::kCreateIndexes;
     } else if (commandString == "startIndexBuild") {

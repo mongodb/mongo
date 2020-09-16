@@ -1729,19 +1729,11 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespacesOfCollMod
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsFailsOnUnsupportedOplogEntry) {
-    // 'convertToCapped' is not supported in rollback.
-    auto convertToCappedOp =
-        makeCommandOp(Timestamp(2, 2), boost::none, "test.$cmd", BSON("convertToCapped" << 1), 2);
-
-    auto status =
-        _rollback->_namespacesForOp_forTest(OplogEntry(convertToCappedOp.first)).getStatus();
-    ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status);
-
     // 'emptycapped' is not supported in rollback.
     auto emptycappedOp =
         makeCommandOp(Timestamp(2, 2), boost::none, "test.$cmd", BSON("emptycapped" << 1), 2);
 
-    status = _rollback->_namespacesForOp_forTest(OplogEntry(emptycappedOp.first)).getStatus();
+    auto status = _rollback->_namespacesForOp_forTest(OplogEntry(emptycappedOp.first)).getStatus();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status);
 }
 

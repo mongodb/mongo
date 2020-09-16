@@ -416,7 +416,6 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
                 break;
             }
             case OplogEntry::CommandType::kDbCheck:
-            case OplogEntry::CommandType::kConvertToCapped:
             case OplogEntry::CommandType::kEmptyCapped: {
                 // These commands do not need to be supported by rollback. 'convertToCapped' should
                 // always be converted to lower level DDL operations, and 'emptycapped' is a
