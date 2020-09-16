@@ -74,17 +74,21 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
 
     // Otherwise construct a metadata section from the list of authenticated users/roles
     auto authSession = AuthorizationSession::get(opCtx->getClient());
-    ImpersonatedUserMetadata metadata;
-    metadata.setUsers(userNameIteratorToContainer<std::vector<UserName>>(
-        authSession->getAuthenticatedUserNames()));
-
-    metadata.setRoles(roleNameIteratorToContainer<std::vector<RoleName>>(
-        authSession->getAuthenticatedRoleNames()));
+    auto userNames = authSession->getImpersonatedUserNames();
+    auto roleNames = authSession->getImpersonatedRoleNames();
+    if (!userNames.more() && !roleNames.more()) {
+        userNames = authSession->getAuthenticatedUserNames();
+        roleNames = authSession->getAuthenticatedRoleNames();
+    }
 
     // If there are no users/roles being impersonated just exit
-    if (metadata.getUsers().empty() && metadata.getRoles().empty()) {
+    if (!userNames.more() && !roleNames.more()) {
         return;
     }
+
+    ImpersonatedUserMetadata metadata;
+    metadata.setUsers(userNameIteratorToContainer<std::vector<UserName>>(userNames));
+    metadata.setRoles(roleNameIteratorToContainer<std::vector<RoleName>>(roleNames));
 
     BSONObjBuilder section(out->subobjStart(kImpersonationMetadataSectionName));
     metadata.serialize(&section);
