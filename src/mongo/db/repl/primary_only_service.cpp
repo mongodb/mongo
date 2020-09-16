@@ -537,7 +537,6 @@ void PrimaryOnlyService::_scheduleRun(WithLock wl, std::shared_ptr<Instance> ins
             if (ErrorCodes::isCancelationError(status) ||
                 ErrorCodes::InterruptedDueToReplStateChange ==  // from kExecutorShutdownStatus
                     status) {
-                instance->_completionPromise.setError(status);
                 return;
             }
             invariant(status);
@@ -545,16 +544,7 @@ void PrimaryOnlyService::_scheduleRun(WithLock wl, std::shared_ptr<Instance> ins
             invariant(!instance->_running);
             instance->_running = true;
 
-            instance->run(std::move(scopedExecutor))
-                .thenRunOn(std::move(executor))  // Must use executor for this since scopedExecutor
-                                                 // could be shut down by this point
-                .getAsync([instance](Status status) {
-                    if (status.isOK()) {
-                        instance->_completionPromise.emplaceValue();
-                    } else {
-                        instance->_completionPromise.setError(status);
-                    }
-                });
+            instance->run(std::move(scopedExecutor));
         });
 }
 

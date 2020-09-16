@@ -77,8 +77,7 @@ public:
 
         ~Instance();
 
-        SemiFuture<void> run(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
+        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
 
         void interrupt(Status status) override;
 
@@ -93,6 +92,14 @@ public:
          * Returns the latest durable migration state.
          */
         DurableState getDurableState(OperationContext* opCtx);
+
+        /**
+         * Returns a Future that will be resolved when all work associated with this Instance has
+         * completed running.
+         */
+        SharedSemiFuture<void> getCompletionFuture() const {
+            return _completionPromise.getFuture();
+        }
 
         void onReceiveDonorForgetMigration();
 
@@ -168,6 +175,9 @@ public:
 
         // Promise that is resolved when the donor receives the donorForgetMigration command.
         SharedPromise<void> _receiveDonorForgetMigrationPromise;
+
+        // Promise that is resolved when the chain of work kicked off by run() has completed.
+        SharedPromise<void> _completionPromise;
     };
 
 private:

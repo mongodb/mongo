@@ -82,9 +82,11 @@ public:
      * released from the PrimaryOnlyService object on stepdown, instance objects may continue to
      * exist until the subsequent stepUp. During stepUp, however, we join() any remaining tasks from
      * the previous term, guaranteeing that there will never be 2 Instance objects representing the
-     * same conceptual task coexisting.
-     * NOTE: PrimaryOnlyService implementations shouldn't have their Instance subclass extended this
-     * Instance class directly, instead they should extend TypedInstance, defined below.
+     * same conceptual task coexisting. Instance objects are released from the PrimaryOnlyService
+     * object when their corresponding state documents are removed.
+     * NOTE: PrimaryOnlyService
+     * implementations shouldn't have their Instance subclass extended this Instance class directly,
+     * instead they should extend TypedInstance, defined below.
      */
     class Instance {
     public:
@@ -92,19 +94,20 @@ public:
 
         virtual ~Instance() = default;
 
-        SharedSemiFuture<void> getCompletionFuture() {
-            return _completionPromise.getFuture();
-        }
-
     protected:
         /**
          * This is the main function that PrimaryOnlyService implementations will need to implement,
          * and is where the bulk of the work those services perform is scheduled. All work run for
          * this Instance *must* be scheduled on 'executor'. Instances are responsible for inserting,
          * updating, and deleting their state documents as needed.
+         *
+         * IMPORTANT NOTE: Once the state document for this Instance is deleted, all shared_ptr
+         * references to this Instance that are managed by the PrimaryOnlyService machinery are
+         * removed, so all work running on behalf of this Instance must extend the Instance's
+         * lifetime by getting a shared_ptr via 'shared_from_this' or else the Instance may be
+         * destroyed out from under them.
          */
-        virtual SemiFuture<void> run(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept = 0;
+        virtual void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept = 0;
 
         /**
          * This is the function that is called when this running Instance needs to be interrupted.
@@ -115,9 +118,6 @@ public:
 
     private:
         bool _running = false;
-
-        // Promise that gets emplaced when the future returned by run() resolves.
-        SharedPromise<void> _completionPromise;
     };
 
     /**

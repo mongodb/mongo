@@ -100,13 +100,12 @@ public:
               _state((State)_stateDoc["state"].Int()),
               _initialState(_state) {}
 
-        SemiFuture<void> run(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override {
+        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override {
             if (MONGO_unlikely(TestServiceHangDuringInitialization.shouldFail())) {
                 TestServiceHangDuringInitialization.pauseWhileSet();
             }
 
-            return SemiFuture<void>::makeReady()
+            SemiFuture<void>::makeReady()
                 .thenRunOn(**executor)
                 .then([self = shared_from_this()] {
                     self->_runOnce(State::kInitializing, State::kOne);
@@ -133,10 +132,32 @@ public:
                         TestServiceHangDuringCompletion.pauseWhileSet();
                     }
                 })
-                .semi();
+                .getAsync([self = shared_from_this()](Status status) {
+                    stdx::lock_guard lk(self->_mutex);
+                    if (self->_completionPromise.getFuture().isReady()) {
+                        // We were already interrupted
+                        return;
+                    }
+
+                    if (status.isOK()) {
+                        self->_completionPromise.emplaceValue();
+                    } else {
+                        self->_completionPromise.setError(status);
+                    }
+                });
         }
 
-        void interrupt(Status status) override{};
+        void interrupt(Status status) override {
+            stdx::lock_guard lk(_mutex);
+
+            if (_completionPromise.getFuture().isReady()) {
+                // We already completed
+                return;
+            }
+            invariant(!status.isOK());
+
+            _completionPromise.setError(status);
+        };
 
         int getID() {
             stdx::lock_guard lk(_mutex);
@@ -151,6 +172,14 @@ public:
         State getInitialState() {
             stdx::lock_guard lk(_mutex);
             return _initialState;
+        }
+
+        SharedSemiFuture<void> getDocumentWriteException() {
+            return _documentWriteException.getFuture();
+        }
+
+        SharedSemiFuture<void> getCompletionFuture() {
+            return _completionPromise.getFuture();
         }
 
     private:
@@ -179,12 +208,17 @@ public:
                 TestServiceHangBeforeWritingStateDoc.pauseWhileSet();
             }
 
-            auto opCtx = cc().makeOperationContext();
-            DBDirectClient client(opCtx.get());
-            if (targetState == State::kDone) {
-                client.remove("admin.test_service", _id);
-            } else {
-                client.update("admin.test_service", _id, newStateDoc, true /*upsert*/);
+            try {
+                auto opCtx = cc().makeOperationContext();
+                DBDirectClient client(opCtx.get());
+                if (targetState == State::kDone) {
+                    client.remove("admin.test_service", _id);
+                } else {
+                    client.update("admin.test_service", _id, newStateDoc, true /*upsert*/);
+                }
+            } catch (const DBException& e) {
+                _documentWriteException.setError(e.toStatus());
+                throw;
             }
         }
 
@@ -192,6 +226,9 @@ public:
         BSONObj _stateDoc;
         State _state = State::kInitializing;
         const State _initialState;
+        SharedPromise<void> _completionPromise;
+        // set only if doing a write to the state document throws an exception.
+        SharedPromise<void> _documentWriteException;
         Mutex _mutex = MONGO_MAKE_LATCH("PrimaryOnlyServiceTest::TestService::_mutex");
     };
 };
@@ -432,7 +469,7 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforePersisted) {
     ASSERT_THROWS_CODE_AND_WHAT(instance->getCompletionFuture().get(),
                                 DBException,
                                 ErrorCodes::InterruptedDueToReplStateChange,
-                                "PrimaryOnlyService executor shut down due to stepDown");
+                                "PrimaryOnlyService interrupted due to stepdown");
 
     stepUp();
 
@@ -601,7 +638,10 @@ TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByStepdown) {
     auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
     TestServiceHangBeforeWritingStateDoc.waitForTimesEntered(++timesEntered);
     stepDown();
+    ASSERT(!instance->getDocumentWriteException().isReady());
     TestServiceHangBeforeWritingStateDoc.setMode(FailPoint::off);
 
-    ASSERT_EQ(ErrorCodes::NotWritablePrimary, instance->getCompletionFuture().getNoThrow());
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange,
+              instance->getCompletionFuture().getNoThrow());
+    ASSERT_EQ(ErrorCodes::NotWritablePrimary, instance->getDocumentWriteException().getNoThrow());
 }

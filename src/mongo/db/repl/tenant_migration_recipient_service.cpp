@@ -222,10 +222,18 @@ void stopOnFailPoint(FailPoint* fp) {
 }
 }  // namespace
 
-SemiFuture<void> TenantMigrationRecipientService::Instance::run(
+void TenantMigrationRecipientService::Instance::interrupt(Status status) {
+    stdx::lock_guard lk(_mutex);
+    // Resolve any unresolved promises to avoid hanging.
+    if (!_completionPromise.getFuture().isReady()) {
+        _completionPromise.setError(status);
+    }
+}
+
+void TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     _scopedExecutor = executor;
-    return ExecutorFuture(**executor)
+    ExecutorFuture(**executor)
         .then([this]() { return _initializeStateDoc(); })
         .then([this] {
             stopOnFailPoint(&stopAfterPersistingTenantMigrationRecipientInstanceStateDoc);
@@ -246,17 +254,25 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // TODO SERVER-48808: Run cloners in MigrationServiceInstance
             // TODO SERVER-48811: Oplog fetching in MigrationServiceInstance
         })
-        .onCompletion([this](Status status) {
+        .getAsync([this](Status status) {
             LOGV2(4878501,
                   "Tenant Recipient data sync completed.",
                   "tenantId"_attr = getTenantId(),
                   "migrationId"_attr = getMigrationUUID(),
                   "error"_attr = status);
-            if (status.code() == stopFailPointErrorCode)
-                return Status::OK();
-            return status;
-        })
-        .semi();
+
+            stdx::lock_guard lk(_mutex);
+            if (_completionPromise.getFuture().isReady()) {
+                // interrupt() was called before we got here
+                return;
+            }
+
+            if (status.isOK() || status.code() == stopFailPointErrorCode) {
+                _completionPromise.emplaceValue();
+            } else {
+                _completionPromise.setError(status);
+            }
+        });
 }
 
 const UUID& TenantMigrationRecipientService::Instance::getMigrationUUID() const {

@@ -73,9 +73,17 @@ public:
     public:
         explicit Instance(BSONObj stateDoc);
 
-        SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept final;
+        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept final;
 
-        void interrupt(Status status) override{};
+        void interrupt(Status status) override;
+
+        /**
+         * Returns a Future that will be resolved when all work associated with this Instance has
+         * completed running.
+         */
+        SharedSemiFuture<void> getCompletionFuture() const {
+            return _completionPromise.getFuture();
+        }
 
         /*
          *  Returns the instance id.
@@ -128,6 +136,8 @@ public:
         const ReadPreferenceSetting _readPreference;
         // TODO(SERVER-50670): Populate authParams
         const BSONObj _authParams;
+        // Promise that is resolved when the chain of work kicked off by run() has completed.
+        SharedPromise<void> _completionPromise;
 
         std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;
 

@@ -151,6 +151,9 @@ void TenantMigrationDonorService::Instance::interrupt(Status status) {
     if (!_receiveDonorForgetMigrationPromise.getFuture().isReady()) {
         _receiveDonorForgetMigrationPromise.setError(status);
     }
+    if (!_completionPromise.getFuture().isReady()) {
+        _completionPromise.setError(status);
+    }
 }
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertStateDocument(
@@ -411,7 +414,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
                                    RecipientForgetMigration(_stateDoc.getId()).toBSON(BSONObj()));
 }
 
-SemiFuture<void> TenantMigrationDonorService::Instance::run(
+void TenantMigrationDonorService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     auto recipientUri =
         uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()));
@@ -422,7 +425,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             delete p;
         });
 
-    return ExecutorFuture<void>(**executor)
+    ExecutorFuture<void>(**executor)
         .then([this, executor] {
             if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
                 return ExecutorFuture<void>(**executor, Status::OK());
@@ -538,14 +541,24 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
                 });
         })
-        .onCompletion([this](Status status) {
+        .getAsync([this](Status status) {
             LOGV2(4920400,
                   "Marked migration state as garbage collectable",
                   "migrationId"_attr = _stateDoc.getId(),
                   "expireAt"_attr = _stateDoc.getExpireAt());
-            return status;
-        })
-        .semi();
+
+            stdx::lock_guard lk(_mutex);
+            if (_completionPromise.getFuture().isReady()) {
+                // interrupt() was called before we got here
+                return;
+            }
+
+            if (status.isOK()) {
+                _completionPromise.emplaceValue();
+            } else {
+                _completionPromise.setError(status);
+            }
+        });
 }
 
 }  // namespace mongo
