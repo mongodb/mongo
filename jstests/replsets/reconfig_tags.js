@@ -1,4 +1,4 @@
-// test that reconfigging only tag changes is properly reflected in isMaster
+// test that reconfigging only tag changes is properly reflected in hello
 
 var replTest = new ReplSetTest({nodes: 2});
 replTest.startSet({oplogSize: 10});
@@ -34,8 +34,8 @@ replTest.awaitSecondaryNodes();
 var testDB = primary.getDB('test');
 
 var newConn = new Mongo(primary.host);
-var isMaster = newConn.adminCommand({isMaster: 1});
-assert(isMaster.tags != null, 'isMaster: ' + tojson(isMaster));
+var hello = newConn.adminCommand({hello: 1});
+assert(hello.tags != null, 'hello: ' + tojson(hello));
 
-print('success: ' + tojson(isMaster));
+print('success: ' + tojson(hello));
 replTest.stopSet();

@@ -1,6 +1,6 @@
 /**
  * Tests the behavior of quiesce mode: the period during secondary shutdown where existing
- * operations are allowed to continue and new operations are accepted, but isMaster requests return
+ * operations are allowed to continue and new operations are accepted, but hello requests return
  * a ShutdownInProgress error, so that clients begin routing operations elsewhere.
  * @tags: [
  *   requires_fcv_47,
@@ -38,9 +38,9 @@ function checkRemainingQuiesceTime(res) {
     assert(res.hasOwnProperty("remainingQuiesceTimeMillis"), res);
 }
 
-function runAwaitableIsMaster(topologyVersionField) {
+function runAwaitableHello(topologyVersionField) {
     let res = assert.commandFailedWithCode(db.runCommand({
-        isMaster: 1,
+        hello: 1,
         topologyVersion: topologyVersionField,
         maxAwaitTimeMS: 99999999,
     }),
@@ -67,13 +67,13 @@ let findCmdFailPoint = configureFailPoint(secondary, "waitInFindBeforeMakingBatc
 let findCmd = startParallelShell(runFind, secondary.port);
 findCmdFailPoint.wait();
 
-jsTestLog("Create a hanging isMaster on the secondary.");
-res = assert.commandWorked(secondary.adminCommand({isMaster: 1}));
+jsTestLog("Create a hanging hello on the secondary.");
+res = assert.commandWorked(secondary.adminCommand({hello: 1}));
 assert(res.hasOwnProperty("topologyVersion"), res);
 let topologyVersionField = res.topologyVersion;
 let isMasterFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
-let isMaster =
-    startParallelShell(funWithArgs(runAwaitableIsMaster, topologyVersionField), secondary.port);
+let hello =
+    startParallelShell(funWithArgs(runAwaitableHello, topologyVersionField), secondary.port);
 isMasterFailPoint.wait();
 assert.eq(1, secondary.getDB("admin").serverStatus().connections.awaitingTopologyChanges);
 
@@ -84,20 +84,20 @@ replTest.stop(
     secondary, null /*signal*/, {skipValidation: true}, {forRestart: true, waitpid: false});
 quiesceModeFailPoint.wait();
 
-jsTestLog("The waiting isMaster returns a ShutdownInProgress error.");
-isMaster();
+jsTestLog("The waiting hello returns a ShutdownInProgress error.");
+hello();
 // We cannot check the metrics because serverStatus returns ShutdownInProgress.
 assert.commandFailedWithCode(secondaryDB.adminCommand({serverStatus: 1}),
                              ErrorCodes.ShutdownInProgress);
 
-jsTestLog("New isMaster commands return a ShutdownInProgress error.");
-res = assert.commandFailedWithCode(secondary.adminCommand({isMaster: 1}),
-                                   ErrorCodes.ShutdownInProgress);
+jsTestLog("New hello commands return a ShutdownInProgress error.");
+res =
+    assert.commandFailedWithCode(secondary.adminCommand({hello: 1}), ErrorCodes.ShutdownInProgress);
 checkTopologyVersion(res, topologyVersionField);
 checkRemainingQuiesceTime(res);
 
 res = assert.commandFailedWithCode(secondary.adminCommand({
-    isMaster: 1,
+    hello: 1,
     topologyVersion: topologyVersionField,
     maxAwaitTimeMS: 99999999,
 }),
@@ -159,13 +159,12 @@ let postStepdownFailpoint = configureFailPoint(primary, "hangInShutdownAfterStep
 replTest.stop(primary, null /*signal*/, {skipValidation: true}, {forRestart: true, waitpid: false});
 postStepdownFailpoint.wait();
 
-jsTestLog("Create a hanging isMaster on the primary.");
-res = assert.commandWorked(primary.adminCommand({isMaster: 1}));
+jsTestLog("Create a hanging hello on the primary.");
+res = assert.commandWorked(primary.adminCommand({hello: 1}));
 assert(res.hasOwnProperty("topologyVersion"), res);
 topologyVersionField = res.topologyVersion;
 isMasterFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-isMaster =
-    startParallelShell(funWithArgs(runAwaitableIsMaster, topologyVersionField), primary.port);
+hello = startParallelShell(funWithArgs(runAwaitableHello, topologyVersionField), primary.port);
 isMasterFailPoint.wait();
 assert.eq(1, primary.getDB("admin").serverStatus().connections.awaitingTopologyChanges);
 
@@ -174,20 +173,19 @@ quiesceModeFailPoint = configureFailPoint(primary, "hangDuringQuiesceMode");
 postStepdownFailpoint.off();
 quiesceModeFailPoint.wait();
 
-jsTestLog("The waiting isMaster returns a ShutdownInProgress error.");
-isMaster();
+jsTestLog("The waiting hello returns a ShutdownInProgress error.");
+hello();
 // We cannot check the metrics because serverStatus returns ShutdownInProgress.
 assert.commandFailedWithCode(primaryDB.adminCommand({serverStatus: 1}),
                              ErrorCodes.ShutdownInProgress);
 
-jsTestLog("New isMaster commands return a ShutdownInProgress error.");
-res = assert.commandFailedWithCode(primary.adminCommand({isMaster: 1}),
-                                   ErrorCodes.ShutdownInProgress);
+jsTestLog("New hello commands return a ShutdownInProgress error.");
+res = assert.commandFailedWithCode(primary.adminCommand({hello: 1}), ErrorCodes.ShutdownInProgress);
 checkTopologyVersion(res, topologyVersionField);
 checkRemainingQuiesceTime(res);
 
 res = assert.commandFailedWithCode(primary.adminCommand({
-    isMaster: 1,
+    hello: 1,
     topologyVersion: topologyVersionField,
     maxAwaitTimeMS: 99999999,
 }),

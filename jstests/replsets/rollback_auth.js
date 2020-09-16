@@ -42,9 +42,9 @@ replTest.initiate({
     ]
 });
 
-// Make sure we have a master
+// Make sure we have a primary
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 var a_conn = conns[0];
 var b_conn = conns[1];
 a_conn.setSecondaryOk();
@@ -53,8 +53,8 @@ var A = a_conn.getDB("admin");
 var B = b_conn.getDB("admin");
 var a = a_conn.getDB("test");
 var b = b_conn.getDB("test");
-assert.eq(master, conns[0], "conns[0] assumed to be master");
-assert.eq(a_conn, master);
+assert.eq(primary, conns[0], "conns[0] assumed to be primary");
+assert.eq(a_conn, primary);
 
 // Make sure we have an arbiter
 assert.soon(function() {
@@ -115,15 +115,15 @@ assert.commandFailedWithCode(b.runCommand({collStats: 'foobar'}), authzErrorCode
 
 jsTestLog("Doing writes that will eventually be rolled back");
 
-// down A and wait for B to become master
+// down A and wait for B to become primary
 replTest.stop(0);
 assert.soon(function() {
     try {
-        return B.isMaster().ismaster;
+        return B.hello().isWritablePrimary;
     } catch (e) {
         return false;
     }
-}, "B didn't become master");
+}, "B didn't become primary");
 printjson(b.adminCommand('replSetGetStatus'));
 
 // Modify the the user and role in a way that will be rolled back.
@@ -146,18 +146,18 @@ assert.commandWorked(b.runCommand({collStats: 'bar'}));
 assert.commandFailedWithCode(b.runCommand({collStats: 'baz'}), authzErrorCode);
 assert.commandFailedWithCode(b.runCommand({collStats: 'foobar'}), authzErrorCode);
 
-// down B, bring A back up, then wait for A to become master
+// down B, bring A back up, then wait for A to become primary
 // insert new data into A so that B will need to rollback when it reconnects to A
 replTest.stop(1);
 
 replTest.restart(0);
 assert.soon(function() {
     try {
-        return A.isMaster().ismaster;
+        return A.hello().isWritablePrimary;
     } catch (e) {
         return false;
     }
-}, "A didn't become master");
+}, "A didn't become primary");
 
 // A should not have the new data as it was down
 assert.commandWorked(a.runCommand({dbStats: 1}));

@@ -82,8 +82,8 @@ reconnect(secondary);
 replSet.stepUp(secondary, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
 
 // Secondary doesn't allow writes yet.
-var res = secondary.getDB("admin").runCommand({"isMaster": 1});
-assert(!res.ismaster);
+var res = secondary.getDB("admin").runCommand({"hello": 1});
+assert(!res.isWritablePrimary);
 
 // Original primary steps up.
 reconnect(primary);

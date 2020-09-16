@@ -26,18 +26,18 @@ doTest = function() {
     print("******* replSetMaintenance called on secondary ************* ");
     assert.commandWorked(sDB.adminCommand("replSetMaintenance"));
 
-    var ismaster = assert.commandWorked(sColl.runCommand("ismaster"));
-    assert.eq(false, ismaster.ismaster);
-    assert.eq(false, ismaster.secondary);
+    var hello = assert.commandWorked(sColl.runCommand("hello"));
+    assert.eq(false, hello.isWritablePrimary);
+    assert.eq(false, hello.secondary);
 
     print("******* writing to primary ************* ");
     assert.commandWorked(mColl.save({_id: -1}));
     printjson(sDB.currentOp());
     assert.neq(null, mColl.findOne());
 
-    var ismaster = assert.commandWorked(sColl.runCommand("ismaster"));
-    assert.eq(false, ismaster.ismaster);
-    assert.eq(false, ismaster.secondary);
+    var hello = assert.commandWorked(sColl.runCommand("hello"));
+    assert.eq(false, hello.isWritablePrimary);
+    assert.eq(false, hello.secondary);
 
     print("******* fsyncUnlock'n secondary ************* ");
     sDB.fsyncUnlock();

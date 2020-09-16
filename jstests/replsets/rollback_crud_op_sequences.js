@@ -41,17 +41,17 @@ replTest.initiate({
     ]
 });
 
-// Make sure we have a master and that that master is node A
+// Make sure we have a primary and that that primary is node A
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 var a_conn = conns[0];
 a_conn.setSecondaryOk();
 var A = a_conn.getDB("admin");
 var b_conn = conns[1];
 b_conn.setSecondaryOk();
 var B = b_conn.getDB("admin");
-assert.eq(master, conns[0], "conns[0] assumed to be master");
-assert.eq(a_conn, master);
+assert.eq(primary, conns[0], "conns[0] assumed to be primary");
+assert.eq(a_conn, primary);
 
 // Wait for initial replication
 var a = a_conn.getDB("foo");
@@ -71,16 +71,16 @@ assert.commandWorked(a.kap.insert({foo: 1}));
 a.createCollection("kap2", {capped: true, size: 5501});
 replTest.awaitReplication();
 
-// isolate A and wait for B to become master
+// isolate A and wait for B to become primary
 conns[0].disconnect(conns[1]);
 conns[0].disconnect(conns[2]);
 assert.soon(function() {
     try {
-        return B.isMaster().ismaster;
+        return B.hello().isWritablePrimary;
     } catch (e) {
         return false;
     }
-}, "node B did not become master as expected", ReplSetTest.kDefaultTimeoutMS);
+}, "node B did not become primary as expected", ReplSetTest.kDefaultTimeoutMS);
 
 // do operations on B and B alone, these will be rolled back
 assert.commandWorked(b.bar.insert({q: 4}));
@@ -97,12 +97,12 @@ assert.commandWorked(b.newcoll.insert({a: true}));
 // create a new empty collection (need to roll back the whole thing)
 b.createCollection("abc");
 
-// isolate B, bring A back into contact with the arbiter, then wait for A to become master
+// isolate B, bring A back into contact with the arbiter, then wait for A to become primary
 // insert new data into A so that B will need to rollback when it reconnects to A
 conns[1].disconnect(conns[2]);
 assert.soon(function() {
     try {
-        return !B.isMaster().ismaster;
+        return !B.hello().isWritablePrimary;
     } catch (e) {
         return false;
     }
@@ -111,7 +111,7 @@ assert.soon(function() {
 conns[0].reconnect(conns[2]);
 assert.soon(function() {
     try {
-        return A.isMaster().ismaster;
+        return A.hello().isWritablePrimary;
     } catch (e) {
         return false;
     }

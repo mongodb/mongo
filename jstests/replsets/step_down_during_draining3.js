@@ -74,14 +74,14 @@ reconnect(secondary);
 replSet.stepUp(secondary, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
 
 // Secondary doesn't allow writes yet.
-var res = secondary.getDB("admin").runCommand({"isMaster": 1});
-assert(!res.ismaster);
+var res = secondary.getDB("admin").runCommand({"hello": 1});
+assert(!res.isWritablePrimary);
 
 assert.commandWorked(secondary.adminCommand({replSetStepDown: 60, force: true}));
 
 // Assert stepdown was successful.
 assert.eq(ReplSetTest.State.SECONDARY, secondary.adminCommand({replSetGetStatus: 1}).myState);
-assert(!secondary.adminCommand('ismaster').ismaster);
+assert(!secondary.adminCommand('hello').isWritablePrimary);
 
 // Prevent the producer from fetching new ops
 assert.commandWorked(

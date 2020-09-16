@@ -27,7 +27,7 @@ function bumpClusterTime() {
     while (true) {
         const higherClusterTime = new Timestamp(clusterTime.getTime() + 20, 1);
         const res = assert.commandWorked(db.adminCommand({
-            'isMaster': 1,
+            'hello': 1,
             '$clusterTime': {
                 'clusterTime': higherClusterTime,
                 'signature':

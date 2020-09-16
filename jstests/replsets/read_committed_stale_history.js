@@ -36,7 +36,7 @@ rst.initiate();
  */
 function waitForPrimary(node) {
     assert.soon(function() {
-        return node.adminCommand('ismaster').ismaster;
+        return node.adminCommand('hello').isWritablePrimary;
     });
 }
 

@@ -27,7 +27,7 @@ rst.initiate();
 
 function waitForPrimary(node) {
     assert.soon(function() {
-        return node.adminCommand('ismaster').ismaster;
+        return node.adminCommand('hello').isWritablePrimary;
     });
 }
 
@@ -52,10 +52,10 @@ assert.commandWorked(
 
 jsTestLog("Do w:majority write that will block waiting for replication.");
 var doMajorityWrite = function() {
-    // Run ismaster command with 'hangUpOnStepDown' set to false to mark this connection as
+    // Run hello command with 'hangUpOnStepDown' set to false to mark this connection as
     // one that shouldn't be closed when the node steps down.  This makes it easier to detect
     // the error returned by the write concern failure.
-    assert.commandWorked(db.adminCommand({ismaster: 1, hangUpOnStepDown: false}));
+    assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
 
     jsTestLog("Begin waiting for w:majority write");
     var res = db.getSiblingDB('wMajorityCheck').stepdownAndBackUp.insert({a: 2}, {

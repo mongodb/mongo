@@ -67,7 +67,7 @@ assert.commandWorked(nodeA.adminCommand({replSetStepUp: 1}));
 restartServerReplication([nodeA, nodeC, nodeD]);
 assert.soon(() => {
     // We cannot use getPrimary() here because 2 nodes report they are primary.
-    return assert.commandWorked(nodeA.adminCommand({ismaster: 1})).ismaster;
+    return assert.commandWorked(nodeA.adminCommand({hello: 1})).isWritablePrimary;
 });
 assert.commandWorked(
     nodeA.getDB(dbName)[collName].insert({term: 3}, {writeConcern: {w: "majority"}}));

@@ -28,7 +28,7 @@ function testConfig(hostName, horizonName, expectedReject, options = {}) {
     assert.commandWorked(mongod.adminCommand(
         {replSetInitiate: {_id: "test", members: [{_id: 0, host: "localhost:" + mongod.port}]}}));
     assert.soon(() => {
-        return assert.commandWorked(mongod.adminCommand({isMaster: 1})).ismaster;
+        return assert.commandWorked(mongod.adminCommand({hello: 1})).isWritablePrimary;
     });
 
     // Make sure replSetReconfig fails with correct error

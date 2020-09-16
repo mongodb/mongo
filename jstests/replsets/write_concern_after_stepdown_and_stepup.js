@@ -28,7 +28,7 @@ rst.initiate();
 
 function waitForPrimary(node) {
     assert.soon(function() {
-        return node.adminCommand('ismaster').ismaster;
+        return node.adminCommand('hello').isWritablePrimary;
     });
 }
 
@@ -58,10 +58,10 @@ const hangBeforeWaitingForWriteConcern =
 jsTestLog("Do w:majority write that won't enter awaitReplication() until after the primary " +
           "has stepped down and back up");
 var doMajorityWrite = function() {
-    // Run ismaster command with 'hangUpOnStepDown' set to false to mark this connection as
+    // Run hello command with 'hangUpOnStepDown' set to false to mark this connection as
     // one that shouldn't be closed when the node steps down.  This simulates the scenario where
     // the write was coming from a mongos.
-    assert.commandWorked(db.adminCommand({ismaster: 1, hangUpOnStepDown: false}));
+    assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
 
     var res = db.getSiblingDB('wMajorityCheck').stepdownAndBackUp.insert({a: 2}, {
         writeConcern: {w: 'majority'}

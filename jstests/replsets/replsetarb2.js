@@ -26,7 +26,7 @@ assert.soon(function() {
     return res.myState === 7;
 }, "Aribiter failed to initialize.");
 
-var result = conns[1].getDB("admin").runCommand({isMaster: 1});
+var result = conns[1].getDB("admin").runCommand({hello: 1});
 assert(result.arbiterOnly);
 assert(!result.passive);
 

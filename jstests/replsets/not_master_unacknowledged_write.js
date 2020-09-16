@@ -30,7 +30,7 @@ jsTestLog("Reading from secondary ...");
  {name: "count", fn: () => secondaryColl.find().count()},
 ].map(({name, fn}) => {
     assert.doesNotThrow(fn);
-    assert.eq(assert.commandWorked(secondary.getDB("admin").isMaster()).ismaster, false);
+    assert.eq(assert.commandWorked(secondary.getDB("admin").hello()).isWritablePrimary, false);
 });
 const postReadingCounter = getNotPrimaryUnackWritesCounter();
 assert.eq(preReadingCounter, postReadingCounter);
@@ -48,12 +48,12 @@ jsTestLog("Primary on port " + primary.port + " hangs up on unacknowledged write
     var result = assert.throws(function() {
         // Provoke the server to hang up.
         fn({writeConcern: {w: 0}});
-        // The connection is now broken and isMaster throws a network error.
-        secondary.getDB("admin").isMaster();
+        // The connection is now broken and hello() throws a network error.
+        secondary.getDB("admin").hello();
     }, [], "network error from " + name);
 
     assert.includes(result.toString(),
-                    "network error while attempting to run command 'isMaster'",
+                    "network error while attempting to run command 'hello'",
                     "after " + name);
 });
 
@@ -81,9 +81,9 @@ awaitShell({checkExitSuccess: false});
 
 jsTestLog("Unacknowledged insert during stepdown provoked disconnect");
 var result = assert.throws(function() {
-    primary.getDB("admin").isMaster();
+    primary.getDB("admin").hello();
 }, [], "network");
-assert.includes(result.toString(), "network error while attempting to run command 'isMaster'");
+assert.includes(result.toString(), "network error while attempting to run command 'hello'");
 
 // Validate the number of unacknowledged writes failed due to step down resulted in network
 // disconnection.

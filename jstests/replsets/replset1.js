@@ -83,9 +83,9 @@ var doTest = function(signal) {
 
     // Now, let's make sure that the old primary comes up as a secondary
     assert.soon(function() {
-        var res = secondary.getDB("admin").runCommand({ismaster: 1});
+        var res = secondary.getDB("admin").runCommand({hello: 1});
         printjson(res);
-        return res['ok'] == 1 && res['ismaster'] == false;
+        return res['ok'] == 1 && res['isWritablePrimary'] == false;
     });
 
     // And we need to make sure that the replset comes back up

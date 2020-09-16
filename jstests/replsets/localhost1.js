@@ -12,6 +12,6 @@ const resp = assert.commandWorked(db.adminCommand({replSetInitiate: undefined}))
 assert(resp.me.startsWith('127.0.0.1'), tojson(resp.me) + " does not start with 127.0.0.1:");
 
 // Wait for the primary to complete its election before shutting down the set.
-assert.soon(() => db.runCommand({ismaster: 1}).ismaster);
+assert.soon(() => db.runCommand({hello: 1}).isWritablePrimary);
 rt.stopSet();
 })();

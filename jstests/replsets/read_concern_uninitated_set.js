@@ -12,7 +12,7 @@ rst.startSet();
 const localDB = rst.nodes[0].getDB('local');
 assert.commandWorked(localDB.test.insert({_id: 0}));
 assert.commandWorked(localDB.runCommand({
-    isMaster: 1,
+    hello: 1,
     "$clusterTime": {
         "clusterTime": Timestamp(1, 1),
         "signature": {"hash": BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="), "keyId": NumberLong(0)}

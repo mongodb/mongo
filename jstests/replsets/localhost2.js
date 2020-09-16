@@ -14,6 +14,6 @@ assert(!resp.me.startsWith('0.0.0.0:'), tojson(resp.me) + " should not start wit
 assert(!resp.me.startsWith('localhost:'), tojson(resp.me) + " should not start with localhost:");
 
 // Wait for the primary to complete its election before shutting down the set.
-assert.soon(() => db.runCommand({ismaster: 1}).ismaster);
+assert.soon(() => db.runCommand({hello: 1}).isWritablePrimary);
 rt.stopSet();
 })();

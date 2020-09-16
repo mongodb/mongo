@@ -50,17 +50,17 @@ replTest.initiate({
     ]
 });
 
-// Make sure we have a master and that that master is node A
+// Make sure we have a primary and that that primary is node A
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 var a_conn = conns[0];
 a_conn.setSecondaryOk();
 var A = a_conn.getDB("admin");
 var b_conn = conns[1];
 b_conn.setSecondaryOk();
 var B = b_conn.getDB("admin");
-assert.eq(master, conns[0], "conns[0] assumed to be master");
-assert.eq(a_conn, master);
+assert.eq(primary, conns[0], "conns[0] assumed to be primary");
+assert.eq(a_conn, primary);
 
 // Wait for initial replication
 var a = a_conn.getDB("foo");
@@ -88,12 +88,12 @@ a.createCollection("kap", {capped: true, size: 5000});
 assert.commandWorked(a.kap.insert({foo: 1}));
 replTest.awaitReplication();
 
-// isolate A and wait for B to become master
+// isolate A and wait for B to become primary
 conns[0].disconnect(conns[1]);
 conns[0].disconnect(conns[2]);
 assert.soon(function() {
     try {
-        return B.isMaster().ismaster;
+        return B.hello().isWritablePrimary;
     } catch (e) {
         return false;
     }
@@ -128,12 +128,12 @@ var abc = b.getSiblingDB("abc");
 assert.commandWorked(abc.foo.insert({x: 1}));
 assert.commandWorked(abc.bar.insert({y: 999}));
 
-// isolate B, bring A back into contact with the arbiter, then wait for A to become master
+// isolate B, bring A back into contact with the arbiter, then wait for A to become primary
 // insert new data into A so that B will need to rollback when it reconnects to A
 conns[1].disconnect(conns[2]);
 assert.soon(function() {
     try {
-        return !B.isMaster().ismaster;
+        return !B.hello().isWritablePrimary;
     } catch (e) {
         return false;
     }
@@ -142,7 +142,7 @@ assert.soon(function() {
 conns[0].reconnect(conns[2]);
 assert.soon(function() {
     try {
-        return A.isMaster().ismaster;
+        return A.hello().isWritablePrimary;
     } catch (e) {
         return false;
     }

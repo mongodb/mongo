@@ -73,7 +73,7 @@ jsTest.log('Restarting primary ' + master.host +
            'Secondary ' + slave.host + ' will become new primary.');
 clearRawMongoProgramOutput();
 replTest.restart(master);
-printjson(sLocal.adminCommand("isMaster"));
+printjson(sLocal.adminCommand("hello"));
 replTest.waitForState(master, ReplSetTest.State.RECOVERING);
 
 replTest.awaitNodesAgreeOnPrimary();

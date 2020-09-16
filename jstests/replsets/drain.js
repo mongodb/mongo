@@ -63,7 +63,7 @@ replSet.waitForState(secondary, ReplSetTest.State.PRIMARY);
 // Ensure new primary is not yet writable
 jsTestLog('New primary should not be writable yet');
 assert.writeError(secondary.getDB("foo").flag.insert({sentinel: 2}));
-assert(!secondary.getDB("admin").runCommand({"isMaster": 1}).ismaster);
+assert(!secondary.getDB("admin").runCommand({"hello": 1}).isWritablePrimary);
 
 // Ensure new primary is not yet readable without secondaryOk bit.
 secondary.setSecondaryOk(false);
@@ -77,7 +77,7 @@ assert.eq(ErrorCodes.NotPrimaryNoSecondaryOk,
 secondary.setSecondaryOk();
 assert.commandWorked(secondary.getDB("foo").runCommand({find: "foo"}));
 
-assert(!secondary.adminCommand({"isMaster": 1}).ismaster);
+assert(!secondary.adminCommand({"hello": 1}).isWritablePrimary);
 
 // Allow draining to complete
 jsTestLog('Disabling fail point on new primary to allow draining to complete');

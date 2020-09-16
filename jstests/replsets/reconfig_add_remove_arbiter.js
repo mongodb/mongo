@@ -2,7 +2,7 @@
  * Test that replSetReconfig can add and remove arbiters.
  */
 
-// isMaster fails on the arbiter once it's removed, which blocks all checks.
+// hello fails on the arbiter once it's removed, which blocks all checks.
 TestData.skipCheckDBHashes = true;
 
 (function() {

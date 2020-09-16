@@ -153,10 +153,10 @@ try {
                              "failed",
                              0);
 
-    jsTestLog('Checking isMaster on ' + primary);
-    var r2 = assert.commandWorked(primary.getDB("admin").runCommand({ismaster: 1}));
-    jsTestLog('Result from running isMaster on ' + primary + ': ' + tojson(r2));
-    assert.eq(r2.ismaster, false);
+    jsTestLog('Checking hello on ' + primary);
+    var r2 = assert.commandWorked(primary.getDB("admin").runCommand({hello: 1}));
+    jsTestLog('Result from running hello on ' + primary + ': ' + tojson(r2));
+    assert.eq(r2.isWritablePrimary, false);
     assert.eq(r2.secondary, true);
 
     // Check that the 'electionCandidateMetrics' section of the replSetGetStatus response has been
@@ -214,7 +214,7 @@ replTest.awaitReplication();
 // of this assert.soon
 assert.soon(function() {
     try {
-        var result = primary.getDB("admin").runCommand({isMaster: 1});
+        var result = primary.getDB("admin").runCommand({hello: 1});
         return new RegExp(":" + replTest.nodes[0].port + "$").test(result.primary);
     } catch (x) {
         return false;

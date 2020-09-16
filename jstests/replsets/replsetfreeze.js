@@ -2,12 +2,12 @@
  * 1: initialize set
  * 2: step down m1
  * 3: freeze set for 30 seconds
- * 4: check no one is master for 30 seconds
- * 5: check for new master
- * 6: step down new master
+ * 4: check no one is primary for 30 seconds
+ * 5: check for new primary
+ * 6: step down new primary
  * 7: freeze for 30 seconds
  * 8: unfreeze
- * 9: check we get a new master within 30 seconds
+ * 9: check we get a new primary within 30 seconds
  */
 
 var w = 0;
@@ -53,7 +53,7 @@ var r = replTest.initiate(config);
 
 replTest.awaitNodesAgreeOnPrimary();
 
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 
 var secondary = replTest.getSecondary();
 jsTestLog('2: freeze secondary ' + secondary.host +
@@ -62,48 +62,48 @@ jsTestLog('2: freeze secondary ' + secondary.host +
 assert.commandWorked(secondary.getDB("admin").runCommand({replSetFreeze: 600}));
 
 assert.commandFailedWithCode(
-    master.getDB("admin").runCommand({replSetFreeze: 30}),
+    primary.getDB("admin").runCommand({replSetFreeze: 30}),
     ErrorCodes.NotSecondary,
-    'replSetFreeze should return error when run on primary ' + master.host);
+    'replSetFreeze should return error when run on primary ' + primary.host);
 
-jsTestLog('3: step down primary ' + master.host);
-assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown: 10, force: 1}));
-printjson(master.getDB("admin").runCommand({replSetGetStatus: 1}));
+jsTestLog('3: step down primary ' + primary.host);
+assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 10, force: 1}));
+printjson(primary.getDB("admin").runCommand({replSetGetStatus: 1}));
 
-jsTestLog('4: freeze stepped down primary ' + master.host + ' for 30 seconds');
+jsTestLog('4: freeze stepped down primary ' + primary.host + ' for 30 seconds');
 var start = (new Date()).getTime();
-assert.commandWorked(master.getDB("admin").runCommand({replSetFreeze: 30}));
+assert.commandWorked(primary.getDB("admin").runCommand({replSetFreeze: 30}));
 
-jsTestLog('5: check no one is master for 30 seconds');
+jsTestLog('5: check no one is primary for 30 seconds');
 while ((new Date()).getTime() - start <
        (28 * 1000)) {  // we need less 30 since it takes some time to return... hacky
-    var result = master.getDB("admin").runCommand({isMaster: 1});
-    assert.eq(result.ismaster, false);
+    var result = primary.getDB("admin").runCommand({hello: 1});
+    assert.eq(result.isWritablePrimary, false);
     assert.eq(result.primary, undefined);
     sleep(1000);
 }
 
 jsTestLog('6: check for new primary');
 var newPrimary = replTest.getPrimary();
-assert.eq(master.host,
+assert.eq(primary.host,
           newPrimary.host,
           'new primary should be the same node as primary that previously stepped down');
 
-jsTestLog('7: step down new master ' + master.host);
-assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown: 10, force: 1}));
+jsTestLog('7: step down new primary ' + primary.host);
+assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 10, force: 1}));
 
-jsTestLog('8: freeze stepped down primary ' + master.host + ' for 30 seconds');
-master.getDB("admin").runCommand({replSetFreeze: 30});
+jsTestLog('8: freeze stepped down primary ' + primary.host + ' for 30 seconds');
+primary.getDB("admin").runCommand({replSetFreeze: 30});
 sleep(1000);
 
-jsTestLog('9: unfreeze stepped down primary ' + master.host + ' after waiting for 1 second');
-master.getDB("admin").runCommand({replSetFreeze: 0});
+jsTestLog('9: unfreeze stepped down primary ' + primary.host + ' after waiting for 1 second');
+primary.getDB("admin").runCommand({replSetFreeze: 0});
 
-jsTestLog('10: wait for unfrozen node ' + master.host + ' to become primary again');
+jsTestLog('10: wait for unfrozen node ' + primary.host + ' to become primary again');
 newPrimary = replTest.getPrimary();
 jsTestLog('Primary after unfreezing node: ' + newPrimary.host);
 assert.eq(
-    master.host,
+    primary.host,
     newPrimary.host,
     'new primary after unfreezing should be the same node as primary that previously stepped down');
 

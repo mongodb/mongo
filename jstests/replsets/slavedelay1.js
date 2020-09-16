@@ -93,7 +93,7 @@ doTest = function(signal) {
 
     // wait for node to become secondary
     assert.soon(function() {
-        var result = conn.getDB("admin").isMaster();
+        var result = conn.getDB("admin").hello();
         printjson(result);
         return result.secondary;
     });

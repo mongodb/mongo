@@ -20,7 +20,7 @@ for (i = 0; i < 20; i++) {
 replTest.awaitReplication();
 
 assert.soon(function() {
-    return conns[1].getDB("admin").isMaster().secondary;
+    return conns[1].getDB("admin").hello().secondary;
 });
 
 join =
@@ -33,10 +33,10 @@ print("check secondary becomes a secondary again");
 var secondarySoon = function() {
     var x = 0;
     assert.soon(function() {
-        var im = conns[1].getDB("admin").isMaster();
+        var helloRes = conns[1].getDB("admin").hello();
         if (x++ % 5 == 0)
-            printjson(im);
-        return im.secondary;
+            printjson(helloRes);
+        return helloRes.secondary;
     });
 };
 
@@ -69,10 +69,10 @@ assert.eq(result.ok, 1, tojson(result));
 print("make sure secondary goes into recovering");
 var x = 0;
 assert.soon(function() {
-    var im = conns[1].getDB("admin").isMaster();
+    var helloRes = conns[1].getDB("admin").hello();
     if (x++ % 5 == 0)
-        printjson(im);
-    return !im.secondary && !im.ismaster;
+        printjson(helloRes);
+    return !helloRes.secondary && !helloRes.isWritablePrimary;
 });
 
 var recv = conns[1].getDB("admin").runCommand({find: "foo"});

@@ -78,10 +78,10 @@ assert.eq(doCommittedRead(oldPrimaryColl), 'old');
 oldPrimary.setSecondaryOk();
 oldPrimary.disconnect(arbiters);
 newPrimary.reconnect(arbiters);
-assert.soon(() => newPrimary.adminCommand('isMaster').ismaster, '', 60 * 1000);
+assert.soon(() => newPrimary.adminCommand('hello').isWritablePrimary, '', 60 * 1000);
 assert.soon(function() {
     try {
-        return !oldPrimary.adminCommand('isMaster').ismaster;
+        return !oldPrimary.adminCommand('hello').isWritablePrimary;
     } catch (e) {
         return false;  // ignore disconnect errors.
     }
@@ -105,8 +105,7 @@ assert.eq(doCommittedRead(oldPrimaryColl), 'old');
 oldPrimary.reconnect(newPrimary);
 assert.soon(function() {
     try {
-        return oldPrimary.adminCommand('isMaster').secondary &&
-            doDirtyRead(oldPrimaryColl) == 'new';
+        return oldPrimary.adminCommand('hello').secondary && doDirtyRead(oldPrimaryColl) == 'new';
     } catch (e) {
         return false;  // ignore disconnect errors.
     }

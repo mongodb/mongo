@@ -25,11 +25,11 @@ print("Start set with two nodes");
 var replTest = new ReplSetTest({name: name, nodes: 2});
 var nodes = replTest.startSet();
 replTest.initiate();
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 var secondary = replTest.getSecondary();
 
 print("Initial sync");
-master.getDB("foo").bar.baz.insert({x: 1});
+primary.getDB("foo").bar.baz.insert({x: 1});
 
 replTest.awaitReplication();
 
@@ -49,7 +49,7 @@ assert.eq(secondary.getDB("admin").runCommand({ping: 1}).ok,
           "we should be connected to the secondary");
 
 try {
-    master.getDB("admin").runCommand({replSetReconfig: config});
+    primary.getDB("admin").runCommand({replSetReconfig: config});
 } catch (e) {
     print(e);
 }
@@ -68,10 +68,10 @@ assert.soon(function() {
 assert.eq(
     secondary.getDB("admin").runCommand({ping: 1}).ok, 1, "we aren't connected to the secondary");
 
-reconnect(master);
+reconnect(primary);
 
 assert.soon(function() {
-    var c = master.getDB("local").system.replset.findOne();
+    var c = primary.getDB("local").system.replset.findOne();
     return c.version == nextVersion;
 });
 
@@ -89,15 +89,15 @@ assert.soon(function() {
         return false;
     }
 });
-master = replTest.getPrimary();
+primary = replTest.getPrimary();
 
 // Wait and account for 'newlyAdded' automatic reconfig.
 nextVersion++;
 replTest.waitForAllNewlyAddedRemovals();
 
 secondary = replTest.getSecondary();
-printjson(master.getDB("admin").runCommand({replSetGetStatus: 1}));
-var newConfig = master.getDB("local").system.replset.findOne();
+printjson(primary.getDB("admin").runCommand({replSetGetStatus: 1}));
+var newConfig = primary.getDB("local").system.replset.findOne();
 print("newConfig: " + tojson(newConfig));
 assert.eq(newConfig.version, nextVersion);
 
@@ -106,27 +106,27 @@ replTest.stop(secondary);
 
 assert.soon(function() {
     try {
-        return master.getDB("admin").runCommand({isMaster: 1}).secondary;
+        return primary.getDB("admin").runCommand({hello: 1}).secondary;
     } catch (e) {
-        print("trying to get master: " + e);
+        print("trying to get primary: " + e);
     }
 }, "waiting for primary to step down", (60 * 1000), 1000);
 
 nextVersion++;
 config.version = nextVersion;
-config.members = config.members.filter(node => node.host == master.host);
+config.members = config.members.filter(node => node.host == primary.host);
 try {
-    master.getDB("admin").runCommand({replSetReconfig: config, force: true});
+    primary.getDB("admin").runCommand({replSetReconfig: config, force: true});
 } catch (e) {
     print(e);
 }
 
-reconnect(master);
+reconnect(primary);
 assert.soon(function() {
-    return master.getDB("admin").runCommand({isMaster: 1}).ismaster;
+    return primary.getDB("admin").runCommand({hello: 1}).isWritablePrimary;
 }, "waiting for old primary to accept reconfig and step up", (60 * 1000), 1000);
 
-config = master.getDB("local").system.replset.findOne();
+config = primary.getDB("local").system.replset.findOne();
 printjson(config);
 assert.gt(config.version, nextVersion);
 

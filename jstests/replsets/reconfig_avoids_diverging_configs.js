@@ -60,7 +60,7 @@ const parallelShell = startParallelShell(
 assert.commandWorked(node1.adminCommand({replSetStepUp: 1}));
 rst.awaitNodesAgreeOnPrimary(rst.kDefaultTimeoutMS, [node1, node2, node3], node1);
 jsTestLog("Current replica set topology: [node0 (Primary)] [node1 (Primary), node2, node3]");
-assert.soon(() => node1.getDB('admin').runCommand({ismaster: 1}).ismaster);
+assert.soon(() => node1.getDB('admin').runCommand({hello: 1}).isWritablePrimary);
 assert.soon(() => isConfigCommitted(node1));
 
 // Reconfig to remove a secondary. We need to specify the node to get the original
