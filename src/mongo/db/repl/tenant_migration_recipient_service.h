@@ -32,8 +32,10 @@
 #include <boost/optional.hpp>
 #include <memory>
 
+#include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 
 namespace mongo {
 
@@ -43,6 +45,7 @@ class ReplicaSetMonitor;
 class ServiceContext;
 
 namespace repl {
+class OplogBufferCollection;
 
 /**
  * TenantMigrationRecipientService is a primary only service to handle
@@ -104,6 +107,14 @@ public:
          */
         const std::string& getTenantId() const;
 
+        /*
+         *  Set the oplog creator functor, to allow use of a mock oplog fetcher.
+         */
+        void setCreateOplogFetcherFn_forTest(
+            std::unique_ptr<OplogFetcherFactory>&& createOplogFetcherFn) {
+            _createOplogFetcherFn = std::move(createOplogFetcherFn);
+        }
+
     private:
         friend class TenantMigrationRecipientServiceTest;
 
@@ -135,6 +146,33 @@ public:
          */
         void _getStartOpTimesFromDonor(WithLock);
 
+        /**
+         * Pushes documents from oplog fetcher to oplog buffer.
+         *
+         * Returns a status even though it always returns OK, to conform the interface OplogFetcher
+         * expects for the EnqueueDocumentsFn.
+         */
+        Status _enqueueDocuments(OplogFetcher::Documents::const_iterator begin,
+                                 OplogFetcher::Documents::const_iterator end,
+                                 const OplogFetcher::DocumentsInfo& info);
+
+        /**
+         * Starts the tenant oplog fetcher.
+         */
+
+        void _startOplogFetcher();
+
+        /**
+         * Called when the oplog fetcher finishes.  Usually the oplog fetcher finishes only when
+         * cancelled or on error.
+         */
+        void _oplogFetcherCallback(Status oplogFetcherStatus);
+
+        /**
+         * Returns the filter used to get only oplog documents related to the appropriate tenant.
+         */
+        BSONObj _getOplogFetcherFilter() const;
+
         std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
 
         // Protects below non-const data members.
@@ -160,6 +198,13 @@ public:
         // optimes while the '_oplogFetcherClient' will be reserved for the oplog fetcher only.
         std::unique_ptr<DBClientConnection> _client;
         std::unique_ptr<DBClientConnection> _oplogFetcherClient;
+
+
+        std::unique_ptr<OplogFetcherFactory> _createOplogFetcherFn =
+            std::make_unique<CreateOplogFetcherFn>();
+        std::unique_ptr<OplogBufferCollection> _donorOplogBuffer;
+        std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;
+        std::unique_ptr<OplogFetcher> _donorOplogFetcher;
     };
 };
 

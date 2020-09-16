@@ -38,6 +38,7 @@
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_fetcher_mock.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -211,6 +212,11 @@ protected:
     DBClientConnection* getOplogFetcherClient(
         const TenantMigrationRecipientService::Instance* instance) const {
         return instance->_oplogFetcherClient.get();
+    }
+
+    OplogFetcher* getDonorOplogFetcher(
+        const TenantMigrationRecipientService::Instance* instance) const {
+        return instance->_donorOplogFetcher.get();
     }
 
     const TenantMigrationRecipientDocument& getStateDoc(
@@ -650,6 +656,41 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Even though we failed, the memory state should still match the on-disk state.
     checkStateDocPersisted(opCtx.get(), instance.get());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFetcher) {
+    FailPointEnableBlock fp("stopAfterStartingOplogFetcherMigrationRecipientInstance");
+
+    const UUID migrationUUID = UUID::gen();
+    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /*dollarPrefixHosts */);
+    insertTopOfOplog(&replSet, topOfOplogOpTime);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        // Create and start the instance.
+        instance = TenantMigrationRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    checkStateDocPersisted(opCtx.get(), instance.get());
+    // The oplog fetcher should exist and be running.
+    auto oplogFetcher = getDonorOplogFetcher(instance.get());
+    ASSERT_TRUE(oplogFetcher != nullptr);
+    ASSERT_TRUE(oplogFetcher->isActive());
 }
 
 }  // namespace repl

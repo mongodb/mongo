@@ -216,6 +216,12 @@ OplogFetcher::~OplogFetcher() {
     join();
 }
 
+void OplogFetcher::setConnection(std::unique_ptr<DBClientConnection>&& _connectedClient) {
+    // Can only call this once, before startup.
+    invariant(!_conn);
+    _conn = std::move(_connectedClient);
+}
+
 Status OplogFetcher::_doStartup_inlock() noexcept {
     return _scheduleWorkAndSaveHandle_inlock(
         [this](const executor::TaskExecutor::CallbackArgs& args) {
@@ -345,18 +351,25 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
         return;
     }
 
+    bool hadExistingConnection = true;
     {
         stdx::lock_guard<Latch> lock(_mutex);
-        _conn = _createClientFn();
+        if (!_conn) {
+            _conn = _createClientFn();
+            hadExistingConnection = false;
+        }
     }
 
     hangAfterOplogFetcherCallbackScheduled.pauseWhileSet();
 
-    auto connectStatus = _connect();
-    // Error out if we failed to connect after exhausting the allowed retry attempts.
-    if (!connectStatus.isOK()) {
-        _finishCallback(connectStatus);
-        return;
+    if (!hadExistingConnection) {
+        auto connectStatus = _connect();
+
+        // Error out if we failed to connect after exhausting the allowed retry attempts.
+        if (!connectStatus.isOK()) {
+            _finishCallback(connectStatus);
+            return;
+        }
     }
 
     _setMetadataWriterAndReader();

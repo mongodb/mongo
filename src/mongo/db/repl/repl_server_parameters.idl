@@ -342,3 +342,24 @@ server_parameters:
         cpp_varname: tenantMigrationGarbageCollectionDelayMS
         default:
             expr: 48 * 60 * 60 * 1000
+
+    tenantMigrationOplogBufferPeekCacheSize:
+        description: >-
+            Set this to specify size of read ahead buffer in the OplogBufferCollection for tenant
+            migrations.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: tenantMigrationOplogBufferPeekCacheSize
+        default: 10000
+            
+    tenantMigrationOplogFetcherBatchSize:
+        description: >-
+            The batchSize to use for the find/getMore queries called by the OplogFetcher for
+            tenant migrations.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: tenantMigrationOplogFetcherBatchSize
+        # 16MB max batch size / 12 byte min doc size * 10 (for good measure) =
+        #     defaultBatchSize to use.
+        default:
+            expr: (16 * 1024 * 1024) / 12 * 10

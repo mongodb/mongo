@@ -196,6 +196,11 @@ public:
         Timestamp lastTS,
         StartingPoint startingPoint = StartingPoint::kSkipFirstDoc);
 
+    /**
+     * Allows the OplogFetcher to use an already-established connection from the caller.  Ownership
+     * of the connection is taken by the OplogFetcher.  Must be called before startup.
+     */
+    void setConnection(std::unique_ptr<DBClientConnection>&& _connectedClient);
 
     /**
      * Prints out the status and settings of the oplog fetcher.

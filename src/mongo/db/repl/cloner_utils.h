@@ -47,6 +47,11 @@ class ClonerUtils {
 
 public:
     /**
+     * Builds a regex that matches database names prefixed with a specific tenantId.
+     */
+    static BSONObj makeTenantDatabaseRegex(StringData prefix);
+
+    /**
      * Builds a filter that matches database names prefixed with a specific tenantId.
      */
     static BSONObj makeTenantDatabaseFilter(StringData prefix);

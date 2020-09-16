@@ -39,9 +39,13 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/cloner_utils.h"
+#include "mongo/db/repl/data_replicator_external_state.h"
+#include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
@@ -53,15 +57,89 @@
 
 namespace mongo {
 namespace repl {
+namespace {
+constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
+}  // namespace
+
+// A convenient place to set test-specific parameters.
+MONGO_FAIL_POINT_DEFINE(pauseBeforeRunTenantMigrationRecipientInstance);
 
 // Fails before waiting for the state doc to be majority replicated.
 MONGO_FAIL_POINT_DEFINE(failWhilePersistingTenantMigrationRecipientInstanceStateDoc);
 MONGO_FAIL_POINT_DEFINE(stopAfterPersistingTenantMigrationRecipientInstanceStateDoc);
 MONGO_FAIL_POINT_DEFINE(stopAfterConnectingTenantMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(stopAfterRetrievingStartOpTimesMigrationRecipientInstance);
+MONGO_FAIL_POINT_DEFINE(stopAfterStartingOplogFetcherMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(setTenantMigrationRecipientInstanceHostTimeout);
 MONGO_FAIL_POINT_DEFINE(pauseAfterRetrievingLastTxnMigrationRecipientInstance);
 
+namespace {
+// We never restart just the oplog fetcher.  If a failure occurs, we restart the whole state machine
+// and recover from there.  So the restart decision is always "no".
+class OplogFetcherRestartDecisionTenantMigration
+    : public OplogFetcher::OplogFetcherRestartDecision {
+public:
+    ~OplogFetcherRestartDecisionTenantMigration(){};
+    bool shouldContinue(OplogFetcher* fetcher, Status status) final {
+        return false;
+    }
+    void fetchSuccessful(OplogFetcher* fetcher) final {}
+};
+
+// The oplog fetcher requires some of the methods in DataReplicatorExternalState to operate.
+class DataReplicatorExternalStateTenantMigration : public DataReplicatorExternalState {
+public:
+    // The oplog fetcher is passed its executor directly and does not use the one from the
+    // DataReplicatorExternalState.
+    executor::TaskExecutor* getTaskExecutor() const final {
+        MONGO_UNREACHABLE;
+    }
+    std::shared_ptr<executor::TaskExecutor> getSharedTaskExecutor() const final {
+        MONGO_UNREACHABLE;
+    }
+
+    // The oplog fetcher uses the current term and opTime to inform the sync source of term changes.
+    // As the term on the donor and the term on the recipient have nothing to do with each other,
+    // we do not want to do that.
+    OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() final {
+        return {OpTime::kUninitializedTerm, OpTime()};
+    }
+
+    // Tenant migration does not require the metadata from the oplog query.
+    void processMetadata(const rpc::ReplSetMetadata& replMetadata,
+                         rpc::OplogQueryMetadata oqMetadata) final {}
+
+    // Tenant migration does not change sync source depending on metadata.
+    ChangeSyncSourceAction shouldStopFetching(const HostAndPort& source,
+                                              const rpc::ReplSetMetadata& replMetadata,
+                                              const rpc::OplogQueryMetadata& oqMetadata,
+                                              const OpTime& previousOpTimeFetched,
+                                              const OpTime& lastOpTimeFetched) final {
+        return ChangeSyncSourceAction::kContinueSyncing;
+    }
+
+    // The oplog fetcher should never call the rest of the methods.
+    std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* opCtx) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<OplogApplier> makeOplogApplier(
+        OplogBuffer* oplogBuffer,
+        OplogApplier::Observer* observer,
+        ReplicationConsistencyMarkers* consistencyMarkers,
+        StorageInterface* storageInterface,
+        const OplogApplier::Options& options,
+        ThreadPool* writerPool) final {
+        MONGO_UNREACHABLE;
+    };
+
+    virtual StatusWith<ReplSetConfig> getCurrentConfig() const final {
+        MONGO_UNREACHABLE;
+    }
+};
+
+
+}  // namespace
 TenantMigrationRecipientService::TenantMigrationRecipientService(ServiceContext* serviceContext)
     : PrimaryOnlyService(serviceContext) {}
 
@@ -292,6 +370,72 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
     _stateDoc.setStartFetchingOpTime(startFetchingOpTime);
 }
 
+void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
+    auto opCtx = cc().makeOperationContext();
+    OplogBufferCollection::Options options;
+    options.peekCacheSize = static_cast<size_t>(tenantMigrationOplogBufferPeekCacheSize);
+    options.dropCollectionAtStartup = false;
+    options.dropCollectionAtShutdown = false;
+    NamespaceString oplogBufferNs(NamespaceString::kConfigDb,
+                                  kOplogBufferPrefix + getMigrationUUID().toString());
+    stdx::lock_guard lk(_mutex);
+    invariant(_stateDoc.getStartFetchingOpTime());
+    _donorOplogBuffer = std::make_unique<OplogBufferCollection>(
+        StorageInterface::get(opCtx.get()), oplogBufferNs, options);
+    _dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateTenantMigration>();
+    _donorOplogFetcher = (*_createOplogFetcherFn)(
+        (**_scopedExecutor).get(),
+        *_stateDoc.getStartFetchingOpTime(),
+        _oplogFetcherClient->getServerHostAndPort(),
+        // The config is only used for setting the awaitData timeout; the defaults are fine.
+        ReplSetConfig::parse(BSON("_id"
+                                  << "dummy"
+                                  << "version" << 1 << "members" << BSONObj())),
+        std::make_unique<OplogFetcherRestartDecisionTenantMigration>(),
+        // We do not need to check the rollback ID.
+        ReplicationProcess::kUninitializedRollbackId,
+        false /* requireFresherSyncSource */,
+        _dataReplicatorExternalState.get(),
+        [this](OplogFetcher::Documents::const_iterator first,
+               OplogFetcher::Documents::const_iterator last,
+               const OplogFetcher::DocumentsInfo& info) {
+            return _enqueueDocuments(first, last, info);
+        },
+        [this](const Status& s, int rbid) { _oplogFetcherCallback(s); },
+        tenantMigrationOplogFetcherBatchSize,
+        OplogFetcher::StartingPoint::kEnqueueFirstDoc,
+        _getOplogFetcherFilter(),
+        ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern),
+        "TenantOplogFetcher_" + getTenantId() + "_" + getMigrationUUID().toString());
+    _donorOplogFetcher->setConnection(std::move(_oplogFetcherClient));
+    uassertStatusOK(_donorOplogFetcher->startup());
+}
+
+Status TenantMigrationRecipientService::Instance::_enqueueDocuments(
+    OplogFetcher::Documents::const_iterator begin,
+    OplogFetcher::Documents::const_iterator end,
+    const OplogFetcher::DocumentsInfo& info) {
+
+    invariant(_donorOplogBuffer);
+
+    if (info.toApplyDocumentCount == 0)
+        return Status::OK();
+
+    auto opCtx = cc().makeOperationContext();
+    // Wait for enough space.
+    _donorOplogBuffer->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
+
+    // Buffer docs for later application.
+    _donorOplogBuffer->push(opCtx.get(), begin, end);
+
+    return Status::OK();
+}
+
+void TenantMigrationRecipientService::Instance::_oplogFetcherCallback(Status oplogFetcherStatus) {
+    // TODO(SERVER-48812): Abort the migration unless the error is CallbackCanceled and
+    // the migration has finished.
+}
+
 namespace {
 constexpr std::int32_t stopFailPointErrorCode = 4880402;
 void stopOnFailPoint(FailPoint* fp) {
@@ -309,9 +453,25 @@ void TenantMigrationRecipientService::Instance::interrupt(Status status) {
     }
 }
 
+BSONObj TenantMigrationRecipientService::Instance::_getOplogFetcherFilter() const {
+    // Either the namespace belongs to the tenant, or it's an applyOps in the admin namespace
+    // and the first operation belongs to the tenant.  A transaction with mixed tenant/non-tenant
+    // operations should not be possible and will fail in the TenantOplogApplier.
+    //
+    // Commit of prepared transactions is not handled here; we'd need to handle them in the applier
+    // by allowing all commits through here and ignoring those not corresponding to active
+    // transactions.
+    BSONObj namespaceRegex = ClonerUtils::makeTenantDatabaseRegex(getTenantId());
+    return BSON("$or" << BSON_ARRAY(BSON("ns" << namespaceRegex)
+                                    << BSON("ns"
+                                            << "admin.$cmd"
+                                            << "o.applyOps.0.ns" << namespaceRegex)));
+}
+
 void TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     _scopedExecutor = executor;
+    pauseBeforeRunTenantMigrationRecipientInstance.pauseWhileSet();
     ExecutorFuture(**executor)
         .then([this]() { return _initializeStateDoc(); })
         .then([this] {
@@ -338,8 +498,12 @@ void TenantMigrationRecipientService::Instance::run(
         })
         .then([this] {
             stopOnFailPoint(&stopAfterRetrievingStartOpTimesMigrationRecipientInstance);
+            _startOplogFetcher();
+        })
+        .then([this] {
+            stopOnFailPoint(&stopAfterStartingOplogFetcherMigrationRecipientInstance);
             // TODO SERVER-48808: Run cloners in MigrationServiceInstance
-            // TODO SERVER-48811: Oplog fetching in MigrationServiceInstance
+            // TODO SERVER-48811: Oplog application in MigrationServiceInstance
         })
         .getAsync([this](Status status) {
             LOGV2(4878501,
