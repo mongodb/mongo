@@ -1049,7 +1049,7 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
          * we can skip it.
          */
         if (__wt_txn_tw_stop_visible_all(session, &cbt->upd_value->tw)) {
-            WT_STAT_CONN_INCR(session, cursor_prev_hs_tombstone_rts);
+            WT_STAT_CONN_INCR(session, cursor_next_hs_tombstone_rts);
             continue;
         }
 

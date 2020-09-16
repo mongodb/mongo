@@ -136,8 +136,6 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
         txn_global->checkpoint_txn_shared.pinned_id = WT_TXN_NONE;
         txn_global->checkpoint_timestamp = WT_TS_NONE;
     }
-
-    __wt_txn_clear_read_timestamp(session);
 }
 
 /*
@@ -638,6 +636,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
      * Reset the transaction state to not running and release the snapshot.
      */
     __wt_txn_release_snapshot(session);
+    /* Clear the read timestamp. */
+    __wt_txn_clear_read_timestamp(session);
     txn->isolation = session->isolation;
 
     txn->rollback_reason = NULL;

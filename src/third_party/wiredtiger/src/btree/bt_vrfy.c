@@ -171,7 +171,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
     bool bm_start, quit;
 
 #if 0
-    /* FIXME-WT-6263: Temporarily disable history store verification. */
+    /* FIXME-WT-6682: temporarily disable history store verification. */
     bool skip_hs;
 #endif
 
@@ -182,9 +182,9 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
     bm_start = false;
 
 #if 0
-    /* FIXME-WT-6263: Temporarily disable history store verification. */
-
     /*
+     * FIXME-WT-6682: temporarily disable history store verification.
+     *
      * Skip the history store explicit call if we're performing a metadata verification. The
      * metadata file is verified before we verify the history store, and it makes no sense to verify
      * the history store against itself.
@@ -273,6 +273,8 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 
 #if 0
             /*
+             * FIXME-WT-6682: temporarily disable history store verification.
+             *
              * The checkpoints are in time-order, so the last one in the list is the most recent. If
              * this is the most recent checkpoint, verify the history store against it.
              *
@@ -280,9 +282,9 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
              */
             if (ret == 0 && (ckpt + 1)->name == NULL && !skip_hs) {
                 /* Open a history store cursor. */
-                WT_ERR(__wt_hs_cursor_open(session);
+                WT_ERR(__wt_hs_cursor_open(session));
                 WT_TRET(__wt_history_store_verify_one(session));
-                WT_TRET(__wt_hs_cursor_close(session);
+                WT_TRET(__wt_hs_cursor_close(session));
                 /*
                  * We cannot error out here. If we got an error verifying the history store, we need
                  * to follow through with reacquiring the exclusive call below. We'll error out

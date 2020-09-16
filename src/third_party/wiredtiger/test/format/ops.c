@@ -400,10 +400,12 @@ operations(u_int ops_seconds, bool lastrun)
     if (g.c_txn_rollback_to_stable)
         tinfo_rollback_to_stable_and_check(session);
 
-    testutil_check(session->close(session, NULL));
-
-    if (lastrun)
+    if (lastrun) {
         tinfo_teardown();
+        timestamp_teardown();
+    }
+
+    testutil_check(session->close(session, NULL));
 }
 
 /*

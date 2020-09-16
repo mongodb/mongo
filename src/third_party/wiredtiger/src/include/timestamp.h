@@ -51,4 +51,6 @@ struct __wt_time_aggregate {
     uint64_t newest_stop_txn;       /* default value: WT_TXN_MAX */
 
     uint8_t prepare;
+
+    uint8_t init_merge; /* Initialized for aggregation and merge */
 };

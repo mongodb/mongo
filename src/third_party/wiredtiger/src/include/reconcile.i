@@ -244,7 +244,7 @@ __wt_rec_addr_ts_init(WT_RECONCILE *r, WT_TIME_AGGREGATE *ta)
     if (r->page->type == WT_PAGE_COL_FIX)
         WT_TIME_AGGREGATE_INIT(ta);
     else
-        WT_TIME_AGGREGATE_INIT_MAX(ta);
+        WT_TIME_AGGREGATE_INIT_MERGE(ta);
 }
 
 /*

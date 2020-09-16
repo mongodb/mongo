@@ -2807,7 +2807,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      * If the user wants to verify WiredTiger metadata, verify the history store now that the
      * metadata table may have been salvaged and eviction has been started and recovery run.
      *
-     * FIXME-WT-6263: Temporarily disable history store verification.
+     * FIXME-WT-6682: temporarily disable history store verification.
      */
     if (verify_meta) {
         WT_ERR(__wt_open_internal_session(conn, "verify hs", false, 0, &verify_session));

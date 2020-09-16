@@ -911,9 +911,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      */
     session->dhandle = NULL;
     /* We have to set the system information before we release the snapshot. */
-    if (full) {
+    if (full)
         WT_ERR(__wt_meta_sysinfo_set(session));
-    }
 
     /* Release the snapshot so we aren't pinning updates in cache. */
     __wt_txn_release_snapshot(session);

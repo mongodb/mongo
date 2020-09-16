@@ -48,10 +48,13 @@ func_ok()
 	    -e '/int __page_write_gen_wrapped_check$/d' \
 	    -e '/int __posix_terminate$/d' \
 	    -e '/int __rec_destroy_session$/d' \
+	    -e '/int __time_aggregate_validate_parent$/d' \
+	    -e '/int __time_aggregate_validate_parent_stable$/d' \
+	    -e '/int __time_value_validate_parent$/d' \
+	    -e '/int __time_value_validate_parent_stable$/d' \
 	    -e '/int __tree_walk_skip_count_callback$/d' \
 	    -e '/int __txn_rollback_to_stable_custom_skip$/d' \
 	    -e '/int __win_terminate$/d' \
-	    -e '/int wiredtiger_calc_modify/d' \
 	    -e '/int __wt_block_compact_end$/d' \
 	    -e '/int __wt_block_compact_start$/d' \
 	    -e '/int __wt_block_manager_size$/d' \
@@ -122,6 +125,7 @@ func_ok()
 	    -e '/int uri2name$/d' \
 	    -e '/int usage$/d' \
 	    -e '/int util_err$/d' \
+	    -e '/int wiredtiger_calc_modify/d' \
 	    -e '/int wiredtiger_extension_init$/d' \
 	    -e '/int wiredtiger_extension_terminate$/d' \
 	    -e '/int wiredtiger_pack_close$/d' \

@@ -1051,6 +1051,9 @@ static const char *const __stats_connection_desc[] = {
   "cursor: cursor modify key and value bytes affected",
   "cursor: cursor modify value bytes modified",
   "cursor: cursor next calls",
+  "cursor: cursor next calls that skip due to a globally visible history store tombstone",
+  "cursor: cursor next calls that skip due to a globally visible history store tombstone in "
+  "rollback to stable",
   "cursor: cursor next calls that skip greater than or equal to 100 entries",
   "cursor: cursor next calls that skip less than 100 entries",
   "cursor: cursor operation restarted",
@@ -1579,6 +1582,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cursor_modify_bytes = 0;
     stats->cursor_modify_bytes_touch = 0;
     stats->cursor_next = 0;
+    stats->cursor_next_hs_tombstone = 0;
+    stats->cursor_next_hs_tombstone_rts = 0;
     stats->cursor_next_skip_ge_100 = 0;
     stats->cursor_next_skip_lt_100 = 0;
     stats->cursor_restart = 0;
@@ -2101,6 +2106,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cursor_modify_bytes += WT_STAT_READ(from, cursor_modify_bytes);
     to->cursor_modify_bytes_touch += WT_STAT_READ(from, cursor_modify_bytes_touch);
     to->cursor_next += WT_STAT_READ(from, cursor_next);
+    to->cursor_next_hs_tombstone += WT_STAT_READ(from, cursor_next_hs_tombstone);
+    to->cursor_next_hs_tombstone_rts += WT_STAT_READ(from, cursor_next_hs_tombstone_rts);
     to->cursor_next_skip_ge_100 += WT_STAT_READ(from, cursor_next_skip_ge_100);
     to->cursor_next_skip_lt_100 += WT_STAT_READ(from, cursor_next_skip_lt_100);
     to->cursor_restart += WT_STAT_READ(from, cursor_restart);
