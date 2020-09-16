@@ -21,7 +21,7 @@ function testReadLoadBalancing(numReplicas) {
 
     assert.eq(numReplicas, rsStats().hosts.length);
 
-    function isMasterOrSecondary(info) {
+    function isPrimaryOrSecondary(info) {
         if (!info.ok)
             return false;
         if (info.ismaster)
@@ -33,7 +33,7 @@ function testReadLoadBalancing(numReplicas) {
         var x = rsStats().hosts;
         printjson(x);
         for (var i = 0; i < x.length; i++)
-            if (!isMasterOrSecondary(x[i]))
+            if (!isPrimaryOrSecondary(x[i]))
                 return false;
         return true;
     });
@@ -73,7 +73,7 @@ function testReadLoadBalancing(numReplicas) {
     c = rs.conf();
     print("config before: " + tojson(c));
     for (i = 0; i < c.members.length; i++) {
-        if (c.members[i].host == db.runCommand("ismaster").primary)
+        if (c.members[i].host == db.runCommand("hello").primary)
             continue;
         c.members[i].hidden = true;
         c.members[i].priority = 0;

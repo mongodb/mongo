@@ -204,7 +204,7 @@ function runTests(client) {
      [checkClosedEarly, runCommand({getnonce: 1})],
      [checkClosedEarly, runCommand({saslStart: 1})],
      [checkClosedEarly, runCommand({saslContinue: 1})],
-     [checkClosedEarly, runCommand({ismaster: 1})],
+     [checkClosedEarly, runCommand({hello: 1})],
      [checkClosedEarly, runCommand({listCollections: 1})],
      [checkClosedEarly, runCommand({listDatabases: 1})],
      [checkClosedEarly, runCommand({listIndexes: "test"})],

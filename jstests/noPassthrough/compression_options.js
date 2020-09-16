@@ -7,11 +7,11 @@ var runTest = function(optionValue, expected) {
     jsTest.log("Testing with --networkMessageCompressors=\"" + optionValue +
                "\" expecting: " + expected);
     var mongo = MongoRunner.runMongod({networkMessageCompressors: optionValue});
-    assert.commandWorked(mongo.adminCommand({isMaster: 1}));
+    assert.commandWorked(mongo.adminCommand({hello: 1}));
     clearRawMongoProgramOutput();
     assert.eq(runMongoProgram("mongo",
                               "--eval",
-                              "tostrictjson(db.isMaster());",
+                              "tostrictjson(db.hello());",
                               "--port",
                               mongo.port,
                               "--networkMessageCompressors=snappy"),
@@ -21,7 +21,7 @@ var runTest = function(optionValue, expected) {
                      .split("\n")
                      .map(function(str) {
                          str = str.replace(/^sh[0-9]+\| /, "");
-                         if (!/^{.*ismaster/.test(str)) {
+                         if (!/^{.*isWritablePrimary/.test(str)) {
                              return "";
                          }
                          return str;

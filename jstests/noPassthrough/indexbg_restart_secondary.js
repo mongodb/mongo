@@ -82,7 +82,7 @@ replTest.start(second,
 try {
     assert.soon(function() {
         try {
-            secondDB.isMaster();  // trigger a reconnect if needed
+            secondDB.hello();  // trigger a reconnect if needed
             return true;
         } catch (e) {
             return false;

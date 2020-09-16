@@ -92,7 +92,7 @@ function runTestWithQuery(queryFn, useSbe = false) {
     }
 
     // Check that the server is still up.
-    assert.commandWorked(db.adminCommand({isMaster: 1}));
+    assert.commandWorked(db.adminCommand({hello: 1}));
 }
 
 function rootedOr() {

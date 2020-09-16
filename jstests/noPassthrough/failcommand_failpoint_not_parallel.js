@@ -33,10 +33,10 @@ jsTest.log("Test validation of blockConnection fields");
         mode: "alwaysOn",
         data: {
             blockConnection: true,
-            failCommands: ["isMaster"],
+            failCommands: ["hello"],
         }
     }));
-    assert.commandFailedWithCode(db.runCommand({isMaster: 1}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(db.runCommand({hello: 1}), ErrorCodes.InvalidOptions);
 
     // 'blockTimeMS' must be non-negative.
     assert.commandWorked(db.adminCommand({
@@ -45,10 +45,10 @@ jsTest.log("Test validation of blockConnection fields");
         data: {
             blockConnection: true,
             blockTimeMS: -100,
-            failCommands: ["isMaster"],
+            failCommands: ["hello"],
         }
     }));
-    assert.commandFailedWithCode(db.runCommand({isMaster: 1}), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(db.runCommand({hello: 1}), ErrorCodes.InvalidOptions);
 
     assert.commandWorked(db.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 }
@@ -121,7 +121,7 @@ jsTest.log("Test that only commands listed in failCommands block");
     let thread = startIncrementRunIdThread();
 
     // Check that other commands get through.
-    assert.commandWorked(db.runCommand({isMaster: 1}));
+    assert.commandWorked(db.runCommand({hello: 1}));
     assert.eq(checkRunId(), 0);
 
     // Wait for the blocked update to get through.

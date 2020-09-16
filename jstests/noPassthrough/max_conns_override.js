@@ -11,7 +11,7 @@ let maxConns = [];
 for (let i = 0; i < 5; i++) {
     maxConns.push(new Mongo(`127.0.0.1:${conn.port}`));
     let tmpDb = maxConns[maxConns.length - 1].getDB("admin");
-    assert.commandWorked(tmpDb.runCommand({isMaster: 1}));
+    assert.commandWorked(tmpDb.runCommand({hello: 1}));
 }
 
 // Get serverStatus to check that we have the right number of threads in the right places

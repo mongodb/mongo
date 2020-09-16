@@ -32,7 +32,7 @@ replTest.restart(0);
 print("5: make sure it stays in recovering");
 var timeout = (new Date()).getTime() + 30000;
 while ((new Date().getTime()) < timeout) {
-    var status = replTest.nodes[0].getDB("admin").runCommand({isMaster: 1});
+    var status = replTest.nodes[0].getDB("admin").runCommand({hello: 1});
     assert(!status.secondary && !status.primary, tojson(status));
     sleep(2000);
 }

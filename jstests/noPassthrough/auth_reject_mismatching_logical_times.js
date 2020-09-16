@@ -16,18 +16,18 @@ function mismatchingLogicalTime(lt) {
 }
 
 function assertRejectsMismatchingLogicalTime(db) {
-    let validTime = db.runCommand({isMaster: 1}).$clusterTime;
+    let validTime = db.runCommand({hello: 1}).$clusterTime;
     let mismatchingTime = mismatchingLogicalTime(validTime);
 
     assert.commandFailedWithCode(
-        db.runCommand({isMaster: 1, $clusterTime: mismatchingTime}),
+        db.runCommand({hello: 1, $clusterTime: mismatchingTime}),
         ErrorCodes.TimeProofMismatch,
         "expected command with mismatching cluster time and signature to be rejected");
 }
 
 function assertAcceptsValidLogicalTime(db) {
-    let validTime = db.runCommand({isMaster: 1}).$clusterTime;
-    assert.commandWorked(testDB.runCommand({isMaster: 1, $clusterTime: validTime}),
+    let validTime = db.runCommand({hello: 1}).$clusterTime;
+    assert.commandWorked(testDB.runCommand({hello: 1, $clusterTime: validTime}),
                          "expected command with valid cluster time and signature to be accepted");
 }
 

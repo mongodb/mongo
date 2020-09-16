@@ -152,7 +152,7 @@ assertSetParameterFails("internalQueryMaxAddToSetBytes", -1);
 
 // Internal BSON max object size is slightly larger than the max user object size, to
 // accommodate command metadata.
-const bsonUserSizeLimit = assert.commandWorked(testDB.isMaster()).maxBsonObjectSize;
+const bsonUserSizeLimit = assert.commandWorked(testDB.hello()).maxBsonObjectSize;
 const bsonObjMaxInternalSize = bsonUserSizeLimit + 16 * 1024;
 
 assertSetParameterFails("internalLookupStageIntermediateDocumentMaxSizeBytes", 1);

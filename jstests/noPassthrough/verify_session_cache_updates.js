@@ -30,7 +30,7 @@ function runTest(conn) {
     verify(conn, 0);
 
     // running a command that doesn't require auth does touch
-    session.getDatabase("admin").runCommand("isMaster");
+    session.getDatabase("admin").runCommand("hello");
     verify(conn, 1);
 
     // running a session updating command does touch
