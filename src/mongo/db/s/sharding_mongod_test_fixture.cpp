@@ -266,10 +266,6 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
                std::move(executorPoolPtr),
                _mockNetwork);
 
-    // NOTE: ShardRegistry::startup() is not called because it starts a task executor with a
-    // self-rescheduling task to reload the ShardRegistry over the network.
-    // grid->shardRegistry()->startup();
-
     if (grid->catalogClient()) {
         grid->catalogClient()->startup();
     }

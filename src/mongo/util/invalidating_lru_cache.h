@@ -67,6 +67,18 @@ struct CacheNotCausallyConsistent {
 };
 
 /**
+ * Helper for determining if a given type is CacheNotCausallyConsistent or not.
+ */
+template <typename T>
+struct isCausallyConsistentImpl : std::true_type {};
+
+template <>
+struct isCausallyConsistentImpl<CacheNotCausallyConsistent> : std::false_type {};
+
+template <class T>
+inline constexpr bool isCausallyConsistent = isCausallyConsistentImpl<T>::value;
+
+/**
  * Specifies the desired causal consistency for calls to 'get' (and 'acquire', respectively in the
  * ReadThroughCache, which is its main consumer).
  */
@@ -200,12 +212,8 @@ public:
         // doesn't support pinning items. Their only usage must be in the authorization mananager
         // for the internal authentication user.
         explicit ValueHandle(Value&& value)
-            : _value(std::make_shared<StoredValue>(nullptr,
-                                                   0,
-                                                   boost::none,
-                                                   std::move(value),
-                                                   CacheNotCausallyConsistent(),
-                                                   CacheNotCausallyConsistent())) {}
+            : _value(std::make_shared<StoredValue>(
+                  nullptr, 0, boost::none, std::move(value), Time(), Time())) {}
 
         explicit ValueHandle(Value&& value, const Time& t)
             : _value(
@@ -218,7 +226,13 @@ public:
         }
 
         bool isValid() const {
+            invariant(bool(*this));
             return _value->isValid.loadRelaxed();
+        }
+
+        const Time& getTime() const {
+            invariant(bool(*this));
+            return _value->time;
         }
 
         Value* get() {
@@ -260,13 +274,16 @@ public:
      * was called, it will become invalidated.
      *
      * The 'time' parameter is mandatory for causally-consistent caches, but not needed otherwise
-     * (since the time never changes). Using a default of '= CacheNotCausallyConsistent()' allows
-     * non-causally-consistent users to not have to pass a second parameter, but would fail
-     * compilation if causally-consistent users forget to pass it.
+     * (since the time never changes).
      */
-    void insertOrAssign(const Key& key,
-                        Value&& value,
-                        const Time& time = CacheNotCausallyConsistent()) {
+    void insertOrAssign(const Key& key, Value&& value) {
+        MONGO_STATIC_ASSERT_MSG(
+            !isCausallyConsistent<Time>,
+            "Time must be passed to insertOrAssign on causally consistent caches");
+        insertOrAssign(key, std::move(value), Time());
+    }
+
+    void insertOrAssign(const Key& key, Value&& value, const Time& time) {
         LockGuardWithPostUnlockDestructor guard(_mutex);
         Time currentTime, currentTimeInStore;
         _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
@@ -307,13 +324,16 @@ public:
      * destroyed.
      *
      * The 'time' parameter is mandatory for causally-consistent caches, but not needed otherwise
-     * (since the time never changes). Using a default of '= CacheNotCausallyConsistent()' allows
-     * non-causally-consistent users to not have to pass a second parameter, but would fail
-     * compilation if causally-consistent users forget to pass it.
+     * (since the time never changes).
      */
-    ValueHandle insertOrAssignAndGet(const Key& key,
-                                     Value&& value,
-                                     const Time& time = CacheNotCausallyConsistent()) {
+    ValueHandle insertOrAssignAndGet(const Key& key, Value&& value) {
+        MONGO_STATIC_ASSERT_MSG(
+            !isCausallyConsistent<Time>,
+            "Time must be passed to insertOrAssignAndGet on causally consistent caches");
+        return insertOrAssignAndGet(key, std::move(value), Time());
+    }
+
+    ValueHandle insertOrAssignAndGet(const Key& key, Value&& value, const Time& time) {
         LockGuardWithPostUnlockDestructor guard(_mutex);
         Time currentTime, currentTimeInStore;
         _invalidate(&guard, key, _cache.find(key), &currentTime, &currentTimeInStore);
