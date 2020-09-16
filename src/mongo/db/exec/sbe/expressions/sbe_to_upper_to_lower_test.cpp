@@ -102,8 +102,8 @@ TEST_F(SBEToUpperToLowerTest, BasicToUpper) {
 
     // BSONObj test.
     auto bsonObj = BSON("number" << 42);
-    auto bsonNum = value::bitcastFrom(bsonObj["number"].value());
-    auto [bsonTag, bsonVal] = value::copyValue(value::TypeTags::bsonObject, bsonNum);
+    auto bsonData = value::bitcastFrom(bsonObj.objdata());
+    auto [bsonTag, bsonVal] = value::copyValue(value::TypeTags::bsonObject, bsonData);
     toUpperAccessor.reset(bsonTag, bsonVal);
     runAndAssertNothing(compiledExpr.get());
 
@@ -170,8 +170,8 @@ TEST_F(SBEToUpperToLowerTest, BasicToLower) {
 
     // BSONObj test.
     auto bsonObj = BSON("number" << 42);
-    auto bsonNum = value::bitcastFrom(bsonObj["number"].value());
-    auto [bsonTag, bsonVal] = value::copyValue(value::TypeTags::bsonObject, bsonNum);
+    auto bsonData = value::bitcastFrom(bsonObj.objdata());
+    auto [bsonTag, bsonVal] = value::copyValue(value::TypeTags::bsonObject, bsonData);
     toLowerAccessor.reset(bsonTag, bsonVal);
     runAndAssertNothing(compiledExpr.get());
 

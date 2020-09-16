@@ -101,8 +101,8 @@ TEST_F(SBECoerceToStringTest, BasicCoerceToString) {
 
     // BSONObj test.
     auto bsonObj = BSON("number" << 42);
-    auto bsonNum = value::bitcastFrom(bsonObj["number"].value());
-    auto [bsonTag, bsonVal] = value::copyValue(value::TypeTags::bsonObject, bsonNum);
+    auto bsonData = value::bitcastFrom(bsonObj.objdata());
+    auto [bsonTag, bsonVal] = value::copyValue(value::TypeTags::bsonObject, bsonData);
     coerceToStringAccessor.reset(bsonTag, bsonVal);
     runAndAssertNothing(compiledExpr.get());
 
