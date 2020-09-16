@@ -1072,20 +1072,32 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
 
     # Get the dependencies for all targets
     implicit = list({dep for tgt in tlist for dep in get_dependencies(tgt)})
+
+    # Now add in the other dependencies related to the command,
+    # e.g. the compiler binary. The ninja rule can be user provided so
+    # we must do some validation to resolve the dependency path for ninja.
     for provider_dep in provider_deps:
+
         provider_dep = sub_env.subst(provider_dep)
         if not provider_dep:
             continue
 
-        if isinstance(provider_dep, SCons.Node.Node):
+        # If the tool is a node, then SCons will resolve the path later, if its not
+        # a node then we assume it generated from build and make sure it is existing.
+        if isinstance(provider_dep, SCons.Node.Node) or os.path.exists(provider_dep):
             implicit.append(provider_dep)
             continue
 
+        # Many commands will assume the binary is in the path, so
+        # we accept this as a possible input from a given command.
         provider_dep_abspath = sub_env.WhereIs(provider_dep)
         if provider_dep_abspath:
             implicit.append(provider_dep_abspath)
             continue
 
+        # Possibly these could be ignore and the build would still work, however it may not always
+        # rebuild correctly, so we hard stop, and force the user to fix the issue with the provided
+        # ninja rule.
         raise Exception(f"Could not resolve path for {provider_dep} dependency on node '{node}'")
 
     ninja_build = {
