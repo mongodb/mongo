@@ -42,6 +42,7 @@ const expectedStopShardErrors = [
 // First, verify that the 'failGetMoreAfterCursorCheckout' failpoint can effectively exercise the
 // error label generation logic for change stream getMores.
 function testFailGetMoreAfterCursorCheckoutFailpoint({errorCode, expectedLabel}) {
+    errorCode = ErrorCodes.doMongosRewrite(errorCode);
     // Activate the failpoint and set the exception that it will throw.
     assert.commandWorked(testDB.adminCommand({
         configureFailPoint: "failGetMoreAfterCursorCheckout",

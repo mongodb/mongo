@@ -28,6 +28,7 @@ const st = new ShardingTest({
 });
 
 function checkErrorCode(res, errorCode, isWCError) {
+    errorCode = ErrorCodes.doMongosRewrite(errorCode);
     if (isWCError) {
         assert.neq(null, res.writeConcernError, res);
         assert.eq(res.writeConcernError.code, errorCode, res);

@@ -81,3 +81,12 @@ ErrorCodes.is${cat.name} = function(err) {
     }
 };
 //#end for
+
+// Returns the ErrorCode to which mongos would remap the specified `err`.
+// Mongos normally rewrites connection state change errors, unless
+// it is shutting down or the code was injected by a mongos failpoint.
+ErrorCodes.doMongosRewrite = function(err) {
+    return (ErrorCodes.isNotPrimaryError(err) || ErrorCodes.isShutdownError(err))
+        ? ErrorCodes.HostUnreachable
+        : err;
+};

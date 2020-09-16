@@ -45,6 +45,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/transport/message_compressor_manager.h"
@@ -105,6 +106,9 @@ public:
         auto cmd = HelloCommand::parse({"hello", apiStrict}, cmdObj);
 
         waitInHello.pauseWhileSet(opCtx);
+
+        // "hello" is exempt from error code rewrites.
+        rpc::RewriteStateChangeErrors::setEnabled(opCtx, false);
 
         auto client = opCtx->getClient();
         if (ClientMetadata::tryFinalize(client)) {
