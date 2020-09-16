@@ -55,6 +55,14 @@ struct ProjectionTraversalVisitorContext {
     // Stores the field names to visit at each nested projection level, and the base path to this
     // level. Top of the stack is the most recently visited level.
     struct NestedLevel {
+        NestedLevel(sbe::value::SlotId inputSlot,
+                    std::list<std::string> fields,
+                    PlanNodeId planNodeId)
+            : inputSlot(inputSlot),
+              fields(std::move(fields)),
+              fieldPathExpressionsTraverseStage(sbe::makeS<sbe::LimitSkipStage>(
+                  sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId)) {}
+
         // The input slot for the current level. This is the parent sub-document for each of the
         // projected fields at the current level.
         sbe::value::SlotId inputSlot;
@@ -65,8 +73,7 @@ struct ProjectionTraversalVisitorContext {
         std::stack<std::string> basePath;
         // A traversal sub-tree which combines traversals for each of the fields at the current
         // level.
-        PlanStageType fieldPathExpressionsTraverseStage{
-            sbe::makeS<sbe::LimitSkipStage>(sbe::makeS<sbe::CoScanStage>(), 1, boost::none)};
+        PlanStageType fieldPathExpressionsTraverseStage;
     };
 
     // Stores evaluation expressions for each of the projections at the current nested level. It can
@@ -104,7 +111,9 @@ struct ProjectionTraversalVisitorContext {
     }
 
     void pushLevel(std::list<std::string> fields) {
-        levels.push({levels.empty() ? inputSlot : slotIdGenerator->generate(), std::move(fields)});
+        levels.push({levels.empty() ? inputSlot : slotIdGenerator->generate(),
+                     std::move(fields),
+                     planNodeId});
     }
 
     std::pair<sbe::value::SlotId, PlanStageType> done() {
@@ -120,10 +129,15 @@ struct ProjectionTraversalVisitorContext {
                                                eval->outputSlot,
                                                sbe::makeSV(),
                                                nullptr,
-                                               nullptr)};
+                                               nullptr,
+                                               planNodeId,
+                                               boost::none)};
     }
 
     OperationContext* opCtx;
+
+    // The node id of the projection QuerySolutionNode.
+    const PlanNodeId planNodeId;
 
     projection_ast::ProjectType projectType;
     sbe::value::SlotIdGenerator* const slotIdGenerator;
@@ -225,6 +239,7 @@ public:
                                _context->frameIdGenerator,
                                _context->inputSlot,
                                _context->env,
+                               _context->planNodeId,
                                &_context->relevantSlots);
         _context->evals.push({{_context->topLevel().inputSlot, outputSlot, std::move(expr)}});
         _context->topLevel().fieldPathExpressionsTraverseStage = std::move(stage);
@@ -275,6 +290,7 @@ public:
 
                         inputStage = sbe::makeProjectStage(
                             std::move(inputStage),
+                            _context->planNodeId,
                             eval->inputSlot,
                             sbe::makeE<sbe::EFunction>(
                                 "getField"sv,
@@ -291,7 +307,9 @@ public:
                                                                     eval->outputSlot,
                                                                     sbe::makeSV(),
                                                                     nullptr,
-                                                                    nullptr);
+                                                                    nullptr,
+                                                                    _context->planNodeId,
+                                                                    boost::none);
                     }},
                 eval->expr);
         }
@@ -303,7 +321,8 @@ public:
 
         // If we have something to actually project, then inject a projection stage.
         if (!projects.empty()) {
-            inputStage = sbe::makeS<sbe::ProjectStage>(std::move(inputStage), std::move(projects));
+            inputStage = sbe::makeS<sbe::ProjectStage>(
+                std::move(inputStage), std::move(projects), _context->planNodeId);
         }
 
         // Finally, inject an mkobj stage to generate a document for the current nested level. For
@@ -322,10 +341,12 @@ public:
                                                               std::move(projectFields),
                                                               std::move(projectSlots),
                                                               true,
-                                                              false),
+                                                              false,
+                                                              _context->planNodeId),
                                 sbe::makeE<sbe::EFunction>("isObject"sv,
                                                            sbe::makeEs(sbe::makeE<sbe::EVariable>(
-                                                               _context->topLevel().inputSlot))))
+                                                               _context->topLevel().inputSlot))),
+                                _context->planNodeId)
                           : sbe::makeS<sbe::MakeObjStage>(std::move(inputStage),
                                                           outputSlot,
                                                           _context->topLevel().inputSlot,
@@ -333,7 +354,8 @@ public:
                                                           std::move(projectFields),
                                                           std::move(projectSlots),
                                                           false,
-                                                          true)}});
+                                                          true,
+                                                          _context->planNodeId)}});
         // We've done with the current nested level.
         _context->popLevel();
     }
@@ -376,8 +398,10 @@ std::pair<sbe::value::SlotId, PlanStageType> generateProjection(
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::FrameIdGenerator* frameIdGenerator,
     sbe::value::SlotId inputVar,
-    sbe::RuntimeEnvironment* env) {
+    sbe::RuntimeEnvironment* env,
+    PlanNodeId planNodeId) {
     ProjectionTraversalVisitorContext context{opCtx,
+                                              planNodeId,
                                               projection->type(),
                                               slotIdGenerator,
                                               frameIdGenerator,

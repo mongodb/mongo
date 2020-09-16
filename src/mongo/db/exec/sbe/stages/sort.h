@@ -49,7 +49,8 @@ public:
               size_t limit,
               size_t memoryLimit,
               bool allowDiskUse,
-              TrialRunProgressTracker* tracker);
+              TrialRunProgressTracker* tracker,
+              PlanNodeId planNodeId);
 
     ~SortStage();
 

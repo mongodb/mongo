@@ -40,7 +40,8 @@ public:
                   std::unique_ptr<PlanStage> inner,
                   value::SlotVector outerProjects,
                   value::SlotVector outerCorrelated,
-                  std::unique_ptr<EExpression> predicate);
+                  std::unique_ptr<EExpression> predicate,
+                  PlanNodeId nodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

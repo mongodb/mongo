@@ -41,8 +41,9 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              value::SlotVector outerCond,
                              value::SlotVector outerProjects,
                              value::SlotVector innerCond,
-                             value::SlotVector innerProjects)
-    : PlanStage("hj"_sd),
+                             value::SlotVector innerProjects,
+                             PlanNodeId planNodeId)
+    : PlanStage("hj"_sd, planNodeId),
       _outerCond(std::move(outerCond)),
       _outerProjects(std::move(outerProjects)),
       _innerCond(std::move(innerCond)),
@@ -62,7 +63,8 @@ std::unique_ptr<PlanStage> HashJoinStage::clone() const {
                                            _outerCond,
                                            _outerProjects,
                                            _innerCond,
-                                           _innerProjects);
+                                           _innerProjects,
+                                           _commonStats.nodeId);
 }
 
 void HashJoinStage::prepare(CompileCtx& ctx) {

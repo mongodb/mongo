@@ -48,8 +48,9 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
                                boost::optional<value::SlotId> seekKeySlotLow,
                                boost::optional<value::SlotId> seekKeySlotHi,
                                PlanYieldPolicy* yieldPolicy,
-                               TrialRunProgressTracker* tracker)
-    : PlanStage(seekKeySlotLow ? "ixseek"_sd : "ixscan"_sd, yieldPolicy),
+                               TrialRunProgressTracker* tracker,
+                               PlanNodeId nodeId)
+    : PlanStage(seekKeySlotLow ? "ixseek"_sd : "ixscan"_sd, yieldPolicy, nodeId),
       _name(name),
       _indexName(indexName),
       _forward(forward),
@@ -78,7 +79,8 @@ std::unique_ptr<PlanStage> IndexScanStage::clone() const {
                                             _seekKeySlotLow,
                                             _seekKeySlotHi,
                                             _yieldPolicy,
-                                            _tracker);
+                                            _tracker,
+                                            _commonStats.nodeId);
 }
 
 void IndexScanStage::prepare(CompileCtx& ctx) {

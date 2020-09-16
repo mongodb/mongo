@@ -49,6 +49,7 @@ std::unique_ptr<sbe::PlanStage> generateFilter(OperationContext* opCtx,
                                                sbe::value::FrameIdGenerator* frameIdGenerator,
                                                sbe::value::SlotId inputSlotIn,
                                                sbe::RuntimeEnvironment* env,
-                                               sbe::value::SlotVector relevantSlotsIn);
+                                               sbe::value::SlotVector relevantSlotsIn,
+                                               PlanNodeId planNodeId);
 
 }  // namespace mongo::stage_builder

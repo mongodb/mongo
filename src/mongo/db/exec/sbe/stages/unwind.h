@@ -38,7 +38,8 @@ public:
                 value::SlotId inField,
                 value::SlotId outField,
                 value::SlotId outIndex,
-                bool preserveNullAndEmptyArrays);
+                bool preserveNullAndEmptyArrays,
+                PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

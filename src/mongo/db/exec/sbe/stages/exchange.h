@@ -253,9 +253,10 @@ public:
                      value::SlotVector fields,
                      ExchangePolicy policy,
                      std::unique_ptr<EExpression> partition,
-                     std::unique_ptr<EExpression> orderLess);
+                     std::unique_ptr<EExpression> orderLess,
+                     PlanNodeId planNodeId);
 
-    ExchangeConsumer(std::shared_ptr<ExchangeState> state);
+    ExchangeConsumer(std::shared_ptr<ExchangeState> state, PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -300,7 +301,9 @@ private:
 
 class ExchangeProducer final : public PlanStage {
 public:
-    ExchangeProducer(std::unique_ptr<PlanStage> input, std::shared_ptr<ExchangeState> state);
+    ExchangeProducer(std::unique_ptr<PlanStage> input,
+                     std::shared_ptr<ExchangeState> state,
+                     PlanNodeId planNodeId);
 
     static void start(OperationContext* opCtx,
                       CompileCtx& ctx,

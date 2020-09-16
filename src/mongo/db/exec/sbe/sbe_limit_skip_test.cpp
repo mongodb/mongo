@@ -42,7 +42,8 @@ using LimitSkipStageTest = PlanStageTestFixture;
 
 TEST_F(LimitSkipStageTest, LimitSimpleTest) {
     // Make a "limit 1000" stage.
-    auto limit = makeS<LimitSkipStage>(makeS<CoScanStage>(), 1000, boost::none);
+    auto limit = makeS<LimitSkipStage>(
+        makeS<CoScanStage>(kEmptyPlanNodeId), 1000, boost::none, kEmptyPlanNodeId);
 
     prepareTree(limit.get());
 
@@ -68,7 +69,7 @@ TEST_F(LimitSkipStageTest, LimitSkipSimpleTest) {
     // Make a "limit 200 skip 300" stage.
     inputGuard.reset();
     auto [scanSlot, scanStage] = generateMockScan(inputTag, inputVal);
-    auto limit = makeS<LimitSkipStage>(std::move(scanStage), 200, 300);
+    auto limit = makeS<LimitSkipStage>(std::move(scanStage), 200, 300, kEmptyPlanNodeId);
 
     auto resultAccessor = prepareTree(limit.get(), scanSlot);
 

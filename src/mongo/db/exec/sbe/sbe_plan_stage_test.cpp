@@ -65,13 +65,17 @@ std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::gener
     auto projectSlot = generateSlotId();
     auto unwindSlot = generateSlotId();
     auto unwind = makeS<UnwindStage>(
-        makeProjectStage(makeS<LimitSkipStage>(makeS<CoScanStage>(), 1, boost::none),
-                         projectSlot,
-                         std::move(arrayExpression)),
+        makeProjectStage(
+            makeS<LimitSkipStage>(
+                makeS<CoScanStage>(kEmptyPlanNodeId), 1, boost::none, kEmptyPlanNodeId),
+            kEmptyPlanNodeId,
+            projectSlot,
+            std::move(arrayExpression)),
         projectSlot,
         unwindSlot,
         generateSlotId(),  // We don't need an index slot but must to provide it.
-        false);            // Don't preserve null and empty arrays.
+        false,             // Don't preserve null and empty arrays.
+        kEmptyPlanNodeId);
 
     // Return the UnwindStage and its output slot. The UnwindStage can be used as an input
     // to other PlanStages.
@@ -103,7 +107,7 @@ PlanStageTestFixture::generateMockScanMulti(int64_t numSlots,
     }
 
     return {std::move(projectSlots),
-            makeS<ProjectStage>(std::move(scanStage), std::move(projections))};
+            makeS<ProjectStage>(std::move(scanStage), std::move(projections), kEmptyPlanNodeId)};
 }
 
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateMockScan(

@@ -77,5 +77,6 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
     boost::optional<sbe::value::SlotId> recordSlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     PlanYieldPolicy* yieldPolicy,
-    TrialRunProgressTracker* tracker);
+    TrialRunProgressTracker* tracker,
+    PlanNodeId nodeId);
 }  // namespace mongo::stage_builder

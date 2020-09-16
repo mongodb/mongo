@@ -48,8 +48,9 @@ public:
                    const fts::FTSQueryImpl& ftsQuery,
                    const fts::FTSSpec& ftsSpec,
                    value::SlotId inputSlot,
-                   value::SlotId outputSlot)
-        : PlanStage("textmatch"),
+                   value::SlotId outputSlot,
+                   PlanNodeId planNodeId)
+        : PlanStage("textmatch", planNodeId),
           _ftsMatcher(ftsQuery, ftsSpec),
           _inputSlot(inputSlot),
           _outputSlot(outputSlot) {

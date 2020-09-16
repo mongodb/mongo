@@ -45,7 +45,8 @@ public:
                 std::unique_ptr<EExpression> filter,
                 value::SlotVector inputThenVals,
                 value::SlotVector inputElseVals,
-                value::SlotVector outputVals);
+                value::SlotVector outputVals,
+                PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

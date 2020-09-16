@@ -36,8 +36,11 @@
 namespace mongo::sbe {
 UnionStage::UnionStage(std::vector<std::unique_ptr<PlanStage>> inputStages,
                        std::vector<value::SlotVector> inputVals,
-                       value::SlotVector outputVals)
-    : PlanStage("union"_sd), _inputVals{std::move(inputVals)}, _outputVals{std::move(outputVals)} {
+                       value::SlotVector outputVals,
+                       PlanNodeId planNodeId)
+    : PlanStage("union"_sd, planNodeId),
+      _inputVals{std::move(inputVals)},
+      _outputVals{std::move(outputVals)} {
     _children = std::move(inputStages);
 
     invariant(_children.size() > 0);
@@ -53,7 +56,8 @@ std::unique_ptr<PlanStage> UnionStage::clone() const {
     for (auto& child : _children) {
         inputStages.emplace_back(child->clone());
     }
-    return std::make_unique<UnionStage>(std::move(inputStages), _inputVals, _outputVals);
+    return std::make_unique<UnionStage>(
+        std::move(inputStages), _inputVals, _outputVals, _commonStats.nodeId);
 }
 
 void UnionStage::prepare(CompileCtx& ctx) {

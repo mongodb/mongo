@@ -38,7 +38,8 @@ class UnionStage final : public PlanStage {
 public:
     UnionStage(std::vector<std::unique_ptr<PlanStage>> inputStages,
                std::vector<value::SlotVector> inputVals,
-               value::SlotVector outputVals);
+               value::SlotVector outputVals,
+               PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

@@ -34,9 +34,10 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 
 namespace mongo::sbe {
-CoScanStage::CoScanStage() : PlanStage("coscan"_sd) {}
+CoScanStage::CoScanStage(PlanNodeId planNodeId) : PlanStage("coscan"_sd, planNodeId) {}
+
 std::unique_ptr<PlanStage> CoScanStage::clone() const {
-    return std::make_unique<CoScanStage>();
+    return std::make_unique<CoScanStage>(_commonStats.nodeId);
 }
 void CoScanStage::prepare(CompileCtx& ctx) {}
 value::SlotAccessor* CoScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {

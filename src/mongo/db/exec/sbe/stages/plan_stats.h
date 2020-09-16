@@ -30,17 +30,28 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/query/stage_types.h"
 
 namespace mongo::sbe {
 struct CommonStats {
     CommonStats() = delete;
-    CommonStats(StringData stageType) : stageType{stageType} {}
+
+    CommonStats(StringData stageType, PlanNodeId nodeId) : stageType{stageType}, nodeId{nodeId} {}
 
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
     }
 
-    StringData stageType;
+    const StringData stageType;
+
+    // An identifier for the node, or zero if the idenfier was not provided. Useful for displaying
+    // debug output such as explain.
+    //
+    // These identifiers are not necessarily unique. For example, they can be used by code
+    // constructing the SBE plan to construct groups of nodes with the same id, e.g. if a group of
+    // PlanStages corresponds to an MQL operation specified by the user.
+    const PlanNodeId nodeId;
+
     size_t advances{0};
     size_t opens{0};
     size_t closes{0};
@@ -48,6 +59,7 @@ struct CommonStats {
     size_t unyields{0};
     bool isEOF{false};
 };
+
 using PlanStageStats = BasePlanStageStats<CommonStats>;
 
 struct ScanStats : public SpecificStats {

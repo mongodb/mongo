@@ -57,6 +57,7 @@ generateExpression(OperationContext* opCtx,
                    sbe::value::FrameIdGenerator* frameIdGenerator,
                    sbe::value::SlotId inputVar,
                    sbe::RuntimeEnvironment* env,
+                   PlanNodeId planNodeId,
                    sbe::value::SlotVector* relevantSlots = nullptr);
 
 /**

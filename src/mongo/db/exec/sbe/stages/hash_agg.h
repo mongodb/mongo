@@ -42,7 +42,8 @@ class HashAggStage final : public PlanStage {
 public:
     HashAggStage(std::unique_ptr<PlanStage> input,
                  value::SlotVector gbs,
-                 value::SlotMap<std::unique_ptr<EExpression>> aggs);
+                 value::SlotMap<std::unique_ptr<EExpression>> aggs,
+                 PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

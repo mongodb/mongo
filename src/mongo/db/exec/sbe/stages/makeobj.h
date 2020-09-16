@@ -42,7 +42,8 @@ public:
                  std::vector<std::string> projectFields,
                  value::SlotVector projectVars,
                  bool forceNewObject,
-                 bool returnOldObject);
+                 bool returnOldObject,
+                 PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

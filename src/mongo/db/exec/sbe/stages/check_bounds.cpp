@@ -36,8 +36,9 @@ CheckBoundsStage::CheckBoundsStage(std::unique_ptr<PlanStage> input,
                                    const CheckBoundsParams& params,
                                    value::SlotId inKeySlot,
                                    value::SlotId inRecordIdSlot,
-                                   value::SlotId outSlot)
-    : PlanStage{"chkbounds"_sd},
+                                   value::SlotId outSlot,
+                                   PlanNodeId planNodeId)
+    : PlanStage{"chkbounds"_sd, planNodeId},
       _params{params},
       _checker{&_params.bounds, _params.keyPattern, _params.direction},
       _inKeySlot{inKeySlot},
@@ -48,7 +49,7 @@ CheckBoundsStage::CheckBoundsStage(std::unique_ptr<PlanStage> input,
 
 std::unique_ptr<PlanStage> CheckBoundsStage::clone() const {
     return std::make_unique<CheckBoundsStage>(
-        _children[0]->clone(), _params, _inKeySlot, _inRecordIdSlot, _outSlot);
+        _children[0]->clone(), _params, _inKeySlot, _inRecordIdSlot, _outSlot, _commonStats.nodeId);
 }
 
 void CheckBoundsStage::prepare(CompileCtx& ctx) {

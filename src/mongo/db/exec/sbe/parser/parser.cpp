@@ -546,7 +546,8 @@ void Parser::walkScan(AstQuery& ast) {
                                  boost::none,
                                  forward,
                                  nullptr,
-                                 nullptr);
+                                 nullptr,
+                                 kEmptyPlanNodeId);
 }
 
 void Parser::walkParallelScan(AstQuery& ast) {
@@ -585,7 +586,8 @@ void Parser::walkParallelScan(AstQuery& ast) {
                                          lookupSlot(recordIdName),
                                          ast.nodes[projectsPos]->identifiers,
                                          lookupSlots(ast.nodes[projectsPos]->renames),
-                                         nullptr);
+                                         nullptr,
+                                         kEmptyPlanNodeId);
 }
 
 void Parser::walkSeek(AstQuery& ast) {
@@ -627,7 +629,8 @@ void Parser::walkSeek(AstQuery& ast) {
                                  lookupSlot(ast.nodes[0]->identifier),
                                  true /* forward */,
                                  nullptr,
-                                 nullptr);
+                                 nullptr,
+                                 kEmptyPlanNodeId);
 }
 
 void Parser::walkIndexScan(AstQuery& ast) {
@@ -683,7 +686,8 @@ void Parser::walkIndexScan(AstQuery& ast) {
                                       boost::none,
                                       boost::none,
                                       nullptr,
-                                      nullptr);
+                                      nullptr,
+                                      kEmptyPlanNodeId);
 }
 
 void Parser::walkIndexSeek(AstQuery& ast) {
@@ -739,28 +743,30 @@ void Parser::walkIndexSeek(AstQuery& ast) {
                                       lookupSlot(ast.nodes[0]->identifier),
                                       lookupSlot(ast.nodes[1]->identifier),
                                       nullptr,
-                                      nullptr);
+                                      nullptr,
+                                      kEmptyPlanNodeId);
 }
 
 void Parser::walkProject(AstQuery& ast) {
     walkChildren(ast);
 
     ast.stage = makeS<ProjectStage>(std::move(ast.nodes[1]->stage),
-                                    lookupSlots(std::move(ast.nodes[0]->projects)));
+                                    lookupSlots(std::move(ast.nodes[0]->projects)),
+                                    kEmptyPlanNodeId);
 }
 
 void Parser::walkFilter(AstQuery& ast) {
     walkChildren(ast);
 
-    ast.stage =
-        makeS<FilterStage<false>>(std::move(ast.nodes[1]->stage), std::move(ast.nodes[0]->expr));
+    ast.stage = makeS<FilterStage<false>>(
+        std::move(ast.nodes[1]->stage), std::move(ast.nodes[0]->expr), kEmptyPlanNodeId);
 }
 
 void Parser::walkCFilter(AstQuery& ast) {
     walkChildren(ast);
 
-    ast.stage =
-        makeS<FilterStage<true>>(std::move(ast.nodes[1]->stage), std::move(ast.nodes[0]->expr));
+    ast.stage = makeS<FilterStage<true>>(
+        std::move(ast.nodes[1]->stage), std::move(ast.nodes[0]->expr), kEmptyPlanNodeId);
 }
 
 void Parser::walkSort(AstQuery& ast) {
@@ -777,7 +783,8 @@ void Parser::walkSort(AstQuery& ast) {
                                  std::numeric_limits<std::size_t>::max(),
                                  std::numeric_limits<std::size_t>::max(),
                                  true /* allowDiskUse */,
-                                 nullptr);
+                                 nullptr,
+                                 kEmptyPlanNodeId);
 }
 
 void Parser::walkUnion(AstQuery& ast) {
@@ -799,8 +806,8 @@ void Parser::walkUnion(AstQuery& ast) {
                     return slots.size() == size;
                 }));
 
-    ast.stage =
-        makeS<UnionStage>(std::move(inputStages), std::move(inputVals), std::move(outputVals));
+    ast.stage = makeS<UnionStage>(
+        std::move(inputStages), std::move(inputVals), std::move(outputVals), kEmptyPlanNodeId);
 }
 
 void Parser::walkUnionBranch(AstQuery& ast) {
@@ -818,7 +825,8 @@ void Parser::walkUnwind(AstQuery& ast) {
                                    lookupSlotStrict(ast.nodes[2]->identifier),
                                    lookupSlotStrict(ast.nodes[0]->identifier),
                                    lookupSlotStrict(ast.nodes[1]->identifier),
-                                   preserveNullAndEmptyArrays);
+                                   preserveNullAndEmptyArrays,
+                                   kEmptyPlanNodeId);
 }
 
 void Parser::walkMkObj(AstQuery& ast) {
@@ -847,7 +855,8 @@ void Parser::walkMkObj(AstQuery& ast) {
                                     std::move(ast.nodes[projectListPos]->renames),
                                     lookupSlots(std::move(ast.nodes[projectListPos]->identifiers)),
                                     false,
-                                    true);
+                                    true,
+                                    kEmptyPlanNodeId);
 }
 
 void Parser::walkGroup(AstQuery& ast) {
@@ -855,7 +864,8 @@ void Parser::walkGroup(AstQuery& ast) {
 
     ast.stage = makeS<HashAggStage>(std::move(ast.nodes[2]->stage),
                                     lookupSlots(std::move(ast.nodes[0]->identifiers)),
-                                    lookupSlots(std::move(ast.nodes[1]->projects)));
+                                    lookupSlots(std::move(ast.nodes[1]->projects)),
+                                    kEmptyPlanNodeId);
 }
 
 void Parser::walkHashJoin(AstQuery& ast) {
@@ -866,8 +876,8 @@ void Parser::walkHashJoin(AstQuery& ast) {
                              lookupSlots(ast.nodes[0]->nodes[0]->identifiers),  // outer conditions
                              lookupSlots(ast.nodes[0]->nodes[1]->identifiers),  // outer projections
                              lookupSlots(ast.nodes[1]->nodes[0]->identifiers),  // inner conditions
-                             lookupSlots(ast.nodes[1]->nodes[1]->identifiers)   // inner projections
-        );
+                             lookupSlots(ast.nodes[1]->nodes[1]->identifiers),  // inner projections
+                             kEmptyPlanNodeId);
 }
 
 void Parser::walkNLJoin(AstQuery& ast) {
@@ -889,14 +899,17 @@ void Parser::walkNLJoin(AstQuery& ast) {
                                      std::move(ast.nodes[innerPos]->stage),
                                      lookupSlots(ast.nodes[0]->identifiers),
                                      lookupSlots(ast.nodes[1]->identifiers),
-                                     std::move(predicate));
+                                     std::move(predicate),
+                                     kEmptyPlanNodeId);
 }
 
 void Parser::walkLimit(AstQuery& ast) {
     walkChildren(ast);
 
-    ast.stage = makeS<LimitSkipStage>(
-        std::move(ast.nodes[1]->stage), std::stoi(ast.nodes[0]->token), boost::none);
+    ast.stage = makeS<LimitSkipStage>(std::move(ast.nodes[1]->stage),
+                                      std::stoi(ast.nodes[0]->token),
+                                      boost::none,
+                                      kEmptyPlanNodeId);
 }
 
 void Parser::walkSkip(AstQuery& ast) {
@@ -905,17 +918,20 @@ void Parser::walkSkip(AstQuery& ast) {
     if (ast.nodes.size() == 3) {
         ast.stage = makeS<LimitSkipStage>(std::move(ast.nodes[2]->stage),
                                           std::stoi(ast.nodes[1]->token),
-                                          std::stoi(ast.nodes[0]->token));
+                                          std::stoi(ast.nodes[0]->token),
+                                          kEmptyPlanNodeId);
     } else {
-        ast.stage = makeS<LimitSkipStage>(
-            std::move(ast.nodes[1]->stage), boost::none, std::stoi(ast.nodes[0]->token));
+        ast.stage = makeS<LimitSkipStage>(std::move(ast.nodes[1]->stage),
+                                          boost::none,
+                                          std::stoi(ast.nodes[0]->token),
+                                          kEmptyPlanNodeId);
     }
 }
 
 void Parser::walkCoScan(AstQuery& ast) {
     walkChildren(ast);
 
-    ast.stage = makeS<CoScanStage>();
+    ast.stage = makeS<CoScanStage>(kEmptyPlanNodeId);
 }
 
 void Parser::walkTraverse(AstQuery& ast) {
@@ -945,7 +961,9 @@ void Parser::walkTraverse(AstQuery& ast) {
                                      lookupSlotStrict(ast.nodes[1]->identifier),
                                      sbe::makeSV(),
                                      foldPos ? std::move(ast.nodes[foldPos]->expr) : nullptr,
-                                     finalPos ? std::move(ast.nodes[finalPos]->expr) : nullptr);
+                                     finalPos ? std::move(ast.nodes[finalPos]->expr) : nullptr,
+                                     kEmptyPlanNodeId,
+                                     boost::none);
 }
 
 void Parser::walkExchange(AstQuery& ast) {
@@ -965,7 +983,8 @@ void Parser::walkExchange(AstQuery& ast) {
                                         lookupSlots(ast.nodes[0]->identifiers),
                                         policy,
                                         nullptr,
-                                        nullptr);
+                                        nullptr,
+                                        kEmptyPlanNodeId);
 }
 
 void Parser::walkBranch(AstQuery& ast) {
@@ -980,7 +999,8 @@ void Parser::walkBranch(AstQuery& ast) {
                                    std::move(ast.nodes[0]->expr),
                                    std::move(inputThenVals),
                                    std::move(inputElseVals),
-                                   std::move(outputVals));
+                                   std::move(outputVals),
+                                   kEmptyPlanNodeId);
 }
 
 std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
@@ -998,11 +1018,12 @@ std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
             walk(*ast.nodes[0]);
             _symbolsLookupTable.erase(it);
             return makeProjectStage(
-                std::move(inputStage), outputSlot, std::move(ast.nodes[0]->expr));
+                std::move(inputStage), kEmptyPlanNodeId, outputSlot, std::move(ast.nodes[0]->expr));
         } else {
             walk(*ast.nodes[0]);
             return makeProjectStage(
                 std::move(inputStage),
+                kEmptyPlanNodeId,
                 outputSlot,
                 makeE<EFunction>("getField"sv,
                                  makeEs(makeE<EVariable>(inputSlot),
@@ -1013,11 +1034,13 @@ std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
         auto traverseIn = _slotIdGenerator.generate();
         auto from =
             makeProjectStage(std::move(inputStage),
+                             kEmptyPlanNodeId,
                              traverseIn,
                              makeE<EFunction>("getField"sv,
                                               makeEs(makeE<EVariable>(inputSlot),
                                                      makeE<EConstant>(ast.nodes[0]->identifier))));
-        auto in = makeS<LimitSkipStage>(makeS<CoScanStage>(), 1, boost::none);
+        auto in = makeS<LimitSkipStage>(
+            makeS<CoScanStage>(kEmptyPlanNodeId), 1, boost::none, kEmptyPlanNodeId);
         auto stage = makeS<TraverseStage>(
             std::move(from),
             walkPathValue(*ast.nodes[1], traverseIn, std::move(in), {}, outputSlot),
@@ -1026,7 +1049,9 @@ std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
             outputSlot,
             std::move(correlated),
             nullptr,
-            nullptr);
+            nullptr,
+            kEmptyPlanNodeId,
+            boost::none);
 
         return stage;
     }
@@ -1149,7 +1174,8 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
     std::vector<std::string> fieldNames;
     std::vector<std::string> fieldRestrictNames;
     value::SlotVector fieldVars;
-    std::unique_ptr<PlanStage> stage = makeS<LimitSkipStage>(makeS<CoScanStage>(), 1, boost::none);
+    std::unique_ptr<PlanStage> stage = makeS<LimitSkipStage>(
+        makeS<CoScanStage>(kEmptyPlanNodeId), 1, boost::none, kEmptyPlanNodeId);
 
     for (size_t idx = ast.nodes.size(); idx-- > 0;) {
         const auto& pf = ast.nodes[idx];
@@ -1170,6 +1196,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                     fieldVars.emplace(fieldVars.begin(), _slotIdGenerator.generate());
                     stage = makeProjectStage(
                         std::move(stage),
+                        kEmptyPlanNodeId,
                         fieldVars.front(),
                         makeE<EFunction>("getField",
                                          makeEs(makeE<EVariable>(inputSlot),
@@ -1181,6 +1208,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                     walk(*action.nodes[0]);
                     fieldVars.emplace(fieldVars.begin(), _slotIdGenerator.generate());
                     stage = makeProjectStage(std::move(stage),
+                                             kEmptyPlanNodeId,
                                              fieldVars.front(),
                                              std::move(action.nodes[0]->nodes[0]->expr));
                     break;
@@ -1193,6 +1221,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                     walk(*action.nodes[0]);
                     fieldVars.emplace(fieldVars.begin(), _slotIdGenerator.generate());
                     stage = makeProjectStage(std::move(stage),
+                                             kEmptyPlanNodeId,
                                              fieldVars.front(),
                                              std::move(action.nodes[0]->nodes[0]->expr));
 
@@ -1206,6 +1235,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                     auto traverseIn = _slotIdGenerator.generate();
                     stage = makeProjectStage(
                         std::move(stage),
+                        kEmptyPlanNodeId,
                         traverseIn,
                         makeE<EFunction>("getField",
                                          makeEs(makeE<EVariable>(inputSlot),
@@ -1219,7 +1249,9 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                                              traverseOut,
                                              sbe::makeSV(),
                                              nullptr,
-                                             nullptr);
+                                             nullptr,
+                                             kEmptyPlanNodeId,
+                                             boost::none);
                     break;
                 }
             }
@@ -1237,7 +1269,8 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                                 std::move(fieldNames),
                                 std::move(fieldVars),
                                 newObj,
-                                retOldObj);
+                                retOldObj,
+                                kEmptyPlanNodeId);
 
     return stage;
 }
@@ -1258,7 +1291,9 @@ void Parser::walkPFO(AstQuery& ast) {
                                      lookupSlotStrict(ast.nodes[0]->identifier),
                                      lookupSlots(ast.nodes[2]->identifiers),
                                      nullptr,
-                                     nullptr);
+                                     nullptr,
+                                     kEmptyPlanNodeId,
+                                     boost::none);
 }
 
 void Parser::walkLazyProducerSpool(AstQuery& ast) {
@@ -1277,7 +1312,8 @@ void Parser::walkLazyProducerSpool(AstQuery& ast) {
     ast.stage = makeS<SpoolLazyProducerStage>(std::move(ast.nodes[inputPos]->stage),
                                               lookupSpoolBuffer(ast.nodes[0]->identifier),
                                               lookupSlots(ast.nodes[1]->identifiers),
-                                              std::move(predicate));
+                                              std::move(predicate),
+                                              kEmptyPlanNodeId);
 }
 
 void Parser::walkEagerProducerSpool(AstQuery& ast) {
@@ -1285,21 +1321,24 @@ void Parser::walkEagerProducerSpool(AstQuery& ast) {
 
     ast.stage = makeS<SpoolEagerProducerStage>(std::move(ast.nodes[2]->stage),
                                                lookupSpoolBuffer(ast.nodes[0]->identifier),
-                                               lookupSlots(ast.nodes[1]->identifiers));
+                                               lookupSlots(ast.nodes[1]->identifiers),
+                                               kEmptyPlanNodeId);
 }
 
 void Parser::walkConsumerSpool(AstQuery& ast) {
     walkChildren(ast);
 
     ast.stage = makeS<SpoolConsumerStage<false>>(lookupSpoolBuffer(ast.nodes[0]->identifier),
-                                                 lookupSlots(ast.nodes[1]->identifiers));
+                                                 lookupSlots(ast.nodes[1]->identifiers),
+                                                 kEmptyPlanNodeId);
 }
 
 void Parser::walkStackConsumerSpool(AstQuery& ast) {
     walkChildren(ast);
 
     ast.stage = makeS<SpoolConsumerStage<true>>(lookupSpoolBuffer(ast.nodes[0]->identifier),
-                                                lookupSlots(ast.nodes[1]->identifiers));
+                                                lookupSlots(ast.nodes[1]->identifiers),
+                                                kEmptyPlanNodeId);
 }
 
 void Parser::walk(AstQuery& ast) {
