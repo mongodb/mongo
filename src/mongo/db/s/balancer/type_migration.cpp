@@ -119,7 +119,8 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
 
     {
         std::string forceJumboVal;
-        Status status = bsonExtractStringField(source, forceJumbo.name(), &forceJumboVal);
+        auto status = bsonExtractStringFieldWithDefault(
+            source, forceJumbo.name(), "doNotForceJumbo", &forceJumboVal);
         if (!status.isOK())
             return status;
 
