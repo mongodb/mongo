@@ -27,8 +27,8 @@ checkIndexes = function(num) {
 checkIndexes(1);
 
 // The reIndex command is only supported in standalone mode.
-const isMaster = db.runCommand({isMaster: 1});
-const isStandalone = isMaster.msg !== "isdbgrid" && !isMaster.hasOwnProperty('setName');
+const hello = db.runCommand({hello: 1});
+const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
 if (isStandalone) {
     assert.commandWorked(t.reIndex());
     checkIndexes(2);

@@ -27,10 +27,10 @@ var explainRes;
 var writeRes;
 var planStage;
 
-var isMaster = db.runCommand("ismaster");
-assert.commandWorked(isMaster);
-var isMongos = (isMaster.msg === "isdbgrid");
-var isStandalone = !isMongos && !isMaster.hasOwnProperty('setName');
+var hello = db.runCommand("hello");
+assert.commandWorked(hello);
+var isMongos = (hello.msg === "isdbgrid");
+var isStandalone = !isMongos && !hello.hasOwnProperty('setName');
 
 var assertIndexHasCollation = function(keyPattern, collation) {
     var indexSpecs = coll.getIndexes();

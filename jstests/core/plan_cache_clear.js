@@ -112,7 +112,7 @@ assert.commandWorked(nonExistentColl.runCommand('planCacheClear'));
 //     Confirm that cache is empty.
 // (Only standalone mode supports the reIndex command.)
 const isMongos = db.adminCommand({isdbgrid: 1}).isdbgrid;
-const isStandalone = !isMongos && !db.runCommand({isMaster: 1}).hasOwnProperty('setName');
+const isStandalone = !isMongos && !db.runCommand({hello: 1}).hasOwnProperty('setName');
 if (isStandalone) {
     assert.eq(1, coll.find({a: 1, b: 1}).itcount());
     assert.eq(1, numPlanCacheEntries(), dumpPlanCacheState());

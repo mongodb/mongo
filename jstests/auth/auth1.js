@@ -66,7 +66,7 @@ function runTest(m) {
 
     assert.eq(1000, tRO.count(), "B1");
     assert.eq(1000, tRO.find().toArray().length, "B2");  // make sure we have a getMore in play
-    assert.commandWorked(dbRO.runCommand({ismaster: 1}), "B3");
+    assert.commandWorked(dbRO.runCommand({hello: 1}), "B3");
 
     assert.writeError(tRO.save({}));
 

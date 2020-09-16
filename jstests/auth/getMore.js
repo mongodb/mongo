@@ -8,9 +8,9 @@ TestData.disableImplicitSessions = true;
 
 function runTest(conn) {
     let adminDB = conn.getDB("admin");
-    let isMaster = adminDB.runCommand("ismaster");
-    assert.commandWorked(isMaster);
-    const isMongos = (isMaster.msg === "isdbgrid");
+    let hello = adminDB.runCommand("hello");
+    assert.commandWorked(hello);
+    const isMongos = (hello.msg === "isdbgrid");
 
     // Create the admin user.
     assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));

@@ -9,7 +9,7 @@
 (function() {
 'use strict';
 
-const maxBsonObjectSize = db.isMaster().maxBsonObjectSize;
+const maxBsonObjectSize = db.hello().maxBsonObjectSize;
 const docOverhead = Object.bsonsize({_id: new ObjectId(), x: ''});
 const maxStrSize = maxBsonObjectSize - docOverhead;
 const maxStr = 'a'.repeat(maxStrSize);

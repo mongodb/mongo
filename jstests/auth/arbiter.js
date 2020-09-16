@@ -48,7 +48,7 @@ const testCases = [
     },
     {
         command: {
-            isMaster: 1,
+            hello: 1,
             "$clusterTime": {
                 clusterTime: Timestamp(1, 1),
                 signature: {hash: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="), keyId: NumberLong(0)}

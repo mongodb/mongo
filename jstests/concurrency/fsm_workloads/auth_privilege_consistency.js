@@ -59,12 +59,12 @@ var $config = (function() {
 
                 // Setup a connection to every member host if this is a replica set
                 // so that we can confirm secondary state during observe().
-                const isMaster = assert.commandWorked(db.runCommand({isMaster: 1}));
-                jsTest.log('isMaster: ' + tojson(isMaster));
-                if (isMaster.hosts) {
-                    const allHosts = isMaster.hosts.concat(isMaster.passives);
+                const hello = assert.commandWorked(db.runCommand({hello: 1}));
+                jsTest.log('hello: ' + tojson(hello));
+                if (hello.hosts) {
+                    const allHosts = hello.hosts.concat(hello.passives);
                     allHosts.forEach(function(node) {
-                        if (node === isMaster.me) {
+                        if (node === hello.me) {
                             // Reuse existing connection for db's connection.
                             const conn = db.getMongo();
                             RSnodes.push(conn);

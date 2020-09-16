@@ -107,7 +107,9 @@ config.members[1].horizons.horizon_name = node1horizonHostname;
 replTest.initiate(config);
 
 var checkExpectedHorizon = function(url, memberIndex, expectedHostname) {
-    // Run isMaster in the shell and check that we get the expected hostname back
+    // Run isMaster in the shell and check that we get the expected hostname back. We must use the
+    // isMaster command instead of its alias hello, as the initial handshake between the shell and
+    // server use isMaster.
     const assertion = (memberIndex === "me")
         ? ("assert(db.runCommand({isMaster: 1})['me'] == '" + expectedHostname + "')")
         : ("assert(db.runCommand({isMaster: 1})['hosts'][" + memberIndex + "] == '" +

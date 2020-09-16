@@ -42,7 +42,7 @@ function stringContains(haystack, needle) {
 }
 
 // test doesn't work when talking to mongos
-if (db.isMaster().msg === "isdbgrid") {
+if (db.hello().msg === "isdbgrid") {
     return;
 }
 

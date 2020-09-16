@@ -9,7 +9,7 @@
 "use strict";
 
 function serverIsMongos() {
-    const res = db.runCommand("ismaster");
+    const res = db.runCommand("hello");
     assert.commandWorked(res);
     return res.msg === "isdbgrid";
 }

@@ -1,11 +1,11 @@
-// Tests that a client may discover a user's supported SASL mechanisms via isMaster.
+// Tests that a client may discover a user's supported SASL mechanisms via hello.
 // @tags: [requires_sharding]
 (function() {
 "use strict";
 
 function runTest(conn) {
     function checkMechs(userid, mechs) {
-        const res = assert.commandWorked(db.runCommand({isMaster: 1, saslSupportedMechs: userid}));
+        const res = assert.commandWorked(db.runCommand({hello: 1, saslSupportedMechs: userid}));
         assert.eq(mechs.sort(), res.saslSupportedMechs.sort(), tojson(res));
     }
 
@@ -16,12 +16,12 @@ function runTest(conn) {
         {createUser: "userAdmin", pwd: "userAdmin", roles: ["userAdminAnyDatabase"]}));
     db.auth("userAdmin", "userAdmin");
 
-    // Check that unknown users do not interrupt isMaster
-    let res = assert.commandWorked(db.runCommand({isMaster: 1, saslSupportedMechs: "test.bogus"}));
+    // Check that unknown users do not interrupt hello
+    let res = assert.commandWorked(db.runCommand({hello: 1, saslSupportedMechs: "test.bogus"}));
     assert.eq(undefined, res.saslSupportedMechs);
 
     // Check that invalid usernames produce the correct error code
-    assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: "bogus"}),
+    assert.commandFailedWithCode(db.runCommand({hello: 1, saslSupportedMechs: "bogus"}),
                                  ErrorCodes.BadValue);
 
     assert.commandWorked(db.runCommand({createUser: "user", pwd: "pwd", roles: []}));

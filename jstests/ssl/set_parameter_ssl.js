@@ -45,7 +45,7 @@ function testTransportTransition(scheme, oldMode, newMode, shouldSucceed) {
     }
 
     let uri = `mongodb://localhost:${conn.port}/admin`;
-    let exitCode = runMongoProgram("mongo", uri, "--eval", "assert.commandWorked(db.isMaster())");
+    let exitCode = runMongoProgram("mongo", uri, "--eval", "assert.commandWorked(db.hello())");
     assert.neq(exitCode, 0, "Was able to connect without SSL when SSLMode was requireSSL");
     MongoRunner.stopMongod(conn);
 }

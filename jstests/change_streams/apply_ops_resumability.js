@@ -23,7 +23,7 @@ let changeStream = cst.startWatchingChanges(
     {pipeline: [{$changeStream: {}}, {$project: {"lsid.uid": 0}}], collection: coll});
 
 // Record the clusterTime at the outset of the test, before any writes are performed.
-const testStartTime = db.isMaster().$clusterTime.clusterTime;
+const testStartTime = db.hello().$clusterTime.clusterTime;
 
 // Do an insert outside of a transaction.
 assert.commandWorked(coll.insert({_id: 0, a: 123}));

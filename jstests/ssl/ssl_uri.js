@@ -5,7 +5,7 @@
 
 var shouldSucceed = function(uri) {
     var conn = new Mongo(uri);
-    var res = conn.getDB('admin').runCommand({"ismaster": 1});
+    var res = conn.getDB('admin').runCommand({"hello": 1});
     assert(res.ok);
 };
 
@@ -39,7 +39,7 @@ var connectWithURI = function(uri) {
                            'jstests/libs/client.pem',
                            uri,
                            '--eval',
-                           'db.runCommand({ismaster: 1})');
+                           'db.runCommand({hello: 1})');
 };
 
 var shouldConnect = function(uri) {
@@ -56,7 +56,7 @@ shouldNotConnect(sslURI + "?ssl=false");
 shouldConnect(sslURI + "?ssl=true");
 
 // Connecting with ssl=true without --ssl will not work
-var res = runMongoProgram('mongo', sslURI + "?ssl=true", '--eval', 'db.runCommand({ismaster: 1})');
+var res = runMongoProgram('mongo', sslURI + "?ssl=true", '--eval', 'db.runCommand({hello: 1})');
 assert.eq(res, 1, "should not have been able to connect without --ssl");
 
 // Clean up

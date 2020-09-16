@@ -133,9 +133,9 @@ testColl.getIndexes();
 lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
 
 // Reindex (Only standalone mode supports the reIndex command.)
-const isMaster = db.runCommand({isMaster: 1});
-const isMongos = (isMaster.msg === "isdbgrid");
-const isStandalone = !isMongos && !isMaster.hasOwnProperty('setName');
+const hello = db.runCommand({hello: 1});
+const isMongos = (hello.msg === "isdbgrid");
+const isStandalone = !isMongos && !hello.hasOwnProperty('setName');
 if (isStandalone) {
     assert.commandWorked(testColl.reIndex());
     lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);

@@ -65,3 +65,17 @@ function checkResponseFields(commandString) {
 checkResponseFields("hello");
 checkResponseFields("ismaster");
 checkResponseFields("isMaster");
+
+// We also test the db.hello() and db.isMaster() helpers to ensure that they return
+// the same response objects as from running the commands directly.
+let cmdResponse1 = db.runCommand("hello");
+let cmdResponse2 = db.hello();
+delete cmdResponse1.localTime;
+delete cmdResponse2.localTime;
+assert.eq(cmdResponse1, cmdResponse2);
+
+cmdResponse1 = db.runCommand("isMaster");
+cmdResponse2 = db.isMaster();
+delete cmdResponse1.localTime;
+delete cmdResponse2.localTime;
+assert.eq(cmdResponse1, cmdResponse2);

@@ -5,7 +5,7 @@ load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Col
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 
-const testStartTime = db.runCommand({isMaster: 1}).$clusterTime.clusterTime;
+const testStartTime = db.runCommand({hello: 1}).$clusterTime.clusterTime;
 
 // Write a document to each chunk, and wait for replication.
 assert.commandWorked(coll.insert({_id: -1}, {writeConcern: {w: "majority"}}));
@@ -45,7 +45,7 @@ assert.commandFailedWithCode(db.runCommand({
                              40674);
 
 // Test that resuming from a time in the future will wait for that time to come.
-let resumeTimeFarFuture = db.runCommand({isMaster: 1}).$clusterTime.clusterTime;
+let resumeTimeFarFuture = db.runCommand({hello: 1}).$clusterTime.clusterTime;
 resumeTimeFarFuture =
     new Timestamp(resumeTimeFarFuture.getTime() + 60 * 60 * 6, 1);  // 6 hours in the future
 

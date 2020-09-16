@@ -164,7 +164,7 @@ assert.commandWorked(sessionDb.adminCommand({
     autocommit: false
 }));
 
-const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
 if (!isMongos) {
     // Skip commands that do not exist on mongos.
 

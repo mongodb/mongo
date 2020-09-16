@@ -14,9 +14,9 @@
 
 const coll = db.expr;
 
-const isMaster = db.runCommand("ismaster");
-assert.commandWorked(isMaster);
-const isMongos = (isMaster.msg === "isdbgrid");
+const hello = db.runCommand("hello");
+assert.commandWorked(hello);
+const isMongos = (hello.msg === "isdbgrid");
 
 //
 // $expr in aggregate.

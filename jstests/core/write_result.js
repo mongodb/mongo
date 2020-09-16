@@ -185,7 +185,7 @@ coll.unsetWriteConcern();
 // NOTE: In a replica set write concern is checked after write
 coll.remove({});
 var wRes = assert.writeError(coll.insert({foo: "bar"}, {writeConcern: {w: "invalid"}}));
-var res = assert.commandWorked(db.isMaster());
+var res = assert.commandWorked(db.hello());
 var replSet = res.hasOwnProperty("setName");
 if (!replSet && coll.getMongo().writeMode() == "commands")
     assert.eq(coll.count(), 0, "not-replset || command mode");

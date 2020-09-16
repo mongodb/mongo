@@ -24,7 +24,7 @@ const sessionOptions = {
 const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 
-const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
 
 assert.commandWorked(testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
 assert.commandWorked(testDB.runCommand({

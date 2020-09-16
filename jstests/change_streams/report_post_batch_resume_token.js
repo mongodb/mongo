@@ -123,7 +123,7 @@ assert.soon(() => {
 });
 
 // Insert two documents into the collection which are of the maximum BSON object size.
-const bsonUserSizeLimit = assert.commandWorked(adminDB.isMaster()).maxBsonObjectSize;
+const bsonUserSizeLimit = assert.commandWorked(adminDB.hello()).maxBsonObjectSize;
 assert.gt(bsonUserSizeLimit, 0);
 for (let i = 0; i < 2; ++i) {
     const docToInsert = {_id: docId++, padding: ""};

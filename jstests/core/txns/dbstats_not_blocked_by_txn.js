@@ -14,7 +14,7 @@ mydb.createCollection("foo", {writeConcern: {w: "majority"}});
 var session = db.getMongo().startSession();
 var sessionDb = session.getDatabase(dbName);
 
-const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
 if (isMongos) {
     // Before starting the transaction below, access the collection so it can be implicitly
     // sharded and force all shards to refresh their database versions because the refresh

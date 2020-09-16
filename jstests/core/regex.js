@@ -8,9 +8,9 @@
 
 const t = db.jstests_regex;
 
-const isMaster = db.runCommand("ismaster");
-assert.commandWorked(isMaster);
-const isMongos = (isMaster.msg === "isdbgrid");
+const hello = db.runCommand("hello");
+assert.commandWorked(hello);
+const isMongos = (hello.msg === "isdbgrid");
 
 t.drop();
 assert.commandWorked(t.save({a: "bcd"}));

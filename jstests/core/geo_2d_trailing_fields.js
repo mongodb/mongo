@@ -7,8 +7,6 @@
 
 const coll = db.geo_2d_trailing_fields;
 
-const isMaster = assert.commandWorked(db.adminCommand({isMaster: 1}));
-
 coll.drop();
 assert.commandWorked(coll.createIndex({a: "2d", b: 1}));
 assert.commandWorked(coll.insert({a: [0, 0]}));

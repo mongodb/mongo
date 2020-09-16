@@ -52,9 +52,9 @@ function assertFailsWithInvalidNamespacesForField(
     }
 }
 
-const isMaster = db.runCommand("ismaster");
-assert.commandWorked(isMaster);
-const isMongos = (isMaster.msg === "isdbgrid");
+const hello = db.runCommand("hello");
+assert.commandWorked(hello);
+const isMongos = (hello.msg === "isdbgrid");
 
 db.commands_namespace_parsing.drop();
 assert.commandWorked(db.commands_namespace_parsing.insert({a: 1}));

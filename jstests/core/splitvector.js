@@ -267,7 +267,7 @@ var case9 = function() {
     assert.eq(1, res.splitKeys.length, "9b");
     assert.eq(2, res.splitKeys[0].x, "9c");
 
-    if (db.runCommand("isMaster").msg != "isdbgrid") {
+    if (db.runCommand("hello").msg != "isdbgrid") {
         res = db.adminCommand(
             {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, force: true});
 

@@ -15,7 +15,7 @@ function testRS(opts, succeed) {
     rs.startSet();
     if (succeed) {
         rs.initiate();
-        assert.commandWorked(rs.getPrimary().getDB('admin').runCommand({isMaster: 1}));
+        assert.commandWorked(rs.getPrimary().getDB('admin').runCommand({hello: 1}));
     } else {
         // The rs.initiate will fail in an assert.soon, which would ordinarily trigger the hang
         // analyzer.  We don't want that to happen, so we disable it here.

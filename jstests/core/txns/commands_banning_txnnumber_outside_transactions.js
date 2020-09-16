@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-const isMongos = assert.commandWorked(db.runCommand("ismaster")).msg === "isdbgrid";
+const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid";
 
 const session = db.getMongo().startSession();
 const sessionDb = session.getDatabase("admin");

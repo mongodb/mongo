@@ -6,7 +6,7 @@
 (function() {
 'use strict';
 
-var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
+var isMongos = ("isdbgrid" == db.runCommand("hello").msg);
 
 var extractResult = function(obj) {
     if (!isMongos)

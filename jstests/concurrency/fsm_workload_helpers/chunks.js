@@ -109,7 +109,7 @@ var ChunkHelper = (function() {
 
     // Take a set of connections to a shard (replica set or standalone mongod),
     // or a set of connections to the config servers, and return a connection
-    // to any node in the set for which ismaster is true.
+    // to any node in the set for which isWritablePrimary is true.
     function getPrimary(connArr) {
         const kDefaultTimeoutMS = 10 * 60 * 1000;  // 10 minutes.
         assertAlways(Array.isArray(connArr), 'Expected an array but got ' + tojson(connArr));
@@ -118,10 +118,10 @@ var ChunkHelper = (function() {
         assert.soon(() => {
             for (let conn of connArr) {
                 assert(isMongod(conn.getDB('admin')), tojson(conn) + ' is not to a mongod');
-                let res = conn.adminCommand({isMaster: 1});
+                let res = conn.adminCommand({hello: 1});
                 assertAlways.commandWorked(res);
 
-                if (res.ismaster) {
+                if (res.isWritablePrimary) {
                     primary = conn;
                     return primary;
                 }

@@ -56,7 +56,7 @@ const rolloverConfig = function(newConfig) {
 
     assert.soon(() => {
         let primary = rst.getPrimary();
-        assert.commandWorked(primary.getDB("admin").runCommand({isMaster: 1}));
+        assert.commandWorked(primary.getDB("admin").runCommand({hello: 1}));
         assert.commandWorked(primary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
 
         // Start a shell that connects to the server with the current CA/cert configuration

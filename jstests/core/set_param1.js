@@ -122,7 +122,7 @@ assert.eq(5, result.accessControl.verbosity);
 assert.commandWorked(
     db.adminCommand({"setParameter": 1, logComponentVerbosity: old.logComponentVerbosity}));
 
-var isMongos = (db.isMaster().msg === 'isdbgrid');
+var isMongos = (db.hello().msg === 'isdbgrid');
 if (!isMongos) {
     //
     // oplogFetcherSteadyStateMaxFetcherRestarts

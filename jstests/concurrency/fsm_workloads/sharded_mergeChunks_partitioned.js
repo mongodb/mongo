@@ -158,9 +158,9 @@ var $config = extendWorkload($config, function($config, $super) {
         // Verify that all config servers have the correct after-state.
         // (see comments below for specifics).
         for (var conn of connCache.config) {
-            var res = conn.adminCommand({isMaster: 1});
+            var res = conn.adminCommand({hello: 1});
             assertAlways.commandWorked(res);
-            if (res.ismaster) {
+            if (res.isWritablePrimary) {
                 // If the mergeChunks operation succeeded, verify that there is now one chunk
                 // between the original chunks' lower and upper bounds. If the operation failed,
                 // verify that there are still two chunks between the original chunks' lower and

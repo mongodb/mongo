@@ -31,7 +31,7 @@ const test = () => {
                               '--port',
                               mongod.port,
                               '--eval',
-                              'db.isMaster()'),
+                              'db.hello()'),
               "mongo did not initialize properly");
 
     // Add an X509 user

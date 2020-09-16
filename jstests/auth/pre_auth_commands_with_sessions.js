@@ -43,7 +43,7 @@ var testCommand = function(cmd) {
     admin.logout();
 };
 
-var commands = ["ping", "ismaster"];
+var commands = ["ping", "hello"];
 for (var i = 0; i < commands.length; i++) {
     testCommand(commands[i]);
 }

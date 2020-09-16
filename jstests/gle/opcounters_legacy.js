@@ -10,7 +10,7 @@ mongo.writeMode = function() {
 db = mongo.getDB(db.toString());
 
 var t = db.opcounters;
-var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
+var isMongos = ("isdbgrid" == db.runCommand("hello").msg);
 var opCounters;
 
 //

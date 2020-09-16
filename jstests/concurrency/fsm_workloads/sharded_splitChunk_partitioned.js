@@ -59,9 +59,9 @@ var $config = extendWorkload($config, function($config, $super) {
         // Verify that all config servers have the correct after-state.
         // (see comments below for specifics).
         for (var conn of connCache.config) {
-            var res = conn.adminCommand({isMaster: 1});
+            var res = conn.adminCommand({hello: 1});
             assertAlways.commandWorked(res);
-            if (res.ismaster) {
+            if (res.isWritablePrimary) {
                 // If the splitChunk operation succeeded, verify that there are now
                 // two chunks between the old chunk's lower and upper bounds.
                 // If the operation failed, verify that there is still only one chunk

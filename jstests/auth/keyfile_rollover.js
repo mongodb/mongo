@@ -62,12 +62,12 @@ const rolloverKey = function(keyFileForServers, keyFileForAuth) {
         restart(secondary);
     });
 
-    // Then we restart the primary and wait for it to come back up with an ismaster call.
+    // Then we restart the primary and wait for it to come back up with an hello call.
     const primary = rst.getPrimary();
     restart(primary);
     assert.soonNoExcept(() => {
         authutil.asCluster(rst.nodes, keyFileForAuth, () => {
-            assert.commandWorked(primary.getDB("admin").runCommand({isMaster: 1}));
+            assert.commandWorked(primary.getDB("admin").runCommand({hello: 1}));
         });
         return true;
     });

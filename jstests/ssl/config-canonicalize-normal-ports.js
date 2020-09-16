@@ -8,6 +8,6 @@ const mongod = MongoRunner.runMongod({
     tlsCertificateKeyFile: 'jstests/libs/server.pem',
 });
 assert(mongod);
-assert.commandWorked(mongod.getDB('admin').runCommand({isMaster: 1}));
+assert.commandWorked(mongod.getDB('admin').runCommand({hello: 1}));
 MongoRunner.stopMongod(mongod);
 })();

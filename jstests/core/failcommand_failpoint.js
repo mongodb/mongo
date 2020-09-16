@@ -69,7 +69,7 @@ assert.commandWorked(adminDB.runCommand({
     mode: "alwaysOn",
     data: {
         errorCode: ErrorCodes.NotWritablePrimary,
-        failCommands: ["isMaster"],
+        failCommands: ["hello"],
         threadName: threadName,
     }
 }));
@@ -155,6 +155,7 @@ assert.commandWorked(adminDB.runCommand({
     }
 }));
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.BadValue);
+assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
 assert.commandWorked(testDB.runCommand({find: "collection"}));
@@ -166,11 +167,12 @@ assert.commandWorked(adminDB.runCommand({
     mode: "alwaysOn",
     data: {
         errorCode: ErrorCodes.BadValue,
-        failCommands: ["ping", "isMaster"],
+        failCommands: ["ping", "hello", "isMaster"],
         threadName: threadName,
     }
 }));
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.BadValue);
+assert.commandFailedWithCode(testDB.runCommand({hello: 1}), ErrorCodes.BadValue);
 assert.commandFailedWithCode(testDB.runCommand({isMaster: 1}), ErrorCodes.BadValue);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
@@ -214,6 +216,7 @@ assert.commandWorked(adminDB.runCommand({
         threadName: threadName,
     }
 }));
+assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
 assert.commandWorked(testDB.runCommand({ping: 1}));
@@ -231,6 +234,7 @@ assert.commandWorked(adminDB.runCommand({
         threadName: threadName,
     }
 }));
+assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
 assert.commandWorked(testDB.runCommand({find: "c"}));
@@ -263,6 +267,7 @@ assert.commandWorked(adminDB.runCommand({
         threadName: threadName,
     }
 }));
+assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
 assert.commandWorked(testDB.runCommand({find: "c"}));
@@ -298,6 +303,7 @@ assert.commandWorked(adminDB.runCommand({
         threadName: threadName,
     }
 }));
+assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
 assert.commandWorked(testDB.runCommand({ping: 1}));
@@ -317,6 +323,7 @@ assert.commandWorked(adminDB.runCommand({
         threadName: threadName,
     }
 }));
+assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
 assert.commandWorked(testDB.runCommand({find: "c"}));

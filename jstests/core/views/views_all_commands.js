@@ -606,9 +606,9 @@ let assertCommandOrWriteFailed = function(res, code, msg) {
 };
 
 // Are we on a mongos?
-var isMaster = db.runCommand("ismaster");
-assert.commandWorked(isMaster);
-var isMongos = (isMaster.msg === "isdbgrid");
+var hello = db.runCommand("hello");
+assert.commandWorked(hello);
+var isMongos = (hello.msg === "isdbgrid");
 
 // Obtain a list of all commands.
 let res = db.runCommand({listCommands: 1});
