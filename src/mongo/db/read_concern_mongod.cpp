@@ -334,14 +334,31 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                                       << " readConcern without replication enabled"};
             }
 
+            // We must read the member state before obtaining the cluster time. Otherwise, we can
+            // run into a race where the cluster time is read as uninitialized, but the member state
+            // is set to RECOVERING by another thread before we invariant that the node is in
+            // STARTUP or STARTUP2.
+            const auto memberState = replCoord->getMemberState();
+
             const auto currentTime = VectorClock::get(opCtx)->getTime();
-            if (currentTime.clusterTime() < *targetClusterTime) {
+            const auto clusterTime = currentTime.clusterTime();
+            if (clusterTime == LogicalTime::kUninitialized) {
+                // currentTime should only be uninitialized if we are in startup recovery or initial
+                // sync.
+                invariant(memberState.startup() || memberState.startup2());
+                return {ErrorCodes::NotPrimaryOrSecondary,
+                        str::stream() << "Current clusterTime is uninitialized, cannot service the "
+                                         "requested clusterTime. Requested clusterTime: "
+                                      << targetClusterTime->toString()
+                                      << "; current clusterTime: " << clusterTime.toString()};
+            }
+            if (clusterTime < *targetClusterTime) {
                 return {ErrorCodes::InvalidOptions,
                         str::stream() << "readConcern " << readConcernName
                                       << " value must not be greater than the current clusterTime. "
                                          "Requested clusterTime: "
-                                      << targetClusterTime->toString() << "; current clusterTime: "
-                                      << currentTime.clusterTime().toString()};
+                                      << targetClusterTime->toString()
+                                      << "; current clusterTime: " << clusterTime.toString()};
             }
 
             auto status = makeNoopWriteIfNeeded(opCtx, *targetClusterTime);
