@@ -66,30 +66,33 @@ public:
      * Sets the mocked collection entry result that getChunksSince will use to construct its return
      * value.
      */
+
     void setCollectionRefreshReturnValue(StatusWith<CollectionType> statusWithCollectionType);
+    void clearCollectionReturnValue();
 
     /**
      * Sets the mocked chunk results that getChunksSince will use to construct its return value.
      */
     void setChunkRefreshReturnValue(StatusWith<std::vector<ChunkType>> statusWithChunks);
+    void clearChunksReturnValue();
 
     /**
      * Sets the mocked database entry result that getDatabase will use to construct its return
      * value.
      */
     void setDatabaseRefreshReturnValue(StatusWith<DatabaseType> swDatabase);
+    void clearDatabaseReturnValue();
+
+    static const Status kCollectionInternalErrorStatus;
+    static const Status kChunksInternalErrorStatus;
+    static const Status kDatabaseInternalErrorStatus;
 
 private:
-    StatusWith<DatabaseType> _swDatabaseReturnValue{
-        Status(ErrorCodes::InternalError, "config loader database response is uninitialized")};
+    StatusWith<CollectionType> _swCollectionReturnValue{kCollectionInternalErrorStatus};
 
-    // These variables hold the mocked chunks and collection entry results used to construct the
-    // return value of getChunksSince above.
-    StatusWith<CollectionType> _swCollectionReturnValue{Status(
-        ErrorCodes::InternalError, "config loader mock collection response is uninitialized")};
+    StatusWith<std::vector<ChunkType>> _swChunksReturnValue{kChunksInternalErrorStatus};
 
-    StatusWith<std::vector<ChunkType>> _swChunksReturnValue{
-        Status(ErrorCodes::InternalError, "config loader mock chunks response is uninitialized")};
+    StatusWith<DatabaseType> _swDatabaseReturnValue{kDatabaseInternalErrorStatus};
 };
 
 }  // namespace mongo

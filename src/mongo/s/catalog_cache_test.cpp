@@ -50,7 +50,7 @@ protected:
         configTargeter()->setFindHostReturnValue(kConfigHostAndPort);
 
         // Setup catalogCache with mock loader
-        _catalogCacheLoader = std::make_unique<CatalogCacheLoaderMock>();
+        _catalogCacheLoader = std::make_shared<CatalogCacheLoaderMock>();
         _catalogCache = std::make_unique<CatalogCache>(getServiceContext(), *_catalogCacheLoader);
 
         // Populate the shardRegistry with the shards from kShards vector
@@ -62,41 +62,89 @@ protected:
         addRemoteShards(shardInfos);
     };
 
+    class ScopedCollectionProvider {
+    public:
+        ScopedCollectionProvider(std::shared_ptr<CatalogCacheLoaderMock> catalogCacheLoader,
+                                 const StatusWith<CollectionType>& swCollection)
+            : _catalogCacheLoader(catalogCacheLoader) {
+            _catalogCacheLoader->setCollectionRefreshReturnValue(swCollection);
+        }
+        ~ScopedCollectionProvider() {
+            _catalogCacheLoader->clearCollectionReturnValue();
+        }
+
+    private:
+        std::shared_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
+    };
+
+    ScopedCollectionProvider scopedCollectionProvider(
+        const StatusWith<CollectionType>& swCollection) {
+        return {_catalogCacheLoader, swCollection};
+    }
+
+    class ScopedChunksProvider {
+    public:
+        ScopedChunksProvider(std::shared_ptr<CatalogCacheLoaderMock> catalogCacheLoader,
+                             const StatusWith<std::vector<ChunkType>>& swChunks)
+            : _catalogCacheLoader(catalogCacheLoader) {
+            _catalogCacheLoader->setChunkRefreshReturnValue(swChunks);
+        }
+        ~ScopedChunksProvider() {
+            _catalogCacheLoader->clearChunksReturnValue();
+        }
+
+    private:
+        std::shared_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
+    };
+
+    ScopedChunksProvider scopedChunksProvider(const StatusWith<std::vector<ChunkType>>& swChunks) {
+        return {_catalogCacheLoader, swChunks};
+    }
+
+    class ScopedDatabaseProvider {
+    public:
+        ScopedDatabaseProvider(std::shared_ptr<CatalogCacheLoaderMock> catalogCacheLoader,
+                               const StatusWith<DatabaseType>& swDatabase)
+            : _catalogCacheLoader(catalogCacheLoader) {
+            _catalogCacheLoader->setDatabaseRefreshReturnValue(swDatabase);
+        }
+        ~ScopedDatabaseProvider() {
+            _catalogCacheLoader->clearDatabaseReturnValue();
+        }
+
+    private:
+        std::shared_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
+    };
+
+    ScopedDatabaseProvider scopedDatabaseProvider(const StatusWith<DatabaseType>& swDatabase) {
+        return {_catalogCacheLoader, swDatabase};
+    }
+
     void loadDatabases(const std::vector<DatabaseType>& databases) {
         for (const auto& db : databases) {
-            _catalogCacheLoader->setDatabaseRefreshReturnValue(db);
+            const auto scopedDbProvider = scopedDatabaseProvider(db);
             const auto swDatabase = _catalogCache->getDatabase(operationContext(), db.getName());
             ASSERT_OK(swDatabase.getStatus());
         }
-
-        // Reset the database return value to avoid false positive results
-        _catalogCacheLoader->setDatabaseRefreshReturnValue(kErrorStatus);
     }
 
     void loadCollection(const ChunkVersion& version) {
         const auto coll = makeCollectionType(version);
-        _catalogCacheLoader->setCollectionRefreshReturnValue(coll);
-        _catalogCacheLoader->setChunkRefreshReturnValue(makeChunks(version));
+        const auto scopedCollProv = scopedCollectionProvider(coll);
+        const auto scopedChunksProv = scopedChunksProvider(makeChunks(version));
 
         const auto swChunkManager =
             _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNs());
         ASSERT_OK(swChunkManager.getStatus());
-
-        // Reset the loader return values to avoid false positive results
-        _catalogCacheLoader->setCollectionRefreshReturnValue(kErrorStatus);
-        _catalogCacheLoader->setChunkRefreshReturnValue(kErrorStatus);
     }
 
     void loadUnshardedCollection(const NamespaceString& nss) {
-        _catalogCacheLoader->setCollectionRefreshReturnValue(
-            Status(ErrorCodes::NamespaceNotFound, "collection not found"));
+        const auto scopedCollProvider =
+            scopedCollectionProvider(Status(ErrorCodes::NamespaceNotFound, "collection not found"));
 
         const auto swChunkManager =
             _catalogCache->getCollectionRoutingInfo(operationContext(), nss);
         ASSERT_OK(swChunkManager.getStatus());
-
-        // Reset the loader return value to avoid false positive results
-        _catalogCacheLoader->setCollectionRefreshReturnValue(kErrorStatus);
     }
 
     std::vector<ChunkType> makeChunks(ChunkVersion version) {
@@ -124,10 +172,8 @@ protected:
     const int kDummyPort{12345};
     const HostAndPort kConfigHostAndPort{"DummyConfig", kDummyPort};
     const std::vector<ShardId> kShards{{"0"}, {"1"}};
-    const Status kErrorStatus{ErrorCodes::InternalError,
-                              "Received an unexpected CatalogCacheLoader request"};
 
-    std::unique_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
+    std::shared_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
     std::unique_ptr<CatalogCache> _catalogCache;
 };
 
@@ -177,6 +223,44 @@ TEST_F(CatalogCacheTest, InvalidateSingleDbOnShardRemoval) {
     ASSERT_EQ(cachedDb.primaryId(), kShards[1]);
 }
 
+TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), 1);
+    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen());
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+    loadCollection(cachedCollVersion);
+    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+        kNss, cachedCollVersion, kShards[0]);
+    ASSERT_OK(_catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus());
+}
+
+TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), 1);
+    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen());
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+    loadCollection(cachedCollVersion);
+    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+        kNss, boost::none, kShards[0]);
+    const auto status =
+        _catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus();
+    ASSERT(status == ErrorCodes::InternalError);
+}
+
+TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
+    const auto dbVersion = DatabaseVersion(UUID::gen(), 1);
+    const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen());
+    const auto wantedCollVersion = ChunkVersion(2, 0, cachedCollVersion.epoch());
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+    loadCollection(cachedCollVersion);
+    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+        kNss, wantedCollVersion, kShards[0]);
+    const auto status =
+        _catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus();
+    ASSERT(status == ErrorCodes::InternalError);
+}
+
 TEST_F(CatalogCacheTest, CheckEpochNoDatabase) {
     const auto collVersion = ChunkVersion(1, 0, OID::gen());
     ASSERT_THROWS_WITH_CHECK(_catalogCache->checkEpochOrThrow(kNss, collVersion, kShards[0]),
@@ -192,7 +276,7 @@ TEST_F(CatalogCacheTest, CheckEpochNoDatabase) {
 }
 
 TEST_F(CatalogCacheTest, CheckEpochNoCollection) {
-    const auto dbVersion = DatabaseVersion();
+    const auto dbVersion = DatabaseVersion(UUID::gen(), 1);
     const auto collVersion = ChunkVersion(1, 0, OID::gen());
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
@@ -209,7 +293,7 @@ TEST_F(CatalogCacheTest, CheckEpochNoCollection) {
 }
 
 TEST_F(CatalogCacheTest, CheckEpochUnshardedCollection) {
-    const auto dbVersion = DatabaseVersion();
+    const auto dbVersion = DatabaseVersion(UUID::gen(), 1);
     const auto collVersion = ChunkVersion(1, 0, OID::gen());
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
@@ -227,7 +311,7 @@ TEST_F(CatalogCacheTest, CheckEpochUnshardedCollection) {
 }
 
 TEST_F(CatalogCacheTest, CheckEpochWithMismatch) {
-    const auto dbVersion = DatabaseVersion();
+    const auto dbVersion = DatabaseVersion(UUID::gen(), 1);
     const auto wantedCollVersion = ChunkVersion(1, 0, OID::gen());
     const auto receivedCollVersion = ChunkVersion(1, 0, OID::gen());
 
@@ -249,7 +333,7 @@ TEST_F(CatalogCacheTest, CheckEpochWithMismatch) {
 }
 
 TEST_F(CatalogCacheTest, CheckEpochWithMatch) {
-    const auto dbVersion = DatabaseVersion();
+    const auto dbVersion = DatabaseVersion(UUID::gen(), 1);
     const auto collVersion = ChunkVersion(1, 0, OID::gen());
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});

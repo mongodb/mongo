@@ -359,12 +359,15 @@ public:
      * With respect to causal consistency, the 'LookupFn' used for this cache must provide the
      * guarantee that if 'advanceTimeInStore' is called with a 'newTime', a subsequent call to
      * 'LookupFn' for 'key' must return at least 'newTime' or later.
+     *
+     * Returns true if the passed 'newTimeInStore' is grater than the time of the currently cached
+     * value or if no value is cached for 'key'.
      */
-    void advanceTimeInStore(const Key& key, const Time& newTime) {
+    bool advanceTimeInStore(const Key& key, const Time& newTime) {
         stdx::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
             it->second->advanceTimeInStore(lg, newTime);
-        _cache.advanceTimeInStore(key, newTime);
+        return _cache.advanceTimeInStore(key, newTime);
     }
 
     /**

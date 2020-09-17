@@ -264,16 +264,20 @@ void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
     _stats.countStaleConfigErrors.addAndFetch(1);
 
     auto collectionEntry = _collectionCache.peekLatestCached(nss);
-    if (collectionEntry && collectionEntry->optRt) {
-        collectionEntry->optRt->setShardStale(shardId);
-    }
 
-    if (wantedVersion) {
-        _collectionCache.advanceTimeInStore(
-            nss, ComparableChunkVersion::makeComparableChunkVersion(*wantedVersion));
-    } else {
-        _collectionCache.advanceTimeInStore(
-            nss, ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh());
+    const auto newChunkVersion = wantedVersion
+        ? ComparableChunkVersion::makeComparableChunkVersion(*wantedVersion)
+        : ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh();
+
+    const bool timeAdvanced = _collectionCache.advanceTimeInStore(nss, newChunkVersion);
+
+    if (timeAdvanced && collectionEntry && collectionEntry->optRt) {
+        // Shards marked stale will be reset on the next refresh.
+        // We can mark the shard stale only if the time advanced, otherwise no refresh would happen
+        // and the shard will remain marked stale.
+        // Even if a concurrent refresh is happening this is still the old collectionEntry,
+        // so it is safe to call setShardStale.
+        collectionEntry->optRt->setShardStale(shardId);
     }
 }
 

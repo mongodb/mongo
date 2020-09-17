@@ -40,6 +40,15 @@ namespace mongo {
 
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
 
+const Status CatalogCacheLoaderMock::kCollectionInternalErrorStatus = {
+    ErrorCodes::InternalError,
+    "Mocked catalog cache loader received unexpected collection request"};
+const Status CatalogCacheLoaderMock::kChunksInternalErrorStatus = {
+    ErrorCodes::InternalError, "Mocked catalog cache loader received unexpected chunks request"};
+const Status CatalogCacheLoaderMock::kDatabaseInternalErrorStatus = {
+    ErrorCodes::InternalError, "Mocked catalog cache loader received unexpected database request"};
+
+
 void CatalogCacheLoaderMock::initializeReplicaSetRole(bool isPrimary) {
     MONGO_UNREACHABLE;
 }
@@ -108,13 +117,25 @@ void CatalogCacheLoaderMock::setCollectionRefreshReturnValue(
     _swCollectionReturnValue = std::move(statusWithCollectionType);
 }
 
+void CatalogCacheLoaderMock::clearCollectionReturnValue() {
+    _swCollectionReturnValue = kCollectionInternalErrorStatus;
+}
+
 void CatalogCacheLoaderMock::setChunkRefreshReturnValue(
     StatusWith<std::vector<ChunkType>> statusWithChunks) {
     _swChunksReturnValue = std::move(statusWithChunks);
 }
 
+void CatalogCacheLoaderMock::clearChunksReturnValue() {
+    _swChunksReturnValue = kChunksInternalErrorStatus;
+}
+
 void CatalogCacheLoaderMock::setDatabaseRefreshReturnValue(StatusWith<DatabaseType> swDatabase) {
     _swDatabaseReturnValue = std::move(swDatabase);
+}
+
+void CatalogCacheLoaderMock::clearDatabaseReturnValue() {
+    _swDatabaseReturnValue = kDatabaseInternalErrorStatus;
 }
 
 }  // namespace mongo

@@ -90,7 +90,7 @@ TEST(InvalidatingLRUCacheTest, CausalConsistency) {
     ASSERT_EQ("Value @ TS 100", cache.get(2, CacheCausalConsistency::kLatestKnown)->value);
 
     auto value = cache.get(2, CacheCausalConsistency::kLatestCached);
-    cache.advanceTimeInStore(2, Timestamp(200));
+    ASSERT(cache.advanceTimeInStore(2, Timestamp(200)));
     ASSERT_EQ("Value @ TS 100", value->value);
     ASSERT(!value.isValid());
     ASSERT_EQ("Value @ TS 100", cache.get(2, CacheCausalConsistency::kLatestCached)->value);
@@ -279,7 +279,7 @@ TEST(InvalidatingLRUCacheTest, CausalConsistencyPreservedForEvictedCheckedOutKey
     ASSERT_EQ("Key 1 - Value @ TS 10", cache.get(1, CacheCausalConsistency::kLatestCached)->value);
     ASSERT_EQ("Key 1 - Value @ TS 10", cache.get(1, CacheCausalConsistency::kLatestKnown)->value);
 
-    cache.advanceTimeInStore(1, Timestamp(11));
+    ASSERT(cache.advanceTimeInStore(1, Timestamp(11)));
     auto [cachedValueAtTS11, timeInStoreAtTS11] = cache.getCachedValueAndTimeInStore(1);
     ASSERT_EQ(Timestamp(11), timeInStoreAtTS11);
     ASSERT(!key1ValueAtTS10.isValid());
@@ -297,7 +297,7 @@ TEST(InvalidatingLRUCacheTest, InvalidateAfterAdvanceTime) {
     TestValueCacheCausallyConsistent cache(1);
 
     cache.insertOrAssign(20, TestValue("Value @ TS 200"), Timestamp(200));
-    cache.advanceTimeInStore(20, Timestamp(250));
+    ASSERT(cache.advanceTimeInStore(20, Timestamp(250)));
     ASSERT_EQ("Value @ TS 200", cache.get(20, CacheCausalConsistency::kLatestCached)->value);
     ASSERT(!cache.get(20, CacheCausalConsistency::kLatestKnown));
 
@@ -310,7 +310,7 @@ TEST(InvalidatingLRUCacheTest, InsertEntryAtTimeLessThanAdvanceTime) {
     TestValueCacheCausallyConsistent cache(1);
 
     cache.insertOrAssign(20, TestValue("Value @ TS 200"), Timestamp(200));
-    cache.advanceTimeInStore(20, Timestamp(300));
+    ASSERT(cache.advanceTimeInStore(20, Timestamp(300)));
     ASSERT_EQ("Value @ TS 200", cache.get(20, CacheCausalConsistency::kLatestCached)->value);
     ASSERT(!cache.get(20, CacheCausalConsistency::kLatestKnown));
 
@@ -432,7 +432,7 @@ TEST(InvalidatingLRUCacheTest, CacheSizeZeroInvalidateAllEntries) {
 TEST(InvalidatingLRUCacheTest, CacheSizeZeroCausalConsistency) {
     TestValueCacheCausallyConsistent cache(0);
 
-    cache.advanceTimeInStore(100, Timestamp(30));
+    ASSERT(cache.advanceTimeInStore(100, Timestamp(30)));
     cache.insertOrAssign(100, TestValue("Value @ TS 30"), Timestamp(30));
     auto [cachedValueAtTS30, timeInStoreAtTS30] = cache.getCachedValueAndTimeInStore(100);
     ASSERT_EQ(Timestamp(), timeInStoreAtTS30);
@@ -442,7 +442,7 @@ TEST(InvalidatingLRUCacheTest, CacheSizeZeroCausalConsistency) {
     ASSERT_EQ("Value @ TS 30", cache.get(100, CacheCausalConsistency::kLatestCached)->value);
     ASSERT_EQ("Value @ TS 30", cache.get(100, CacheCausalConsistency::kLatestKnown)->value);
 
-    cache.advanceTimeInStore(100, Timestamp(35));
+    ASSERT(cache.advanceTimeInStore(100, Timestamp(35)));
     auto [cachedValueAtTS35, timeInStoreAtTS35] = cache.getCachedValueAndTimeInStore(100);
     ASSERT_EQ(Timestamp(35), timeInStoreAtTS35);
     ASSERT_EQ("Value @ TS 30", cachedValueAtTS35->value);
@@ -452,6 +452,19 @@ TEST(InvalidatingLRUCacheTest, CacheSizeZeroCausalConsistency) {
     auto valueAtTS40 = cache.insertOrAssignAndGet(100, TestValue("Value @ TS 40"), Timestamp(40));
     ASSERT_EQ("Value @ TS 40", cache.get(100, CacheCausalConsistency::kLatestCached)->value);
     ASSERT_EQ("Value @ TS 40", cache.get(100, CacheCausalConsistency::kLatestKnown)->value);
+}
+
+TEST(InvalidatingLRUCacheTest, AdvanceTimeNoEntry) {
+    TestValueCacheCausallyConsistent cache(1);
+    // If there is no cached entry advanceTime will always return true
+    ASSERT(cache.advanceTimeInStore(100, Timestamp(30)));
+    ASSERT(cache.advanceTimeInStore(100, Timestamp(30)));
+}
+
+TEST(InvalidatingLRUCacheTest, AdvanceTimeSameTime) {
+    TestValueCacheCausallyConsistent cache(1);
+    cache.insertOrAssignAndGet(100, TestValue("Value @ TS 30"), Timestamp(30));
+    ASSERT(!cache.advanceTimeInStore(100, Timestamp(30)));
 }
 
 template <class TCache, typename TestFunc>
@@ -529,7 +542,7 @@ TEST(InvalidatingLRUCacheParallelTest, AdvanceTime) {
         auto latestCached = cache.get(key, CacheCausalConsistency::kLatestCached);
         auto latestKnown = cache.get(key, CacheCausalConsistency::kLatestKnown);
 
-        cache.advanceTimeInStore(key, Timestamp(counter.fetchAndAdd(1)));
+        ASSERT(cache.advanceTimeInStore(key, Timestamp(counter.fetchAndAdd(1))));
     });
 }
 

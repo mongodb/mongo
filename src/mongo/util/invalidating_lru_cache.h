@@ -409,8 +409,11 @@ public:
      * is currently cached, but with isValid = false. Calls to 'get' with a causal consistency of
      * 'kLatestKnown' will return no value. It is up to the caller to this function to subsequently
      * either 'insertOrAssign' a new value for the 'key', or to call 'invalidate'.
+     *
+     * Returns true if the passed 'newTimeInStore' is grater than the time of the currently cached
+     * value or if no value is cached for 'key'.
      */
-    void advanceTimeInStore(const Key& key, const Time& newTimeInStore) {
+    bool advanceTimeInStore(const Key& key, const Time& newTimeInStore) {
         stdx::lock_guard<Latch> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
@@ -420,13 +423,17 @@ public:
             storedValue = it->second.lock();
         }
 
-        if (!storedValue)
-            return;
+        if (!storedValue) {
+            return true;
+        }
 
-        if (newTimeInStore > storedValue->timeInStore) {
+        if (storedValue->timeInStore < newTimeInStore) {
             storedValue->timeInStore = newTimeInStore;
             storedValue->isValid.store(false);
+            return true;
         }
+
+        return false;
     }
 
     /**

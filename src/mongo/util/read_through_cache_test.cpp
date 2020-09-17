@@ -356,7 +356,7 @@ TEST_F(ReadThroughCacheTest, CausalConsistency) {
     ASSERT_EQ(10, cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestKnown)->counter);
 
     nextToReturn.emplace(CachedValue(20), Timestamp(20));
-    cache.advanceTimeInStore("TestKey", Timestamp(20));
+    ASSERT(cache.advanceTimeInStore("TestKey", Timestamp(20)));
     ASSERT_EQ(10, cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestCached)->counter);
     ASSERT(!cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestCached).isValid());
     ASSERT_EQ(20, cache.acquire(_opCtx, "TestKey", CacheCausalConsistency::kLatestKnown)->counter);
@@ -607,7 +607,7 @@ TEST_F(ReadThroughCacheAsyncTest, AdvanceTimeDuringLookupOfUnCachedKey) {
     auto futureAtTS100 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
     ASSERT(!futureAtTS100.isReady());
 
-    cache.advanceTimeInStore("TestKey", Timestamp(200));
+    ASSERT(cache.advanceTimeInStore("TestKey", Timestamp(200)));
     auto futureAtTS200 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
     ASSERT(!futureAtTS200.isReady());
 
@@ -640,7 +640,7 @@ TEST_F(ReadThroughCacheAsyncTest, KeyDeletedAfterAdvanceTimeInStore) {
     ASSERT_EQ(100, futureAtTS100.get()->counter);
     ASSERT(futureAtTS100.get().isValid());
 
-    cache.advanceTimeInStore("TestKey", Timestamp(200));
+    ASSERT(cache.advanceTimeInStore("TestKey", Timestamp(200)));
     auto futureAtTS200 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
 
     nextToReturn.emplace(boost::none, Timestamp(200));
@@ -672,12 +672,12 @@ TEST_F(ReadThroughCacheAsyncTest, AcquireAsyncAndAdvanceTimeInterleave) {
     ASSERT_EQ(100, futureAtTS100.get()->counter);
     ASSERT(futureAtTS100.get().isValid());
 
-    cache.advanceTimeInStore("TestKey", Timestamp(150));
+    ASSERT(cache.advanceTimeInStore("TestKey", Timestamp(150)));
     auto futureAtTS150 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
     ASSERT(!futureAtTS100.get().isValid());
     ASSERT(!futureAtTS150.isReady());
 
-    cache.advanceTimeInStore("TestKey", Timestamp(250));
+    ASSERT(cache.advanceTimeInStore("TestKey", Timestamp(250)));
     auto futureAtTS250 = cache.acquireAsync("TestKey", CacheCausalConsistency::kLatestKnown);
     ASSERT(!futureAtTS100.get().isValid());
     ASSERT(!futureAtTS150.isReady());
