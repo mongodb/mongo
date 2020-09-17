@@ -414,7 +414,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericDiv(value::Type
                 return {false, value::TypeTags::NumberDouble, value::bitcastFrom(result)};
             }
             case value::TypeTags::NumberDecimal: {
-                assertNonZero(numericCast<Decimal128>(rhsTag, rhsValue).isZero());
+                assertNonZero(!numericCast<Decimal128>(rhsTag, rhsValue).isZero());
                 auto result = numericCast<Decimal128>(lhsTag, lhsValue)
                                   .divide(numericCast<Decimal128>(rhsTag, rhsValue));
                 auto [tag, val] = value::makeCopyDecimal(result);

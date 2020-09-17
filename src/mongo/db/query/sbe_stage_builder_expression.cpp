@@ -1651,7 +1651,36 @@ public:
         unsupportedExpression("$dateFromString");
     }
     void visit(ExpressionDivide* expr) final {
-        unsupportedExpression(expr->getOpName());
+        _context->ensureArity(2);
+
+        auto rhs = _context->popExpr();
+        auto lhs = _context->popExpr();
+
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(std::move(lhs), std::move(rhs));
+        sbe::EVariable lhsRef{frameId, 0};
+        sbe::EVariable rhsRef{frameId, 1};
+
+        auto checkIsNumber = sbe::makeE<sbe::EPrimBinary>(
+            sbe::EPrimBinary::logicAnd,
+            sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(lhsRef.clone())),
+            sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(rhsRef.clone())));
+
+        auto checkIsNullOrMissing = sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
+                                                                 generateNullOrMissing(lhsRef),
+                                                                 generateNullOrMissing(rhsRef));
+
+        auto divideExpr = buildMultiBranchConditional(
+            CaseValuePair{std::move(checkIsNullOrMissing),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{std::move(checkIsNumber),
+                          sbe::makeE<sbe::EPrimBinary>(
+                              sbe::EPrimBinary::div, lhsRef.clone(), rhsRef.clone())},
+            sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073101},
+                                   "$divide only supports numeric types"));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(divideExpr)));
     }
     void visit(ExpressionExp* expr) final {
         auto frameId = _context->frameIdGenerator->generate();
