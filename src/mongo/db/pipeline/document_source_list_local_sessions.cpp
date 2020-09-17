@@ -48,9 +48,8 @@ DocumentSource::GetNextResult DocumentSourceListLocalSessions::getNext() {
 
     while (!_ids.empty()) {
         const auto& id = _ids.back();
+        const auto record = _cache->peekCached(id);
         _ids.pop_back();
-
-        const auto& record = _cache->peekCached(id);
         if (!record) {
             // It's possible for SessionRecords to have expired while we're walking
             continue;
