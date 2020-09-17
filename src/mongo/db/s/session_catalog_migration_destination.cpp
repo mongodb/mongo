@@ -61,7 +61,7 @@ const WriteConcernOptions kMajorityWC(WriteConcernOptions::kMajority,
 
 struct ProcessOplogResult {
     LogicalSessionId sessionId;
-    TxnNumber txnNum;
+    TxnNumber txnNum{kUninitializedTxnNumber};
 
     repl::OpTime oplogTime;
     bool isPrePostImage = false;
