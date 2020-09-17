@@ -185,6 +185,20 @@ void CommandHelpers::runCommandInvocation(OperationContext* opCtx,
     }
 }
 
+Future<void> CommandHelpers::runCommandInvocationAsync(
+    std::shared_ptr<RequestExecutionContext> rec,
+    std::shared_ptr<CommandInvocation> invocation) try {
+    auto hooks = getCommandInvocationHooksHandle(rec->getOpCtx()->getServiceContext());
+    if (hooks)
+        hooks->onBeforeAsyncRun(rec, invocation.get());
+    return invocation->runAsync(rec).then([rec, hooks, invocation] {
+        if (hooks)
+            hooks->onAfterAsyncRun(rec, invocation.get());
+    });
+} catch (const DBException& e) {
+    return e.toStatus();
+}
+
 void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
                                        const CommandInvocation* invocation,
                                        const OpMsgRequest& request,
@@ -799,6 +813,16 @@ private:
             BSONObjBuilder bob = result->getBodyBuilder();
             CommandHelpers::appendSimpleCommandStatus(bob, ok);
         }
+    }
+
+    Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec) override {
+        return _command->runAsync(rec, _dbName).onError([rec](Status status) {
+            if (status.code() != ErrorCodes::FailedToRunWithReplyBuilder)
+                return status;
+            BSONObjBuilder bob = rec->getReplyBuilder()->getBodyBuilder();
+            CommandHelpers::appendSimpleCommandStatus(bob, false);
+            return Status::OK();
+        });
     }
 
     void explain(OperationContext* opCtx,

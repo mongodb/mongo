@@ -399,6 +399,10 @@ error_codes:
 
     - {code: 329, name: TenantMigrationInProgress}
 
+    - {code: 330, name: SkipCommandExecution}
+
+    - {code: 331, name: FailedToRunWithReplyBuilder}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
