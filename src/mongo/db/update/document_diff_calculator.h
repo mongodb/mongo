@@ -31,17 +31,27 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/update/document_diff_serialization.h"
+#include "mongo/db/update_index_data.h"
 
 
 namespace mongo::doc_diff {
+
+struct DiffResult {
+    Diff diff;
+    bool indexesAffected;  // Whether the index data need to be modified if the diff is applied.
+};
+
 /**
  * Returns the delta between 'pre' and 'post' by recursively iterating the object. If the size
  * of the computed delta is larger than the 'post' object then the function returns
  * 'boost::none'. The 'paddingForDiff' represents the additional size that needs be added to the
- * size of the diff, while comparing whether the diff is viable.
+ * size of the diff, while comparing whether the diff is viable. If any paths in 'indexData' are
+ * affected by the generated diff, then the 'indexesAffected' field in the output will be set to
+ * true, false otherwise.
  */
-boost::optional<doc_diff::Diff> computeDiff(const BSONObj& pre,
-                                            const BSONObj& post,
-                                            size_t paddingForDiff);
+boost::optional<DiffResult> computeDiff(const BSONObj& pre,
+                                        const BSONObj& post,
+                                        size_t paddingForDiff,
+                                        const UpdateIndexData* indexData);
 
 };  // namespace mongo::doc_diff

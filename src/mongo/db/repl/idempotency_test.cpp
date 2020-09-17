@@ -287,10 +287,13 @@ void RandomizedIdempotencyTest::runUpdateV2IdempotencyTestCase(double v2Probabil
                 // computing the input objects) would break idempotency. So we do a dry run of what
                 // the collection state would look like and compute diffs based on that.
                 generatedDoc = generateDocWithId(kDocId);
-                auto diff = doc_diff::computeDiff(
-                    oldDoc, *generatedDoc, update_oplog_entry::kSizeOfDeltaOplogEntryMetadata);
-                ASSERT(diff);
-                oplogDiff = BSON("$v" << 2 << "diff" << *diff);
+                auto diffOutput =
+                    doc_diff::computeDiff(oldDoc,
+                                          *generatedDoc,
+                                          update_oplog_entry::kSizeOfDeltaOplogEntryMetadata,
+                                          nullptr);
+                ASSERT(diffOutput);
+                oplogDiff = BSON("$v" << 2 << "diff" << diffOutput->diff);
             } else {
                 oplogDiff = updateV1Generator.generateUpdate();
             }

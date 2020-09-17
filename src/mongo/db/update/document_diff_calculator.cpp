@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/update/document_diff_calculator.h"
 
 namespace mongo::doc_diff {
@@ -156,15 +157,75 @@ void calculateSubDiffHelper(const BSONElement& preVal,
         diffNode->addChild(fieldIdentifier, std::move(subDiff));
     }
 }
+
+class StringWrapper {
+public:
+    StringWrapper(size_t s) : storage(std::to_string(s)), str(storage) {}
+    StringWrapper(StringData s) : str(s) {}
+
+    StringData getStr() {
+        return str;
+    }
+
+private:
+    std::string storage;
+    StringData str;
+};
+
+template <class DiffNode>
+bool anyIndexesMightBeAffected(const DiffNode* node,
+                               const UpdateIndexData* indexData,
+                               FieldRef* path) {
+    for (auto&& [field, child] : node->getChildren()) {
+        // The 'field' here can either be an integer or a string.
+        StringWrapper wrapper(field);
+        FieldRef::FieldRefTempAppend tempAppend(*path, wrapper.getStr());
+        switch (child->type()) {
+            case diff_tree::NodeType::kDelete:
+            case diff_tree::NodeType::kUpdate:
+            case diff_tree::NodeType::kInsert: {
+                if (indexData && indexData->mightBeIndexed(*path)) {
+                    return true;
+                }
+                break;
+            }
+            case diff_tree::NodeType::kDocumentSubDiff: {
+                if (anyIndexesMightBeAffected<diff_tree::DocumentSubDiffNode>(
+                        checked_cast<const diff_tree::DocumentSubDiffNode*>(child.get()),
+                        indexData,
+                        path)) {
+                    return true;
+                }
+                break;
+            }
+            case diff_tree::NodeType::kArray: {
+                auto* arrayNode = checked_cast<const diff_tree::ArrayNode*>(child.get());
+                if ((arrayNode->getResize() && indexData && indexData->mightBeIndexed(*path)) ||
+                    anyIndexesMightBeAffected<diff_tree::ArrayNode>(arrayNode, indexData, path)) {
+                    return true;
+                }
+                break;
+            }
+            case diff_tree::NodeType::kDocumentInsert: {
+                MONGO_UNREACHABLE;
+            }
+        }
+    }
+    return false;
+}
 }  // namespace
 
-boost::optional<doc_diff::Diff> computeDiff(const BSONObj& pre,
-                                            const BSONObj& post,
-                                            size_t padding) {
+boost::optional<DiffResult> computeDiff(const BSONObj& pre,
+                                        const BSONObj& post,
+                                        size_t padding,
+                                        const UpdateIndexData* indexData) {
     if (auto diffNode = computeDocDiff(pre, post, padding)) {
         auto diff = diffNode->serialize();
         if (diff.objsize() < post.objsize()) {
-            return diff;
+            FieldRef path;
+            return DiffResult{diff,
+                              anyIndexesMightBeAffected<diff_tree::DocumentSubDiffNode>(
+                                  diffNode.get(), indexData, &path)};
         }
     }
     return {};

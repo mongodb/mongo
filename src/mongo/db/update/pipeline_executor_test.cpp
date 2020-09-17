@@ -74,8 +74,16 @@ public:
         return _allowDeltaOplogEntries;
     }
 
-private:
+protected:
     bool _allowDeltaOplogEntries = false;
+};
+
+class PipelineExecutorV2ModeTest : public PipelineExecutorTest {
+public:
+    void run() {
+        _allowDeltaOplogEntries = true;
+        UpdateNodeTest::run();
+    }
 };
 
 TEST_F(PipelineExecutorTest, Noop) {
@@ -102,12 +110,13 @@ TEST_F(PipelineExecutorTest, ShouldNotCreateIdIfNoIdExistsAndNoneIsSpecified) {
     mutablebson::Document doc(fromjson("{c: 1, d: 'largeStringValue'}"));
     auto result = exec.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{c: 1, d: 'largeStringValue', a: 1, b: 2}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     if (deltaOplogEntryAllowed()) {
+        ASSERT_FALSE(result.indexesAffected);
         ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {a: 1, b: 2}}}"), result.oplogEntry);
     } else {
+        ASSERT_TRUE(result.indexesAffected);
         ASSERT_BSONOBJ_BINARY_EQ(fromjson("{c: 1, d: 'largeStringValue', a: 1, b: 2}"),
                                  result.oplogEntry);
     }
@@ -139,12 +148,14 @@ TEST_F(PipelineExecutorTest, ShouldSucceedWhenImmutableIdIsNotModified) {
     addImmutablePath("_id");
     auto result = exec.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+
     ASSERT_EQUALS(fromjson("{_id: 0, c: 1, d: 'largeStringValue', a: 1, b: 2}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     if (deltaOplogEntryAllowed()) {
+        ASSERT_FALSE(result.indexesAffected);
         ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {a: 1, b: 2 }}}"), result.oplogEntry);
     } else {
+        ASSERT_TRUE(result.indexesAffected);
         ASSERT_BSONOBJ_BINARY_EQ(fromjson("{_id: 0, c: 1, d: 'largeStringValue', a: 1, b: 2}"),
                                  result.oplogEntry);
     }
@@ -159,13 +170,15 @@ TEST_F(PipelineExecutorTest, ComplexDoc) {
     mutablebson::Document doc(fromjson("{a: 1, b: [0, 2, 2], e: ['val1', 'val2']}"));
     auto result = exec.applyUpdate(getApplyParams(doc.root()));
     ASSERT_FALSE(result.noop);
-    ASSERT_TRUE(result.indexesAffected);
+
     ASSERT_EQUALS(fromjson("{a: 1, b: [0, 1, 2], e: ['val1', 'val2'], c: {d: 1}}"), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     if (deltaOplogEntryAllowed()) {
+        ASSERT_FALSE(result.indexesAffected);
         ASSERT_BSONOBJ_BINARY_EQ(fromjson("{$v: 2, diff: {i: {c: {d: 1}}, sb: {a: true, u1: 1} }}"),
                                  result.oplogEntry);
     } else {
+        ASSERT_TRUE(result.indexesAffected);
         ASSERT_BSONOBJ_BINARY_EQ(fromjson("{a: 1, b: [0, 1, 2], e: ['val1', 'val2'], c: {d: 1}}"),
                                  result.oplogEntry);
     }
@@ -407,6 +420,297 @@ TEST_F(PipelineExecutorTest, NoopWithConstants) {
     ASSERT_EQUALS(fromjson("{a: 1, b: 2}"), doc);
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
     ASSERT_TRUE(result.oplogEntry.isEmpty());
+}
+
+TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithDeletes) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj preImage(
+        fromjson("{f1: {a: {b: {c: 1, paddingField: 'largeValueString'}, c: 1, paddingField: "
+                 "'largeValueString'}}, paddingField: 'largeValueString'}"));
+    addIndexedPath("p.a.b");
+    addIndexedPath("f1.a.b");
+    {
+        // When a path in the diff is a prefix of index path.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{fromjson("{$unset: ['f1', 'f2', 'f3']}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_EQUALS(doc, fromjson("{paddingField: 'largeValueString'}"));
+        ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry, fromjson("{$v: 2, diff: {d: {f1: false}}}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // When a path in the diff is same as index path.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{fromjson("{$unset: ['f1.a.p', 'f1.a.c', 'f1.a.b']}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_EQUALS(
+            doc,
+            fromjson(
+                "{f1: {a: {paddingField: 'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
+                                 fromjson("{$v: 2, diff: {sf1: {sa: {d: {b: false, c: false}}}}}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // When the index path is a prefix of a path in the diff.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{fromjson("{$unset: 'f1.a.b.c'}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
+                                 fromjson("{$v: 2, diff: {sf1: {sa: {sb: {d: {c: false}}}}}}"));
+        ASSERT_EQUALS(
+            doc,
+            fromjson("{f1: {a: {b: {paddingField: 'largeValueString'}, c: 1, paddingField: "
+                     "'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // With common parent, but path diverges.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{fromjson("{$unset: 'f1.a.c'}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
+                                 fromjson("{$v: 2, diff: {sf1: {sa: {d: {c: false}}}}}"));
+        ASSERT_EQUALS(
+            doc,
+            fromjson("{f1: {a: {b: {c: 1, paddingField: 'largeValueString'}, paddingField: "
+                     "'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT(!result.indexesAffected);
+    }
+}
+
+TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithUpdatesAndInserts) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj preImage(
+        fromjson("{f1: {a: {b: {c: 1, paddingField: 'largeValueString'}, c: 1, paddingField: "
+                 "'largeValueString'}}, paddingField: 'largeValueString'}"));
+    addIndexedPath("p.a.b");
+    addIndexedPath("f1.a.b");
+    addIndexedPath("f1.a.newField");
+    {
+        // When a path in the diff is a prefix of index path.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{fromjson("{$set: {f1: true, f2: true}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_EQUALS(doc, fromjson("{f1: true, paddingField: 'largeValueString', f2: true}"));
+        ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
+                                 fromjson("{$v: 2, diff: {u: {f1: true}, i: {f2: true}}}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // When a path in the diff is same as index path.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{fromjson("{$set: {'f1.a.newField': true}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify diff format.
+        ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
+                                 fromjson("{$v: 2, diff: {sf1: {sa: {i: {newField: true}}}}}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // When the index path is a prefix of a path in the diff.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{fromjson("{$set: {'f1.a.b.c': true}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
+                                 fromjson("{$v: 2, diff: {sf1: {sa: {sb: {u: {c: true}}}}}}"));
+        ASSERT_EQUALS(
+            doc,
+            fromjson(
+                "{f1: {a: {b: {c: true, paddingField: 'largeValueString'}, c: 1, paddingField: "
+                "'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // With common parent, but path diverges.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{fromjson("{$set: {'f1.a.p': true}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
+                                 fromjson("{$v: 2, diff: {sf1: {sa: {i: {p: true}}}}}"));
+        ASSERT_EQUALS(
+            doc,
+            fromjson("{f1: {a: {b: {c: 1, paddingField: 'largeValueString'}, c: 1, paddingField: "
+                     "'largeValueString', p: true}}, paddingField: 'largeValueString'}"));
+        ASSERT(!result.indexesAffected);
+    }
+}
+
+TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithArraysAlongIndexPath) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj preImage(
+        fromjson("{f1: [0, {a: {b: ['someStringValue', {c: 1, paddingField: 'largeValueString'}], "
+                 "c: 1, paddingField: 'largeValueString'}}], paddingField: 'largeValueString'}"));
+    addIndexedPath("p.a.b");
+    addIndexedPath("f1.a.2.b");
+
+    {
+        // Test resize.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{
+            fromjson("{$replaceWith: {f1: [0, {a: {b: ['someStringValue'], c: 1, paddingField: "
+                     "'largeValueString'}}], paddingField: 'largeValueString'}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_EQUALS(
+            doc,
+            fromjson(
+                "{f1: [0, {a: {b: ['someStringValue'], c: 1, paddingField: 'largeValueString'}}], "
+                "paddingField: 'largeValueString'}"));
+        ASSERT_BSONOBJ_BINARY_EQ(
+            result.oplogEntry,
+            fromjson("{$v: 2, diff: {sf1: {a: true, s1: {sa: {sb: {a: true, l: 1}}}}}}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // When the index path is a prefix of a path in the diff and also involves numeric
+        // components along the way. The numeric components should always be ignored.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{
+            fromjson("{$replaceWith: {f1: [0, {a: {b: ['someStringValue', {c: 1, "
+                     "paddingField:'largeValueString',d: 1}], c: 1, paddingField: "
+                     "'largeValueString'}}], paddingField: 'largeValueString'}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_EQUALS(doc,
+                      fromjson("{f1: [0, {a: {b: ['someStringValue', {c: 1, paddingField: "
+                               "'largeValueString', d: 1}], c: 1, paddingField: "
+                               "'largeValueString'}}], paddingField: 'largeValueString'}"));
+        ASSERT_BSONOBJ_BINARY_EQ(
+            result.oplogEntry,
+            fromjson(
+                "{$v: 2, diff: {sf1: {a: true, s1: {sa: {sb: {a: true, s1: {i: {d: 1} }}}}}}}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // When inserting a sub-object into array, and the sub-object diverges from the index path.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{
+            fromjson("{$set: {f1: {$concatArrays: ['$f1', [{newField: 1}]]}}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_EQUALS(
+            doc,
+            fromjson(
+                "{f1: [0, {a: {b: ['someStringValue', {c: 1, paddingField: 'largeValueString'}], "
+                "c: 1, paddingField: 'largeValueString'}}, {newField: 1}], paddingField: "
+                "'largeValueString'}"));
+        ASSERT_BSONOBJ_BINARY_EQ(result.oplogEntry,
+                                 fromjson("{$v: 2, diff: {sf1: {a: true, u2: {newField: 1} }}}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // When a common array path element is updated, but the paths diverge at the last element.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{
+            fromjson("{$replaceWith: {f1: [0, {a: {b: ['someStringValue', {c: 1, paddingField: "
+                     "'largeValueString'}], c: 2, paddingField: 'largeValueString'}}], "
+                     "paddingField: 'largeValueString'}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_BSONOBJ_BINARY_EQ(
+            result.oplogEntry, fromjson("{$v: 2, diff: {sf1: {a: true, s1: {sa: {u: {c: 2} }}}}}"));
+        ASSERT_EQUALS(
+            doc,
+            fromjson(
+                "{f1: [0, {a: {b: ['someStringValue', {c: 1, paddingField: 'largeValueString'}], "
+                "c: 2, paddingField: 'largeValueString'}}], paddingField: 'largeValueString'}"));
+        ASSERT(!result.indexesAffected);
+    }
+}
+
+TEST_F(PipelineExecutorV2ModeTest, TestIndexesAffectedWithArraysAfterIndexPath) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj preImage(
+        fromjson("{f1: {a: {b: {c: [{paddingField: 'largeValueString'}, 1]}, c: 1, paddingField: "
+                 "'largeValueString'}}, paddingField: 'largeValueString'}"));
+    addIndexedPath("p.a.b");
+    addIndexedPath("f1.a.2.b");
+
+    {
+        // Test resize.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{
+            fromjson("{$set: {'f1.a.b.c': [{paddingField: 'largeValueString'}]}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_EQUALS(
+            doc,
+            fromjson("{f1: {a: {b: {c: [{paddingField: 'largeValueString'}]}, c: 1, paddingField: "
+                     "'largeValueString'}}, paddingField: 'largeValueString'}"));
+        ASSERT_BSONOBJ_BINARY_EQ(
+            result.oplogEntry, fromjson("{$v: 2, diff: {sf1: {sa: {sb: {sc: {a: true, l: 1}}}}}}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // Add an array element.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{
+            fromjson("{$set: {'f1.a.b.c': {$concatArrays: ['$f1.a.b.c', [{newField: 1}]]}}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_EQUALS(doc,
+                      fromjson("{f1: {a: {b: {c: [{paddingField: 'largeValueString'}, 1, "
+                               "{newField: 1}]}, c: 1, paddingField: 'largeValueString'}}, "
+                               "paddingField: 'largeValueString'}"));
+        ASSERT_BSONOBJ_BINARY_EQ(
+            result.oplogEntry,
+            fromjson("{$v: 2, diff: {sf1: {sa: {sb: {sc: {a: true, u2: {newField: 1} }}}}}}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        // Updating a sub-array element.
+        auto doc = mutablebson::Document(preImage);
+        const std::vector<BSONObj> pipeline{
+            fromjson("{$set: {'f1.a.b.c': [{paddingField: 'largeValueString'}, 'updatedVal']}}")};
+        PipelineExecutor test(expCtx, pipeline);
+        auto result = test.applyUpdate(getApplyParams(doc.root()));
+
+        // Verify post-image and diff format.
+        ASSERT_EQUALS(doc,
+                      fromjson("{f1: {a: {b: {c: [{paddingField: 'largeValueString'}, "
+                               "'updatedVal']}, c: 1, paddingField: 'largeValueString'}}, "
+                               "paddingField: 'largeValueString'}"));
+        ASSERT_BSONOBJ_BINARY_EQ(
+            result.oplogEntry,
+            fromjson("{$v: 2, diff: {sf1: {sa: {sb: {sc: {a: true, u1: 'updatedVal'}}}}}}"));
+        ASSERT(result.indexesAffected);
+    }
 }
 
 }  // namespace

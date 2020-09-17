@@ -268,7 +268,6 @@ public:
         : _node(node), _bob(std::move(bob)), _childIt(node.getChildren().begin()) {}
 
     UniqueFrame execute() override {
-        invariant(!_node.getChildren().empty());
         if (_childIt == _node.getChildren().begin()) {
             // If this is the first execution of this frame, append array header and resize field if
             // present.
@@ -279,7 +278,6 @@ public:
         }
 
         for (; _childIt != _node.getChildren().end(); ++_childIt) {
-
             auto&& [idx, child] = *_childIt;
             auto idxAsStr = std::to_string(idx);
 

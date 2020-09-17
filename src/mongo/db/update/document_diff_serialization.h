@@ -269,6 +269,11 @@ public:
         return subDiffs;
     }
 
+    const absl::node_hash_map<std::string, std::unique_ptr<Node>, StringMapHasher, StringMapEq>&
+    getChildren() const {
+        return children;
+    }
+
 private:
     // We store the raw pointer to each of the child node so that we don't have to look up in
     // 'children' map every time. Note that the field names of these modifications will reference

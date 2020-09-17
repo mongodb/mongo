@@ -110,16 +110,16 @@ void runTest(std::vector<BSONObj> documents, size_t numSimulations) {
         std::vector<BSONObj> diffs;
         diffs.reserve(documents.size() - 1);
         for (size_t i = 1; i < documents.size(); ++i) {
-            const auto diff = computeDiff(
-                preDoc, documents[i], update_oplog_entry::kSizeOfDeltaOplogEntryMetadata);
+            const auto diffOutput = computeDiff(
+                preDoc, documents[i], update_oplog_entry::kSizeOfDeltaOplogEntryMetadata, nullptr);
 
-            ASSERT(diff);
-            diffs.push_back(*diff);
-            const auto postObj = applyDiffTestHelper(preDoc, *diff);
+            ASSERT(diffOutput);
+            diffs.push_back(diffOutput->diff);
+            const auto postObj = applyDiffTestHelper(preDoc, diffOutput->diff);
             ASSERT_BSONOBJ_BINARY_EQ(documents[i], postObj);
 
             // Applying the diff the second time also generates the same object.
-            ASSERT_BSONOBJ_BINARY_EQ(postObj, applyDiffTestHelper(postObj, *diff));
+            ASSERT_BSONOBJ_BINARY_EQ(postObj, applyDiffTestHelper(postObj, diffOutput->diff));
 
             preDoc = documents[i];
         }

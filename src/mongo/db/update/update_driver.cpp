@@ -251,9 +251,7 @@ Status UpdateDriver::update(OperationContext* opCtx,
                             FieldRefSetWithStorage* modifiedPaths) {
     // TODO: assert that update() is called at most once in a !_multi case.
 
-    _affectIndices =
-        (_updateType == UpdateType::kReplacement || _updateType == UpdateType::kPipeline) &&
-        (_indexedFields != nullptr);
+    _affectIndices = _updateType == UpdateType::kReplacement && _indexedFields != nullptr;
 
     _logDoc.reset();
 

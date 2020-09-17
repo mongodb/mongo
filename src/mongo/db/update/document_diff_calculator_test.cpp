@@ -39,11 +39,12 @@
 namespace mongo {
 namespace {
 
+
 TEST(DocumentDiffCalculatorTest, SameObjectsNoDiff) {
     auto assertDiffEmpty = [](const BSONObj& doc) {
-        auto diff = doc_diff::computeDiff(doc, doc, 5);
-        ASSERT(diff);
-        ASSERT_BSONOBJ_BINARY_EQ(*diff, BSONObj());
+        auto diffOutput = doc_diff::computeDiff(doc, doc, 5, nullptr);
+        ASSERT(diffOutput);
+        ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, BSONObj());
     };
     assertDiffEmpty(fromjson("{field1: 1}"));
     assertDiffEmpty(fromjson("{field1: []}"));
@@ -55,43 +56,47 @@ TEST(DocumentDiffCalculatorTest, SameObjectsNoDiff) {
 }
 
 TEST(DocumentDiffCalculatorTest, LargeDelta) {
-    ASSERT_FALSE(
-        doc_diff::computeDiff(fromjson("{a: 1, b: 2, c: 3}"), fromjson("{A: 1, B: 2, C: 3}"), 0));
+    ASSERT_FALSE(doc_diff::computeDiff(
+        fromjson("{a: 1, b: 2, c: 3}"), fromjson("{A: 1, B: 2, C: 3}"), 0, nullptr));
 
     // Inserting field at the beginning produces a large delta.
     ASSERT_FALSE(doc_diff::computeDiff(
-        fromjson("{b: 1, c: 1, d: 1}"), fromjson("{a: 1, b: 1, c: 1, d: 1}"), 0));
+        fromjson("{b: 1, c: 1, d: 1}"), fromjson("{a: 1, b: 1, c: 1, d: 1}"), 0, nullptr));
 
     // Empty objects.
-    ASSERT_FALSE(doc_diff::computeDiff(BSONObj(), BSONObj(), 1));
+    ASSERT_FALSE(doc_diff::computeDiff(BSONObj(), BSONObj(), 1, nullptr));
 
     // Full diff.
-    ASSERT_FALSE(doc_diff::computeDiff(fromjson("{b: 1}"), BSONObj(), 0));
-    ASSERT_FALSE(doc_diff::computeDiff(BSONObj(), fromjson("{b: 1}"), 0));
+    ASSERT_FALSE(doc_diff::computeDiff(fromjson("{b: 1}"), BSONObj(), 0, nullptr));
+    ASSERT_FALSE(doc_diff::computeDiff(BSONObj(), fromjson("{b: 1}"), 0, nullptr));
 }
 
 TEST(DocumentDiffCalculatorTest, DeleteAndInsertFieldAtTheEnd) {
-    auto diff = doc_diff::computeDiff(fromjson("{a: 1, b: 'valueString', c: 3, d: 4}"),
-                                      fromjson("{b: 'valueString', c: 3, d: 4, a: 1}"),
-                                      15);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{i: {a: 1}}"));
+    auto diffOutput = doc_diff::computeDiff(fromjson("{a: 1, b: 'valueString', c: 3, d: 4}"),
+                                            fromjson("{b: 'valueString', c: 3, d: 4, a: 1}"),
+                                            15,
+                                            nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{i: {a: 1}}"));
 }
 
 TEST(DocumentDiffCalculatorTest, DeletesRecordedInAscendingOrderOfFieldNames) {
-    auto diff = doc_diff::computeDiff(fromjson("{b: 1, a: 2, c: 3, d: 4, e: 'valueString'}"),
-                                      fromjson("{c: 3, d: 4, e: 'valueString'}"),
-                                      15);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{d: {a: false, b: false}}"));
+    auto diffOutput = doc_diff::computeDiff(fromjson("{b: 1, a: 2, c: 3, d: 4, e: 'valueString'}"),
+                                            fromjson("{c: 3, d: 4, e: 'valueString'}"),
+                                            15,
+                                            nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{d: {a: false, b: false}}"));
 
     // Delete at the end still follow the order.
-    diff = doc_diff::computeDiff(
+    diffOutput = doc_diff::computeDiff(
         fromjson("{b: 1, a: 2, c: 'value', d: 'valueString', e: 'valueString', g: 1, f: 1}"),
         fromjson("{c: 'value', d: 'valueString', e: 'valueString'}"),
-        15);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{d: {g: false, f: false, a: false, b: false}}"));
+        15,
+        nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff,
+                             fromjson("{d: {g: false, f: false, a: false, b: false}}"));
 }
 
 TEST(DocumentDiffCalculatorTest, DataTypeChangeRecorded) {
@@ -101,150 +106,168 @@ TEST(DocumentDiffCalculatorTest, DataTypeChangeRecorded) {
         fromjson("{a: 'valueString', b: 2, c: {subField1: 1, subField2: 3}, d: 4}");
     const auto objWithLongValue =
         fromjson("{a: 'valueString', b: 2, c: {subField1: 1, subField2: NumberLong(3)}, d: 4}");
-    auto diff = doc_diff::computeDiff(objWithDoubleValue, objWithIntValue, 15);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{sc: {u: {subField2: 3}} }"));
+    auto diffOutput = doc_diff::computeDiff(objWithDoubleValue, objWithIntValue, 15, nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{sc: {u: {subField2: 3}} }"));
 
-    diff = doc_diff::computeDiff(objWithIntValue, objWithLongValue, 15);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{sc: {u: {subField2: NumberLong(3)}} }"));
+    diffOutput = doc_diff::computeDiff(objWithIntValue, objWithLongValue, 15, nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{sc: {u: {subField2: NumberLong(3)}} }"));
 
-    diff = doc_diff::computeDiff(objWithLongValue, objWithDoubleValue, 15);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{sc: {u: {subField2: 3.0}} }"));
+    diffOutput = doc_diff::computeDiff(objWithLongValue, objWithDoubleValue, 15, nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{sc: {u: {subField2: 3.0}} }"));
 }
 
 TEST(DocumentDiffCalculatorTest, NullAndMissing) {
-    auto diff = doc_diff::computeDiff(fromjson("{a: null}"), fromjson("{}"), 15);
-    ASSERT_FALSE(diff);
+    auto diffOutput = doc_diff::computeDiff(fromjson("{a: null}"), fromjson("{}"), 15, nullptr);
+    ASSERT_FALSE(diffOutput);
 
-    diff =
+    diffOutput =
         doc_diff::computeDiff(fromjson("{a: null, b: undefined, c: null, d: 'someValueStr'}"),
                               fromjson("{a: null, b: undefined, c: undefined, d: 'someValueStr'}"),
-                              15);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{u: {c: undefined}}"));
+                              15,
+                              nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{u: {c: undefined}}"));
 }
 
 TEST(DocumentDiffCalculatorTest, FieldOrder) {
-    auto diff = doc_diff::computeDiff(fromjson("{a: 1, b: 2, c: {p: 1, q: 1, s: 1, r: 2}, d: 4}"),
-                                      fromjson("{a: 1, b: 2, c: {p: 1, q: 1, r: 2, s: 1}, d: 4}"),
-                                      10);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{sc: {i: {s: 1}} }"));
+    auto diffOutput =
+        doc_diff::computeDiff(fromjson("{a: 1, b: 2, c: {p: 1, q: 1, s: 1, r: 2}, d: 4}"),
+                              fromjson("{a: 1, b: 2, c: {p: 1, q: 1, r: 2, s: 1}, d: 4}"),
+                              10,
+                              nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{sc: {i: {s: 1}} }"));
 }
 
 TEST(DocumentDiffCalculatorTest, SimpleArrayPush) {
-    auto diff = doc_diff::computeDiff(fromjson("{field1: 'abcd', field2: [1, 2, 3]}"),
-                                      fromjson("{field1: 'abcd', field2: [1, 2, 3, 4]}"),
-                                      5);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{sfield2: {a: true, 'u3': 4}}"));
+    auto diffOutput = doc_diff::computeDiff(fromjson("{field1: 'abcd', field2: [1, 2, 3]}"),
+                                            fromjson("{field1: 'abcd', field2: [1, 2, 3, 4]}"),
+                                            5,
+                                            nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{sfield2: {a: true, 'u3': 4}}"));
 }
 
 TEST(DocumentDiffCalculatorTest, NestedArray) {
-    auto diff = doc_diff::computeDiff(fromjson("{field1: 'abcd', field2: [1, 2, 3, [[2]]]}"),
-                                      fromjson("{field1: 'abcd', field2: [1, 2, 3, [[4]]]}"),
-                                      0);
-    ASSERT(diff);
+    auto diffOutput = doc_diff::computeDiff(fromjson("{field1: 'abcd', field2: [1, 2, 3, [[2]]]}"),
+                                            fromjson("{field1: 'abcd', field2: [1, 2, 3, [[4]]]}"),
+                                            0,
+                                            nullptr);
+    ASSERT(diffOutput);
     // When the sub-array delta is larger than the size of the sub-array, we record it as an update
     // operation.
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{sfield2: {a: true, 'u3': [[4]]}}"));
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{sfield2: {a: true, 'u3': [[4]]}}"));
 
-    diff = doc_diff::computeDiff(
+    diffOutput = doc_diff::computeDiff(
         fromjson("{field1: 'abcd', field2: [1, 2, 3, [1, 'longString', [2], 4, 5, 6], 5, 5, 5]}"),
         fromjson("{field1: 'abcd', field2: [1, 2, 3, [1, 'longString', [4], 4], 5, 6]}"),
-        0);
-    ASSERT(diff);
+        0,
+        nullptr);
+    ASSERT(diffOutput);
     ASSERT_BSONOBJ_BINARY_EQ(
-        *diff, fromjson("{sfield2: {a: true, l: 6, 's3': {a: true, l: 4, 'u2': [4]}, 'u5': 6}}"));
+        diffOutput->diff,
+        fromjson("{sfield2: {a: true, l: 6, 's3': {a: true, l: 4, 'u2': [4]}, 'u5': 6}}"));
 }
 
 TEST(DocumentDiffCalculatorTest, SubObjHasEmptyFieldName) {
-    auto diff = doc_diff::computeDiff(
+    auto diffOutput = doc_diff::computeDiff(
         fromjson("{'': '1', field2: [1, 2, 3, {'': {'': 1, padding: 'largeFieldValue'}}]}"),
         fromjson("{'': '2', field2: [1, 2, 3, {'': {'': 2, padding: 'largeFieldValue'}}]}"),
-        15);
+        15,
+        nullptr);
 
-    ASSERT(diff);
+    ASSERT(diffOutput);
     ASSERT_BSONOBJ_BINARY_EQ(
-        *diff, fromjson("{u: {'': '2'}, sfield2: {a: true, s3: {s: {u: {'': 2}}} }}"));
+        diffOutput->diff, fromjson("{u: {'': '2'}, sfield2: {a: true, s3: {s: {u: {'': 2}}} }}"));
 }
 
 TEST(DocumentDiffCalculatorTest, SubObjInSubArrayUpdateElements) {
-    auto diff = doc_diff::computeDiff(
+    auto diffOutput = doc_diff::computeDiff(
         fromjson("{field1: 'abcd', field2: [1, 2, 3, "
                  "{field3: ['veryLargeStringValueveryLargeStringValue', 2, 3, 4]}]}"),
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {'field3': "
                  "['veryLargeStringValueveryLargeStringValue', 2, 4, 3, 5]}]}"),
-        0);
+        0,
+        nullptr);
 
-    ASSERT(diff);
+    ASSERT(diffOutput);
     ASSERT_BSONOBJ_BINARY_EQ(
-        *diff, fromjson("{sfield2: {a: true, s3: {sfield3: {a: true, u2: 4, u3: 3, u4: 5}} }}"));
+        diffOutput->diff,
+        fromjson("{sfield2: {a: true, s3: {sfield3: {a: true, u2: 4, u3: 3, u4: 5}} }}"));
 }
 
 TEST(DocumentDiffCalculatorTest, SubObjInSubArrayDeleteElements) {
-    auto diff = doc_diff::computeDiff(
+    auto diffOutput = doc_diff::computeDiff(
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {'field3': ['largeString', 2, 3, 4, 5]}]}"),
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {'field3': ['largeString', 2, 3, 5]}]}"),
-        15);
-    ASSERT(diff);
+        15,
+        nullptr);
+    ASSERT(diffOutput);
     ASSERT_BSONOBJ_BINARY_EQ(
-        *diff, fromjson("{sfield2: {a: true, 's3': {sfield3: {a: true, l: 4, 'u3': 5}} }}"));
+        diffOutput->diff,
+        fromjson("{sfield2: {a: true, 's3': {sfield3: {a: true, l: 4, 'u3': 5}} }}"));
 }
 
 TEST(DocumentDiffCalculatorTest, NestedSubObjs) {
-    auto diff = doc_diff::computeDiff(
+    auto diffOutput = doc_diff::computeDiff(
         fromjson("{level1Field1: 'abcd', level1Field2: {level2Field1: {level3Field1: {p: 1}, "
                  "level3Field2: {q: 1}}, level2Field2: 2}, level1Field3: 3, level1Field4: "
                  "{level2Field1: {level3Field1: {p: 1}, level3Field2: {q: 1}}} }"),
         fromjson("{level1Field1: 'abcd', level1Field2: {level2Field1: {level3Field1: {q: 1}, "
                  "level3Field2: {q: 1}}, level2Field2: 2}, level1Field3: '3', level1Field4: "
                  "{level2Field1: {level3Field1: {q: 1}, level3Field2: {q: 1}}} }"),
-        15);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff,
+        15,
+        nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff,
                              fromjson("{u: {level1Field3: '3'}, slevel1Field2: {slevel2Field1: {u: "
                                       "{level3Field1: {q: 1}}}}, slevel1Field4: {slevel2Field1: "
                                       "{u: {level3Field1: {q: 1}}}} }"));
 }
 
 TEST(DocumentDiffCalculatorTest, SubArrayInSubArrayLargeDelta) {
-    auto diff = doc_diff::computeDiff(
+    auto diffOutput = doc_diff::computeDiff(
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {field3: [2, 3, 4, 5]}]}"),
         fromjson("{field1: 'abcd', field2: [1, 2, 3, {field3: [1, 2, 3, 4, 5]}]}"),
-        15);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff,
+        15,
+        nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff,
                              fromjson("{sfield2: {a: true, 'u3': {field3: [1, 2, 3, 4, 5]}} }"));
 }
 
 TEST(DocumentDiffCalculatorTest, SubObjInSubArrayLargeDelta) {
-    auto diff =
+    auto diffOutput =
         doc_diff::computeDiff(fromjson("{field1: [1, 2, 3, 4, 5, 6, {a: 1, b: 2, c: 3, d: 4}, 7]}"),
                               fromjson("{field1: [1, 2, 3, 4, 5, 6, {p: 1, q: 2}, 7]}"),
-                              0);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{sfield1: {a: true, 'u6': {p: 1, q: 2}} }"));
+                              0,
+                              nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff,
+                             fromjson("{sfield1: {a: true, 'u6': {p: 1, q: 2}} }"));
 }
 
 TEST(DocumentDiffCalculatorTest, SubObjInSubObjLargeDelta) {
-    auto diff = doc_diff::computeDiff(
+    auto diffOutput = doc_diff::computeDiff(
         fromjson("{field: {p: 'someString', q: 2, r: {a: 1, b: 2, c: 3, 'd': 4}, s: 3}}"),
         fromjson("{field: {p: 'someString', q: 2, r: {p: 1, q: 2}, s: 3}}"),
-        0);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{sfield: {u: {r: {p: 1, q: 2} }} }"));
+        0,
+        nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{sfield: {u: {r: {p: 1, q: 2} }} }"));
 }
 
 TEST(DocumentDiffCalculatorTest, SubArrayInSubObjLargeDelta) {
-    auto diff =
+    auto diffOutput =
         doc_diff::computeDiff(fromjson("{field: {p: 'someString', q: 2, r: [1, 3, 4, 5], s: 3}}"),
                               fromjson("{field: {p: 'someString', q: 2, r: [1, 2, 3, 4], s: 3}}"),
-                              0);
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{sfield: {u: {r: [1, 2, 3, 4]}} }"));
+                              0,
+                              nullptr);
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{sfield: {u: {r: [1, 2, 3, 4]}} }"));
 }
 
 void buildDeepObj(BSONObjBuilder* builder,
@@ -276,20 +299,20 @@ TEST(DocumentDiffCalculatorTest, DeeplyNestObjectGenerateDiff) {
 
     BSONObjBuilder postBob;
     postBob.append("largeField", largeValue);
-    auto diff = doc_diff::computeDiff(preObj, postBob.done(), 0);
+    auto diffOutput = doc_diff::computeDiff(preObj, postBob.done(), 0, nullptr);
 
     // Just deleting the deeply nested sub-object should give the post object.
-    ASSERT(diff);
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, fromjson("{d: {subObj: false}}"));
+    ASSERT(diffOutput);
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, fromjson("{d: {subObj: false}}"));
 
     BSONObjBuilder postBob2;
     postBob2.append("largeField", largeValue);
     buildDeepObj(&postBob2, "subObj", 0, maxDepth - 1, functionToApply);
 
     // Deleting the deepest field should give the post object.
-    diff = doc_diff::computeDiff(preObj, postBob2.done(), 0);
-    ASSERT(diff);
-    ASSERT(diff->valid());
+    diffOutput = doc_diff::computeDiff(preObj, postBob2.done(), 0, nullptr);
+    ASSERT(diffOutput);
+    ASSERT(diffOutput->diff.valid());
 
     BSONObjBuilder expectedOutputBuilder;
     buildDeepObj(&expectedOutputBuilder,
@@ -301,7 +324,7 @@ TEST(DocumentDiffCalculatorTest, DeeplyNestObjectGenerateDiff) {
                          builder->append("d", BSON("subObj" << false));
                      }
                  });
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, expectedOutputBuilder.obj());
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, expectedOutputBuilder.obj());
 }
 
 TEST(DocumentDiffCalculatorTest, DeepestObjectSubDiff) {
@@ -326,9 +349,9 @@ TEST(DocumentDiffCalculatorTest, DeepestObjectSubDiff) {
     auto postObj = postBob.done();
     ASSERT(postObj.valid());
 
-    auto diff = doc_diff::computeDiff(preObj, postObj, 0);
-    ASSERT(diff);
-    ASSERT(diff->valid());
+    auto diffOutput = doc_diff::computeDiff(preObj, postObj, 0, nullptr);
+    ASSERT(diffOutput);
+    ASSERT(diffOutput->diff.valid());
 
     BSONObjBuilder expectedOutputBuilder;
     buildDeepObj(&expectedOutputBuilder,
@@ -340,7 +363,7 @@ TEST(DocumentDiffCalculatorTest, DeepestObjectSubDiff) {
                          builder->append("u", BSON("field" << 2));
                      }
                  });
-    ASSERT_BSONOBJ_BINARY_EQ(*diff, expectedOutputBuilder.obj());
+    ASSERT_BSONOBJ_BINARY_EQ(diffOutput->diff, expectedOutputBuilder.obj());
 }
 
 }  // namespace
