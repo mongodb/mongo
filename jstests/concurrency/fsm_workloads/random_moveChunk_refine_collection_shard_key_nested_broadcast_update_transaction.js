@@ -11,6 +11,7 @@
  *   # therefore unsafe to automatically run inside a multi-statement transaction because its
  *   # progress will continually be interrupted.
  *   operations_longer_than_stepdown_interval_in_txns,
+ *   requires_fcv_44,
  *   requires_non_retryable_writes,
  *   requires_sharding,
  *   uses_transactions,

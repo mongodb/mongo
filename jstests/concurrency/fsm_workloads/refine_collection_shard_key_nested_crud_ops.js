@@ -3,7 +3,7 @@
 /**
  * Same as the base workload, but refines to a nested shard key.
  *
- * @tags: [requires_persistence, requires_sharding]
+ * @tags: [requires_persistence, requires_sharding, requires_fcv_44]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');
