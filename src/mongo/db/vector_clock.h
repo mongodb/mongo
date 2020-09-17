@@ -136,13 +136,6 @@ public:
     VectorTime getTime() const;
 
     /**
-     * Returns the current cluster time if this is a replica set node, otherwise returns a null
-     * logical time.
-     */
-    static LogicalTime getClusterTimeForReplicaSet(ServiceContext* svcCtx);
-    static LogicalTime getClusterTimeForReplicaSet(OperationContext* opCtx);
-
-    /**
      * Adds the necessary fields to outMessage to gossip the current time to another node, taking
      * into account if the gossiping is to an internal or external client (based on the session
      * tags).  Returns true if the ClusterTime was output into outMessage, or false otherwise.

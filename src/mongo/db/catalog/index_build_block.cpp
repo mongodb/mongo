@@ -228,7 +228,8 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                 // timestamp. We use the cluster time since it's guaranteed to be greater than the
                 // time of the index build. It is possible the cluster time could be in the future,
                 // and we will need to do another write to reach the minimum visible snapshot.
-                commitTime = VectorClock::getClusterTimeForReplicaSet(svcCtx).asTimestamp();
+                const auto currentTime = VectorClock::get(svcCtx)->getTime();
+                commitTime = currentTime.clusterTime().asTimestamp();
             }
 
             LOGV2(20345,

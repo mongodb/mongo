@@ -170,13 +170,13 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
         // Set the minimum snapshot for all Collections in this db. This ensures that readers
         // using majority readConcern level can only use the collections after their repaired
         // versions are in the committed view.
-        auto clusterTime = VectorClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
+        const auto currentTime = VectorClock::get(opCtx)->getTime();
 
         for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
             auto collection =
                 collIt.getWritableCollection(opCtx, CollectionCatalog::LifetimeMode::kInplace);
             if (collection) {
-                collection->setMinimumVisibleSnapshot(clusterTime);
+                collection->setMinimumVisibleSnapshot(currentTime.clusterTime().asTimestamp());
             }
         }
 

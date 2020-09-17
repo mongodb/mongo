@@ -262,8 +262,9 @@ public:
         // This was also done when dropAllIndexes() committed, but we need to ensure that no one
         // tries to read in the intermediate state where all indexes are newer than the current
         // snapshot so are unable to be used.
-        auto clusterTime = VectorClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
-        collection.getWritableCollection()->setMinimumVisibleSnapshot(clusterTime);
+        const auto currentTime = VectorClock::get(opCtx)->getTime();
+        collection.getWritableCollection()->setMinimumVisibleSnapshot(
+            currentTime.clusterTime().asTimestamp());
         collection.commitToCatalog();
 
         result.append("nIndexes", static_cast<int>(swIndexesToRebuild.getValue().size()));

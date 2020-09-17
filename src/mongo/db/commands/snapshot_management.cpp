@@ -77,7 +77,8 @@ public:
 
         Lock::GlobalLock lk(opCtx, MODE_IX);
 
-        auto name = VectorClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
+        const auto currentTime = VectorClock::get(opCtx)->getTime();
+        const auto name = currentTime.clusterTime().asTimestamp();
         result.append("name", static_cast<long long>(name.asULL()));
 
         return true;

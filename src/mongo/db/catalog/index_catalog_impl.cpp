@@ -1026,7 +1026,8 @@ public:
             // a commit timestamp. We use the cluster time since it's guaranteed to be greater
             // than the time of the index removal. It is possible the cluster time could be in the
             // future, and we will need to do another write to reach the minimum visible snapshot.
-            commitTime = VectorClock::getClusterTimeForReplicaSet(_opCtx).asTimestamp();
+            const auto currentTime = VectorClock::get(_opCtx)->getTime();
+            commitTime = currentTime.clusterTime().asTimestamp();
         }
         _entry->setDropped();
         _collection->setMinimumVisibleSnapshot(commitTime.get());
