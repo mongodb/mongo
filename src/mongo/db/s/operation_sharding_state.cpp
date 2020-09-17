@@ -78,7 +78,6 @@ bool OperationShardingState::allowImplicitCollectionCreation() const {
 
 void OperationShardingState::initializeClientRoutingVersionsFromCommand(NamespaceString nss,
                                                                         const BSONObj& cmdObj) {
-    // TODO SERVER-48618 Enforce that the nss shoud not be empty.
     boost::optional<ChunkVersion> shardVersion;
     boost::optional<DatabaseVersion> dbVersion;
     const auto shardVersionElem = cmdObj.getField(ChunkVersion::kShardVersionField);
@@ -104,8 +103,6 @@ void OperationShardingState::initializeClientRoutingVersions(
     NamespaceString nss,
     const boost::optional<ChunkVersion>& shardVersion,
     const boost::optional<DatabaseVersion>& dbVersion) {
-    // TODO SERVER-48618 Enforce that the nss shoud not be empty. For now, all empty
-    // NamespaceStrings will be mapped under the empty string "".
     if (shardVersion) {
         invariant(_shardVersionsChecked.find(nss.ns()) == _shardVersionsChecked.end(), nss.ns());
         _shardVersions[nss.ns()] = *shardVersion;
@@ -117,14 +114,10 @@ void OperationShardingState::initializeClientRoutingVersions(
 }
 
 bool OperationShardingState::hasShardVersion(const NamespaceString& nss) const {
-    // TODO SERVER-48618 Enforce that the nss shoud not be empty. For now, all empty
-    // NamespaceStrings will be treated as the same namespace.
     return _shardVersions.find(nss.ns()) != _shardVersions.end();
 }
 
 boost::optional<ChunkVersion> OperationShardingState::getShardVersion(const NamespaceString& nss) {
-    // TODO SERVER-48618 Enforce that the nss shoud not be empty. For now, all empty
-    // NamespaceStrings will be treated as the same namespace.
     _shardVersionsChecked.insert(nss.ns());
     const auto it = _shardVersions.find(nss.ns());
     if (it != _shardVersions.end()) {
