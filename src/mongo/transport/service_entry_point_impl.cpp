@@ -271,6 +271,8 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
         bob->append("active", static_cast<int>(sc->getActiveClientOperations()));
         bob->append("exhaustIsMaster",
                     static_cast<int>(IsMasterMetrics::get(sc)->getNumExhaustIsMaster()));
+        bob->append("exhaustHello",
+                    static_cast<int>(IsMasterMetrics::get(sc)->getNumExhaustHello()));
         bob->append("awaitingTopologyChanges",
                     static_cast<int>(IsMasterMetrics::get(sc)->getNumAwaitingTopologyChanges()));
     }
