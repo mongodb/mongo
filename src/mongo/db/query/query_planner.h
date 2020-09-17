@@ -38,6 +38,7 @@ namespace mongo {
 
 class CachedSolution;
 class Collection;
+class CollectionPtr;
 
 /**
  * QueryPlanner's job is to provide an entry point to the query planning and optimization
@@ -106,7 +107,7 @@ public:
      * lists of query solutions in 'SubqueriesPlanningResult'.
      */
     static StatusWith<SubqueriesPlanningResult> planSubqueries(OperationContext* opCtx,
-                                                               const Collection* collection,
+                                                               const CollectionPtr& collection,
                                                                const PlanCache* planCache,
                                                                const CanonicalQuery& query,
                                                                const QueryPlannerParams& params);

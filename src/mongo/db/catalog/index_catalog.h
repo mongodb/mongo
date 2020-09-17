@@ -45,6 +45,7 @@ namespace mongo {
 
 class Client;
 class Collection;
+class CollectionPtr;
 
 class IndexDescriptor;
 struct InsertDeleteOptions;
@@ -410,7 +411,7 @@ public:
      * See IndexCatalogEntry::setMultikey().
      */
     virtual void setMultikeyPaths(OperationContext* const opCtx,
-                                  const Collection* coll,
+                                  const CollectionPtr& coll,
                                   const IndexDescriptor* const desc,
                                   const KeyStringSet& multikeyMetadataKeys,
                                   const MultikeyPaths& multikeyPaths) const = 0;
@@ -424,7 +425,7 @@ public:
      * This method may throw.
      */
     virtual Status indexRecords(OperationContext* const opCtx,
-                                const Collection* collection,
+                                const CollectionPtr& collection,
                                 const std::vector<BsonRecord>& bsonRecords,
                                 int64_t* const keysInsertedOut) = 0;
 
@@ -435,7 +436,7 @@ public:
      * This method may throw.
      */
     virtual Status updateRecord(OperationContext* const opCtx,
-                                const Collection* coll,
+                                const CollectionPtr& coll,
                                 const BSONObj& oldDoc,
                                 const BSONObj& newDoc,
                                 const RecordId& recordId,
@@ -483,7 +484,7 @@ public:
                                             InsertDeleteOptions* options) const = 0;
 
     virtual void indexBuildSuccess(OperationContext* opCtx,
-                                   const Collection* coll,
+                                   const CollectionPtr& coll,
                                    IndexCatalogEntry* index) = 0;
 };
 }  // namespace mongo

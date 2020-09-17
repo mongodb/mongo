@@ -85,8 +85,7 @@ public:
     }
 
     int countResults(CollectionScanParams::Direction direction, const BSONObj& filterObj) {
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        auto collection = ctx.getCollection();
+        AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
         // Configure the scan.
         CollectionScanParams params;
@@ -102,13 +101,13 @@ public:
         // Make a scan and have the runner own it.
         unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
-            _expCtx.get(), collection, params, ws.get(), filterExpr.get());
+            _expCtx.get(), collection.getCollection(), params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(ps),
-                                        collection,
+                                        collection.getCollection(),
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -123,7 +122,7 @@ public:
         return count;
     }
 
-    void getRecordIds(const Collection* collection,
+    void getRecordIds(const CollectionPtr& collection,
                       CollectionScanParams::Direction direction,
                       vector<RecordId>* out) {
         WorkingSet ws;
@@ -185,8 +184,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanBasicBackwardWithMatch) {
 
 // Get objects in the order we inserted them.
 TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
-    AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-    auto collection = ctx.getCollection();
+    AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
     // Configure the scan.
     CollectionScanParams params;
@@ -195,11 +193,15 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
 
     // Make a scan and have the runner own it.
     unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    unique_ptr<PlanStage> ps =
-        std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
+    unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
+        _expCtx.get(), collection.getCollection(), params, ws.get(), nullptr);
 
-    auto statusWithPlanExecutor = plan_executor_factory::make(
-        _expCtx, std::move(ws), std::move(ps), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    auto statusWithPlanExecutor =
+        plan_executor_factory::make(_expCtx,
+                                    std::move(ws),
+                                    std::move(ps),
+                                    collection.getCollection(),
+                                    PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -216,19 +218,22 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
 
 // Get objects in the reverse order we inserted them when we go backwards.
 TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
-    AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-    auto collection = ctx.getCollection();
+    AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
     CollectionScanParams params;
     params.direction = CollectionScanParams::BACKWARD;
     params.tailable = false;
 
     unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    unique_ptr<PlanStage> ps =
-        std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
+    unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
+        _expCtx.get(), collection.getCollection(), params, ws.get(), nullptr);
 
-    auto statusWithPlanExecutor = plan_executor_factory::make(
-        _expCtx, std::move(ws), std::move(ps), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    auto statusWithPlanExecutor =
+        plan_executor_factory::make(_expCtx,
+                                    std::move(ws),
+                                    std::move(ps),
+                                    collection.getCollection(),
+                                    PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -247,7 +252,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
 TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
     dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
 
-    const Collection* coll = ctx.getCollection();
+    const CollectionPtr& coll = ctx.getCollection();
 
     // Get the RecordIds that would be returned by an in-order scan.
     vector<RecordId> recordIds;
@@ -300,7 +305,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
 // object we would have gotten after that.  But, do it in reverse!
 TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackward) {
     dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-    const Collection* coll = ctx.getCollection();
+    const CollectionPtr& coll = ctx.getCollection();
 
     // Get the RecordIds that would be returned by an in-order scan.
     vector<RecordId> recordIds;
@@ -352,12 +357,11 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackw
 // Verify that successfully seeking to the resumeAfterRecordId returns PlanStage::NEED_TIME and
 // that we can complete the collection scan afterwards.
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuccess) {
-    AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-    auto collection = ctx.getCollection();
+    AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
     // Get the RecordIds that would be returned by an in-order scan.
     vector<RecordId> recordIds;
-    getRecordIds(collection, CollectionScanParams::FORWARD, &recordIds);
+    getRecordIds(collection.getCollection(), CollectionScanParams::FORWARD, &recordIds);
 
     // We will resume the collection scan this many results in.
     auto offset = 10;
@@ -371,8 +375,8 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
 
     // Create plan stage.
     unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    unique_ptr<PlanStage> ps =
-        std::make_unique<CollectionScan>(_expCtx.get(), collection, params, ws.get(), nullptr);
+    unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
+        _expCtx.get(), collection.getCollection(), params, ws.get(), nullptr);
 
     WorkingSetID id = WorkingSet::INVALID_ID;
 
@@ -380,8 +384,12 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
     ASSERT_EQUALS(PlanStage::NEED_TIME, ps->work(&id));
 
     // Run the rest of the scan and verify the results.
-    auto statusWithPlanExecutor = plan_executor_factory::make(
-        _expCtx, std::move(ws), std::move(ps), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    auto statusWithPlanExecutor =
+        plan_executor_factory::make(_expCtx,
+                                    std::move(ws),
+                                    std::move(ps),
+                                    collection.getCollection(),
+                                    PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
 

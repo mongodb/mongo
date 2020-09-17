@@ -51,6 +51,7 @@
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/db/yieldable.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -58,6 +59,7 @@
 
 namespace mongo {
 class CappedCallback;
+class CollectionPtr;
 class ExtentManager;
 class IndexCatalog;
 class IndexCatalogEntry;
@@ -552,6 +554,7 @@ public:
      */
     virtual std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
         OperationContext* opCtx,
+        const CollectionPtr& yieldableCollection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         ScanDirection scanDirection,
         boost::optional<RecordId> resumeAfterRecordId = boost::none) const = 0;
@@ -575,5 +578,86 @@ public:
         return logv2::multipleAttrs(col.ns(), col.uuid());
     }
 };
+
+/**
+ * Smart-pointer'esque type to handle yielding of Collection lock that may invalidate pointers when
+ * resuming. CollectionPtr will re-load the Collection from the Catalog when restoring from a yield
+ * that dropped Collection locks. If this is constructed from a Lock-Free Reads context (shared_ptr)
+ * or writable pointer, then it is not allowed to reload from the catalog and the yield operations
+ * are no-ops.
+ */
+class CollectionPtr : public Yieldable {
+public:
+    static CollectionPtr null;
+
+    CollectionPtr();
+
+    // Creates a Yieldable CollectionPtr that reloads the Collection pointer from the catalog when
+    // restoring from yield
+    CollectionPtr(OperationContext* opCtx, const Collection* collection, uint64_t catalogEpoch);
+
+    // Creates non-yieldable CollectionPtr, performing yield/restore will be a no-op.
+    struct NoYieldTag {};
+    CollectionPtr(const Collection* collection, NoYieldTag);
+    CollectionPtr(const std::shared_ptr<const Collection>& collection);
+    CollectionPtr(Collection* collection);
+
+    CollectionPtr(const CollectionPtr&) = delete;
+    CollectionPtr(CollectionPtr&&);
+    ~CollectionPtr();
+
+    CollectionPtr& operator=(const CollectionPtr&) = delete;
+    CollectionPtr& operator=(CollectionPtr&&);
+
+    explicit operator bool() const {
+        return static_cast<bool>(_collection);
+    }
+
+    bool operator==(const CollectionPtr& other) const {
+        return get() == other.get();
+    }
+    bool operator!=(const CollectionPtr& other) const {
+        return !operator==(other);
+    }
+    const Collection* operator->() const {
+        return _collection;
+    }
+    const Collection* get() const {
+        return _collection;
+    }
+
+    // Creates a new CollectionPtr that is detached from the current, if the current instance is
+    // yieldable the new CollectionPtr will also be. Yielding on the new instance may cause the
+    // instance we detached from to dangle.
+    CollectionPtr detached() const;
+
+    void reset() {
+        *this = CollectionPtr();
+    }
+
+    void yield() const override;
+    void restore() const override;
+
+    static void installCatalogLookupImpl(
+        std::function<CollectionPtr(OperationContext*, CollectionUUID, uint64_t)> impl);
+
+    friend std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll);
+
+private:
+    bool _canYield() const;
+
+    // These members needs to be mutable so the yield/restore interface can be const. We don't want
+    // yield/restore to require a non-const instance when it otherwise could be const.
+    mutable const Collection* _collection;
+    mutable OptionalCollectionUUID _uuid;
+    mutable NamespaceString _ns;
+    OperationContext* _opCtx;
+    uint64_t _catalogEpoch;
+};
+
+inline std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll) {
+    os << coll.get();
+    return os;
+}
 
 }  // namespace mongo

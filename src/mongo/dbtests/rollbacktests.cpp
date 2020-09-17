@@ -62,7 +62,8 @@ void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
     }
 }
 bool collectionExists(OperationContext* opCtx, OldClientContext* ctx, const string& ns) {
-    return CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, NamespaceString(ns));
+    return (bool)CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx,
+                                                                           NamespaceString(ns));
 }
 
 void createCollection(OperationContext* opCtx, const NamespaceString& nss) {

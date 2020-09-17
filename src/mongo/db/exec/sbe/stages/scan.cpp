@@ -178,7 +178,7 @@ void ScanStage::open(bool reOpen) {
         _openCallback(_opCtx, _coll->getCollection(), reOpen);
     }
 
-    if (auto collection = _coll->getCollection()) {
+    if (const auto& collection = _coll->getCollection()) {
         if (_seekKeyAccessor) {
             auto [tag, val] = _seekKeyAccessor->getViewOfValue();
             const auto msgTag = tag;
@@ -453,7 +453,7 @@ void ParallelScanStage::open(bool reOpen) {
     uassertStatusOK(repl::ReplicationCoordinator::get(_opCtx)->checkCanServeReadsFor(
         _opCtx, _coll->getNss(), true));
 
-    auto collection = _coll->getCollection();
+    const auto& collection = _coll->getCollection();
 
     if (collection) {
         {

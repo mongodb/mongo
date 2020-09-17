@@ -82,7 +82,7 @@ MONGO_FAIL_POINT_DEFINE(failReceivedGetmore);
 MONGO_FAIL_POINT_DEFINE(legacyGetMoreWaitWithCursor)
 
 bool shouldSaveCursor(OperationContext* opCtx,
-                      const Collection* collection,
+                      const CollectionPtr& collection,
                       PlanExecutor::ExecState finalState,
                       PlanExecutor* exec) {
     const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
@@ -121,7 +121,7 @@ void beginQueryOp(OperationContext* opCtx,
 }
 
 void endQueryOp(OperationContext* opCtx,
-                const Collection* collection,
+                const CollectionPtr& collection,
                 const PlanExecutor& exec,
                 long long numResults,
                 CursorId cursorId) {
@@ -410,7 +410,7 @@ Message getMore(OperationContext* opCtx,
 
     PlanExecutor* exec = cursorPin->getExecutor();
     exec->reattachToOperationContext(opCtx);
-    exec->restoreState();
+    exec->restoreState(readLock ? &readLock->getCollection() : nullptr);
 
     auto planSummary = exec->getPlanSummary();
     {
@@ -476,7 +476,7 @@ Message getMore(OperationContext* opCtx,
 
         // Reacquiring locks.
         readLock.emplace(opCtx, nss);
-        exec->restoreState();
+        exec->restoreState(&readLock->getCollection());
 
         // We woke up because either the timed_wait expired, or there was more data. Either way,
         // attempt to generate another batch of results.
@@ -605,8 +605,8 @@ bool runQuery(OperationContext* opCtx,
     LOGV2_DEBUG(20914, 2, "Running query", "query"_attr = redact(cq->toStringShort()));
 
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
-    AutoGetCollectionForReadCommand ctx(opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
-    const Collection* const collection = ctx.getCollection();
+    AutoGetCollectionForReadCommand collection(
+        opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
     const QueryRequest& qr = cq->getQueryRequest();
 
     opCtx->setExhaust(qr.isExhaust());
@@ -625,7 +625,8 @@ bool runQuery(OperationContext* opCtx,
     // Get the execution plan for the query.
     constexpr auto verbosity = ExplainOptions::Verbosity::kExecAllPlans;
     expCtx->explain = qr.isExplain() ? boost::make_optional(verbosity) : boost::none;
-    auto exec = uassertStatusOK(getExecutorLegacyFind(opCtx, collection, std::move(cq)));
+    auto exec =
+        uassertStatusOK(getExecutorLegacyFind(opCtx, collection.getCollection(), std::move(cq)));
 
     // If it's actually an explain, do the explain and return rather than falling through
     // to the normal query execution loop.
@@ -634,7 +635,8 @@ bool runQuery(OperationContext* opCtx,
         bb.skip(sizeof(QueryResult::Value));
 
         BSONObjBuilder explainBob;
-        Explain::explainStages(exec.get(), collection, verbosity, BSONObj(), &explainBob);
+        Explain::explainStages(
+            exec.get(), collection.getCollection(), verbosity, BSONObj(), &explainBob);
 
         // Add the resulting object to the return buffer.
         BSONObj explainObj = explainBob.obj();
@@ -721,7 +723,7 @@ bool runQuery(OperationContext* opCtx,
     // this cursorid later.
     long long ccId = 0;
 
-    if (shouldSaveCursor(opCtx, collection, state, exec.get())) {
+    if (shouldSaveCursor(opCtx, collection.getCollection(), state, exec.get())) {
         // We won't use the executor until it's getMore'd.
         exec->saveState();
         exec->detachFromOperationContext();
@@ -763,11 +765,15 @@ bool runQuery(OperationContext* opCtx,
             pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
         }
 
-        endQueryOp(opCtx, collection, *pinnedCursor.getCursor()->getExecutor(), numResults, ccId);
+        endQueryOp(opCtx,
+                   collection.getCollection(),
+                   *pinnedCursor.getCursor()->getExecutor(),
+                   numResults,
+                   ccId);
     } else {
         LOGV2_DEBUG(
             20917, 5, "Not caching executor but returning results", "numResults"_attr = numResults);
-        endQueryOp(opCtx, collection, *exec, numResults, ccId);
+        endQueryOp(opCtx, collection.getCollection(), *exec, numResults, ccId);
     }
 
     // Fill out the output buffer's header.

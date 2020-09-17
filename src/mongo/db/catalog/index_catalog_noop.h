@@ -194,19 +194,19 @@ public:
     }
 
     void setMultikeyPaths(OperationContext* const opCtx,
-                          const Collection* coll,
+                          const CollectionPtr& coll,
                           const IndexDescriptor* const desc,
                           const MultikeyPaths& multikeyPaths) const override {}
 
     Status indexRecords(OperationContext* const opCtx,
-                        const Collection* coll,
+                        const CollectionPtr& coll,
                         const std::vector<BsonRecord>& bsonRecords,
                         int64_t* const keysInsertedOut) override {
         return Status::OK();
     }
 
     Status updateRecord(OperationContext* const opCtx,
-                        const Collection* coll,
+                        const CollectionPtr& coll,
                         const BSONObj& oldDoc,
                         const BSONObj& newDoc,
                         const RecordId& recordId,
@@ -243,7 +243,7 @@ public:
                                     InsertDeleteOptions* options) const override {}
 
     void indexBuildSuccess(OperationContext* opCtx,
-                           const Collection* coll,
+                           const CollectionPtr& coll,
                            IndexCatalogEntry* index) override {}
 };
 

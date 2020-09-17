@@ -163,8 +163,7 @@ int insertDataRange(OperationContext* opCtx, int startIDNum, int endIDNum) {
                             << " to " << endIDNum);
 
 
-    AutoGetCollection autoColl(opCtx, kNss, MODE_IX);
-    const Collection* coll = autoColl.getCollection();
+    AutoGetCollection coll(opCtx, kNss, MODE_IX);
     std::vector<InsertStatement> inserts;
     for (int i = startIDNum; i < endIDNum; ++i) {
         auto doc = BSON("_id" << i);
@@ -183,8 +182,7 @@ int insertDataRange(OperationContext* opCtx, int startIDNum, int endIDNum) {
  * Inserts a single invalid document into the kNss collection and then returns that count.
  */
 int setUpInvalidData(OperationContext* opCtx) {
-    AutoGetCollection autoColl(opCtx, kNss, MODE_IX);
-    const Collection* coll = autoColl.getCollection();
+    AutoGetCollection coll(opCtx, kNss, MODE_IX);
     RecordStore* rs = coll->getRecordStore();
 
     {

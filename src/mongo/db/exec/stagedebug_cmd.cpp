@@ -148,14 +148,14 @@ public:
         auto expCtx = make_intrusive<ExpressionContext>(
             opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
 
-        // Need a context to get the actual const Collection*
+        // Need a context to get the actual const CollectionPtr&
         // TODO A write lock is currently taken here to accommodate stages that perform writes
         //      (e.g. DeleteStage).  This should be changed to use a read lock for read-only
         //      execution trees.
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
 
         // Make sure the collection is valid.
-        const Collection* collection = autoColl.getCollection();
+        const auto& collection = autoColl.getCollection();
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Couldn't find collection " << nss.ns(),
                 collection);
@@ -201,7 +201,7 @@ public:
     }
 
     PlanStage* parseQuery(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const Collection* collection,
+                          const CollectionPtr& collection,
                           BSONObj obj,
                           WorkingSet* workingSet,
                           const NamespaceString& nss,

@@ -97,7 +97,8 @@ public:
      *
      * This entry is owned by the IndexCatalog.
      */
-    const IndexCatalogEntry* getEntry(OperationContext* opCtx, const Collection* collection) const;
+    const IndexCatalogEntry* getEntry(OperationContext* opCtx,
+                                      const CollectionPtr& collection) const;
     IndexCatalogEntry* getEntry(OperationContext* opCtx, Collection* collection);
 
     /**

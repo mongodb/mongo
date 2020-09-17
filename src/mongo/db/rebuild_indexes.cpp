@@ -92,7 +92,7 @@ StatusWith<IndexNameObjs> getIndexNameObjs(OperationContext* opCtx,
 }
 
 Status rebuildIndexesOnCollection(OperationContext* opCtx,
-                                  const Collection* collection,
+                                  const CollectionPtr& collection,
                                   const std::vector<BSONObj>& indexSpecs,
                                   RepairData repair) {
     // Skip the rest if there are no indexes to rebuild.

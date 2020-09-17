@@ -157,7 +157,7 @@ public:
         }
         BSONObj spec = builder.append("name", key).append("v", 2).done();
 
-        const Collection* collection =
+        CollectionPtr collection =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collNs);
         auto descriptor =
             std::make_unique<IndexDescriptor>(collection, IndexNames::findPluginName(spec), spec);
@@ -171,13 +171,13 @@ public:
     }
 
     void indexBuildSuccess(OperationContext* opCtx, NamespaceString collNs, std::string key) {
-        const Collection* collection =
+        CollectionPtr collection =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collNs);
         DurableCatalog::get(opCtx)->indexBuildSuccess(opCtx, collection->getCatalogId(), key);
     }
 
     Status removeEntry(OperationContext* opCtx, StringData collNs, DurableCatalog* catalog) {
-        const Collection* collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+        CollectionPtr collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
             opCtx, NamespaceString(collNs));
         return dynamic_cast<DurableCatalogImpl*>(catalog)->_removeEntry(opCtx,
                                                                         collection->getCatalogId());

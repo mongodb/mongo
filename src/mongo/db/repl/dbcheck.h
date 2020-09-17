@@ -41,6 +41,7 @@ namespace mongo {
 
 // Forward declarations.
 class Collection;
+class CollectionPtr;
 class OperationContext;
 
 namespace repl {
@@ -83,7 +84,7 @@ struct DbCheckCollectionInformation {
  * previous or next UUID, return boost::none respectively.
  */
 std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
-    OperationContext* opCtx, const Collection* collection);
+    OperationContext* opCtx, const CollectionPtr& collection);
 
 /**
  * Get a HealthLogEntry for a dbCheck collection.
@@ -118,7 +119,7 @@ public:
      * @param maxBytes The maximum number of bytes to hash.
      */
     DbCheckHasher(OperationContext* opCtx,
-                  const Collection* collection,
+                  const CollectionPtr& collection,
                   const BSONKey& start,
                   const BSONKey& end,
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
@@ -191,26 +192,34 @@ public:
     AutoGetCollectionForDbCheck(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 const OplogEntriesEnum& type);
-    const Collection* getCollection(void) {
+    explicit operator bool() const {
+        return static_cast<bool>(getCollection());
+    }
+
+    const Collection* operator->() const {
+        return getCollection().get();
+    }
+
+    const CollectionPtr& getCollection() const {
         return _collection;
     }
 
 private:
     AutoGetDbForDbCheck _agd;
     Lock::CollectionLock _collLock;
-    const Collection* _collection;
+    CollectionPtr _collection;
 };
 
 
 /**
  * Gather the index information for a collection.
  */
-std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const Collection* collection);
+std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const CollectionPtr& collection);
 
 /**
  * Gather other information for a collection.
  */
-BSONObj collectionOptions(OperationContext* opCtx, const Collection* collection);
+BSONObj collectionOptions(OperationContext* opCtx, const CollectionPtr& collection);
 
 namespace repl {
 

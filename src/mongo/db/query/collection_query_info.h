@@ -48,7 +48,14 @@ class CollectionQueryInfo {
 public:
     CollectionQueryInfo();
 
-    inline static const auto get = Collection::declareDecoration<CollectionQueryInfo>();
+    inline static const auto getCollectionQueryInfo =
+        Collection::declareDecoration<CollectionQueryInfo>();
+    static const CollectionQueryInfo& get(const CollectionPtr& collection) {
+        return CollectionQueryInfo::getCollectionQueryInfo(collection.get());
+    }
+    static CollectionQueryInfo& get(Collection* collection) {
+        return CollectionQueryInfo::getCollectionQueryInfo(collection);
+    }
 
     /**
      * Get the PlanCache for this collection.
@@ -63,7 +70,7 @@ public:
     /**
      * Builds internal cache state based on the current state of the Collection's IndexCatalog.
      */
-    void init(OperationContext* opCtx, const Collection* coll);
+    void init(OperationContext* opCtx, const CollectionPtr& coll);
 
     /**
      * Register a newly-created index with the cache.  Must be called whenever an index is
@@ -71,7 +78,9 @@ public:
      *
      * Must be called under exclusive collection lock.
      */
-    void addedIndex(OperationContext* opCtx, const Collection* coll, const IndexDescriptor* desc);
+    void addedIndex(OperationContext* opCtx,
+                    const CollectionPtr& coll,
+                    const IndexDescriptor* desc);
 
     /**
      * Deregister a newly-dropped index with the cache.  Must be called whenever an index is
@@ -79,26 +88,26 @@ public:
      *
      * Must be called under exclusive collection lock.
      */
-    void droppedIndex(OperationContext* opCtx, const Collection* coll, StringData indexName);
+    void droppedIndex(OperationContext* opCtx, const CollectionPtr& coll, StringData indexName);
 
     /**
      * Removes all cached query plans.
      */
-    void clearQueryCache(const Collection* coll) const;
+    void clearQueryCache(const CollectionPtr& coll) const;
 
     void notifyOfQuery(OperationContext* opCtx,
-                       const Collection* coll,
+                       const CollectionPtr& coll,
                        const PlanSummaryStats& summaryStats) const;
 
 private:
-    void computeIndexKeys(OperationContext* opCtx, const Collection* coll);
-    void updatePlanCacheIndexEntries(OperationContext* opCtx, const Collection* coll);
+    void computeIndexKeys(OperationContext* opCtx, const CollectionPtr& coll);
+    void updatePlanCacheIndexEntries(OperationContext* opCtx, const CollectionPtr& coll);
 
     /**
      * Rebuilds cached information that is dependent on index composition. Must be called
      * when index composition changes.
      */
-    void rebuildIndexData(OperationContext* opCtx, const Collection* coll);
+    void rebuildIndexData(OperationContext* opCtx, const CollectionPtr& coll);
 
     // ---  index keys cache
     bool _keysComputed;

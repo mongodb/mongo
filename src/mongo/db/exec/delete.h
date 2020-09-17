@@ -104,7 +104,7 @@ public:
     DeleteStage(ExpressionContext* expCtx,
                 std::unique_ptr<DeleteStageParams> params,
                 WorkingSet* ws,
-                const Collection* collection,
+                const CollectionPtr& collection,
                 PlanStage* child);
 
     bool isEOF() final;

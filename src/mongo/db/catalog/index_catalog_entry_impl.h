@@ -155,7 +155,7 @@ public:
      * as multikey here.
      */
     void setMultikey(OperationContext* opCtx,
-                     const Collection* coll,
+                     const CollectionPtr& coll,
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths) final;
 
@@ -188,7 +188,7 @@ private:
      * Used by setMultikey() only.
      */
     Status _setMultikeyInMultiDocumentTransaction(OperationContext* opCtx,
-                                                  const Collection* collection,
+                                                  const CollectionPtr& collection,
                                                   const MultikeyPaths& multikeyPaths);
 
     bool _catalogIsReady(OperationContext* opCtx) const;
@@ -205,7 +205,7 @@ private:
      * Sets on-disk multikey flag for this index.
      */
     void _catalogSetMultikey(OperationContext* opCtx,
-                             const Collection* collection,
+                             const CollectionPtr& collection,
                              const MultikeyPaths& multikeyPaths);
 
     KVPrefix _catalogGetPrefix(OperationContext* opCtx) const;

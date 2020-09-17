@@ -113,11 +113,11 @@ public:
     void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const final;
 
     CollectionCatalog::iterator begin(OperationContext* opCtx) const final {
-        return CollectionCatalog::get(opCtx).begin(_name);
+        return CollectionCatalog::get(opCtx).begin(opCtx, _name);
     }
 
     CollectionCatalog::iterator end(OperationContext* opCtx) const final {
-        return CollectionCatalog::get(opCtx).end();
+        return CollectionCatalog::get(opCtx).end(opCtx);
     }
 
 private:
@@ -137,7 +137,7 @@ private:
      */
     Status _finishDropCollection(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 const Collection* collection) const;
+                                 const CollectionPtr& collection) const;
 
     /**
      * Removes all indexes for a collection.

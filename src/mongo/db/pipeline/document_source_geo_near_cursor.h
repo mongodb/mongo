@@ -60,7 +60,7 @@ public:
      * nonnegative.
      */
     static boost::intrusive_ptr<DocumentSourceGeoNearCursor> create(
-        const Collection*,
+        const CollectionPtr&,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
         const boost::intrusive_ptr<ExpressionContext>&,
         FieldPath distanceField,
@@ -70,7 +70,7 @@ public:
     const char* getSourceName() const final;
 
 private:
-    DocumentSourceGeoNearCursor(const Collection*,
+    DocumentSourceGeoNearCursor(const CollectionPtr&,
                                 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
                                 const boost::intrusive_ptr<ExpressionContext>&,
                                 FieldPath distanceField,

@@ -79,7 +79,7 @@ public:
         return _clientContext->db();
     }
 
-    const Collection* getCollection() const {
+    CollectionPtr getCollection() const {
         return CollectionCatalog::get(_opCtx).lookupCollectionByNamespace(_opCtx, _nss);
     }
 

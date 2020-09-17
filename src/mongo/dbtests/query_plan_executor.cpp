@@ -97,7 +97,7 @@ public:
      * capable of executing a simple collection scan.
      */
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeCollScanExec(
-        const Collection* coll,
+        const CollectionPtr& coll,
         BSONObj& filterObj,
         PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
         TailableModeEnum tailableMode = TailableModeEnum::kNormal) {
@@ -148,7 +148,7 @@ public:
         ixparams.bounds.endKey = BSON("" << end);
         ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
 
-        const Collection* coll =
+        const CollectionPtr& coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
 
 
@@ -183,7 +183,7 @@ protected:
 
 private:
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
-        const Collection* collection =
+        CollectionPtr collection =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
         std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
@@ -206,7 +206,7 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     BSONObj indexSpec = BSON("a" << 1);
     addIndex(indexSpec);
 
-    const Collection* collection = ctx.getCollection();
+    CollectionPtr collection = ctx.getCollection();
 
     // Create the aggregation pipeline.
     std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
@@ -242,7 +242,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    const Collection* coll = ctx.getCollection();
+    const CollectionPtr& coll = ctx.getCollection();
     auto exec = makeCollScanExec(coll, filterObj, PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT);
 
     BSONObj resultObj;
@@ -259,7 +259,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwa
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    const Collection* coll = ctx.getCollection();
+    const CollectionPtr& coll = ctx.getCollection();
     auto exec = makeCollScanExec(coll,
                                  filterObj,
                                  PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT,
@@ -279,7 +279,7 @@ TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailabl
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    const Collection* coll = ctx.getCollection();
+    const CollectionPtr& coll = ctx.getCollection();
     auto exec = makeCollScanExec(coll,
                                  filterObj,
                                  PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT,
@@ -299,7 +299,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYield) {
 
     BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-    const Collection* coll = ctx.getCollection();
+    const CollectionPtr& coll = ctx.getCollection();
     auto exec = makeCollScanExec(coll, filterObj, PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED);
 
     BSONObj resultObj;
@@ -364,7 +364,7 @@ TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
 
     BSONObj filterObj = fromjson("{a: {$gte: 2}}");
 
-    const Collection* coll = ctx.getCollection();
+    const CollectionPtr& coll = ctx.getCollection();
     auto exec = makeCollScanExec(coll, filterObj);
 
     BSONObj objOut;

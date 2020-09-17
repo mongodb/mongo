@@ -62,7 +62,7 @@ public:
         _client.dropCollection(ns());
     }
 
-    void getRecordIds(set<RecordId>* out, const Collection* coll) {
+    void getRecordIds(set<RecordId>* out, const CollectionPtr& coll) {
         auto cursor = coll->getCursor(&_opCtx);
         while (auto record = cursor->next()) {
             out->insert(record->id);
@@ -102,7 +102,7 @@ public:
     void run() {
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        const Collection* coll =
+        CollectionPtr coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -169,7 +169,7 @@ public:
         Lock::DBLock lk(&_opCtx, nss().db(), MODE_X);
         OldClientContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
-        const Collection* coll =
+        CollectionPtr coll =
             CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);

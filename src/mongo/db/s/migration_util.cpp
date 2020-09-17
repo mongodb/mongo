@@ -537,7 +537,7 @@ void submitOrphanRangesForCleanup(OperationContext* opCtx) {
         if (dbName == NamespaceString::kLocalDb)
             continue;
 
-        for (auto collIt = catalog.begin(dbName); collIt != catalog.end(); ++collIt) {
+        for (auto collIt = catalog.begin(opCtx, dbName); collIt != catalog.end(opCtx); ++collIt) {
             auto uuid = collIt.uuid().get();
             auto nss = catalog.lookupNSSByUUID(opCtx, uuid).get();
             LOGV2_DEBUG(22034,

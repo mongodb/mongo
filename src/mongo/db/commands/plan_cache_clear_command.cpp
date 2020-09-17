@@ -47,7 +47,7 @@
 namespace mongo {
 namespace {
 
-PlanCache* getPlanCache(OperationContext* opCtx, const Collection* collection) {
+PlanCache* getPlanCache(OperationContext* opCtx, const CollectionPtr& collection) {
     invariant(collection);
     PlanCache* planCache = CollectionQueryInfo::get(collection).getPlanCache();
     invariant(planCache);

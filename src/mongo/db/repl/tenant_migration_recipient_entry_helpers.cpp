@@ -52,9 +52,9 @@ namespace {
  * Creates the tenant migration recipients collection if it doesn't exist.
  * Note: Throws WriteConflictException if the collection already exist.
  */
-const Collection* ensureTenantMigrationRecipientsCollectionExists(OperationContext* opCtx,
-                                                                  Database* db,
-                                                                  const NamespaceString& nss) {
+CollectionPtr ensureTenantMigrationRecipientsCollectionExists(OperationContext* opCtx,
+                                                              Database* db,
+                                                              const NamespaceString& nss) {
     // Sanity checks.
     invariant(db);
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
@@ -129,9 +129,8 @@ StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx
                                                          const UUID& migrationUUID) {
     // Read the most up to date data.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
-    AutoGetCollectionForRead autoCollection(opCtx,
-                                            NamespaceString::kTenantMigrationRecipientsNamespace);
-    const Collection* collection = autoCollection.getCollection();
+    AutoGetCollectionForRead collection(opCtx,
+                                        NamespaceString::kTenantMigrationRecipientsNamespace);
 
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
@@ -140,8 +139,11 @@ StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx
     }
 
     BSONObj result;
-    auto foundDoc = Helpers::findOne(
-        opCtx, collection, BSON("_id" << migrationUUID), result, /*requireIndex=*/true);
+    auto foundDoc = Helpers::findOne(opCtx,
+                                     collection.getCollection(),
+                                     BSON("_id" << migrationUUID),
+                                     result,
+                                     /*requireIndex=*/true);
     if (!foundDoc) {
         return Status(ErrorCodes::NoMatchingDocument,
                       str::stream() << "No matching state doc found with tenant migration UUID: "

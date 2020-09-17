@@ -69,7 +69,7 @@ public:
 };
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(
-    OperationContext* opCtx, const Collection* collection) {
+    OperationContext* opCtx, const CollectionPtr& collection) {
     auto qr = std::make_unique<QueryRequest>(collection->ns());
     qr->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
 

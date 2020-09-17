@@ -206,18 +206,18 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     // Current code only supports replacement update.
     dassert(UpdateDriver::isDocReplacement(updateRequest.getUpdateModification()));
 
-    AutoGetCollection autoColl(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IX);
+    AutoGetCollection collection(
+        opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IX);
 
     uassert(40527,
             str::stream() << "Unable to persist transaction state because the session transaction "
                              "collection is missing. This indicates that the "
                           << NamespaceString::kSessionTransactionsTableNamespace.ns()
                           << " collection has been manually deleted.",
-            autoColl.getCollection());
+            collection.getCollection());
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto collection = autoColl.getCollection();
     auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
 
     uassert(40672,

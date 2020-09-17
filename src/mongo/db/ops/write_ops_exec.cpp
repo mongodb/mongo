@@ -281,7 +281,7 @@ bool handleError(OperationContext* opCtx,
 }
 
 void insertDocuments(OperationContext* opCtx,
-                     const Collection* collection,
+                     const CollectionPtr& collection,
                      std::vector<InsertStatement>::iterator begin,
                      std::vector<InsertStatement>::iterator end,
                      bool fromMigrate) {
@@ -336,7 +336,7 @@ void insertDocuments(OperationContext* opCtx,
  * they only allow one operation at a time because they enforce insertion order with a MODE_X
  * collection lock, which we cannot hold in transactions.
  */
-Status checkIfTransactionOnCappedColl(OperationContext* opCtx, const Collection* collection) {
+Status checkIfTransactionOnCappedColl(OperationContext* opCtx, const CollectionPtr& collection) {
     if (opCtx->inMultiDocumentTransaction() && collection->isCapped()) {
         return {ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "Collection '" << collection->ns()
@@ -649,7 +649,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         makeCollection(opCtx, ns);
     }
 
-    if (auto coll = collection->getCollection()) {
+    if (const auto& coll = collection->getCollection()) {
         // Transactions are not allowed to operate on capped collections.
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
@@ -677,7 +677,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     PlanSummaryStats summary;
     exec->getSummaryStats(&summary);
-    if (auto coll = collection->getCollection()) {
+    if (const auto& coll = collection->getCollection()) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
 
@@ -915,7 +915,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     PlanSummaryStats summary;
     exec->getSummaryStats(&summary);
-    if (auto coll = collection.getCollection()) {
+    if (const auto& coll = collection.getCollection()) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
     curOp.debug().setPlanSummaryMetrics(summary);

@@ -74,7 +74,7 @@ struct TextStageParams {
 class TextStage final : public PlanStage {
 public:
     TextStage(ExpressionContext* expCtx,
-              const Collection* collection,
+              const CollectionPtr& collection,
               const TextStageParams& params,
               WorkingSet* ws,
               const MatchExpression* filter);
@@ -97,7 +97,7 @@ private:
      * Helper method to built the query execution plan for the text stage.
      */
     std::unique_ptr<PlanStage> buildTextTree(OperationContext* opCtx,
-                                             const Collection* collection,
+                                             const CollectionPtr& collection,
                                              WorkingSet* ws,
                                              const MatchExpression* filter,
                                              bool wantTextScore) const;

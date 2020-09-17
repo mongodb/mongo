@@ -125,7 +125,7 @@ public:
      * Uses a forward collection scan stage to get the docs, and populates 'out' with
      * the results.
      */
-    void getCollContents(const Collection* collection, vector<BSONObj>* out) {
+    void getCollContents(const CollectionPtr& collection, vector<BSONObj>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
@@ -145,7 +145,7 @@ public:
         }
     }
 
-    void getRecordIds(const Collection* collection,
+    void getRecordIds(const CollectionPtr& collection,
                       CollectionScanParams::Direction direction,
                       vector<RecordId>* out) {
         WorkingSet ws;
@@ -204,7 +204,7 @@ public:
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver(_expCtx);
-            const Collection* collection = ctx.getCollection();
+            CollectionPtr collection = ctx.getCollection();
             ASSERT(collection);
 
             // Collection should be empty.
@@ -244,11 +244,10 @@ public:
 
         // Verify the contents of the resulting collection.
         {
-            AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-            const Collection* collection = ctx.getCollection();
+            AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
             vector<BSONObj> objs;
-            getCollContents(collection, &objs);
+            getCollContents(collection.getCollection(), &objs);
 
             // Expect a single document, {_id: 0, x: 1, y: 2}.
             ASSERT_EQUALS(1U, objs.size());
@@ -276,7 +275,7 @@ public:
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver(_expCtx);
-            const Collection* coll =
+            const CollectionPtr& coll =
                 CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
             ASSERT(coll);
 
@@ -352,11 +351,10 @@ public:
 
         // Check the contents of the collection.
         {
-            AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-            const Collection* collection = ctx.getCollection();
+            AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
             vector<BSONObj> objs;
-            getCollContents(collection, &objs);
+            getCollContents(collection.getCollection(), &objs);
 
             // Verify that the collection now has 9 docs (one was deleted).
             ASSERT_EQUALS(9U, objs.size());
@@ -388,7 +386,7 @@ public:
         // Various variables we'll need.
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
-        const Collection* coll = ctx.getCollection();
+        const CollectionPtr& coll = ctx.getCollection();
         ASSERT(coll);
         auto request = UpdateRequest();
         request.setNamespaceString(nss);
@@ -481,7 +479,7 @@ public:
         // Various variables we'll need.
         dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
         OpDebug* opDebug = &CurOp::get(_opCtx)->debug();
-        const Collection* coll = ctx.getCollection();
+        const CollectionPtr& coll = ctx.getCollection();
         ASSERT(coll);
         auto request = UpdateRequest();
         request.setNamespaceString(nss);

@@ -99,7 +99,7 @@ constexpr StringData IndexDescriptor::kUniqueFieldName;
 constexpr StringData IndexDescriptor::kHiddenFieldName;
 constexpr StringData IndexDescriptor::kWeightsFieldName;
 
-IndexDescriptor::IndexDescriptor(const Collection* collection,
+IndexDescriptor::IndexDescriptor(const CollectionPtr& collection,
                                  const std::string& accessMethodName,
                                  BSONObj infoObj)
     : _accessMethodName(accessMethodName),

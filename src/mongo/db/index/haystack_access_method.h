@@ -37,6 +37,7 @@
 namespace mongo {
 
 class Collection;
+class CollectionPtr;
 class OperationContext;
 
 /**

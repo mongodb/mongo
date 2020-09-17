@@ -573,8 +573,7 @@ TEST_F(StorageInterfaceImplTest, CreateCollectionWithIDIndexCommits) {
     ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
     ASSERT_OK(loader->commit());
 
-    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
-    auto coll = autoColl.getCollection();
+    AutoGetCollectionForReadCommand coll(opCtx, nss);
     ASSERT(coll);
     ASSERT_EQ(coll->getRecordStore()->numRecords(opCtx), 2LL);
     auto collIdxCat = coll->getIndexCatalog();
@@ -601,8 +600,7 @@ void _testDestroyUncommitedCollectionBulkLoader(
     // Collection and ID index should not exist after 'loader' is destroyed.
     destroyLoaderFn(std::move(loader));
 
-    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
-    auto coll = autoColl.getCollection();
+    AutoGetCollectionForReadCommand coll(opCtx, nss);
 
     // Bulk loader is used to create indexes. The collection is not dropped when the bulk loader is
     // destroyed.

@@ -41,7 +41,7 @@ template <typename PlanStageType>
 class StageBuilder {
 public:
     StageBuilder(OperationContext* opCtx,
-                 const Collection* collection,
+                 const CollectionPtr& collection,
                  const CanonicalQuery& cq,
                  const QuerySolution& solution)
         : _opCtx(opCtx), _collection(collection), _cq(cq), _solution(solution) {}
@@ -56,7 +56,7 @@ public:
 
 protected:
     OperationContext* _opCtx;
-    const Collection* _collection;
+    const CollectionPtr& _collection;
     const CanonicalQuery& _cq;
     const QuerySolution& _solution;
 };

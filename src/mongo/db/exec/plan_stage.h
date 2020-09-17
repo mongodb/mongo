@@ -41,6 +41,7 @@ namespace mongo {
 
 class ClockSource;
 class Collection;
+class CollectionPtr;
 class OperationContext;
 class RecordId;
 

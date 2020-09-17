@@ -77,11 +77,11 @@ public:
         }
     }
 
-    Status createIndex(const Collection* collection, BSONObj indexSpec) {
+    Status createIndex(const CollectionPtr& collection, BSONObj indexSpec) {
         return dbtests::createIndexFromSpec(_opCtx.get(), collection->ns().ns(), indexSpec);
     }
 
-    void assertMultikeyPaths(const Collection* collection,
+    void assertMultikeyPaths(const CollectionPtr& collection,
                              BSONObj keyPattern,
                              const MultikeyPaths& expectedMultikeyPaths) {
         const IndexCatalog* indexCatalog = collection->getIndexCatalog();
@@ -124,8 +124,7 @@ private:
 };
 
 TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreation) {
-    AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_X);
-    const Collection* collection = autoColl.getCollection();
+    AutoGetCollection collection(_opCtx.get(), _nss, MODE_X);
     invariant(collection);
 
     {
@@ -139,18 +138,17 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreation) {
     }
 
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
-    createIndex(collection,
+    createIndex(collection.getCollection(),
                 BSON("name"
                      << "a_1_b_1"
                      << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
-    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreationWithMultipleDocuments) {
-    AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_X);
-    const Collection* collection = autoColl.getCollection();
+    AutoGetCollection collection(_opCtx.get(), _nss, MODE_X);
     invariant(collection);
 
     {
@@ -168,22 +166,21 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreationWithMultipleDocuments) {
     }
 
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
-    createIndex(collection,
+    createIndex(collection.getCollection(),
                 BSON("name"
                      << "a_1_b_1"
                      << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
-    assertMultikeyPaths(collection, keyPattern, {{0U}, {0U}});
+    assertMultikeyPaths(collection.getCollection(), keyPattern, {{0U}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
-    AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_X);
-    const Collection* collection = autoColl.getCollection();
+    AutoGetCollection collection(_opCtx.get(), _nss, MODE_X);
     invariant(collection);
 
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
-    createIndex(collection,
+    createIndex(collection.getCollection(),
                 BSON("name"
                      << "a_1_b_1"
                      << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
@@ -199,7 +196,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
@@ -211,16 +208,15 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection, keyPattern, {{0U}, {0U}});
+    assertMultikeyPaths(collection.getCollection(), keyPattern, {{0U}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
-    AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_X);
-    const Collection* collection = autoColl.getCollection();
+    AutoGetCollection collection(_opCtx.get(), _nss, MODE_X);
     invariant(collection);
 
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
-    createIndex(collection,
+    createIndex(collection.getCollection(),
                 BSON("name"
                      << "a_1_b_1"
                      << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
@@ -234,7 +230,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, MultikeyComponents{}});
+    assertMultikeyPaths(
+        collection.getCollection(), keyPattern, {MultikeyComponents{}, MultikeyComponents{}});
 
     {
         auto cursor = collection->getCursor(_opCtx.get());
@@ -259,16 +256,15 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
         }
     }
 
-    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
-    AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_X);
-    const Collection* collection = autoColl.getCollection();
+    AutoGetCollection collection(_opCtx.get(), _nss, MODE_X);
     invariant(collection);
 
     BSONObj keyPattern = BSON("a" << 1 << "b" << 1);
-    createIndex(collection,
+    createIndex(collection.getCollection(),
                 BSON("name"
                      << "a_1_b_1"
                      << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
@@ -284,7 +280,7 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
 
     {
         auto cursor = collection->getCursor(_opCtx.get());
@@ -299,23 +295,22 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
         }
     }
 
-    assertMultikeyPaths(collection, keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(collection.getCollection(), keyPattern, {MultikeyComponents{}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
-    AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_X);
-    const Collection* collection = autoColl.getCollection();
+    AutoGetCollection collection(_opCtx.get(), _nss, MODE_X);
     invariant(collection);
 
     BSONObj keyPatternAB = BSON("a" << 1 << "b" << 1);
-    createIndex(collection,
+    createIndex(collection.getCollection(),
                 BSON("name"
                      << "a_1_b_1"
                      << "key" << keyPatternAB << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
 
     BSONObj keyPatternAC = BSON("a" << 1 << "c" << 1);
-    createIndex(collection,
+    createIndex(collection.getCollection(),
                 BSON("name"
                      << "a_1_c_1"
                      << "key" << keyPatternAC << "v" << static_cast<int>(kIndexVersion)))
@@ -331,8 +326,8 @@ TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
         wuow.commit();
     }
 
-    assertMultikeyPaths(collection, keyPatternAB, {{0U}, MultikeyComponents{}});
-    assertMultikeyPaths(collection, keyPatternAC, {{0U}, MultikeyComponents{}});
+    assertMultikeyPaths(collection.getCollection(), keyPatternAB, {{0U}, MultikeyComponents{}});
+    assertMultikeyPaths(collection.getCollection(), keyPatternAC, {{0U}, MultikeyComponents{}});
 }
 
 }  // namespace

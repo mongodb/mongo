@@ -55,7 +55,7 @@ public:
             return builder.obj();
         }
         AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
-        auto oplog = oplogRead.getCollection();
+        const auto& oplog = oplogRead.getCollection();
         if (oplog) {
             const auto localDb =
                 DatabaseHolder::get(opCtx)->getDb(opCtx, NamespaceString::kLocalDb);

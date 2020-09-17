@@ -393,7 +393,7 @@ private:
             return Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated due to stepdown");
         }
 
-        auto collection = agc.getCollection();
+        const auto& collection = agc.getCollection();
 
         if (!collection) {
             return {ErrorCodes::NamespaceNotFound, "dbCheck collection no longer exists"};

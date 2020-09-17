@@ -74,7 +74,7 @@ public:
      * Attempts to generates keys for each skipped record and insert into the index. Returns OK if
      * all records were either indexed or no longer exist.
      */
-    Status retrySkippedRecords(OperationContext* opCtx, const Collection* collection);
+    Status retrySkippedRecords(OperationContext* opCtx, const CollectionPtr& collection);
 
     boost::optional<std::string> getTableIdent() const {
         return _skippedRecordsTable ? boost::make_optional(_skippedRecordsTable->rs()->getIdent())

@@ -74,7 +74,7 @@ public:
             }
             collection = _database->createCollection(&_opCtx, nss());
             wunit.commit();
-            _collection = collection;
+            _collection = std::move(collection);
         }
 
         addIndex(IndexSpec().addKey("a").unique(false));
@@ -129,7 +129,7 @@ protected:
             wunit.commit();
         }
         abortOnExit.dismiss();
-        _collection = collection.get();
+        _collection = collection.get().detached();
     }
 
     void insert(const char* s) {
@@ -161,7 +161,7 @@ protected:
     OldClientContext _context;
 
     Database* _database;
-    const Collection* _collection;
+    CollectionPtr _collection;
 };
 
 class FindOneOr : public Base {

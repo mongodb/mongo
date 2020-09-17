@@ -51,7 +51,7 @@
 namespace mongo {
 
 boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::create(
-    const Collection* collection,
+    const CollectionPtr& collection,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     FieldPath distanceField,
@@ -66,7 +66,7 @@ boost::intrusive_ptr<DocumentSourceGeoNearCursor> DocumentSourceGeoNearCursor::c
 }
 
 DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
-    const Collection* collection,
+    const CollectionPtr& collection,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     FieldPath distanceField,

@@ -43,7 +43,7 @@ public:
         OperationContext* opCtx,
         std::unique_ptr<CanonicalQuery> cq,
         std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-        const Collection* collection,
+        const CollectionPtr& collection,
         NamespaceString nss,
         bool isOpen,
         boost::optional<std::queue<std::pair<BSONObj, boost::optional<RecordId>>>> stash,
@@ -62,7 +62,7 @@ public:
     }
 
     void saveState();
-    void restoreState();
+    void restoreState(const Yieldable* yieldable);
 
     void detachFromOperationContext();
     void reattachToOperationContext(OperationContext* opCtx);

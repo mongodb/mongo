@@ -99,7 +99,7 @@ bool SkippedRecordTracker::areAllRecordsApplied(OperationContext* opCtx) const {
 }
 
 Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
-                                                 const Collection* collection) {
+                                                 const CollectionPtr& collection) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
     if (!_skippedRecordsTable) {
         return Status::OK();

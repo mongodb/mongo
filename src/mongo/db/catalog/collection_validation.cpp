@@ -354,7 +354,7 @@ std::string multikeyPathsToString(MultikeyPaths paths) {
 void _validateCatalogEntry(OperationContext* opCtx,
                            ValidateState* validateState,
                            ValidateResults* results) {
-    const Collection* collection = validateState->getCollection();
+    const auto& collection = validateState->getCollection();
     CollectionOptions options =
         DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, collection->getCatalogId());
     if (options.uuid) {

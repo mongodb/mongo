@@ -59,7 +59,7 @@ public:
                      std::unique_ptr<QuerySolution> qs,
                      std::unique_ptr<CanonicalQuery> cq,
                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                     const Collection* collection,
+                     const CollectionPtr& collection,
                      NamespaceString nss,
                      PlanYieldPolicy::YieldPolicy yieldPolicy);
 
@@ -68,7 +68,7 @@ public:
     const NamespaceString& nss() const final;
     OperationContext* getOpCtx() const final;
     void saveState() final;
-    void restoreState() final;
+    void restoreState(const Yieldable* yieldable) final;
     void detachFromOperationContext() final;
     void reattachToOperationContext(OperationContext* opCtx) final;
     ExecState getNextDocument(Document* objOut, RecordId* dlOut) final;
@@ -96,7 +96,7 @@ public:
      *
      * This is only public for PlanYieldPolicy. DO NOT CALL ANYWHERE ELSE.
      */
-    void restoreStateWithoutRetrying();
+    void restoreStateWithoutRetrying(const Yieldable* yieldable);
 
     /**
      * Return a pointer to this executor's MultiPlanStage, or nullptr if it does not have one.

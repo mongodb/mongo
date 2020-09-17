@@ -114,11 +114,10 @@ public:
      * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
     const QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const Collection* collection = ctx.getCollection();
+        AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
         QueryPlannerParams plannerParams;
-        fillOutPlannerParams(&_opCtx, collection, cq, &plannerParams);
+        fillOutPlannerParams(&_opCtx, collection.getCollection(), cq, &plannerParams);
 
         // Plan.
         auto statusWithSolutions = QueryPlanner::plan(*cq, plannerParams);
@@ -128,12 +127,12 @@ public:
         ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 
         // Fill out the MPR.
-        _mps.reset(new MultiPlanStage(_expCtx.get(), collection, cq));
+        _mps.reset(new MultiPlanStage(_expCtx.get(), collection.getCollection(), cq));
         unique_ptr<WorkingSet> ws(new WorkingSet());
         // Put each solution from the planner into the MPR.
         for (size_t i = 0; i < solutions.size(); ++i) {
             auto&& root = stage_builder::buildClassicExecutableTree(
-                &_opCtx, collection, *cq, *solutions[i], ws.get());
+                &_opCtx, collection.getCollection(), *cq, *solutions[i], ws.get());
             _mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
         }
         // This is what sets a backup plan, should we test for it.
@@ -245,11 +244,12 @@ public:
                                                  "{ixscan: {filter: null, pattern: {d:1}}}}}",
                                                  soln->root()));
 
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const Collection* collection = ctx.getCollection();
+        AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
         StatusWith<std::unique_ptr<PlanCacheEntry>> planCacheEntryWithStatus =
-            CollectionQueryInfo::get(collection).getPlanCache()->getEntry(*(cq.get()));
+            CollectionQueryInfo::get(collection.getCollection())
+                .getPlanCache()
+                ->getEntry(*(cq.get()));
         ASSERT_OK(planCacheEntryWithStatus.getStatus());
 
         // We assert that there was only one plan scored, implying that there was only one

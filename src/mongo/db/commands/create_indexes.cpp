@@ -317,7 +317,7 @@ boost::optional<CommitQuorumOptions> parseAndGetCommitQuorum(OperationContext* o
  * returned vector is empty after returning, no new indexes need to be built. Throws on error.
  */
 std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* opCtx,
-                                                             const Collection* collection,
+                                                             const CollectionPtr& collection,
                                                              std::vector<BSONObj> indexSpecs) {
     // Normalize the specs' collations, wildcard projections, and partial filters as applicable.
     auto normalSpecs = IndexBuildsCoordinator::normalizeIndexSpecs(opCtx, collection, indexSpecs);
@@ -339,7 +339,7 @@ void fillCommandResultWithIndexesAlreadyExistInfo(int numIndexes, BSONObjBuilder
  * Returns true, after filling in the command result, if the index creation can return early.
  */
 bool indexesAlreadyExist(OperationContext* opCtx,
-                         const Collection* collection,
+                         const CollectionPtr& collection,
                          const std::vector<BSONObj>& specs,
                          BSONObjBuilder* result) {
     auto specsCopy = resolveDefaultsAndRemoveExistingIndexes(opCtx, collection, specs);
@@ -518,12 +518,12 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
         }
 
         bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns.ns(), [&] {
-            AutoGetCollection autoColl(opCtx, ns, MODE_IS);
-            auto collection = autoColl.getCollection();
+            AutoGetCollection collection(opCtx, ns, MODE_IS);
 
             // Before potentially taking an exclusive collection lock, check if all indexes already
             // exist while holding an intent lock.
-            if (collection && indexesAlreadyExist(opCtx, collection, specs, &result)) {
+            if (collection &&
+                indexesAlreadyExist(opCtx, collection.getCollection(), specs, &result)) {
                 repl::ReplClientInfo::forClient(opCtx->getClient())
                     .setLastOpToSystemLastOpTime(opCtx);
                 return true;

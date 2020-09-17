@@ -87,7 +87,7 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
 }
 
 namespace {
-Status dropUnfinishedIndexes(OperationContext* opCtx, const Collection* collection) {
+Status dropUnfinishedIndexes(OperationContext* opCtx, const CollectionPtr& collection) {
     std::vector<std::string> indexNames;
     auto durableCatalog = DurableCatalog::get(opCtx);
     durableCatalog->getAllIndexes(opCtx, collection->getCatalogId(), &indexNames);

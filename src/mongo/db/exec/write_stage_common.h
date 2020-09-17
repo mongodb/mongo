@@ -37,6 +37,7 @@ namespace mongo {
 
 class CanonicalQuery;
 class Collection;
+class CollectionPtr;
 class OperationContext;
 
 namespace write_stage_common {
@@ -49,7 +50,7 @@ namespace write_stage_common {
  * May throw a WriteConflictException if there was a conflict while searching to see if the document
  * still exists.
  */
-bool ensureStillMatches(const Collection* collection,
+bool ensureStillMatches(const CollectionPtr& collection,
                         OperationContext* opCtx,
                         WorkingSet* ws,
                         WorkingSetID id,

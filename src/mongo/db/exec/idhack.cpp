@@ -52,7 +52,7 @@ const char* IDHackStage::kStageType = "IDHACK";
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          CanonicalQuery* query,
                          WorkingSet* ws,
-                         const Collection* collection,
+                         const CollectionPtr& collection,
                          const IndexDescriptor* descriptor)
     : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
       _workingSet(ws),
@@ -64,7 +64,7 @@ IDHackStage::IDHackStage(ExpressionContext* expCtx,
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          const BSONObj& key,
                          WorkingSet* ws,
-                         const Collection* collection,
+                         const CollectionPtr& collection,
                          const IndexDescriptor* descriptor)
     : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
       _workingSet(ws),

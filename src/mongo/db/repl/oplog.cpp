@@ -213,7 +213,7 @@ void _logOpsInner(OperationContext* opCtx,
                   const NamespaceString& nss,
                   std::vector<Record>* records,
                   const std::vector<Timestamp>& timestamps,
-                  const Collection* oplogCollection,
+                  const CollectionPtr& oplogCollection,
                   OpTime finalOpTime,
                   Date_t wallTime) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
@@ -333,7 +333,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
         oplogEntry->setOpTime(slot);
     }
 
-    auto oplog = oplogInfo->getCollection();
+    const auto& oplog = oplogInfo->getCollection();
     auto wallClockTime = oplogEntry->getWallClockTime();
 
     auto bsonOplogEntry = oplogEntry->toBSON();
@@ -425,7 +425,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     invariant(!opTimes.empty());
     auto lastOpTime = opTimes.back();
     invariant(!lastOpTime.isNull());
-    auto oplog = oplogInfo->getCollection();
+    const auto& oplog = oplogInfo->getCollection();
     auto wallClockTime = oplogEntryTemplate->getWallClockTime();
     _logOpsInner(opCtx, nss, &records, timestamps, oplog, lastOpTime, wallClockTime);
     wuow.commit();
@@ -536,7 +536,7 @@ void createOplog(OperationContext* opCtx,
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();
 
     OldClientContext ctx(opCtx, oplogCollectionName.ns());
-    const Collection* collection =
+    CollectionPtr collection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, oplogCollectionName);
 
     if (collection) {
@@ -981,7 +981,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     }
 
     NamespaceString requestNss;
-    const Collection* collection = nullptr;
+    CollectionPtr collection = nullptr;
     if (auto uuid = op.getUuid()) {
         CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
         collection = catalog.lookupCollectionByUUID(opCtx, uuid.get());
@@ -1728,14 +1728,14 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx) {
     }
 }
 
-void establishOplogCollectionForLogging(OperationContext* opCtx, const Collection* oplog) {
+void establishOplogCollectionForLogging(OperationContext* opCtx, const CollectionPtr& oplog) {
     invariant(opCtx->lockState()->isW());
     invariant(oplog);
     LocalOplogInfo::get(opCtx)->setCollection(oplog);
 }
 
 void signalOplogWaiters() {
-    auto oplog = LocalOplogInfo::get(getGlobalServiceContext())->getCollection();
+    const auto& oplog = LocalOplogInfo::get(getGlobalServiceContext())->getCollection();
     if (oplog) {
         oplog->getCappedCallback()->notifyCappedWaitersIfNeeded();
     }

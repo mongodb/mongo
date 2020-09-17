@@ -349,7 +349,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsCommand) {
              << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
-                                            const Collection*,
+                                            const CollectionPtr&,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&) {

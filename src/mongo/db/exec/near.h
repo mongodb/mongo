@@ -108,7 +108,7 @@ protected:
               const char* typeName,
               StageType type,
               WorkingSet* workingSet,
-              const Collection* collection,
+              const CollectionPtr& collection,
               const IndexDescriptor* indexDescriptor);
 
     //
@@ -122,7 +122,7 @@ protected:
      */
     virtual std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
                                                           WorkingSet* workingSet,
-                                                          const Collection* collection) = 0;
+                                                          const CollectionPtr& collection) = 0;
 
     /**
      * Computes the distance value for the given member data, or -1 if the member should not be

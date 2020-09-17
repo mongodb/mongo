@@ -45,7 +45,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rt,
-    const Collection* collection,
+    const CollectionPtr& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     NamespaceString nss,
     std::unique_ptr<QuerySolution> qs) {
@@ -65,7 +65,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rt,
-    const Collection* collection,
+    const CollectionPtr& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     NamespaceString nss,
     std::unique_ptr<QuerySolution> qs) {
@@ -87,7 +87,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<QuerySolution> qs,
     std::unique_ptr<CanonicalQuery> cq,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy) {
 
@@ -113,7 +113,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-    const Collection* collection,
+    const CollectionPtr& collection,
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
 
@@ -142,7 +142,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-    const Collection* collection,
+    const CollectionPtr& collection,
     NamespaceString nss,
     std::queue<std::pair<BSONObj, boost::optional<RecordId>>> stash,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {

@@ -43,7 +43,7 @@ namespace mongo::sbe {
 class MultiPlanner final : public BaseRuntimePlanner {
 public:
     MultiPlanner(OperationContext* opCtx,
-                 const Collection* collection,
+                 const CollectionPtr& collection,
                  const CanonicalQuery& cq,
                  PlanCachingMode cachingMode,
                  PlanYieldPolicySBE* yieldPolicy)

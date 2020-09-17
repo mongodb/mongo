@@ -243,7 +243,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
 }
 
 const IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx,
-                                                   const Collection* collection) const {
+                                                   const CollectionPtr& collection) const {
     auto descriptor = collection->getIndexCatalog()->findIndexByName(
         opCtx, _indexName, true /* includeUnfinishedIndexes */);
 

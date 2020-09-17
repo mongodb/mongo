@@ -38,6 +38,7 @@
 namespace mongo {
 
 class ClockSource;
+class Yieldable;
 
 class PlanYieldPolicy {
 public:
@@ -237,6 +238,11 @@ public:
     PlanYieldPolicy::YieldPolicy getPolicy() const {
         return _policy;
     }
+
+    /**
+     * Set new yieldable instance if policy supports it.
+     */
+    virtual void setYieldable(const Yieldable* yieldable) {}
 
 private:
     /**

@@ -110,7 +110,7 @@ public:
 
     void searchHaystack(const HaystackAccessMethod* ham,
                         OperationContext* opCtx,
-                        const Collection* collection,
+                        const CollectionPtr& collection,
                         const BSONObj& nearObj,
                         double maxDistance,
                         const BSONObj& search,
@@ -233,7 +233,7 @@ public:
         uassertStatusOK(replCoord->checkCanServeReadsFor(
             opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-        const Collection* collection = ctx.getCollection();
+        const auto& collection = ctx.getCollection();
         if (!collection) {
             errmsg = "can't find ns";
             return false;

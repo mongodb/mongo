@@ -37,7 +37,7 @@ void RequiresCollectionStage::doSaveState() {
     doSaveStateRequiresCollection();
 
     // A stage may not access storage while in a saved state.
-    _collection = nullptr;
+    _collection = CollectionPtr();
 }
 
 void RequiresCollectionStage::doRestoreState() {
@@ -64,6 +64,9 @@ void RequiresCollectionStage::doRestoreState() {
     // restored locks on the correct name. It is now safe to restore the Collection pointer. The
     // collection must exist, since we already successfully looked up the namespace string by UUID
     // under the correct lock manager locks.
+    // TODO SERVER-51115: We can't have every instance of RequiresCollectionStage do a catalog
+    // lookup with lock free reads. If we have multiple instances within a single executor they
+    // might get different pointers.
     _collection = catalog.lookupCollectionByUUID(opCtx(), _collectionUUID);
     invariant(_collection);
 

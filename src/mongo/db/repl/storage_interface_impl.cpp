@@ -299,28 +299,27 @@ Status StorageInterfaceImpl::insertDocument(OperationContext* opCtx,
 namespace {
 
 /**
- * Returns const Collection* from database RAII object.
+ * Returns const CollectionPtr& from database RAII object.
  * Returns NamespaceNotFound if the database or collection does not exist.
  */
 template <typename AutoGetCollectionType>
-StatusWith<decltype(std::declval<AutoGetCollectionType>().getCollection())> getCollection(
-    const AutoGetCollectionType& autoGetCollection,
-    const NamespaceStringOrUUID& nsOrUUID,
-    const std::string& message) {
+StatusWith<const CollectionPtr*> getCollection(const AutoGetCollectionType& autoGetCollection,
+                                               const NamespaceStringOrUUID& nsOrUUID,
+                                               const std::string& message) {
     if (!autoGetCollection.getDb()) {
         StringData dbName = nsOrUUID.nss() ? nsOrUUID.nss()->db() : nsOrUUID.dbname();
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Database [" << dbName << "] not found. " << message};
     }
 
-    auto collection = autoGetCollection.getCollection();
+    const auto& collection = autoGetCollection.getCollection();
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection [" << nsOrUUID.toString() << "] not found. "
                               << message};
     }
 
-    return collection;
+    return &collection;
 }
 
 Status insertDocumentsSingleBatch(OperationContext* opCtx,
@@ -329,14 +328,14 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
                                   std::vector<InsertStatement>::const_iterator end) {
     boost::optional<AutoGetCollection> autoColl;
     boost::optional<AutoGetOplog> autoOplog;
-    const Collection* collection;
+    const CollectionPtr* collection;
 
     auto nss = nsOrUUID.nss();
     if (nss && nss->isOplog()) {
         // Simplify locking rules for oplog collection.
         autoOplog.emplace(opCtx, OplogAccessMode::kWrite);
-        collection = autoOplog->getCollection();
-        if (!collection) {
+        collection = &autoOplog->getCollection();
+        if (!*collection) {
             return {ErrorCodes::NamespaceNotFound, "Oplog collection does not exist"};
         }
     } else {
@@ -351,7 +350,7 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
 
     WriteUnitOfWork wunit(opCtx);
     OpDebug* const nullOpDebug = nullptr;
-    auto status = collection->insertDocuments(opCtx, begin, end, nullOpDebug, false);
+    auto status = (*collection)->insertDocuments(opCtx, begin, end, nullOpDebug, false);
     if (!status.isOK()) {
         return status;
     }
@@ -454,7 +453,7 @@ StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* opCtx
         NamespaceString::kRsOplogNamespace.ns(),
         [&]() -> StatusWith<size_t> {
             AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
-            auto oplog = oplogRead.getCollection();
+            const auto& oplog = oplogRead.getCollection();
             if (!oplog) {
                 return {ErrorCodes::NamespaceNotFound, "Your oplog doesn't exist."};
             }
@@ -602,7 +601,7 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
         if (!collectionResult.isOK()) {
             return collectionResult.getStatus();
         }
-        auto collection = collectionResult.getValue();
+        const auto& collection = *collectionResult.getValue();
 
         WriteUnitOfWork wunit(opCtx);
         auto tsResult = opCtx->recoveryUnit()->setTimestamp(ts);
@@ -667,7 +666,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
             if (!collectionResult.isOK()) {
                 return Result(collectionResult.getStatus());
             }
-            auto collection = collectionResult.getValue();
+            const auto& collection = *collectionResult.getValue();
 
             auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
             auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
@@ -922,7 +921,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         if (!collectionResult.isOK()) {
             return collectionResult.getStatus();
         }
-        auto collection = collectionResult.getValue();
+        const auto& collection = *collectionResult.getValue();
         WriteUnitOfWork wuow(opCtx);
         if (!ts.isNull()) {
             uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(ts));
@@ -970,7 +969,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         if (!collectionResult.isOK()) {
             return collectionResult.getStatus();
         }
-        auto collection = collectionResult.getValue();
+        const auto& collection = *collectionResult.getValue();
 
         // We can create an UpdateRequest now that the collection's namespace has been resolved, in
         // the event it was specified as a UUID.
@@ -1080,7 +1079,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
         if (!collectionResult.isOK()) {
             return collectionResult.getStatus();
         }
-        auto collection = collectionResult.getValue();
+        const auto& collection = *collectionResult.getValue();
 
         auto planExecutorResult = mongo::getExecutorDelete(
             nullptr, collection, &parsedDelete, boost::none /* verbosity */);
@@ -1103,7 +1102,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
 }
 
 boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTimestamp(
-    OperationContext* opCtx, const Collection* oplog, const Timestamp& timestamp) {
+    OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) {
     invariant(oplog);
     invariant(opCtx->lockState()->isLocked());
 
@@ -1134,7 +1133,7 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
 }
 
 boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
-    OperationContext* opCtx, const Collection* oplogCollection, const Timestamp& timestamp) {
+    OperationContext* opCtx, const CollectionPtr& oplogCollection, const Timestamp& timestamp) {
     // Oplog reads are specially done under only MODE_IS global locks, without database or
     // collection level intent locks. Therefore, reads can run concurrently with validate cmds that
     // take collection MODE_X locks. Validate with {full:true} set calls WT::verify on the
@@ -1209,7 +1208,7 @@ StatusWith<StorageInterface::CollectionSize> StorageInterfaceImpl::getCollection
     if (!collectionResult.isOK()) {
         return collectionResult.getStatus();
     }
-    auto collection = collectionResult.getValue();
+    const auto& collection = *collectionResult.getValue();
 
     return collection->dataSize(opCtx);
 }
@@ -1223,7 +1222,7 @@ StatusWith<StorageInterface::CollectionCount> StorageInterfaceImpl::getCollectio
     if (!collectionResult.isOK()) {
         return collectionResult.getStatus();
     }
-    auto collection = collectionResult.getValue();
+    const auto& collection = *collectionResult.getValue();
 
     return collection->numRecords(opCtx);
 }
@@ -1238,7 +1237,7 @@ Status StorageInterfaceImpl::setCollectionCount(OperationContext* opCtx,
     if (!collectionResult.isOK()) {
         return collectionResult.getStatus();
     }
-    auto collection = collectionResult.getValue();
+    const auto& collection = *collectionResult.getValue();
 
     auto rs = collection->getRecordStore();
     // We cannot fix the data size correctly, so we just get the current cached value and keep it
@@ -1257,7 +1256,7 @@ StatusWith<OptionalCollectionUUID> StorageInterfaceImpl::getCollectionUUID(
     if (!collectionResult.isOK()) {
         return collectionResult.getStatus();
     }
-    auto collection = collectionResult.getValue();
+    const auto& collection = *collectionResult.getValue();
     return collection->uuid();
 }
 
@@ -1340,12 +1339,11 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
         return Status::OK();
     }
 
-    const Collection* const usersCollection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-            opCtx, AuthorizationManager::usersCollectionNamespace);
+    CollectionPtr usersCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+        opCtx, AuthorizationManager::usersCollectionNamespace);
     const bool hasUsers =
         usersCollection && !Helpers::findOne(opCtx, usersCollection, BSONObj(), false).isNull();
-    const Collection* const adminVersionCollection =
+    CollectionPtr adminVersionCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
             opCtx, AuthorizationManager::versionCollectionNamespace);
     BSONObj authSchemaVersionDocument;
@@ -1398,7 +1396,7 @@ void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationCont
     if (primaryOnly &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin"))
         return;
-    auto oplog = oplogRead.getCollection();
+    const auto& oplog = oplogRead.getCollection();
     uassert(ErrorCodes::NotYetInitialized, "The oplog does not exist", oplog);
     oplog->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 }

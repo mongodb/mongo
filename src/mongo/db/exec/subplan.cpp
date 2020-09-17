@@ -57,7 +57,7 @@ using std::vector;
 const char* SubplanStage::kStageType = "SUBPLAN";
 
 SubplanStage::SubplanStage(ExpressionContext* expCtx,
-                           const Collection* collection,
+                           const CollectionPtr& collection,
                            WorkingSet* ws,
                            const QueryPlannerParams& params,
                            CanonicalQuery* cq)

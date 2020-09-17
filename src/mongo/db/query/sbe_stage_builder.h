@@ -89,7 +89,7 @@ struct PlanStageData {
 class SlotBasedStageBuilder final : public StageBuilder<sbe::PlanStage> {
 public:
     SlotBasedStageBuilder(OperationContext* opCtx,
-                          const Collection* collection,
+                          const CollectionPtr& collection,
                           const CanonicalQuery& cq,
                           const QuerySolution& solution,
                           PlanYieldPolicySBE* yieldPolicy,

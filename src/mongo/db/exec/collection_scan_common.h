@@ -34,8 +34,6 @@
 
 namespace mongo {
 
-class Collection;
-
 struct CollectionScanParams {
     enum Direction {
         FORWARD = 1,

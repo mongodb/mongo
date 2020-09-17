@@ -112,7 +112,7 @@ AutoGetCollectionBase<CatalogCollectionLookupT>::AutoGetCollectionBase(
     if (!db)
         return;
 
-    _coll = CatalogCollectionLookupT::lookupCollection(opCtx, _resolvedNss);
+    _coll = _lookup.lookupCollection(opCtx, _resolvedNss);
     invariant(!nsOrUUID.uuid() || _coll,
               str::stream() << "Collection for " << _resolvedNss.ns()
                             << " disappeared after successufully resolving "
@@ -165,28 +165,38 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
         class WritableCollectionReset : public RecoveryUnit::Change {
         public:
             WritableCollectionReset(AutoGetCollection& autoColl,
-                                    const Collection* rollbackCollection)
-                : _autoColl(autoColl), _rollbackCollection(rollbackCollection) {}
+                                    const CollectionPtr& rollbackCollection,
+                                    uint64_t catalogEpoch)
+                : _autoColl(autoColl),
+                  _rollbackCollection(rollbackCollection.get()),
+                  _catalogEpoch(catalogEpoch) {}
             void commit(boost::optional<Timestamp> commitTime) final {
+                // Restore coll to a yieldable collection
+                _autoColl._coll = {
+                    _autoColl.getOperationContext(), _autoColl._coll.get(), _catalogEpoch};
                 _autoColl._writableColl = nullptr;
             }
             void rollback() final {
-                _autoColl._coll = _rollbackCollection;
+                _autoColl._coll = {
+                    _autoColl.getOperationContext(), _rollbackCollection, _catalogEpoch};
                 _autoColl._writableColl = nullptr;
             }
 
         private:
             AutoGetCollection& _autoColl;
             const Collection* _rollbackCollection;
+            uint64_t _catalogEpoch;
         };
 
-        _writableColl = CollectionCatalog::get(_opCtx).lookupCollectionByNamespaceForMetadataWrite(
-            _opCtx, mode, _resolvedNss);
+        auto& catalog = CollectionCatalog::get(_opCtx);
+        _writableColl =
+            catalog.lookupCollectionByNamespaceForMetadataWrite(_opCtx, mode, _resolvedNss);
         if (mode == CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork) {
             _opCtx->recoveryUnit()->registerChange(
-                std::make_unique<WritableCollectionReset>(*this, _coll));
+                std::make_unique<WritableCollectionReset>(*this, _coll, catalog.getEpoch()));
         }
 
+        // Set to writable collection. We are no longer yieldable.
         _coll = _writableColl;
     }
     return _writableColl;
@@ -202,9 +212,12 @@ struct CollectionWriter::SharedImpl {
 CollectionWriter::CollectionWriter(OperationContext* opCtx,
                                    const CollectionUUID& uuid,
                                    CollectionCatalog::LifetimeMode mode)
-    : _opCtx(opCtx), _mode(mode), _sharedImpl(std::make_shared<SharedImpl>(this)) {
+    : _collection(&_storedCollection),
+      _opCtx(opCtx),
+      _mode(mode),
+      _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
-    _collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
+    _storedCollection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
     _sharedImpl->_writableCollectionInitializer = [opCtx,
                                                    uuid](CollectionCatalog::LifetimeMode mode) {
         return CollectionCatalog::get(opCtx).lookupCollectionByUUIDForMetadataWrite(
@@ -215,8 +228,11 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx,
 CollectionWriter::CollectionWriter(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    CollectionCatalog::LifetimeMode mode)
-    : _opCtx(opCtx), _mode(mode), _sharedImpl(std::make_shared<SharedImpl>(this)) {
-    _collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    : _collection(&_storedCollection),
+      _opCtx(opCtx),
+      _mode(mode),
+      _sharedImpl(std::make_shared<SharedImpl>(this)) {
+    _storedCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
     _sharedImpl->_writableCollectionInitializer = [opCtx,
                                                    nss](CollectionCatalog::LifetimeMode mode) {
         return CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(
@@ -226,10 +242,10 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx,
 
 CollectionWriter::CollectionWriter(AutoGetCollection& autoCollection,
                                    CollectionCatalog::LifetimeMode mode)
-    : _opCtx(autoCollection.getOperationContext()),
+    : _collection(&autoCollection.getCollection()),
+      _opCtx(autoCollection.getOperationContext()),
       _mode(mode),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
-    _collection = autoCollection.getCollection();
     _sharedImpl->_writableCollectionInitializer =
         [&autoCollection](CollectionCatalog::LifetimeMode mode) {
             return autoCollection.getWritableCollection(mode);
@@ -237,7 +253,8 @@ CollectionWriter::CollectionWriter(AutoGetCollection& autoCollection,
 }
 
 CollectionWriter::CollectionWriter(Collection* writableCollection)
-    : _collection(writableCollection),
+    : _collection(&_storedCollection),
+      _storedCollection(writableCollection),
       _writableCollection(writableCollection),
       _mode(CollectionCatalog::LifetimeMode::kInplace) {}
 
@@ -264,30 +281,34 @@ Collection* CollectionWriter::getWritableCollection() {
         class WritableCollectionReset : public RecoveryUnit::Change {
         public:
             WritableCollectionReset(std::shared_ptr<SharedImpl> shared,
-                                    const Collection* rollbackCollection)
-                : _shared(std::move(shared)), _rollbackCollection(rollbackCollection) {}
+                                    CollectionPtr rollbackCollection)
+                : _shared(std::move(shared)), _rollbackCollection(std::move(rollbackCollection)) {}
             void commit(boost::optional<Timestamp> commitTime) final {
                 if (_shared->_parent)
                     _shared->_parent->_writableCollection = nullptr;
             }
             void rollback() final {
                 if (_shared->_parent) {
-                    _shared->_parent->_collection = _rollbackCollection;
+                    _shared->_parent->_storedCollection = std::move(_rollbackCollection);
                     _shared->_parent->_writableCollection = nullptr;
                 }
             }
 
         private:
             std::shared_ptr<SharedImpl> _shared;
-            const Collection* _rollbackCollection;
+            CollectionPtr _rollbackCollection;
         };
 
-        if (_mode == CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork) {
-            _opCtx->recoveryUnit()->registerChange(
-                std::make_unique<WritableCollectionReset>(_sharedImpl, _collection));
-        }
+        // If we are using our stored Collection then we are not managed by an AutoGetCollection and
+        // we need to manage lifetime here.
+        if (*_collection == _storedCollection) {
+            if (_mode == CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork) {
+                _opCtx->recoveryUnit()->registerChange(std::make_unique<WritableCollectionReset>(
+                    _sharedImpl, std::move(_storedCollection)));
+            }
 
-        _collection = _writableCollection;
+            _storedCollection = _writableCollection;
+        }
     }
     return _writableCollection;
 }
@@ -306,7 +327,9 @@ CatalogCollectionLookup::CollectionStorage CatalogCollectionLookup::lookupCollec
 
 CatalogCollectionLookupForRead::CollectionStorage CatalogCollectionLookupForRead::lookupCollection(
     OperationContext* opCtx, const NamespaceString& nss) {
-    return CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForRead(opCtx, nss);
+    auto ptr = CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForRead(opCtx, nss);
+    _collection = CollectionPtr(ptr);
+    return ptr;
 }
 
 LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
@@ -364,7 +387,7 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
     }
 
     _oplogInfo = repl::LocalOplogInfo::get(opCtx);
-    _oplog = _oplogInfo->getCollection();
+    _oplog = &_oplogInfo->getCollection();
 }
 
 template class AutoGetCollectionBase<CatalogCollectionLookup>;

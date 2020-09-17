@@ -54,7 +54,7 @@ public:
                WorkingSet* ws,
                std::unique_ptr<PlanStage> child,
                const MatchExpression* filter,
-               const Collection* collection);
+               const CollectionPtr& collection);
 
     ~FetchStage();
 

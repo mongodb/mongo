@@ -57,7 +57,7 @@ using fts::MAX_WEIGHT;
 const char* TextStage::kStageType = "TEXT";
 
 TextStage::TextStage(ExpressionContext* expCtx,
-                     const Collection* collection,
+                     const CollectionPtr& collection,
                      const TextStageParams& params,
                      WorkingSet* ws,
                      const MatchExpression* filter)
@@ -96,7 +96,7 @@ const SpecificStats* TextStage::getSpecificStats() const {
 }
 
 unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
-                                               const Collection* collection,
+                                               const CollectionPtr& collection,
                                                WorkingSet* ws,
                                                const MatchExpression* filter,
                                                bool wantTextScore) const {

@@ -67,14 +67,14 @@ public:
         ASSERT_OK(dbtests::createIndex(_opCtx, kTestNamespace, kTestKeyPattern));
 
         _autoColl.emplace(_opCtx, NamespaceString{kTestNamespace});
-        auto* coll = _autoColl->getCollection();
+        const auto& coll = _autoColl->getCollection();
         ASSERT(coll);
         _mockGeoIndex = coll->getIndexCatalog()->findIndexByKeyPatternAndOptions(
             _opCtx, kTestKeyPattern, _makeMinimalIndexSpec(kTestKeyPattern));
         ASSERT(_mockGeoIndex);
     }
 
-    const Collection* getCollection() const {
+    const CollectionPtr& getCollection() const {
         return _autoColl->getCollection();
     }
 
@@ -112,7 +112,7 @@ public:
 
     MockNearStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   WorkingSet* workingSet,
-                  const Collection* coll,
+                  const CollectionPtr& coll,
                   const IndexDescriptor* indexDescriptor)
         : NearStage(expCtx.get(),
                     "MOCK_DISTANCE_SEARCH_STAGE",
@@ -128,7 +128,7 @@ public:
 
     std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
                                                   WorkingSet* workingSet,
-                                                  const Collection* collection) final {
+                                                  const CollectionPtr& collection) final {
         if (_pos == static_cast<int>(_intervals.size()))
             return nullptr;
 
@@ -234,7 +234,7 @@ TEST_F(QueryStageNearTest, EmptyResults) {
     WorkingSet workingSet;
 
     AutoGetCollectionForRead autoColl(_opCtx, NamespaceString{kTestNamespace});
-    auto* coll = autoColl.getCollection();
+    const auto& coll = autoColl.getCollection();
     ASSERT(coll);
 
     MockNearStage nearStage(_expCtx.get(), &workingSet, coll, _mockGeoIndex);

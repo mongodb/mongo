@@ -586,7 +586,7 @@ void MigrationChunkClonerSourceLegacy::_decrementOutstandingOperationTrackReques
 }
 
 void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationContext* opCtx,
-                                                                    const Collection* collection,
+                                                                    const CollectionPtr& collection,
                                                                     BSONArrayBuilder* arrBuilder) {
     ElapsedTracker tracker(opCtx->getServiceContext()->getFastClockSource(),
                            internalQueryExecYieldIterations.load(),
@@ -597,7 +597,7 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationCon
         _jumboChunkCloneState->clonerExec = std::move(exec);
     } else {
         _jumboChunkCloneState->clonerExec->reattachToOperationContext(opCtx);
-        _jumboChunkCloneState->clonerExec->restoreState();
+        _jumboChunkCloneState->clonerExec->restoreState(&collection);
     }
 
     PlanExecutor::ExecState execState;
@@ -655,7 +655,7 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationCon
 }
 
 void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromCloneLocs(OperationContext* opCtx,
-                                                                    const Collection* collection,
+                                                                    const CollectionPtr& collection,
                                                                     BSONArrayBuilder* arrBuilder) {
     ElapsedTracker tracker(opCtx->getServiceContext()->getFastClockSource(),
                            internalQueryExecYieldIterations.load(),
@@ -705,7 +705,7 @@ uint64_t MigrationChunkClonerSourceLegacy::getCloneBatchBufferAllocationSize() {
 }
 
 Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
-                                                        const Collection* collection,
+                                                        const CollectionPtr& collection,
                                                         BSONArrayBuilder* arrBuilder) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(_args.getNss(), MODE_IS));
 
@@ -802,7 +802,7 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONO
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(OperationContext* opCtx,
-                                                        const Collection* const collection) {
+                                                        const CollectionPtr& collection) {
     // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore, any
     // multi-key index prefixed by shard key cannot be multikey over the shard key fields.
     const IndexDescriptor* idx =
@@ -833,15 +833,13 @@ MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(OperationContext* opCtx,
 }
 
 Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opCtx) {
-    AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
-
-    const Collection* const collection = autoColl.getCollection();
+    AutoGetCollection collection(opCtx, _args.getNss(), MODE_IS);
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection " << _args.getNss().ns() << " does not exist."};
     }
 
-    auto swExec = _getIndexScanExecutor(opCtx, collection);
+    auto swExec = _getIndexScanExecutor(opCtx, collection.getCollection());
     if (!swExec.isOK()) {
         return swExec.getStatus();
     }

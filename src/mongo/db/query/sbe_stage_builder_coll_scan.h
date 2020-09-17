@@ -53,7 +53,7 @@ std::tuple<sbe::value::SlotId,
            boost::optional<sbe::value::SlotId>,
            std::unique_ptr<sbe::PlanStage>>
 generateCollScan(OperationContext* opCtx,
-                 const Collection* collection,
+                 const CollectionPtr& collection,
                  const CollectionScanNode* csn,
                  sbe::value::SlotIdGenerator* slotIdGenerator,
                  sbe::value::FrameIdGenerator* frameIdGenerator,

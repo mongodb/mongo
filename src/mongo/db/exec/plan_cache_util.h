@@ -80,7 +80,7 @@ void logNotCachingNoData(std::string&& solution);
 template <typename PlanStageType, typename ResultType, typename Data>
 void updatePlanCache(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     PlanCachingMode cachingMode,
     const CanonicalQuery& query,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,

@@ -163,7 +163,7 @@ BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
  * Return an object describing the collection. Takes a collection lock if nameOnly is false.
  */
 BSONObj buildCollectionBson(OperationContext* opCtx,
-                            const Collection* collection,
+                            const CollectionPtr& collection,
                             bool includePendingDrops,
                             bool nameOnly) {
     if (!collection) {
@@ -321,7 +321,7 @@ public:
                         }
 
                         Lock::CollectionLock clk(opCtx, nss, MODE_IS);
-                        const Collection* collection =
+                        CollectionPtr collection =
                             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
                         BSONObj collBson =
                             buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
@@ -332,7 +332,7 @@ public:
                     }
                 } else {
                     mongo::catalog::forEachCollectionFromDb(
-                        opCtx, dbname, MODE_IS, [&](const Collection* collection) {
+                        opCtx, dbname, MODE_IS, [&](const CollectionPtr& collection) {
                             if (authorizedCollections &&
                                 (!as->isAuthorizedForAnyActionOnResource(
                                     ResourcePattern::forExactNamespace(collection->ns())))) {

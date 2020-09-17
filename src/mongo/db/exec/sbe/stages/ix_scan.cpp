@@ -178,7 +178,7 @@ void IndexScanStage::open(bool reOpen) {
     _open = true;
     _firstGetNext = true;
 
-    if (auto collection = _coll->getCollection()) {
+    if (const auto& collection = _coll->getCollection()) {
         auto indexCatalog = collection->getIndexCatalog();
         auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
         if (indexDesc) {

@@ -532,8 +532,7 @@ void Parser::walkScan(AstQuery& ast) {
     }
 
     NamespaceString nssColl{dbName, collName};
-    AutoGetCollectionForRead ctxColl(_opCtx, nssColl);
-    auto collection = ctxColl.getCollection();
+    AutoGetCollectionForRead collection(_opCtx, nssColl);
     NamespaceStringOrUUID name =
         collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
@@ -576,8 +575,7 @@ void Parser::walkParallelScan(AstQuery& ast) {
     }
 
     NamespaceString nssColl{dbName, collName};
-    AutoGetCollectionForRead ctxColl(_opCtx, nssColl);
-    auto collection = ctxColl.getCollection();
+    AutoGetCollectionForRead collection(_opCtx, nssColl);
     NamespaceStringOrUUID name =
         collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
 
@@ -616,8 +614,7 @@ void Parser::walkSeek(AstQuery& ast) {
     }
 
     NamespaceString nssColl{dbName, collName};
-    AutoGetCollectionForRead ctxColl(_opCtx, nssColl);
-    auto collection = ctxColl.getCollection();
+    AutoGetCollectionForRead collection(_opCtx, nssColl);
     NamespaceStringOrUUID name =
         collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
 
@@ -667,8 +664,7 @@ void Parser::walkIndexScan(AstQuery& ast) {
     }
 
     NamespaceString nssColl{dbName, collName};
-    AutoGetCollectionForRead ctxColl(_opCtx, nssColl);
-    auto collection = ctxColl.getCollection();
+    AutoGetCollectionForRead collection(_opCtx, nssColl);
     NamespaceStringOrUUID name =
         collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
@@ -724,8 +720,7 @@ void Parser::walkIndexSeek(AstQuery& ast) {
     }
 
     NamespaceString nssColl{dbName, collName};
-    AutoGetCollectionForRead ctxColl(_opCtx, nssColl);
-    auto collection = ctxColl.getCollection();
+    AutoGetCollectionForRead collection(_opCtx, nssColl);
     NamespaceStringOrUUID name =
         collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;

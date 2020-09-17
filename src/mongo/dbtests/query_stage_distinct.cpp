@@ -126,7 +126,7 @@ public:
         addIndex(BSON("a" << 1));
 
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const Collection* coll = ctx.getCollection();
+        const CollectionPtr& coll = ctx.getCollection();
 
         // Set up the distinct stage.
         std::vector<const IndexDescriptor*> indexes;
@@ -192,7 +192,7 @@ public:
         addIndex(BSON("a" << 1));
 
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const Collection* coll = ctx.getCollection();
+        const CollectionPtr& coll = ctx.getCollection();
 
         // Set up the distinct stage.
         std::vector<const IndexDescriptor*> indexes;
@@ -259,7 +259,7 @@ public:
         addIndex(BSON("a" << 1 << "b" << 1));
 
         AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const Collection* coll = ctx.getCollection();
+        const CollectionPtr& coll = ctx.getCollection();
 
         std::vector<const IndexDescriptor*> indices;
         coll->getIndexCatalog()->findIndexesByKeyPattern(

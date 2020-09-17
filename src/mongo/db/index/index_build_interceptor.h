@@ -132,7 +132,7 @@ public:
      * following the last inserted record from a previous call to drainWritesIntoIndex.
      */
     Status drainWritesIntoIndex(OperationContext* opCtx,
-                                const Collection* coll,
+                                const CollectionPtr& coll,
                                 const InsertDeleteOptions& options,
                                 TrackDuplicates trackDups,
                                 DrainYieldPolicy drainYieldPolicy);
@@ -150,7 +150,7 @@ public:
      * successful, keys are written directly to the index. Unsuccessful key generation or writes
      * will return errors.
      */
-    Status retrySkippedRecords(OperationContext* opCtx, const Collection* collection);
+    Status retrySkippedRecords(OperationContext* opCtx, const CollectionPtr& collection);
 
     /**
      * Returns 'true' if there are no visible records remaining to be applied from the side writes
@@ -179,7 +179,7 @@ private:
 
     void _initializeMultiKeyPaths(IndexCatalogEntry* entry);
     Status _applyWrite(OperationContext* opCtx,
-                       const Collection* coll,
+                       const CollectionPtr& coll,
                        const BSONObj& doc,
                        const InsertDeleteOptions& options,
                        TrackDuplicates trackDups,

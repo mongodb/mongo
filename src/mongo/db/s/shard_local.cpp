@@ -127,9 +127,11 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
     invariant(ns.db() == "config" || ns.db() == "admin");
 
     try {
+        // TODO SERVER-50983: Create abstraction for creating collection when using
+        // AutoGetCollection
         AutoGetOrCreateDb autoDb(opCtx, ns.db(), MODE_IX);
         AutoGetCollection autoColl(opCtx, ns, MODE_X);
-        auto collection = autoColl.getCollection();
+        const Collection* collection = autoColl.getCollection().get();
         if (!collection) {
             CollectionOptions options;
             options.uuid = UUID::gen();

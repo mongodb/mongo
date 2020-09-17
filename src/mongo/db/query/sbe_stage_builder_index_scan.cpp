@@ -266,7 +266,7 @@ makeIntervalsFromIndexBounds(const IndexBounds& bounds,
  */
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
 generateOptimizedMultiIntervalIndexScan(
-    const Collection* collection,
+    const CollectionPtr& collection,
     const std::string& indexName,
     bool forward,
     std::vector<std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>>
@@ -386,7 +386,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> makeAnchorBranchF
  * consisting of valid recordId's and index seek keys to restart the index scan from.
  */
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
-makeRecursiveBranchForGenericIndexScan(const Collection* collection,
+makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
                                        const std::string& indexName,
                                        const sbe::CheckBoundsParams& params,
                                        sbe::SpoolId spoolId,
@@ -513,7 +513,7 @@ makeRecursiveBranchForGenericIndexScan(const Collection* collection,
  *   - The recursion is terminated when the sspool becomes empty.
  */
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
-generateGenericMultiIntervalIndexScan(const Collection* collection,
+generateGenericMultiIntervalIndexScan(const CollectionPtr& collection,
                                       const IndexScanNode* ixn,
                                       KeyString::Version version,
                                       Ordering ordering,
@@ -614,7 +614,7 @@ generateGenericMultiIntervalIndexScan(const Collection* collection,
 }  // namespace
 
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleIntervalIndexScan(
-    const Collection* collection,
+    const CollectionPtr& collection,
     const std::string& indexName,
     bool forward,
     std::unique_ptr<KeyString::Value> lowKey,
@@ -673,7 +673,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
 
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateIndexScan(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     const IndexScanNode* ixn,
     boost::optional<sbe::value::SlotId> returnKeySlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,

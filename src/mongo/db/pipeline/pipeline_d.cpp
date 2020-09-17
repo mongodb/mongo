@@ -99,7 +99,7 @@ namespace {
  * storage engine support for random cursors.
  */
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorExecutor(
-    const Collection* coll,
+    const CollectionPtr& coll,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     long long sampleSize,
     long long numRecords,
@@ -187,7 +187,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
     const intrusive_ptr<ExpressionContext>& expCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     const NamespaceString& nss,
     BSONObj queryObj,
     BSONObj projectionObj,
@@ -273,7 +273,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
  *
  * The 'collection' is required to exist. Throws if no usable 2d or 2dsphere index could be found.
  */
-StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx, const Collection* collection) {
+StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx,
+                                          const CollectionPtr& collection) {
     invariant(collection);
 
     std::vector<const IndexDescriptor*> idxs;
@@ -313,7 +314,7 @@ StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx, const Collect
 }  // namespace
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutor(const Collection* collection,
+PipelineD::buildInnerQueryExecutor(const CollectionPtr& collection,
                                    const NamespaceString& nss,
                                    const AggregationRequest* aggRequest,
                                    Pipeline* pipeline) {
@@ -348,7 +349,7 @@ PipelineD::buildInnerQueryExecutor(const Collection* collection,
                     ? DocumentSourceCursor::CursorType::kEmptyDocuments
                     : DocumentSourceCursor::CursorType::kRegular;
                 auto attachExecutorCallback =
-                    [cursorType](const Collection* collection,
+                    [cursorType](const CollectionPtr& collection,
                                  std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                                  Pipeline* pipeline) {
                         auto cursor = DocumentSourceCursor::create(
@@ -372,7 +373,7 @@ PipelineD::buildInnerQueryExecutor(const Collection* collection,
 }
 
 void PipelineD::attachInnerQueryExecutorToPipeline(
-    const Collection* collection,
+    const CollectionPtr& collection,
     PipelineD::AttachExecutorCallback attachExecutorCallback,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     Pipeline* pipeline) {
@@ -384,7 +385,7 @@ void PipelineD::attachInnerQueryExecutorToPipeline(
     }
 }
 
-void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(const Collection* collection,
+void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(const CollectionPtr& collection,
                                                            const NamespaceString& nss,
                                                            const AggregationRequest* aggRequest,
                                                            Pipeline* pipeline) {
@@ -483,7 +484,7 @@ auto buildProjectionForPushdown(const DepsTracker& deps, Pipeline* pipeline) {
 }  // namespace
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutorGeneric(const Collection* collection,
+PipelineD::buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
                                           const NamespaceString& nss,
                                           const AggregationRequest* aggRequest,
                                           Pipeline* pipeline) {
@@ -561,7 +562,7 @@ PipelineD::buildInnerQueryExecutorGeneric(const Collection* collection,
         (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage());
 
     auto attachExecutorCallback =
-        [cursorType, trackOplogTS](const Collection* collection,
+        [cursorType, trackOplogTS](const CollectionPtr& collection,
                                    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                                    Pipeline* pipeline) {
             auto cursor = DocumentSourceCursor::create(
@@ -572,7 +573,7 @@ PipelineD::buildInnerQueryExecutorGeneric(const Collection* collection,
 }
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutorGeoNear(const Collection* collection,
+PipelineD::buildInnerQueryExecutorGeoNear(const CollectionPtr& collection,
                                           const NamespaceString& nss,
                                           const AggregationRequest* aggRequest,
                                           Pipeline* pipeline) {
@@ -616,7 +617,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(const Collection* collection,
                                    locationField = geoNearStage->getLocationField(),
                                    distanceMultiplier =
                                        geoNearStage->getDistanceMultiplier().value_or(1.0)](
-                                      const Collection* collection,
+                                      const CollectionPtr& collection,
                                       std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
                                       Pipeline* pipeline) {
         auto cursor = DocumentSourceGeoNearCursor::create(collection,
@@ -634,7 +635,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(const Collection* collection,
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prepareExecutor(
     const intrusive_ptr<ExpressionContext>& expCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     const NamespaceString& nss,
     Pipeline* pipeline,
     const boost::intrusive_ptr<DocumentSourceSort>& sortStage,

@@ -51,9 +51,9 @@ class RequiresCollectionStage : public PlanStage {
 public:
     RequiresCollectionStage(const char* stageType,
                             ExpressionContext* expCtx,
-                            const Collection* coll)
+                            const CollectionPtr& coll)
         : PlanStage(stageType, expCtx),
-          _collection(coll),
+          _collection(coll.detached()),
           _collectionUUID(_collection->uuid()),
           _catalogEpoch(getCatalogEpoch()),
           _nss(_collection->ns()) {
@@ -77,7 +77,7 @@ protected:
      */
     virtual void doRestoreStateRequiresCollection() = 0;
 
-    const Collection* collection() const {
+    const CollectionPtr& collection() const {
         return _collection;
     }
 
@@ -91,7 +91,7 @@ private:
         return CollectionCatalog::get(opCtx()).getEpoch();
     }
 
-    const Collection* _collection;
+    CollectionPtr _collection;
     const UUID _collectionUUID;
     const uint64_t _catalogEpoch;
 

@@ -104,7 +104,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
     // If the collection doesn't exist or disappears after releasing locks and waiting, there is no
     // need to check for pending catalog changes.
-    while (auto coll = _autoColl->getCollection()) {
+    while (const auto& coll = _autoColl->getCollection()) {
         // Ban snapshot reads on capped collections.
         uassert(ErrorCodes::SnapshotUnavailable,
                 "Reading from capped collections with readConcern snapshot is not supported",

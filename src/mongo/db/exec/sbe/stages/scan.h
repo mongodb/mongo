@@ -37,7 +37,7 @@
 
 namespace mongo {
 namespace sbe {
-using ScanOpenCallback = std::function<void(OperationContext*, const Collection*, bool)>;
+using ScanOpenCallback = std::function<void(OperationContext*, const CollectionPtr&, bool)>;
 
 class ScanStage final : public PlanStage {
 public:

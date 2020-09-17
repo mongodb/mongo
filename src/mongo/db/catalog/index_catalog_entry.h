@@ -47,6 +47,7 @@
 namespace mongo {
 class CollatorInterface;
 class Collection;
+class CollectionPtr;
 class CollectionCatalogEntry;
 class IndexAccessMethod;
 class IndexBuildInterceptor;
@@ -132,7 +133,7 @@ public:
      * as multikey here.
      */
     virtual void setMultikey(OperationContext* const opCtx,
-                             const Collection* coll,
+                             const CollectionPtr& coll,
                              const KeyStringSet& multikeyMetadataKeys,
                              const MultikeyPaths& multikeyPaths) = 0;
 

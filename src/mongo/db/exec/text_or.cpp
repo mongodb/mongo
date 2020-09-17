@@ -56,7 +56,7 @@ TextOrStage::TextOrStage(ExpressionContext* expCtx,
                          const FTSSpec& ftsSpec,
                          WorkingSet* ws,
                          const MatchExpression* filter,
-                         const Collection* collection)
+                         const CollectionPtr& collection)
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _ftsSpec(ftsSpec),
       _ws(ws),

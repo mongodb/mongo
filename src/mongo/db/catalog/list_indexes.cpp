@@ -52,20 +52,19 @@ namespace mongo {
 StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& ns,
                                            bool includeBuildUUIDs) {
-    AutoGetCollectionForReadCommand ctx(opCtx, ns);
-    const Collection* collection = ctx.getCollection();
-    auto nss = ctx.getNss();
+    AutoGetCollectionForReadCommand collection(opCtx, ns);
+    auto nss = collection.getNss();
     if (!collection) {
         return StatusWith<std::list<BSONObj>>(ErrorCodes::NamespaceNotFound,
-                                              str::stream()
-                                                  << "ns does not exist: " << ctx.getNss().ns());
+                                              str::stream() << "ns does not exist: "
+                                                            << collection.getNss().ns());
     }
     return StatusWith<std::list<BSONObj>>(
-        listIndexesInLock(opCtx, collection, nss, includeBuildUUIDs));
+        listIndexesInLock(opCtx, collection.getCollection(), nss, includeBuildUUIDs));
 }
 
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
-                                     const Collection* collection,
+                                     const CollectionPtr& collection,
                                      const NamespaceString& nss,
                                      bool includeBuildUUIDs) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));

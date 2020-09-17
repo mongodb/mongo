@@ -715,8 +715,7 @@ Timestamp ReplicationCoordinatorExternalStateImpl::getGlobalTimestamp(ServiceCon
 }
 
 bool ReplicationCoordinatorExternalStateImpl::oplogExists(OperationContext* opCtx) {
-    auto oplog = LocalOplogInfo::get(opCtx)->getCollection();
-    return oplog != nullptr;
+    return static_cast<bool>(LocalOplogInfo::get(opCtx)->getCollection());
 }
 
 StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndWallTime(

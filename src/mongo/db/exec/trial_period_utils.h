@@ -33,6 +33,7 @@
 
 namespace mongo {
 class Collection;
+class CollectionPtr;
 
 namespace trial_period {
 /**
@@ -40,7 +41,7 @@ namespace trial_period {
  *
  * Calculated based on a fixed query knob and the size of the collection.
  */
-size_t getTrialPeriodMaxWorks(OperationContext* opCtx, const Collection* collection);
+size_t getTrialPeriodMaxWorks(OperationContext* opCtx, const CollectionPtr& collection);
 
 /**
  * Returns the max number of documents which we should allow any plan to return during the

@@ -116,7 +116,7 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
                     str::stream() << "The database is in the process of being dropped " << ns.db(),
                     autoColl.getDb() && !autoColl.getDb()->isDropPending(opCtx));
 
-            auto collection = autoColl.getCollection();
+            const auto& collection = autoColl.getCollection();
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Failed to create indexes for aggregation because collection "
                                      "does not exist: "

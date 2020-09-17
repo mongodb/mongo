@@ -58,7 +58,7 @@ namespace {
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
 bool checkIfSingleDoc(OperationContext* opCtx,
-                      const Collection* collection,
+                      const CollectionPtr& collection,
                       const IndexDescriptor* idx,
                       const ChunkType* chunk) {
     KeyPattern kp(idx->keyPattern());
@@ -208,9 +208,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
         }
     }
 
-    AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-
-    const Collection* const collection = autoColl.getCollection();
+    AutoGetCollection collection(opCtx, nss, MODE_IS);
     if (!collection) {
         LOGV2_WARNING(
             23778,
@@ -237,10 +235,10 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
 
     KeyPattern shardKeyPattern(keyPatternObj);
     if (shardKeyPattern.globalMax().woCompare(backChunk.getMax()) == 0 &&
-        checkIfSingleDoc(opCtx, collection, idx, &backChunk)) {
+        checkIfSingleDoc(opCtx, collection.getCollection(), idx, &backChunk)) {
         return boost::optional<ChunkRange>(ChunkRange(backChunk.getMin(), backChunk.getMax()));
     } else if (shardKeyPattern.globalMin().woCompare(frontChunk.getMin()) == 0 &&
-               checkIfSingleDoc(opCtx, collection, idx, &frontChunk)) {
+               checkIfSingleDoc(opCtx, collection.getCollection(), idx, &frontChunk)) {
         return boost::optional<ChunkRange>(ChunkRange(frontChunk.getMin(), frontChunk.getMax()));
     }
 

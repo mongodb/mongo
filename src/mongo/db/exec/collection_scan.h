@@ -55,7 +55,7 @@ public:
     static const char* kStageType;
 
     CollectionScan(ExpressionContext* expCtx,
-                   const Collection* collection,
+                   const CollectionPtr& collection,
                    const CollectionScanParams& params,
                    WorkingSet* workingSet,
                    const MatchExpression* filter);

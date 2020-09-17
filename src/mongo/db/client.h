@@ -52,7 +52,6 @@
 
 namespace mongo {
 
-class Collection;
 class Locker;
 class OperationContext;
 class ThreadClient;

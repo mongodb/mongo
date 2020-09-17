@@ -174,7 +174,7 @@ public:
                                 result);
         }
 
-        const Collection* const collection = ctx->getCollection();
+        const auto& collection = ctx->getCollection();
 
         auto executor = uassertStatusOK(
             getExecutorDistinct(collection, QueryPlannerParams::DEFAULT, &parsedDistinct));
@@ -235,7 +235,7 @@ public:
             return true;
         }
 
-        const Collection* const collection = ctx->getCollection();
+        const auto& collection = ctx->getCollection();
 
         auto executor =
             getExecutorDistinct(collection, QueryPlannerParams::DEFAULT, &parsedDistinct);

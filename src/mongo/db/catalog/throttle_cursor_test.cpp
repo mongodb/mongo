@@ -59,7 +59,7 @@ public:
 
     Date_t getTime();
     int64_t getDifferenceInMillis(Date_t start, Date_t end);
-    SortedDataInterfaceThrottleCursor getIdIndex(const Collection* coll);
+    SortedDataInterfaceThrottleCursor getIdIndex(const CollectionPtr& coll);
 
     std::unique_ptr<DataThrottle> _dataThrottle;
 };
@@ -72,8 +72,7 @@ void ThrottleCursorTest::setUp() {
 
     // Insert random data into the collection. We don't need to create an index as the _id index is
     // created by default.
-    AutoGetCollection autoColl(operationContext(), kNss, MODE_X);
-    const Collection* collection = autoColl.getCollection();
+    AutoGetCollection collection(operationContext(), kNss, MODE_X);
     invariant(collection);
 
     OpDebug* const nullOpDebug = nullptr;
@@ -108,7 +107,7 @@ int64_t ThrottleCursorTest::getDifferenceInMillis(Date_t start, Date_t end) {
     return end.toMillisSinceEpoch() - start.toMillisSinceEpoch();
 }
 
-SortedDataInterfaceThrottleCursor ThrottleCursorTest::getIdIndex(const Collection* coll) {
+SortedDataInterfaceThrottleCursor ThrottleCursorTest::getIdIndex(const CollectionPtr& coll) {
     const IndexDescriptor* idDesc = coll->getIndexCatalog()->findIdIndex(operationContext());
     const IndexCatalogEntry* idEntry = coll->getIndexCatalog()->getEntry(idDesc);
     const IndexAccessMethod* iam = idEntry->accessMethod();
@@ -119,7 +118,7 @@ SortedDataInterfaceThrottleCursor ThrottleCursorTest::getIdIndex(const Collectio
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const Collection* coll = autoColl.getCollection();
+    const CollectionPtr& coll = autoColl.getCollection();
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
@@ -152,7 +151,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const Collection* coll = autoColl.getCollection();
+    const CollectionPtr& coll = autoColl.getCollection();
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
@@ -204,7 +203,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOnLargeDocs) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const Collection* coll = autoColl.getCollection();
+    const CollectionPtr& coll = autoColl.getCollection();
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf2MBForDataThrottle");
@@ -265,7 +264,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOnLargeDocs) {
 TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const Collection* coll = autoColl.getCollection();
+    const CollectionPtr& coll = autoColl.getCollection();
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
@@ -292,7 +291,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
 TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const Collection* coll = autoColl.getCollection();
+    const CollectionPtr& coll = autoColl.getCollection();
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
@@ -343,7 +342,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
 TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const Collection* coll = autoColl.getCollection();
+    const CollectionPtr& coll = autoColl.getCollection();
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");
@@ -385,7 +384,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
 TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
     auto opCtx = operationContext();
     AutoGetCollection autoColl(opCtx, kNss, MODE_X);
-    const Collection* coll = autoColl.getCollection();
+    const CollectionPtr& coll = autoColl.getCollection();
 
     // Use a fixed record data size to simplify the timing calculations.
     FailPointEnableBlock failPoint("fixedCursorDataSizeOf512KBForDataThrottle");

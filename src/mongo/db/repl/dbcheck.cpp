@@ -172,7 +172,7 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(const NamespaceString& nss,
 }
 
 DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
-                             const Collection* collection,
+                             const CollectionPtr& collection,
                              const BSONKey& start,
                              const BSONKey& end,
                              int64_t maxCount,
@@ -233,7 +233,7 @@ std::string hashCollectionInfo(const DbCheckCollectionInformation& info) {
 }
 
 std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
-    OperationContext* opCtx, const Collection* collection) {
+    OperationContext* opCtx, const CollectionPtr& collection) {
     const CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
     const UUID uuid = collection->uuid();
 
@@ -350,7 +350,7 @@ bool DbCheckHasher::_canHash(const BSONObj& obj) {
     return true;
 }
 
-std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const Collection* collection) {
+std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const CollectionPtr& collection) {
     std::vector<BSONObj> result;
     std::vector<std::string> names;
 
@@ -370,7 +370,7 @@ std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const Collecti
     return result;
 }
 
-BSONObj collectionOptions(OperationContext* opCtx, const Collection* collection) {
+BSONObj collectionOptions(OperationContext* opCtx, const CollectionPtr& collection) {
     return DurableCatalog::get(opCtx)
         ->getCollectionOptions(opCtx, collection->getCatalogId())
         .toBSON();
@@ -407,8 +407,7 @@ namespace {
 Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                const repl::OpTime& optime,
                                const DbCheckOplogBatch& entry) {
-    AutoGetCollectionForDbCheck agc(opCtx, entry.getNss(), entry.getType());
-    const Collection* collection = agc.getCollection();
+    AutoGetCollectionForDbCheck collection(opCtx, entry.getNss(), entry.getType());
     std::string msg = "replication consistency check";
 
     if (!collection) {
@@ -419,7 +418,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
     Status status = Status::OK();
     boost::optional<DbCheckHasher> hasher;
     try {
-        hasher.emplace(opCtx, collection, entry.getMinKey(), entry.getMaxKey());
+        hasher.emplace(opCtx, collection.getCollection(), entry.getMinKey(), entry.getMaxKey());
     } catch (const DBException& exception) {
         auto logEntry = dbCheckErrorHealthLogEntry(
             entry.getNss(), msg, OplogEntriesEnum::Batch, exception.toStatus());

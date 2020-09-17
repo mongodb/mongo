@@ -513,7 +513,7 @@ public:
                 opCtx->recoveryUnit()->setReadOnce(true);
             }
             exec->reattachToOperationContext(opCtx);
-            exec->restoreState();
+            exec->restoreState(nullptr);
 
             auto planSummary = exec->getPlanSummary();
             {
@@ -584,7 +584,7 @@ public:
                 [exec, dropAndReacquireReadLock]() {
                     exec->saveState();
                     dropAndReacquireReadLock();
-                    exec->restoreState();
+                    exec->restoreState(nullptr);
                 };
 
             waitWithPinnedCursorDuringGetMoreBatch.execute([&](const BSONObj& data) {

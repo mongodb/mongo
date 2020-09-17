@@ -591,7 +591,7 @@ void Explain::statsToBSON(const PlanStageStats& stats,
 }
 
 void Explain::generatePlannerInfo(PlanExecutor* exec,
-                                  const Collection* collection,
+                                  const CollectionPtr& collection,
                                   BSONObj extraInfo,
                                   BSONObjBuilder* out) {
     auto planExecImpl = dynamic_cast<PlanExecutorImpl*>(exec);
@@ -795,7 +795,7 @@ void Explain::generateExecutionInfo(PlanExecutor* exec,
 }
 
 void Explain::explainStages(PlanExecutor* exec,
-                            const Collection* collection,
+                            const CollectionPtr& collection,
                             ExplainOptions::Verbosity verbosity,
                             Status executePlanStatus,
                             PlanStageStats* winningPlanTrialStats,
@@ -833,7 +833,7 @@ void Explain::explainPipelineExecutor(PlanExecutorPipeline* exec,
 }
 
 void Explain::explainStages(PlanExecutor* exec,
-                            const Collection* collection,
+                            const CollectionPtr& collection,
                             ExplainOptions::Verbosity verbosity,
                             BSONObj extraInfo,
                             BSONObjBuilder* out) {
@@ -844,6 +844,7 @@ void Explain::explainStages(PlanExecutor* exec,
     auto winningPlanTrialStats = Explain::getWinningPlanTrialStats(exec);
 
     Status executePlanStatus = Status::OK();
+    const CollectionPtr* collectionPtr = &collection;
 
     // If we need execution stats, then run the plan in order to gather the stats.
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -857,12 +858,12 @@ void Explain::explainStages(PlanExecutor* exec,
         // then the collection may no longer be valid. We conservatively set our collection pointer
         // to null in case it is invalid.
         if (executePlanStatus != ErrorCodes::NoQueryExecutionPlans) {
-            collection = nullptr;
+            collectionPtr = &CollectionPtr::null;
         }
     }
 
     explainStages(exec,
-                  collection,
+                  *collectionPtr,
                   verbosity,
                   executePlanStatus,
                   winningPlanTrialStats.get(),

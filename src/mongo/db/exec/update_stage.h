@@ -86,7 +86,7 @@ public:
     UpdateStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
-                const Collection* collection,
+                const CollectionPtr& collection,
                 PlanStage* child);
 
     bool isEOF() override;
@@ -104,7 +104,7 @@ protected:
     UpdateStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,
                 WorkingSet* ws,
-                const Collection* collection);
+                const CollectionPtr& collection);
 
     void doSaveStateRequiresCollection() final {}
 

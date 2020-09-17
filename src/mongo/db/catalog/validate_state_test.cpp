@@ -63,8 +63,7 @@ public:
     /**
      * Create collection 'nss' and insert some documents. It will possess a default _id index.
      */
-    const Collection* createCollectionAndPopulateIt(OperationContext* opCtx,
-                                                    const NamespaceString& nss);
+    void createCollectionAndPopulateIt(OperationContext* opCtx, const NamespaceString& nss);
 
 private:
     void setUp() override;
@@ -76,13 +75,12 @@ void ValidateStateTest::createCollection(OperationContext* opCtx, const Namespac
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, defaultCollectionOptions));
 }
 
-const Collection* ValidateStateTest::createCollectionAndPopulateIt(OperationContext* opCtx,
-                                                                   const NamespaceString& nss) {
+void ValidateStateTest::createCollectionAndPopulateIt(OperationContext* opCtx,
+                                                      const NamespaceString& nss) {
     // Create collection.
     createCollection(opCtx, nss);
 
-    AutoGetCollection autoColl(opCtx, nss, MODE_X);
-    const Collection* collection = autoColl.getCollection();
+    AutoGetCollection collection(opCtx, nss, MODE_X);
     invariant(collection);
 
     // Insert some data.
@@ -93,8 +91,6 @@ const Collection* ValidateStateTest::createCollectionAndPopulateIt(OperationCont
             collection->insertDocument(opCtx, InsertStatement(BSON("_id" << i)), nullOpDebug));
         wuow.commit();
     }
-
-    return collection;
 }
 
 void ValidateStateTest::setUp() {
@@ -124,8 +120,7 @@ void ValidateStateTest::setUp() {
  * Builds an index on the given 'nss'. 'indexKey' specifies the index key, e.g. {'a': 1};
  */
 void createIndex(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& indexKey) {
-    AutoGetCollection autoColl(opCtx, nss, MODE_X);
-    auto collection = autoColl.getCollection();
+    AutoGetCollection collection(opCtx, nss, MODE_X);
     ASSERT(collection);
 
     ASSERT_EQ(1, indexKey.nFields()) << nss << "/" << indexKey;

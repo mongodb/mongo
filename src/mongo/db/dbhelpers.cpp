@@ -61,7 +61,7 @@ using std::unique_ptr;
    set your db SavedContext first
 */
 bool Helpers::findOne(OperationContext* opCtx,
-                      const Collection* collection,
+                      const CollectionPtr& collection,
                       const BSONObj& query,
                       BSONObj& result,
                       bool requireIndex) {
@@ -76,7 +76,7 @@ bool Helpers::findOne(OperationContext* opCtx,
    set your db SavedContext first
 */
 RecordId Helpers::findOne(OperationContext* opCtx,
-                          const Collection* collection,
+                          const CollectionPtr& collection,
                           const BSONObj& query,
                           bool requireIndex) {
     if (!collection)
@@ -88,7 +88,7 @@ RecordId Helpers::findOne(OperationContext* opCtx,
 }
 
 RecordId Helpers::findOne(OperationContext* opCtx,
-                          const Collection* collection,
+                          const CollectionPtr& collection,
                           std::unique_ptr<QueryRequest> qr,
                           bool requireIndex) {
     if (!collection)
@@ -130,7 +130,7 @@ bool Helpers::findById(OperationContext* opCtx,
     invariant(database);
 
     // TODO ForRead?
-    const Collection* collection =
+    CollectionPtr collection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, NamespaceString(ns));
     if (!collection) {
         return false;
@@ -156,7 +156,7 @@ bool Helpers::findById(OperationContext* opCtx,
 }
 
 RecordId Helpers::findById(OperationContext* opCtx,
-                           const Collection* collection,
+                           const CollectionPtr& collection,
                            const BSONObj& idquery) {
     verify(collection);
     const IndexCatalog* catalog = collection->getIndexCatalog();
@@ -167,10 +167,11 @@ RecordId Helpers::findById(OperationContext* opCtx,
 
 // Acquires necessary locks to read the collection with the given namespace. If this is an oplog
 // read, use AutoGetOplog for simplified locking.
-const Collection* getCollectionForRead(OperationContext* opCtx,
-                                       const NamespaceString& ns,
-                                       boost::optional<AutoGetCollectionForReadCommand>& autoColl,
-                                       boost::optional<AutoGetOplog>& autoOplog) {
+const CollectionPtr& getCollectionForRead(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    boost::optional<AutoGetCollectionForReadCommand>& autoColl,
+    boost::optional<AutoGetOplog>& autoOplog) {
     if (ns.isOplog()) {
         // Simplify locking rules for oplog collection.
         autoOplog.emplace(opCtx, OplogAccessMode::kRead);
@@ -184,7 +185,7 @@ const Collection* getCollectionForRead(OperationContext* opCtx,
 bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& result) {
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     boost::optional<AutoGetOplog> autoOplog;
-    auto collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
+    const auto& collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
 
     auto exec = InternalPlanner::collectionScan(
         opCtx, ns, collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
@@ -206,7 +207,7 @@ bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& res
 bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) {
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     boost::optional<AutoGetOplog> autoOplog;
-    auto collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
+    const auto& collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
 
     auto exec = InternalPlanner::collectionScan(
         opCtx, ns, collection, PlanYieldPolicy::YieldPolicy::NO_YIELD, InternalPlanner::BACKWARD);
@@ -306,7 +307,7 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
 void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& nss) {
     OldClientContext context(opCtx, nss.ns());
     repl::UnreplicatedWritesBlock uwb(opCtx);
-    const Collection* collection = context.db()
+    CollectionPtr collection = context.db()
         ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)
         : nullptr;
     deleteObjects(opCtx, collection, nss, BSONObj(), false);

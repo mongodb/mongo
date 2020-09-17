@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/views/view.h"
+#include "mongo/db/yieldable.h"
 
 namespace mongo {
 
@@ -106,7 +107,6 @@ class AutoGetCollectionBase {
     AutoGetCollectionBase& operator=(const AutoGetCollectionBase&) = delete;
 
     using CollectionStorage = typename CatalogCollectionLookupT::CollectionStorage;
-    using CollectionPtr = typename CatalogCollectionLookupT::CollectionPtr;
 
 public:
     AutoGetCollectionBase(
@@ -123,15 +123,15 @@ public:
     /**
      * AutoGetCollection can be used as a pointer with the -> operator.
      */
-    CollectionPtr operator->() const {
-        return getCollection();
+    const Collection* operator->() const {
+        return getCollection().get();
     }
 
     /**
      * Dereference operator, returns a lvalue reference to the collection.
      */
-    std::add_lvalue_reference_t<std::remove_pointer_t<CollectionPtr>> operator*() const {
-        return *getCollection();
+    const Collection& operator*() const {
+        return *getCollection().get();
     }
 
     /**
@@ -151,8 +151,8 @@ public:
     /**
      * Returns nullptr if the collection didn't exist.
      */
-    CollectionPtr getCollection() const {
-        return CatalogCollectionLookupT::toCollectionPtr(_coll);
+    const CollectionPtr& getCollection() const {
+        return _lookup.toCollectionPtr(_coll);
     }
 
     /**
@@ -181,26 +181,28 @@ protected:
     boost::optional<Lock::CollectionLock> _collLock;
 
     CollectionStorage _coll = nullptr;
+    CatalogCollectionLookupT _lookup;
     std::shared_ptr<ViewDefinition> _view;
 };
 
 struct CatalogCollectionLookup {
-    using CollectionStorage = const Collection*;
-    using CollectionPtr = const Collection*;
+    using CollectionStorage = CollectionPtr;
 
-    static CollectionStorage lookupCollection(OperationContext* opCtx, const NamespaceString& nss);
-    static CollectionPtr toCollectionPtr(CollectionStorage collection) {
+    CollectionStorage lookupCollection(OperationContext* opCtx, const NamespaceString& nss);
+    const CollectionPtr& toCollectionPtr(const CollectionStorage& collection) const {
         return collection;
     }
 };
 struct CatalogCollectionLookupForRead {
     using CollectionStorage = std::shared_ptr<const Collection>;
-    using CollectionPtr = const Collection*;
 
-    static CollectionStorage lookupCollection(OperationContext* opCtx, const NamespaceString& nss);
-    static CollectionPtr toCollectionPtr(const CollectionStorage& collection) {
-        return collection.get();
+    CollectionStorage lookupCollection(OperationContext* opCtx, const NamespaceString& nss);
+    const CollectionPtr& toCollectionPtr(const CollectionStorage&) const {
+        return _collection;
     }
+
+private:
+    CollectionPtr _collection;
 };
 
 class AutoGetCollection : public AutoGetCollectionBase<CatalogCollectionLookup> {
@@ -266,19 +268,19 @@ public:
     CollectionWriter& operator=(CollectionWriter&&) = delete;
 
     explicit operator bool() const {
-        return get();
+        return static_cast<bool>(get());
     }
 
     const Collection* operator->() const {
-        return get();
+        return get().get();
     }
 
     const Collection& operator*() const {
-        return *get();
+        return *get().get();
     }
 
-    const Collection* get() const {
-        return _collection;
+    const CollectionPtr& get() const {
+        return *_collection;
     }
 
     // Returns writable Collection, any previous Collection that has been returned may be
@@ -289,7 +291,13 @@ public:
     void commitToCatalog();
 
 private:
-    const Collection* _collection = nullptr;
+    // If this class is instantiated with the constructors that take UUID or nss we need somewhere
+    // to store the CollectionPtr used. But if it is instantiated with an AutoGetCollection then the
+    // lifetime of the object is managed there. To unify the two code paths we have a pointer that
+    // points to either the CollectionPtr in an AutoGetCollection or to a stored CollectionPtr in
+    // this instance. This can also be used to determine how we were instantiated.
+    const CollectionPtr* _collection = nullptr;
+    CollectionPtr _storedCollection;
     Collection* _writableCollection = nullptr;
     OperationContext* _opCtx = nullptr;
     CollectionCatalog::LifetimeMode _mode;
@@ -418,8 +426,8 @@ public:
     /**
      * Returns a pointer to the oplog collection or nullptr if the oplog collection didn't exist.
      */
-    const Collection* getCollection() const {
-        return _oplog;
+    const CollectionPtr& getCollection() const {
+        return *_oplog;
     }
 
 private:
@@ -429,7 +437,7 @@ private:
     boost::optional<Lock::DBLock> _dbWriteLock;
     boost::optional<Lock::CollectionLock> _collWriteLock;
     repl::LocalOplogInfo* _oplogInfo;
-    const Collection* _oplog;
+    const CollectionPtr* _oplog;
 };
 
 }  // namespace mongo

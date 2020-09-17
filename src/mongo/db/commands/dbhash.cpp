@@ -231,48 +231,50 @@ public:
         std::set<std::string> cappedCollectionSet;
 
         bool noError = true;
-        catalog::forEachCollectionFromDb(opCtx, dbname, MODE_IS, [&](const Collection* collection) {
-            auto collNss = collection->ns();
+        catalog::forEachCollectionFromDb(
+            opCtx, dbname, MODE_IS, [&](const CollectionPtr& collection) {
+                auto collNss = collection->ns();
 
-            if (collNss.size() - 1 <= dbname.size()) {
-                errmsg = str::stream() << "weird fullCollectionName [" << collNss.toString() << "]";
-                noError = false;
-                return false;
-            }
+                if (collNss.size() - 1 <= dbname.size()) {
+                    errmsg = str::stream()
+                        << "weird fullCollectionName [" << collNss.toString() << "]";
+                    noError = false;
+                    return false;
+                }
 
-            if (repl::ReplicationCoordinator::isOplogDisabledForNS(collNss)) {
+                if (repl::ReplicationCoordinator::isOplogDisabledForNS(collNss)) {
+                    return true;
+                }
+
+                if (collNss.coll().startsWith("tmp.mr.")) {
+                    // We skip any incremental map reduce collections as they also aren't
+                    // replicated.
+                    return true;
+                }
+
+                if (desiredCollections.size() > 0 &&
+                    desiredCollections.count(collNss.coll().toString()) == 0)
+                    return true;
+
+                // Don't include 'drop pending' collections.
+                if (collNss.isDropPendingNamespace())
+                    return true;
+
+                if (collection->isCapped()) {
+                    cappedCollectionSet.insert(collNss.coll().toString());
+                }
+
+                if (OptionalCollectionUUID uuid = collection->uuid()) {
+                    collectionToUUIDMap[collNss.coll().toString()] = uuid;
+                }
+
+                // Compute the hash for this collection.
+                std::string hash = _hashCollection(opCtx, db, collNss);
+
+                collectionToHashMap[collNss.coll().toString()] = hash;
+
                 return true;
-            }
-
-            if (collNss.coll().startsWith("tmp.mr.")) {
-                // We skip any incremental map reduce collections as they also aren't
-                // replicated.
-                return true;
-            }
-
-            if (desiredCollections.size() > 0 &&
-                desiredCollections.count(collNss.coll().toString()) == 0)
-                return true;
-
-            // Don't include 'drop pending' collections.
-            if (collNss.isDropPendingNamespace())
-                return true;
-
-            if (collection->isCapped()) {
-                cappedCollectionSet.insert(collNss.coll().toString());
-            }
-
-            if (OptionalCollectionUUID uuid = collection->uuid()) {
-                collectionToUUIDMap[collNss.coll().toString()] = uuid;
-            }
-
-            // Compute the hash for this collection.
-            std::string hash = _hashCollection(opCtx, db, collNss);
-
-            collectionToHashMap[collNss.coll().toString()] = hash;
-
-            return true;
-        });
+            });
         if (!noError)
             return false;
 
@@ -315,7 +317,7 @@ public:
 private:
     std::string _hashCollection(OperationContext* opCtx, Database* db, const NamespaceString& nss) {
 
-        const Collection* collection =
+        CollectionPtr collection =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         invariant(collection);
 

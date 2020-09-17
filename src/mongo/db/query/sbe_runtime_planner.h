@@ -60,7 +60,7 @@ public:
 class BaseRuntimePlanner : public RuntimePlanner {
 public:
     BaseRuntimePlanner(OperationContext* opCtx,
-                       const Collection* collection,
+                       const CollectionPtr& collection,
                        const CanonicalQuery& cq,
                        PlanYieldPolicySBE* yieldPolicy)
         : _opCtx(opCtx), _collection(collection), _cq(cq), _yieldPolicy(yieldPolicy) {
@@ -95,7 +95,7 @@ protected:
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots);
 
     OperationContext* const _opCtx;
-    const Collection* const _collection;
+    const CollectionPtr& _collection;
     const CanonicalQuery& _cq;
     PlanYieldPolicySBE* const _yieldPolicy;
 };

@@ -44,7 +44,6 @@
 
 namespace mongo {
 
-class Collection;
 class CursorManager;
 class RecoveryUnit;
 

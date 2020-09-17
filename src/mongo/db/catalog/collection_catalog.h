@@ -55,7 +55,7 @@ class CollectionCatalog {
     friend class iterator;
 
 public:
-    using CollectionInfoFn = std::function<bool(const Collection* collection)>;
+    using CollectionInfoFn = std::function<bool(const CollectionPtr& collection)>;
 
     enum class LifetimeMode {
         // Lifetime of writable Collection is managed by an active write unit of work. The writable
@@ -73,10 +73,14 @@ public:
 
     class iterator {
     public:
-        using value_type = const Collection*;
+        using value_type = CollectionPtr;
 
-        iterator(StringData dbName, uint64_t genNum, const CollectionCatalog& catalog);
-        iterator(std::map<std::pair<std::string, CollectionUUID>,
+        iterator(OperationContext* opCtx,
+                 StringData dbName,
+                 uint64_t genNum,
+                 const CollectionCatalog& catalog);
+        iterator(OperationContext* opCtx,
+                 std::map<std::pair<std::string, CollectionUUID>,
                           std::shared_ptr<Collection>>::const_iterator mapIter);
         value_type operator*();
         iterator operator++();
@@ -104,13 +108,13 @@ public:
         bool _repositionIfNeeded();
         bool _exhausted();
 
+        OperationContext* _opCtx;
         std::string _dbName;
         boost::optional<CollectionUUID> _uuid;
         uint64_t _genNum;
         std::map<std::pair<std::string, CollectionUUID>,
                  std::shared_ptr<Collection>>::const_iterator _mapIter;
         const CollectionCatalog* _catalog;
-        static constexpr Collection* _nullCollection = nullptr;
     };
 
     struct ProfileSettings {
@@ -182,7 +186,7 @@ public:
     Collection* lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
                                                        LifetimeMode mode,
                                                        CollectionUUID uuid);
-    const Collection* lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
+    CollectionPtr lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
     std::shared_ptr<const Collection> lookupCollectionByUUIDForRead(OperationContext* opCtx,
                                                                     CollectionUUID uuid) const;
 
@@ -205,8 +209,8 @@ public:
     Collection* lookupCollectionByNamespaceForMetadataWrite(OperationContext* opCtx,
                                                             LifetimeMode mode,
                                                             const NamespaceString& nss);
-    const Collection* lookupCollectionByNamespace(OperationContext* opCtx,
-                                                  const NamespaceString& nss) const;
+    CollectionPtr lookupCollectionByNamespace(OperationContext* opCtx,
+                                              const NamespaceString& nss) const;
     std::shared_ptr<const Collection> lookupCollectionByNamespaceForRead(
         OperationContext* opCtx, const NamespaceString& nss) const;
 
@@ -324,8 +328,8 @@ public:
      */
     uint64_t getEpoch() const;
 
-    iterator begin(StringData db) const;
-    iterator end() const;
+    iterator begin(OperationContext* opCtx, StringData db) const;
+    iterator end(OperationContext* opCtx) const;
 
     /**
      * Lookup the name of a resource by its ResourceId. If there are multiple namespaces mapped to

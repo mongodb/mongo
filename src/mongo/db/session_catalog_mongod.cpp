@@ -270,9 +270,8 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
 }
 
 boost::optional<UUID> MongoDSessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {
-    AutoGetCollection autoColl(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
+    AutoGetCollection coll(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
 
-    const auto coll = autoColl.getCollection();
     if (!coll) {
         return boost::none;
     }

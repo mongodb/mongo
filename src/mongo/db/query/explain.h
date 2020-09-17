@@ -42,6 +42,7 @@
 namespace mongo {
 
 class Collection;
+class CollectionPtr;
 class OperationContext;
 class PlanExecutorPipeline;
 struct PlanSummaryStats;
@@ -72,7 +73,7 @@ public:
      * added to the "executionStats" section of the explain.
      */
     static void explainStages(PlanExecutor* exec,
-                              const Collection* collection,
+                              const CollectionPtr& collection,
                               ExplainOptions::Verbosity verbosity,
                               BSONObj extraInfo,
                               BSONObjBuilder* out);
@@ -92,7 +93,7 @@ public:
      * - 'out' is the builder for the explain output.
      */
     static void explainStages(PlanExecutor* exec,
-                              const Collection* collection,
+                              const CollectionPtr& collection,
                               ExplainOptions::Verbosity verbosity,
                               Status executePlanStatus,
                               PlanStageStats* winningPlanTrialStats,
@@ -205,7 +206,7 @@ private:
      * - 'out' is a builder for the explain output.
      */
     static void generatePlannerInfo(PlanExecutor* exec,
-                                    const Collection* collection,
+                                    const CollectionPtr& collection,
                                     BSONObj extraInfo,
                                     BSONObjBuilder* out);
 

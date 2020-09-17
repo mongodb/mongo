@@ -289,7 +289,7 @@ public:
 
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
-            const Collection* const collection = ctx->getCollection();
+            const auto& collection = ctx->getCollection();
 
             // Get the execution plan for the query.
             bool permitYield = true;
@@ -412,7 +412,7 @@ public:
                 return;
             }
 
-            const Collection* const collection = ctx->getCollection();
+            const auto& collection = ctx->getCollection();
 
             if (cq->getQueryRequest().isReadOnce()) {
                 // The readOnce option causes any storage-layer cursors created during plan

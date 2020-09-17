@@ -87,7 +87,7 @@ const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx
     return _indexedPaths;
 }
 
-void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const Collection* coll) {
+void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const CollectionPtr& coll) {
     _indexedPaths.clear();
 
     std::unique_ptr<IndexCatalog::IndexIterator> it =
@@ -160,7 +160,7 @@ void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const Collec
 }
 
 void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
-                                        const Collection* coll,
+                                        const CollectionPtr& coll,
                                         const PlanSummaryStats& summaryStats) const {
     auto& collectionIndexUsageTracker =
         CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations());
@@ -181,7 +181,7 @@ void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
     }
 }
 
-void CollectionQueryInfo::clearQueryCache(const Collection* coll) const {
+void CollectionQueryInfo::clearQueryCache(const CollectionPtr& coll) const {
     LOGV2_DEBUG(20907,
                 1,
                 "Clearing plan cache - collection info cache reset",
@@ -196,7 +196,7 @@ PlanCache* CollectionQueryInfo::getPlanCache() const {
 }
 
 void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx,
-                                                      const Collection* coll) {
+                                                      const CollectionPtr& coll) {
     std::vector<CoreIndexInfo> indexCores;
 
     // TODO We shouldn't need to include unfinished indexes, but we must here because the index
@@ -212,7 +212,7 @@ void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx,
     _planCache->notifyOfIndexUpdates(indexCores);
 }
 
-void CollectionQueryInfo::init(OperationContext* opCtx, const Collection* coll) {
+void CollectionQueryInfo::init(OperationContext* opCtx, const CollectionPtr& coll) {
     const bool includeUnfinishedIndexes = false;
     std::unique_ptr<IndexCatalog::IndexIterator> ii =
         coll->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
@@ -226,7 +226,7 @@ void CollectionQueryInfo::init(OperationContext* opCtx, const Collection* coll) 
 }
 
 void CollectionQueryInfo::addedIndex(OperationContext* opCtx,
-                                     const Collection* coll,
+                                     const CollectionPtr& coll,
                                      const IndexDescriptor* desc) {
     invariant(desc);
 
@@ -236,14 +236,14 @@ void CollectionQueryInfo::addedIndex(OperationContext* opCtx,
 }
 
 void CollectionQueryInfo::droppedIndex(OperationContext* opCtx,
-                                       const Collection* coll,
+                                       const CollectionPtr& coll,
                                        StringData indexName) {
     rebuildIndexData(opCtx, coll);
     CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations())
         .unregisterIndex(indexName);
 }
 
-void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const Collection* coll) {
+void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const CollectionPtr& coll) {
     clearQueryCache(coll);
 
     _keysComputed = false;

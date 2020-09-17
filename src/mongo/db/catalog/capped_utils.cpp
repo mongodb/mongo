@@ -113,7 +113,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                              const NamespaceString& toNss,
                              long long size,
                              bool temp) {
-    const Collection* fromCollection =
+    const CollectionPtr& fromCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, fromNss);
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -152,7 +152,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         uassertStatusOK(createCollection(opCtx, toNss.db().toString(), cmd.done()));
     }
 
-    const Collection* toCollection =
+    const CollectionPtr& toCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
     invariant(toCollection);  // we created above
 
@@ -231,7 +231,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             // abandonSnapshot.
             exec->saveState();
             opCtx->recoveryUnit()->abandonSnapshot();
-            exec->restoreState();  // Handles any WCEs internally.
+            exec->restoreState(&fromCollection);  // Handles any WCEs internally.
         }
     }
 

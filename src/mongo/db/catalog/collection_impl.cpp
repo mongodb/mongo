@@ -690,7 +690,8 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     }
 
     int64_t keysInserted;
-    status = _indexCatalog->indexRecords(opCtx, this, bsonRecords, &keysInserted);
+    status = _indexCatalog->indexRecords(
+        opCtx, {this, CollectionPtr::NoYieldTag{}}, bsonRecords, &keysInserted);
     if (opDebug) {
         opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
     }
@@ -841,8 +842,13 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     if (indexesAffected) {
         int64_t keysInserted, keysDeleted;
 
-        uassertStatusOK(_indexCatalog->updateRecord(
-            opCtx, this, *args->preImageDoc, newDoc, oldLocation, &keysInserted, &keysDeleted));
+        uassertStatusOK(_indexCatalog->updateRecord(opCtx,
+                                                    {this, CollectionPtr::NoYieldTag{}},
+                                                    *args->preImageDoc,
+                                                    newDoc,
+                                                    oldLocation,
+                                                    &keysInserted,
+                                                    &keysDeleted));
 
         if (opDebug) {
             opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
@@ -1233,13 +1239,18 @@ StatusWith<std::vector<BSONObj>> CollectionImpl::addCollationDefaultsToIndexSpec
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExecutor(
     OperationContext* opCtx,
+    const CollectionPtr& yieldableCollection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     ScanDirection scanDirection,
     boost::optional<RecordId> resumeAfterRecordId) const {
     auto isForward = scanDirection == ScanDirection::kForward;
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
-    return InternalPlanner::collectionScan(
-        opCtx, _ns.ns(), this, yieldPolicy, direction, resumeAfterRecordId);
+    return InternalPlanner::collectionScan(opCtx,
+                                           yieldableCollection->ns().ns(),
+                                           yieldableCollection,
+                                           yieldPolicy,
+                                           direction,
+                                           resumeAfterRecordId);
 }
 
 void CollectionImpl::setNs(NamespaceString nss) {

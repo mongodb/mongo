@@ -76,7 +76,7 @@ Status _createView(OperationContext* opCtx,
 
         // Create 'system.views' in a separate WUOW if it does not exist.
         WriteUnitOfWork wuow(opCtx);
-        const Collection* coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+        CollectionPtr coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
             opCtx, NamespaceString(db->getSystemViewsName()));
         if (!coll) {
             coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));
@@ -119,7 +119,7 @@ Status _createCollection(OperationContext* opCtx,
         // This is a top-level handler for collection creation name conflicts. New commands coming
         // in, or commands that generated a WriteConflict must return a NamespaceExists error here
         // on conflict.
-        if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss) != nullptr) {
+        if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)) {
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "Collection already exists. NS: " << nss);
         }

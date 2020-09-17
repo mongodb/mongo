@@ -39,7 +39,7 @@
 namespace mongo {
 namespace write_stage_common {
 
-bool ensureStillMatches(const Collection* collection,
+bool ensureStillMatches(const CollectionPtr& collection,
                         OperationContext* opCtx,
                         WorkingSet* ws,
                         WorkingSetID id,

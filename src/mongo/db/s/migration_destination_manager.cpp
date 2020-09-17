@@ -717,7 +717,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         // missing (auto-heal indexes).
 
         // Checks that the collection's UUID matches the donor's.
-        auto checkUUIDsMatch = [&](const Collection* collection) {
+        auto checkUUIDsMatch = [&](const CollectionPtr& collection) {
             uassert(ErrorCodes::NotWritablePrimary,
                     str::stream() << "Unable to create collection " << nss.ns()
                                   << " because the node is not primary",
@@ -737,7 +737,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
 
         // Gets the missing indexes and checks if the collection is empty (auto-healing is
         // possible).
-        auto checkEmptyOrGetMissingIndexesFromDonor = [&](const Collection* collection) {
+        auto checkEmptyOrGetMissingIndexesFromDonor = [&](const CollectionPtr& collection) {
             auto indexCatalog = collection->getIndexCatalog();
             auto indexSpecs = indexCatalog->removeExistingIndexesNoChecks(
                 opCtx, collectionOptionsAndIndexes.indexSpecs);
@@ -754,12 +754,12 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         };
 
         {
-            AutoGetCollection autoGetCollection(opCtx, nss, MODE_IS);
+            AutoGetCollection collection(opCtx, nss, MODE_IS);
 
-            auto collection = autoGetCollection.getCollection();
             if (collection) {
-                checkUUIDsMatch(collection);
-                auto indexSpecs = checkEmptyOrGetMissingIndexesFromDonor(collection);
+                checkUUIDsMatch(collection.getCollection());
+                auto indexSpecs =
+                    checkEmptyOrGetMissingIndexesFromDonor(collection.getCollection());
                 if (indexSpecs.empty()) {
                     return;
                 }

@@ -42,7 +42,7 @@ PlanExecutorSBE::PlanExecutorSBE(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-    const Collection* collection,
+    const CollectionPtr& collection,
     NamespaceString nss,
     bool isOpen,
     boost::optional<std::queue<std::pair<BSONObj, boost::optional<RecordId>>>> stash,
@@ -105,7 +105,7 @@ void PlanExecutorSBE::saveState() {
     _root->saveState();
 }
 
-void PlanExecutorSBE::restoreState() {
+void PlanExecutorSBE::restoreState(const Yieldable* yieldable) {
     invariant(_root);
     _root->restoreState();
 }

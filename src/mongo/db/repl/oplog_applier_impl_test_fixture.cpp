@@ -89,7 +89,7 @@ void OplogApplierImplOpObserver::onUpdate(OperationContext* opCtx,
 }
 
 void OplogApplierImplOpObserver::onCreateCollection(OperationContext* opCtx,
-                                                    const Collection* coll,
+                                                    const CollectionPtr& coll,
                                                     const NamespaceString& collectionName,
                                                     const CollectionOptions& options,
                                                     const BSONObj& idIndex,

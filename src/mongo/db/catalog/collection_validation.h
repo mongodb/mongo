@@ -36,6 +36,7 @@ namespace mongo {
 
 class OperationContext;
 class Collection;
+class CollectionPtr;
 class BSONObjBuilder;
 class Status;
 

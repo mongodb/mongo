@@ -44,7 +44,7 @@ StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& ns,
                                            bool includeBuildUUIDs);
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
-                                     const Collection* collection,
+                                     const CollectionPtr& collection,
                                      const NamespaceString& nss,
                                      bool includeBuildUUIDs);
 std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,

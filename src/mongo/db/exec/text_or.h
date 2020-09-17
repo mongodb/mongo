@@ -71,7 +71,7 @@ public:
                 const FTSSpec& ftsSpec,
                 WorkingSet* ws,
                 const MatchExpression* filter,
-                const Collection* collection);
+                const CollectionPtr& collection);
 
     void addChild(std::unique_ptr<PlanStage> child);
 

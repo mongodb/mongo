@@ -36,6 +36,7 @@
 namespace mongo {
 
 class Collection;
+class CollectionPtr;
 class CollectionCatalogEntry;
 
 namespace catalog {

@@ -112,11 +112,11 @@ void DeferredWriter::_worker(InsertStatement stmt) {
 
     auto agc = std::move(result.getValue());
 
-    const Collection& collection = *agc->getCollection();
+    const CollectionPtr& collection = agc->getCollection();
 
     Status status = writeConflictRetry(opCtx, "deferred insert", _nss.ns(), [&] {
         WriteUnitOfWork wuow(opCtx);
-        Status status = collection.insertDocument(opCtx, stmt, nullptr, false);
+        Status status = collection->insertDocument(opCtx, stmt, nullptr, false);
         if (!status.isOK()) {
             return status;
         }

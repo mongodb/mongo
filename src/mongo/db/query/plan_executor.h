@@ -187,7 +187,7 @@ public:
      * WriteConflictException is encountered. If the time limit is exceeded during this retry
      * process, throws ErrorCodes::MaxTimeMSExpired.
      */
-    virtual void restoreState() = 0;
+    virtual void restoreState(const Yieldable* yieldable) = 0;
 
     /**
      * Detaches from the OperationContext and releases any storage-engine state.

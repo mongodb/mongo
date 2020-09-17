@@ -83,7 +83,7 @@ MONGO_FAIL_POINT_DEFINE(throwInternalErrorInDeleteRange);
  * enqueued for deletion.
  */
 bool collectionUuidHasChanged(const NamespaceString& nss,
-                              const Collection* currentCollection,
+                              const CollectionPtr& currentCollection,
                               UUID expectedCollectionUuid) {
 
     if (!currentCollection) {
@@ -121,11 +121,11 @@ bool collectionUuidHasChanged(const NamespaceString& nss,
  * the range failed.
  */
 StatusWith<int> deleteNextBatch(OperationContext* opCtx,
-                                const Collection* collection,
+                                const CollectionPtr& collection,
                                 BSONObj const& keyPattern,
                                 ChunkRange const& range,
                                 int numDocsToRemovePerBatch) {
-    invariant(collection != nullptr);
+    invariant(collection);
 
     auto const& nss = collection->ns();
 
@@ -303,18 +303,21 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                        ensureRangeDeletionTaskStillExists(opCtx, *migrationId);
                    }
 
-                   AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-                   auto* const collection = autoColl.getCollection();
+                   AutoGetCollection collection(opCtx, nss, MODE_IX);
 
                    // Ensure the collection exists and has not been dropped or dropped and
                    // recreated.
-                   uassert(ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
-                           "Collection has been dropped since enqueuing this range "
-                           "deletion task. No need to delete documents.",
-                           !collectionUuidHasChanged(nss, collection, collectionUuid));
+                   uassert(
+                       ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
+                       "Collection has been dropped since enqueuing this range "
+                       "deletion task. No need to delete documents.",
+                       !collectionUuidHasChanged(nss, collection.getCollection(), collectionUuid));
 
-                   auto numDeleted = uassertStatusOK(deleteNextBatch(
-                       opCtx, collection, keyPattern, range, numDocsToRemovePerBatch));
+                   auto numDeleted = uassertStatusOK(deleteNextBatch(opCtx,
+                                                                     collection.getCollection(),
+                                                                     keyPattern,
+                                                                     range,
+                                                                     numDocsToRemovePerBatch));
 
                    LOGV2_DEBUG(
                        23769,

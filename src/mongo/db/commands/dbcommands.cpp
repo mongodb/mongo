@@ -479,8 +479,7 @@ public:
         bool estimate = jsobj["estimate"].trueValue();
 
         const NamespaceString nss(ns);
-        AutoGetCollectionForReadCommand ctx(opCtx, nss);
-        const Collection* collection = ctx.getCollection();
+        AutoGetCollectionForReadCommand collection(opCtx, nss);
 
         const auto collDesc =
             CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
@@ -527,7 +526,7 @@ public:
                 return 1;
             }
             exec = InternalPlanner::collectionScan(
-                opCtx, ns, collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                opCtx, ns, collection.getCollection(), PlanYieldPolicy::YieldPolicy::NO_YIELD);
         } else if (min.isEmpty() || max.isEmpty()) {
             errmsg = "only one of min or max specified";
             return false;
@@ -552,7 +551,7 @@ public:
             max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
 
             exec = InternalPlanner::indexScan(opCtx,
-                                              collection,
+                                              collection.getCollection(),
                                               idx,
                                               min,
                                               max,

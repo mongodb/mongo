@@ -603,12 +603,12 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
                   "Scanning collection to fix collection count",
                   "namespace"_attr = nss.ns(),
                   "uuid"_attr = uuid.toString());
-            AutoGetCollectionForRead autoCollToScan(opCtx, nss);
-            auto collToScan = autoCollToScan.getCollection();
-            invariant(coll == collToScan,
+            AutoGetCollectionForRead collToScan(opCtx, nss);
+            invariant(coll == collToScan.getCollection(),
                       str::stream() << "Catalog returned invalid collection: " << nss.ns() << " ("
                                     << uuid.toString() << ")");
             auto exec = collToScan->makePlanExecutor(opCtx,
+                                                     collToScan.getCollection(),
                                                      PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                      Collection::ScanDirection::kForward);
             long long countFromScan = 0;

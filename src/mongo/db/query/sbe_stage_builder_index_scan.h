@@ -40,7 +40,7 @@ namespace mongo::stage_builder {
  */
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateIndexScan(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     const IndexScanNode* ixn,
     boost::optional<sbe::value::SlotId> returnKeySlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,
@@ -67,7 +67,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateIndexScan
  * in the index.
  */
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleIntervalIndexScan(
-    const Collection* collection,
+    const CollectionPtr& collection,
     const std::string& indexName,
     bool forward,
     std::unique_ptr<KeyString::Value> lowKey,

@@ -76,9 +76,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
     }
 
     {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        AutoGetCollection collection(opCtx, nss, MODE_IS);
 
-        const Collection* const collection = autoColl.getCollection();
         uassert(ErrorCodes::NamespaceNotFound, "ns not found", collection);
 
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
@@ -164,7 +163,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         long long numChunks = 0;
 
         auto exec = InternalPlanner::indexScan(opCtx,
-                                               collection,
+                                               collection.getCollection(),
                                                idx,
                                                minKey,
                                                maxKey,
@@ -182,7 +181,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         BSONObj maxKeyInChunk;
         {
             auto exec = InternalPlanner::indexScan(opCtx,
-                                                   collection,
+                                                   collection.getCollection(),
                                                    idx,
                                                    maxKey,
                                                    minKey,
@@ -299,7 +298,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                   "keyCount"_attr = keyCount);
 
             exec = InternalPlanner::indexScan(opCtx,
-                                              collection,
+                                              collection.getCollection(),
                                               idx,
                                               minKey,
                                               maxKey,

@@ -1124,7 +1124,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
 StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     const PlanCache* planCache,
     const CanonicalQuery& query,
     const QueryPlannerParams& params) {

@@ -45,20 +45,24 @@ MONGO_FAIL_POINT_DEFINE(setInterruptOnlyPlansCheckForInterruptHang);
 }  // namespace
 
 PlanYieldPolicyImpl::PlanYieldPolicyImpl(PlanExecutorImpl* exec,
-                                         PlanYieldPolicy::YieldPolicy policy)
+                                         PlanYieldPolicy::YieldPolicy policy,
+                                         const Yieldable* yieldable)
     : PlanYieldPolicy(exec->getOpCtx()->lockState()->isGlobalLockedRecursively()
                           ? PlanYieldPolicy::YieldPolicy::NO_YIELD
                           : policy,
                       exec->getOpCtx()->getServiceContext()->getFastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()}),
-      _planYielding(exec) {}
+      _planYielding(exec),
+      _yieldable(yieldable) {}
 
 Status PlanYieldPolicyImpl::yield(OperationContext* opCtx, std::function<void()> whileYieldingFn) {
     // Can't use writeConflictRetry since we need to call saveState before reseting the
     // transaction.
     for (int attempt = 1; true; attempt++) {
         try {
+            // Saving and restoring state modifies _yieldable so make a copy before we start
+            const Yieldable* yieldable = _yieldable;
             try {
                 _planYielding->saveState();
             } catch (const WriteConflictException&) {
@@ -70,10 +74,10 @@ Status PlanYieldPolicyImpl::yield(OperationContext* opCtx, std::function<void()>
                 opCtx->recoveryUnit()->abandonSnapshot();
             } else {
                 // Release and reacquire locks.
-                _yieldAllLocks(opCtx, whileYieldingFn, _planYielding->nss());
+                _yieldAllLocks(opCtx, yieldable, whileYieldingFn, _planYielding->nss());
             }
 
-            _planYielding->restoreStateWithoutRetrying();
+            _planYielding->restoreStateWithoutRetrying(yieldable);
             return Status::OK();
         } catch (const WriteConflictException&) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
@@ -89,6 +93,7 @@ Status PlanYieldPolicyImpl::yield(OperationContext* opCtx, std::function<void()>
 }
 
 void PlanYieldPolicyImpl::_yieldAllLocks(OperationContext* opCtx,
+                                         const Yieldable* yieldable,
                                          std::function<void()> whileYieldingFn,
                                          const NamespaceString& planExecNS) {
     // Things have to happen here in a specific order:
@@ -100,6 +105,10 @@ void PlanYieldPolicyImpl::_yieldAllLocks(OperationContext* opCtx,
     Locker* locker = opCtx->lockState();
 
     Locker::LockSnapshot snapshot;
+
+    if (yieldable) {
+        yieldable->yield();
+    }
 
     auto unlocked = locker->saveLockStateAndUnlock(&snapshot);
 
@@ -128,6 +137,10 @@ void PlanYieldPolicyImpl::_yieldAllLocks(OperationContext* opCtx,
     }
 
     locker->restoreLockState(opCtx, snapshot);
+
+    if (yieldable) {
+        yieldable->restore();
+    }
 
     // After yielding and reacquiring locks, the preconditions that were used to select our
     // ReadSource initially need to be checked again. Queries hold an AutoGetCollectionForRead RAII

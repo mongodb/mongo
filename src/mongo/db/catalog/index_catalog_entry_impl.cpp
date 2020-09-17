@@ -170,7 +170,7 @@ void IndexCatalogEntryImpl::setIsReady(bool newIsReady) {
 }
 
 void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
-                                        const Collection* collection,
+                                        const CollectionPtr& collection,
                                         const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths) {
     // An index can either track path-level multikey information in the catalog or as metadata keys
@@ -256,7 +256,7 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
 }
 
 Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
-    OperationContext* opCtx, const Collection* collection, const MultikeyPaths& multikeyPaths) {
+    OperationContext* opCtx, const CollectionPtr& collection, const MultikeyPaths& multikeyPaths) {
     // If we are inside a multi-document transaction, we write the on-disk multikey update in a
     // separate transaction so that it will not generate prepare conflicts with other operations
     // that try to set the multikey flag. In general, it should always be safe to update the
@@ -340,7 +340,7 @@ bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,
 }
 
 void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
-                                                const Collection* collection,
+                                                const CollectionPtr& collection,
                                                 const MultikeyPaths& multikeyPaths) {
     // It's possible that the index type (e.g. ascending/descending index) supports tracking
     // path-level multikey information, but this particular index doesn't.

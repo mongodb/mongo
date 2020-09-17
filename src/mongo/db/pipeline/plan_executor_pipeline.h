@@ -62,7 +62,7 @@ public:
     // underlying data access plan is saved/restored internally in between DocumentSourceCursor
     // batches, or when the underlying PlanStage tree yields.
     void saveState() override {}
-    void restoreState() override {}
+    void restoreState(const Yieldable* yieldable) override {}
 
     void detachFromOperationContext() override {
         _pipeline->detachFromOperationContext();

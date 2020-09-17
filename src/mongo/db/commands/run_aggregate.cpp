@@ -563,7 +563,7 @@ Status runAggregate(OperationContext* opCtx,
             }
         }
 
-        const Collection* collection = ctx ? ctx->getCollection() : nullptr;
+        const auto& collection = ctx ? ctx->getCollection() : CollectionPtr::null;
 
         // If this is a view, resolve it by finding the underlying collection and stitching view
         // pipelines and this request's pipeline together. We then release our locks before
@@ -781,7 +781,7 @@ Status runAggregate(OperationContext* opCtx,
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
         if (ctx && ctx->getCollection()) {
-            const Collection* coll = ctx->getCollection();
+            const CollectionPtr& coll = ctx->getCollection();
             CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, stats);
         }
     }

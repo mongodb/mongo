@@ -150,7 +150,7 @@ Status IndexBuildInterceptor::checkDuplicateKeyConstraints(OperationContext* opC
 }
 
 Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
-                                                   const Collection* coll,
+                                                   const CollectionPtr& coll,
                                                    const InsertDeleteOptions& options,
                                                    TrackDuplicates trackDuplicates,
                                                    DrainYieldPolicy drainYieldPolicy) {
@@ -307,7 +307,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 }
 
 Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
-                                          const Collection* coll,
+                                          const CollectionPtr& coll,
                                           const BSONObj& operation,
                                           const InsertDeleteOptions& options,
                                           TrackDuplicates trackDups,
@@ -531,7 +531,7 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
 }
 
 Status IndexBuildInterceptor::retrySkippedRecords(OperationContext* opCtx,
-                                                  const Collection* collection) {
+                                                  const CollectionPtr& collection) {
     return _skippedRecordTracker.retrySkippedRecords(opCtx, collection);
 }
 

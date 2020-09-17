@@ -83,14 +83,15 @@ MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
  * Constructs a PlanYieldPolicy based on 'policy'.
  */
 std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(PlanExecutorImpl* exec,
-                                                 PlanYieldPolicy::YieldPolicy policy) {
+                                                 PlanYieldPolicy::YieldPolicy policy,
+                                                 const Yieldable* yieldable) {
     switch (policy) {
         case PlanYieldPolicy::YieldPolicy::YIELD_AUTO:
         case PlanYieldPolicy::YieldPolicy::YIELD_MANUAL:
         case PlanYieldPolicy::YieldPolicy::NO_YIELD:
         case PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
         case PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY: {
-            return std::make_unique<PlanYieldPolicyImpl>(exec, policy);
+            return std::make_unique<PlanYieldPolicyImpl>(exec, policy, yieldable);
         }
         case PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT: {
             return std::make_unique<AlwaysTimeOutYieldPolicy>(exec);
@@ -130,7 +131,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    unique_ptr<QuerySolution> qs,
                                    unique_ptr<CanonicalQuery> cq,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   const Collection* collection,
+                                   const CollectionPtr& collection,
                                    NamespaceString nss,
                                    PlanYieldPolicy::YieldPolicy yieldPolicy)
     : _opCtx(opCtx),
@@ -141,8 +142,10 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       _root(std::move(rt)),
       _nss(std::move(nss)),
       // There's no point in yielding if the collection doesn't exist.
-      _yieldPolicy(makeYieldPolicy(
-          this, collection ? yieldPolicy : PlanYieldPolicy::YieldPolicy::NO_YIELD)) {
+      _yieldPolicy(
+          makeYieldPolicy(this,
+                          collection ? yieldPolicy : PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                          collection ? &collection : nullptr)) {
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);
     invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
 
@@ -243,12 +246,13 @@ void PlanExecutorImpl::saveState() {
     if (!isMarkedAsKilled()) {
         _root->saveState();
     }
+    _yieldPolicy->setYieldable(nullptr);
     _currentState = kSaved;
 }
 
-void PlanExecutorImpl::restoreState() {
+void PlanExecutorImpl::restoreState(const Yieldable* yieldable) {
     try {
-        restoreStateWithoutRetrying();
+        restoreStateWithoutRetrying(yieldable);
     } catch (const WriteConflictException&) {
         if (!_yieldPolicy->canAutoYield())
             throw;
@@ -258,9 +262,10 @@ void PlanExecutorImpl::restoreState() {
     }
 }
 
-void PlanExecutorImpl::restoreStateWithoutRetrying() {
+void PlanExecutorImpl::restoreStateWithoutRetrying(const Yieldable* yieldable) {
     invariant(_currentState == kSaved);
 
+    _yieldPolicy->setYieldable(yieldable);
     if (!isMarkedAsKilled()) {
         _root->restoreState();
     }

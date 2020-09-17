@@ -139,7 +139,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    const Collection* collection = ctx.getCollection();
+    CollectionPtr collection = ctx.getCollection();
 
     // Get planner params.
     QueryPlannerParams plannerParams;
@@ -168,7 +168,7 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
         test->insert(BSON("a" << 1 << "b" << i << "c" << i));
     }
 
-    const Collection* collection = ctx.getCollection();
+    CollectionPtr collection = ctx.getCollection();
 
     auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
@@ -252,7 +252,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
     // one relevant index.
     BSONObj query = fromjson("{$or: [{a: 1, b: 15}, {c: 1}]}");
 
-    const Collection* collection = ctx.getCollection();
+    CollectionPtr collection = ctx.getCollection();
 
     auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
@@ -308,7 +308,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
     // ranking. For the second branch it's because there is only one relevant index.
     BSONObj query = fromjson("{$or: [{a: 1, e: 1}, {d: 1}]}");
 
-    const Collection* collection = ctx.getCollection();
+    CollectionPtr collection = ctx.getCollection();
 
     auto qr = std::make_unique<QueryRequest>(nss);
     qr->setFilter(query);
@@ -487,7 +487,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     qr->setSort(BSON("d" << 1));
     auto cq = unittest::assertGet(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
 
-    const Collection* collection = ctx.getCollection();
+    CollectionPtr collection = ctx.getCollection();
 
     QueryPlannerParams plannerParams;
     fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
@@ -571,7 +571,7 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
 }
 
 TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelection) {
-    const Collection* collection = nullptr;
+    CollectionPtr collection = nullptr;
     {
         dbtests::WriteContextForTests ctx{opCtx(), nss.ns()};
         addIndex(BSON("p1" << 1 << "opt1" << 1));
@@ -615,7 +615,7 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
 }
 
 TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSelection) {
-    const Collection* collection = nullptr;
+    CollectionPtr collection = nullptr;
     {
         dbtests::WriteContextForTests ctx{opCtx(), nss.ns()};
         addIndex(BSON("p1" << 1 << "opt1" << 1));

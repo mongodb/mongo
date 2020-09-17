@@ -45,14 +45,14 @@ namespace mongo::stage_builder {
  * will consist of.
  */
 std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,
-                                                      const Collection* collection,
+                                                      const CollectionPtr& collection,
                                                       const CanonicalQuery& cq,
                                                       const QuerySolution& solution,
                                                       WorkingSet* ws);
 
 std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>
 buildSlotBasedExecutableTree(OperationContext* opCtx,
-                             const Collection* collection,
+                             const CollectionPtr& collection,
                              const CanonicalQuery& cq,
                              const QuerySolution& solution,
                              PlanYieldPolicy* yieldPolicy,

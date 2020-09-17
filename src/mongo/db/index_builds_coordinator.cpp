@@ -118,7 +118,7 @@ void checkShardKeyRestrictions(OperationContext* opCtx,
  * bypass the index build registration.
  */
 bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
-                                                     const Collection* collection,
+                                                     const CollectionPtr& collection,
                                                      IndexBuildProtocol protocol) {
     const auto& nss = collection->ns();
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X), str::stream() << nss);
@@ -1436,7 +1436,7 @@ void IndexBuildsCoordinator::_completeSelfAbort(OperationContext* opCtx,
 void IndexBuildsCoordinator::_completeAbortForShutdown(
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replState,
-    const Collection* collection) {
+    const CollectionPtr& collection) {
     // Leave it as-if kill -9 happened. Startup recovery will restart the index build.
     auto isResumable = !replState->lastOpTimeBeforeInterceptors.isNull();
     _indexBuildsManager.abortIndexBuildWithoutCleanupForShutdown(
@@ -1984,8 +1984,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
 
     // AutoGetCollection throws an exception if it is unable to look up the collection by UUID.
     NamespaceStringOrUUID nssOrUuid{dbName.toString(), collectionUUID};
-    AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
-    const Collection* collection = autoColl.getCollection();
+    AutoGetCollection collection(opCtx, nssOrUuid, MODE_X);
     const auto& nss = collection->ns();
 
     // Disallow index builds on drop-pending namespaces (system.drop.*) if we are primary.
@@ -2008,7 +2007,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
 
     std::vector<BSONObj> filteredSpecs;
     try {
-        filteredSpecs = prepareSpecListForCreate(opCtx, collection, nss, specs);
+        filteredSpecs = prepareSpecListForCreate(opCtx, collection.getCollection(), nss, specs);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -2017,16 +2016,17 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
         // The requested index (specs) are already built or are being built. Return success
         // early (this is v4.0 behavior compatible).
         ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
-        int numIndexes = getNumIndexesTotal(opCtx, collection);
+        int numIndexes = getNumIndexesTotal(opCtx, collection.getCollection());
         indexCatalogStats.numIndexesBefore = numIndexes;
         indexCatalogStats.numIndexesAfter = numIndexes;
         return SharedSemiFuture(indexCatalogStats);
     }
 
     // Bypass the thread pool if we are building indexes on an empty collection.
-    if (shouldBuildIndexesOnEmptyCollectionSinglePhased(opCtx, collection, protocol)) {
+    if (shouldBuildIndexesOnEmptyCollectionSinglePhased(
+            opCtx, collection.getCollection(), protocol)) {
         ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
-        indexCatalogStats.numIndexesBefore = getNumIndexesTotal(opCtx, collection);
+        indexCatalogStats.numIndexesBefore = getNumIndexesTotal(opCtx, collection.getCollection());
         try {
             // Replicate this index build using the old-style createIndexes oplog entry to avoid
             // timestamping issues that would result from this empty collection optimization on a
@@ -2044,13 +2044,14 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
             ex.addContext(str::stream() << "index build on empty collection failed: " << buildUUID);
             return ex.toStatus();
         }
-        indexCatalogStats.numIndexesAfter = getNumIndexesTotal(opCtx, collection);
+        indexCatalogStats.numIndexesAfter = getNumIndexesTotal(opCtx, collection.getCollection());
         return SharedSemiFuture(indexCatalogStats);
     }
 
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
         buildUUID, collectionUUID, dbName.toString(), filteredSpecs, protocol);
-    replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection);
+    replIndexBuildState->stats.numIndexesBefore =
+        getNumIndexesTotal(opCtx, collection.getCollection());
 
     auto status = _registerIndexBuild(lk, replIndexBuildState);
     if (!status.isOK()) {
@@ -2317,7 +2318,7 @@ void runOnAlternateContext(OperationContext* opCtx, std::string name, Func func)
 
 void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     const Status& status) {
@@ -2345,7 +2346,7 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
 
 void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     std::shared_ptr<ReplIndexBuildState> replState,
     const IndexBuildOptions& indexBuildOptions,
     const Status& status) {
@@ -2446,12 +2447,11 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
                   status.isA<ErrorCategory::ShutdownError>(),
               str::stream() << "Unexpected error code during index build cleanup: " << status);
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
-        _cleanUpSinglePhaseAfterFailure(
-            opCtx, collection.get(), replState, indexBuildOptions, status);
+        _cleanUpSinglePhaseAfterFailure(opCtx, collection, replState, indexBuildOptions, status);
     } else {
         invariant(IndexBuildProtocol::kTwoPhase == replState->protocol,
                   str::stream() << replState->buildUUID);
-        _cleanUpTwoPhaseAfterFailure(opCtx, collection.get(), replState, indexBuildOptions, status);
+        _cleanUpTwoPhaseAfterFailure(opCtx, collection, replState, indexBuildOptions, status);
     }
 
     // Any error that escapes at this point is not fatal and can be handled by the caller.
@@ -2642,7 +2642,7 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     }
 }
 
-const Collection* IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeysIntoIndex(
+CollectionPtr IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeysIntoIndex(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     // Rebuilding system indexes during startup using the IndexBuildsCoordinator is done by all
     // storage engines if they're missing.
@@ -3029,7 +3029,7 @@ std::vector<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_filte
 }
 
 int IndexBuildsCoordinator::getNumIndexesTotal(OperationContext* opCtx,
-                                               const Collection* collection) {
+                                               const CollectionPtr& collection) {
     invariant(collection);
     const auto& nss = collection->ns();
     invariant(opCtx->lockState()->isLocked(),
@@ -3044,7 +3044,7 @@ int IndexBuildsCoordinator::getNumIndexesTotal(OperationContext* opCtx,
 
 std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     const NamespaceString& nss,
     const std::vector<BSONObj>& indexSpecs) {
     UncommittedCollections::get(opCtx).invariantHasExclusiveAccessToCollection(opCtx,
@@ -3077,7 +3077,9 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
 }
 
 std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
-    OperationContext* opCtx, const Collection* collection, const std::vector<BSONObj>& indexSpecs) {
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const std::vector<BSONObj>& indexSpecs) {
     // This helper function may be called before the collection is created, when we are attempting
     // to check whether the candidate index collides with any existing indexes. If 'collection' is
     // nullptr, skip normalization. Since the collection does not exist there cannot be a conflict,

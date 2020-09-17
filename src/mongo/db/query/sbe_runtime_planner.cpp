@@ -30,6 +30,7 @@
 
 #include "mongo/db/query/sbe_runtime_planner.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/query/plan_executor_sbe.h"

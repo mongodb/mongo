@@ -60,7 +60,7 @@ namespace mongo {
 const char* IndexScan::kStageType = "IXSCAN";
 
 IndexScan::IndexScan(ExpressionContext* expCtx,
-                     const Collection* collection,
+                     const CollectionPtr& collection,
                      IndexScanParams params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)

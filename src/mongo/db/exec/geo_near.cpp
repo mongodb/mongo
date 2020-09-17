@@ -266,7 +266,7 @@ static R2Annulus twoDDistanceBounds(const GeoNearParams& nearParams,
     return fullBounds;
 }
 
-GeoNear2DStage::DensityEstimator::DensityEstimator(const Collection* collection,
+GeoNear2DStage::DensityEstimator::DensityEstimator(const CollectionPtr& collection,
                                                    PlanStage::Children* children,
                                                    BSONObj infoObj,
                                                    const GeoNearParams* nearParams,
@@ -454,7 +454,7 @@ static const string kTwoDIndexNearStage("GEO_NEAR_2D");
 GeoNear2DStage::GeoNear2DStage(const GeoNearParams& nearParams,
                                ExpressionContext* expCtx,
                                WorkingSet* workingSet,
-                               const Collection* collection,
+                               const CollectionPtr& collection,
                                const IndexDescriptor* twoDIndex)
     : NearStage(expCtx,
                 kTwoDIndexNearStage.c_str(),
@@ -480,7 +480,7 @@ public:
                         WorkingSet* ws,
                         std::unique_ptr<PlanStage> child,
                         MatchExpression* filter,
-                        const Collection* collection)
+                        const CollectionPtr& collection)
         : FetchStage(expCtx, ws, std::move(child), filter, collection), _matcher(filter) {}
 
 private:
@@ -520,7 +520,7 @@ static R2Annulus projectBoundsToTwoDDegrees(R2Annulus sphereBounds) {
 }
 
 std::unique_ptr<NearStage::CoveredInterval> GeoNear2DStage::nextInterval(
-    OperationContext* opCtx, WorkingSet* workingSet, const Collection* collection) {
+    OperationContext* opCtx, WorkingSet* workingSet, const CollectionPtr& collection) {
     // The search is finished if we searched at least once and all the way to the edge
     if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
         return nullptr;
@@ -697,7 +697,7 @@ static const string kS2IndexNearStage("GEO_NEAR_2DSPHERE");
 GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
                                            ExpressionContext* expCtx,
                                            WorkingSet* workingSet,
-                                           const Collection* collection,
+                                           const CollectionPtr& collection,
                                            const IndexDescriptor* s2Index)
     : NearStage(expCtx,
                 kS2IndexNearStage.c_str(),
@@ -762,7 +762,7 @@ S2Region* buildS2Region(const R2Annulus& sphereBounds) {
 }
 }  // namespace
 
-GeoNear2DSphereStage::DensityEstimator::DensityEstimator(const Collection* collection,
+GeoNear2DSphereStage::DensityEstimator::DensityEstimator(const CollectionPtr& collection,
                                                          PlanStage::Children* children,
                                                          const GeoNearParams* nearParams,
                                                          const S2IndexingParams& indexParams,
@@ -919,7 +919,7 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* opCtx,
 }
 
 std::unique_ptr<NearStage::CoveredInterval> GeoNear2DSphereStage::nextInterval(
-    OperationContext* opCtx, WorkingSet* workingSet, const Collection* collection) {
+    OperationContext* opCtx, WorkingSet* workingSet, const CollectionPtr& collection) {
     // The search is finished if we searched at least once and all the way to the edge
     if (_currBounds.getInner() >= 0 && _currBounds.getOuter() == _fullBounds.getOuter()) {
         return nullptr;

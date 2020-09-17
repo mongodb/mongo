@@ -189,7 +189,7 @@ void checkCollation(OperationContext* opCtx, const ShardsvrShardCollectionReques
                                AutoGetCollectionViewMode::kViewsForbidden);
 
     const auto actualCollator = [&]() -> const CollatorInterface* {
-        const auto* const coll = autoColl.getCollection();
+        const auto& coll = autoColl.getCollection();
         if (coll) {
             uassert(
                 ErrorCodes::InvalidOptions, "can't shard a capped collection", !coll->isCapped());

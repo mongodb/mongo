@@ -107,11 +107,19 @@ public:
         AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
         Date_t deadline = Date_t::max());
 
+    explicit operator bool() const {
+        return static_cast<bool>(getCollection());
+    }
+
+    const Collection* operator->() const {
+        return getCollection().get();
+    }
+
     Database* getDb() const {
         return _autoColl->getDb();
     }
 
-    const Collection* getCollection() const {
+    const CollectionPtr& getCollection() const {
         return _autoColl->getCollection();
     }
 
@@ -151,11 +159,19 @@ public:
         Date_t deadline = Date_t::max(),
         AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
 
+    explicit operator bool() const {
+        return static_cast<bool>(getCollection());
+    }
+
+    const Collection* operator->() const {
+        return getCollection().get();
+    }
+
     Database* getDb() const {
         return _autoCollForRead.getDb();
     }
 
-    const Collection* getCollection() const {
+    const CollectionPtr& getCollection() const {
         return _autoCollForRead.getCollection();
     }
 

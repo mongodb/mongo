@@ -2303,7 +2303,7 @@ StatusWith<OpTime> ReplicationCoordinatorImpl::getLatestWriteOpTime(OperationCon
     if (!canAcceptNonLocalWrites()) {
         return {ErrorCodes::NotWritablePrimary, "Not primary so can't get latest write optime"};
     }
-    auto oplog = LocalOplogInfo::get(opCtx)->getCollection();
+    const auto& oplog = LocalOplogInfo::get(opCtx)->getCollection();
     if (!oplog) {
         return {ErrorCodes::NamespaceNotFound, "oplog collection does not exist"};
     }
@@ -2836,7 +2836,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
         if (!ns->isOplog()) {
             return true;
         }
-    } else if (auto oplogCollection = LocalOplogInfo::get(opCtx)->getCollection()) {
+    } else if (const auto& oplogCollection = LocalOplogInfo::get(opCtx)->getCollection()) {
         auto uuid = nsOrUUID.uuid();
         invariant(uuid, nsOrUUID.toString());
         if (oplogCollection->uuid() != *uuid) {

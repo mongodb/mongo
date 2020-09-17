@@ -35,6 +35,7 @@ namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 class Collection;
+class CollectionPtr;
 class NamespaceString;
 class OperationContext;
 

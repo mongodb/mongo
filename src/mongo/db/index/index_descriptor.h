@@ -43,6 +43,7 @@
 namespace mongo {
 
 class Collection;
+class CollectionPtr;
 class IndexCatalogEntry;
 class IndexCatalogEntryContainer;
 class OperationContext;
@@ -95,7 +96,7 @@ public:
     /**
      * infoObj is a copy of the index-describing BSONObj contained in the catalog.
      */
-    IndexDescriptor(const Collection* collection,
+    IndexDescriptor(const CollectionPtr& collection,
                     const std::string& accessMethodName,
                     BSONObj infoObj);
 

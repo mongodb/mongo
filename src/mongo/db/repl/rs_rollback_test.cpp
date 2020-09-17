@@ -79,7 +79,7 @@ OplogInterfaceMock::Operation makeNoopOplogEntryAndRecordId(Seconds seconds) {
     return std::make_pair(BSON("ts" << ts.getTimestamp()), RecordId(1));
 }
 
-OplogInterfaceMock::Operation makeDropIndexOplogEntry(const Collection* collection,
+OplogInterfaceMock::Operation makeDropIndexOplogEntry(const CollectionPtr& collection,
                                                       BSONObj key,
                                                       std::string indexName,
                                                       int time) {
@@ -96,7 +96,7 @@ OplogInterfaceMock::Operation makeDropIndexOplogEntry(const Collection* collecti
         RecordId(time));
 }
 
-OplogInterfaceMock::Operation makeStartIndexBuildOplogEntry(const Collection* collection,
+OplogInterfaceMock::Operation makeStartIndexBuildOplogEntry(const CollectionPtr& collection,
                                                             UUID buildUUID,
                                                             BSONObj spec,
                                                             int time) {
@@ -112,7 +112,7 @@ OplogInterfaceMock::Operation makeStartIndexBuildOplogEntry(const Collection* co
                           RecordId(time));
 }
 
-OplogInterfaceMock::Operation makeCommitIndexBuildOplogEntry(const Collection* collection,
+OplogInterfaceMock::Operation makeCommitIndexBuildOplogEntry(const CollectionPtr& collection,
                                                              UUID buildUUID,
                                                              BSONObj spec,
                                                              int time) {
@@ -128,7 +128,7 @@ OplogInterfaceMock::Operation makeCommitIndexBuildOplogEntry(const Collection* c
                           RecordId(time));
 }
 
-OplogInterfaceMock::Operation makeAbortIndexBuildOplogEntry(const Collection* collection,
+OplogInterfaceMock::Operation makeAbortIndexBuildOplogEntry(const CollectionPtr& collection,
                                                             UUID buildUUID,
                                                             BSONObj spec,
                                                             int time) {
@@ -150,7 +150,7 @@ OplogInterfaceMock::Operation makeAbortIndexBuildOplogEntry(const Collection* co
                           RecordId(time));
 }
 
-OplogInterfaceMock::Operation makeCreateIndexOplogEntry(const Collection* collection,
+OplogInterfaceMock::Operation makeCreateIndexOplogEntry(const CollectionPtr& collection,
                                                         BSONObj key,
                                                         std::string indexName,
                                                         int time) {
@@ -847,14 +847,14 @@ BSONObj idxSpec(NamespaceString nss, std::string id) {
 }
 
 // Returns the number of indexes that exist on the given collection.
-int numIndexesOnColl(OperationContext* opCtx, NamespaceString nss, const Collection* coll) {
+int numIndexesOnColl(OperationContext* opCtx, NamespaceString nss, const CollectionPtr& coll) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
     auto indexCatalog = coll->getIndexCatalog();
     ASSERT(indexCatalog);
     return indexCatalog->numIndexesReady(opCtx);
 }
 
-int numIndexesInProgress(OperationContext* opCtx, NamespaceString nss, const Collection* coll) {
+int numIndexesInProgress(OperationContext* opCtx, NamespaceString nss, const CollectionPtr& coll) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
     auto indexCatalog = coll->getIndexCatalog();
     ASSERT(indexCatalog);
@@ -1738,7 +1738,7 @@ OpTime getOpTimeFromOplogEntry(const BSONObj& entry) {
 
 TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
     createOplog(_opCtx.get());
-    const Collection* coll = nullptr;
+    CollectionPtr coll;
     CollectionOptions options;
     options.uuid = UUID::gen();
     {

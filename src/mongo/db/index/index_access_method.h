@@ -87,7 +87,7 @@ public:
      * The behavior of the insertion can be specified through 'options'.
      */
     virtual Status insert(OperationContext* opCtx,
-                          const Collection* coll,
+                          const CollectionPtr& coll,
                           const BSONObj& obj,
                           const RecordId& loc,
                           const InsertDeleteOptions& options,
@@ -100,7 +100,7 @@ public:
      * multikey in the catalog, and sets the path-level multikey information if applicable.
      */
     virtual Status insertKeysAndUpdateMultikeyPaths(OperationContext* opCtx,
-                                                    const Collection* coll,
+                                                    const CollectionPtr& coll,
                                                     const KeyStringSet& keys,
                                                     const KeyStringSet& multikeyMetadataKeys,
                                                     const MultikeyPaths& multikeyPaths,
@@ -114,7 +114,7 @@ public:
      * insertion of these keys should cause the index to become multikey.
      */
     virtual Status insertKeys(OperationContext* opCtx,
-                              const Collection* coll,
+                              const CollectionPtr& coll,
                               const KeyStringSet& keys,
                               const RecordId& loc,
                               const InsertDeleteOptions& options,
@@ -155,7 +155,7 @@ public:
      * 'numDeleted' will be set to the number of keys removed from the index for the document.
      */
     virtual Status update(OperationContext* opCtx,
-                          const Collection* coll,
+                          const CollectionPtr& coll,
                           const UpdateTicket& ticket,
                           int64_t* numInserted,
                           int64_t* numDeleted) = 0;
@@ -215,7 +215,7 @@ public:
      * Sets this index as multikey with the provided paths.
      */
     virtual void setIndexIsMultikey(OperationContext* opCtx,
-                                    const Collection* collection,
+                                    const CollectionPtr& collection,
                                     KeyStringSet multikeyMetadataKeys,
                                     MultikeyPaths paths) = 0;
 
@@ -454,7 +454,7 @@ public:
                               std::unique_ptr<SortedDataInterface> btree);
 
     Status insert(OperationContext* opCtx,
-                  const Collection* coll,
+                  const CollectionPtr& coll,
                   const BSONObj& obj,
                   const RecordId& loc,
                   const InsertDeleteOptions& options,
@@ -462,7 +462,7 @@ public:
                   int64_t* numInserted) final;
 
     Status insertKeys(OperationContext* opCtx,
-                      const Collection* coll,
+                      const CollectionPtr& coll,
                       const KeyStringSet& keys,
                       const RecordId& loc,
                       const InsertDeleteOptions& options,
@@ -470,7 +470,7 @@ public:
                       int64_t* numInserted) final;
 
     Status insertKeysAndUpdateMultikeyPaths(OperationContext* opCtx,
-                                            const Collection* coll,
+                                            const CollectionPtr& coll,
                                             const KeyStringSet& keys,
                                             const KeyStringSet& multikeyMetadataKeys,
                                             const MultikeyPaths& multikeyPaths,
@@ -494,7 +494,7 @@ public:
                        UpdateTicket* ticket) const final;
 
     Status update(OperationContext* opCtx,
-                  const Collection* coll,
+                  const CollectionPtr& coll,
                   const UpdateTicket& ticket,
                   int64_t* numInserted,
                   int64_t* numDeleted) final;
@@ -520,7 +520,7 @@ public:
     Status compact(OperationContext* opCtx) final;
 
     void setIndexIsMultikey(OperationContext* opCtx,
-                            const Collection* collection,
+                            const CollectionPtr& collection,
                             KeyStringSet multikeyMetadataKeys,
                             MultikeyPaths paths) final;
 

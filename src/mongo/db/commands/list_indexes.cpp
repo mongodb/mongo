@@ -157,18 +157,18 @@ public:
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         BSONArrayBuilder firstBatch;
         {
-            AutoGetCollectionForReadCommand ctx(opCtx,
-                                                CommandHelpers::parseNsOrUUID(dbname, cmdObj));
-            const Collection* collection = ctx.getCollection();
+            AutoGetCollectionForReadCommand collection(
+                opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj));
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "ns does not exist: " << ctx.getNss().ns(),
+                    str::stream() << "ns does not exist: " << collection.getNss().ns(),
                     collection);
-            nss = ctx.getNss();
+            nss = collection.getNss();
 
             auto expCtx = make_intrusive<ExpressionContext>(
                 opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
 
-            auto indexList = listIndexesInLock(opCtx, collection, nss, includeBuildUUIDs);
+            auto indexList =
+                listIndexesInLock(opCtx, collection.getCollection(), nss, includeBuildUUIDs);
             auto ws = std::make_unique<WorkingSet>();
             auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
 

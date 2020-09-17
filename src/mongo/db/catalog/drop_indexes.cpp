@@ -60,7 +60,7 @@ constexpr auto kIndexFieldName = "index"_sd;
 Status checkView(OperationContext* opCtx,
                  const NamespaceString& nss,
                  Database* db,
-                 const Collection* collection) {
+                 const CollectionPtr& collection) {
     if (!collection) {
         if (db && ViewCatalog::get(db)->lookup(opCtx, nss.ns())) {
             return Status(ErrorCodes::CommandNotSupportedOnView,
@@ -73,7 +73,7 @@ Status checkView(OperationContext* opCtx,
 
 Status checkReplState(OperationContext* opCtx,
                       NamespaceStringOrUUID dbAndUUID,
-                      const Collection* collection) {
+                      const CollectionPtr& collection) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto canAcceptWrites = replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
     bool writesAreReplicatedAndNotPrimary = opCtx->writesAreReplicated() && !canAcceptWrites;
@@ -142,7 +142,7 @@ StatusWith<const IndexDescriptor*> getDescriptorByKeyPattern(OperationContext* o
  * to be held to look up the index name from the key pattern.
  */
 StatusWith<std::vector<std::string>> getIndexNames(OperationContext* opCtx,
-                                                   const Collection* collection,
+                                                   const CollectionPtr& collection,
                                                    const BSONElement& indexElem) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IX));
 
@@ -187,7 +187,7 @@ std::vector<UUID> abortIndexBuildByIndexNames(OperationContext* opCtx,
  * Drops single index given a descriptor.
  */
 Status dropIndexByDescriptor(OperationContext* opCtx,
-                             const Collection* collection,
+                             const CollectionPtr& collection,
                              IndexCatalog* indexCatalog,
                              const IndexDescriptor* desc) {
     if (desc->isIdIndex()) {

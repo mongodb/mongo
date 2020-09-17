@@ -46,6 +46,7 @@ namespace mongo {
 
 class Client;
 class Collection;
+class CollectionPtr;
 
 class IndexDescriptor;
 struct InsertDeleteOptions;
@@ -221,7 +222,7 @@ public:
     // ---- modify single index
 
     void setMultikeyPaths(OperationContext* const opCtx,
-                          const Collection* coll,
+                          const CollectionPtr& coll,
                           const IndexDescriptor* desc,
                           const KeyStringSet& multikeyMetadataKeys,
                           const MultikeyPaths& multikeyPaths) const override;
@@ -235,7 +236,7 @@ public:
      * This method may throw.
      */
     Status indexRecords(OperationContext* opCtx,
-                        const Collection* coll,
+                        const CollectionPtr& coll,
                         const std::vector<BsonRecord>& bsonRecords,
                         int64_t* keysInsertedOut) override;
 
@@ -243,7 +244,7 @@ public:
      * See IndexCatalog::updateRecord
      */
     Status updateRecord(OperationContext* const opCtx,
-                        const Collection* coll,
+                        const CollectionPtr& coll,
                         const BSONObj& oldDoc,
                         const BSONObj& newDoc,
                         const RecordId& recordId,
@@ -281,7 +282,7 @@ public:
                                     InsertDeleteOptions* options) const override;
 
     void indexBuildSuccess(OperationContext* opCtx,
-                           const Collection* collection,
+                           const CollectionPtr& collection,
                            IndexCatalogEntry* index) override;
 
 private:
@@ -296,7 +297,7 @@ private:
     std::string _getAccessMethodName(const BSONObj& keyPattern) const;
 
     Status _indexKeys(OperationContext* opCtx,
-                      const Collection* coll,
+                      const CollectionPtr& coll,
                       IndexCatalogEntry* index,
                       const KeyStringSet& keys,
                       const KeyStringSet& multikeyMetadataKeys,
@@ -307,19 +308,19 @@ private:
                       int64_t* keysInsertedOut);
 
     Status _indexFilteredRecords(OperationContext* opCtx,
-                                 const Collection* coll,
+                                 const CollectionPtr& coll,
                                  IndexCatalogEntry* index,
                                  const std::vector<BsonRecord>& bsonRecords,
                                  int64_t* keysInsertedOut);
 
     Status _indexRecords(OperationContext* opCtx,
-                         const Collection* coll,
+                         const CollectionPtr& coll,
                          IndexCatalogEntry* index,
                          const std::vector<BsonRecord>& bsonRecords,
                          int64_t* keysInsertedOut);
 
     Status _updateRecord(OperationContext* const opCtx,
-                         const Collection* coll,
+                         const CollectionPtr& coll,
                          IndexCatalogEntry* index,
                          const BSONObj& oldDoc,
                          const BSONObj& newDoc,
@@ -348,7 +349,7 @@ private:
      * plugin-level transformations if appropriate, etc.
      */
     StatusWith<BSONObj> _fixIndexSpec(OperationContext* opCtx,
-                                      const Collection* collection,
+                                      const CollectionPtr& collection,
                                       const BSONObj& spec) const;
 
     Status _isSpecOk(OperationContext* opCtx, const BSONObj& spec) const;

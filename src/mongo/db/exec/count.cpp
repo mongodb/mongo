@@ -46,7 +46,7 @@ using std::vector;
 const char* CountStage::kStageType = "COUNT";
 
 CountStage::CountStage(ExpressionContext* expCtx,
-                       const Collection* collection,
+                       const CollectionPtr& collection,
                        long long limit,
                        long long skip,
                        WorkingSet* ws,

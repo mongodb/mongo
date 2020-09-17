@@ -57,7 +57,7 @@ class PlanYieldPolicy;
 class CachedPlanStage final : public RequiresAllIndicesStage {
 public:
     CachedPlanStage(ExpressionContext* expCtx,
-                    const Collection* collection,
+                    const CollectionPtr& collection,
                     WorkingSet* ws,
                     CanonicalQuery* cq,
                     const QueryPlannerParams& params,

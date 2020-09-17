@@ -121,7 +121,7 @@ AbstractIndexAccessMethod::AbstractIndexAccessMethod(IndexCatalogEntry* btreeSta
 
 // Find the keys for obj, put them in the tree pointing to loc.
 Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
-                                         const Collection* coll,
+                                         const CollectionPtr& coll,
                                          const BSONObj& obj,
                                          const RecordId& loc,
                                          const InsertDeleteOptions& options,
@@ -158,7 +158,7 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
 
 Status AbstractIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
     OperationContext* opCtx,
-    const Collection* coll,
+    const CollectionPtr& coll,
     const KeyStringSet& keys,
     const KeyStringSet& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths,
@@ -185,7 +185,7 @@ Status AbstractIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
 }
 
 Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
-                                             const Collection* coll,
+                                             const CollectionPtr& coll,
                                              const KeyStringSet& keys,
                                              const RecordId& loc,
                                              const InsertDeleteOptions& options,
@@ -422,7 +422,7 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
 }
 
 Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
-                                         const Collection* coll,
+                                         const CollectionPtr& coll,
                                          const UpdateTicket& ticket,
                                          int64_t* numInserted,
                                          int64_t* numDeleted) {
@@ -775,7 +775,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 }
 
 void AbstractIndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx,
-                                                   const Collection* collection,
+                                                   const CollectionPtr& collection,
                                                    KeyStringSet multikeyMetadataKeys,
                                                    MultikeyPaths paths) {
     _indexCatalogEntry->setMultikey(opCtx, collection, multikeyMetadataKeys, paths);

@@ -44,7 +44,7 @@ class OperationContext;
  * not yield. If 'god' is true, deletes are allowed on system namespaces.
  */
 long long deleteObjects(OperationContext* opCtx,
-                        const Collection* collection,
+                        const CollectionPtr& collection,
                         const NamespaceString& ns,
                         BSONObj pattern,
                         bool justOne,

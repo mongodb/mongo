@@ -72,7 +72,7 @@ void markShouldCollectTimingInfoOnSubtree(PlanStage* root) {
 }  // namespace
 
 MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
-                               const Collection* collection,
+                               const CollectionPtr& collection,
                                CanonicalQuery* cq,
                                PlanCachingMode cachingMode)
     : RequiresCollectionStage(kStageType, expCtx, collection),

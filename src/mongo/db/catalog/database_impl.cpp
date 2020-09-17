@@ -204,7 +204,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
 void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
 
-    CollectionCatalog::CollectionInfoFn callback = [&](const Collection* collection) {
+    CollectionCatalog::CollectionInfoFn callback = [&](const CollectionPtr& collection) {
         try {
             WriteUnitOfWork wuow(opCtx);
             Status status = dropCollection(opCtx, collection->ns(), {});
@@ -227,7 +227,7 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
         return true;
     };
 
-    CollectionCatalog::CollectionInfoFn predicate = [&](const Collection* collection) {
+    CollectionCatalog::CollectionInfoFn predicate = [&](const CollectionPtr& collection) {
         return DurableCatalog::get(opCtx)
             ->getCollectionOptions(opCtx, collection->getCatalogId())
             .temp;
@@ -260,7 +260,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
 
     catalog::forEachCollectionFromDb(
-        opCtx, name(), MODE_IS, [&](const Collection* collection) -> bool {
+        opCtx, name(), MODE_IS, [&](const CollectionPtr& collection) -> bool {
             nCollections += 1;
             objects += collection->numRecords(opCtx);
             size += collection->dataSize(opCtx);
@@ -490,7 +490,7 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
 
 Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                                            const NamespaceString& nss,
-                                           const Collection* collection) const {
+                                           const CollectionPtr& collection) const {
     UUID uuid = collection->uuid();
     LOGV2(20318,
           "Finishing collection drop for {namespace} ({uuid}).",
@@ -565,7 +565,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const CollectionOptions& options) const {
-    if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss) != nullptr) {
+    if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)) {
         if (options.isView()) {
             uasserted(17399,
                       str::stream()
@@ -819,7 +819,7 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
         if (nss.isSystem())
             continue;
 
-        const Collection* coll =
+        const CollectionPtr& coll =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
         if (!coll)
             continue;

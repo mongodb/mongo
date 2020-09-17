@@ -51,7 +51,7 @@ namespace mongo {
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
     OperationContext* opCtx,
     StringData ns,
-    const Collection* collection,
+    const CollectionPtr& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const Direction direction,
     boost::optional<RecordId> resumeAfterRecordId) {
@@ -60,7 +60,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString(ns));
 
-    if (nullptr == collection) {
+    if (!collection) {
         auto eof = std::make_unique<EOFStage>(expCtx.get());
         // Takes ownership of 'ws' and 'eof'.
         auto statusWithPlanExecutor = plan_executor_factory::make(
@@ -82,7 +82,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithCollectionScan(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     std::unique_ptr<DeleteStageParams> params,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     Direction direction) {
@@ -106,7 +106,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     const IndexDescriptor* descriptor,
     const BSONObj& startKey,
     const BSONObj& endKey,
@@ -137,7 +137,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithIndexScan(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     std::unique_ptr<DeleteStageParams> params,
     const IndexDescriptor* descriptor,
     const BSONObj& startKey,
@@ -172,7 +172,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWithIdHack(
     OperationContext* opCtx,
-    const Collection* collection,
+    const CollectionPtr& collection,
     const UpdateStageParams& params,
     const IndexDescriptor* descriptor,
     const BSONObj& key,
@@ -201,7 +201,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
 std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WorkingSet* ws,
-    const Collection* collection,
+    const CollectionPtr& collection,
     Direction direction,
     boost::optional<RecordId> resumeAfterRecordId) {
     invariant(collection);
@@ -223,7 +223,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
 std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WorkingSet* ws,
-    const Collection* collection,
+    const CollectionPtr& collection,
     const IndexDescriptor* descriptor,
     const BSONObj& startKey,
     const BSONObj& endKey,

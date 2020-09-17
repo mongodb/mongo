@@ -117,7 +117,7 @@ protected:
     OldClientContext _context;
 
     Database* _database;
-    const Collection* _collection;
+    CollectionPtr _collection;
 
     DBDirectClient _client;
 };

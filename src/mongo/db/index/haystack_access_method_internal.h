@@ -55,7 +55,7 @@ public:
                             double maxDistance,
                             unsigned limit,
                             const std::string& geoField,
-                            const Collection* collection)
+                            const CollectionPtr& collection)
         : _opCtx(opCtx),
           _collection(collection),
           _near(nearObj),
@@ -87,7 +87,7 @@ public:
 
 private:
     OperationContext* _opCtx;
-    const Collection* _collection;
+    const CollectionPtr& _collection;
 
     Point _near;
     double _maxDistance;

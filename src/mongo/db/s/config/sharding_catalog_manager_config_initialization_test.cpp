@@ -244,8 +244,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         repl::UnreplicatedWritesBlock uwb(opCtx);
         auto nss = VersionType::ConfigNS;
         writeConflictRetry(opCtx, "removeConfigDocuments", nss.ns(), [&] {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-            auto coll = autoColl.getCollection();
+            AutoGetCollection coll(opCtx, nss, MODE_IX);
             ASSERT_TRUE(coll);
             auto cursor = coll->getCursor(opCtx);
             std::vector<RecordId> recordIds;

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,25 +29,11 @@
 
 #pragma once
 
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/query/stage_builder.h"
-
-namespace mongo::stage_builder {
-/**
- * A stage builder which builds an executable tree using classic PlanStages.
- */
-class ClassicStageBuilder : public StageBuilder<PlanStage> {
+namespace mongo {
+class Yieldable {
 public:
-    ClassicStageBuilder(OperationContext* opCtx,
-                        const CollectionPtr& collection,
-                        const CanonicalQuery& cq,
-                        const QuerySolution& solution,
-                        WorkingSet* ws)
-        : StageBuilder<PlanStage>{opCtx, collection, cq, solution}, _ws{ws} {}
-
-    std::unique_ptr<PlanStage> build(const QuerySolutionNode* root) final;
-
-private:
-    WorkingSet* _ws;
+    virtual ~Yieldable() {}
+    virtual void yield() const = 0;
+    virtual void restore() const = 0;
 };
-}  // namespace mongo::stage_builder
+}  // namespace mongo

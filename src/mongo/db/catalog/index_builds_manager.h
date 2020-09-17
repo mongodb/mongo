@@ -44,6 +44,7 @@
 namespace mongo {
 
 class Collection;
+class CollectionPtr;
 class OperationContext;
 class ServiceContext;
 
@@ -97,12 +98,12 @@ public:
      * Runs the scanning/insertion phase of the index build..
      */
     Status startBuildingIndex(OperationContext* opCtx,
-                              const Collection* collection,
+                              const CollectionPtr& collection,
                               const UUID& buildUUID,
                               boost::optional<RecordId> resumeAfterRecordId = boost::none);
 
     Status resumeBuildingIndexFromBulkLoadPhase(OperationContext* opCtx,
-                                                const Collection* collection,
+                                                const CollectionPtr& collection,
                                                 const UUID& buildUUID);
 
     /**
@@ -112,7 +113,10 @@ public:
      * Returns the number of records and the size of the data iterated over.
      */
     StatusWith<std::pair<long long, long long>> startBuildingIndexForRecovery(
-        OperationContext* opCtx, const Collection* coll, const UUID& buildUUID, RepairData repair);
+        OperationContext* opCtx,
+        const CollectionPtr& coll,
+        const UUID& buildUUID,
+        RepairData repair);
 
     /**
      * Document inserts observed during the scanning/insertion phase of an index build are not
@@ -129,13 +133,13 @@ public:
      */
     Status retrySkippedRecords(OperationContext* opCtx,
                                const UUID& buildUUID,
-                               const Collection* collection);
+                               const CollectionPtr& collection);
 
     /**
      * Runs the index constraint violation checking phase of the index build..
      */
     Status checkIndexConstraintViolations(OperationContext* opCtx,
-                                          const Collection* collection,
+                                          const CollectionPtr& collection,
                                           const UUID& buildUUID);
 
     /**
@@ -168,7 +172,7 @@ public:
      * been cleared away, or not having yet started..
      */
     bool abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
-                                                  const Collection* collection,
+                                                  const CollectionPtr& collection,
                                                   const UUID& buildUUID,
                                                   bool isResumable);
 
@@ -178,7 +182,7 @@ public:
      * index build and resumable index builds are supported.
      */
     bool abortIndexBuildWithoutCleanupForShutdown(OperationContext* opCtx,
-                                                  const Collection* collection,
+                                                  const CollectionPtr& collection,
                                                   const UUID& buildUUID,
                                                   bool isResumable);
 

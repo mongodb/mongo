@@ -220,7 +220,7 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
                                      OptionalCollectionUUID uuid,
                                      NamespaceString source,
                                      NamespaceString target,
-                                     const Collection* targetColl,
+                                     const CollectionPtr& targetColl,
                                      RenameCollectionOptions options,
                                      repl::OpTime renameOpTimeFromApplyOps) {
     return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
@@ -560,7 +560,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
           "temporaryCollection"_attr = tmpName,
           "sourceCollection"_attr = source);
 
-    const Collection* tmpColl = nullptr;
+    CollectionPtr tmpColl = nullptr;
     {
         auto collectionOptions =
             DurableCatalog::get(opCtx)->getCollectionOptions(opCtx, sourceColl->getCatalogId());
@@ -648,10 +648,10 @@ Status renameBetweenDBs(OperationContext* opCtx,
         // drop the exclusive database lock on the target and grab an intent lock on the temporary
         // collection.
         targetDBLock.reset();
+        tmpColl.reset();
 
         AutoGetCollection autoTmpColl(opCtx, tmpCollUUID, MODE_IX);
-        tmpColl = autoTmpColl.getCollection();
-        if (!tmpColl) {
+        if (!autoTmpColl) {
             return Status(ErrorCodes::NamespaceNotFound,
                           str::stream() << "Temporary collection '" << tmpName
                                         << "' was removed while renaming collection across DBs");
@@ -672,7 +672,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
                 for (int i = 0; record && (i < internalInsertMaxBatchSize.load()); i++) {
                     const InsertStatement stmt(record->data.releaseToBson());
                     OpDebug* const opDebug = nullptr;
-                    auto status = tmpColl->insertDocument(opCtx, stmt, opDebug, true);
+                    auto status = autoTmpColl->insertDocument(opCtx, stmt, opDebug, true);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -892,11 +892,10 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
                       str::stream() << "Cannot rename collection to the oplog");
     }
 
-    const Collection* const sourceColl =
-        AutoGetCollectionForRead(opCtx, sourceNss, AutoGetCollectionViewMode::kViewsPermitted)
-            .getCollection();
+    AutoGetCollectionForRead sourceColl(
+        opCtx, sourceNss, AutoGetCollectionViewMode::kViewsPermitted);
 
-    if (sourceNss.isDropPendingNamespace() || sourceColl == nullptr) {
+    if (sourceNss.isDropPendingNamespace() || !sourceColl) {
         boost::optional<NamespaceString> dropTargetNss;
 
         if (options.dropTarget)

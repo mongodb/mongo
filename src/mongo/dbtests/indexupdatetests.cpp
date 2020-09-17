@@ -56,7 +56,7 @@ static const NamespaceString _nss = NamespaceString(_ns);
 /**
  * Test fixture for a write locked test using collection _ns.  Includes functionality to
  * partially construct a new IndexDetails in a manner that supports proper cleanup in
- * dropCollection().
+ * dropcollection().get().
  */
 class IndexBuildBase {
 public:
@@ -270,7 +270,7 @@ public:
         boost::optional<Lock::CollectionLock> collLk;
         collLk.emplace(_opCtx, _nss, LockMode::MODE_IX);
         // The new index is not listed in the index catalog because the index build failed.
-        ASSERT(!collection()->getIndexCatalog()->findIndexByName(_opCtx, "a_1"));
+        ASSERT(!collection().get()->getIndexCatalog()->findIndexByName(_opCtx, "a_1"));
     }
 };
 
@@ -320,7 +320,7 @@ public:
         collLk.emplace(_opCtx, _nss, LockMode::MODE_IX);
 
         // The new index is not listed in the index catalog because the index build failed.
-        ASSERT(!collection()->getIndexCatalog()->findIndexByName(_opCtx, "_id_"));
+        ASSERT(!collection().get()->getIndexCatalog()->findIndexByName(_opCtx, "_id_"));
     }
 };  // namespace IndexUpdateTests
 
@@ -547,7 +547,7 @@ protected:
 class IndexCatatalogFixIndexKey : public IndexBuildBase {
 public:
     void run() {
-        auto indexCatalog = collection()->getIndexCatalog();
+        auto indexCatalog = collection().get()->getIndexCatalog();
 
         ASSERT_BSONOBJ_EQ(BSON("x" << 1), indexCatalog->fixIndexKey(BSON("x" << 1)));
 

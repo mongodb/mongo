@@ -68,7 +68,7 @@ public:
         return _nss;
     }
 
-    const Collection* coll() const {
+    const CollectionPtr& coll() const {
         return (*_coll).getCollection();
     }
 

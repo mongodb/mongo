@@ -57,7 +57,7 @@ using std::vector;
 const char* CollectionScan::kStageType = "COLLSCAN";
 
 CollectionScan::CollectionScan(ExpressionContext* expCtx,
-                               const Collection* collection,
+                               const CollectionPtr& collection,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)

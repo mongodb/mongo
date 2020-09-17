@@ -786,8 +786,7 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
                           << nss << "' without providing any indexes.");
     }
 
-    AutoGetCollectionForRead autoColl(opCtx, nss);
-    const Collection* collection = autoColl.getCollection();
+    AutoGetCollectionForRead collection(opCtx, nss);
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Collection '" << nss << "' was not found.");

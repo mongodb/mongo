@@ -199,7 +199,7 @@ Status verifySystemIndexes(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void createSystemIndexes(OperationContext* opCtx, const Collection* collection) {
+void createSystemIndexes(OperationContext* opCtx, const CollectionPtr& collection) {
     invariant(collection);
     const NamespaceString& ns = collection->ns();
     BSONObj indexSpec;

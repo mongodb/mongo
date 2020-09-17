@@ -112,7 +112,7 @@ struct CollModRequest {
 
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                const NamespaceString& nss,
-                                               const Collection* coll,
+                                               const CollectionPtr& coll,
                                                const BSONObj& cmdObj,
                                                BSONObjBuilder* oplogEntryBuilder) {
 

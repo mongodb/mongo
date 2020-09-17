@@ -42,6 +42,7 @@ namespace mongo {
 
 class CollatorInterface;
 class Collection;
+class CollectionPtr;
 class WorkingSetMember;
 
 /**

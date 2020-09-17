@@ -89,7 +89,7 @@ public:
         return countWorks;
     }
 
-    const Collection* getCollection() {
+    CollectionPtr getCollection() {
         return CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, ns());
     }
 

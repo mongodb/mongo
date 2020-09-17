@@ -434,7 +434,7 @@ public:
      * This function throws on error. Expects caller to have exclusive access to `collection`.
      */
     static std::vector<BSONObj> prepareSpecListForCreate(OperationContext* opCtx,
-                                                         const Collection* collection,
+                                                         const CollectionPtr& collection,
                                                          const NamespaceString& nss,
                                                          const std::vector<BSONObj>& indexSpecs);
 
@@ -451,7 +451,7 @@ public:
      * This function throws on error.
      */
     static std::vector<BSONObj> normalizeIndexSpecs(OperationContext* opCtx,
-                                                    const Collection* collection,
+                                                    const CollectionPtr& collection,
                                                     const std::vector<BSONObj>& indexSpecs);
 
     /**
@@ -461,7 +461,7 @@ public:
      *
      * Expects a lock to be held by the caller, so that 'collection' is safe to use.
      */
-    static int getNumIndexesTotal(OperationContext* opCtx, const Collection* collection);
+    static int getNumIndexesTotal(OperationContext* opCtx, const CollectionPtr& collection);
 
 
     /**
@@ -597,7 +597,7 @@ protected:
      * Cleans up a single-phase index build after a failure.
      */
     void _cleanUpSinglePhaseAfterFailure(OperationContext* opCtx,
-                                         const Collection* collection,
+                                         const CollectionPtr& collection,
                                          std::shared_ptr<ReplIndexBuildState> replState,
                                          const IndexBuildOptions& indexBuildOptions,
                                          const Status& status);
@@ -606,7 +606,7 @@ protected:
      * Cleans up a two-phase index build after a failure.
      */
     void _cleanUpTwoPhaseAfterFailure(OperationContext* opCtx,
-                                      const Collection* collection,
+                                      const CollectionPtr& collection,
                                       std::shared_ptr<ReplIndexBuildState> replState,
                                       const IndexBuildOptions& indexBuildOptions,
                                       const Status& status);
@@ -631,7 +631,7 @@ protected:
                             Status reason);
     void _completeAbortForShutdown(OperationContext* opCtx,
                                    std::shared_ptr<ReplIndexBuildState> replState,
-                                   const Collection* collection);
+                                   const CollectionPtr& collection);
 
     /**
      * Waits for the last optime before the interceptors were installed on the node to be majority
@@ -661,7 +661,7 @@ protected:
      */
     void _insertSortedKeysIntoIndexForResume(OperationContext* opCtx,
                                              std::shared_ptr<ReplIndexBuildState> replState);
-    const Collection* _setUpForScanCollectionAndInsertSortedKeysIntoIndex(
+    CollectionPtr _setUpForScanCollectionAndInsertSortedKeysIntoIndex(
         OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
 
     /**

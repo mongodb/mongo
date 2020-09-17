@@ -60,9 +60,8 @@ Status upsert(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry) {
                               "upsertIndexBuildEntry",
                               NamespaceString::kIndexBuildEntryNamespace.ns(),
                               [&]() -> Status {
-                                  AutoGetCollection autoCollection(
+                                  AutoGetCollection collection(
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                                  const Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
                                       str::stream ss;
                                       ss << "Collection not found: "
@@ -116,9 +115,8 @@ Status upsert(OperationContext* opCtx, const BSONObj& filter, const BSONObj& upd
                               "upsertIndexBuildEntry",
                               NamespaceString::kIndexBuildEntryNamespace.ns(),
                               [&]() -> Status {
-                                  AutoGetCollection autoCollection(
+                                  AutoGetCollection collection(
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                                  const Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
                                       str::stream ss;
                                       ss << "Collection not found: "
@@ -142,9 +140,8 @@ Status update(OperationContext* opCtx, const BSONObj& filter, const BSONObj& upd
                               "updateIndexBuildEntry",
                               NamespaceString::kIndexBuildEntryNamespace.ns(),
                               [&]() -> Status {
-                                  AutoGetCollection autoCollection(
+                                  AutoGetCollection collection(
                                       opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                                  const Collection* collection = autoCollection.getCollection();
                                   if (!collection) {
                                       str::stream ss;
                                       ss << "Collection not found: "
@@ -184,7 +181,7 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
                                    opCtx, NamespaceString::kIndexBuildEntryNamespace)) {
                                WriteUnitOfWork wuow(opCtx);
                                CollectionOptions defaultCollectionOptions;
-                               const Collection* collection =
+                               CollectionPtr collection =
                                    db->createCollection(opCtx,
                                                         NamespaceString::kIndexBuildEntryNamespace,
                                                         defaultCollectionOptions);
@@ -223,9 +220,8 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
         "addIndexBuildEntry",
         NamespaceString::kIndexBuildEntryNamespace.ns(),
         [&]() -> Status {
-            AutoGetCollection autoCollection(
+            AutoGetCollection collection(
                 opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-            const Collection* collection = autoCollection.getCollection();
             if (!collection) {
                 str::stream ss;
                 ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
@@ -257,17 +253,18 @@ Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
         "removeIndexBuildEntry",
         NamespaceString::kIndexBuildEntryNamespace.ns(),
         [&]() -> Status {
-            AutoGetCollection autoCollection(
+            AutoGetCollection collection(
                 opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-            const Collection* collection = autoCollection.getCollection();
             if (!collection) {
                 str::stream ss;
                 ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
                 return Status(ErrorCodes::NamespaceNotFound, ss);
             }
 
-            RecordId rid = Helpers::findOne(
-                opCtx, collection, BSON("_id" << indexBuildUUID), /*requireIndex=*/true);
+            RecordId rid = Helpers::findOne(opCtx,
+                                            collection.getCollection(),
+                                            BSON("_id" << indexBuildUUID),
+                                            /*requireIndex=*/true);
             if (rid.isNull()) {
                 str::stream ss;
                 ss << "No matching IndexBuildEntry found with indexBuildUUID: " << indexBuildUUID;
@@ -286,8 +283,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     // Read the most up to date data.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
               opCtx->recoveryUnit()->getTimestampReadSource());
-    AutoGetCollectionForRead autoCollection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
-    const Collection* collection = autoCollection.getCollection();
+    AutoGetCollectionForRead collection(opCtx, NamespaceString::kIndexBuildEntryNamespace);
 
     // Must not be interruptible. This fail point is used to test the scenario where the index
     // build's OperationContext is interrupted by an abort, which will subsequently remove index
@@ -301,8 +297,11 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     }
 
     BSONObj obj;
-    bool foundObj = Helpers::findOne(
-        opCtx, collection, BSON("_id" << indexBuildUUID), obj, /*requireIndex=*/true);
+    bool foundObj = Helpers::findOne(opCtx,
+                                     collection.getCollection(),
+                                     BSON("_id" << indexBuildUUID),
+                                     obj,
+                                     /*requireIndex=*/true);
     if (!foundObj) {
         str::stream ss;
         ss << "No matching IndexBuildEntry found with indexBuildUUID: " << indexBuildUUID;

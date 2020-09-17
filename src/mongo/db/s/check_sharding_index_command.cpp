@@ -87,8 +87,7 @@ public:
             return true;
         }
 
-        AutoGetCollectionForReadCommand autoColl(opCtx, nss);
-        auto collection = autoColl.getCollection();
+        AutoGetCollectionForReadCommand collection(opCtx, nss);
         if (!collection) {
             errmsg = "ns not found";
             return false;

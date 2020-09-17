@@ -54,13 +54,13 @@ namespace {
  * Checks whether a callback function should be created for a ScanStage and returns it, if so. The
  * logic in the provided callback will be executed when the ScanStage is opened or reopened.
  */
-sbe::ScanOpenCallback makeOpenCallbackIfNeeded(const Collection* collection,
+sbe::ScanOpenCallback makeOpenCallbackIfNeeded(const CollectionPtr& collection,
                                                const CollectionScanNode* csn) {
     if (csn->direction == CollectionScanParams::FORWARD && csn->shouldWaitForOplogVisibility) {
         invariant(!csn->tailable);
         invariant(collection->ns().isOplog());
 
-        return [](OperationContext* opCtx, const Collection* collection, bool reOpen) {
+        return [](OperationContext* opCtx, const CollectionPtr& collection, bool reOpen) {
             if (!reOpen) {
                 // Forward, non-tailable scans from the oplog need to wait until all oplog entries
                 // before the read begins to be visible. This isn't needed for reverse scans because
@@ -87,7 +87,7 @@ sbe::ScanOpenCallback makeOpenCallbackIfNeeded(const Collection* collection,
  * of the same SlotId (the latter is returned purely for convenience purposes).
  */
 std::tuple<std::vector<std::string>, sbe::value::SlotVector, boost::optional<sbe::value::SlotId>>
-makeOplogTimestampSlotsIfNeeded(const Collection* collection,
+makeOplogTimestampSlotsIfNeeded(const CollectionPtr& collection,
                                 sbe::value::SlotIdGenerator* slotIdGenerator,
                                 bool shouldTrackLatestOplogTimestamp) {
     if (shouldTrackLatestOplogTimestamp) {
@@ -118,7 +118,7 @@ std::tuple<sbe::value::SlotId,
            boost::optional<sbe::value::SlotId>,
            std::unique_ptr<sbe::PlanStage>>
 generateOptimizedOplogScan(OperationContext* opCtx,
-                           const Collection* collection,
+                           const CollectionPtr& collection,
                            const CollectionScanNode* csn,
                            sbe::value::SlotIdGenerator* slotIdGenerator,
                            sbe::value::FrameIdGenerator* frameIdGenerator,
@@ -300,7 +300,7 @@ std::tuple<sbe::value::SlotId,
            boost::optional<sbe::value::SlotId>,
            std::unique_ptr<sbe::PlanStage>>
 generateGenericCollScan(OperationContext* opCtx,
-                        const Collection* collection,
+                        const CollectionPtr& collection,
                         const CollectionScanNode* csn,
                         sbe::value::SlotIdGenerator* slotIdGenerator,
                         sbe::value::FrameIdGenerator* frameIdGenerator,
@@ -447,7 +447,7 @@ std::tuple<sbe::value::SlotId,
            boost::optional<sbe::value::SlotId>,
            std::unique_ptr<sbe::PlanStage>>
 generateCollScan(OperationContext* opCtx,
-                 const Collection* collection,
+                 const CollectionPtr& collection,
                  const CollectionScanNode* csn,
                  sbe::value::SlotIdGenerator* slotIdGenerator,
                  sbe::value::FrameIdGenerator* frameIdGenerator,

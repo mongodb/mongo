@@ -35,6 +35,7 @@
 namespace mongo {
 
 class Collection;
+class CollectionPtr;
 class Database;
 class OperationContext;
 class QueryRequest;
@@ -59,18 +60,18 @@ struct Helpers {
        @return true if object found
     */
     static bool findOne(OperationContext* opCtx,
-                        const Collection* collection,
+                        const CollectionPtr& collection,
                         const BSONObj& query,
                         BSONObj& result,
                         bool requireIndex = false);
 
     static RecordId findOne(OperationContext* opCtx,
-                            const Collection* collection,
+                            const CollectionPtr& collection,
                             const BSONObj& query,
                             bool requireIndex);
 
     static RecordId findOne(OperationContext* opCtx,
-                            const Collection* collection,
+                            const CollectionPtr& collection,
                             std::unique_ptr<QueryRequest> qr,
                             bool requireIndex);
 
@@ -90,7 +91,7 @@ struct Helpers {
      * uasserts if no _id index.
      * @return null loc if not found */
     static RecordId findById(OperationContext* opCtx,
-                             const Collection* collection,
+                             const CollectionPtr& collection,
                              const BSONObj& query);
 
     /**

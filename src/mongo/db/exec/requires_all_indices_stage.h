@@ -43,7 +43,7 @@ class RequiresAllIndicesStage : public RequiresCollectionStage {
 public:
     RequiresAllIndicesStage(const char* stageType,
                             ExpressionContext* expCtx,
-                            const Collection* coll)
+                            const CollectionPtr& coll)
         : RequiresCollectionStage(stageType, expCtx, coll) {
         auto allEntriesShared = coll->getIndexCatalog()->getAllReadyEntriesShared();
         _indexCatalogEntries.reserve(allEntriesShared.size());

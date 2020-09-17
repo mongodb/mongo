@@ -324,7 +324,7 @@ OplogEntry IdempotencyTest::partialTxn(LogicalSessionId lsid,
                           prevOpTime);
 }
 
-std::string IdempotencyTest::computeDataHash(const Collection* collection) {
+std::string IdempotencyTest::computeDataHash(const CollectionPtr& collection) {
     auto desc = collection->getIndexCatalog()->findIdIndex(_opCtx.get());
     ASSERT_TRUE(desc);
     auto exec = InternalPlanner::indexScan(_opCtx.get(),
@@ -375,7 +375,7 @@ std::vector<CollectionState> IdempotencyTest::validateAllCollections() {
 CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
     auto collUUID = [&]() -> OptionalCollectionUUID {
         AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
-        if (auto collection = autoColl.getCollection()) {
+        if (const auto& collection = autoColl.getCollection()) {
             return collection->uuid();
         }
         return boost::none;
@@ -388,8 +388,7 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
     }
 
     {
-        AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
-        auto collection = autoColl.getCollection();
+        AutoGetCollectionForReadCommand collection(_opCtx.get(), nss);
 
         if (!collection) {
             // Return a mostly default initialized CollectionState struct with exists set to false
@@ -412,10 +411,9 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
         ASSERT_TRUE(validateResults.valid);
     }
 
-    AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
-    auto collection = autoColl.getCollection();
+    AutoGetCollectionForReadCommand collection(_opCtx.get(), nss);
 
-    std::string dataHash = computeDataHash(collection);
+    std::string dataHash = computeDataHash(collection.getCollection());
 
     auto durableCatalog = DurableCatalog::get(_opCtx.get());
     auto collectionOptions =

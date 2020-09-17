@@ -56,6 +56,7 @@ namespace mongo {
 extern FailPoint leaveIndexBuildUnfinishedForShutdown;
 
 class Collection;
+class CollectionPtr;
 class MatchExpression;
 class NamespaceString;
 class OperationContext;
@@ -121,7 +122,7 @@ public:
                                           const BSONObj& spec,
                                           OnInitFn onInit);
     StatusWith<std::vector<BSONObj>> initForResume(OperationContext* opCtx,
-                                                   const Collection* collection,
+                                                   const CollectionPtr& collection,
                                                    const std::vector<BSONObj>& specs,
                                                    const ResumeIndexInfo& resumeInfo);
 
@@ -136,7 +137,8 @@ public:
      * When called on primaries, this generates a new optime, writes a no-op oplog entry, and
      * timestamps the first catalog write. Does nothing on secondaries.
      */
-    static OnInitFn makeTimestampedIndexOnInitFn(OperationContext* opCtx, const Collection* coll);
+    static OnInitFn makeTimestampedIndexOnInitFn(OperationContext* opCtx,
+                                                 const CollectionPtr& coll);
 
     /**
      * Inserts all documents in the Collection into the indexes and logs with timing info.
@@ -152,7 +154,7 @@ public:
      */
     Status insertAllDocumentsInCollection(
         OperationContext* opCtx,
-        const Collection* collection,
+        const CollectionPtr& collection,
         boost::optional<RecordId> resumeAfterRecordId = boost::none);
 
     /**
@@ -177,9 +179,9 @@ public:
      *
      * Should not be called inside of a WriteUnitOfWork.
      */
-    Status dumpInsertsFromBulk(OperationContext* opCtx, const Collection* collection);
+    Status dumpInsertsFromBulk(OperationContext* opCtx, const CollectionPtr& collection);
     Status dumpInsertsFromBulk(OperationContext* opCtx,
-                               const Collection* collection,
+                               const CollectionPtr& collection,
                                const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord);
     /**
      * For background indexes using an IndexBuildInterceptor to capture inserts during a build,
@@ -208,7 +210,7 @@ public:
      * of an index build, so it must ensure that before it finishes, it has indexed all documents in
      * a collection, requiring a call to this function upon completion.
      */
-    Status retrySkippedRecords(OperationContext* opCtx, const Collection* collection);
+    Status retrySkippedRecords(OperationContext* opCtx, const CollectionPtr& collection);
 
     /**
      * Check any constraits that may have been temporarily violated during the index build for
@@ -217,7 +219,7 @@ public:
      *
      * Must not be in a WriteUnitOfWork.
      */
-    Status checkConstraints(OperationContext* opCtx, const Collection* collection);
+    Status checkConstraints(OperationContext* opCtx, const CollectionPtr& collection);
 
     /**
      * Marks the index ready for use. Should only be called as the last method after
@@ -279,7 +281,7 @@ public:
      * This should only be used during rollback.
      */
     boost::optional<ResumeIndexInfo> abortWithoutCleanupForRollback(OperationContext* opCtx,
-                                                                    const Collection* collection,
+                                                                    const CollectionPtr& collection,
                                                                     bool isResumable);
 
     /**
@@ -292,7 +294,7 @@ public:
      * This should only be used during shutdown.
      */
     void abortWithoutCleanupForShutdown(OperationContext* opCtx,
-                                        const Collection* collection,
+                                        const CollectionPtr& collection,
                                         bool isResumable);
 
     /**
@@ -321,13 +323,13 @@ private:
      * supported.
      */
     boost::optional<ResumeIndexInfo> _abortWithoutCleanup(OperationContext* opCtx,
-                                                          const Collection* collection,
+                                                          const CollectionPtr& collection,
                                                           bool shutdown,
                                                           bool isResumable);
 
-    void _writeStateToDisk(OperationContext* opCtx, const Collection* collection) const;
+    void _writeStateToDisk(OperationContext* opCtx, const CollectionPtr& collection) const;
 
-    BSONObj _constructStateObject(OperationContext* opCtx, const Collection* collection) const;
+    BSONObj _constructStateObject(OperationContext* opCtx, const CollectionPtr& collection) const;
 
     Status _failPointHangDuringBuild(OperationContext* opCtx,
                                      FailPoint* fp,

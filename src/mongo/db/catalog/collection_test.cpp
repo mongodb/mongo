@@ -62,7 +62,7 @@ TEST_F(CollectionTest, CappedNotifierKillAndIsDead) {
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
-    const Collection* col = acfr.getCollection();
+    const CollectionPtr& col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
     ASSERT_FALSE(notifier->isDead());
     notifier->kill();
@@ -74,7 +74,7 @@ TEST_F(CollectionTest, CappedNotifierTimeouts) {
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
-    const Collection* col = acfr.getCollection();
+    const CollectionPtr& col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
     ASSERT_EQ(notifier->getVersion(), 0u);
 
@@ -90,7 +90,7 @@ TEST_F(CollectionTest, CappedNotifierWaitAfterNotifyIsImmediate) {
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
-    const Collection* col = acfr.getCollection();
+    const CollectionPtr& col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
 
     auto prevVersion = notifier->getVersion();
@@ -109,7 +109,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousNotifyAll) {
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
-    const Collection* col = acfr.getCollection();
+    const CollectionPtr& col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
     auto prevVersion = notifier->getVersion();
     auto thisVersion = prevVersion + 1;
@@ -134,7 +134,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousKill) {
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
-    const Collection* col = acfr.getCollection();
+    const CollectionPtr& col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
     auto prevVersion = notifier->getVersion();
 
@@ -158,7 +158,7 @@ TEST_F(CollectionTest, HaveCappedWaiters) {
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
-    const Collection* col = acfr.getCollection();
+    const CollectionPtr& col = acfr.getCollection();
     ASSERT_FALSE(col->getCappedCallback()->haveCappedWaiters());
     {
         auto notifier = col->getCappedInsertNotifier();
@@ -172,7 +172,7 @@ TEST_F(CollectionTest, NotifyCappedWaitersIfNeeded) {
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
-    const Collection* col = acfr.getCollection();
+    const CollectionPtr& col = acfr.getCollection();
     col->getCappedCallback()->notifyCappedWaitersIfNeeded();
     {
         auto notifier = col->getCappedInsertNotifier();
@@ -187,14 +187,14 @@ TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
     makeCapped(nss);
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
-    const Collection* col = acfr.getCollection();
+    const CollectionPtr& col = acfr.getCollection();
     auto notifier = col->getCappedInsertNotifier();
     auto prevVersion = notifier->getVersion();
     auto thisVersion = prevVersion + 1;
 
     auto before = Date_t::now();
     notifier->waitUntil(prevVersion, before + Milliseconds(25));
-    stdx::thread thread([before, prevVersion, col] {
+    stdx::thread thread([before, prevVersion, &col] {
         auto after = Date_t::now();
         ASSERT_GTE(after - before, Milliseconds(25));
         col->getCappedCallback()->notifyCappedWaitersIfNeeded();

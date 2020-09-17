@@ -69,7 +69,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
         // interruptions such as restartCatalog. PBWM, database lock or collection lock is not
         // needed. This improves concurrency if oplog truncation takes long time.
         AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
-        auto oplog = oplogWrite.getCollection();
+        const auto& oplog = oplogWrite.getCollection();
         if (!oplog) {
             LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
             return false;

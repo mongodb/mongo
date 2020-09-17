@@ -31,14 +31,20 @@
 
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/yieldable.h"
 
 namespace mongo {
 
 class PlanYieldPolicyImpl final : public PlanYieldPolicy {
 public:
-    PlanYieldPolicyImpl(PlanExecutorImpl* exec, PlanYieldPolicy::YieldPolicy policy);
+    PlanYieldPolicyImpl(PlanExecutorImpl* exec,
+                        PlanYieldPolicy::YieldPolicy policy,
+                        const Yieldable* yieldable);
 
 private:
+    void setYieldable(const Yieldable* yieldable) override {
+        _yieldable = yieldable;
+    }
     Status yield(OperationContext* opCtx, std::function<void()> whileYieldingFn = nullptr) override;
 
     void preCheckInterruptOnly(OperationContext* opCtx) override;
@@ -52,12 +58,14 @@ private:
      * The whileYieldingFn will be executed after unlocking the locks and before re-acquiring them.
      */
     void _yieldAllLocks(OperationContext* opCtx,
+                        const Yieldable* yieldable,
                         std::function<void()> whileYieldingFn,
                         const NamespaceString& planExecNS);
 
     // The plan executor which this yield policy is responsible for yielding. Must not outlive the
     // plan executor.
     PlanExecutorImpl* const _planYielding;
+    const Yieldable* _yieldable;
 };
 
 }  // namespace mongo

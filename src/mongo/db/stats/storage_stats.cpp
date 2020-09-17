@@ -70,7 +70,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         return Status::OK();
     }
 
-    const Collection* collection = autoColl->getCollection();  // Will be set if present
+    const auto& collection = autoColl->getCollection();  // Will be set if present
     if (!autoColl->getDb() || !collection) {
         result->appendNumber("size", 0);
         result->appendNumber("count", 0);
@@ -145,13 +145,12 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 Status appendCollectionRecordCount(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    BSONObjBuilder* result) {
-    AutoGetCollectionForReadCommand ctx(opCtx, nss);
-    if (!ctx.getDb()) {
+    AutoGetCollectionForReadCommand collection(opCtx, nss);
+    if (!collection.getDb()) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Database [" << nss.db().toString() << "] not found."};
     }
 
-    const Collection* collection = ctx.getCollection();
     if (!collection) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Collection [" << nss.toString() << "] not found."};

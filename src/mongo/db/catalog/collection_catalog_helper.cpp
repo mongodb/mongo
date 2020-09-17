@@ -45,14 +45,15 @@ void forEachCollectionFromDb(OperationContext* opCtx,
                              CollectionCatalog::CollectionInfoFn predicate) {
 
     CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
-    for (auto collectionIt = catalog.begin(dbName); collectionIt != catalog.end(); ++collectionIt) {
+    for (auto collectionIt = catalog.begin(opCtx, dbName); collectionIt != catalog.end(opCtx);
+         ++collectionIt) {
         auto uuid = collectionIt.uuid().get();
         if (predicate && !catalog.checkIfCollectionSatisfiable(uuid, predicate)) {
             continue;
         }
 
         boost::optional<Lock::CollectionLock> clk;
-        const Collection* collection = nullptr;
+        CollectionPtr collection;
 
         while (auto nss = catalog.lookupNSSByUUID(opCtx, uuid)) {
             // Get a fresh snapshot for each locked collection to see any catalog changes.

@@ -43,6 +43,7 @@ namespace mongo {
 
 class CappedCallback;
 class Collection;
+class CollectionPtr;
 class MAdvise;
 class OperationContext;
 

@@ -50,7 +50,7 @@ class OperationContext;
  * a cursor ID of 0.
  */
 bool shouldSaveCursor(OperationContext* opCtx,
-                      const Collection* collection,
+                      const CollectionPtr& collection,
                       PlanExecutor::ExecState finalState,
                       PlanExecutor* exec);
 
@@ -79,7 +79,7 @@ void beginQueryOp(OperationContext* opCtx,
  * Uses explain functionality to extract stats from 'exec'.
  */
 void endQueryOp(OperationContext* opCtx,
-                const Collection* collection,
+                const CollectionPtr& collection,
                 const PlanExecutor& exec,
                 long long numResults,
                 CursorId cursorId);
