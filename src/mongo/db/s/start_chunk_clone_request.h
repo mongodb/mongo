@@ -137,7 +137,7 @@ private:
 
     boost::optional<UUID> _migrationId;
     LogicalSessionId _lsid;
-    TxnNumber _txnNumber;
+    TxnNumber _txnNumber{kUninitializedTxnNumber};
 
     // The session id of this migration
     MigrationSessionId _sessionId;
