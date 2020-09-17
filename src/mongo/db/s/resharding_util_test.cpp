@@ -35,6 +35,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -56,6 +57,7 @@ class MockMongoInterface final : public StubMongoProcessInterface {
 public:
     MockMongoInterface(std::deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
+
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
         Pipeline* ownedPipeline, bool allowTargetingShards = true) final {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
@@ -1159,6 +1161,119 @@ TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineAfterID) {
     auto pipeline = constructPipeline(mockResults, Timestamp::max(), middleTransactionSessionId);
 
     ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
+}
+
+class ReshardingCollectionCloneTest : public AggregationContextFixture {
+protected:
+    const NamespaceString& sourceNss() {
+        return _sourceNss;
+    }
+
+    boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext(
+        NamespaceString sourceNss) {
+        _sourceNss = sourceNss;
+        NamespaceString foreignNss("config.cache.chunks." + sourceNss.toString());
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+            new ExpressionContextForTest(getOpCtx(), sourceNss));
+        expCtx->setResolvedNamespace(sourceNss, {sourceNss, {}});
+        expCtx->setResolvedNamespace(foreignNss, {foreignNss, {}});
+        return expCtx;
+    }
+
+
+    std::deque<DocumentSource::GetNextResult> makeForeignData(const ShardKeyPattern& pattern) {
+        const std::initializer_list<const char*> data{
+            "{_id: { x : { $minKey : 1 } }, max: { x : 0.0 }, shard: 'shard1' }",
+            "{_id: { x : 0.0 }, max: { x : { $maxKey : 1 } }, shard: 'shard2' }"};
+        std::deque<DocumentSource::GetNextResult> results;
+        for (auto&& json : data) {
+            results.emplace_back(Document(fromjson(json)));
+        }
+        return results;
+    }
+
+    std::deque<DocumentSource::GetNextResult> makeSourceData(const ShardKeyPattern& pattern) {
+        const std::initializer_list<const char*> data{
+            "{_id: 1, x: { $minKey: 1} }",
+            "{_id: 2, x: -0.001}",
+            "{_id: 3, x: NumberLong(0)}",
+            "{_id: 4, x: 0.0}",
+            "{_id: 5, x: 0.001}",
+            "{_id: 6, x: { $maxKey: 1} }",
+        };
+        std::deque<DocumentSource::GetNextResult> results;
+        for (auto&& json : data) {
+            results.emplace_back(Document(fromjson(json)));
+        }
+        return results;
+    }
+
+private:
+    NamespaceString _sourceNss;
+};
+
+TEST_F(ReshardingCollectionCloneTest, CollectionClonePipelineBasicMinKey) {
+    NamespaceString fromNs("test", "system.resharding.coll");
+    ShardKeyPattern pattern(BSON("x" << 1));
+
+    auto expCtx = createExpressionContext(fromNs);
+
+    auto foreignData = makeForeignData(pattern);
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(foreignData));
+
+    auto sourceData = makeSourceData(pattern);
+    auto mockSource = DocumentSourceMock::createForTest(std::move(sourceData), expCtx);
+
+    auto pipeline = createAggForCollectionCloning(expCtx, pattern, fromNs, ShardId("shard1"));
+    pipeline->addInitialSource(mockSource);
+
+    auto next = pipeline->getNext();
+    ASSERT(next);
+    BSONObj val = fromjson("{_id: 1, x: {$minKey : 1}}");
+    ASSERT_BSONOBJ_BINARY_EQ(val, next->toBson());
+
+    next = pipeline->getNext();
+    ASSERT(next);
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 2 << "x" << -0.001), next->toBson());
+
+    ASSERT(!pipeline->getNext());
+}
+
+TEST_F(ReshardingCollectionCloneTest, CollectionClonePipelineBasicMaxKey) {
+    NamespaceString fromNs("test", "system.resharding.coll");
+    ShardKeyPattern pattern(BSON("x" << 1));
+
+    auto expCtx = createExpressionContext(fromNs);
+
+    auto foreignData = makeForeignData(pattern);
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoInterface>(std::move(foreignData));
+
+    auto sourceData = makeSourceData(pattern);
+    auto mockSource = DocumentSourceMock::createForTest(std::move(sourceData), expCtx);
+
+    auto pipeline = createAggForCollectionCloning(expCtx, pattern, fromNs, ShardId("shard2"));
+    pipeline->addInitialSource(mockSource);
+
+    auto next = pipeline->getNext();
+    ASSERT(next);
+    BSONObj val = fromjson("{_id: 3, x: NumberLong(0)}");
+    ASSERT_BSONOBJ_BINARY_EQ(val, next->toBson());
+
+    next = pipeline->getNext();
+    ASSERT(next);
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 4 << "x" << 0.0), next->toBson());
+
+    next = pipeline->getNext();
+    ASSERT(next);
+    ASSERT_BSONOBJ_BINARY_EQ(BSON("_id" << 5 << "x" << 0.001), next->toBson());
+
+    next = pipeline->getNext();
+    ASSERT(next);
+    val = fromjson("{_id: 6, x: {$maxKey: 1}}");
+    ASSERT_BSONOBJ_BINARY_EQ(val, next->toBson());
+
+
+    ASSERT(!pipeline->getNext());
 }
 
 }  // namespace

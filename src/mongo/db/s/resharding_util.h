@@ -147,5 +147,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
 boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
                                               const NamespaceString& sourceNss,
                                               BSONObj fullDocument);
+/**
+ * Creates pipeline for filtering collection data matching the recipient shard.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> createAggForCollectionCloning(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ShardKeyPattern& newShardKeyPattern,
+    const NamespaceString& sourceNss,
+    const ShardId& recipientShard);
 
 }  // namespace mongo
