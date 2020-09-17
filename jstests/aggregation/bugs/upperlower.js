@@ -13,19 +13,11 @@ function assertResult(expectedUpper, expectedLower, string) {
 }
 
 function assertException(string) {
-    assert.commandFailedWithCode(coll.runCommand({
-        aggregate: 'aggregate',
-        pipeline: [{$project: {upper: {$toUpper: string}}}],
-        cursor: {}
-    }),
-                                 [16020, 16007]);
+    const error1 = assert.throws(() => coll.aggregate([{$project: {upper: {$toUpper: string}}}]));
+    assert.commandFailedWithCode(error1, [16020, 16007, ErrorCodes.TypeMismatch]);
 
-    assert.commandFailedWithCode(coll.runCommand({
-        aggregate: 'aggregate',
-        pipeline: [{$project: {lower: {$toLower: string}}}],
-        cursor: {}
-    }),
-                                 [16020, 16007]);
+    const error2 = assert.throws(() => coll.aggregate([{$project: {lower: {$toLower: string}}}]));
+    assert.commandFailedWithCode(error2, [16020, 16007, ErrorCodes.TypeMismatch]);
 }
 
 // Wrong number of arguments.
