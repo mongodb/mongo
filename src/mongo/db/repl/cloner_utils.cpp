@@ -39,7 +39,7 @@ namespace repl {
 
 BSONObj ClonerUtils::makeTenantDatabaseFilter(StringData prefix) {
     return BSON("name" << BSON("$regexp"
-                               << "/^" + prefix + "_.*/"));
+                               << "^" + prefix + "_"));
 }
 
 BSONObj ClonerUtils::buildMajorityWaitRequest(Timestamp operationTime) {
