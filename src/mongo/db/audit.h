@@ -270,6 +270,15 @@ void logCreateIndex(Client* client,
 void logCreateCollection(Client* client, StringData nsname);
 
 /**
+ * Logs the result of a createView command.
+ */
+void logCreateView(Client* client,
+                   StringData nsname,
+                   StringData viewOn,
+                   BSONArray pipeline,
+                   ErrorCodes::Error code);
+
+/**
  * Logs the result of a createDatabase command.
  */
 void logCreateDatabase(Client* client, StringData dbname);

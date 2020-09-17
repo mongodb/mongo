@@ -608,14 +608,18 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
     NamespaceString viewOnNss(viewName.db(), options.viewOn);
     _checkCanCreateCollection(opCtx, viewName, options);
 
-    audit::logCreateCollection(&cc(), viewName.toString());
+    BSONArray pipeline(options.pipeline);
+    auto status = Status::OK();
+    if (viewName.isOplog()) {
+        status = {ErrorCodes::InvalidNamespace,
+                  str::stream() << "invalid namespace name for a view: " + viewName.toString()};
+    } else {
+        status = ViewCatalog::get(this)->createView(
+            opCtx, viewName, viewOnNss, pipeline, options.collation);
+    }
 
-    if (viewName.isOplog())
-        return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "invalid namespace name for a view: " + viewName.toString());
-
-    return ViewCatalog::get(this)->createView(
-        opCtx, viewName, viewOnNss, BSONArray(options.pipeline), options.collation);
+    audit::logCreateView(&cc(), viewName.toString(), viewOnNss.toString(), pipeline, status.code());
+    return status;
 }
 
 Collection* DatabaseImpl::createCollection(OperationContext* opCtx,

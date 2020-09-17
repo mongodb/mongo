@@ -147,6 +147,12 @@ void mongo::audit::logCreateIndex(Client* client,
 
 void mongo::audit::logCreateCollection(Client* client, StringData nsname) {}
 
+void mongo::audit::logCreateView(Client* client,
+                                 StringData nsname,
+                                 StringData viewOn,
+                                 BSONArray pipeline,
+                                 ErrorCodes::Error code) {}
+
 void mongo::audit::logCreateDatabase(Client* client, StringData dbname) {}
 
 
